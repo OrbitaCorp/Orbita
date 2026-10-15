@@ -933,7 +933,7 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
 
             {/* ══ STATS BAR ══ */}
             {(config?.appearance?.showStatsBar ?? true) && stats.length > 0 && (
-                    <div className="sf-stats-wrap" style={{ background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', padding: '12px 0' }}>
+                    <div data-ap-sec="stats" className="sf-stats-wrap" style={{ background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', padding: '12px 0' }}>
                         <div className="sf-w" style={{ display: 'flex', justifyContent: 'center' }}>
                             <div className="sf-stats-row" style={{ display: 'flex', alignItems: 'center' }}>
                                 {stats.map((s, i, arr) => (
@@ -970,28 +970,28 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
 
             {/* ══ ESTANTES ══ — ver "Estantes de productos" arriba. */}
             {(ap?.showFeaturedSection ?? true) && destacados.length > 0 && (
-                <section className="sf-w" style={{ paddingTop: 36, paddingBottom: 36 }}>
+                <section data-ap-sec="estante-destacados" className="sf-w" style={{ paddingTop: 36, paddingBottom: 36 }}>
                     <SectionHead color="#EF4444" eyebrow="Destacados" titulo="Productos destacados" onVer={() => go('/catalogo')} />
                     <EstanteProductos productos={destacados} modoLista={modoListaEstante} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />
                 </section>
             )}
 
             {(ap?.showNewArrivalsSection ?? true) && nuevosIngresos.length > 0 && (
-                <section className="sf-w" style={{ paddingBottom: 36 }}>
+                <section data-ap-sec="estante-nuevos" className="sf-w" style={{ paddingBottom: 36 }}>
                     <SectionHead color="#10B981" eyebrow="Nuevos ingresos" titulo="Recién llegados" onVer={() => go('/catalogo')} />
                     <EstanteProductos productos={nuevosIngresos} modoLista={modoListaEstante} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />
                 </section>
             )}
 
             {(ap?.showRecommendedSection ?? true) && estanteRecomendados.length > 0 && (
-                <section className="sf-w" style={{ paddingBottom: 36 }}>
+                <section data-ap-sec="estante-recomendados" className="sf-w" style={{ paddingBottom: 36 }}>
                     <SectionHead color="var(--color-primary)" eyebrow="Recomendados" titulo="Recomendados para vos" onVer={() => go('/catalogo')} />
                     <EstanteProductos productos={estanteRecomendados} modoLista={modoListaEstante} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />
                 </section>
             )}
 
             {(ap?.showBestSellersSection ?? true) && estanteTopVentas.length > 0 && (
-                <section className="sf-w" style={{ paddingBottom: 36 }}>
+                <section data-ap-sec="estante-topventas" className="sf-w" style={{ paddingBottom: 36 }}>
                     <SectionHead color="#F59E0B" eyebrow="Top ventas" titulo="Más vendidos" onVer={() => go('/catalogo?sort=bestselling')} />
                     <EstanteProductos productos={estanteTopVentas} modoLista={modoListaEstante} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />
                 </section>
@@ -1006,7 +1006,7 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
                 (fondo fijo, texto y CTA encima, el resto de la página
                 sigue el scroll normal). */}
             {(config?.appearance?.showParallaxBanner ?? false) && config?.appearance?.parallaxImageUrl && (
-                <section className="sf-parallax" style={{ backgroundImage: `url(${config.appearance.parallaxImageUrl})`, ['--sf-par-img' as string]: `url(${config.appearance.parallaxImageUrl})` }}>
+                <section data-ap-sec="parallax" className="sf-parallax" style={{ backgroundImage: `url(${config.appearance.parallaxImageUrl})`, ['--sf-par-img' as string]: `url(${config.appearance.parallaxImageUrl})` }}>
                     <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, rgba(15,23,42,0.62) 0%, rgba(15,23,42,0.30) 55%, rgba(15,23,42,0.10) 100%)' }} />
                     <div className="sf-w" style={{ position: 'relative', zIndex: 1, width: '100%' }}>
                         <div style={{ maxWidth: 520, padding: '56px 0' }}>
@@ -1035,7 +1035,7 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
                 stats ya ocupa ese lugar (el de "señal de confianza apenas
                 entrás") y dos franjas seguidas compitiendo se anulan. */}
             {(config?.appearance?.showBrands ?? false) && marcas.length > 0 && (
-                <section className="sf-marcas">
+                <section data-ap-sec="marcas" className="sf-marcas">
                     {tituloMarcas && <div className="sf-marcas-volanta">{tituloMarcas}</div>}
                     {marcasEnMarquee ? (
                         // Un poco más lenta que la de categorías (36s): estas
@@ -1058,14 +1058,16 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
                 diseño elegido en Apariencia → "Video en tu tienda". Sin
                 ningún link válido no dibuja nada. */}
             {(config?.appearance?.showVideo ?? false) && (
-                <SeccionVideos
-                    titulo={tituloVideo}
-                    subtitulo={subtituloVideo}
-                    layout={config?.appearance?.videoLayout}
-                    videos={config?.appearance?.videos}
-                    videoUrlLegado={config?.appearance?.videoUrl}
-                    go={go}
-                />
+                <div data-ap-sec="video">
+                    <SeccionVideos
+                        titulo={tituloVideo}
+                        subtitulo={subtituloVideo}
+                        layout={config?.appearance?.videoLayout}
+                        videos={config?.appearance?.videos}
+                        videoUrlLegado={config?.appearance?.videoUrl}
+                        go={go}
+                    />
+                </div>
             )}
 
             {/* ══ BANNER WHATSAPP ══ — diseño elegido en Apariencia (ver
@@ -1083,12 +1085,14 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
                     textos={TEXTOS_WHATSAPP_DEMO}
                 />
             )) : config?.appearance?.showWhatsapp !== false && tienda.wpp && (
-                <WhatsappBanner
-                    layout={config?.appearance?.whatsappLayout}
-                    wpp={tienda.wpp}
-                    message={config?.appearance?.whatsappText}
-                    scheduleText={config?.contact?.scheduleText}
-                />
+                <div data-ap-sec="whatsapp">
+                    <WhatsappBanner
+                        layout={config?.appearance?.whatsappLayout}
+                        wpp={tienda.wpp}
+                        message={config?.appearance?.whatsappText}
+                        scheduleText={config?.contact?.scheduleText}
+                    />
+                </div>
             )}
             </>
             )}
@@ -1384,7 +1388,7 @@ function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHero
     }
 
     return (
-        <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} {...deslizar}
+        <div data-ap-sec="hero" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} {...deslizar}
             style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--color-border)' }}>
             {/* alignItems:'stretch' + el `flex:1` de cada caja de fondo (abajo)
                 son lo que hace que TODOS los slides midan lo mismo: la pista
@@ -1673,7 +1677,7 @@ function SeccionCategorias({ cats, go, estilo, categoryIds }: { cats: CatVisual[
     if (catsAMostrar.length === 0) return null
 
     return (
-        <div style={{ paddingTop: 24, paddingBottom: 28 }}>
+        <div data-ap-sec="categorias" style={{ paddingTop: 24, paddingBottom: 28 }}>
             <div className="sf-w" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: elegido === 'indice' ? 6 : 12, gap: 10 }}>
                 <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>Comprá por categoría</h2>
                 <button className="ds-link" onClick={() => go('/catalogo')} style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer' }}>Ver todas →</button>

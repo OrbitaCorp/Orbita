@@ -13,7 +13,7 @@ export function SeccionTextos({ ap, set, soloContenido }: PropsSeccion & { soloC
                 ver mensajesAnuncio() en AnnouncementBar.tsx. El tope de 200
                 caracteres es el del backend (shippingText), contando los
                 saltos de línea. */}
-            <div style={{ marginBottom: 6 }}>
+            <div data-ap-foco="anuncio" style={{ marginBottom: 6 }}>
                 <FieldLabel help="Se muestra en el banner angosto debajo del header, si está activado en '¿Qué ven tus clientes?'. Podés cargar varios ítems: con la cartelera se deslizan uno tras otro, y fijo van rotando.">Mensajes del banner debajo del header</FieldLabel>
                 {(() => {
                     const items = ap.textoEnvio.split('\n')
@@ -68,7 +68,7 @@ export function SeccionTextos({ ap, set, soloContenido }: PropsSeccion & { soloC
                 FloatingWhatsapp.tsx). Esto es el mensaje que queda YA ESCRITO
                 en el chat cuando el cliente lo toca — vacío, WhatsApp abre
                 con "Hola! Quería hacer una consulta.". */}
-            {!soloContenido && <div><FieldLabel help="El mensaje que aparece ya escrito en el chat cuando tu cliente toca el botón de WhatsApp. Él lo puede borrar o cambiar antes de enviarlo.">Mensaje del botón de WhatsApp</FieldLabel><Inp value={ap.textoWhatsapp} onChange={v => set('textoWhatsapp', v)} maxLength={30} /></div>}
+            {!soloContenido && <div data-ap-foco="whatsapp"><FieldLabel help="El mensaje que aparece ya escrito en el chat cuando tu cliente toca el botón de WhatsApp. Él lo puede borrar o cambiar antes de enviarlo.">Mensaje del botón de WhatsApp</FieldLabel><Inp value={ap.textoWhatsapp} onChange={v => set('textoWhatsapp', v)} maxLength={30} /></div>}
         </SecCard>
     )
 }

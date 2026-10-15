@@ -58,7 +58,7 @@ export function AnnouncementBar({ text, visible = true, scroll = false, dark = f
   )
 
   return (
-    <div className={scroll ? undefined : 'orb-anuncio-fijo'} style={{
+    <div data-ap-sec="anuncio" className={scroll ? undefined : 'orb-anuncio-fijo'} style={{
       height: 40, display: 'flex', alignItems: 'center',
       // Antes hardcodeado a un azul fijo (#1D4ED8/#3B82F6) — nunca reflejaba
       // el color primario que el dueño configura en Apariencia (bug

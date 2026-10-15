@@ -546,7 +546,7 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
 
   return (
     <>
-      <header style={{ position: 'sticky', top: 0, zIndex: 50, background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)' }}>
+      <header data-ap-sec="header" style={{ position: 'sticky', top: 0, zIndex: 50, background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)' }}>
         <style>{`
           .sf-nav-link {
             position: relative; display: inline-flex; align-items: center; flex-shrink: 0;

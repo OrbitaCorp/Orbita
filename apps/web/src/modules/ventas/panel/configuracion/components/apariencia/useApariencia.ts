@@ -1,11 +1,12 @@
 // El estado de la pantalla de Apariencia: carga lo publicado, lleva el
 // formulario con sus cambios sin guardar, y guarda o descarta.
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ApiError, panelGetAppearance, panelGetBusiness, panelUpdateAppearance, panelGetCategoriesFlat, panelGetProducts, type ApiCategory, type ApiProductListItem } from '@/lib/api'
 import { AP_DEFAULTS, loadFont, type Apariencia as Ap } from '../../mock/apariencia.mock'
 import { apToUpdateDto, dtoToAp } from '../../mock/apariencia.mapper'
 import { PLANTILLAS } from '@/modules/ventas/panel/avanzado/plantillas/datos'
+import { FOCO_POR_CAMPO, type ObjetivoPreview, type PedidoFoco } from './focoPreview'
 
 // Las plantillas tenían un cintillo PROPIO (y las recetas, además, un
 // parallax), cargados en la pestaña Secciones, aparte del anuncio y el
@@ -73,10 +74,29 @@ export function useApariencia(onToast: (m: string) => void, editandoPlantilla = 
     // en su lugar mientras la plantilla esté puesta.
     const [homeTemplate, setHomeTemplateLocal] = useState<string | null>(null)
 
-    const set = <K extends keyof Ap>(k: K, v: Ap[K]) => { setApRaw(p => ({ ...p, [k]: v })); setDirty(true) }
+    // La parte de la tienda a la que la vista previa tiene que llevar la mirada
+    // (ver focoPreview.ts). Cada pedido lleva un número nuevo, así pedir dos
+    // veces lo mismo (tocar otro campo del mismo lugar) vuelve a disparar.
+    const [foco, setFoco] = useState<PedidoFoco | null>(null)
+    const pedirFoco = useCallback((objetivo: ObjetivoPreview) => {
+        setFoco(f => ({ objetivo, n: (f?.n ?? 0) + 1 }))
+    }, [])
+
+    const set = <K extends keyof Ap>(k: K, v: Ap[K]) => {
+        setApRaw(p => ({ ...p, [k]: v }))
+        setDirty(true)
+        const objetivo = FOCO_POR_CAMPO[k]
+        if (objetivo) pedirFoco(objetivo)
+    }
     // Para un cambio que toca más de un campo a la vez (ver "Grilla de
-    // productos" en SeccionLayout.tsx).
-    const actualizar = (fn: (p: Ap) => Ap) => { setApRaw(fn); setDirty(true) }
+    // productos" en SeccionLayout.tsx). `campo` es el que el dueño tocó, para
+    // saber a dónde llevar la vista previa.
+    const actualizar = (fn: (p: Ap) => Ap, campo?: keyof Ap) => {
+        setApRaw(fn)
+        setDirty(true)
+        const objetivo = campo && FOCO_POR_CAMPO[campo]
+        if (objetivo) pedirFoco(objetivo)
+    }
 
     // Subdominio real, para la vista previa — antes ahí decía siempre
     // "rama.orbita.shop" fijo, ni fuera el negocio de verdad.
@@ -165,5 +185,6 @@ export function useApariencia(onToast: (m: string) => void, editandoPlantilla = 
     return {
         ap, set, actualizar, dirty, publicado, cargando, errorCarga, categorias, productos,
         guardando, errorGuardado, homeTemplate, setHomeTemplateLocal, subdomain, guardar, descartar,
+        foco, pedirFoco,
     }
 }
