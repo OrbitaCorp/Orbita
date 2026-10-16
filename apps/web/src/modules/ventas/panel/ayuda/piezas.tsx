@@ -179,6 +179,30 @@ const CSS_AYUDA = `
 .ayu-paso > small { font-size: 12px; font-weight: 500; color: var(--color-muted); }
 .ayu-paso-on > small { color: var(--color-text); }
 
+.ayu-btn-chico { flex: none; min-height: 38px; padding: 0 18px; font-size: 14px; }
+
+/* Recorrido: la explicación de un paso. Chica y quieta; al pie en el celular. */
+.ayu-rec {
+    position: fixed; z-index: 230; box-sizing: border-box; max-width: calc(100vw - 24px);
+    background: var(--color-bg); color: var(--color-text);
+    border: 1px solid var(--color-border-strong); border-radius: 14px; padding: 12px 14px 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    animation: ayuEntra 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.ayu-rec-cab { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.ayu-rec-n { font-size: 12px; font-weight: 500; color: var(--color-muted); font-variant-numeric: tabular-nums; }
+.ayu-rec-omitir {
+    display: inline-flex; align-items: center; gap: 3px; min-height: 28px; padding: 0 8px; margin-right: -8px;
+    border: none; border-radius: 8px; background: none; cursor: pointer; font-family: inherit;
+    font-size: 12.5px; font-weight: 500; color: var(--color-muted);
+    transition: background-color 150ms ease, color 150ms ease;
+}
+.ayu-rec-omitir:hover { background: var(--color-surface-alt); color: var(--color-text); }
+.ayu-rec-omitir:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.ayu-rec-titulo { font-size: 15.5px; font-weight: 650; letter-spacing: -0.01em; line-height: 1.35; }
+.ayu-rec-texto { margin: 4px 0 12px; font-size: 14px; line-height: 1.55; color: var(--color-body); }
+.ayu-rec-pie { display: flex; align-items: center; justify-content: flex-end; gap: 16px; }
+
 .ayu-sug {
     position: fixed; z-index: 160; box-sizing: border-box;
     background: var(--color-bg); color: var(--color-text);
@@ -210,7 +234,7 @@ const CSS_AYUDA = `
 @keyframes ayuEntra { from { opacity: 0; transform: translateY(14px) scale(0.98) } to { opacity: 1; transform: none } }
 @keyframes ayuDesliza { from { opacity: 0; transform: translateX(36px) } to { opacity: 1; transform: none } }
 @media (prefers-reduced-motion: reduce) {
-    .ayu-velo, .ayu-tarjeta, .ayu-sug { animation: none; }
+    .ayu-velo, .ayu-tarjeta, .ayu-sug, .ayu-rec { animation: none; }
     .ayu-btn, .ayu-paso > span { transition: none; }
     .ayu-btn-prim:hover { transform: none; }
 }

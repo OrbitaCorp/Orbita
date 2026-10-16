@@ -12,7 +12,8 @@
 //    personalizar tu página web?". Qué mostrar lo decide decidirPrimerosPasos.
 // 2. Aviso por módulo: la primera vez que se entra a un módulo, una tarjeta
 //    "¿Querés ver cómo funciona?" con [Ver tutorial] [Ahora no]. El tutorial es
-//    la HojaTutorial, armada con temas del manual (modulos.ts cubre todos).
+//    el Recorrido: pasos cortos que señalan la pantalla real, sin navegar ni
+//    mover nada (recorridos.ts cubre todos los módulos).
 // 3. Sugerencias: de vez en cuando, "¿Ya sabés crear un descuento?" para lo que
 //    todavía no hizo (la API lo sabe). Elige sugerencias.ts.
 //
@@ -23,9 +24,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import { useAuth } from '@/lib/auth/AuthContext'
 import { adminPath } from '@/lib/tenant'
-import { panelEstadoVerificacionEmail, panelGetTutorial } from '@/lib/api'
-import { ayudaDe, claveDeAyuda } from './modulos'
-import { puedeUsarModoPrueba, comandoDeQuery, cumplidasSimuladas, siguientePasoDePrueba } from './acceso'
+import { panelEstadoVerificacionEmail, panelGetCategoriesFlat, panelGetProductStats, panelGetTutorial } from '@/lib/api'
+import { claveDeAyuda, recorridoDe } from './recorridos'
+import { puedeUsarModoPrueba, comandoDeQuery, cumplidasSimuladas } from './acceso'
 import {
     COPY_PASO, NOMBRES_DE_PASOS, SECCION_DEL_PASO, decidirPrimerosPasos, pasoInicial, type VistaPrimerosPasos,
 } from './primerosPasos'
@@ -36,13 +37,13 @@ import {
 } from './sugerencias'
 import { ESTADO_AYUDA_VACIO, POSPONER_MS, guardarAyuda, leerAyuda, type EstadoAyuda } from './almacen'
 import { AvisoChico, EstilosAyuda, Tarjeta } from './piezas'
-import HojaTutorial from './HojaTutorial'
+import Recorrido from './Recorrido'
 import Foco from './Foco'
 
 // Mientras hay un paso a medias se vuelve a preguntar cada tanto: crear la
 // categoría o el producto no cambia de ruta, y el cierre tiene que aparecer
 // solo cuando el dato ya existe.
-const REVISAR_CADA_MS = 5000
+const REVISAR_CADA_MS = 3000
 
 export default function AyudaHost() {
     const router = useRouter()
@@ -158,6 +159,33 @@ export default function AyudaHost() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [comando, !!ayuda])
 
+    // ── Modo prueba: notar solo cuando se crea la categoría o el producto ──
+    // La tienda de pruebas ya tiene de todo, así que no sirve preguntarle a la API
+    // "¿hay algún producto?". En cambio se cuenta lo que hay al empezar cada paso y
+    // se avanza cuando ese número sube: o sea, cuando la persona crea uno de verdad.
+    const pasoDePrueba = modoPruebaPermitido ? ayuda?.prueba : null
+    useEffect(() => {
+        if (pasoDePrueba !== 'categoria' && pasoDePrueba !== 'producto') return
+        let vigente = true
+        const revisar = async () => {
+            try {
+                const [categorias, stats] = await Promise.all([panelGetCategoriesFlat(), panelGetProductStats()])
+                if (!vigente) return
+                const ahora = { categorias: categorias.length, productos: stats.total }
+                const base = ayudaRef.current?.pruebaBase
+                if (!base) { actualizarAyuda(a => ({ ...a, pruebaBase: ahora })); return }
+                if (pasoDePrueba === 'categoria' && ahora.categorias > base.categorias) {
+                    actualizarAyuda(a => ({ ...a, prueba: 'producto', pruebaBase: ahora }))
+                } else if (pasoDePrueba === 'producto' && ahora.productos > base.productos) {
+                    actualizarAyuda(a => ({ ...a, prueba: 'listo', pruebaBase: null }))
+                }
+            } catch { /* sin respuesta se vuelve a intentar en la próxima vuelta */ }
+        }
+        void revisar()
+        const t = setInterval(() => void revisar(), 2500)
+        return () => { vigente = false; clearInterval(t) }
+    }, [pasoDePrueba, actualizarAyuda])
+
     const primeros: VistaPrimerosPasos = !esAdmin || !ayuda
         ? { tipo: 'nada' }
         : decidirPrimerosPasos({ cumplidas, seccion, vista, pospuesto, enCurso: ayuda.enCurso })
@@ -213,7 +241,7 @@ export default function AyudaHost() {
     // Espera a saber si hay primeros pasos pendientes (cumplidas o fallo) para
     // no mostrar dos cosas a la vez ni parpadear.
     const listoParaAviso = !!ayuda && (!esAdmin || cumplidas !== null || fallo)
-    const modulo = ayudaDe(clave)
+    const modulo = recorridoDe(clave)
     const libre = esMember && listoParaAviso && primeros.tipo === 'nada' && !eleccionVisible && !!modulo
     const ofrecer = libre && !ayuda?.vistos.includes(clave)
     // Pidió este tutorial desde una sugerencia: se abre directo, sin preguntarle de nuevo.
@@ -288,17 +316,13 @@ export default function AyudaHost() {
                     background: 'var(--color-surface-alt)', borderBottom: '1px solid var(--color-border)',
                 }}>
                     <span style={{ flex: '1 1 240px' }}>{primeros.texto}</span>
-                    {/* Solo en el modo prueba: como la tienda es simulada, no hay un dato real
-                        que avise que terminó el paso, así que se avanza a mano. */}
+                    {/* Solo en el modo prueba: los pasos avanzan solos al crear la categoría y el
+                        producto de verdad (se cuentan); esto es solo para salir. */}
                     {ayuda.prueba && (
                         <span style={{ display: 'inline-flex', gap: 6 }}>
                             <EstilosAyuda />
-                            <button type="button" className="ayu-btn ayu-btn-sec" style={{ minHeight: 32, padding: '0 12px', fontSize: 13 }}
-                                onClick={() => actualizarAyuda(a => ({ ...a, prueba: a.prueba ? siguientePasoDePrueba(a.prueba) : null }))}>
-                                Ya lo hice (prueba)
-                            </button>
                             <button type="button" className="ayu-btn ayu-btn-txt" style={{ minHeight: 32, padding: '0 10px', fontSize: 13 }}
-                                onClick={() => actualizarAyuda(a => ({ ...a, prueba: null }))}>
+                                onClick={() => actualizarAyuda(a => ({ ...a, prueba: null, pruebaBase: null }))}>
                                 Salir de la prueba
                             </button>
                         </span>
@@ -371,7 +395,7 @@ export default function AyudaHost() {
     }
 
     // ── Aviso por módulo, tutorial y sugerencias ──
-    const ayudaAbierta = hojaAbierta ? ayudaDe(avisada ?? clave) : null
+    const recorridoAbierto = hojaAbierta ? recorridoDe(avisada ?? clave) : null
     return (
         <>
             <EstilosAyuda />
@@ -386,11 +410,10 @@ export default function AyudaHost() {
                     onCerrar={() => setAvisoCerrado(true)}
                 />
             )}
-            {ayudaAbierta && (
-                <HojaTutorial
-                    ayuda={ayudaAbierta}
+            {recorridoAbierto && (
+                <Recorrido
+                    recorrido={recorridoAbierto}
                     onCerrar={() => { setHojaAbierta(false); setAvisoCerrado(true) }}
-                    onManual={() => { setHojaAbierta(false); setAvisoCerrado(true); ir('manual') }}
                 />
             )}
             {sugerenciaVisible && (

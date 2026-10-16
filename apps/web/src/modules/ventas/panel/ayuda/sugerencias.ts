@@ -10,7 +10,7 @@
 // invitado…) nunca se sugiere. Lógica pura, con tests; la pantalla está en
 // AyudaHost.
 
-import { claveDeAyuda } from './modulos'
+import { claveDeAyuda } from './recorridos'
 
 export interface Sugerencia {
     /** Id de la tarea en `cumplidas` (ver businesses.service.ts getTutorial). */

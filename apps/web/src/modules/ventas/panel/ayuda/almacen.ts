@@ -28,12 +28,14 @@ export interface EstadoAyuda {
     descartadasSeguidas: number
     /** Hasta cuándo (ms epoch) no se muestra ninguna sugerencia. 0 = no. */
     silenciadoHasta: number
+    /** Modo prueba: cuántas categorías y productos había al empezar el paso, para notar cuando se crea uno. */
+    pruebaBase: { categorias: number; productos: number } | null
 }
 
 export const ESTADO_AYUDA_VACIO: EstadoAyuda = {
     vistos: [], pospuestoHasta: 0, enCurso: false, esperaCorreo: false,
     sabe: [], posponer: {}, ultimaSugerencia: 0, prueba: null, pruebaElegida: false,
-    descartadasSeguidas: 0, silenciadoHasta: 0,
+    descartadasSeguidas: 0, silenciadoHasta: 0, pruebaBase: null,
 }
 
 /** "Más tarde" calla los primeros pasos un día. */
@@ -63,6 +65,9 @@ export function parsear(crudo: string | null): EstadoAyuda {
             pruebaElegida: o?.pruebaElegida === true,
             descartadasSeguidas: typeof o?.descartadasSeguidas === 'number' ? o.descartadasSeguidas : 0,
             silenciadoHasta: typeof o?.silenciadoHasta === 'number' ? o.silenciadoHasta : 0,
+            pruebaBase: typeof o?.pruebaBase?.categorias === 'number' && typeof o.pruebaBase.productos === 'number'
+                ? { categorias: o.pruebaBase.categorias, productos: o.pruebaBase.productos }
+                : null,
         }
     } catch {
         return ESTADO_AYUDA_VACIO

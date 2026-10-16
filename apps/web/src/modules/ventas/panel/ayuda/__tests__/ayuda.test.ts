@@ -1,53 +1,68 @@
 import { describe, expect, it } from 'vitest'
-import { CAPITULOS } from '../../manual/contenido'
 import { SECCIONES_DEL_PANEL, VISTAS_DE_CONFIGURACION } from '../../secciones'
-import { AYUDA_POR_SECCION, ayudaDe, claveDeAyuda } from '../modulos'
+import { RECORRIDOS, claveDeAyuda, recorridoDe } from '../recorridos'
+import { coincide, normalizar } from '../ubicar'
 import { decidirPrimerosPasos, pasoInicial } from '../primerosPasos'
 import { ESTADO_AYUDA_VACIO, parsear } from '../almacen'
 import { puedeUsarModoPrueba, comandoDeQuery, cumplidasSimuladas, siguientePasoDePrueba } from '../acceso'
 import { INTERVALO_MS, SUGERENCIAS, claveDeSugerencia, elegirSugerencia } from '../sugerencias'
 
-// El tutorial de cada módulo sale del manual: si un id de acá deja de existir
-// allá, el aviso mostraría una hoja vacía (o ninguna) sin que nadie se entere.
-describe('tutorial por módulo', () => {
-    it('cada módulo apunta a un capítulo y a temas que existen en el manual', () => {
-        for (const [clave, def] of Object.entries(AYUDA_POR_SECCION)) {
-            const capitulo = CAPITULOS.find(c => c.id === def.capitulo)
-            expect(capitulo, `${clave}: capítulo ${def.capitulo}`).toBeTruthy()
-            for (const id of def.temas) {
-                expect(capitulo!.temas.some(t => t.id === id), `${clave}: tema ${id}`).toBe(true)
-            }
-            expect(ayudaDe(clave)?.temas).toHaveLength(def.temas.length)
-        }
-    })
-
+describe('recorrido por módulo', () => {
     it('las claves son secciones del panel o una vista de Configuración', () => {
-        for (const clave of Object.keys(AYUDA_POR_SECCION)) {
+        for (const clave of Object.keys(RECORRIDOS)) {
             const [seccion, vista] = clave.split('/')
             expect(SECCIONES_DEL_PANEL as readonly string[]).toContain(seccion)
             if (vista) expect(VISTAS_DE_CONFIGURACION as readonly string[]).toContain(vista)
         }
     })
 
-    it('cada pantalla de Configuración tiene su tutorial (menos la zona peligrosa)', () => {
+    it('cada pantalla de Configuración tiene su recorrido (menos la zona peligrosa)', () => {
         for (const v of VISTAS_DE_CONFIGURACION) {
             if (v === 'peligro' || v === 'general') continue
-            expect(ayudaDe(claveDeAyuda('configuracion', v)), `configuracion/${v}`).not.toBeNull()
+            expect(recorridoDe(claveDeAyuda('configuracion', v)), `configuracion/${v}`).not.toBeNull()
         }
     })
 
-    it('cada sección del panel tiene tutorial, salvo el manual y el Inicio de Orbi', () => {
+    it('cada sección del panel tiene recorrido, salvo el manual', () => {
         for (const sec of SECCIONES_DEL_PANEL) {
             if (sec === 'manual' || sec === 'configuracion') continue
-            expect(ayudaDe(claveDeAyuda(sec)), sec).not.toBeNull()
+            expect(recorridoDe(claveDeAyuda(sec)), sec).not.toBeNull()
         }
     })
 
-    it('Configuración sin vista (o con la vieja "general") abre el tutorial de Negocio', () => {
+    it('Configuración sin vista (o con la vieja "general") abre el recorrido de Negocio', () => {
         expect(claveDeAyuda('configuracion')).toBe('configuracion/negocio')
         expect(claveDeAyuda('configuracion', 'general')).toBe('configuracion/negocio')
         expect(claveDeAyuda('configuracion', 'apariencia')).toBe('configuracion/apariencia')
         expect(claveDeAyuda('catalogo', 'nuevo')).toBe('catalogo')
+    })
+
+    it('breves: pocos pasos y poco texto, para que se terminen en el celular', () => {
+        for (const [clave, r] of Object.entries(RECORRIDOS)) {
+            expect(r.pasos.length, clave).toBeGreaterThan(0)
+            expect(r.pasos.length, clave).toBeLessThanOrEqual(4)
+            for (const p of r.pasos) {
+                expect(p.titulo.length, `${clave}: ${p.titulo}`).toBeLessThanOrEqual(40)
+                expect(p.texto.length, `${clave}: ${p.titulo}`).toBeLessThanOrEqual(190)
+            }
+        }
+    })
+
+    it('cada recorrido tiene algo que se vea siempre: un paso que no depende de la pantalla', () => {
+        // Un recorrido hecho solo de pasos opcionales podría saltarse entero y dejar al usuario con nada.
+        for (const [clave, r] of Object.entries(RECORRIDOS)) {
+            expect(r.pasos.some(p => !p.opcional), clave).toBe(true)
+        }
+    })
+})
+
+describe('encontrar textos en la pantalla', () => {
+    it('ignora tildes, mayúsculas, flechas y espacios', () => {
+        expect(normalizar('  Más   Tarde →')).toBe('mas tarde')
+        expect(normalizar('✓ Tienda online')).toBe('tienda online')
+        expect(coincide('Pendientes', 'pendientes')).toBe(true)
+        expect(coincide('Pendientes 5', 'Pendientes')).toBe(false)
+        expect(coincide('Pendientes 5', 'Pendientes', true)).toBe(true)
     })
 })
 
@@ -102,7 +117,7 @@ describe('sugerencias', () => {
     it('cada sugerencia lleva a un tutorial que existe y los ids no se repiten', () => {
         const ids = SUGERENCIAS.map(s => s.id)
         expect(new Set(ids).size).toBe(ids.length)
-        for (const s of SUGERENCIAS) expect(ayudaDe(claveDeSugerencia(s)), s.id).not.toBeNull()
+        for (const s of SUGERENCIAS) expect(recorridoDe(claveDeSugerencia(s)), s.id).not.toBeNull()
     })
 
     it('sugiere primero lo que deja la tienda lista para vender', () => {

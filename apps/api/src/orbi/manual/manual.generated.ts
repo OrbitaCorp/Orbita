@@ -9,7 +9,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "e069e939d2b3cac9",
+  "version": "a0e3ba5653a3dad0",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -718,7 +718,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "tutorial",
       "capitulo": "Si te trabás",
       "titulo": "Los tutoriales de cada módulo",
-      "texto": "La primera vez que entrás a un módulo (Productos, Pedidos, Clientes…) te preguntamos si querés ver cómo funciona. Si tocás \"Ver tutorial\", se abre una explicación corta, de a una pantalla por vez, con qué significa cada cosa y cómo se crea. Con \"Ahora no\" o \"Omitir\" la salteás sin perder nada.\n\nEl tutorial no te mueve de pantalla ni te señala botones: solo explica. Cada módulo lo ofrece una sola vez en cada dispositivo, y todo lo que dice también está en este manual.\n\nDe vez en cuando, además, te preguntamos si ya sabés hacer algo que todavía no hiciste (por ejemplo, crear un descuento). Si contestás que sí, no te lo volvemos a preguntar; si contestás que no, te mostramos el tutorial. Lo que ya hiciste nunca se sugiere.",
+      "texto": "La primera vez que entrás a un módulo (Productos, Pedidos, Clientes…) te preguntamos si querés ver cómo funciona. Si tocás \"Ver tutorial\", te lo mostramos sobre la pantalla misma: un paso por vez, con la parte señalada nítida y el resto difuminado, y una explicación de dos renglones de qué es y cómo se hace. Con \"Ahora no\" o \"Omitir\" lo salteás sin perder nada.\n\nEl tutorial no te mueve de pantalla ni hace nada por vos: solo señala y explica. Cada módulo lo ofrece una sola vez en cada dispositivo, y el detalle completo de todo está en este manual.\n\nDe vez en cuando, además, te preguntamos si ya sabés hacer algo que todavía no hiciste (por ejemplo, crear un descuento). Si contestás que sí, no te lo volvemos a preguntar; si contestás que no, te mostramos el tutorial. Lo que ya hiciste nunca se sugiere.",
       "destino": {
         "seccion": "dashboard",
         "label": "Ir al Inicio"
