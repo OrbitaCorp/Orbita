@@ -483,7 +483,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                             </div>
                         )}
                     </div>
-                    <div style={{ position: 'relative', marginBottom: 14 }}>
+                    <div data-ayuda="pedido-buscar" style={{ position: 'relative', marginBottom: 14 }}>
                         <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-muted)' }} />
                         <input className="ds-field" value={buscaProd} onChange={e => setBuscaProd(e.target.value)} placeholder="Buscar producto…" style={{ ...inputBase, paddingLeft: 32 }} />
                     </div>
@@ -598,7 +598,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                         </div>
 
                         {/* Cliente */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                        <div data-ayuda="pedido-cliente" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                             <User size={13} style={{ color: 'var(--color-subtle)' }} />
                             <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-subtle)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cliente</span>
                         </div>
@@ -731,7 +731,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                         </div>
                         {/* Sin productos no hay nada que cobrar: el bloque queda apagado hasta
                             que se agrega el primero (Ale, 08/09). */}
-                        <div className={`npos-seg${esPresencial ? ' npos-seg--3' : ''}`} role="group" aria-label={esPresencial ? 'Cómo se cobró' : 'Cómo va a pagar'} aria-disabled={sinProductos || undefined} style={{ marginBottom: 12, opacity: sinProductos ? 0.45 : 1, pointerEvents: sinProductos ? 'none' : undefined }}>
+                        <div data-ayuda="pedido-cobro" className={`npos-seg${esPresencial ? ' npos-seg--3' : ''}`} role="group" aria-label={esPresencial ? 'Cómo se cobró' : 'Cómo va a pagar'} aria-disabled={sinProductos || undefined} style={{ marginBottom: 12, opacity: sinProductos ? 0.45 : 1, pointerEvents: sinProductos ? 'none' : undefined }}>
                             <button type="button" className="npos-segbtn" disabled={sinProductos} aria-pressed={cobro === 'CASH'} onClick={() => setCobro(c => c === 'CASH' && !esPresencial ? null : 'CASH')}>
                                 <span className="npos-segico"><Banknote size={15} strokeWidth={2} /></span>
                                 <span className="npos-segtxt"><b>Efectivo</b></span>
@@ -845,7 +845,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                                 <span>Total</span>
                                 <span style={{ fontFamily: '"Geist Mono", monospace', color: 'var(--color-primary-h)', fontSize: 20 }}>{fmtMoney(total)}</span>
                             </div>
-                            <Button variant="primary" loading={creando} disabled={!puedeCrear} onClick={() => void crear()} style={{ width: '100%', justifyContent: 'center' }}>
+                            <Button variant="primary" loading={creando} disabled={!puedeCrear} onClick={() => void crear()} data-ayuda="pedido-confirmar" style={{ width: '100%', justifyContent: 'center' }}>
                                 {esPresencial ? 'Registrar venta' : 'Crear pedido'}
                             </Button>
                             {!clienteListo && carrito.length > 0 && (

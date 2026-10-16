@@ -18,11 +18,15 @@ export interface PasoRecorrido {
     texto: string
     /** Se salta solo si lo señalado no está en la pantalla (botones que dependen de los datos). */
     opcional?: boolean
+    /** Clave del recorrido que sigue si la persona toca lo señalado (ej.: "Crear descuento" → la guía del formulario). */
+    alTocar?: string
 }
 
 export interface Recorrido {
     /** Cómo se nombra: "¿Querés ver cómo funciona X?". */
     titulo: string
+    /** La pregunta completa del aviso, si "cómo funciona X" no suena bien (formularios de creación). */
+    pregunta?: string
     pasos: PasoRecorrido[]
 }
 
@@ -47,7 +51,7 @@ export const RECORRIDOS: Record<string, Recorrido> = {
     pedidos: {
         titulo: 'Pedidos',
         pasos: [
-            { donde: { boton: 'Nuevo pedido' }, titulo: 'Cargá una venta a mano', texto: 'Para lo que vendés por fuera de la tienda: mostrador, WhatsApp o Instagram. Las ventas de la tienda entran solas.' },
+            { donde: { boton: 'Nuevo pedido' }, alTocar: 'pedidos/nuevo', titulo: 'Cargá una venta a mano', texto: 'Para lo que vendés por fuera de la tienda: mostrador, WhatsApp o Instagram. Las ventas de la tienda entran solas.' },
             { donde: { texto: 'Pendientes', parcial: true }, titulo: 'Los estados', texto: 'Cada pedido avanza de pestaña: Pendientes, Confirmados, En preparación, Enviados y Entregados. Tu cliente ve ese avance.', opcional: true },
             { donde: { boton: 'Exportar' }, titulo: 'Llevátelo a Excel', texto: 'Descargá la lista de pedidos para guardarla o trabajarla afuera.', opcional: true },
         ],
@@ -55,7 +59,7 @@ export const RECORRIDOS: Record<string, Recorrido> = {
     catalogo: {
         titulo: 'Productos',
         pasos: [
-            { donde: { boton: 'Crear producto' }, titulo: 'Creá un producto', texto: 'Nombre, fotos, precio, stock y categoría. Mientras cargás, ves cómo queda en tu tienda.' },
+            { donde: { boton: 'Crear producto' }, alTocar: 'catalogo/nuevo', titulo: 'Creá un producto', texto: 'Nombre, fotos, precio, stock y categoría. Mientras cargás, ves cómo queda en tu tienda.' },
             { donde: { texto: 'Publicados', parcial: true }, titulo: 'Los números de arriba', texto: 'Cuántos productos tenés, cuántos están publicados y cuáles se quedaron sin stock.', opcional: true },
             { donde: { boton: 'Importar Excel' }, titulo: 'Muchos de una vez', texto: 'Si ya tenés tu lista en Excel, subila y se cargan todos juntos.', opcional: true },
         ],
@@ -63,7 +67,7 @@ export const RECORRIDOS: Record<string, Recorrido> = {
     categorias: {
         titulo: 'Categorías',
         pasos: [
-            { donde: { boton: 'Nueva categoría' }, titulo: 'Armá tus categorías', texto: 'Son los rubros con los que tu cliente recorre la tienda. Con 2 a 6 alcanza, y podés sumar subcategorías.' },
+            { donde: { boton: 'Nueva categoría' }, alTocar: 'categorias/nueva', titulo: 'Armá tus categorías', texto: 'Son los rubros con los que tu cliente recorre la tienda. Con 2 a 6 alcanza, y podés sumar subcategorías.' },
         ],
     },
     clientes: {
@@ -77,20 +81,20 @@ export const RECORRIDOS: Record<string, Recorrido> = {
         titulo: 'Mensajes',
         pasos: [
             { titulo: 'La bandeja', texto: 'Acá te escriben tus clientes desde la tienda: las conversaciones a la izquierda y el chat a la derecha.' },
-            { donde: { boton: 'Nueva plantilla' }, titulo: 'Respuestas guardadas', texto: 'Escribí una vez lo que te preguntan siempre ("¿hacen envíos?") y mandalo con un toque desde el chat.', opcional: true },
+            { donde: { boton: 'Nueva plantilla' }, alTocar: 'mensajes/plantilla', titulo: 'Respuestas guardadas', texto: 'Escribí una vez lo que te preguntan siempre ("¿hacen envíos?") y mandalo con un toque desde el chat.', opcional: true },
         ],
     },
     descuentos: {
         titulo: 'Descuentos',
         pasos: [
-            { donde: { boton: 'Crear descuento' }, titulo: 'Un descuento automático', texto: 'Se aplica solo en el carrito, sin código: un porcentaje, un monto fijo, un 2x1…', opcional: true },
+            { donde: { boton: 'Crear descuento' }, alTocar: 'descuentos/crear', titulo: 'Un descuento automático', texto: 'Se aplica solo en el carrito, sin código: un porcentaje, un monto fijo, un 2x1…', opcional: true },
             { titulo: 'Descuento o cupón', texto: 'El descuento se aplica solo. El cupón necesita que tu cliente escriba un código; esos se crean en Cupones.' },
         ],
     },
     cupones: {
         titulo: 'Cupones',
         pasos: [
-            { donde: { boton: 'Crear cupón' }, titulo: 'Un cupón', texto: 'Un código más un descuento. Podés limitar los usos, pedir un monto mínimo y ponerle vigencia.', opcional: true },
+            { donde: { boton: 'Crear cupón' }, alTocar: 'cupones/crear', titulo: 'Un cupón', texto: 'Un código más un descuento. Podés limitar los usos, pedir un monto mínimo y ponerle vigencia.', opcional: true },
             { titulo: 'Compartilo', texto: 'Cada cupón se puede compartir por link o mandar por email a tus clientes.' },
         ],
     },
@@ -182,7 +186,7 @@ export const RECORRIDOS: Record<string, Recorrido> = {
         titulo: 'tu Equipo',
         pasos: [
             { titulo: 'Quién entra al panel', texto: 'Cada persona entra con su propio usuario. El Propietario lo ve todo; el Empleado, solo el trabajo del día a día.' },
-            { donde: { boton: 'Invitar miembro' }, titulo: 'Sumá a tu gente', texto: 'Los invitás por email y les llega la invitación al correo.', opcional: true },
+            { donde: { boton: 'Invitar miembro' }, alTocar: 'configuracion/equipo/invitar', titulo: 'Sumá a tu gente', texto: 'Los invitás por email y les llega la invitación al correo.', opcional: true },
         ],
     },
     'configuracion/notificaciones': {
@@ -216,10 +220,86 @@ export const RECORRIDOS: Record<string, Recorrido> = {
             { titulo: 'Quién hizo qué', texto: 'Si trabajás con equipo, acá se contesta "¿quién cambió este precio?" sin tener que preguntarle a nadie.' },
         ],
     },
+
+    // ── Formularios de creación: guían campo por campo, sobre el formulario real ──
+    // Se abren solos al tocar el botón señalado en el recorrido del módulo, o con
+    // "Ver tutorial" desde el formulario. La categoría, la plantilla y la invitación
+    // son ventanas (no una pantalla): solo se piden por su clave.
+    'descuentos/crear': {
+        titulo: 'crear un descuento',
+        pregunta: '¿Querés ver cómo se crea un descuento?',
+        pasos: [
+            { donde: { texto: 'Nombre del descuento' }, titulo: 'Poneles un nombre', texto: 'Elegí uno que te ayude a reconocerlo después, por ejemplo "Promo invierno".' },
+            { donde: { texto: 'Tipo de descuento' }, titulo: 'Elegí cómo descuenta', texto: 'Un porcentaje o un monto fijo, sobre productos elegidos o sobre el total del ticket. A la derecha ves cómo queda.' },
+            { donde: { texto: 'Vigencia y condiciones', tarjeta: true }, titulo: 'Cuándo vale', texto: 'Desde cuándo y hasta cuándo, qué días y en qué horario. Sin fecha final, no vence.', opcional: true },
+            { donde: { texto: 'Resumen', tarjeta: true }, titulo: 'Revisá y creá', texto: 'Acá ves todo junto. Cuando esté bien, tocá "Crear descuento" al final de la página.', opcional: true },
+        ],
+    },
+    'cupones/crear': {
+        titulo: 'crear un cupón',
+        pregunta: '¿Querés ver cómo se crea un cupón?',
+        pasos: [
+            { donde: { texto: 'Código del cupón' }, titulo: 'El código', texto: 'Es lo que tu cliente escribe en la tienda para usarlo. Lo podés escribir vos o generarlo.' },
+            { donde: { texto: 'Configuración', tarjeta: true }, titulo: 'Qué descuento da', texto: 'Un porcentaje o un monto fijo, y si pedís una compra mínima.', opcional: true },
+            { donde: { texto: 'Límites de uso', tarjeta: true }, titulo: 'Cuántas veces', texto: 'Cuántas veces se puede usar en total y cuántas por cada cliente.', opcional: true },
+            { donde: { texto: 'Vigencia', tarjeta: true }, titulo: 'Cuándo vale', texto: 'Desde cuándo y hasta cuándo se puede usar el cupón.', opcional: true },
+        ],
+    },
+    'catalogo/nuevo': {
+        titulo: 'crear un producto',
+        pregunta: '¿Querés ver cómo se crea un producto?',
+        pasos: [
+            { donde: { texto: 'Fotos' }, titulo: 'Empezá por las fotos', texto: 'La primera es la que se ve en el catálogo. Arrastralas o tocá para subirlas.' },
+            { donde: { texto: 'Nombre' }, titulo: 'El nombre', texto: 'Poné cómo lo buscaría tu cliente, por ejemplo "Remera oversize negra".' },
+            { donde: { texto: 'Precio' }, titulo: 'Precio y stock', texto: 'El precio es lo que paga tu cliente. El stock baja solo con cada venta.', opcional: true },
+            { donde: { texto: 'Categoría' }, titulo: 'Dónde va', texto: 'Elegí en qué categoría aparece dentro de tu tienda.', opcional: true },
+            { donde: { boton: 'Publicar' }, titulo: 'Publicalo', texto: 'Publicar lo muestra ya en tu tienda. Con "Guardar borrador" queda oculto hasta que lo termines.', opcional: true },
+        ],
+    },
+    'pedidos/nuevo': {
+        titulo: 'cargar una venta',
+        pregunta: '¿Querés ver cómo se carga una venta?',
+        pasos: [
+            { donde: { ayuda: 'pedido-buscar' }, titulo: 'Elegí los productos', texto: 'Buscalos y tocá cada uno para sumarlo al ticket.' },
+            { donde: { ayuda: 'pedido-cliente' }, titulo: 'Poné el cliente', texto: 'Elegí uno que ya tengas o cargá uno nuevo con su nombre y email.', opcional: true },
+            { donde: { ayuda: 'pedido-cobro' }, titulo: 'Cómo se cobró', texto: 'Efectivo, transferencia o las dos. Queda registrado en tus números.', opcional: true },
+            { donde: { ayuda: 'pedido-confirmar' }, titulo: 'Registrala', texto: 'Cuando esté todo, tocá acá: la venta entra a tus pedidos y descuenta el stock.', opcional: true },
+        ],
+    },
+    'categorias/nueva': {
+        titulo: 'crear una categoría',
+        pregunta: '¿Querés ver cómo se crea una categoría?',
+        pasos: [
+            { donde: { ayuda: 'cat-nombre' }, titulo: 'El nombre', texto: 'Por ejemplo "Remeras" o "Zapatillas". Es lo que tu cliente ve en el menú de la tienda.' },
+            { donde: { ayuda: 'cat-icono' }, titulo: 'Un ícono', texto: 'Elegí uno. Si tenés una foto, se ve mejor: subila arriba, en Imagen.', opcional: true },
+            { donde: { ayuda: 'cat-crear' }, titulo: 'Creala', texto: 'Tocá Crear y listo: ya podés cargar productos en ella.', opcional: true },
+        ],
+    },
+    'mensajes/plantilla': {
+        titulo: 'crear una plantilla',
+        pregunta: '¿Querés ver cómo se crea una plantilla de respuesta?',
+        pasos: [
+            { donde: { ayuda: 'plantilla-nombre' }, titulo: 'Un nombre', texto: 'Para encontrarla rápido cuando estés chateando, por ejemplo "Horarios".' },
+            { donde: { ayuda: 'plantilla-mensaje' }, titulo: 'El mensaje', texto: 'Escribí la respuesta. Con {nombre} o {id} se completa sola con los datos de cada cliente.', opcional: true },
+        ],
+    },
+    'configuracion/equipo/invitar': {
+        titulo: 'invitar a alguien',
+        pregunta: '¿Querés ver cómo se invita a alguien del equipo?',
+        pasos: [
+            { donde: { texto: 'Nombre completo' }, titulo: 'Quién es', texto: 'Su nombre y su email: ahí le llega la invitación.' },
+            { titulo: 'Qué puede hacer', texto: 'Elegí su rol. El Empleado ve el trabajo del día a día; el Propietario, todo.' },
+        ],
+    },
 }
+
+/** Sección → la vista (?vista=) que abre su formulario de creación. */
+const CREACION: Record<string, string> = { descuentos: 'crear', cupones: 'crear', catalogo: 'nuevo', pedidos: 'nuevo' }
 
 /** La clave del recorrido para donde está parado el usuario. */
 export function claveDeAyuda(seccion: string, vista?: string): string {
+    // Los formularios de creación tienen su propia guía.
+    if (vista && CREACION[seccion] === vista) return `${seccion}/${vista}`
     if (seccion === 'configuracion') {
         // Sin vista (o con la vieja 'general'), Configuración abre en Negocio.
         const v = !vista || vista === 'general' ? 'negocio' : vista

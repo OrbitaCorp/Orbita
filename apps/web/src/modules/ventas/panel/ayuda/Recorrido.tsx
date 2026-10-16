@@ -17,19 +17,21 @@ import type { Recorrido as RecorridoDef } from './recorridos'
 interface Props {
     recorrido: RecorridoDef
     onCerrar: () => void
+    /** Tocó lo señalado en un paso que sigue con otra guía (ver PasoRecorrido.alTocar). */
+    onAbrir?: (clave: string) => void
 }
 
 const ANCHO = 320
 const ALTO_ESTIMADO = 190
 const AIRE = 16
 
-export default function Recorrido({ recorrido, onCerrar }: Props) {
+export default function Recorrido({ recorrido, onCerrar, onAbrir }: Props) {
     const { pasos } = recorrido
     const [i, setI] = useState(0)
     const paso = pasos[i]
     const ultimo = i === pasos.length - 1
     const movil = typeof window !== 'undefined' && window.innerWidth < 640
-    const { caja, noEncontrado } = useCaja(paso.donde, String(i), movil)
+    const { caja, noEncontrado } = useCaja(paso.donde, String(i), movil, () => { if (paso.alTocar) onAbrir?.(paso.alTocar) })
 
     const siguiente = useCallback(() => {
         if (i >= pasos.length - 1) onCerrar()

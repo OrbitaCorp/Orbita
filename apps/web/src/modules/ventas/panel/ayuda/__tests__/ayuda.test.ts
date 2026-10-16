@@ -12,7 +12,10 @@ describe('recorrido por módulo', () => {
         for (const clave of Object.keys(RECORRIDOS)) {
             const [seccion, vista] = clave.split('/')
             expect(SECCIONES_DEL_PANEL as readonly string[]).toContain(seccion)
-            if (vista) expect(VISTAS_DE_CONFIGURACION as readonly string[]).toContain(vista)
+            if (!vista) continue
+            // Configuración: una vista suya. El resto: la vista del formulario de creación.
+            if (seccion === 'configuracion') expect(VISTAS_DE_CONFIGURACION as readonly string[]).toContain(vista)
+            else expect(['crear', 'nuevo', 'nueva', 'plantilla']).toContain(vista)
         }
     })
 
@@ -30,17 +33,39 @@ describe('recorrido por módulo', () => {
         }
     })
 
+    it('los formularios de creación tienen su propia guía, y la lista apunta a ella', () => {
+        expect(claveDeAyuda('descuentos', 'crear')).toBe('descuentos/crear')
+        expect(claveDeAyuda('cupones', 'crear')).toBe('cupones/crear')
+        expect(claveDeAyuda('catalogo', 'nuevo')).toBe('catalogo/nuevo')
+        expect(claveDeAyuda('pedidos', 'nuevo')).toBe('pedidos/nuevo')
+        // Lo que no es creación sigue con la guía del módulo.
+        expect(claveDeAyuda('pedidos', 'historial')).toBe('pedidos')
+        expect(claveDeAyuda('descuentos', 'metricas')).toBe('descuentos')
+        for (const clave of ['descuentos/crear', 'cupones/crear', 'catalogo/nuevo', 'pedidos/nuevo', 'categorias/nueva', 'mensajes/plantilla', 'configuracion/equipo/invitar']) {
+            expect(recorridoDe(clave), clave).not.toBeNull()
+            expect(recorridoDe(clave)?.pregunta, clave).toBeTruthy()
+        }
+    })
+
+    it('tocar lo señalado en un paso lleva a una guía que existe', () => {
+        for (const [clave, r] of Object.entries(RECORRIDOS)) {
+            for (const p of r.pasos) {
+                if (p.alTocar) expect(recorridoDe(p.alTocar), `${clave} → ${p.alTocar}`).not.toBeNull()
+            }
+        }
+    })
+
     it('Configuración sin vista (o con la vieja "general") abre el recorrido de Negocio', () => {
         expect(claveDeAyuda('configuracion')).toBe('configuracion/negocio')
         expect(claveDeAyuda('configuracion', 'general')).toBe('configuracion/negocio')
         expect(claveDeAyuda('configuracion', 'apariencia')).toBe('configuracion/apariencia')
-        expect(claveDeAyuda('catalogo', 'nuevo')).toBe('catalogo')
+        expect(claveDeAyuda('catalogo', 'otra')).toBe('catalogo')
     })
 
     it('breves: pocos pasos y poco texto, para que se terminen en el celular', () => {
         for (const [clave, r] of Object.entries(RECORRIDOS)) {
             expect(r.pasos.length, clave).toBeGreaterThan(0)
-            expect(r.pasos.length, clave).toBeLessThanOrEqual(4)
+            expect(r.pasos.length, clave).toBeLessThanOrEqual(5)
             for (const p of r.pasos) {
                 expect(p.titulo.length, `${clave}: ${p.titulo}`).toBeLessThanOrEqual(40)
                 expect(p.texto.length, `${clave}: ${p.titulo}`).toBeLessThanOrEqual(190)

@@ -29,7 +29,14 @@ const fuente = archivosDe(SRC)
 describe('lo que señalan los recorridos existe en las pantallas', () => {
     for (const [clave, r] of Object.entries(RECORRIDOS)) {
         for (const p of r.pasos) {
-            if (!p.donde || 'ayuda' in p.donde) continue
+            if (!p.donde) continue
+            if ('ayuda' in p.donde) {
+                const marca = `data-ayuda="${p.donde.ayuda}"`
+                it(`${clave} → ${marca}`, () => {
+                    expect(fuente.includes(marca), `ninguna pantalla lleva ${marca}`).toBe(true)
+                })
+                continue
+            }
             const texto = 'boton' in p.donde ? p.donde.boton : p.donde.texto
             it(`${clave} → "${texto}"`, () => {
                 expect(fuente.includes(texto), `no se encontró «${texto}» en ninguna pantalla`).toBe(true)

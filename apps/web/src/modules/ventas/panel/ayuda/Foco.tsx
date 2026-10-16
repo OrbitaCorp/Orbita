@@ -16,15 +16,17 @@ interface Props {
     /** Valor de data-ayuda del botón a resaltar. */
     objetivo: string
     texto: string
+    /** Tocó el botón señalado. */
+    alTocar?: () => void
 }
 
 const ALTO_FRASE = 44
 const AIRE = 8
 
-export default function Foco({ objetivo, texto }: Props) {
+export default function Foco({ objetivo, texto, alTocar }: Props) {
     const [tocado, setTocado] = useState(false)
     const movil = typeof window !== 'undefined' && window.innerWidth < 640
-    const { caja } = useCaja({ ayuda: objetivo }, objetivo, movil, () => setTocado(true))
+    const { caja } = useCaja({ ayuda: objetivo }, objetivo, movil, () => { setTocado(true); alTocar?.() })
 
     if (!caja || tocado) return null
 

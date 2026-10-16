@@ -350,7 +350,7 @@ export default function Categorias() {
 
                             {/* Ícono picker */}
                             <label style={cl}>Ícono</label>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8,1fr)', gap: 6, margin: '8px 0 16px' }}>
+                            <div data-ayuda="cat-icono" style={{ display: 'grid', gridTemplateColumns: 'repeat(8,1fr)', gap: 6, margin: '8px 0 16px' }}>
                                 {CAT_ICONS.map(key => {
                                     const a = sel.cat.icono === key
                                     return (
@@ -503,7 +503,7 @@ function CatModal({ modal, onClose, onSave, onToast }: {
             maxWidth={440}
             footer={<>
                 <Button variant="outline" onClick={onClose} disabled={guardando}>Cancelar</Button>
-                <Button variant="primary" disabled={!nombre.trim() || guardando} onClick={() => void submit()}>
+                <Button variant="primary" disabled={!nombre.trim() || guardando} onClick={() => void submit()} data-ayuda="cat-crear">
                     {guardando ? (editing ? 'Guardando…' : 'Creando…') : (editing ? 'Guardar' : 'Crear')}
                 </Button>
             </>}
@@ -515,7 +515,7 @@ function CatModal({ modal, onClose, onSave, onToast }: {
                 </div>
             )}
 
-            <EditorField label="Nombre" value={nombre} onChange={setNombre} />
+            <div data-ayuda="cat-nombre"><EditorField label="Nombre" value={nombre} onChange={setNombre} /></div>
             <div style={{ fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', marginBottom: 16, marginTop: -10 }}>slug: {slug || '-'}</div>
 
             {/* Imagen — opcional, además del ícono de abajo. Con imagen

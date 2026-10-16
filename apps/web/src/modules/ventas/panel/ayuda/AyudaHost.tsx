@@ -243,6 +243,16 @@ export default function AyudaHost() {
     // no mostrar dos cosas a la vez ni parpadear.
     const listoParaAviso = !!ayuda && (!esAdmin || cumplidas !== null || fallo)
     const modulo = recorridoDe(clave)
+    // Un recorrido es de UNA pantalla: si la persona cambia de pantalla (por ejemplo, tocó
+    // "Crear descuento"), el de la lista se cierra y no se queda flotando sobre el formulario.
+    // Si el cambio vino de tocar lo señalado, `encadenar` abre la guía que sigue.
+    const clavePrevia = useRef(clave)
+    useEffect(() => {
+        if (clavePrevia.current === clave) return
+        clavePrevia.current = clave
+        setHojaAbierta(false)
+    }, [clave])
+
     const libre = esMember && listoParaAviso && primeros.tipo === 'nada' && !eleccionVisible && !!modulo
     const ofrecer = libre && !ayuda?.vistos.includes(clave)
     // Pidió este tutorial desde una sugerencia: se abre directo, sin preguntarle de nuevo.
@@ -256,6 +266,20 @@ export default function AyudaHost() {
         if (pedidaAqui) setPedida(null)
         actualizarAyuda(a => (a.vistos.includes(clave) ? a : { ...a, vistos: [...a.vistos, clave] }))
     }, [pedidaAqui, ofrecer, clave, actualizarAyuda])
+
+    // Tocó lo señalado en un paso que sigue con otra guía: se cierra esta y, cuando el
+    // formulario (o la ventana) ya está en pantalla, se abre la que sigue.
+    const encadenar = useCallback((siguiente: string) => {
+        setHojaAbierta(false)
+        setTimeout(() => {
+            if (!recorridoDe(siguiente)) return
+            setAvisada(siguiente)
+            setAvisoCerrado(true)
+            setSugerencia(null)
+            setHojaAbierta(true)
+            actualizarAyuda(a => (a.vistos.includes(siguiente) ? a : { ...a, vistos: [...a.vistos, siguiente] }))
+        }, 600)
+    }, [actualizarAyuda])
 
     // El botón "?" de la barra de arriba abre el tutorial de la pantalla cuando se quiera.
     const claveRef = useRef(clave)
@@ -316,6 +340,15 @@ export default function AyudaHost() {
 
     if (!esMember || !ayuda) return null
 
+    const recorridoAbierto = hojaAbierta ? recorridoDe(avisada ?? clave) : null
+    const recorridoNodo = recorridoAbierto && (
+        <Recorrido
+            recorrido={recorridoAbierto}
+            onCerrar={() => { setHojaAbierta(false); setAvisoCerrado(true) }}
+            onAbrir={encadenar}
+        />
+    )
+
     // ── Primeros pasos ──
     if (primeros.tipo === 'tira') {
         // El foco resalta el botón de entrada de cada paso. Dentro del formulario
@@ -344,7 +377,16 @@ export default function AyudaHost() {
                         </span>
                     )}
                 </div>
-                {foco && <Foco key={foco.objetivo} objetivo={foco.objetivo} texto={foco.texto} />}
+                {foco && (
+                    <Foco
+                        key={foco.objetivo}
+                        objetivo={foco.objetivo}
+                        texto={foco.texto}
+                        // Al tocar el botón señalado, la guía del formulario o de la ventana que se abre.
+                        alTocar={() => encadenar(primeros.paso === 'categoria' ? 'categorias/nueva' : 'catalogo/nuevo')}
+                    />
+                )}
+                {recorridoNodo}
             </>
         )
     }
@@ -361,7 +403,11 @@ export default function AyudaHost() {
                     titulo={c.titulo}
                     texto={c.texto}
                     boton={c.boton}
-                    onBoton={() => ir(SECCION_DEL_PASO[primeros.paso], primeros.paso === 'producto' ? { vista: 'nuevo' } : undefined)}
+                    onBoton={() => {
+                        ir(SECCION_DEL_PASO[primeros.paso], primeros.paso === 'producto' ? { vista: 'nuevo' } : undefined)
+                        // En el formulario del producto la guía arranca sola; en Categorías primero se señala el botón.
+                        if (primeros.paso === 'producto') encadenar('catalogo/nuevo')
+                    }}
                     secundario="Más tarde"
                     onSecundario={() => { setPospuesto(true); actualizarAyuda(a => ({ ...a, pospuestoHasta: Date.now() + POSPONER_MS })) }}
                 />
@@ -411,14 +457,13 @@ export default function AyudaHost() {
     }
 
     // ── Aviso por módulo, tutorial y sugerencias ──
-    const recorridoAbierto = hojaAbierta ? recorridoDe(avisada ?? clave) : null
     return (
         <>
             <EstilosAyuda />
             {avisoVisible && modulo && (
                 <AvisoChico
                     region="Tutorial del módulo"
-                    texto={`¿Querés ver cómo funciona ${modulo.titulo}?`}
+                    texto={modulo.pregunta ?? `¿Querés ver cómo funciona ${modulo.titulo}?`}
                     principal="Ver tutorial"
                     onPrincipal={() => setHojaAbierta(true)}
                     secundaria="Ahora no"
@@ -426,12 +471,7 @@ export default function AyudaHost() {
                     onCerrar={() => setAvisoCerrado(true)}
                 />
             )}
-            {recorridoAbierto && (
-                <Recorrido
-                    recorrido={recorridoAbierto}
-                    onCerrar={() => { setHojaAbierta(false); setAvisoCerrado(true) }}
-                />
-            )}
+            {recorridoNodo}
             {sugerenciaVisible && (
                 <AvisoChico
                     region="Sugerencia de tutorial"
