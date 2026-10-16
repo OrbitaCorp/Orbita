@@ -300,9 +300,8 @@ export default function Header({ onMenuClick }: Props) {
                 }
                 /* Con el botón de Orbi (44px) la barra de 320px dejaba ~38px
                    para el título de la pantalla: quedaba en "C…". Se baja el
-                   de tema, que también se cambia desde Mi perfil; pasa a los
-                   420px para que entre el botón de tutorial. */
-                @media (max-width: 420px) {
+                   de tema, que también se cambia desde Mi perfil. */
+                @media (max-width: 360px) {
                     .admin-theme-btn   { display: none !important; }
                 }
             `}</style>

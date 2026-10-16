@@ -39,7 +39,7 @@ export default function AyudaBoton() {
     )
 }
 
-// Con texto en pantallas anchas; en el celular, solo el ícono, para que entre en la barra.
+// Con texto en pantallas anchas. En el celular no va en la barra: ahí está "Ver tutorial" dentro de la página (AyudaEnPagina).
 const CSS_BOTON = `
 .admin-ayuda-btn {
     flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -49,7 +49,6 @@ const CSS_BOTON = `
 }
 .admin-ayuda-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 @media (max-width: 639px) {
-    .admin-ayuda-btn { width: 36px; padding: 0; }
-    .admin-ayuda-label { display: none; }
+    .admin-ayuda-btn { display: none; }
 }
 `

@@ -9,6 +9,7 @@ import { RequireAuth } from '@/lib/auth/RequireAuth'
 import { useOrbiKeyboardShortcut } from '@/components/orbi/useOrbiKeyboardShortcut'
 import { useOrbiStore } from '@/components/orbi/useOrbiStore'
 import AyudaHost from '@/modules/ventas/panel/ayuda/AyudaHost'
+import AyudaEnPagina from '@/modules/ventas/panel/ayuda/AyudaEnPagina'
 import { SidebarModeProvider } from './SidebarModeContext'
 import { EscenaEspacial } from '@/modules/landing/components/v2/EscenaEspacial'
 
@@ -129,6 +130,8 @@ function AdminShell({ children }: { children: ReactNode }) {
                         WebkitOverflowScrolling: 'touch',
                     }}
                 >
+                    {/* "Ver tutorial" de la pantalla, solo en el celular (en la compu va en la barra). */}
+                    <AyudaEnPagina />
                     {children}
                 </main>
             </div>
