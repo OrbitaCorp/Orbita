@@ -23,15 +23,33 @@ export default function AyudaBoton() {
     if (!recorridoDe(claveDeAyuda(seccion, vista))) return null
 
     return (
-        <button
-            type="button"
-            onClick={() => window.dispatchEvent(new Event(EVENTO_ABRIR_AYUDA))}
-            aria-label="Ver el tutorial de esta pantalla"
-            title="Tutorial de esta pantalla"
-            className="admin-ayuda-btn ds-hover grid place-items-center rounded-lg"
-            style={{ width: 36, height: 36, background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-body)', flexShrink: 0, cursor: 'pointer' }}
-        >
-            <HelpCircle size={17} strokeWidth={1.5} />
-        </button>
+        <>
+            <style>{CSS_BOTON}</style>
+            <button
+                type="button"
+                onClick={() => window.dispatchEvent(new Event(EVENTO_ABRIR_AYUDA))}
+                aria-label="Ver el tutorial de esta pantalla"
+                title="Tutorial de esta pantalla"
+                className="admin-ayuda-btn ds-hover"
+            >
+                <HelpCircle size={16} strokeWidth={1.6} aria-hidden="true" />
+                <span className="admin-ayuda-label">Ver tutorial</span>
+            </button>
+        </>
     )
 }
+
+// Con texto en pantallas anchas; en el celular, solo el ícono, para que entre en la barra.
+const CSS_BOTON = `
+.admin-ayuda-btn {
+    flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    height: 36px; padding: 0 12px; border-radius: 8px; cursor: pointer; font-family: inherit;
+    font-size: 13px; font-weight: 600; white-space: nowrap;
+    background: transparent; border: 1px solid var(--color-border); color: var(--color-text);
+}
+.admin-ayuda-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+@media (max-width: 639px) {
+    .admin-ayuda-btn { width: 36px; padding: 0; }
+    .admin-ayuda-label { display: none; }
+}
+`
