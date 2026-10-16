@@ -38,6 +38,7 @@ import {
 import { ESTADO_AYUDA_VACIO, POSPONER_MS, guardarAyuda, leerAyuda, type EstadoAyuda } from './almacen'
 import { AvisoChico, EstilosAyuda, Tarjeta } from './piezas'
 import Recorrido from './Recorrido'
+import { EVENTO_ABRIR_AYUDA } from './AyudaBoton'
 import Foco from './Foco'
 
 // Mientras hay un paso a medias se vuelve a preguntar cada tanto: crear la
@@ -255,6 +256,21 @@ export default function AyudaHost() {
         if (pedidaAqui) setPedida(null)
         actualizarAyuda(a => (a.vistos.includes(clave) ? a : { ...a, vistos: [...a.vistos, clave] }))
     }, [pedidaAqui, ofrecer, clave, actualizarAyuda])
+
+    // El botón "?" de la barra de arriba abre el tutorial de la pantalla cuando se quiera.
+    const claveRef = useRef(clave)
+    useEffect(() => { claveRef.current = clave })
+    useEffect(() => {
+        const abrir = () => {
+            if (!recorridoDe(claveRef.current)) return
+            setAvisada(claveRef.current)
+            setAvisoCerrado(true)
+            setSugerencia(null)
+            setHojaAbierta(true)
+        }
+        window.addEventListener(EVENTO_ABRIR_AYUDA, abrir)
+        return () => window.removeEventListener(EVENTO_ABRIR_AYUDA, abrir)
+    }, [])
 
     // ── Sugerencias ──
     // Solo a quien ya terminó los primeros pasos y no tiene nada más en pantalla.
