@@ -1,0 +1,78 @@
+import { describe, expect, it } from 'vitest'
+import type { ChatMessage, ConversationRow } from '@/lib/api'
+import {
+  VENTANA_WHATSAPP_MS, armarFilas, colorDeAvatar, estadoDeEntrega, iniciales, marcaDeLaLista, puedeResponderHasta, repartirCharlas, separadorDeDia,
+} from './utilidades'
+
+const AHORA = new Date(2026, 9, 17, 15, 30) // sábado 17 de octubre de 2026, 15:30
+
+const msg = (id: string, sender: 'CUSTOMER' | 'STORE', creado: Date, extra: Partial<ChatMessage> = {}): ChatMessage => ({
+  id, sender, text: 'hola', orderId: null, channel: 'WHATSAPP', deliveryStatus: null, createdAt: creado.toISOString(), ...extra,
+} as ChatMessage)
+
+describe('repartirCharlas', () => {
+  const fila = (id: string, canal?: ConversationRow['lastChannel']) => ({ id, lastChannel: canal } as ConversationRow)
+  it('manda a WhatsApp lo que terminó por WhatsApp y al sistema todo lo demás', () => {
+    const r = repartirCharlas([fila('a', 'WHATSAPP'), fila('b', 'STOREFRONT'), fila('c', undefined)])
+    expect(r.whatsapp.map((x) => x.id)).toEqual(['a'])
+    expect(r.sistema.map((x) => x.id)).toEqual(['b', 'c'])
+  })
+})
+
+describe('puedeResponderHasta', () => {
+  it('son 24 horas desde el último mensaje del cliente por WhatsApp', () => {
+    const ultimo = new Date(AHORA.getTime() - 5 * 3600_000)
+    const r = puedeResponderHasta([msg('1', 'CUSTOMER', new Date(AHORA.getTime() - 30 * 3600_000)), msg('2', 'CUSTOMER', ultimo)], AHORA.getTime())
+    expect(r?.getTime()).toBe(ultimo.getTime() + VENTANA_WHATSAPP_MS)
+  })
+  it('lo que escribió el negocio no renueva el plazo', () => {
+    const viejo = new Date(AHORA.getTime() - 30 * 3600_000)
+    expect(puedeResponderHasta([msg('1', 'CUSTOMER', viejo), msg('2', 'STORE', new Date(AHORA.getTime() - 3600_000))], AHORA.getTime())).toBeNull()
+  })
+  it('un mensaje del chat de la tienda no cuenta para WhatsApp, y sin mensajes del cliente no hay plazo', () => {
+    expect(puedeResponderHasta([msg('1', 'CUSTOMER', new Date(AHORA.getTime() - 3600_000), { channel: 'STOREFRONT' })], AHORA.getTime())).toBeNull()
+    expect(puedeResponderHasta([], AHORA.getTime())).toBeNull()
+  })
+})
+
+describe('fechas como en WhatsApp', () => {
+  it('la lista muestra la hora de hoy, "Ayer" o la fecha', () => {
+    expect(marcaDeLaLista(new Date(2026, 9, 17, 9, 5).toISOString(), AHORA)).toBe('09:05')
+    expect(marcaDeLaLista(new Date(2026, 9, 16, 23, 0).toISOString(), AHORA)).toBe('Ayer')
+    expect(marcaDeLaLista(new Date(2026, 8, 3, 12, 0).toISOString(), AHORA)).toBe('03/09/2026')
+  })
+  it('el separador del chat dice HOY, AYER, el día de la semana o la fecha completa', () => {
+    expect(separadorDeDia(new Date(2026, 9, 17, 1).toISOString(), AHORA)).toBe('HOY')
+    expect(separadorDeDia(new Date(2026, 9, 16, 1).toISOString(), AHORA)).toBe('AYER')
+    expect(separadorDeDia(new Date(2026, 9, 14, 12).toISOString(), AHORA)).toBe('MIÉRCOLES')
+    expect(separadorDeDia(new Date(2026, 8, 3, 12).toISOString(), AHORA)).toBe('3 de septiembre de 2026')
+  })
+})
+
+describe('avatares y entrega', () => {
+  it('iniciales y color estable por persona', () => {
+    expect(iniciales('Ana Paz')).toBe('AP')
+    expect(iniciales('')).toBe('?')
+    expect(colorDeAvatar('Ana Paz')).toBe(colorDeAvatar('Ana Paz'))
+  })
+  it('los tildes solo existen en lo que mandó el negocio', () => {
+    expect(estadoDeEntrega({ sender: 'CUSTOMER', deliveryStatus: null })).toBeNull()
+    expect(estadoDeEntrega({ sender: 'STORE', deliveryStatus: 'sent' })).toBe('enviado')
+    expect(estadoDeEntrega({ sender: 'STORE', deliveryStatus: 'delivered' })).toBe('entregado')
+    expect(estadoDeEntrega({ sender: 'STORE', deliveryStatus: 'read' })).toBe('leido')
+    expect(estadoDeEntrega({ sender: 'STORE', deliveryStatus: 'failed' })).toBe('fallo')
+  })
+})
+
+describe('armarFilas', () => {
+  it('marca el separador del primer mensaje de cada día y la colita al empezar cada racha', () => {
+    const filas = armarFilas([
+      msg('1', 'CUSTOMER', new Date(2026, 9, 16, 10)),
+      msg('2', 'CUSTOMER', new Date(2026, 9, 16, 10, 1)),
+      msg('3', 'STORE', new Date(2026, 9, 16, 11)),
+      msg('4', 'STORE', new Date(2026, 9, 17, 9)),
+    ], AHORA)
+    expect(filas.map((f) => f.dia)).toEqual(['AYER', null, null, 'HOY'])
+    expect(filas.map((f) => f.primeroDeRacha)).toEqual([true, false, true, true])
+  })
+})

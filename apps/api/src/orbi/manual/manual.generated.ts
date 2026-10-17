@@ -9,7 +9,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "12e0809225232abd",
+  "version": "4a591d490055030f",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -319,7 +319,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "bandeja",
       "capitulo": "Mensajes",
       "titulo": "La bandeja",
-      "texto": "Tus clientes te escriben desde la tienda y todo cae acá. A la izquierda la lista de conversaciones, con los no leídos marcados; a la derecha, el chat abierto.\n\nCuando hay algo sin leer, aparece un punto rojo en Mensajes en el menú de la izquierda: no hace falta entrar a chequear.\n\nSi tu negocio tiene WhatsApp conectado, los mensajes que te lleguen por ahí aparecen en esta misma bandeja, con la etiqueta del canal, y los respondés desde acá. Para conectarlo tocá \"Conectar WhatsApp\", arriba de la lista de conversaciones. WhatsApp solo permite responder dentro de las 24 horas del último mensaje del cliente. Si el botón no aparece, WhatsApp todavía no está habilitado para tu negocio.\n\nConsejo: Los mensajes directos de Instagram no están en esta bandeja: se atienden en Difusión → Mensajes, con una bandeja parecida a la de Instagram. Ahí también se conecta la cuenta.",
+      "texto": "Tus clientes te escriben desde la tienda y todo cae acá. A la izquierda la lista de conversaciones, con los no leídos marcados; a la derecha, el chat abierto.\n\nCuando hay algo sin leer, aparece un punto rojo en Mensajes en el menú de la izquierda: no hace falta entrar a chequear.\n\nArriba de la bandeja elegís qué mensajes ver, y al elegir cambia la bandeja de abajo: Mensajes del sistema son los que te escriben tus clientes desde el chat de tu tienda online (el cliente los ve y recibe tus respuestas en su perfil de la tienda), y WhatsApp son los chats de tu número de WhatsApp Business, con el mismo aspecto que WhatsApp Web: lista de chats con buscador y filtros (Todos, No leídos, Archivados) a la izquierda, y el chat con sus burbujas, tildes y barra para escribir a la derecha.\n\nPara usar WhatsApp, elegí WhatsApp y tocá \"Conectar cuenta de WhatsApp Business\": pegás los datos de tu app de Meta (ID del número, ID de la cuenta y token) y listo. Podés responder dentro de las 24 horas del último mensaje del cliente; pasado ese plazo el chat se lee pero no se responde hasta que el cliente escriba de nuevo, y el propio chat lo avisa. Si ves que WhatsApp todavía no está disponible para tu negocio, es porque lo estamos habilitando de a poco.\n\nConsejo: Los mensajes directos de Instagram no están en esta bandeja: se atienden en Difusión → Mensajes, con una bandeja parecida a la de Instagram. Ahí también se conecta la cuenta.",
       "destino": {
         "seccion": "mensajes",
         "label": "Ir a Mensajes"

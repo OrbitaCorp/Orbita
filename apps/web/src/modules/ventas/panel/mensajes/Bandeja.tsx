@@ -3,8 +3,16 @@ import { useRouter } from 'next/router'
 import type { VistaMensaje } from './components/MsgTabs'
 import { BandejaLista } from './components/BandejaLista'
 import { ChatPanel } from './components/ChatPanel'
+import { SelectorDeCanal, type EstadoDeWhatsapp } from './components/SelectorDeCanal'
+import { WhatsappModal } from './components/WhatsappConexion'
+import { ConectarWhatsapp } from './whatsapp/ConectarWhatsapp'
+import { WhatsAppWeb } from './whatsapp/WhatsAppWeb'
+import { repartirCharlas, type CanalDeMensajes } from './whatsapp/utilidades'
 import type { Conversacion, Plantilla, CategoriaPlantilla } from './mock/mensajes.mock'
-import { listConversations, updateConversation, listMessageTemplates, type ConversationRow, type MessageTemplateRow } from '@/lib/api'
+import {
+  ApiError, getWhatsappConnection, listConversations, updateConversation, listMessageTemplates,
+  type ConversationRow, type MessageTemplateRow,
+} from '@/lib/api'
 import { adminPath, currentSlug } from '@/lib/tenant'
 
 // El backend usa el enum en mayúsculas; el resto de esta pantalla trabaja en
@@ -101,6 +109,8 @@ function BandejaSkeleton() {
 // ─── Vista Bandeja (split panel) ─────────────────────────────────────────────
 
 interface BandejaProps {
+  canal:    CanalDeMensajes
+  onCanal:  (c: CanalDeMensajes) => void
   convId:   string | null
   onAbrir:  (id: string) => void
   onCerrar: () => void
@@ -110,10 +120,19 @@ interface BandejaProps {
   onPedido: (orderId: string) => void
 }
 
-function BandejaMensajes({ convId, onAbrir, onCerrar, ir, onToast, onPerfil, onPedido }: BandejaProps) {
+function BandejaMensajes({ canal, onCanal, convId, onAbrir, onCerrar, ir, onToast, onPerfil, onPedido }: BandejaProps) {
   const [loading, setLoading] = useState(true)
   const [rows, setRows] = useState<ConversationRow[]>([])
   const [plantillas, setPlantillas] = useState<Plantilla[]>([])
+  const [whatsapp, setWhatsapp] = useState<EstadoDeWhatsapp>('cargando')
+  const [modalWhatsapp, setModalWhatsapp] = useState(false)
+
+  // Si hay una cuenta conectada, y si WhatsApp está habilitado para este negocio. 403/404: no está disponible
+  // (negocio no habilitado, o la API todavía no tiene el endpoint).
+  const cargarWhatsapp = () => getWhatsappConnection().then(setWhatsapp).catch((e) => {
+    setWhatsapp(e instanceof ApiError && (e.status === 403 || e.status === 404) ? 'no-disponible' : { connected: false })
+  })
+  useEffect(() => { void cargarWhatsapp() }, [])
 
   useEffect(() => {
     let cancelado = false
@@ -139,8 +158,14 @@ function BandejaMensajes({ convId, onAbrir, onCerrar, ir, onToast, onPerfil, onP
 
   if (loading) return <BandejaSkeleton />
 
-  const conversaciones = rows.map(aConversacion)
+  // Cada charla va a la bandeja del canal por el que terminó: del sistema (chat de la tienda) o de WhatsApp.
+  const { sistema, whatsapp: deWhatsapp } = repartirCharlas(rows)
+  const conversaciones = sistema.map(aConversacion)
   const activaCV = conversaciones.find((cv) => cv.id === convId) ?? null
+  const sinLeer = {
+    sistema: sistema.filter((r) => r.isUnread && !r.isArchived).length,
+    whatsapp: deWhatsapp.filter((r) => r.isUnread && !r.isArchived).length,
+  }
 
   // Abrir una conversación = navegación real (cambia la URL vía ?conv=<id>).
   // Marcarla leída de verdad lo hace el backend cuando ChatPanel pide los
@@ -166,8 +191,46 @@ function BandejaMensajes({ convId, onAbrir, onCerrar, ir, onToast, onPerfil, onP
     }
   }
 
+  const selector = <SelectorDeCanal canal={canal} onCanal={onCanal} sinLeer={sinLeer} whatsapp={whatsapp} />
+
+  // ── WhatsApp: el chat con el aspecto de WhatsApp Web, o cómo conectar la cuenta ──
+  if (canal === 'whatsapp') {
+    const conectado = typeof whatsapp === 'object' && whatsapp.connected ? whatsapp : null
+    return (
+      <>
+        {selector}
+        {whatsapp === 'cargando' && <BandejaSkeleton />}
+        {whatsapp === 'no-disponible' && <ConectarWhatsapp caso="no-disponible" onConectar={() => undefined} />}
+        {typeof whatsapp === 'object' && !whatsapp.connected && <ConectarWhatsapp caso="sin-conectar" onConectar={() => setModalWhatsapp(true)} />}
+        {conectado && (
+          <WhatsAppWeb
+            charlas={deWhatsapp}
+            estado={conectado}
+            convId={convId}
+            plantillas={plantillas}
+            onAbrir={handleSelect}
+            onCerrar={onCerrar}
+            onArchivar={handleArchivar}
+            onPerfil={onPerfil}
+            onToast={onToast}
+            onAdministrar={() => setModalWhatsapp(true)}
+            onEnviado={() => { void listConversations().then(setRows).catch(() => undefined) }}
+          />
+        )}
+        {modalWhatsapp && (
+          <WhatsappModal
+            estado={typeof whatsapp === 'object' ? whatsapp : null}
+            onCerrar={() => setModalWhatsapp(false)}
+            onCambio={() => { void cargarWhatsapp() }}
+          />
+        )}
+      </>
+    )
+  }
+
   return (
     <>
+      {selector}
       {/* Mobile: Estado 1 (lista) y Estado 2 (chat) son excluyentes; ambos quedan montados
           para conservar filtro y scroll de la lista al volver. Desktop: split sin cambios. */}
       <style>{`
@@ -179,7 +242,7 @@ function BandejaMensajes({ convId, onAbrir, onCerrar, ir, onToast, onPerfil, onP
           .msg-split:not(.has-conv) .msg-chat { display: none !important; }
         }
       `}</style>
-      <div className={`msg-split ${activaCV ? 'has-conv' : ''}`} style={{ display: 'flex', height: 'calc(100dvh - 138px)', minHeight: 480, border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden', background: 'var(--color-bg)' }}>
+      <div className={`msg-split ${activaCV ? 'has-conv' : ''}`} style={{ display: 'flex', height: 'calc(100dvh - 270px)', minHeight: 480, border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden', background: 'var(--color-bg)' }}>
         <div className="msg-list">
           <BandejaLista conversaciones={conversaciones} activaId={convId} onSelect={handleSelect} onArchivar={handleArchivar} />
         </div>
@@ -197,6 +260,7 @@ export function MensajesHub() {
   const router  = useRouter()
   const { vista } = router.query
   const convId = (router.query.conv as string) ?? null
+  const canal: CanalDeMensajes = router.query.canal === 'whatsapp' ? 'whatsapp' : 'sistema'
   const [toast, setToast] = useState<string | null>(null)
 
   useEffect(() => {
@@ -212,6 +276,11 @@ export function MensajesHub() {
     router.push({ query: q })
   }
 
+  // Cambiar de bandeja cierra el chat abierto (era de la otra).
+  const cambiarCanal = (c: CanalDeMensajes) => {
+    const { conv: _c, canal: _k, ...rest } = router.query
+    void router.push({ query: c === 'whatsapp' ? { ...rest, canal: 'whatsapp' } : rest })
+  }
   const abrirConv = (id: string) => router.push({ query: { ...router.query, conv: id } })
   const cerrarConv = () => {
     const { conv: _c, ...rest } = router.query
@@ -254,7 +323,7 @@ export function MensajesHub() {
       <style>{`@media (max-width: 768px) { .msg-hub { padding: 16px !important; } }`}</style>
       {esPlantillas
         ? <PlantillasInline onToast={setToast} />
-        : <BandejaMensajes convId={convId} onAbrir={abrirConv} onCerrar={cerrarConv} ir={ir} onToast={setToast} onPerfil={irPerfil} onPedido={irPedido} />
+        : <BandejaMensajes canal={canal} onCanal={cambiarCanal} convId={convId} onAbrir={abrirConv} onCerrar={cerrarConv} ir={ir} onToast={setToast} onPerfil={irPerfil} onPedido={irPedido} />
       }
       {toast && (
         <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9000, background: 'var(--color-text)', color: 'var(--color-bg)', padding: '10px 18px', borderRadius: 8, fontSize: 13, fontWeight: 500, boxShadow: '0 4px 16px rgba(0,0,0,.2)', whiteSpace: 'nowrap' }}>
