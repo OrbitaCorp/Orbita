@@ -521,6 +521,7 @@ export const CAPITULOS: Capitulo[] = [
             bloques: [
                 { tipo: 'parrafo', texto: 'Tus clientes te escriben desde la tienda y todo cae acá. A la izquierda la lista de conversaciones, con los no leídos marcados; a la derecha, el chat abierto.' },
                 { tipo: 'parrafo', texto: 'Cuando hay algo sin leer, aparece un punto rojo en **Mensajes** en el menú de la izquierda: no hace falta entrar a chequear.' },
+                { tipo: 'parrafo', texto: 'Si tu negocio tiene WhatsApp conectado, los mensajes que te lleguen por ahí aparecen en esta misma bandeja, con la etiqueta del canal, y los respondés desde acá. Para conectarlo tocá [[Conectar WhatsApp]], arriba de la lista de conversaciones. WhatsApp solo permite responder dentro de las 24 horas del último mensaje del cliente. Si el botón no aparece, WhatsApp todavía no está habilitado para tu negocio.' },
                 { tipo: 'nota', variante: 'tip', texto: 'Los mensajes directos de Instagram no están en esta bandeja: se atienden en **Difusión → Mensajes**, con una bandeja parecida a la de Instagram. Ahí también se conecta la cuenta.' },
             ],
         },

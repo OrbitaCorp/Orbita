@@ -9,7 +9,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "a0e3ba5653a3dad0",
+  "version": "12e0809225232abd",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -319,7 +319,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "bandeja",
       "capitulo": "Mensajes",
       "titulo": "La bandeja",
-      "texto": "Tus clientes te escriben desde la tienda y todo cae acá. A la izquierda la lista de conversaciones, con los no leídos marcados; a la derecha, el chat abierto.\n\nCuando hay algo sin leer, aparece un punto rojo en Mensajes en el menú de la izquierda: no hace falta entrar a chequear.\n\nConsejo: Los mensajes directos de Instagram no están en esta bandeja: se atienden en Difusión → Mensajes, con una bandeja parecida a la de Instagram. Ahí también se conecta la cuenta.",
+      "texto": "Tus clientes te escriben desde la tienda y todo cae acá. A la izquierda la lista de conversaciones, con los no leídos marcados; a la derecha, el chat abierto.\n\nCuando hay algo sin leer, aparece un punto rojo en Mensajes en el menú de la izquierda: no hace falta entrar a chequear.\n\nSi tu negocio tiene WhatsApp conectado, los mensajes que te lleguen por ahí aparecen en esta misma bandeja, con la etiqueta del canal, y los respondés desde acá. Para conectarlo tocá \"Conectar WhatsApp\", arriba de la lista de conversaciones. WhatsApp solo permite responder dentro de las 24 horas del último mensaje del cliente. Si el botón no aparece, WhatsApp todavía no está habilitado para tu negocio.\n\nConsejo: Los mensajes directos de Instagram no están en esta bandeja: se atienden en Difusión → Mensajes, con una bandeja parecida a la de Instagram. Ahí también se conecta la cuenta.",
       "destino": {
         "seccion": "mensajes",
         "label": "Ir a Mensajes"
