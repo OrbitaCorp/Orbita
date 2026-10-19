@@ -26,7 +26,12 @@ const URL_INVITACIONES = 'https://www.instagram.com/accounts/manage_access/'
 // Video que muestra dónde aceptar la invitación de prueba en Instagram. Pegá acá la dirección de
 // YouTube, Vimeo o un archivo .mp4/.webm y aparece en el paso 3; mientras sea null, no se muestra.
 // Se borra junto con PASOS_EVALUADOR cuando Meta apruebe el acceso avanzado.
-const VIDEO_EVALUADOR_URL: string | null = null
+//
+// Hoy es el tutorial "Cómo aceptar la invitación de Instagram y conectar tu cuenta" (40 s, con voz), aprobado en la
+// cola de Marketing (Superadmin → Marketing → Videos, tipo tutorial, id b3a011ad-7192-43a4-a270-888c8a9d1aa5).
+// La dirección es el archivo en R2: si ese video se borra de la cola, hay que volver a null o apuntar a otro.
+const VIDEO_EVALUADOR_URL: string | null =
+  'https://pub-4c590787fd69461f8d464b91d826c1b4.r2.dev/marketing/videos/033681c8-d745-43b1-a5ef-ba8e8e9b5887.mp4'
 
 const TITULOS_PASOS = ['Dejá tu usuario', 'Confirmamos tu cuenta', 'Aceptá la invitación y conectá']
 
