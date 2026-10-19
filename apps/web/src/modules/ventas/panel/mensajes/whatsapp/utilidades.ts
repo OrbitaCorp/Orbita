@@ -1,4 +1,4 @@
-import type { CanalDeBandeja, ChatMessage, ConversationRow } from '@/lib/api'
+import type { BotChatEstado, BotModo, CanalDeBandeja, ChatMessage, ConversationRow } from '@/lib/api'
 
 // Lógica chica del módulo Mensajes que no depende de la pantalla: a qué canal pertenece una charla, hasta cuándo se
 // puede contestar por WhatsApp y cómo se muestran las horas y los días como en WhatsApp.
@@ -134,6 +134,24 @@ export function errorDeFoto(f: Pick<File, 'type' | 'size'>): string | null {
   if (!TIPOS_DE_FOTO.includes(f.type)) return 'Elegí una foto JPG, PNG o WebP.'
   if (f.size > MAX_BYTES_FOTO) return 'La foto pesa más de 10 MB.'
   return null
+}
+
+/**
+ * ¿Orbi contesta en este chat? Mismo criterio que la API: con el interruptor general apagado, nunca; ON y OFF son del
+ * dueño; DEFAULT sigue el modo general (solo atiende en "todos"); PAUSADO y DERIVADO lo callan hasta que el dueño lo reactive.
+ */
+export function orbiAtiende(config: { enabled: boolean; modo: BotModo } | null, estado: BotChatEstado | undefined): boolean {
+  if (!config?.enabled) return false
+  const e = estado ?? 'DEFAULT'
+  if (e === 'ON') return true
+  if (e === 'DEFAULT') return config.modo === 'TODOS'
+  return false
+}
+
+/** Lo que se marca en la lista de chats: "atencion" si Orbi pidió que lo vea una persona, "orbi" si lo atiende Orbi. */
+export function marcaDeBot(config: { enabled: boolean; modo: BotModo } | null, bot: ConversationRow['bot']): 'atencion' | 'orbi' | null {
+  if (bot?.estado === 'DERIVADO') return 'atencion'
+  return orbiAtiende(config, bot?.estado) ? 'orbi' : null
 }
 
 export interface FilaDelChat {

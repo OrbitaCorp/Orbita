@@ -100,6 +100,8 @@ model Business {
   payments             Payment[]
   mpCredentials        MpCredentials?
   whatsappConnection   WhatsappConnection?
+  whatsappBotConfig    WhatsappBotConfig?
+  whatsappBotTurns     WhatsappBotTurn[]
   instagramConnection  InstagramConnection?
   instagramEarlyAccess InstagramEarlyAccess?
   instagramPosts       InstagramPost[]
@@ -1593,6 +1595,12 @@ model Conversation {
   customerId String   @map("customer_id") // FK real (antes era string nombre)
   isUnread   Boolean  @default(true) @map("is_unread")
   isArchived Boolean  @default(false) @map("is_archived")
+  // Orbi atendiendo este chat de WhatsApp: DEFAULT sigue el modo general del negocio, ON/OFF lo decide el dueño para
+  // este chat, PAUSADO es que entró una persona y Orbi se calló, DERIVADO que Orbi pidió que lo atienda una persona.
+  // PAUSADO y DERIVADO solo los levanta el dueño (a mano).
+  botEstado     WhatsappBotChatEstado @default(DEFAULT) @map("bot_estado")
+  botMotivo     String?               @map("bot_motivo") // por qué está PAUSADO o DERIVADO, para mostrarlo en el chat
+  botCambiadoAt DateTime?             @map("bot_cambiado_at")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
@@ -1614,6 +1622,7 @@ model Message {
   channel        MessageChannel @default(STOREFRONT) // por dónde entró/salió: el chat de la tienda o WhatsApp
   externalId     String?        @unique @map("external_id") // id del mensaje en Meta (wamid): idempotencia del webhook y cruce con los estados
   deliveryStatus String?        @map("delivery_status") // solo WhatsApp saliente: sent | delivered | read | failed
+  viaOrbi        Boolean        @default(false) @map("via_orbi") // lo contestó Orbi (el bot de atención de WhatsApp), no una persona
   attachments    Json? // Instagram: [{ tipo: image|video|audio|file, url }] — archivos que llegaron o se mandaron con el mensaje
   createdAt      DateTime       @default(now()) @map("created_at") // timestamp real (antes string display)
 
@@ -1774,6 +1783,61 @@ model WhatsappConnection {
   business Business @relation(fields: [businessId], references: [id])
 
   @@map("whatsapp_connections")
+}
+
+enum WhatsappBotModo {
+  SELECCIONADOS // Orbi atiende solo los chats donde el dueño lo activa
+  TODOS // Orbi atiende todos los chats, salvo donde el dueño lo apaga o entra una persona
+}
+
+enum WhatsappBotChatEstado {
+  DEFAULT
+  ON
+  OFF
+  PAUSADO
+  DERIVADO
+}
+
+// Orbi como atención al público por WhatsApp (función del paquete Avanzado): el interruptor general del negocio, cómo
+// elige los chats y lo que el dueño quiere que Orbi sepa. Una fila por negocio.
+model WhatsappBotConfig {
+  id            String          @id @default(uuid())
+  businessId    String          @unique @map("business_id")
+  enabled       Boolean         @default(false)
+  modo          WhatsappBotModo @default(SELECCIONADOS)
+  instrucciones String? // indicaciones del dueño para Orbi (tono, promociones, políticas), hasta 1000 caracteres
+  topeCreditos  Int?            @map("tope_creditos") // tope mensual propio del dueño, por debajo del cupo del plan
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@map("whatsapp_bot_configs")
+}
+
+// Una fila por respuesta de Orbi en WhatsApp: de acá sale lo que se gastó del cupo del mes. Sin texto a propósito (los
+// mensajes ya están en la conversación).
+model WhatsappBotTurn {
+  id               String   @id @default(uuid())
+  businessId       String   @map("business_id")
+  conversationId   String?  @map("conversation_id")
+  status           String // ok | error | quota | derivado | limite
+  rounds           Int      @default(0)
+  toolsUsed        String[] @default([]) @map("tools_used")
+  model            String?
+  provider         String?
+  promptTokens     Int?     @map("prompt_tokens")
+  completionTokens Int?     @map("completion_tokens")
+  costUsd          Decimal? @map("cost_usd") @db.Decimal(12, 6)
+  credits          Int      @default(0)
+  latencyMs        Int      @default(0) @map("latency_ms")
+  errorCategory    String?  @map("error_category")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@index([businessId, createdAt])
+  @@map("whatsapp_bot_turns")
 }
 
 enum WhatsappConnectionStatus {

@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import { Archive, ArrowLeft, EllipsisVertical, FileText, ImagePlus, Search, SendHorizontal, Smile, X } from 'lucide-react'
+import { Archive, ArrowLeft, EllipsisVertical, FileText, ImagePlus, Search, SendHorizontal, Smile, Sparkles, X } from 'lucide-react'
 import {
-  ApiError, getConversationMessages, sendConversationImage, sendConversationMessage,
-  type ChatMessage, type ConversationRow, type WhatsappEstado,
+  ApiError, getConversationMessages, getWhatsappBot, sendConversationImage, sendConversationMessage, setConversationBot,
+  type ChatMessage, type ConversationRow, type WhatsappBotEstado, type WhatsappEstado,
 } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { resolverVariables, type Plantilla } from '../mock/mensajes.mock'
+import { OrbiWhatsapp } from './OrbiWhatsapp'
 import {
-  armarFilas, colorDeAvatar, errorDeFoto, estadoDeEntrega, fotoDelMensaje, hora, iniciales, marcaDeLaLista, pieDeFoto, puedeResponderHasta,
+  armarFilas, colorDeAvatar, errorDeFoto, estadoDeEntrega, fotoDelMensaje, hora, iniciales, marcaDeBot, marcaDeLaLista, orbiAtiende, pieDeFoto, puedeResponderHasta,
   TIPOS_DE_FOTO, vistaPreviaDeLaLista, type EstadoDeEntrega,
 } from './utilidades'
 
@@ -54,6 +55,11 @@ export function WhatsAppWeb({ charlas, estado, convId, plantillas, onAbrir, onCe
   const [menu, setMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const activa = charlas.find((c) => c.id === convId) ?? null
+  // Orbi como atención al público: su configuración (null si no se pudo leer, por ejemplo un miembro sin permiso) y si se
+  // está viendo el panel para configurarlo.
+  const [bot, setBot] = useState<WhatsappBotEstado | null>(null)
+  const [verOrbi, setVerOrbi] = useState(false)
+  useEffect(() => { getWhatsappBot().then(setBot).catch(() => setBot(null)) }, [])
 
   useEffect(() => {
     if (!menu) return
@@ -76,7 +82,7 @@ export function WhatsAppWeb({ charlas, estado, convId, plantillas, onAbrir, onCe
   const archivadas = charlas.filter((c) => c.isArchived).length
 
   return (
-    <div className={`wa-raiz${activa ? ' wa-con-chat' : ''}`}>
+    <div className={`wa-raiz${activa || (verOrbi && bot) ? ' wa-con-chat' : ''}`}>
       <style>{CSS}</style>
 
       <aside className="wa-lista" aria-label="Chats de WhatsApp">
@@ -90,6 +96,7 @@ export function WhatsAppWeb({ charlas, estado, convId, plantillas, onAbrir, onCe
             <button type="button" className="wa-icono" aria-label="Menú" aria-expanded={menu} onClick={() => setMenu((m) => !m)}><EllipsisVertical size={20} /></button>
             {menu && (
               <div className="wa-menu" role="menu">
+                {bot && <button type="button" role="menuitem" onClick={() => { setMenu(false); setVerOrbi(true); onCerrar() }}>Orbi en WhatsApp</button>}
                 <button type="button" role="menuitem" onClick={() => { setMenu(false); onAdministrar() }}>Administrar la cuenta conectada</button>
               </div>
             )}
@@ -126,11 +133,13 @@ export function WhatsAppWeb({ charlas, estado, convId, plantillas, onAbrir, onCe
             const entrega = m ? estadoDeEntrega(m) : null
             return (
               <li key={c.id}>
-                <button type="button" className={`wa-fila${c.id === convId ? ' wa-fila-activa' : ''}`} onClick={() => onAbrir(c.id)} aria-current={c.id === convId}>
+                <button type="button" className={`wa-fila${c.id === convId ? ' wa-fila-activa' : ''}`} onClick={() => { setVerOrbi(false); onAbrir(c.id) }} aria-current={c.id === convId}>
                   <Avatar nombre={c.customerName} foto={c.customerAvatar} />
                   <span className="wa-fila-cuerpo">
                     <span className="wa-fila-arriba">
                       <span className="wa-fila-nombre">{c.customerName}</span>
+                      {marcaDeBot(bot, c.bot) === 'atencion' && <span className="wa-marca wa-marca-atencion">Necesita atención</span>}
+                      {marcaDeBot(bot, c.bot) === 'orbi' && <span className="wa-marca">Orbi</span>}
                       <span className={`wa-fila-hora${c.isUnread ? ' wa-fila-hora-nueva' : ''}`}>{marcaDeLaLista(m?.createdAt ?? c.updatedAt)}</span>
                     </span>
                     <span className="wa-fila-abajo">
@@ -149,7 +158,9 @@ export function WhatsAppWeb({ charlas, estado, convId, plantillas, onAbrir, onCe
       </aside>
 
       <section className="wa-chat" aria-label="Chat">
-        {activa ? (
+        {verOrbi && bot ? (
+          <OrbiWhatsapp bot={bot} onCambio={(b) => { setBot(b); onEnviado() }} onVolver={() => setVerOrbi(false)} onToast={onToast} />
+        ) : activa ? (
           <Chat
             key={activa.id}
             charla={activa}
@@ -159,6 +170,7 @@ export function WhatsAppWeb({ charlas, estado, convId, plantillas, onAbrir, onCe
             onPerfil={() => onPerfil(activa.customerId)}
             onToast={onToast}
             onEnviado={onEnviado}
+            bot={bot}
           />
         ) : (
           <div className="wa-bienvenida">
@@ -166,6 +178,12 @@ export function WhatsAppWeb({ charlas, estado, convId, plantillas, onAbrir, onCe
             <h2>WhatsApp en Órbita</h2>
             <p>Tus clientes te escriben a <strong>{estado.displayPhone ?? 'tu número de WhatsApp Business'}</strong> y vos les respondés desde acá, sin salir del panel.</p>
             <p className="wa-bienvenida-nota">Elegí un chat de la lista para empezar. WhatsApp solo permite responder dentro de las 24 horas del último mensaje del cliente.</p>
+            {bot && (
+              <button type="button" className="wa-orbi-cta" onClick={() => setVerOrbi(true)}>
+                <Sparkles size={16} aria-hidden />
+                {bot.enabled ? 'Configurar Orbi en WhatsApp' : 'Conectá a Orbi a tu WhatsApp'}
+              </button>
+            )}
           </div>
         )}
       </section>
@@ -183,11 +201,13 @@ interface ChatProps {
   onPerfil: () => void
   onToast: (m: string) => void
   onEnviado: () => void
+  /** La configuración de Orbi para WhatsApp (null si no se pudo leer). */
+  bot: WhatsappBotEstado | null
 }
 
 type Panel = 'emojis' | 'plantillas' | null
 
-function Chat({ charla, plantillas, onVolver, onArchivar, onPerfil, onToast, onEnviado }: ChatProps) {
+function Chat({ charla, plantillas, onVolver, onArchivar, onPerfil, onToast, onEnviado, bot }: ChatProps) {
   const { user } = useAuth()
   const tienda = user && 'business' in user ? user.business.name : undefined
   const [mensajes, setMensajes] = useState<ChatMessage[] | null>(null)
@@ -198,6 +218,10 @@ function Chat({ charla, plantillas, onVolver, onArchivar, onPerfil, onToast, onE
   const [foto, setFoto] = useState<{ archivo: File; vista: string } | null>(null)
   const [visor, setVisor] = useState<string | null>(null)
   const selector = useRef<HTMLInputElement>(null)
+  // Orbi en este chat: se enciende, se apaga o se reactiva a mano.
+  const [cambiandoBot, setCambiandoBot] = useState(false)
+  const atiendeOrbi = orbiAtiende(bot, charla.bot?.estado)
+  const estadoBot = charla.bot?.estado
   const [ahora, setAhora] = useState(() => Date.now())
   const lista = useRef<HTMLDivElement>(null)
   const cerca = useRef(true)
@@ -279,6 +303,18 @@ function Chat({ charla, plantillas, onVolver, onArchivar, onPerfil, onToast, onE
   const alTeclear = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void enviar() }
   }
+  const cambiarOrbi = async (estado: 'ON' | 'OFF') => {
+    setCambiandoBot(true)
+    try {
+      await setConversationBot(charla.id, estado)
+      onEnviado()
+      onToast(estado === 'ON' ? 'Orbi atiende este chat' : 'Orbi dejó este chat: lo atendés vos')
+    } catch (e) {
+      onToast(e instanceof ApiError && e.status < 500 ? e.message : 'No se pudo cambiar a Orbi en este chat')
+    } finally {
+      if (montado.current) setCambiandoBot(false)
+    }
+  }
   const poner = (t: string) => { setTexto((a) => `${a}${t}`.slice(0, limite)); entrada.current?.focus() }
 
   const elegirFoto = (archivo: File | undefined) => {
@@ -304,10 +340,30 @@ function Chat({ charla, plantillas, onVolver, onArchivar, onPerfil, onToast, onE
             </span>
           </span>
         </button>
+        {bot?.enabled && (
+          <button
+            type="button" className={`wa-orbi-btn${atiendeOrbi ? ' wa-orbi-btn-on' : ''}`} disabled={cambiandoBot}
+            aria-pressed={atiendeOrbi} onClick={() => void cambiarOrbi(atiendeOrbi ? 'OFF' : 'ON')}
+            title={atiendeOrbi ? 'Orbi está contestando acá: tocá para atenderlo vos' : 'Que Orbi atienda este chat'}
+          >
+            <Sparkles size={15} aria-hidden />
+            <span>{atiendeOrbi ? 'Orbi atiende' : 'Activar Orbi'}</span>
+          </button>
+        )}
         <button type="button" className="wa-icono" onClick={onArchivar} aria-label={charla.isArchived ? 'Desarchivar el chat' : 'Archivar el chat'} title={charla.isArchived ? 'Desarchivar' : 'Archivar'}>
           <Archive size={19} />
         </button>
       </header>
+
+      {bot?.enabled && (estadoBot === 'PAUSADO' || estadoBot === 'DERIVADO') && (
+        <div className={`wa-orbi-aviso${estadoBot === 'DERIVADO' ? ' wa-orbi-aviso-atencion' : ''}`} role="status">
+          <span>
+            <strong>{estadoBot === 'DERIVADO' ? 'Orbi pidió que lo atienda una persona.' : 'Orbi está en pausa en este chat.'}</strong>{' '}
+            {charla.bot?.motivo ?? ''}
+          </span>
+          <button type="button" disabled={cambiandoBot} onClick={() => void cambiarOrbi('ON')}>Reactivar Orbi</button>
+        </div>
+      )}
 
       <div className="wa-mensajes" ref={lista} onScroll={alScrollear}>
         <p className="wa-aviso-info">Los mensajes salen por tu número de WhatsApp Business y llegan a tu cliente como cualquier otro chat.</p>
@@ -334,6 +390,7 @@ function Chat({ charla, plantillas, onVolver, onArchivar, onPerfil, onToast, onE
                     </>
                   ) : (
                     <>
+                      {m.viaOrbi && <span className="wa-orbi-tag"><Sparkles size={11} aria-hidden /> Orbi</span>}
                       <span className="wa-burbuja-texto">{m.text}</span>
                       <span className="wa-burbuja-meta">
                         {hora(m.createdAt)}
@@ -607,7 +664,23 @@ const CSS = `
 .wa-bienvenida strong { font-weight: 600; color: var(--wa-texto); }
 .wa-bienvenida-nota { font-size: 13px !important; }
 
+.wa-marca { flex-shrink: 0; padding: 1px 7px; border-radius: 9px; font-size: 11px; font-weight: 500; color: var(--wa-verde); background: rgba(0,168,132,0.12); }
+.wa-marca-atencion { color: #b45309; background: rgba(245,158,11,0.18); }
+.dark .wa-marca-atencion { color: #fbbf24; }
+.wa-fila-arriba .wa-fila-nombre { flex: 1; min-width: 0; }
+.wa-orbi-btn { flex-shrink: 0; height: 32px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--wa-borde); border-radius: 16px; cursor: pointer; font-size: 13px; color: var(--wa-texto-2); background: var(--wa-panel); }
+.wa-orbi-btn:hover:not(:disabled) { background: var(--wa-hover); }
+.wa-orbi-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.wa-orbi-btn-on { color: #fff; border-color: var(--wa-verde); background: var(--wa-verde); }
+.wa-orbi-btn-on:hover:not(:disabled) { background: #029374; }
+.wa-orbi-aviso { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 16px; font-size: 13px; line-height: 1.45; color: var(--wa-aviso-texto); background: var(--wa-aviso); }
+.wa-orbi-aviso button { flex-shrink: 0; height: 30px; padding: 0 14px; border: none; border-radius: 15px; cursor: pointer; font-size: 13px; font-weight: 500; color: #fff; background: var(--wa-verde); }
+.wa-orbi-aviso button:disabled { opacity: 0.5; cursor: not-allowed; }
+.wa-orbi-tag { display: inline-flex; align-items: center; gap: 3px; margin-bottom: 2px; font-size: 11px; font-weight: 600; color: var(--wa-verde); }
+.wa-orbi-cta { margin-top: 10px; height: 40px; padding: 0 20px; display: inline-flex; align-items: center; gap: 8px; border: none; border-radius: 20px; cursor: pointer; font-size: 14.5px; font-weight: 500; color: #fff; background: var(--wa-verde); }
 @media (max-width: 768px) {
+  .wa-orbi-btn span { display: none; }
+  .wa-orbi-btn { width: 36px; padding: 0; justify-content: center; }
   .wa-raiz { height: calc(100dvh - 240px); min-height: 420px; }
   .wa-lista { width: 100%; max-width: none; border-right: none; }
   .wa-chat { display: none; }

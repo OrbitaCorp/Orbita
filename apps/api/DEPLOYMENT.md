@@ -848,6 +848,17 @@ Business desde Mensajes → WhatsApp con el botón de Meta, sin pegar datos a ma
   guardan como JPEG (≤ 2048 px, ≤ 5 MB) en el bucket **`whatsapp-media`** de Supabase Storage, que se crea solo la primera
   vez (público, rutas con UUID: WhatsApp tiene que poder bajar la imagen por su dirección). No hace falta migración ni
   variable nueva. Audio, video y documentos no se guardan: siguen entrando como etiqueta en el texto.
+- **Orbi como atención al público (paquete Avanzado):** el bot (`src/whatsapp/whatsapp-bot*.ts`) contesta los chats de
+  WhatsApp donde el dueño lo activó. Corre DENTRO del pedido del webhook (Cloud Run corre con `--cpu-throttling`: lo que
+  queda después de responder no recibe CPU), con una espera de ~3,5 s para juntar mensajes seguidos
+  (`WHATSAPP_BOT_ESPERA_MS`). Usa el mismo modelo que Orbi del panel (`ORBI_MODEL_WHATSAPP` → `ORBI_MODEL_PANEL` →
+  `ORBI_MODEL`) y herramientas de solo lectura: el catálogo sale de `StorefrontService` (lo mismo que ve un comprador) y
+  los pedidos solo los de la persona que escribe. **Cupo aparte** del de Orbi del panel: `WHATSAPP_BOT_CREDITOS_MES`
+  (2000 por defecto), con tope propio opcional del dueño; lo gastado sale de `whatsapp_bot_turns`. Habilitación: el
+  addon `ADVANCED` activo; `WHATSAPP_BOT_SIN_PACK=true` lo salta y es SOLO para desarrollo (nunca en `env-vars.yaml`).
+  Tablas nuevas: `whatsapp_bot_configs`, `whatsapp_bot_turns` y columnas en `conversations` (`bot_estado`, `bot_motivo`,
+  `bot_cambiado_at`) y `messages` (`via_orbi`); migración `20261019010000_whatsapp_bot` (aplicar en producción con
+  `prisma-prod.sh migrate deploy` ANTES de desplegar la API).
 - **Probar sin un número real:** cuenta sandbox desde el panel de Meta (WhatsApp → Testear integraciones) o el formulario
   manual («Conectala a mano» en la pantalla de conectar).
 - **Cobro:** en Embedded Signup cada cliente agrega su propio medio de pago en Meta y paga ahí sus conversaciones.

@@ -9,6 +9,8 @@ import { CANALES_DE_BANDEJA, ConversationsService, type CanalDeBandeja } from '.
 import { SUBIDA_IMAGEN } from '../common/utils/subida-imagen';
 import { SendImageDto } from './dto/send-image.dto';
 import { SendMessageDto } from './dto/send-message.dto';
+import { ChatBotDto } from './dto/chat-bot.dto';
+import { WhatsappBotService } from '../whatsapp/whatsapp-bot.service';
 import { UpdateConversationDto } from './dto/update-conversation.dto';
 
 // Bandeja de mensajes del panel. Hasta acá (17/09) andaba SIN gate de
@@ -21,7 +23,10 @@ import { UpdateConversationDto } from './dto/update-conversation.dto';
 // sin gate ninguno) — el propietario siempre pasa (ver PermissionsGuard).
 @Controller('conversations')
 export class ConversationsController {
-  constructor(private readonly conversationsService: ConversationsService) {}
+  constructor(
+    private readonly conversationsService: ConversationsService,
+    private readonly bot: WhatsappBotService,
+  ) {}
 
   @Get()
   @FullModeOnly()
@@ -67,6 +72,15 @@ export class ConversationsController {
   sendImage(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: SendImageDto, @UploadedFile() file?: Express.Multer.File) {
     const member = assertMemberContext(ctx);
     return this.conversationsService.enviarImagen(member.businessId, id, file, dto.texto);
+  }
+
+  // Orbi en un chat de WhatsApp: encenderlo, apagarlo o reactivarlo (levanta la pausa y la derivación). Es decisión de quien atiende.
+  @Patch(':id/bot')
+  @FullModeOnly()
+  @RequirePermission('messages.manage')
+  cambiarBot(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: ChatBotDto) {
+    const member = assertMemberContext(ctx);
+    return this.bot.cambiarEstadoDelChat(member.businessId, id, dto.estado);
   }
 
   @Patch(':id')

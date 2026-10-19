@@ -3309,7 +3309,7 @@ export function meRevokeAllSessions() { return bffRequest<{ ok: boolean }>('/api
 export type ChatChannel = 'STOREFRONT' | 'WHATSAPP' | 'INSTAGRAM'
 // `attachments`: las fotos del mensaje (solo WhatsApp). El resto de los archivos llega como etiqueta en el texto.
 export type ChatAttachment = { tipo: 'image'; url: string }
-export type ChatMessage = { id: string; sender: 'CUSTOMER' | 'STORE'; text: string; orderId: string | null; channel?: ChatChannel; deliveryStatus?: string | null; attachments?: ChatAttachment[] | null; createdAt: string }
+export type ChatMessage = { id: string; sender: 'CUSTOMER' | 'STORE'; text: string; orderId: string | null; channel?: ChatChannel; deliveryStatus?: string | null; attachments?: ChatAttachment[] | null; viaOrbi?: boolean; createdAt: string }
 
 // Storefront (cliente logueado)
 export type MeConversation = { id: string | null; messages: ChatMessage[] }
@@ -3324,6 +3324,8 @@ export type ConversationRow = {
   isUnread: boolean; isArchived: boolean; lastChannel?: ChatChannel; lastMessage: ChatMessage | null; updatedAt: string
   // Lo último de cada bandeja y su propio "sin leer". Ausente en respuestas viejas o de la demo.
   canales?: Partial<Record<CanalDeBandeja, { lastMessage: ChatMessage; isUnread: boolean }>>
+  // Orbi en este chat de WhatsApp: su estado y, si está pausado o derivado, por qué.
+  bot?: { estado: BotChatEstado; motivo: string | null }
 }
 export function listConversations() { return panelRequest<ConversationRow[]>('/conversations') }
 // `canal`: la bandeja desde la que se mira o se contesta (Mensajes locales = STOREFRONT, o WhatsApp). Las dos no se
@@ -3347,6 +3349,24 @@ export async function sendConversationImage(id: string, input: { foto: File; tex
     throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
   }
   return body as ChatMessage
+}
+// ── Orbi como atención al público por WhatsApp (paquete Avanzado) ─────────────
+// DEFAULT sigue el modo general; ON/OFF lo decide el dueño para ese chat; PAUSADO = entró una persona y Orbi se calló;
+// DERIVADO = Orbi pidió que lo atienda una persona. PAUSADO y DERIVADO solo los levanta el dueño.
+export type BotModo = 'SELECCIONADOS' | 'TODOS'
+export type BotChatEstado = 'DEFAULT' | 'ON' | 'OFF' | 'PAUSADO' | 'DERIVADO'
+export type WhatsappBotEstado = {
+  disponible: boolean; conectado: boolean; enabled: boolean; modo: BotModo
+  instrucciones: string | null; topeCreditos: number | null
+  cupo: { mes: string; usados: number; total: number; limite: number; porcentaje: number }
+}
+export function getWhatsappBot() { return panelRequest<WhatsappBotEstado>('/whatsapp/bot') }
+export function updateWhatsappBot(input: { enabled?: boolean; modo?: BotModo; instrucciones?: string | null; topeCreditos?: number | null }) {
+  return panelRequest<WhatsappBotEstado>('/whatsapp/bot', { method: 'PATCH', body: JSON.stringify(input) })
+}
+/** Enciende (ON, también reactiva un chat pausado o derivado) o apaga (OFF) a Orbi en un chat de WhatsApp. */
+export function setConversationBot(id: string, estado: 'ON' | 'OFF') {
+  return panelRequest<{ botEstado: BotChatEstado }>(`/conversations/${id}/bot`, { method: 'PATCH', body: JSON.stringify({ estado }) })
 }
 export function updateConversation(id: string, input: { isUnread?: boolean; isArchived?: boolean }) {
   return panelRequest<{ ok: boolean }>(`/conversations/${id}`, { method: 'PATCH', body: JSON.stringify(input) })

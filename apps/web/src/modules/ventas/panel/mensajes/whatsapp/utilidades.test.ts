@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { ChatMessage, ConversationRow } from '@/lib/api'
 import {
   MAX_BYTES_FOTO, VENTANA_WHATSAPP_MS, armarFilas, colorDeAvatar, errorDeFoto, estadoDeEntrega, fotoDelMensaje, iniciales, marcaDeLaLista, pieDeFoto, puedeResponderHasta,
-  repartirCharlas, separadorDeDia, vistaPreviaDeLaLista,
+  marcaDeBot, orbiAtiende, repartirCharlas, separadorDeDia, vistaPreviaDeLaLista,
 } from './utilidades'
 
 const AHORA = new Date(2026, 9, 17, 15, 30) // sábado 17 de octubre de 2026, 15:30
@@ -125,5 +125,33 @@ describe('fotos en el chat', () => {
     expect(errorDeFoto({ type: 'application/pdf', size: 1000 })).toMatch(/JPG, PNG o WebP/)
     expect(errorDeFoto({ type: 'image/gif', size: 1000 })).not.toBeNull()
     expect(errorDeFoto({ type: 'image/jpeg', size: MAX_BYTES_FOTO + 1 })).toMatch(/10 MB/)
+  })
+})
+
+describe('Orbi en los chats', () => {
+  const sel = { enabled: true, modo: 'SELECCIONADOS' as const }
+  const todos = { enabled: true, modo: 'TODOS' as const }
+
+  it('apagado en general, no atiende en ningún chat', () => {
+    expect(orbiAtiende(null, 'ON')).toBe(false)
+    expect(orbiAtiende({ enabled: false, modo: 'TODOS' }, 'ON')).toBe(false)
+  })
+  it('"solo los que yo active": atiende los ON; "todos": atiende todos menos los apagados', () => {
+    expect(orbiAtiende(sel, 'ON')).toBe(true)
+    expect(orbiAtiende(sel, 'DEFAULT')).toBe(false)
+    expect(orbiAtiende(sel, undefined)).toBe(false)
+    expect(orbiAtiende(todos, 'DEFAULT')).toBe(true)
+    expect(orbiAtiende(todos, 'OFF')).toBe(false)
+  })
+  it('pausado o derivado lo callan, en cualquier modo', () => {
+    expect(orbiAtiende(todos, 'PAUSADO')).toBe(false)
+    expect(orbiAtiende(todos, 'DERIVADO')).toBe(false)
+  })
+  it('la lista marca los chats que Orbi atiende y los que necesitan a una persona', () => {
+    expect(marcaDeBot(sel, { estado: 'ON', motivo: null })).toBe('orbi')
+    expect(marcaDeBot(sel, { estado: 'DEFAULT', motivo: null })).toBeNull()
+    expect(marcaDeBot(sel, { estado: 'DERIVADO', motivo: 'Reclamo' })).toBe('atencion')
+    expect(marcaDeBot(null, { estado: 'DERIVADO', motivo: 'Reclamo' })).toBe('atencion')
+    expect(marcaDeBot(todos, undefined)).toBe('orbi')
   })
 })

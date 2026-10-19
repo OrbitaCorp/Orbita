@@ -1,3 +1,4 @@
+import { pausarSiAtendiaOrbi, type MensajeEntrante } from './whatsapp-bot-estado';
 import {
   BadGatewayException,
   BadRequestException,
@@ -175,8 +176,10 @@ export class WhatsappService {
 
   // ── Webhook: eventos ───────────────────────────────────────────────────────
 
-  async procesarWebhook(body: WaWebhookBody): Promise<void> {
-    if (body.object !== 'whatsapp_business_account') return;
+  /** Procesa el aviso de Meta. Devuelve los mensajes de clientes que entraron (nuevos), para que Orbi los atienda. */
+  async procesarWebhook(body: WaWebhookBody): Promise<MensajeEntrante[]> {
+    const nuevos: MensajeEntrante[] = [];
+    if (body.object !== 'whatsapp_business_account') return nuevos;
     for (const entry of body.entry ?? []) {
       for (const change of entry.changes ?? []) {
         if (!change.value) continue;
@@ -215,7 +218,8 @@ export class WhatsappService {
         const nombres = new Map((change.value.contacts ?? []).map((c) => [c.wa_id ?? '', c.profile?.name]));
         for (const m of change.value.messages ?? []) {
           try {
-            await this.guardarEntrante(conexion.businessId, m, nombres.get(m.from));
+            const guardado = await this.guardarEntrante(conexion.businessId, m, nombres.get(m.from));
+            if (guardado) nuevos.push(guardado);
           } catch (e) {
             // Un mensaje que falla no puede tumbar el resto ni hacer que Meta
             // reintente todo el lote: queda en el log con su id.
@@ -231,6 +235,7 @@ export class WhatsappService {
         }
       }
     }
+    return nuevos;
   }
 
   private textoDe(m: WaMessage): string | null {
@@ -274,25 +279,25 @@ export class WhatsappService {
     }
   }
 
-  private async guardarEntrante(businessId: string, m: WaMessage, nombrePerfil?: string): Promise<void> {
+  private async guardarEntrante(businessId: string, m: WaMessage, nombrePerfil?: string): Promise<MensajeEntrante | null> {
     const textoBase = this.textoDe(m);
-    if (!textoBase) return;
+    if (!textoBase) return null;
     // Meta reintenta si no recibe 200 a tiempo: sin esto un mismo mensaje se
     // guardaría dos veces. `externalId` es único, pero se mira antes para no
     // depender de capturar el error de la base.
-    if (await this.prisma.message.findUnique({ where: { externalId: m.id }, select: { id: true } })) return;
+    if (await this.prisma.message.findUnique({ where: { externalId: m.id }, select: { id: true } })) return null;
     const adjuntos = await this.adjuntosDe(businessId, m.type, m.image);
     const texto = this.textoConAdjuntos(adjuntos, m.image, textoBase);
 
     const customerId = await this.resolverCliente(businessId, m.from, nombrePerfil);
-    if (!customerId) return;
+    if (!customerId) return null;
 
     const conv =
       (await this.prisma.conversation.findFirst({ where: { businessId, customerId }, select: { id: true } })) ??
       (await this.prisma.conversation.create({ data: { businessId, customerId, isUnread: true }, select: { id: true } }));
 
     const creado = m.timestamp ? new Date(Number(m.timestamp) * 1000) : new Date();
-    await this.prisma.$transaction([
+    const [mensaje] = await this.prisma.$transaction([
       this.prisma.message.create({
         data: {
           conversationId: conv.id, sender: 'CUSTOMER', text: texto, channel: 'WHATSAPP', externalId: m.id, createdAt: creado,
@@ -301,6 +306,9 @@ export class WhatsappService {
       }),
       this.prisma.conversation.update({ where: { id: conv.id }, data: { isUnread: true, isArchived: false, updatedAt: new Date() } }),
     ]);
+    const messageId = (mensaje as { id?: string } | undefined)?.id;
+    if (!messageId) return null;
+    return { businessId, conversationId: conv.id, customerId, messageId, waId: m.from, esTexto: m.type === 'text' || m.type === 'button' || m.type === 'interactive' };
   }
 
   /**
@@ -343,6 +351,12 @@ export class WhatsappService {
       }),
       this.prisma.conversation.update({ where: { id: conv.id }, data: { updatedAt: new Date() } }),
     ]);
+    // Lo escribió una persona desde el celular: si Orbi atendía este chat, se calla (la reactiva el dueño).
+    try {
+      await pausarSiAtendiaOrbi(this.prisma, businessId, conv.id);
+    } catch (err) {
+      this.logger.warn(`No se pudo pausar a Orbi en ${conv.id}: ${describeError(err)}`);
+    }
   }
 
   /**

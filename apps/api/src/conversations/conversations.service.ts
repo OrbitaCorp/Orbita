@@ -1,3 +1,4 @@
+import { pausarSiAtendiaOrbi } from '../whatsapp/whatsapp-bot-estado';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -25,7 +26,7 @@ const SIN_SOLO_INSTAGRAM = {
 export type CanalDeBandeja = 'STOREFRONT' | 'WHATSAPP';
 export const CANALES_DE_BANDEJA: CanalDeBandeja[] = ['STOREFRONT', 'WHATSAPP'];
 
-type MensajeRow = { id: string; sender: string; text: string; orderId: string | null; channel: string; deliveryStatus: string | null; createdAt: Date; attachments?: unknown };
+type MensajeRow = { id: string; sender: string; text: string; orderId: string | null; channel: string; deliveryStatus: string | null; createdAt: Date; attachments?: unknown; viaOrbi?: boolean };
 
 @Injectable()
 export class ConversationsService {
@@ -60,6 +61,8 @@ export class ConversationsService {
       id: m.id, sender: m.sender, text: m.text, orderId: m.orderId, channel: m.channel, deliveryStatus: m.deliveryStatus, createdAt: m.createdAt,
       // Fotos del mensaje (WhatsApp): [{ tipo: 'image', url }].
       attachments: Array.isArray(m.attachments) ? m.attachments : null,
+      // Lo contestó Orbi (el bot de atención de WhatsApp).
+      viaOrbi: m.viaOrbi === true,
     };
   }
 
@@ -79,9 +82,9 @@ export class ConversationsService {
     // Lo último de cada canal y por dónde escribió el cliente por última vez: con eso cada bandeja arma SU lista, con su
     // propio último mensaje y su propio "sin leer", sin mezclar lo del otro canal.
     const ids = rows.map((r) => r.id);
-    const ultimosPorCanal = ids.length === 0 ? [] : await this.prisma.$queryRaw<{ conversation_id: string; id: string; sender: string; text: string; order_id: string | null; channel: string; delivery_status: string | null; created_at: Date; attachments: unknown }[]>`
+    const ultimosPorCanal = ids.length === 0 ? [] : await this.prisma.$queryRaw<{ conversation_id: string; id: string; sender: string; text: string; order_id: string | null; channel: string; delivery_status: string | null; created_at: Date; attachments: unknown; via_orbi: boolean }[]>`
       SELECT DISTINCT ON (conversation_id, channel)
-        conversation_id, id, sender::text AS sender, text, order_id, channel::text AS channel, delivery_status, created_at, attachments
+        conversation_id, id, sender::text AS sender, text, order_id, channel::text AS channel, delivery_status, created_at, attachments, via_orbi
       FROM messages
       WHERE conversation_id IN (${Prisma.join(ids)}) AND channel IN ('STOREFRONT'::"MessageChannel", 'WHATSAPP'::"MessageChannel")
       ORDER BY conversation_id, channel, created_at DESC`;
@@ -96,7 +99,7 @@ export class ConversationsService {
       for (const m of ultimosPorCanal) {
         if (m.conversation_id !== conversationId) continue;
         canales[m.channel as CanalDeBandeja] = {
-          lastMessage: this.aMensaje({ id: m.id, sender: m.sender, text: m.text, orderId: m.order_id, channel: m.channel, deliveryStatus: m.delivery_status, createdAt: m.created_at, attachments: m.attachments }),
+          lastMessage: this.aMensaje({ id: m.id, sender: m.sender, text: m.text, orderId: m.order_id, channel: m.channel, deliveryStatus: m.delivery_status, createdAt: m.created_at, attachments: m.attachments, viaOrbi: m.via_orbi }),
           // "Sin leer" es de la bandeja donde llegó el último mensaje del cliente; la otra no se entera.
           isUnread: sinLeer && canalDelUltimoCliente.get(conversationId) === m.channel,
         };
@@ -116,6 +119,8 @@ export class ConversationsService {
       lastChannel: c.messages[0]?.channel ?? 'STOREFRONT',
       lastMessage: c.messages[0] ? this.aMensaje(c.messages[0]) : null,
       canales: canalesDe(c.id, c.isUnread),
+      // Orbi en este chat de WhatsApp: su estado y, si está pausado o derivado, por qué.
+      bot: { estado: c.botEstado, motivo: c.botMotivo },
       updatedAt: c.updatedAt,
     }));
   }
@@ -205,6 +210,8 @@ export class ConversationsService {
     // Si lo pendiente era de la otra bandeja, contestar acá no lo borra.
     const limpiaPendiente = !forzado || !ultimoDelCliente || ultimoDelCliente.channel === forzado;
     await this.prisma.conversation.update({ where: { id: conversationId }, data: { ...(limpiaPendiente ? { isUnread: false } : {}), updatedAt: new Date() } });
+    // Contestó una persona por WhatsApp: si Orbi atendía este chat, se calla.
+    if (canal === 'WHATSAPP') await this.pausarOrbi(businessId, conversationId);
     return this.aMensaje(msg);
   }
 
@@ -233,7 +240,17 @@ export class ConversationsService {
     const ultimoDelCliente = await this.canalDelUltimoMensajeDelCliente(conversationId);
     const limpiaPendiente = !ultimoDelCliente || ultimoDelCliente === 'WHATSAPP';
     await this.prisma.conversation.update({ where: { id: conversationId }, data: { ...(limpiaPendiente ? { isUnread: false } : {}), updatedAt: new Date() } });
+    await this.pausarOrbi(businessId, conversationId);
     return this.aMensaje(msg);
+  }
+
+  // Mejor esfuerzo: que no se pueda pausar a Orbi no puede hacer fallar un mensaje que ya salió.
+  private async pausarOrbi(businessId: string, conversationId: string): Promise<void> {
+    try {
+      await pausarSiAtendiaOrbi(this.prisma, businessId, conversationId);
+    } catch {
+      /* se reintenta con el próximo mensaje de la persona */
+    }
   }
 
   async update(businessId: string, conversationId: string, dto: UpdateConversationDto) {
