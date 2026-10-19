@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorefrontService } from '../storefront/storefront.service';
 import { WhatsappService } from './whatsapp.service';
-import { LLM_ADAPTER, type LlmAdapter, type LlmMessage } from '../orbi/llm/llm-adapter.interface';
+import { LLM_ADAPTER_BOT, type LlmAdapter, type LlmMessage } from '../orbi/llm/llm-adapter.interface';
 import { sumarConsumo, nuevoProgresoDelTurno } from '../orbi/turno/motor-de-turno';
 import { costoDelTurno } from '../orbi/turno/costo-del-turno';
 import { vueltaDeTools } from '../orbi/turno/vuelta';
@@ -24,7 +24,8 @@ const VUELTAS_MAX = 4;
 const HISTORIAL = 12;
 const RESPUESTAS_POR_HORA = 20;
 const CREDITOS_MES_POR_DEFECTO = 2000;
-const TIEMPO_MAX_MS = 40_000;
+// Tope de todo el pedido al modelo, con la cadena de respaldos adentro (Groq y Workers AI tienen 15 s cada uno).
+const TIEMPO_MAX_MS = 50_000;
 const dormir = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 export interface EstadoDelBot {
@@ -48,7 +49,7 @@ export class WhatsappBotService {
     private readonly config: ConfigService,
     private readonly whatsapp: WhatsappService,
     private readonly storefront: StorefrontService,
-    @Inject(LLM_ADAPTER) private readonly llm: Pick<LlmAdapter, 'streamChat'>,
+    @Inject(LLM_ADAPTER_BOT) private readonly llm: Pick<LlmAdapter, 'streamChat'>,
   ) {
     this.herramientas = new HerramientasDelBot(this.prisma, this.storefront);
   }
@@ -152,6 +153,19 @@ export class WhatsappBotService {
     }
   }
 
+  /**
+   * ¿Este sigue siendo el último mensaje del chat, y es del cliente? Falso si el cliente siguió escribiendo (lo atiende el
+   * aviso de ese último mensaje, con todo el contexto) o si ya contestó alguien (otra corrida de Orbi, o una persona).
+   */
+  private async esElUltimoSinContestar(conversationId: string, messageId: string): Promise<boolean> {
+    const ultimo = await this.prisma.message.findFirst({
+      where: { conversationId, channel: 'WHATSAPP' },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, sender: true },
+    });
+    return !!ultimo && ultimo.id === messageId && ultimo.sender === 'CUSTOMER';
+  }
+
   private async leerChat(businessId: string, conversationId: string) {
     return this.prisma.conversation.findFirst({ where: { id: conversationId, businessId }, select: { botEstado: true, isArchived: true } });
   }
@@ -166,12 +180,7 @@ export class WhatsappBotService {
     // Espera a que termine de escribir; al despertar, solo sigue si este es el último mensaje y nadie contestó.
     const espera = Number(this.config.get<string>('WHATSAPP_BOT_ESPERA_MS') ?? 3500);
     if (espera > 0) await dormir(espera);
-    const ultimo = await this.prisma.message.findFirst({
-      where: { conversationId, channel: 'WHATSAPP' },
-      orderBy: { createdAt: 'desc' },
-      select: { id: true, sender: true },
-    });
-    if (!ultimo || ultimo.id !== m.messageId || ultimo.sender !== 'CUSTOMER') return;
+    if (!(await this.esElUltimoSinContestar(conversationId, m.messageId))) return;
     const ahora = await this.leerChat(businessId, conversationId);
     if (!ahora || !orbiAtiendeElChat(cfg, ahora.botEstado)) return;
 
@@ -217,6 +226,12 @@ export class WhatsappBotService {
         ctx: { businessId, slug: negocio.subdomain, customerId: m.customerId },
       });
       const texto = r.texto.trim().slice(0, MAX_CARACTERES_RESPUESTA);
+      // El modelo tarda: mientras pensaba, el cliente pudo seguir escribiendo o contestar una persona. En ese caso esta
+      // respuesta ya quedó vieja y no se manda (la del último mensaje la arma con todo el contexto).
+      if (!(await this.esElUltimoSinContestar(conversationId, m.messageId))) {
+        await this.registrar({ businessId, conversationId, status: 'descartado', ...r.metricas, latencyMs: Date.now() - inicio });
+        return;
+      }
       if (!texto && !r.derivar) {
         await this.contestar(m, MENSAJE_DE_DERIVACION, { status: 'error', derivar: 'Orbi no pudo armar una respuesta.', ...r.metricas, latencyMs: Date.now() - inicio });
         return;
@@ -224,7 +239,10 @@ export class WhatsappBotService {
       await this.contestar(m, texto || MENSAJE_DE_DERIVACION, { status: r.derivar ? 'derivado' : 'ok', derivar: r.derivar, ...r.metricas, latencyMs: Date.now() - inicio });
     } catch (e) {
       this.logger.error(`Orbi falló al responder en ${conversationId}: ${describeError(e)}`);
-      await this.derivar(businessId, conversationId, 'Orbi no pudo responder: lo revisa una persona.');
+      // Si mientras tanto ya contestó otra corrida (o una persona), el chat está atendido: no hace falta derivarlo.
+      if (await this.esElUltimoSinContestar(conversationId, m.messageId)) {
+        await this.derivar(businessId, conversationId, 'Orbi no pudo responder: lo revisa una persona.');
+      }
       await this.registrar({ businessId, conversationId, status: 'error', errorCategory: (e as Error)?.name ?? 'error', latencyMs: Date.now() - inicio });
     }
   }
@@ -380,7 +398,7 @@ export class WhatsappBotService {
 interface TurnoParaGuardar {
   businessId: string;
   conversationId: string;
-  status: 'ok' | 'error' | 'quota' | 'derivado' | 'limite';
+  status: 'ok' | 'error' | 'quota' | 'derivado' | 'limite' | 'descartado';
   rounds?: number;
   toolsUsed?: string[];
   model?: string;

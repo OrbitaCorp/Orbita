@@ -851,8 +851,12 @@ Business desde Mensajes → WhatsApp con el botón de Meta, sin pegar datos a ma
 - **Orbi como atención al público (paquete Avanzado):** el bot (`src/whatsapp/whatsapp-bot*.ts`) contesta los chats de
   WhatsApp donde el dueño lo activó. Corre DENTRO del pedido del webhook (Cloud Run corre con `--cpu-throttling`: lo que
   queda después de responder no recibe CPU), con una espera de ~3,5 s para juntar mensajes seguidos
-  (`WHATSAPP_BOT_ESPERA_MS`). Usa el mismo modelo que Orbi del panel (`ORBI_MODEL_WHATSAPP` → `ORBI_MODEL_PANEL` →
-  `ORBI_MODEL`) y herramientas de solo lectura: el catálogo sale de `StorefrontService` (lo mismo que ve un comprador) y
+  (`WHATSAPP_BOT_ESPERA_MS`). Modelo de IA con respaldos, del más barato al más caro: **Groq** (`GROQ_MODEL`,
+  gpt-oss-120b) → **Workers AI de Cloudflare** (`CF_LLM_MODEL`, `@cf/openai/gpt-oss-120b`; usa `R2_ACCOUNT_ID` +
+  `CF_WORKERS_AI_API_TOKEN`, que necesita el permiso de Workers AI) → **Gemini** (`ORBI_MODEL_WHATSAPP` →
+  `ORBI_MODEL_PANEL` → `ORBI_MODEL`). Cada uno tiene 15 s para contestar; si se cae (429, 5xx, red) o no contesta,
+  sigue el próximo, y los que no tienen credenciales se saltean (`cadenaDeRespaldos` en `llm-adapter.provider.ts`). Sin
+  secrets nuevos. Herramientas de solo lectura: el catálogo sale de `StorefrontService` (lo mismo que ve un comprador) y
   los pedidos solo los de la persona que escribe. **Cupo aparte** del de Orbi del panel: `WHATSAPP_BOT_CREDITOS_MES`
   (2000 por defecto), con tope propio opcional del dueño; lo gastado sale de `whatsapp_bot_turns`. Habilitación: el
   addon `ADVANCED` activo; `WHATSAPP_BOT_SIN_PACK=true` lo salta y es SOLO para desarrollo (nunca en `env-vars.yaml`).

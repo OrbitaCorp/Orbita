@@ -72,6 +72,8 @@ type Opciones = {
   cfg?: Partial<{ enabled: boolean; modo: string; instrucciones: string | null; topeCreditos: number | null }> | null;
   botEstado?: string;
   ultimo?: { id: string; sender: string } | null;
+  /** Qué ve cada consulta del último mensaje del chat, en orden (la última se repite). Pisa a `ultimo`. */
+  ultimos?: ({ id: string; sender: string } | null)[];
   usados?: number;
   respuestasRecientes?: number;
   eventos?: LlmEvent[][]; // una lista de eventos por vuelta del modelo
@@ -83,6 +85,9 @@ const uso = (prompt = 1000, salida = 200): LlmEvent => ({ type: 'usage', usage: 
 
 function armar(o: Opciones = {}) {
   const cfg = o.cfg === null ? null : { id: 'c', businessId: BIZ, enabled: true, modo: 'SELECCIONADOS', instrucciones: null, topeCreditos: null, ...o.cfg };
+  const propio = { id: MSG.messageId, sender: 'CUSTOMER' };
+  const ultimoMock = jest.fn().mockResolvedValue(o.ultimo === undefined ? propio : o.ultimo);
+  for (const u of o.ultimos ?? []) ultimoMock.mockResolvedValueOnce(u);
   const prisma: any = {
     whatsappBotConfig: { findUnique: jest.fn().mockResolvedValue(cfg), upsert: jest.fn().mockResolvedValue({}) },
     whatsappBotTurn: { aggregate: jest.fn().mockResolvedValue({ _sum: { credits: o.usados ?? 0 } }), create: jest.fn().mockResolvedValue({}) },
@@ -95,7 +100,7 @@ function armar(o: Opciones = {}) {
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     message: {
-      findFirst: jest.fn().mockResolvedValue(o.ultimo === undefined ? { id: MSG.messageId, sender: 'CUSTOMER' } : o.ultimo),
+      findFirst: ultimoMock,
       count: jest.fn().mockImplementation(async ({ where }: any) => (where.createdAt ? (o.respuestasRecientes ?? 0) : 0)),
       findMany: jest.fn().mockResolvedValue([
         // De más nuevo a más viejo, como los pide el servicio.
@@ -199,6 +204,25 @@ describe('WhatsappBotService.atender', () => {
     const t = armar();
     await t.bot.atender([{ ...MSG, messageId: 'm-0' }, MSG]);
     expect(t.llm.streamChat).toHaveBeenCalledTimes(1);
+  });
+
+  it('si mientras el modelo piensa el cliente sigue escribiendo, la respuesta vieja se descarta (y se anota lo gastado)', async () => {
+    // 1ª consulta (al despertar): es el último. 2ª (antes de mandar): ya hay uno más nuevo.
+    const t = armar({ ultimos: [{ id: MSG.messageId, sender: 'CUSTOMER' }, { id: 'mas-nuevo', sender: 'CUSTOMER' }] });
+    await t.bot.atender([MSG]);
+    expect(t.llm.streamChat).toHaveBeenCalledTimes(1);
+    expect(t.whatsapp.enviarTexto).not.toHaveBeenCalled();
+    const turno = t.prisma.whatsappBotTurn.create.mock.calls[0][0].data;
+    expect(turno.status).toBe('descartado');
+    expect(turno.credits).toBeGreaterThan(0);
+  });
+
+  it('si mientras tanto ya contestó otra corrida, un error o un corte por tiempo no deja el chat derivado', async () => {
+    const t = armar({ ultimos: [{ id: MSG.messageId, sender: 'CUSTOMER' }, { id: 'resp', sender: 'STORE' }] });
+    t.llm.streamChat.mockImplementation(async function* () { throw new Error('This operation was aborted'); });
+    await t.bot.atender([MSG]);
+    expect(t.prisma.conversation.updateMany).not.toHaveBeenCalled();
+    expect(t.prisma.whatsappBotTurn.create.mock.calls[0][0].data.status).toBe('error');
   });
 
   it('si pide derivar, manda la despedida y deja el chat para una persona, sin sin-leer apagado', async () => {

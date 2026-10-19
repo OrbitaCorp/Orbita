@@ -7,7 +7,7 @@ import type { UsageMeteringService } from './usage-metering.service';
  */
 export function medirConsumoDeTexto(
   metering: Pick<UsageMeteringService, 'track'>,
-  r: { provider?: 'gemini' | 'groq'; model?: string; promptTokens?: number; completionTokens?: number; cachedTokens?: number; thinkingTokens?: number },
+  r: { provider?: 'gemini' | 'groq' | 'workers-ai'; model?: string; promptTokens?: number; completionTokens?: number; cachedTokens?: number; thinkingTokens?: number },
   ctx: { feature: string; businessId?: string; metadata?: Record<string, unknown> },
 ): void {
   if (!r.provider || !r.promptTokens) return;
