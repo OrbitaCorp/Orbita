@@ -690,6 +690,11 @@ const CSS = `
   .wa-mensajes { padding: 12px 4% 8px; }
   .wa-burbuja { max-width: 82%; }
   .wa-escribir { font-size: 16px; }
+  .wa-barra { gap: 2px; padding: 8px 8px; }
+  .wa-barra .wa-icono { width: 34px; height: 34px; }
+  .wa-enviar { width: 40px; height: 40px; }
+  .wa-emojis { grid-template-columns: repeat(auto-fill, minmax(36px, 1fr)); width: calc(100vw - 32px); max-width: 320px; }
+  .wa-foto-previa { padding: 8px 10px; }
   .wa-panel-plantillas { width: calc(100vw - 48px); }
 }
 @media (prefers-reduced-motion: reduce) { .wa-icono, .wa-filtros button, .wa-enviar { transition: none; } .wa-giro { animation: none; } }
