@@ -7,6 +7,7 @@ import {
 import { useAuth } from '@/hooks/useAuth'
 import { resolverVariables, type Plantilla } from '../mock/mensajes.mock'
 import { OrbiWhatsapp } from './OrbiWhatsapp'
+import { FormatoWhatsapp } from './FormatoWhatsapp'
 import {
   armarFilas, colorDeAvatar, errorDeFoto, estadoDeEntrega, fotoDelMensaje, hora, iniciales, marcaDeBot, marcaDeLaLista, orbiAtiende, pieDeFoto, puedeResponderHasta,
   TIPOS_DE_FOTO, vistaPreviaDeLaLista, type EstadoDeEntrega,
@@ -387,7 +388,7 @@ function Chat({ charla, plantillas, onVolver, onArchivar, onPerfil, onToast, onE
                       <button type="button" className="wa-foto" onClick={() => setVisor(fotoDelMensaje(m))} aria-label="Ver la foto en grande">
                         <img src={fotoDelMensaje(m) ?? ''} alt={pieDeFoto(m) || 'Foto'} loading="lazy" />
                       </button>
-                      {pieDeFoto(m) && <span className="wa-burbuja-texto wa-foto-pie">{pieDeFoto(m)}</span>}
+                      {pieDeFoto(m) && <span className="wa-burbuja-texto wa-foto-pie"><FormatoWhatsapp texto={pieDeFoto(m)} /></span>}
                       <span className={`wa-burbuja-meta${pieDeFoto(m) ? ' wa-foto-pie' : ' wa-meta-sobre-foto'}`}>
                         {hora(m.createdAt)}
                         {entrega && <Tildes estado={entrega} />}
@@ -396,7 +397,7 @@ function Chat({ charla, plantillas, onVolver, onArchivar, onPerfil, onToast, onE
                   ) : (
                     <>
                       {m.viaOrbi && <span className="wa-orbi-tag"><Sparkles size={11} aria-hidden /> Orbi</span>}
-                      <span className="wa-burbuja-texto">{m.text}</span>
+                      <span className="wa-burbuja-texto"><FormatoWhatsapp texto={m.text} /></span>
                       <span className="wa-burbuja-meta">
                         {hora(m.createdAt)}
                         {entrega && <Tildes estado={entrega} />}
@@ -681,6 +682,11 @@ const CSS = `
 .wa-orbi-aviso { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 16px; font-size: 13px; line-height: 1.45; color: var(--wa-aviso-texto); background: var(--wa-aviso); }
 .wa-orbi-aviso button { flex-shrink: 0; height: 30px; padding: 0 14px; border: none; border-radius: 15px; cursor: pointer; font-size: 13px; font-weight: 500; color: #fff; background: var(--wa-verde); }
 .wa-orbi-aviso button:disabled { opacity: 0.5; cursor: not-allowed; }
+.wa-fmt-link { color: #027eb5; text-decoration: underline; text-underline-offset: 2px; word-break: break-all; }
+.dark .wa-fmt-link { color: #53bdeb; }
+.wa-fmt-codigo, .wa-fmt-bloque { font-family: ui-monospace, "Cascadia Mono", Menlo, monospace; font-size: 0.92em; }
+.wa-fmt-bloque { display: block; margin: 2px 0; padding: 4px 6px; border-radius: 4px; background: rgba(11,20,26,0.06); white-space: pre-wrap; }
+.dark .wa-fmt-bloque { background: rgba(255,255,255,0.08); }
 .wa-orbi-tag { display: inline-flex; align-items: center; gap: 3px; margin-bottom: 2px; font-size: 11px; font-weight: 600; color: var(--wa-verde); }
 .wa-orbi-cta { margin-top: 10px; height: 40px; padding: 0 20px; display: inline-flex; align-items: center; gap: 8px; border: none; border-radius: 20px; cursor: pointer; font-size: 14.5px; font-weight: 500; color: #fff; background: var(--wa-verde); }
 @media (max-width: 768px) {
