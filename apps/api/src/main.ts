@@ -10,6 +10,8 @@ import { PrismaService } from './prisma/prisma.service';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
+  // TEMPORAL (diagnóstico local, no se commitea)
+  app.use((req: any, res: any, next: any) => { res.on('finish', () => console.log('[REQ]', req.method, req.originalUrl.slice(0, 120), res.statusCode)); next(); });
 
   // IP real del cliente detrás de Firebase Hosting + Cloud Run, solo si se
   // configuró el número exacto de saltos (ver common/utils/proxy.ts).

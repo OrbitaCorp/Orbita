@@ -115,6 +115,10 @@ function armar(o: Opciones = {}) {
   const storefront: any = {
     listProducts: jest.fn().mockResolvedValue({ total: 1, data: [{ id: 'abcdef12-0000', name: 'Zapatilla Run', categoryName: 'Calzado', price: 50000, comparePrice: 60000, priceTo: null, promoLabel: null, inStock: true, byOrder: false, variantOptions: [{ name: 'Talle', values: [{ value: '40' }, { value: '41' }] }] }] }),
     getProduct: jest.fn(),
+    listCoupons: jest.fn().mockResolvedValue([
+      { code: 'OCTUBRE10', name: 'Octubre', type: 'PERCENT_TICKET', value: 10, minAmount: 50000, endDate: '2026-10-31T23:59:59.000Z', categories: [] },
+      { code: 'REMERAS', name: 'Remeras', type: 'AMOUNT_PRODUCT', value: 2000, minAmount: null, endDate: null, categories: ['Remeras'] },
+    ]),
     getConfig: jest.fn().mockResolvedValue({
       business: { name: 'Rama', mode: 'FULL' },
       contact: { scheduleText: 'Lun a Vie 9-18', email: null, instagram: '@rama', tiktok: null, facebook: null },
@@ -334,6 +338,29 @@ describe('HerramientasDelBot', () => {
     expect(texto).not.toContain('7654321098');
     expect(texto).not.toContain('rama.mp');
     expect(texto).toContain('Lun a Vie 9-18');
+  });
+
+  it('cupones y descuentos: solo los públicos vigentes, dicho en palabras, y avisa que el cupón va en el checkout', async () => {
+    const t = armar();
+    const h = new HerramientasDelBot(t.prisma, t.storefront);
+    const r = (await h.ejecutar('cupones_y_descuentos', {}, ctx)) as { ok: true; datos: any };
+    expect(t.storefront.listCoupons).toHaveBeenCalledWith('rama');
+    expect(r.datos.cupones).toEqual([
+      { codigo: 'OCTUBRE10', nombre: 'Octubre', descuento: '10% de descuento', compra_minima: 50000, vence: '2026-10-31', solo_en: null },
+      { codigo: 'REMERAS', nombre: 'Remeras', descuento: '$2000 de descuento', compra_minima: null, vence: null, solo_en: ['Remeras'] },
+    ]);
+    expect(r.datos.como_se_usa).toContain('checkout');
+  });
+
+  it('el detalle de un producto cuenta su promo 2x1 y a qué alcanza', async () => {
+    const { h, tienda } = herramientas();
+    tienda.getProduct.mockResolvedValue({
+      id: 'abcdef12-0000', name: 'Remera', description: null, categoryName: 'Remeras', price: 10000, comparePrice: null, promoLabel: '2x1', byOrder: false, specs: [],
+      promo: { label: '2x1', llevaCantidad: 2, pagaCantidad: 1, scope: 'CATEGORY', categoryName: 'Remeras', otherProducts: [] },
+      options: [], variants: [],
+    });
+    const r = (await h.ejecutar('detalle_producto', { producto_id: 'abcdef12-0000' }, ctx)) as { ok: true; datos: any };
+    expect(r.datos.promocion).toMatchObject({ lleva: 2, paga: 1, aplica_a: 'toda la categoría Remeras' });
   });
 
   it('un error interno no se le cuenta al modelo (ni al cliente)', async () => {

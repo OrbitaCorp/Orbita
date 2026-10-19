@@ -41,6 +41,12 @@ export const HERRAMIENTAS_DEL_BOT: LlmToolDefinition[] = [
     parameters: { type: 'object', properties: {} },
   },
   {
+    name: 'cupones_y_descuentos',
+    description:
+      'Cupones públicos vigentes (con su código, cuánto descuentan, desde qué monto y hasta cuándo) y descuentos por medio de pago. Los descuentos automáticos, ofertas y promos 2x1 / 3x2 NO están acá: ya vienen en el precio y la oferta de cada producto (buscar_productos y detalle_producto).',
+    parameters: { type: 'object', properties: {} },
+  },
+  {
     name: 'estado_de_mi_pedido',
     description: 'Estado de los pedidos de la persona que escribe (los últimos 3, o uno puntual por su número). Solo ve los suyos.',
     parameters: {
@@ -81,7 +87,7 @@ const enlaceDeProducto = (slug: string, id: string) => `https://${slug}.orbita.s
 export class HerramientasDelBot {
   constructor(
     private readonly prisma: Pick<PrismaService, 'order'>,
-    private readonly tienda: Pick<StorefrontService, 'listProducts' | 'getProduct' | 'getConfig'>,
+    private readonly tienda: Pick<StorefrontService, 'listProducts' | 'getProduct' | 'getConfig' | 'listCoupons'>,
   ) {}
 
   /** Corre una herramienta de lectura. `derivar_a_una_persona` no pasa por acá: la maneja el servicio. */
@@ -94,6 +100,8 @@ export class HerramientasDelBot {
           return await this.detalleProducto(ctx, typeof args.producto_id === 'string' ? args.producto_id : '');
         case 'datos_de_la_tienda':
           return { ok: true, datos: await this.datosDeLaTienda(ctx) };
+        case 'cupones_y_descuentos':
+          return { ok: true, datos: await this.cuponesYDescuentos(ctx) };
         case 'estado_de_mi_pedido':
           return { ok: true, datos: await this.estadoDePedidos(ctx, Number.isInteger(args.numero_de_pedido) ? (args.numero_de_pedido as number) : undefined) };
         default:
@@ -117,6 +125,7 @@ export class HerramientasDelBot {
         precio_antes: p.comparePrice && p.comparePrice > p.price ? p.comparePrice : null,
         precio_hasta: p.priceTo,
         oferta: p.promoLabel,
+        oferta_hasta: p.offerEndsAt,
         hay_stock: p.inStock,
         se_hace_por_pedido: p.byOrder,
         variantes: p.variantOptions.map((o) => ({ opcion: o.name, valores: o.values.map((v) => v.value) })),
@@ -139,6 +148,16 @@ export class HerramientasDelBot {
         precio: p.price,
         precio_antes: p.comparePrice && p.comparePrice > p.price ? p.comparePrice : null,
         oferta: p.promoLabel,
+        // Promo tipo 2x1 / 3x2: lleva X y paga Y, y a qué alcanza (este producto, una categoría, o varios productos).
+        promocion: p.promo
+          ? {
+              descripcion: p.promo.label,
+              lleva: p.promo.llevaCantidad,
+              paga: p.promo.pagaCantidad,
+              aplica_a: p.promo.scope === 'CATEGORY' ? `toda la categoría ${p.promo.categoryName ?? ''}`.trim() : 'este producto y otros elegidos por la tienda',
+              tambien_incluye: p.promo.otherProducts.slice(0, 5).map((o) => o.name),
+            }
+          : null,
         se_hace_por_pedido: p.byOrder,
         caracteristicas: (p.specs ?? []).slice(0, 12).map((s) => `${s.label}: ${s.value}`),
         variantes: p.variants.map((v) => ({
@@ -186,6 +205,30 @@ export class HerramientasDelBot {
         : null,
       cambios_y_devoluciones: pago ? { se_aceptan: pago.returnsEnabled, plazo: pago.returnsWindowText } : null,
       cancelaciones_de_pedidos: pago ? { se_aceptan: pago.cancellationsEnabled } : null,
+    };
+  }
+
+  private async cuponesYDescuentos(ctx: ContextoDelBot) {
+    const [cupones, c] = await Promise.all([this.tienda.listCoupons(ctx.slug), this.tienda.getConfig(ctx.slug)]);
+    const pago = c.payment;
+    const descripcion = (tipo: string, valor: number): string => {
+      if (tipo === 'PERCENT_PRODUCT' || tipo === 'PERCENT_TICKET') return `${valor}% de descuento`;
+      if (tipo === 'AMOUNT_PRODUCT' || tipo === 'AMOUNT_TICKET') return `$${valor} de descuento`;
+      return 'promoción especial';
+    };
+    return {
+      cupones: cupones.slice(0, 8).map((d) => ({
+        codigo: d.code,
+        nombre: d.name,
+        descuento: descripcion(d.type, d.value),
+        compra_minima: d.minAmount,
+        vence: d.endDate ? d.endDate.slice(0, 10) : null,
+        solo_en: d.categories.length > 0 ? d.categories : null,
+      })),
+      como_se_usa: 'El cupón se escribe en el checkout de la tienda, al pagar: no se aplica por este chat.',
+      descuentos_por_medio_de_pago: pago
+        ? { efectivo_porcentaje: pago.cashDiscountPercent, mercado_pago_porcentaje: pago.mercadopagoDiscountPercent }
+        : null,
     };
   }
 

@@ -171,6 +171,7 @@ export function WhatsAppWeb({ charlas, estado, convId, plantillas, onAbrir, onCe
             onToast={onToast}
             onEnviado={onEnviado}
             bot={bot}
+            onConfigurarOrbi={() => { setVerOrbi(true); onCerrar() }}
           />
         ) : (
           <div className="wa-bienvenida">
@@ -203,11 +204,13 @@ interface ChatProps {
   onEnviado: () => void
   /** La configuración de Orbi para WhatsApp (null si no se pudo leer). */
   bot: WhatsappBotEstado | null
+  /** Abre el panel para encender a Orbi en general (se usa cuando todavía está apagado). */
+  onConfigurarOrbi: () => void
 }
 
 type Panel = 'emojis' | 'plantillas' | null
 
-function Chat({ charla, plantillas, onVolver, onArchivar, onPerfil, onToast, onEnviado, bot }: ChatProps) {
+function Chat({ charla, plantillas, onVolver, onArchivar, onPerfil, onToast, onEnviado, bot, onConfigurarOrbi }: ChatProps) {
   const { user } = useAuth()
   const tienda = user && 'business' in user ? user.business.name : undefined
   const [mensajes, setMensajes] = useState<ChatMessage[] | null>(null)
@@ -341,11 +344,12 @@ function Chat({ charla, plantillas, onVolver, onArchivar, onPerfil, onToast, onE
             </span>
           </span>
         </button>
-        {bot?.enabled && (
+        {bot && (
           <button
             type="button" className={`wa-orbi-btn${atiendeOrbi ? ' wa-orbi-btn-on' : ''}`} disabled={cambiandoBot}
-            aria-pressed={atiendeOrbi} onClick={() => void cambiarOrbi(atiendeOrbi ? 'OFF' : 'ON')}
-            title={atiendeOrbi ? 'Orbi está contestando acá: tocá para atenderlo vos' : 'Que Orbi atienda este chat'}
+            aria-pressed={atiendeOrbi}
+            onClick={() => (bot.enabled ? void cambiarOrbi(atiendeOrbi ? 'OFF' : 'ON') : onConfigurarOrbi())}
+            title={!bot.enabled ? 'Primero encendé a Orbi para WhatsApp' : atiendeOrbi ? 'Orbi está contestando acá: tocá para atenderlo vos' : 'Que Orbi atienda este chat'}
           >
             <Sparkles size={15} aria-hidden />
             <span>{atiendeOrbi ? 'Orbi atiende' : 'Activar Orbi'}</span>
