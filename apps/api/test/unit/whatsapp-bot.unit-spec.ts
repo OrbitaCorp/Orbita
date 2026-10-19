@@ -4,6 +4,7 @@ import { orbiAtiendeElChat, pausarSiAtendiaOrbi, type MensajeEntrante } from '..
 import { HerramientasDelBot } from '../../src/whatsapp/whatsapp-bot-tools';
 import { WhatsappBotService } from '../../src/whatsapp/whatsapp-bot.service';
 import { MENSAJE_DE_DERIVACION, MENSAJE_SIN_MEDIOS, promptDelBot } from '../../src/whatsapp/whatsapp-bot-prompt';
+import { MARCA_MENU_TEXTO, PEDIDO_DE_OPCION } from '../../src/whatsapp/whatsapp-bot-menu';
 
 // Orbi como atención al público por WhatsApp: cuándo atiende un chat, cuándo se calla, qué lee y qué hace ante la duda.
 
@@ -69,7 +70,11 @@ describe('pausarSiAtendiaOrbi (entró una persona al chat)', () => {
 // ─── El servicio ─────────────────────────────────────────────────────────────
 
 type Opciones = {
-  cfg?: Partial<{ enabled: boolean; modo: string; instrucciones: string | null; topeCreditos: number | null }> | null;
+  cfg?: Partial<{ enabled: boolean; modo: string; instrucciones: string | null; topeCreditos: number | null; modalidad: string; menuEstilo: string; bienvenida: string | null; menuOpciones: unknown }> | null;
+  /** Cuántas respuestas de Orbi hay ya en el chat (0 = primer contacto). */
+  respuestasPrevias?: number;
+  /** El último mensaje que mandó Orbi (para entender un "2" suelto como opción de un menú en texto). */
+  ultimoDeOrbi?: { text: string } | null;
   botEstado?: string;
   ultimo?: { id: string; sender: string } | null;
   /** Qué ve cada consulta del último mensaje del chat, en orden (la última se repite). Pisa a `ultimo`. */
@@ -100,8 +105,8 @@ function armar(o: Opciones = {}) {
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     message: {
-      findFirst: ultimoMock,
-      count: jest.fn().mockImplementation(async ({ where }: any) => (where.createdAt ? (o.respuestasRecientes ?? 0) : 0)),
+      findFirst: jest.fn().mockImplementation((args: any) => (args?.where?.viaOrbi ? Promise.resolve(o.ultimoDeOrbi ?? null) : ultimoMock(args))),
+      count: jest.fn().mockImplementation(async ({ where }: any) => (where.createdAt ? (o.respuestasRecientes ?? 0) : (o.respuestasPrevias ?? 0))),
       findMany: jest.fn().mockResolvedValue([
         // De más nuevo a más viejo, como los pide el servicio.
         { sender: 'CUSTOMER', text: '¿Tienen zapatillas?' },
@@ -116,6 +121,7 @@ function armar(o: Opciones = {}) {
   const config: any = { get: (k: string) => ({ WHATSAPP_BOT_ESPERA_MS: '0' } as Record<string, string>)[k] };
   const whatsapp: any = {
     enviarTexto: o.falloEnvio ? jest.fn().mockRejectedValue(new Error('rechazado')) : jest.fn().mockResolvedValue('wamid.ORBI'),
+    enviarInteractivo: jest.fn().mockResolvedValue('wamid.MENU'),
   };
   const storefront: any = {
     listProducts: jest.fn().mockResolvedValue({ total: 1, data: [{ id: 'abcdef12-0000', name: 'Zapatilla Run', categoryName: 'Calzado', price: 50000, comparePrice: 60000, priceTo: null, promoLabel: null, inStock: true, byOrder: false, variantOptions: [{ name: 'Talle', values: [{ value: '40' }, { value: '41' }] }] }] }),
@@ -412,5 +418,205 @@ describe('promptDelBot', () => {
     const p = promptDelBot({ ...base, instrucciones: 'Hablá de vos y ofrecé el 10% en efectivo' });
     expect(p).toContain('ofrecé el 10% en efectivo');
     expect(p).toContain('siempre que no contradigan las reglas');
+  });
+});
+
+describe('modalidades de Orbi (la elige el dueño)', () => {
+  const dice = (texto: string, extra: Partial<MensajeEntrante> = {}): MensajeEntrante => ({ ...MSG, texto, ...extra });
+  const toco = (opcionId: string, titulo = 'x'): MensajeEntrante => ({ ...MSG, texto: titulo, opcionId });
+  const guardado = (t: ReturnType<typeof armar>) => t.prisma.message.create.mock.calls.at(-1)[0].data;
+
+  describe('solo menú (sin IA)', () => {
+    const cfg = { modalidad: 'SOLO_MENU' };
+
+    it('el primer mensaje abre con el saludo y el menú interactivo, sin gastar IA', async () => {
+      const t = armar({ cfg });
+      await t.bot.atender([dice('hola')]);
+      expect(t.llm.streamChat).not.toHaveBeenCalled();
+      const menu = t.whatsapp.enviarInteractivo.mock.calls[0][3];
+      expect(menu.type).toBe('list');
+      expect(menu.body.text).toContain('Rama');
+      expect(menu.action.sections[0].rows.map((r: any) => r.id)).toEqual(['catalogo', 'pedidos', 'promos', 'envios', 'horarios', 'persona']);
+      expect(guardado(t)).toMatchObject({ sender: 'STORE', viaOrbi: true, externalId: 'wamid.MENU' });
+      expect(guardado(t).text).toContain(MARCA_MENU_TEXTO);
+      expect(t.prisma.whatsappBotTurn.create.mock.calls[0][0].data.credits).toBe(0);
+    });
+
+    it('un texto que no es una opción vuelve a mostrar el menú, avisando que no lo entendió', async () => {
+      const t = armar({ cfg, respuestasPrevias: 2 });
+      await t.bot.atender([dice('quiero una remera azul')]);
+      expect(t.llm.streamChat).not.toHaveBeenCalled();
+      expect(t.whatsapp.enviarInteractivo.mock.calls[0][3].body.text).toContain('No te entendí');
+    });
+
+    it('un saludo con el chat ya empezado muestra el menú sin el "no te entendí"', async () => {
+      const t = armar({ cfg, respuestasPrevias: 2 });
+      await t.bot.atender([dice('hola')]);
+      expect(t.whatsapp.enviarInteractivo.mock.calls[0][3].body.text).not.toContain('No te entendí');
+    });
+
+    it('al elegir "catálogo" contesta con productos y links armados con los datos reales, y avisa cómo volver al menú', async () => {
+      const t = armar({ cfg });
+      await t.bot.atender([toco('catalogo', 'Ver el catálogo')]);
+      expect(t.llm.streamChat).not.toHaveBeenCalled();
+      const texto = t.whatsapp.enviarTexto.mock.calls[0][3] as string;
+      expect(texto).toContain('*Zapatilla Run*');
+      expect(texto).toContain('$50.000');
+      expect(texto).toContain('https://rama.orbita.site/p/abcdef12');
+      expect(texto).toContain('Escribí *menú*');
+      expect(t.prisma.whatsappBotTurn.create.mock.calls[0][0].data).toMatchObject({ status: 'ok', credits: 0 });
+    });
+
+    it('las demás opciones de fábrica contestan con datos de la tienda (promos con el cupón, horarios y envíos)', async () => {
+      const t = armar({ cfg });
+      await t.bot.atender([toco('promos')]);
+      expect(t.whatsapp.enviarTexto.mock.calls[0][3]).toContain('OCTUBRE10');
+      const t2 = armar({ cfg });
+      await t2.bot.atender([toco('horarios')]);
+      expect(t2.whatsapp.enviarTexto.mock.calls[0][3]).toContain('Lun a Vie 9-18');
+      const t3 = armar({ cfg });
+      await t3.bot.atender([toco('envios')]);
+      expect(t3.whatsapp.enviarTexto.mock.calls[0][3]).toContain('Envíos a todo el país');
+    });
+
+    it('sigue funcionando con el cupo de IA agotado, porque no usa IA', async () => {
+      const t = armar({ cfg, usados: 999999 });
+      await t.bot.atender([toco('catalogo')]);
+      expect(t.whatsapp.enviarTexto).toHaveBeenCalledTimes(1);
+      expect(t.prisma.whatsappBotTurn.create.mock.calls[0][0].data.status).toBe('ok');
+    });
+
+    it('"Hablar con alguien" deriva el chat a una persona', async () => {
+      const t = armar({ cfg });
+      await t.bot.atender([toco('persona')]);
+      expect(t.whatsapp.enviarTexto).toHaveBeenCalledWith(BIZ, CONV, MSG.waId, MENSAJE_DE_DERIVACION);
+      expect(t.prisma.conversation.updateMany.mock.calls.at(-1)[0].data).toMatchObject({ botEstado: 'DERIVADO' });
+    });
+
+    it('una opción propia del dueño contesta con su texto fijo', async () => {
+      const t = armar({ cfg: { ...cfg, menuOpciones: [{ id: 'custom-1', titulo: 'Mayoristas', activa: true, respuesta: 'Escribinos a mayor@rama.com' }, { id: 'persona', titulo: 'Hablar con alguien', activa: true }] } });
+      await t.bot.atender([toco('custom-1', 'Mayoristas')]);
+      expect(t.whatsapp.enviarTexto).toHaveBeenCalledWith(BIZ, CONV, MSG.waId, 'Escribinos a mayor@rama.com');
+    });
+
+    it('una opción que el dueño apagó ya no se acepta (un menú viejo en el celular del cliente): se muestra el vigente', async () => {
+      const t = armar({ cfg: { ...cfg, menuOpciones: [{ id: 'catalogo', titulo: 'Catálogo', activa: false }, { id: 'persona', titulo: 'Hablar con alguien', activa: true }] }, respuestasPrevias: 1 });
+      await t.bot.atender([toco('catalogo')]);
+      expect(t.whatsapp.enviarTexto).not.toHaveBeenCalledWith(BIZ, CONV, MSG.waId, expect.stringContaining('Zapatilla'));
+      expect(t.whatsapp.enviarInteractivo).toHaveBeenCalledTimes(1);
+    });
+
+    it('un "2" suelto elige la opción 2, pero solo si lo último que mandó Orbi fue un menú en texto', async () => {
+      const t = armar({ cfg, ultimoDeOrbi: { text: `Hola\n\n1. Ver el catálogo\n2. Mis pedidos\n\n${MARCA_MENU_TEXTO}.` } });
+      await t.bot.atender([dice('2')]);
+      expect(t.prisma.order.findMany).toHaveBeenCalledTimes(1);
+      const sin = armar({ cfg, respuestasPrevias: 1, ultimoDeOrbi: { text: 'Gracias por escribirnos' } });
+      await sin.bot.atender([dice('2')]);
+      expect(sin.prisma.order.findMany).not.toHaveBeenCalled();
+      expect(sin.whatsapp.enviarInteractivo).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('menú + conversación', () => {
+    const cfg = { modalidad: 'MENU_Y_CONVERSACION' };
+
+    it('el primer contacto abre con el menú, sin IA', async () => {
+      const t = armar({ cfg });
+      await t.bot.atender([dice('hola tienen zapatillas?')]);
+      expect(t.whatsapp.enviarInteractivo).toHaveBeenCalledTimes(1);
+      expect(t.llm.streamChat).not.toHaveBeenCalled();
+    });
+
+    it('un saludo con el chat empezado vuelve a mostrar el menú', async () => {
+      const t = armar({ cfg, respuestasPrevias: 3 });
+      await t.bot.atender([dice('buenas')]);
+      expect(t.whatsapp.enviarInteractivo).toHaveBeenCalledTimes(1);
+      expect(t.llm.streamChat).not.toHaveBeenCalled();
+    });
+
+    it('una consulta con el chat empezado la contesta la IA', async () => {
+      const t = armar({ cfg, respuestasPrevias: 3 });
+      await t.bot.atender([dice('hola tienen zapatillas?')]);
+      expect(t.llm.streamChat).toHaveBeenCalledTimes(1);
+      expect(t.whatsapp.enviarInteractivo).not.toHaveBeenCalled();
+    });
+
+    it('al elegir una opción, la IA contesta sabiendo qué se quiso decir (no solo el título)', async () => {
+      const t = armar({ cfg, respuestasPrevias: 1 });
+      await t.bot.atender([toco('pedidos', 'Mis pedidos')]);
+      expect(t.llm.streamChat).toHaveBeenCalledTimes(1);
+      const ultimoUsuario = t.llmMensajes[0].filter((x) => x.role === 'user').at(-1);
+      expect(ultimoUsuario?.content).toBe(PEDIDO_DE_OPCION.pedidos);
+    });
+
+    it('con el cupo agotado, la opción elegida avisa que lo ve una persona', async () => {
+      const t = armar({ cfg, respuestasPrevias: 1, usados: 999999 });
+      await t.bot.atender([toco('catalogo')]);
+      expect(t.llm.streamChat).not.toHaveBeenCalled();
+      expect(t.whatsapp.enviarTexto).toHaveBeenCalledWith(BIZ, CONV, MSG.waId, MENSAJE_DE_DERIVACION);
+    });
+  });
+
+  describe('conversacional (como hasta ahora)', () => {
+    it('no muestra menú: contesta todo con IA, hasta el "hola"', async () => {
+      const t = armar({ cfg: { modalidad: 'CONVERSACIONAL' } });
+      await t.bot.atender([dice('hola')]);
+      expect(t.llm.streamChat).toHaveBeenCalledTimes(1);
+      expect(t.whatsapp.enviarInteractivo).not.toHaveBeenCalled();
+    });
+    it('una opción de un menú viejo se trata como un texto más', async () => {
+      const t = armar({ cfg: { modalidad: 'CONVERSACIONAL' } });
+      await t.bot.atender([toco('catalogo', 'Ver el catálogo')]);
+      expect(t.llm.streamChat).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('si WhatsApp no deja mandar el menú interactivo', () => {
+    it('lo manda como texto numerado', async () => {
+      const t = armar({ cfg: { modalidad: 'SOLO_MENU' } });
+      t.whatsapp.enviarInteractivo.mockRejectedValue(Object.assign(new Error('Graph 400'), { status: 400 }));
+      await t.bot.atender([dice('hola')]);
+      const texto = t.whatsapp.enviarTexto.mock.calls[0][3] as string;
+      expect(texto).toContain('1. Ver el catálogo');
+      expect(texto).toContain(MARCA_MENU_TEXTO);
+    });
+    it('pero el plazo de 24 horas vencido no se arregla con texto: queda para una persona', async () => {
+      const { UnprocessableEntityException } = await import('@nestjs/common');
+      const t = armar({ cfg: { modalidad: 'SOLO_MENU' } });
+      t.whatsapp.enviarInteractivo.mockRejectedValue(new UnprocessableEntityException('24 horas'));
+      await t.bot.atender([dice('hola')]);
+      expect(t.whatsapp.enviarTexto).not.toHaveBeenCalled();
+      expect(t.prisma.conversation.updateMany.mock.calls.at(-1)[0].data).toMatchObject({ botEstado: 'DERIVADO' });
+    });
+  });
+
+  describe('configuración del menú', () => {
+    it('guarda la modalidad, el estilo, el saludo y las opciones, validando contra el estilo que queda', async () => {
+      const t = armar();
+      const tres = [{ id: 'catalogo', titulo: 'Catálogo', activa: true }, { id: 'pedidos', titulo: 'Pedidos', activa: true }, { id: 'persona', titulo: 'Hablar con alguien', activa: true }];
+      await t.bot.guardar(BIZ, { modalidad: 'SOLO_MENU', menuEstilo: 'BOTONES', bienvenida: '  ¡Hola! ¿En qué te ayudo?  ', menuOpciones: tres });
+      const data = t.prisma.whatsappBotConfig.upsert.mock.calls[0][0].update;
+      expect(data).toMatchObject({ modalidad: 'SOLO_MENU', menuEstilo: 'BOTONES', bienvenida: '¡Hola! ¿En qué te ayudo?' });
+      expect(data.menuOpciones.map((o: any) => o.id)).toEqual(['catalogo', 'pedidos', 'persona']);
+    });
+    it('rechaza un menú inválido con el motivo: botones con más de 3, títulos largos, opciones propias sin respuesta', async () => {
+      const t = armar();
+      const seis = ['catalogo', 'pedidos', 'promos', 'envios', 'horarios', 'persona'].map((id) => ({ id, titulo: 'Op', activa: true }));
+      await expect(t.bot.guardar(BIZ, { menuEstilo: 'BOTONES', menuOpciones: seis })).rejects.toThrow(/hasta 3/);
+      await expect(t.bot.guardar(BIZ, { menuOpciones: [{ id: 'catalogo', titulo: 'x'.repeat(30), activa: true }] })).rejects.toThrow(/24/);
+      await expect(t.bot.guardar(BIZ, { menuOpciones: [{ id: 'custom-1', titulo: 'Mayor', activa: true }] })).rejects.toThrow(/necesita el texto/);
+      expect(t.prisma.whatsappBotConfig.upsert).not.toHaveBeenCalled();
+    });
+    it('pasar a botones con el menú de fábrica (6 opciones activas) se rechaza: hay que apagar algunas', async () => {
+      const t = armar();
+      await expect(t.bot.guardar(BIZ, { menuEstilo: 'BOTONES' })).rejects.toBeInstanceOf(BadRequestException);
+    });
+    it('el estado trae la modalidad, el saludo de ejemplo y las opciones vigentes', async () => {
+      const t = armar({ cfg: { modalidad: 'MENU_Y_CONVERSACION', menuEstilo: 'LISTA' } });
+      const e = await t.bot.estado(BIZ);
+      expect(e).toMatchObject({ modalidad: 'MENU_Y_CONVERSACION', menuEstilo: 'LISTA', bienvenida: null });
+      expect(e.bienvenidaPorDefecto).toContain('Rama');
+      expect(e.menuOpciones).toHaveLength(6);
+    });
   });
 });

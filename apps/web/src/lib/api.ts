@@ -3355,13 +3355,22 @@ export async function sendConversationImage(id: string, input: { foto: File; tex
 // DERIVADO = Orbi pidió que lo atienda una persona. PAUSADO y DERIVADO solo los levanta el dueño.
 export type BotModo = 'SELECCIONADOS' | 'TODOS'
 export type BotChatEstado = 'DEFAULT' | 'ON' | 'OFF' | 'PAUSADO' | 'DERIVADO'
+// Cómo atiende Orbi (lo elige el dueño): todo con IA, un menú de opciones y después IA, o solo menú (sin IA).
+export type BotModalidad = 'CONVERSACIONAL' | 'MENU_Y_CONVERSACION' | 'SOLO_MENU'
+export type MenuEstilo = 'LISTA' | 'BOTONES'
+/** Una opción del menú. Las de fábrica: catalogo, pedidos, promos, envios, horarios, persona. Las del dueño: custom-N (con su `respuesta`). */
+export type OpcionDeMenu = { id: string; titulo: string; descripcion?: string; activa: boolean; respuesta?: string }
 export type WhatsappBotEstado = {
   disponible: boolean; conectado: boolean; enabled: boolean; modo: BotModo
   instrucciones: string | null; topeCreditos: number | null
+  modalidad: BotModalidad; menuEstilo: MenuEstilo; bienvenida: string | null; bienvenidaPorDefecto: string; menuOpciones: OpcionDeMenu[]
   cupo: { mes: string; usados: number; total: number; limite: number; porcentaje: number }
 }
 export function getWhatsappBot() { return panelRequest<WhatsappBotEstado>('/whatsapp/bot') }
-export function updateWhatsappBot(input: { enabled?: boolean; modo?: BotModo; instrucciones?: string | null; topeCreditos?: number | null }) {
+export function updateWhatsappBot(input: {
+  enabled?: boolean; modo?: BotModo; instrucciones?: string | null; topeCreditos?: number | null
+  modalidad?: BotModalidad; menuEstilo?: MenuEstilo; bienvenida?: string | null; menuOpciones?: OpcionDeMenu[]
+}) {
   return panelRequest<WhatsappBotEstado>('/whatsapp/bot', { method: 'PATCH', body: JSON.stringify(input) })
 }
 /** Enciende (ON, también reactiva un chat pausado o derivado) o apaga (OFF) a Orbi en un chat de WhatsApp. */

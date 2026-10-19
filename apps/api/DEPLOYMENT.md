@@ -863,6 +863,15 @@ Business desde Mensajes → WhatsApp con el botón de Meta, sin pegar datos a ma
   Tablas nuevas: `whatsapp_bot_configs`, `whatsapp_bot_turns` y columnas en `conversations` (`bot_estado`, `bot_motivo`,
   `bot_cambiado_at`) y `messages` (`via_orbi`); migración `20261019010000_whatsapp_bot` (aplicar en producción con
   `prisma-prod.sh migrate deploy` ANTES de desplegar la API).
+- **Modalidades de Orbi (las elige el dueño):** `CONVERSACIONAL` (todo con IA), `MENU_Y_CONVERSACION` (el primer contacto
+  y los saludos abren con un menú; lo demás, IA) y `SOLO_MENU` (menú y respuestas fijas, sin IA: no gasta cupo y sigue
+  andando con el cupo agotado). El menú sale como mensaje **interactivo** (lista de hasta 10 opciones o hasta 3 botones;
+  no necesita plantilla aprobada, solo dentro de las 24 h) y, si WhatsApp lo rechaza, como texto numerado (el "2" suelto
+  se entiende como la opción 2 solo si lo último que mandó Orbi fue ese menú). Lo que el cliente toca llega en el webhook
+  como `interactive.list_reply` / `button_reply` con el `id` de la opción. Opciones y saludo en `whatsapp_bot_configs`
+  (`menu_opciones`, `bienvenida`, `menu_estilo`, `modalidad`); migración `20261019020000_whatsapp_bot_modalidades`
+  (aplicar en producción antes de desplegar la API). A confirmar con una cuenta real: cómo se ven los interactivos en la
+  app WhatsApp Business del celular cuando el número está en coexistencia.
 - **Probar sin un número real:** cuenta sandbox desde el panel de Meta (WhatsApp → Testear integraciones) o el formulario
   manual («Conectala a mano» en la pantalla de conectar).
 - **Cobro:** en Embedded Signup cada cliente agrega su propio medio de pago en Meta y paga ahí sus conversaciones.

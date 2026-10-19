@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { ArrowLeft, Lock, Sparkles } from 'lucide-react'
-import { ApiError, updateWhatsappBot, type BotModo, type WhatsappBotEstado } from '@/lib/api'
+import { ApiError, updateWhatsappBot, type BotModalidad, type BotModo, type MenuEstilo, type WhatsappBotEstado } from '@/lib/api'
+import { MenuEditor, CSS_MENU } from './MenuEditor'
+import { errorDelMenu, menuCambio, opcionesParaGuardar } from './menuBot'
 
 // Mensajes → WhatsApp → "Orbi en WhatsApp": el panel donde el dueño enciende a Orbi como atención al público de su
-// número, elige en qué chats contesta, le deja indicaciones y ve cuánto lleva gastado del cupo del mes. Es una función del
-// paquete Avanzado. Usa los colores de WhatsApp Web (variables --wa-*), igual que el resto de la bandeja.
+// número, elige CÓMO atiende (todo con IA, menú + IA, o solo menú), en qué chats contesta, le deja indicaciones y ve cuánto
+// lleva gastado del cupo del mes. Es una función del paquete Avanzado. Usa los colores de WhatsApp Web (variables --wa-*).
 
 interface Props {
   bot: WhatsappBotEstado
@@ -15,15 +17,30 @@ interface Props {
 
 const MAX_INSTRUCCIONES = 1000
 
+const MODALIDADES: { id: BotModalidad; titulo: string; texto: string }[] = [
+  { id: 'CONVERSACIONAL', titulo: 'Conversación', texto: 'Orbi contesta todo con inteligencia artificial, como una persona del equipo.' },
+  { id: 'MENU_Y_CONVERSACION', titulo: 'Menú y conversación', texto: 'Saluda con un menú de opciones (catálogo, pedidos, promos…) y después conversa con IA.' },
+  { id: 'SOLO_MENU', titulo: 'Solo menú', texto: 'Contesta únicamente con el menú y respuestas fijas. No usa IA: no gasta cupo.' },
+]
+
 export function OrbiWhatsapp({ bot, onCambio, onVolver, onToast }: Props) {
   const [guardando, setGuardando] = useState(false)
   const [instrucciones, setInstrucciones] = useState(bot.instrucciones ?? '')
   const [tope, setTope] = useState(bot.topeCreditos === null ? '' : String(bot.topeCreditos))
+  const [estilo, setEstilo] = useState<MenuEstilo>(bot.menuEstilo)
+  const [bienvenida, setBienvenida] = useState(bot.bienvenida ?? '')
+  const [opciones, setOpciones] = useState(bot.menuOpciones)
 
-  const guardar = async (cambios: Parameters<typeof updateWhatsappBot>[0], aviso?: string) => {
+  const guardar = async (cambios: Parameters<typeof updateWhatsappBot>[0], aviso?: string, sincronizarFormulario = false) => {
     setGuardando(true)
     try {
-      onCambio(await updateWhatsappBot(cambios))
+      const nuevo = await updateWhatsappBot(cambios)
+      onCambio(nuevo)
+      // Solo se vuelve a llenar el formulario con lo guardado cuando lo que se guardó es el formulario: un interruptor no pisa lo que se está escribiendo.
+      if (sincronizarFormulario) {
+        setInstrucciones(nuevo.instrucciones ?? ''); setTope(nuevo.topeCreditos === null ? '' : String(nuevo.topeCreditos))
+        setEstilo(nuevo.menuEstilo); setBienvenida(nuevo.bienvenida ?? ''); setOpciones(nuevo.menuOpciones)
+      }
       if (aviso) onToast(aviso)
     } catch (e) {
       onToast(e instanceof ApiError && e.status < 500 ? e.message : 'No se pudo guardar el cambio')
@@ -34,13 +51,27 @@ export function OrbiWhatsapp({ bot, onCambio, onVolver, onToast }: Props) {
 
   const topeNumero = tope.trim() === '' ? null : Number(tope)
   const topeValido = topeNumero === null || (Number.isInteger(topeNumero) && topeNumero >= 0)
-  const hayCambios = (instrucciones.trim() || null) !== (bot.instrucciones ?? null) || topeNumero !== bot.topeCreditos
+  const conMenu = bot.modalidad !== 'CONVERSACIONAL'
+  const errorMenu = conMenu ? errorDelMenu(opciones, estilo) : null
+  const cambioMenu = estilo !== bot.menuEstilo || (bienvenida.trim() || null) !== (bot.bienvenida ?? null) || menuCambio(opciones, bot.menuOpciones)
+  const hayCambios = (instrucciones.trim() || null) !== (bot.instrucciones ?? null) || topeNumero !== bot.topeCreditos || cambioMenu
   const bloqueado = !bot.disponible || !bot.conectado
   const { cupo } = bot
 
+  const guardarCambios = () =>
+    void guardar(
+      {
+        instrucciones: instrucciones.trim() || null,
+        topeCreditos: topeNumero,
+        ...(cambioMenu ? { menuEstilo: estilo, bienvenida: bienvenida.trim() || null, menuOpciones: opcionesParaGuardar(opciones) } : {}),
+      },
+      'Cambios guardados',
+      true,
+    )
+
   return (
     <div className="orb-raiz">
-      <style>{CSS}</style>
+      <style>{CSS}{CSS_MENU}</style>
       <header className="wa-cabecera orb-cabecera">
         <button type="button" className="wa-icono orb-volver" onClick={onVolver} aria-label="Volver a los chats"><ArrowLeft size={20} /></button>
         <span className="orb-icono" aria-hidden><Sparkles size={18} /></span>
@@ -52,7 +83,7 @@ export function OrbiWhatsapp({ bot, onCambio, onVolver, onToast }: Props) {
 
       <div className="orb-cuerpo">
         <p className="orb-texto">
-          Conectá a Orbi a tu WhatsApp y atiende a tus clientes por vos: les cuenta qué productos tenés, precios, stock, formas de pago, envíos y en qué estado está su pedido, siempre con los datos reales de tu tienda. Ante la duda no inventa: te pasa el chat.
+          Conectá a Orbi a tu WhatsApp y atiende a tus clientes por vos: les cuenta qué productos tenés, precios, stock, promos, formas de pago, envíos y en qué estado está su pedido, siempre con los datos reales de tu tienda. Ante la duda no inventa: te pasa el chat.
         </p>
 
         {!bot.disponible && (
@@ -81,6 +112,37 @@ export function OrbiWhatsapp({ bot, onCambio, onVolver, onToast }: Props) {
         </section>
 
         <section className="orb-bloque" aria-disabled={!bot.enabled}>
+          <p className="orb-titulo">Cómo atiende Orbi</p>
+          {MODALIDADES.map((m) => (
+            <label key={m.id} className={`orb-opcion${bot.modalidad === m.id ? ' orb-opcion-sel' : ''}`}>
+              <input type="radio" name="orbi-modalidad" checked={bot.modalidad === m.id} disabled={guardando || bloqueado} onChange={() => void guardar({ modalidad: m.id })} />
+              <span><strong>{m.titulo}</strong><small>{m.texto}</small></span>
+            </label>
+          ))}
+        </section>
+
+        {conMenu && (
+          <section className="orb-bloque">
+            <p className="orb-titulo">Estilo del menú</p>
+            <div className="orb-estilos" role="radiogroup" aria-label="Estilo del menú">
+              <label className={`orb-opcion${estilo === 'LISTA' ? ' orb-opcion-sel' : ''}`}>
+                <input type="radio" name="orbi-estilo" checked={estilo === 'LISTA'} disabled={guardando || bloqueado} onChange={() => setEstilo('LISTA')} />
+                <span><strong>Lista</strong><small>Un botón que abre las opciones (hasta 10).</small></span>
+              </label>
+              <label className={`orb-opcion${estilo === 'BOTONES' ? ' orb-opcion-sel' : ''}`}>
+                <input type="radio" name="orbi-estilo" checked={estilo === 'BOTONES'} disabled={guardando || bloqueado} onChange={() => setEstilo('BOTONES')} />
+                <span><strong>Botones</strong><small>Hasta 3 botones a la vista.</small></span>
+              </label>
+            </div>
+            <MenuEditor
+              estilo={estilo} bienvenida={bienvenida} bienvenidaPorDefecto={bot.bienvenidaPorDefecto} opciones={opciones} deshabilitado={bloqueado}
+              onBienvenida={setBienvenida} onOpciones={setOpciones}
+            />
+            {errorMenu && <p className="orb-error" role="alert">{errorMenu}</p>}
+          </section>
+        )}
+
+        <section className="orb-bloque" aria-disabled={!bot.enabled}>
           <p className="orb-titulo">En qué chats contesta</p>
           <label className={`orb-opcion${bot.modo === 'SELECCIONADOS' ? ' orb-opcion-sel' : ''}`}>
             <input type="radio" name="orbi-modo" checked={bot.modo === 'SELECCIONADOS'} disabled={guardando || bloqueado} onChange={() => void guardar({ modo: 'SELECCIONADOS' as BotModo })} />
@@ -95,16 +157,18 @@ export function OrbiWhatsapp({ bot, onCambio, onVolver, onToast }: Props) {
           </p>
         </section>
 
-        <section className="orb-bloque">
-          <label className="orb-titulo" htmlFor="orbi-indicaciones">Qué querés que sepa Orbi</label>
-          <p className="orb-ayuda">Opcional: tono, promociones del mes, políticas propias. Orbi lo tiene en cuenta en cada respuesta.</p>
-          <textarea
-            id="orbi-indicaciones" className="orb-campo" rows={4} maxLength={MAX_INSTRUCCIONES} value={instrucciones}
-            onChange={(e) => setInstrucciones(e.target.value)} disabled={bloqueado}
-            placeholder="Ej.: Hablá de vos. Este mes hay 10% de descuento pagando en efectivo."
-          />
-          <p className="orb-contador">{instrucciones.length}/{MAX_INSTRUCCIONES}</p>
-        </section>
+        {bot.modalidad !== 'SOLO_MENU' && (
+          <section className="orb-bloque">
+            <label className="orb-titulo" htmlFor="orbi-indicaciones">Qué querés que sepa Orbi</label>
+            <p className="orb-ayuda">Opcional: tono, promociones del mes, políticas propias. Orbi lo tiene en cuenta en cada respuesta con IA.</p>
+            <textarea
+              id="orbi-indicaciones" className="orb-campo" rows={4} maxLength={MAX_INSTRUCCIONES} value={instrucciones}
+              onChange={(e) => setInstrucciones(e.target.value)} disabled={bloqueado}
+              placeholder="Ej.: Hablá de vos. Este mes hay 10% de descuento pagando en efectivo."
+            />
+            <p className="orb-contador">{instrucciones.length}/{MAX_INSTRUCCIONES}</p>
+          </section>
+        )}
 
         <section className="orb-bloque">
           <p className="orb-titulo">Cupo de este mes</p>
@@ -112,7 +176,7 @@ export function OrbiWhatsapp({ bot, onCambio, onVolver, onToast }: Props) {
             <i style={{ width: `${cupo.porcentaje}%` }} className={cupo.porcentaje >= 90 ? 'orb-barra-alta' : ''} />
           </div>
           <p className="orb-ayuda">
-            Usaste <strong>{cupo.usados.toLocaleString('es-AR')}</strong> de {cupo.limite.toLocaleString('es-AR')} créditos ({cupo.porcentaje}%). Se renueva el 1° de cada mes. Si se agota, Orbi deja de contestar y te avisa en los chats.
+            Usaste <strong>{cupo.usados.toLocaleString('es-AR')}</strong> de {cupo.limite.toLocaleString('es-AR')} créditos ({cupo.porcentaje}%). Se renueva el 1° de cada mes. Si se agota, Orbi deja de contestar con IA y te avisa en los chats; el menú sigue funcionando.
           </p>
           <label className="orb-titulo orb-chico" htmlFor="orbi-tope">Tope propio (opcional)</label>
           <input
@@ -122,7 +186,7 @@ export function OrbiWhatsapp({ bot, onCambio, onVolver, onToast }: Props) {
           <p className="orb-ayuda">Si querés gastar menos que tu cupo, poné acá un número menor.</p>
         </section>
 
-        <button type="button" className="orb-guardar" disabled={guardando || bloqueado || !hayCambios || !topeValido} onClick={() => void guardar({ instrucciones: instrucciones.trim() || null, topeCreditos: topeNumero }, 'Cambios guardados')}>
+        <button type="button" className="orb-guardar" disabled={guardando || bloqueado || !hayCambios || !topeValido || !!errorMenu} onClick={guardarCambios}>
           {guardando ? 'Guardando…' : 'Guardar cambios'}
         </button>
       </div>
@@ -147,6 +211,7 @@ const CSS = `
 .orb-ayuda { margin: 0; font-size: 13px; line-height: 1.5; color: var(--wa-texto-2); }
 .orb-ayuda strong { font-weight: 600; color: var(--wa-texto); }
 .orb-nota { margin-top: 4px; }
+.orb-error { margin: 0; font-size: 13px; line-height: 1.5; color: var(--wa-error); }
 .orb-switch { position: relative; width: 44px; height: 26px; flex-shrink: 0; padding: 0; border: none; border-radius: 13px; cursor: pointer; background: #8696a0; transition: background-color 150ms; }
 .orb-switch i { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform 150ms; }
 .orb-switch-on { background: var(--wa-verde); }
@@ -156,6 +221,7 @@ const CSS = `
 .orb-opcion-sel { border-color: var(--wa-verde); }
 .orb-opcion input { margin-top: 4px; accent-color: var(--wa-verde); }
 .orb-opcion small { display: block; margin-top: 2px; font-size: 12.5px; line-height: 1.45; color: var(--wa-texto-2); }
+.orb-estilos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .orb-campo { width: 100%; box-sizing: border-box; padding: 9px 12px; border: 1px solid var(--wa-borde); border-radius: 8px; resize: vertical; background: var(--wa-entrada); font: inherit; font-size: 14px; line-height: 1.5; color: var(--wa-texto); }
 .orb-campo-chico { width: 180px; }
 .orb-campo:disabled { opacity: 0.6; cursor: not-allowed; }
@@ -165,6 +231,6 @@ const CSS = `
 .orb-barra .orb-barra-alta { background: var(--wa-error); }
 .orb-guardar { align-self: flex-start; height: 40px; padding: 0 22px; border: none; border-radius: 20px; cursor: pointer; font-size: 14.5px; font-weight: 500; color: #fff; background: var(--wa-verde); }
 .orb-guardar:disabled { opacity: 0.4; cursor: not-allowed; }
-@media (max-width: 768px) { .orb-volver { display: inline-flex; } .orb-fila { align-items: flex-start; } }
+@media (max-width: 768px) { .orb-volver { display: inline-flex; } .orb-fila { align-items: flex-start; } .orb-estilos { grid-template-columns: minmax(0, 1fr); } }
 @media (prefers-reduced-motion: reduce) { .orb-switch, .orb-switch i, .orb-barra i { transition: none; } }
 `

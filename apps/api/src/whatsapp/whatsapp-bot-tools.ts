@@ -208,6 +208,67 @@ export class HerramientasDelBot {
     };
   }
 
+  /**
+   * La respuesta fija de una opción de fábrica del menú (modalidad "solo menú"): texto armado con los mismos datos que
+   * usan las herramientas, sin pasar por la IA.
+   */
+  async respuestaFija(opcion: string, ctx: ContextoDelBot): Promise<string> {
+    const plata = (n: number) => `$${Math.round(n).toLocaleString('es-AR')}`;
+    const tienda = `https://${ctx.slug}.orbita.site`;
+    try {
+      switch (opcion) {
+        case 'catalogo': {
+          const r = await this.buscarProductos(ctx, '');
+          if (r.productos.length === 0) return `Mirá todo lo que tenemos en nuestra tienda: ${tienda}`;
+          const lineas = r.productos
+            .slice(0, 5)
+            .map((p) => `• *${p.nombre}* — ${plata(p.precio)}${p.oferta ? ` (${p.oferta})` : ''}${p.hay_stock ? '' : ' · sin stock'}\n${p.link}`)
+            .join('\n\n');
+          return `Algunos de nuestros productos:\n\n${lineas}\n\nCatálogo completo: ${tienda}`;
+        }
+        case 'pedidos': {
+          const r = await this.estadoDePedidos(ctx);
+          if (r.pedidos.length === 0) return ('aviso' in r && r.aviso) || 'No encontré pedidos a tu nombre.';
+          const lineas = r.pedidos.map((o) => `*Pedido #${o.numero}* — ${o.estado}\n${o.productos.join(', ')} · ${plata(o.total)}`).join('\n\n');
+          return `Tus últimos pedidos:\n\n${lineas}`;
+        }
+        case 'promos': {
+          const r = await this.cuponesYDescuentos(ctx);
+          const cupones = r.cupones.map((c) => `• Cupón *${c.codigo}*: ${c.descuento}${c.compra_minima ? `, compra mínima ${plata(c.compra_minima)}` : ''}${c.vence ? `, hasta el ${c.vence}` : ''}${c.solo_en ? ` (solo ${c.solo_en.join(', ')})` : ''}`);
+          const pago = r.descuentos_por_medio_de_pago;
+          const medios = [pago?.efectivo_porcentaje ? `• Pagando en efectivo: ${pago.efectivo_porcentaje}% de descuento` : '', pago?.mercado_pago_porcentaje ? `• Pagando con Mercado Pago: ${pago.mercado_pago_porcentaje}% de descuento` : ''].filter(Boolean);
+          const todo = [...cupones, ...medios];
+          if (todo.length === 0) return `Ahora no hay cupones vigentes, pero mirá las ofertas en el catálogo: ${tienda}`;
+          return `Promos vigentes:\n\n${todo.join('\n')}${cupones.length ? '\n\nLos cupones se escriben en el checkout de la tienda, al pagar.' : ''}`;
+        }
+        case 'envios': {
+          const d = (await this.datosDeLaTienda(ctx)) as Record<string, any>;
+          const pagos = ((d.formas_de_pago ?? []) as string[]).filter(Boolean);
+          const e = d.envios as { politica?: string | null; demora_estimada?: string | null; gratis_desde?: number | null } | null;
+          const partes = [
+            pagos.length ? `*Formas de pago*\n${pagos.map((p) => `• ${p}`).join('\n')}` : '',
+            e?.politica || e?.demora_estimada || e?.gratis_desde
+              ? `*Envíos*\n${[e?.politica, e?.demora_estimada ? `Demora estimada: ${e.demora_estimada}` : '', e?.gratis_desde ? `Envío gratis desde ${plata(e.gratis_desde)}` : ''].filter(Boolean).join('\n')}`
+              : '',
+            d.retiro_en_local ? `*Retiro en local*\n${[d.retiro_en_local.local, d.retiro_en_local.direccion].filter(Boolean).join(' · ')}` : '',
+          ].filter(Boolean);
+          return partes.length ? partes.join('\n\n') : `Todos los detalles de envíos y pagos están en nuestra tienda: ${tienda}`;
+        }
+        case 'horarios': {
+          const d = (await this.datosDeLaTienda(ctx)) as Record<string, any>;
+          const c = (d.contacto ?? {}) as Record<string, string | null>;
+          const redes = [c.instagram && `Instagram: ${c.instagram}`, c.tiktok && `TikTok: ${c.tiktok}`, c.facebook && `Facebook: ${c.facebook}`, c.email && `Email: ${c.email}`].filter(Boolean);
+          const partes = [d.horarios ? `*Horarios*\n${d.horarios}` : '', redes.length ? `*Contacto*\n${redes.join('\n')}` : ''].filter(Boolean);
+          return partes.length ? partes.join('\n\n') : `Escribinos por acá o visitá nuestra tienda: ${tienda}`;
+        }
+        default:
+          return `Visitá nuestra tienda: ${tienda}`;
+      }
+    } catch {
+      return 'No pude consultar eso ahora. Escribí *menú* y elegí "Hablar con alguien".';
+    }
+  }
+
   private async cuponesYDescuentos(ctx: ContextoDelBot) {
     const [cupones, c] = await Promise.all([this.tienda.listCoupons(ctx.slug), this.tienda.getConfig(ctx.slug)]);
     const pago = c.payment;

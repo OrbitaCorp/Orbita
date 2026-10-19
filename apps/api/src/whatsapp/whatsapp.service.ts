@@ -57,7 +57,7 @@ interface WaMessage {
   type: string;
   text?: { body?: string };
   button?: { text?: string };
-  interactive?: { button_reply?: { title?: string }; list_reply?: { title?: string } };
+  interactive?: { button_reply?: { id?: string; title?: string }; list_reply?: { id?: string; title?: string } };
   image?: WaMedia;
   video?: WaMedia;
   document?: WaMedia;
@@ -308,7 +308,9 @@ export class WhatsappService {
     ]);
     const messageId = (mensaje as { id?: string } | undefined)?.id;
     if (!messageId) return null;
-    return { businessId, conversationId: conv.id, customerId, messageId, waId: m.from, esTexto: m.type === 'text' || m.type === 'button' || m.type === 'interactive' };
+    // Si tocó una opción de un menú (lista o botón), su id; si escribió, el texto.
+    const opcionId = m.interactive?.list_reply?.id ?? m.interactive?.button_reply?.id;
+    return { businessId, conversationId: conv.id, customerId, messageId, waId: m.from, esTexto: m.type === 'text' || m.type === 'button' || m.type === 'interactive', texto, ...(opcionId ? { opcionId } : {}) };
   }
 
   /**
@@ -658,6 +660,11 @@ export class WhatsappService {
    */
   async enviarTexto(businessId: string, conversationId: string, waId: string, texto: string): Promise<string> {
     return this.enviarCarga(businessId, conversationId, waId, { type: 'text', text: { body: texto, preview_url: false } });
+  }
+
+  /** Manda un mensaje interactivo (lista o botones). Mismas reglas de plazo que el texto. Devuelve el id del mensaje en Meta. */
+  async enviarInteractivo(businessId: string, conversationId: string, waId: string, interactive: Record<string, unknown>): Promise<string> {
+    return this.enviarCarga(businessId, conversationId, waId, { type: 'interactive', interactive });
   }
 
   /** Manda una imagen (de una dirección pública de nuestro almacenamiento), con un pie de foto opcional. Mismas reglas de plazo. */

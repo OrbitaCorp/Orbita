@@ -1,4 +1,5 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
+import type { WhatsappBotConfig } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorefrontService } from '../storefront/storefront.service';
@@ -9,7 +10,11 @@ import { costoDelTurno } from '../orbi/turno/costo-del-turno';
 import { vueltaDeTools } from '../orbi/turno/vuelta';
 import { mesArgentina, rangoDeMesArgentina } from '../common/utils/hora-argentina';
 import { describeError } from '../common/utils/describe-error.util';
-import { HERRAMIENTAS_DEL_BOT, HerramientasDelBot } from './whatsapp-bot-tools';
+import { HERRAMIENTAS_DEL_BOT, HerramientasDelBot, type ContextoDelBot } from './whatsapp-bot-tools';
+import {
+  MARCA_MENU_TEXTO, PEDIDO_DE_OPCION, armarMenuInteractivo, armarMenuTexto, bienvenidaPorDefecto, esSaludoOPedidoDeMenu, opcionDeNumero, opcionesActivas,
+  opcionesDelMenu, validarMenu, LIMITES_MENU, type MenuEstilo, type Modalidad, type OpcionDeMenu,
+} from './whatsapp-bot-menu';
 import { orbiAtiendeElChat, type BotChatEstado, type BotModo, type MensajeEntrante } from './whatsapp-bot-estado';
 import { MAX_CARACTERES_RESPUESTA, MENSAJE_DE_DERIVACION, MENSAJE_SIN_MEDIOS, promptDelBot } from './whatsapp-bot-prompt';
 
@@ -36,6 +41,14 @@ export interface EstadoDelBot {
   modo: BotModo;
   instrucciones: string | null;
   topeCreditos: number | null;
+  /** Cómo atiende Orbi: todo con IA, menú + IA, o solo menú. */
+  modalidad: Modalidad;
+  menuEstilo: MenuEstilo;
+  /** Lo que escribió el dueño (null = el de siempre) y el de siempre, para mostrarlo de ejemplo. */
+  bienvenida: string | null;
+  bienvenidaPorDefecto: string;
+  /** Las opciones del menú, en orden, con las del dueño (o las de fábrica si no editó nada). */
+  menuOpciones: OpcionDeMenu[];
   cupo: { mes: string; usados: number; total: number; limite: number; porcentaje: number };
 }
 
@@ -85,10 +98,11 @@ export class WhatsappBotService {
   }
 
   async estado(businessId: string): Promise<EstadoDelBot> {
-    const [cfg, disponible, conexion] = await Promise.all([
+    const [cfg, disponible, conexion, negocio] = await Promise.all([
       this.prisma.whatsappBotConfig.findUnique({ where: { businessId } }),
       this.tienePack(businessId),
       this.prisma.whatsappConnection.findUnique({ where: { businessId }, select: { status: true } }),
+      this.prisma.business.findFirst({ where: { id: businessId }, select: { name: true } }),
     ]);
     return {
       disponible,
@@ -97,13 +111,21 @@ export class WhatsappBotService {
       modo: cfg?.modo ?? 'SELECCIONADOS',
       instrucciones: cfg?.instrucciones ?? null,
       topeCreditos: cfg?.topeCreditos ?? null,
+      modalidad: (cfg?.modalidad as Modalidad | undefined) ?? 'CONVERSACIONAL',
+      menuEstilo: (cfg?.menuEstilo as MenuEstilo | undefined) ?? 'LISTA',
+      bienvenida: cfg?.bienvenida ?? null,
+      bienvenidaPorDefecto: bienvenidaPorDefecto(negocio?.name ?? 'la tienda'),
+      menuOpciones: opcionesDelMenu(cfg?.menuOpciones),
       cupo: await this.cupo(businessId, cfg?.topeCreditos ?? null),
     };
   }
 
   async guardar(
     businessId: string,
-    dto: { enabled?: boolean; modo?: BotModo; instrucciones?: string | null; topeCreditos?: number | null },
+    dto: {
+      enabled?: boolean; modo?: BotModo; instrucciones?: string | null; topeCreditos?: number | null;
+      modalidad?: Modalidad; menuEstilo?: MenuEstilo; bienvenida?: string | null; menuOpciones?: unknown[];
+    },
   ): Promise<EstadoDelBot> {
     if (dto.enabled === true && !(await this.tienePack(businessId))) {
       throw new ForbiddenException('Orbi en WhatsApp es una función del paquete Avanzado.');
@@ -113,7 +135,22 @@ export class WhatsappBotService {
       if (conexion?.status !== 'ACTIVE') throw new BadRequestException('Primero conectá tu cuenta de WhatsApp Business.');
     }
     const instrucciones = dto.instrucciones === undefined ? undefined : dto.instrucciones?.trim() || null;
+    const bienvenida = dto.bienvenida === undefined ? undefined : dto.bienvenida?.trim().slice(0, LIMITES_MENU.bienvenida) || null;
+    // El menú se valida con el estilo que va a quedar (el nuevo o el que ya estaba): con botones entran 3 opciones, con lista 10.
+    let menuOpciones: OpcionDeMenu[] | undefined;
+    if (dto.menuOpciones !== undefined || dto.menuEstilo !== undefined) {
+      const actual = await this.prisma.whatsappBotConfig.findUnique({ where: { businessId }, select: { menuEstilo: true, menuOpciones: true } });
+      const estilo = (dto.menuEstilo ?? actual?.menuEstilo ?? 'LISTA') as MenuEstilo;
+      const propuestas = dto.menuOpciones ?? opcionesDelMenu(actual?.menuOpciones);
+      const error = validarMenu(propuestas, estilo);
+      if (error) throw new BadRequestException(error);
+      if (dto.menuOpciones !== undefined) menuOpciones = opcionesDelMenu(propuestas);
+    }
     const data = {
+      ...(dto.modalidad !== undefined ? { modalidad: dto.modalidad } : {}),
+      ...(dto.menuEstilo !== undefined ? { menuEstilo: dto.menuEstilo } : {}),
+      ...(bienvenida !== undefined ? { bienvenida } : {}),
+      ...(menuOpciones !== undefined ? { menuOpciones: menuOpciones as unknown as object[] } : {}),
       ...(dto.enabled !== undefined ? { enabled: dto.enabled } : {}),
       ...(dto.modo !== undefined ? { modo: dto.modo } : {}),
       ...(instrucciones !== undefined ? { instrucciones } : {}),
@@ -187,10 +224,9 @@ export class WhatsappBotService {
     const negocio = await this.prisma.business.findFirst({ where: { id: businessId, isActive: true, isPaused: false, deletedAt: null }, select: { name: true, subdomain: true } });
     if (!negocio) return;
 
-    if (!m.esTexto) {
-      await this.contestar(m, MENSAJE_SIN_MEDIOS, { status: 'ok', derivar: null });
-      return;
-    }
+    const modalidad = (cfg.modalidad as Modalidad) ?? 'CONVERSACIONAL';
+    const opciones = opcionesActivas(cfg.menuOpciones);
+    const ctx: ContextoDelBot = { businessId, slug: negocio.subdomain, customerId: m.customerId };
 
     // Tope de respuestas por chat y por hora: frena a quien escribe sin parar.
     const respuestasRecientes = await this.prisma.message.count({
@@ -202,6 +238,83 @@ export class WhatsappBotService {
       return;
     }
 
+    // El cliente eligió una opción del menú (la tocó, o respondió con su número).
+    if (modalidad !== 'CONVERSACIONAL') {
+      const elegida = (m.opcionId ? opciones.find((o) => o.id === m.opcionId) : undefined) ?? (await this.opcionPorNumero(m, opciones));
+      if (elegida) return this.atenderOpcion(m, cfg, negocio, ctx, elegida);
+    }
+
+    if (!m.esTexto) {
+      await this.contestar(m, MENSAJE_SIN_MEDIOS, { status: 'ok', derivar: null });
+      return;
+    }
+
+    if (modalidad === 'SOLO_MENU') {
+      // Sin IA: cualquier otro texto vuelve a mostrar el menú (y una frase si no era un saludo).
+      const aviso = (await this.hayRespuestasDeOrbi(conversationId)) && !esSaludoOPedidoDeMenu(m.texto ?? '') ? 'No te entendí del todo 🙂 Elegí una opción:' : undefined;
+      await this.enviarMenu(m, cfg, negocio, opciones, aviso);
+      return;
+    }
+    if (modalidad === 'MENU_Y_CONVERSACION' && (!(await this.hayRespuestasDeOrbi(conversationId)) || esSaludoOPedidoDeMenu(m.texto ?? ''))) {
+      // El primer contacto y los saludos abren con el menú; lo demás lo conversa la IA.
+      await this.enviarMenu(m, cfg, negocio, opciones);
+      return;
+    }
+
+    await this.responderConModelo(m, cfg, negocio, ctx);
+  }
+
+  private async hayRespuestasDeOrbi(conversationId: string): Promise<boolean> {
+    return (await this.prisma.message.count({ where: { conversationId, viaOrbi: true } })) > 0;
+  }
+
+  /** "2" suelto como elección de la opción 2, pero solo si lo último que mandó Orbi fue un menú en texto. */
+  private async opcionPorNumero(m: MensajeEntrante, opciones: OpcionDeMenu[]): Promise<OpcionDeMenu | undefined> {
+    if (!m.esTexto || !m.texto) return undefined;
+    const op = opcionDeNumero(m.texto, opciones);
+    if (!op) return undefined;
+    const ultimo = await this.prisma.message.findFirst({ where: { conversationId: m.conversationId, viaOrbi: true }, orderBy: { createdAt: 'desc' }, select: { text: true } });
+    return ultimo?.text.includes(MARCA_MENU_TEXTO) ? op : undefined;
+  }
+
+  /** Manda el menú: interactivo (lista o botones) y, si WhatsApp no lo deja, el mismo menú en texto numerado. */
+  private async enviarMenu(m: MensajeEntrante, cfg: WhatsappBotConfig, negocio: { name: string }, opciones: OpcionDeMenu[], aviso?: string) {
+    const bienvenida = cfg.bienvenida?.trim() || bienvenidaPorDefecto(negocio.name);
+    const guardado = armarMenuTexto(bienvenida, opciones, aviso);
+    const interactivo = armarMenuInteractivo(aviso ? `${aviso}\n\n${bienvenida}` : bienvenida, opciones, cfg.menuEstilo as MenuEstilo);
+    await this.contestar(m, guardado, { status: 'ok', derivar: null }, async () => {
+      try {
+        return await this.whatsapp.enviarInteractivo(m.businessId, m.conversationId, m.waId, interactivo);
+      } catch (e) {
+        // El plazo de 24 h no se arregla con texto; cualquier otro rechazo del interactivo sí.
+        if (e instanceof UnprocessableEntityException) throw e;
+        this.logger.warn(`WhatsApp no aceptó el menú interactivo en ${m.conversationId}; va en texto: ${describeError(e)}`);
+        return this.whatsapp.enviarTexto(m.businessId, m.conversationId, m.waId, guardado);
+      }
+    });
+  }
+
+  /** El cliente eligió una opción: hablar con una persona, una respuesta propia del dueño, o una de fábrica (fija, o con IA). */
+  private async atenderOpcion(m: MensajeEntrante, cfg: WhatsappBotConfig, negocio: { name: string; subdomain: string }, ctx: ContextoDelBot, op: OpcionDeMenu) {
+    if (op.id === 'persona') {
+      await this.contestar(m, MENSAJE_DE_DERIVACION, { status: 'derivado', derivar: 'Eligió "Hablar con alguien" en el menú.' });
+      return;
+    }
+    if (op.id.startsWith('custom-')) {
+      await this.contestar(m, op.respuesta ?? MENSAJE_DE_DERIVACION, { status: 'ok', derivar: null });
+      return;
+    }
+    if (cfg.modalidad === 'SOLO_MENU') {
+      const texto = await this.herramientas.respuestaFija(op.id, ctx);
+      await this.contestar(m, `${texto}\n\nEscribí *menú* para ver las opciones.`.slice(0, MAX_CARACTERES_RESPUESTA + 200), { status: 'ok', derivar: null });
+      return;
+    }
+    await this.responderConModelo(m, cfg, negocio, ctx, PEDIDO_DE_OPCION[op.id] ?? op.titulo);
+  }
+
+  /** Contesta con la IA (Groq → Workers AI → Gemini). `pedido`: lo que el cliente quiso decir al tocar una opción del menú. */
+  private async responderConModelo(m: MensajeEntrante, cfg: WhatsappBotConfig, negocio: { name: string; subdomain: string }, ctx: ContextoDelBot, pedido?: string) {
+    const { businessId, conversationId } = m;
     // Cupo del mes: agotado, Orbi se calla y avisa al dueño.
     const cupo = await this.cupo(businessId, cfg.topeCreditos);
     if (cupo.usados >= cupo.limite) {
@@ -214,6 +327,8 @@ export class WhatsappBotService {
       const cliente = await this.prisma.customer.findFirst({ where: { id: m.customerId, businessId }, select: { firstName: true } });
       const previas = await this.prisma.message.count({ where: { conversationId, viaOrbi: true } });
       const historial = await this.historial(conversationId);
+      // Al tocar una opción, el último mensaje del cliente es solo el título ("Mis pedidos"): se le explica qué quiso decir.
+      if (pedido && historial.length > 0 && historial[historial.length - 1].role === 'user') historial[historial.length - 1] = { role: 'user', content: pedido };
       const r = await this.correrModelo({
         sistema: promptDelBot({
           tienda: negocio.name,
@@ -223,7 +338,7 @@ export class WhatsappBotService {
           esPrimeraRespuesta: previas === 0,
         }),
         historial,
-        ctx: { businessId, slug: negocio.subdomain, customerId: m.customerId },
+        ctx,
       });
       const texto = r.texto.trim().slice(0, MAX_CARACTERES_RESPUESTA);
       // El modelo tarda: mientras pensaba, el cliente pudo seguir escribiendo o contestar una persona. En ese caso esta
@@ -334,12 +449,12 @@ export class WhatsappBotService {
   }
 
   /** Manda la respuesta por WhatsApp, la guarda en el chat marcada como de Orbi y, si hay que derivar, deja el chat para una persona. */
-  private async contestar(m: MensajeEntrante, texto: string, d: Omit<TurnoParaGuardar, 'businessId' | 'conversationId'> & { derivar: string | null }) {
+  private async contestar(m: MensajeEntrante, texto: string, d: Omit<TurnoParaGuardar, 'businessId' | 'conversationId'> & { derivar: string | null }, enviar?: () => Promise<string>) {
     const { businessId, conversationId } = m;
     const { derivar, ...turno } = d;
     let externalId: string;
     try {
-      externalId = await this.whatsapp.enviarTexto(businessId, conversationId, m.waId, texto);
+      externalId = enviar ? await enviar() : await this.whatsapp.enviarTexto(businessId, conversationId, m.waId, texto);
     } catch (e) {
       this.logger.warn(`Orbi no pudo enviar la respuesta en ${conversationId}: ${describeError(e)}`);
       await this.derivar(businessId, conversationId, 'Orbi no pudo enviar su respuesta: lo revisa una persona.');

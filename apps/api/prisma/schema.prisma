@@ -1790,6 +1790,20 @@ enum WhatsappBotModo {
   TODOS // Orbi atiende todos los chats, salvo donde el dueño lo apaga o entra una persona
 }
 
+// Cómo atiende Orbi (lo elige el dueño): CONVERSACIONAL contesta todo con IA; MENU_Y_CONVERSACION saluda con un menú de
+// opciones y después conversa con IA; SOLO_MENU responde solo con el menú y respuestas fijas, sin gastar IA.
+enum WhatsappBotModalidad {
+  CONVERSACIONAL
+  MENU_Y_CONVERSACION
+  SOLO_MENU
+}
+
+// El menú como lista desplegable (hasta 10 opciones) o como botones (hasta 3).
+enum WhatsappMenuEstilo {
+  LISTA
+  BOTONES
+}
+
 enum WhatsappBotChatEstado {
   DEFAULT
   ON
@@ -1806,6 +1820,10 @@ model WhatsappBotConfig {
   enabled       Boolean         @default(false)
   modo          WhatsappBotModo @default(SELECCIONADOS)
   instrucciones String? // indicaciones del dueño para Orbi (tono, promociones, políticas), hasta 1000 caracteres
+  modalidad     WhatsappBotModalidad @default(CONVERSACIONAL)
+  menuEstilo    WhatsappMenuEstilo   @default(LISTA) @map("menu_estilo")
+  bienvenida    String? // saludo antes del menú; null = el de siempre
+  menuOpciones  Json?   @map("menu_opciones") // [{ id, titulo, descripcion?, activa, respuesta? }] en orden; null = el menú por defecto
   topeCreditos  Int?            @map("tope_creditos") // tope mensual propio del dueño, por debajo del cupo del plan
   createdAt     DateTime        @default(now()) @map("created_at")
   updatedAt     DateTime        @updatedAt @map("updated_at")

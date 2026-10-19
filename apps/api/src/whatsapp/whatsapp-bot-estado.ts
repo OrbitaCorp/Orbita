@@ -14,6 +14,10 @@ export interface MensajeEntrante {
   waId: string;
   /** false = no es texto (audio, imagen, documento…): Orbi no lo lee. */
   esTexto: boolean;
+  /** Lo que dijo (o el título de la opción que tocó). */
+  texto?: string;
+  /** Si tocó una opción de un menú (lista o botón): su id. */
+  opcionId?: string;
 }
 
 export type BotModo = 'SELECCIONADOS' | 'TODOS';
