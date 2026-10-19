@@ -3,8 +3,8 @@ import type { WhatsappEstado } from '@/lib/api'
 import { IconoWhatsapp } from '../whatsapp/WhatsAppWeb'
 import type { CanalDeMensajes } from '../whatsapp/utilidades'
 
-// Arriba de Mensajes: se elige qué bandeja ver. "Mensajes del sistema" son los del chat de la tienda online;
-// "WhatsApp" es el número de WhatsApp Business conectado. Cada opción explica qué es, y la de WhatsApp dice si hay
+// Arriba de Mensajes: se elige qué bandeja ver. "Mensajes locales" (los del sistema) son los del chat de la tienda
+// online; "WhatsApp" es el número de WhatsApp Business conectado. Las dos bandejas no se mezclan. Cada opción explica qué es, y la de WhatsApp dice si hay
 // una cuenta conectada. Al elegir, cambia la bandeja de abajo.
 
 export type EstadoDeWhatsapp = 'cargando' | 'no-disponible' | WhatsappEstado
@@ -28,8 +28,8 @@ export function SelectorDeCanal({ canal, onCanal, sinLeer, whatsapp }: Props) {
   const opciones: { id: CanalDeMensajes; titulo: string; texto: string; linea: string; icono: React.ReactNode; punto: boolean }[] = [
     {
       id: 'sistema',
-      titulo: 'Mensajes del sistema',
-      texto: 'Los que te escriben tus clientes desde el chat de tu tienda online. El cliente los ve en su perfil de la tienda y le llegan tus respuestas ahí mismo.',
+      titulo: 'Mensajes locales',
+      texto: 'Los mensajes del sistema: lo que te escriben tus clientes desde el chat de tu tienda online. Los ven y reciben tus respuestas en su perfil de la tienda.',
       linea: 'Siempre disponible',
       icono: <MessageSquare size={20} strokeWidth={1.8} />,
       punto: false,
@@ -37,7 +37,7 @@ export function SelectorDeCanal({ canal, onCanal, sinLeer, whatsapp }: Props) {
     {
       id: 'whatsapp',
       titulo: 'WhatsApp',
-      texto: 'Los chats de tu número de WhatsApp Business, con el mismo aspecto que WhatsApp Web. Respondés desde acá y tu cliente lo recibe en su WhatsApp.',
+      texto: 'Los chats de tu número de WhatsApp Business, con el aspecto de WhatsApp Web. Es otra bandeja: no se mezcla con los mensajes locales.',
       linea: lineaWhatsapp,
       icono: <IconoWhatsapp size={20} />,
       punto: conectado,

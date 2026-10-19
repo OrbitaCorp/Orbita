@@ -200,7 +200,8 @@ function Chat({ charla, plantillas, onVolver, onArchivar, onPerfil, onToast, onE
 
   // Mensajes reales + sondeo mientras el chat está abierto (y al volver a la pestaña, que el navegador frena).
   useEffect(() => {
-    const cargar = () => getConversationMessages(charla.id).then((r) => { if (montado.current) setMensajes(r) }).catch(() => undefined)
+    // Bandeja de WhatsApp: solo los mensajes de WhatsApp (los del chat de la tienda están en Mensajes locales).
+    const cargar = () => getConversationMessages(charla.id, 'WHATSAPP').then((r) => { if (montado.current) setMensajes(r) }).catch(() => undefined)
     void cargar()
     const t = setInterval(cargar, POLL_MS)
     const alVolver = () => { if (document.visibilityState === 'visible') void cargar() }
@@ -240,7 +241,7 @@ function Chat({ charla, plantillas, onVolver, onArchivar, onPerfil, onToast, onE
     if (!puedeEnviar) return
     setEnviando(true)
     try {
-      const nuevo = await sendConversationMessage(charla.id, { text: texto.trim() })
+      const nuevo = await sendConversationMessage(charla.id, { text: texto.trim(), canal: 'WHATSAPP' })
       if (!montado.current) return
       cerca.current = true
       setMensajes((previos) => [...(previos ?? []), nuevo])

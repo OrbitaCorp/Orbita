@@ -52,7 +52,7 @@ describe('conectarConEmbeddedSignup', () => {
   it('canjea el código con las credenciales de la app, registra el número, guarda y suscribe', async () => {
     const { svc, prisma, llamadas } = armar();
     const r = await svc.conectarConEmbeddedSignup(BIZ, dto);
-    expect(r).toEqual({ connected: true, displayPhone: '+54 9 11 5555-0000', suscripta: true });
+    expect(r).toEqual({ connected: true, displayPhone: '+54 9 11 5555-0000', suscripta: true, coexistencia: false });
 
     const canje = new URL(llamadas[0].url);
     expect(canje.pathname).toMatch(/\/oauth\/access_token$/);

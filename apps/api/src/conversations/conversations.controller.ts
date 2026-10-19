@@ -1,10 +1,10 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { FullModeOnly } from '../common/decorators/full-mode-only.decorator';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
-import { ConversationsService } from './conversations.service';
+import { CANALES_DE_BANDEJA, ConversationsService, type CanalDeBandeja } from './conversations.service';
 import { SendMessageDto } from './dto/send-message.dto';
 import { UpdateConversationDto } from './dto/update-conversation.dto';
 
@@ -42,9 +42,10 @@ export class ConversationsController {
   @Get(':id/messages')
   @FullModeOnly()
   @RequirePermission('messages.view')
-  messages(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
+  messages(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Query('canal') canal?: string) {
     const member = assertMemberContext(ctx);
-    return this.conversationsService.getMessages(member.businessId, id, !member.readOnly);
+    if (canal !== undefined && !CANALES_DE_BANDEJA.includes(canal as CanalDeBandeja)) throw new BadRequestException('Canal inválido');
+    return this.conversationsService.getMessages(member.businessId, id, !member.readOnly, canal as CanalDeBandeja | undefined);
   }
 
   @Post(':id/messages')

@@ -19,8 +19,8 @@ interface Props {
 
 const PASOS = [
   { titulo: 'Tocá el botón de abajo', texto: 'Se abre una ventana de Meta, la empresa dueña de WhatsApp.' },
-  { titulo: 'Iniciá sesión con Facebook y elegí tu número', texto: 'Elegí tu cuenta de WhatsApp Business (o creá una) y el número con el que atendés. Meta te manda un código por SMS o llamada para confirmar que es tuyo.' },
-  { titulo: 'Atendé tus chats desde acá', texto: 'Los mensajes de tus clientes llegan a esta pantalla, con el aspecto de WhatsApp Web, y tus respuestas salen por tu número.' },
+  { titulo: 'Iniciá sesión con Facebook y conectá tu número', texto: 'Escribís el número de tu app WhatsApp Business, Meta te manda un código y lo ingresás en la app. Te pregunta si querés traer el historial de tus chats.' },
+  { titulo: 'Seguí usando tu app y atendé también desde acá', texto: 'Tu app WhatsApp Business del celular sigue funcionando igual: lo que escribas ahí también se ve en Órbita, y lo que respondas desde Órbita le llega a tu cliente.' },
 ]
 
 export function ConectarWhatsapp({ caso, estado = 'libre', error, aviso, onConectar, onManual }: Props) {
@@ -61,10 +61,13 @@ export function ConectarWhatsapp({ caso, estado = 'libre', error, aviso, onConec
           {error && <p className="cw-error" role="alert">{error}</p>}
           {aviso && <p className="cw-aviso" role="status">{aviso}</p>}
 
-          <p className="cw-nota">
-            Usa la API oficial de WhatsApp Business de Meta. Necesitás una cuenta de Facebook con acceso a tu negocio y un número que pueda recibir SMS o llamadas.
-            WhatsApp solo permite responder dentro de las 24 horas del último mensaje del cliente.
-          </p>
+          <ul className="cw-limites" aria-label="Qué tener en cuenta">
+            <li>Necesitás la app <strong>WhatsApp Business</strong> (actualizada) en tu celular; el WhatsApp personal no sirve.</li>
+            <li>Los chats de <strong>grupos</strong> no se traen a Órbita.</li>
+            <li>Al conectar, se desvinculan <strong>WhatsApp Web y Desktop</strong>; los volvés a usar con Órbita.</li>
+            <li>Usá tu app seguido: si pasan unas dos semanas sin abrirla en el celular, Meta corta la conexión.</li>
+            <li>WhatsApp solo permite responder dentro de las <strong>24 horas</strong> del último mensaje del cliente.</li>
+          </ul>
           {onManual && (
             <button type="button" className="cw-manual" onClick={onManual}>¿Tenés una cuenta de prueba de Meta? Conectala a mano</button>
           )}
@@ -87,7 +90,8 @@ const CSS = `
 .cw-raiz .cw-boton { min-width: 300px; justify-content: center; background: #00a884; border-color: #00a884; }
 .cw-error { margin: 12px 0 0; max-width: 52ch; font-size: 13px; line-height: 1.5; color: var(--color-error); }
 .cw-aviso { margin: 12px 0 0; max-width: 52ch; font-size: 13px; line-height: 1.5; color: var(--color-text); }
-.cw-nota { margin: 14px 0 0; max-width: 52ch; font-size: 12.5px; line-height: 1.5; color: var(--color-muted); }
+.cw-limites { margin: 16px 0 0; padding: 12px 14px 12px 30px; width: 100%; box-sizing: border-box; text-align: left; border-radius: 12px; background: var(--color-surface-alt); border: 1px solid var(--color-border); display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; line-height: 1.5; color: var(--color-muted); }
+.cw-limites strong { font-weight: 600; color: var(--color-text); }
 .cw-manual { margin-top: 12px; border: none; background: transparent; padding: 0; cursor: pointer; font: inherit; font-size: 12.5px; color: var(--color-muted); text-decoration: underline; text-underline-offset: 3px; }
 .cw-manual:hover { color: var(--color-text); }
 .cw-manual:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 4px; }

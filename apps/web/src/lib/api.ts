@@ -3320,10 +3320,17 @@ export function meSendConversationMessage(text: string) {
 export type ConversationRow = {
   id: string; customerId: string; customerName: string; customerEmail: string | null; customerAvatar: string | null
   isUnread: boolean; isArchived: boolean; lastChannel?: ChatChannel; lastMessage: ChatMessage | null; updatedAt: string
+  // Lo último de cada bandeja y su propio "sin leer". Ausente en respuestas viejas o de la demo.
+  canales?: Partial<Record<CanalDeBandeja, { lastMessage: ChatMessage; isUnread: boolean }>>
 }
 export function listConversations() { return panelRequest<ConversationRow[]>('/conversations') }
-export function getConversationMessages(id: string) { return panelRequest<ChatMessage[]>(`/conversations/${id}/messages`) }
-export function sendConversationMessage(id: string, input: { text: string; orderId?: string }) {
+// `canal`: la bandeja desde la que se mira o se contesta (Mensajes locales = STOREFRONT, o WhatsApp). Las dos no se
+// mezclan: cada una ve solo los mensajes de su canal.
+export type CanalDeBandeja = 'STOREFRONT' | 'WHATSAPP'
+export function getConversationMessages(id: string, canal?: CanalDeBandeja) {
+  return panelRequest<ChatMessage[]>(`/conversations/${id}/messages${canal ? `?canal=${canal}` : ''}`)
+}
+export function sendConversationMessage(id: string, input: { text: string; orderId?: string; canal?: CanalDeBandeja }) {
   return panelRequest<ChatMessage>(`/conversations/${id}/messages`, { method: 'POST', body: JSON.stringify(input) })
 }
 export function updateConversation(id: string, input: { isUnread?: boolean; isArchived?: boolean }) {
@@ -3342,8 +3349,8 @@ export function connectWhatsapp(input: { phoneNumberId: string; wabaId: string; 
   return panelRequest<{ connected: true; displayPhone: string | null; suscripta: boolean }>('/whatsapp/connection', { method: 'POST', body: JSON.stringify(input) })
 }
 // Conexión por Embedded Signup (el botón de Meta): el código y los ids que dio Meta al terminar el proceso.
-export function connectWhatsappIntegrado(input: { code: string; phoneNumberId: string; wabaId: string; businessId?: string }) {
-  return panelRequest<{ connected: true; displayPhone: string | null; suscripta: boolean }>('/whatsapp/embedded-signup', { method: 'POST', body: JSON.stringify(input) })
+export function connectWhatsappIntegrado(input: { code: string; phoneNumberId?: string; wabaId: string; businessId?: string }) {
+  return panelRequest<{ connected: true; displayPhone: string | null; suscripta: boolean; coexistencia: boolean }>('/whatsapp/embedded-signup', { method: 'POST', body: JSON.stringify(input) })
 }
 export function disconnectWhatsapp() { return panelRequest<{ connected: false }>('/whatsapp/connection', { method: 'DELETE' }) }
 

@@ -20,6 +20,16 @@ describe('interpretarMensajeDeMeta', () => {
     expect(interpretarMensajeDeMeta(FB, msg('FINISH', { waba_id: '2' }))).toMatchObject({ tipo: 'error' })
   })
 
+  it('coexistencia: terminar de conectar el número de la app WhatsApp Business trae solo el id de la cuenta', () => {
+    expect(interpretarMensajeDeMeta(FB, msg('FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING', { waba_id: '222', business_id: '333' })))
+      .toEqual({ tipo: 'terminado', wabaId: '222', businessId: '333' })
+    expect(interpretarMensajeDeMeta(FB, msg('FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING', {}))).toMatchObject({ tipo: 'error' })
+  })
+
+  it('un CANCEL con mensaje de error es un error de la persona, no un simple cancelar', () => {
+    expect(interpretarMensajeDeMeta(FB, msg('CANCEL', { error_message: 'Número no válido', error_code: 1 }))).toEqual({ tipo: 'error', mensaje: 'Número no válido' })
+  })
+
   it('terminar sin agregar un número, cancelar y los errores de Meta se distinguen', () => {
     expect(interpretarMensajeDeMeta(FB, msg('FINISH_ONLY_WABA', { waba_id: '2' }))).toEqual({ tipo: 'sin-numero', wabaId: '2' })
     expect(interpretarMensajeDeMeta(FB, msg('CANCEL', { current_step: 'PHONE_NUMBER_SETUP' }))).toEqual({ tipo: 'cancelado', paso: 'PHONE_NUMBER_SETUP' })

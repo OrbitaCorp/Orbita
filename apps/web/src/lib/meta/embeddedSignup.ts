@@ -11,6 +11,9 @@
 const APP_ID = process.env.NEXT_PUBLIC_META_APP_ID ?? '1634368494718041'
 const CONFIG_ID = process.env.NEXT_PUBLIC_WHATSAPP_CONFIG_ID ?? '28952638967708467'
 const VERSION = 'v23.0'
+// Coexistencia: el dueño conecta el número de su app WhatsApp Business y sigue usándola (lo que escribe desde el celular
+// también se ve en Órbita). Es el `featureType` del flujo de Meta para esos números; se puede cambiar por entorno.
+const FEATURE_TYPE = process.env.NEXT_PUBLIC_WHATSAPP_FEATURE_TYPE ?? 'whatsapp_business_app_onboarding'
 const SDK_URL = 'https://connect.facebook.net/es_LA/sdk.js'
 const ORIGENES_DE_META = ['https://www.facebook.com', 'https://web.facebook.com', 'https://business.facebook.com']
 /** Cuánto se espera a que el cliente termine el proceso en Meta antes de rendirse. */
@@ -25,7 +28,8 @@ declare global { interface Window { FB?: FbSdk } }
 
 export interface ResultadoDeSignup {
   code: string
-  phoneNumberId: string
+  /** En coexistencia Meta no devuelve el id del número, solo el de la cuenta: la API lo busca en la cuenta. */
+  phoneNumberId?: string
   wabaId: string
   businessId?: string
 }
@@ -38,7 +42,7 @@ export class ErrorDeSignup extends Error {
 }
 
 export type MensajeDeMeta =
-  | { tipo: 'terminado'; phoneNumberId: string; wabaId: string; businessId?: string }
+  | { tipo: 'terminado'; phoneNumberId?: string; wabaId: string; businessId?: string }
   | { tipo: 'sin-numero'; wabaId?: string }
   | { tipo: 'cancelado'; paso?: string }
   | { tipo: 'error'; mensaje: string }
@@ -69,9 +73,19 @@ export function interpretarMensajeDeMeta(origen: string, datos: unknown): Mensaj
     if (!phoneNumberId || !wabaId) return { tipo: 'error', mensaje: 'Meta no devolvió los datos del número. Probá de nuevo.' }
     return { tipo: 'terminado', phoneNumberId, wabaId, businessId: texto(info.business_id) }
   }
+  // Coexistencia: terminó de conectar el número de su app WhatsApp Business. Meta da solo el id de la cuenta.
+  if (m.event === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING') {
+    const wabaId = texto(info.waba_id)
+    if (!wabaId) return { tipo: 'error', mensaje: 'Meta no devolvió los datos de tu cuenta. Probá de nuevo.' }
+    return { tipo: 'terminado', wabaId, businessId: texto(info.business_id) }
+  }
   // Terminó pero sin agregar un número: no se puede conectar nada.
-  if (m.event === 'FINISH_ONLY_WABA' || m.event === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING') return { tipo: 'sin-numero', wabaId: texto(info.waba_id) }
-  if (m.event === 'CANCEL') return { tipo: 'cancelado', paso: texto(info.current_step) }
+  if (m.event === 'FINISH_ONLY_WABA') return { tipo: 'sin-numero', wabaId: texto(info.waba_id) }
+  // Meta también usa CANCEL para avisar de un error de la persona (con su mensaje): eso se muestra como error.
+  if (m.event === 'CANCEL') {
+    const motivo = texto(info.error_message)
+    return motivo ? { tipo: 'error', mensaje: motivo } : { tipo: 'cancelado', paso: texto(info.current_step) }
+  }
   if (m.event === 'ERROR') return { tipo: 'error', mensaje: texto(info.error_message) ?? 'Meta no pudo completar la conexión. Probá de nuevo.' }
   return null
 }
@@ -155,7 +169,7 @@ export function iniciarEmbeddedSignup(): Promise<ResultadoDeSignup> {
         config_id: CONFIG_ID,
         response_type: 'code',
         override_default_response_type: true,
-        extras: { setup: {}, featureType: '', sessionInfoVersion: '3' },
+        extras: { setup: {}, version: 'v4', sessionInfoVersion: '3', featureType: FEATURE_TYPE },
       },
     )
   })

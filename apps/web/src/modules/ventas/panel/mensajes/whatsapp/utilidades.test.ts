@@ -10,12 +10,34 @@ const msg = (id: string, sender: 'CUSTOMER' | 'STORE', creado: Date, extra: Part
   id, sender, text: 'hola', orderId: null, channel: 'WHATSAPP', deliveryStatus: null, createdAt: creado.toISOString(), ...extra,
 } as ChatMessage)
 
-describe('repartirCharlas', () => {
-  const fila = (id: string, canal?: ConversationRow['lastChannel']) => ({ id, lastChannel: canal } as ConversationRow)
-  it('manda a WhatsApp lo que terminó por WhatsApp y al sistema todo lo demás', () => {
+describe('repartirCharlas: las dos bandejas no se mezclan', () => {
+  const fila = (id: string, canal?: ConversationRow['lastChannel'], extra: Partial<ConversationRow> = {}) => ({ id, lastChannel: canal, isUnread: false, ...extra } as ConversationRow)
+  const info = (texto: string, isUnread = false) => ({ lastMessage: { id: texto, text: texto } as ChatMessage, isUnread })
+
+  it('sin el detalle por canal (la demo o una API vieja) usa el canal del último mensaje', () => {
     const r = repartirCharlas([fila('a', 'WHATSAPP'), fila('b', 'STOREFRONT'), fila('c', undefined)])
     expect(r.whatsapp.map((x) => x.id)).toEqual(['a'])
     expect(r.sistema.map((x) => x.id)).toEqual(['b', 'c'])
+  })
+
+  it('una persona que escribió por los dos canales está en las dos bandejas, cada una con SU último mensaje', () => {
+    const r = repartirCharlas([fila('x', 'WHATSAPP', { canales: { STOREFRONT: info('desde la tienda'), WHATSAPP: info('por wpp') } })])
+    expect(r.sistema).toHaveLength(1)
+    expect(r.whatsapp).toHaveLength(1)
+    expect(r.sistema[0].lastMessage?.text).toBe('desde la tienda')
+    expect(r.whatsapp[0].lastMessage?.text).toBe('por wpp')
+  })
+
+  it('el "sin leer" de un canal no se ve en la otra bandeja', () => {
+    const r = repartirCharlas([fila('x', 'WHATSAPP', { isUnread: true, canales: { STOREFRONT: info('tienda', false), WHATSAPP: info('wpp', true) } })])
+    expect(r.whatsapp[0].isUnread).toBe(true)
+    expect(r.sistema[0].isUnread).toBe(false)
+  })
+
+  it('una charla que solo existe en un canal no aparece en la otra bandeja', () => {
+    const r = repartirCharlas([fila('solo-wpp', 'WHATSAPP', { canales: { WHATSAPP: info('wpp') } }), fila('solo-tienda', 'STOREFRONT', { canales: { STOREFRONT: info('tienda') } })])
+    expect(r.sistema.map((x) => x.id)).toEqual(['solo-tienda'])
+    expect(r.whatsapp.map((x) => x.id)).toEqual(['solo-wpp'])
   })
 })
 

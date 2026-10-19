@@ -137,7 +137,15 @@ function BandejaMensajes({ canal, onCanal, convId, onAbrir, onCerrar, ir, onToas
 
   // Conectar con el botón de Meta (Embedded Signup). El SDK se carga de antes, mientras se ve la pantalla de conectar.
   const sinCuenta = canal === 'whatsapp' && typeof whatsapp === 'object' && !whatsapp.connected
-  const conexion = useConexionIntegrada({ activo: sinCuenta, onConectado: () => { void cargarWhatsapp() } })
+  const conexion = useConexionIntegrada({
+    activo: sinCuenta,
+    onConectado: ({ coexistencia }) => {
+      void cargarWhatsapp()
+      onToast(coexistencia
+        ? 'WhatsApp conectado. Dejá abierta la app WhatsApp Business en tu celular unos minutos mientras traemos tus chats.'
+        : 'WhatsApp conectado.')
+    },
+  })
 
   useEffect(() => {
     let cancelado = false

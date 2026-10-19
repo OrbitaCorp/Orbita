@@ -10,8 +10,8 @@ export type EstadoDeConexion = 'libre' | 'meta' | 'guardando'
 interface Opciones {
   /** Solo se carga el SDK de Meta cuando la pantalla de conectar está a la vista. */
   activo: boolean
-  /** Se conectó: que la pantalla vuelva a mirar el estado de la cuenta. */
-  onConectado: () => void
+  /** Se conectó: que la pantalla vuelva a mirar el estado de la cuenta. `coexistencia`: el número sigue en la app del celular. */
+  onConectado: (r: { coexistencia: boolean }) => void
 }
 
 export function useConexionIntegrada({ activo, onConectado }: Opciones) {
@@ -38,7 +38,7 @@ export function useConexionIntegrada({ activo, onConectado }: Opciones) {
         const res = await connectWhatsappIntegrado(r)
         if (!montado.current) return
         if (!res.suscripta) setAviso('Quedó conectada, pero no pudimos suscribir la app a tu cuenta de WhatsApp: no vas a recibir mensajes hasta que se resuelva. Probá desconectar y volver a conectar.')
-        onConectado()
+        onConectado({ coexistencia: res.coexistencia })
       })
       .catch((e: unknown) => {
         if (!montado.current) return

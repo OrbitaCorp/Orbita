@@ -38,6 +38,8 @@ const VENTANA_MS = 24 * 60 * 60 * 1000;
 const ERR_DESTINATARIO_NO_PERMITIDO = 131030;
 
 const ORDEN_ESTADO: Record<string, number> = { sent: 1, delivered: 2, read: 3 };
+// Estado de entrega que trae el historial → el que guarda Órbita.
+const ESTADO_DEL_HISTORIAL: Record<string, string> = { SENT: 'sent', DELIVERED: 'delivered', READ: 'read', PLAYED: 'read', ERROR: 'failed' };
 
 interface WaMedia {
   caption?: string;
@@ -60,11 +62,32 @@ interface WaStatus {
   status: string;
   errors?: { code?: number; title?: string }[];
 }
+// Coexistencia (el número sigue en la app WhatsApp Business): lo que el dueño escribe desde el celular llega como "eco".
+interface WaEco extends Omit<WaMessage, 'from'> {
+  from?: string;
+  /** El cliente al que le escribió el negocio. */
+  to: string;
+  revoke?: { original_message_id?: string };
+  edit?: { original_message_id?: string; message?: { type?: string; text?: { body?: string } } };
+}
+// Historial que Meta manda una vez al conectar un número que ya estaba en la app.
+interface WaHistorialMensaje extends Omit<WaMessage, 'from'> {
+  from?: string;
+  to?: string;
+  history_context?: { status?: string };
+}
+interface WaHistorialBloque {
+  metadata?: { phase?: number; chunk_order?: number; progress?: number };
+  threads?: { id?: string; messages?: WaHistorialMensaje[] }[];
+  errors?: { code?: number; title?: string }[];
+}
 interface WaChangeValue {
   metadata?: { phone_number_id?: string };
   contacts?: { wa_id?: string; profile?: { name?: string } }[];
   messages?: WaMessage[];
   statuses?: WaStatus[];
+  message_echoes?: WaEco[];
+  history?: WaHistorialBloque[];
 }
 export interface WaWebhookBody {
   object?: string;
@@ -81,6 +104,7 @@ const ETIQUETA_TIPO: Record<string, string> = {
   sticker: '[Sticker]',
   location: '[Ubicación]',
   contacts: '[Contacto]',
+  media_placeholder: '[Archivo]',
 };
 
 // Error de la Graph API. Extiende BadGatewayException para que, si nadie lo
@@ -149,7 +173,9 @@ export class WhatsappService {
     if (body.object !== 'whatsapp_business_account') return;
     for (const entry of body.entry ?? []) {
       for (const change of entry.changes ?? []) {
-        if (change.field !== 'messages' || !change.value) continue;
+        if (!change.value) continue;
+        const campo = change.field;
+        if (campo !== 'messages' && campo !== 'smb_message_echoes' && campo !== 'history') continue;
         const phoneNumberId = change.value.metadata?.phone_number_id;
         if (!phoneNumberId) continue;
         const conexion = await this.prisma.whatsappConnection.findUnique({
@@ -158,6 +184,26 @@ export class WhatsappService {
         });
         if (!conexion || conexion.status !== 'ACTIVE') {
           this.logger.warn(`Evento de WhatsApp para un número sin conexión activa (${phoneNumberId})`);
+          continue;
+        }
+        // Lo que el dueño escribe desde el celular (coexistencia).
+        if (campo === 'smb_message_echoes') {
+          for (const e of change.value.message_echoes ?? []) {
+            try {
+              await this.guardarEco(conexion.businessId, e);
+            } catch (err) {
+              this.logger.error(`No se pudo guardar el mensaje del celular ${e.id}: ${describeError(err)}`);
+            }
+          }
+          continue;
+        }
+        // El historial de chats que comparte el dueño al conectar (una sola vez).
+        if (campo === 'history') {
+          try {
+            await this.guardarHistorial(conexion.businessId, change.value.history ?? []);
+          } catch (err) {
+            this.logger.error(`No se pudo guardar el historial de WhatsApp: ${describeError(err)}`);
+          }
           continue;
         }
         const nombres = new Map((change.value.contacts ?? []).map((c) => [c.wa_id ?? '', c.profile?.name]));
@@ -216,6 +262,89 @@ export class WhatsappService {
       }),
       this.prisma.conversation.update({ where: { id: conv.id }, data: { isUnread: true, isArchived: false, updatedAt: new Date() } }),
     ]);
+  }
+
+  /**
+   * Un mensaje que el dueño escribió desde la app WhatsApp Business (o la edita o la borra): queda en el hilo del
+   * cliente como mensaje del negocio. No marca la charla como sin leer: lo escribió el propio negocio.
+   */
+  private async guardarEco(businessId: string, e: WaEco): Promise<void> {
+    // Editar o borrar un mensaje que ya está guardado (siempre de ESTE negocio).
+    if (e.type === 'edit' || e.type === 'revoke') {
+      const original = e.type === 'edit' ? e.edit?.original_message_id : e.revoke?.original_message_id;
+      if (!original) return;
+      const existente = await this.prisma.message.findUnique({ where: { externalId: original }, select: { id: true, conversationId: true } });
+      if (!existente) return;
+      const propia = await this.prisma.conversation.findFirst({ where: { id: existente.conversationId, businessId }, select: { id: true } });
+      if (!propia) return;
+      const nuevoTexto = e.type === 'edit' ? e.edit?.message?.text?.body?.trim() : '[Mensaje eliminado]';
+      if (nuevoTexto) await this.prisma.message.update({ where: { id: existente.id }, data: { text: nuevoTexto } });
+      return;
+    }
+
+    const texto = this.textoDe({ id: e.id, from: e.to, type: e.type, text: e.text, image: e.image, video: e.video, document: e.document });
+    if (!texto) return;
+    if (await this.prisma.message.findUnique({ where: { externalId: e.id }, select: { id: true } })) return;
+
+    const customerId = await this.resolverCliente(businessId, e.to);
+    if (!customerId) return;
+    const conv =
+      (await this.prisma.conversation.findFirst({ where: { businessId, customerId }, select: { id: true } })) ??
+      (await this.prisma.conversation.create({ data: { businessId, customerId, isUnread: false }, select: { id: true } }));
+
+    const creado = e.timestamp ? new Date(Number(e.timestamp) * 1000) : new Date();
+    await this.prisma.$transaction([
+      this.prisma.message.create({
+        data: { conversationId: conv.id, sender: 'STORE', text: texto, channel: 'WHATSAPP', externalId: e.id, deliveryStatus: 'sent', createdAt: creado },
+      }),
+      this.prisma.conversation.update({ where: { id: conv.id }, data: { updatedAt: new Date() } }),
+    ]);
+  }
+
+  /**
+   * Historial de chats (hasta 180 días) que Meta manda al conectar un número que ya estaba en la app, en bloques. Se
+   * guarda como lo que fue (lo de cada cliente y lo del negocio), sin marcar nada como sin leer y sin duplicar lo que
+   * ya estuviera. Si el dueño no quiso compartirlo, Meta avisa con un error y no hay nada que guardar.
+   */
+  private async guardarHistorial(businessId: string, bloques: WaHistorialBloque[]): Promise<void> {
+    for (const bloque of bloques) {
+      if (bloque.errors?.length) {
+        this.logger.log(`Historial de WhatsApp no compartido (negocio ${businessId}): ${bloque.errors[0].code ?? ''} ${bloque.errors[0].title ?? ''}`);
+        continue;
+      }
+      for (const hilo of bloque.threads ?? []) {
+        const waId = hilo.id;
+        if (!waId || !hilo.messages?.length) continue;
+        const filas = hilo.messages.flatMap((m) => {
+          const texto = this.textoDe({ id: m.id, from: waId, type: m.type, text: m.text, image: m.image, video: m.video, document: m.document });
+          if (!texto || !m.id) return [];
+          // Del negocio: tiene `to`, o `from` no es el cliente. Del cliente: `from` es el cliente.
+          const delNegocio = m.to !== undefined || (m.from !== undefined && m.from !== waId);
+          return [{
+            sender: (delNegocio ? 'STORE' : 'CUSTOMER') as 'STORE' | 'CUSTOMER',
+            text: texto,
+            externalId: m.id,
+            deliveryStatus: delNegocio ? (ESTADO_DEL_HISTORIAL[m.history_context?.status ?? ''] ?? 'sent') : null,
+            createdAt: m.timestamp ? new Date(Number(m.timestamp) * 1000) : new Date(),
+          }];
+        });
+        if (filas.length === 0) continue;
+
+        const customerId = await this.resolverCliente(businessId, waId);
+        if (!customerId) continue;
+        const conv =
+          (await this.prisma.conversation.findFirst({ where: { businessId, customerId }, select: { id: true } })) ??
+          (await this.prisma.conversation.create({ data: { businessId, customerId, isUnread: false }, select: { id: true } }));
+
+        await this.prisma.message.createMany({
+          data: filas.map((f) => ({ conversationId: conv.id, channel: 'WHATSAPP' as const, ...f })),
+          skipDuplicates: true,
+        });
+        // La charla sube en la lista hasta su último mensaje, nunca más allá.
+        const ultimo = new Date(Math.max(...filas.map((f) => f.createdAt.getTime())));
+        await this.prisma.conversation.updateMany({ where: { id: conv.id, businessId, updatedAt: { lt: ultimo } }, data: { updatedAt: ultimo } });
+      }
+    }
   }
 
   // Un cliente de WhatsApp es un Customer del negocio, identificado por su
@@ -328,20 +457,42 @@ export class WhatsappService {
   async conectarConEmbeddedSignup(businessId: string, dto: EmbeddedSignupDto) {
     const token = await this.canjearCodigo(dto.code);
 
-    const numeros = await this.graphCall<{ data?: { id: string; display_phone_number?: string }[] }>(
-      `/${dto.wabaId}/phone_numbers?fields=id,display_phone_number`,
+    const numeros = await this.graphCall<{ data?: { id: string; display_phone_number?: string; is_on_biz_app?: boolean }[] }>(
+      `/${dto.wabaId}/phone_numbers?fields=id,display_phone_number,is_on_biz_app`,
       token,
       { method: 'GET' },
     ).catch(() => {
       throw new UnprocessableEntityException('No pudimos acceder a esa cuenta de WhatsApp Business. Volvé a intentar la conexión.');
     });
-    const numero = numeros.data?.find((n) => n.id === dto.phoneNumberId);
-    if (!numero) throw new UnprocessableEntityException('Ese número no pertenece a la cuenta de WhatsApp Business que elegiste.');
+    // Con coexistencia Meta no da el id del número, solo el de la cuenta: se toma el que sigue en la app WhatsApp
+    // Business. Si vino un id, tiene que ser de esa cuenta (nadie conecta un número que no es suyo).
+    const lista = numeros.data ?? [];
+    const numero = dto.phoneNumberId ? lista.find((n) => n.id === dto.phoneNumberId) : (lista.find((n) => n.is_on_biz_app === true) ?? lista[0]);
+    if (!numero) {
+      throw new UnprocessableEntityException(dto.phoneNumberId
+        ? 'Ese número no pertenece a la cuenta de WhatsApp Business que elegiste.'
+        : 'No encontramos ningún número en esa cuenta de WhatsApp Business. Agregá uno y volvé a intentarlo.');
+    }
 
-    await this.registrarNumero(dto.phoneNumberId, token);
-    await this.guardarConexion(businessId, dto.wabaId, dto.phoneNumberId, numero.display_phone_number ?? null, token);
+    // Un número que sigue en la app WhatsApp Business ya está registrado: registrarlo de nuevo no corresponde.
+    const coexistencia = numero.is_on_biz_app === true;
+    if (!coexistencia) await this.registrarNumero(numero.id, token);
+    await this.guardarConexion(businessId, dto.wabaId, numero.id, numero.display_phone_number ?? null, token);
     const suscripta = await this.suscribirApp(dto.wabaId, token);
-    return { connected: true as const, displayPhone: numero.display_phone_number ?? null, suscripta };
+    // Meta da 24 horas desde la conexión para traer los contactos y el historial, y una sola vez.
+    if (coexistencia) await this.pedirSincronizacionDeLaApp(numero.id, token);
+    return { connected: true as const, displayPhone: numero.display_phone_number ?? null, suscripta, coexistencia };
+  }
+
+  /** Pide a Meta los contactos y el historial de chats de la app WhatsApp Business (llegan por webhook). Mejor esfuerzo. */
+  private async pedirSincronizacionDeLaApp(phoneNumberId: string, token: string): Promise<void> {
+    for (const tipo of ['smb_app_state_sync', 'history']) {
+      try {
+        await this.graphCall(`/${phoneNumberId}/smb_app_data`, token, { method: 'POST', body: JSON.stringify({ messaging_product: 'whatsapp', sync_type: tipo }) });
+      } catch (e) {
+        this.logger.warn(`No se pudo pedir la sincronización "${tipo}" del número ${phoneNumberId}: ${describeError(e)}`);
+      }
+    }
   }
 
   /** Canjea el código de Embedded Signup por el token de acceso del negocio. */

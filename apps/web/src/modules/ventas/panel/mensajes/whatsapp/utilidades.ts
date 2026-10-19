@@ -1,4 +1,4 @@
-import type { ChatMessage, ConversationRow } from '@/lib/api'
+import type { CanalDeBandeja, ChatMessage, ConversationRow } from '@/lib/api'
 
 // Lógica chica del módulo Mensajes que no depende de la pantalla: a qué canal pertenece una charla, hasta cuándo se
 // puede contestar por WhatsApp y cómo se muestran las horas y los días como en WhatsApp.
@@ -8,15 +8,35 @@ export const VENTANA_WHATSAPP_MS = 24 * HORA_MS
 
 export type CanalDeMensajes = 'sistema' | 'whatsapp'
 
-/**
- * Las charlas se reparten por el canal del último mensaje: es el mismo criterio con el que el panel decide por dónde
- * sale la respuesta. Lo que no es de WhatsApp es del sistema (el chat de la tienda). Las de Instagram ni siquiera
- * llegan acá: se atienden en Difusión.
- */
 export const esDeWhatsapp = (c: Pick<ConversationRow, 'lastChannel'>): boolean => c.lastChannel === 'WHATSAPP'
 
+/** La charla vista desde una bandeja: con SU último mensaje y SU "sin leer", sin nada del otro canal. */
+function vistaDeLaBandeja(r: ConversationRow, canal: CanalDeBandeja): ConversationRow | null {
+  const info = r.canales?.[canal]
+  if (!info) return null
+  return { ...r, lastMessage: info.lastMessage, lastChannel: canal, isUnread: info.isUnread }
+}
+
+/**
+ * Reparte las charlas en las dos bandejas SIN mezclarlas: la local (el chat de la tienda) tiene las charlas que tienen
+ * mensajes de la tienda, y la de WhatsApp las que tienen mensajes de WhatsApp. Una persona que escribió por los dos
+ * canales está en las dos, y en cada una se ve solo lo de ese canal. Las de Instagram no llegan acá: se atienden en
+ * Difusión. Con una respuesta sin el detalle por canal (la demo, o una API vieja), se usa el canal del último mensaje.
+ */
 export function repartirCharlas(rows: ConversationRow[]): { sistema: ConversationRow[]; whatsapp: ConversationRow[] } {
-  return { sistema: rows.filter((r) => !esDeWhatsapp(r)), whatsapp: rows.filter(esDeWhatsapp) }
+  const sistema: ConversationRow[] = []
+  const whatsapp: ConversationRow[] = []
+  for (const r of rows) {
+    if (!r.canales) {
+      ;(esDeWhatsapp(r) ? whatsapp : sistema).push(r)
+      continue
+    }
+    const s = vistaDeLaBandeja(r, 'STOREFRONT')
+    const w = vistaDeLaBandeja(r, 'WHATSAPP')
+    if (s) sistema.push(s)
+    if (w) whatsapp.push(w)
+  }
+  return { sistema, whatsapp }
 }
 
 /** Hasta cuándo se puede contestar por WhatsApp (24 h desde el último mensaje del cliente), o null si ya venció. */

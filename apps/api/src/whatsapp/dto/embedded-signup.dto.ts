@@ -10,8 +10,10 @@ export class EmbeddedSignupDto {
   @Transform(trim) @IsString() @IsNotEmpty() @MaxLength(2000)
   code!: string;
 
-  @Transform(trim) @IsString() @Matches(/^\d{5,20}$/, { message: 'El ID del número debe ser numérico' })
-  phoneNumberId!: string;
+  // Con la coexistencia (el número sigue en la app WhatsApp Business) Meta no devuelve el id del número, solo el de la
+  // cuenta: se busca en la cuenta.
+  @IsOptional() @Transform(trim) @IsString() @Matches(/^\d{5,20}$/, { message: 'El ID del número debe ser numérico' })
+  phoneNumberId?: string;
 
   @Transform(trim) @IsString() @Matches(/^\d{5,20}$/, { message: 'El ID de la cuenta de WhatsApp Business debe ser numérico' })
   wabaId!: string;

@@ -829,6 +829,20 @@ Business desde Mensajes → WhatsApp con el botón de Meta, sin pegar datos a ma
   inicio de sesión con Facebook / SDK de JavaScript, y el webhook de WhatsApp Business Account apunta a
   `https://api.orbita.site/api/v1/webhooks/whatsapp` (un solo webhook para todos los negocios: el negocio se resuelve por
   `phone_number_id`).
+- **Coexistencia (el número sigue en la app WhatsApp Business):** el flujo del panel usa `featureType:
+  whatsapp_business_app_onboarding` y `version: v4` (`embeddedSignup.ts`; `NEXT_PUBLIC_WHATSAPP_FEATURE_TYPE` lo cambia).
+  Meta termina con `FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING` y solo da el id de la cuenta: la API busca el número que
+  sigue en la app (`is_on_biz_app`), **no lo registra** y pide el volcado de contactos e historial
+  (`POST /{phone}/smb_app_data`, una sola vez y dentro de las 24 h de conectar). Para que esto llegue, **en el panel de Meta
+  (WhatsApp → Configuración → Webhook) hay que suscribir los campos `smb_message_echoes`, `history` y
+  `smb_app_state_sync`** además de `messages`: los dos primeros los procesa `whatsapp.service.ts` (lo que el dueño escribe
+  desde el celular y el historial de chats); `smb_app_state_sync` (contactos) todavía se ignora. Límites de Meta: la app tiene
+  que ser WhatsApp Business ≥ 2.24.17, los grupos no se sincronizan, se desvinculan los dispositivos vinculados (Web y
+  Desktop) y con ~14 días sin abrir la app en el celular Meta corta la conexión (`PARTNER_REMOVED`). Disponibilidad por país:
+  confirmarla en la documentación de Meta.
+- **Las dos bandejas de Mensajes no se mezclan:** `GET /conversations` devuelve `canales` (último mensaje y «sin leer» de
+  cada canal), `GET /conversations/:id/messages?canal=` filtra por canal y `POST .../messages` acepta `canal` para
+  responder siempre por el de la bandeja desde la que se contesta.
 - **Probar sin un número real:** cuenta sandbox desde el panel de Meta (WhatsApp → Testear integraciones) o el formulario
   manual («Conectala a mano» en la pantalla de conectar).
 - **Cobro:** en Embedded Signup cada cliente agrega su propio medio de pago en Meta y paga ahí sus conversaciones.
