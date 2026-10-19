@@ -20,7 +20,8 @@ export function useConexionIntegrada({ activo, onConectado }: Opciones) {
   const [aviso, setAviso] = useState<string | null>(null)
   const montado = useRef(true)
   const corte = useRef<AbortController | null>(null)
-  useEffect(() => () => { montado.current = false; corte.current?.abort() }, [])
+  // En desarrollo React monta, desmonta y vuelve a montar: por eso se vuelve a poner en true al montar.
+  useEffect(() => { montado.current = true; return () => { montado.current = false; corte.current?.abort() } }, [])
 
   // El SDK se carga de antes: FB.login tiene que salir directo del clic, y cargarlo recién ahí lo hace bloqueable.
   useEffect(() => {

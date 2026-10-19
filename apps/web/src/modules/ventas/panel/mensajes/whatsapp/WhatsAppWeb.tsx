@@ -228,7 +228,8 @@ function Chat({ charla, plantillas, onVolver, onArchivar, onPerfil, onToast, onE
   const entrada = useRef<HTMLTextAreaElement>(null)
   const barra = useRef<HTMLDivElement>(null)
   const montado = useRef(true)
-  useEffect(() => () => { montado.current = false }, [])
+  // En desarrollo React monta, desmonta y vuelve a montar: por eso se vuelve a poner en true al montar.
+  useEffect(() => { montado.current = true; return () => { montado.current = false } }, [])
   // La vista previa es una dirección temporal del navegador: se libera al cambiar de foto o al salir.
   useEffect(() => () => { if (foto) URL.revokeObjectURL(foto.vista) }, [foto])
   useEffect(() => {
