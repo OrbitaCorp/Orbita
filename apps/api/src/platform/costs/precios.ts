@@ -69,7 +69,9 @@ const PRECIO_POR_UNIDAD: Record<string, Record<string, number>> = {
 };
 
 /** Proveedores cuyo costo sale de usage_events (los sincroniza InternalCostAdapter). */
-export const PROVEEDORES_INTERNOS = [...Object.keys(PRECIOS_IA), ...Object.keys(PRECIO_POR_UNIDAD)];
+// 'workers-ai' queda afuera: no escribe usage_events (el bot de WhatsApp anota su gasto en whatsapp_bot_turns) y lo que
+// cobra Cloudflare ya entra por su adaptador externo de facturación.
+export const PROVEEDORES_INTERNOS = [...Object.keys(PRECIOS_IA).filter((p) => p !== 'workers-ai'), ...Object.keys(PRECIO_POR_UNIDAD)];
 
 const LADO_DE_LA_CATEGORIA: Record<string, 'entrada' | 'salida'> = {
   prompt_tokens: 'entrada',
