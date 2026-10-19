@@ -14,6 +14,7 @@ import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { describeError } from '../common/utils/describe-error.util';
 import { ConnectWhatsappDto } from './dto/connect-whatsapp.dto';
+import type { EmbeddedSignupDto } from './dto/embedded-signup.dto';
 
 // WhatsApp Business (Cloud API de Meta) dentro de la bandeja de Mensajes.
 //
@@ -271,15 +272,17 @@ export class WhatsappService {
    * La conexión de WhatsApp todavía es manual (se pegan los datos de Meta): no
    * es para que la vea cualquier negocio. En producción solo se habilita a los
    * negocios listados en WHATSAPP_NEGOCIOS_HABILITADOS (subdominios separados
-   * por coma); sin la variable, ninguno. Fuera de producción, sin la variable,
-   * están todos habilitados para poder probar. Se reemplaza por el plan/Embedded
-   * Signup cuando esté listo.
+   * por coma); sin la variable, ninguno. Con `*` están todos habilitados (es lo
+   * que se pone cuando la conexión es por Embedded Signup y no hace falta pegar
+   * datos a mano). Fuera de producción, sin la variable, están todos habilitados
+   * para poder probar.
    */
   async asegurarHabilitado(businessId: string): Promise<void> {
     const lista = (this.config.get<string>('WHATSAPP_NEGOCIOS_HABILITADOS') ?? '')
       .split(',')
       .map((s) => s.trim().toLowerCase())
       .filter(Boolean);
+    if (lista.includes('*')) return;
     if (lista.length === 0) {
       if (this.config.get<string>('NODE_ENV') === 'production') throw new ForbiddenException('WhatsApp todavía no está disponible para este negocio');
       return;
@@ -308,12 +311,89 @@ export class WhatsappService {
       { method: 'GET' },
     );
 
+    await this.guardarConexion(businessId, dto.wabaId, dto.phoneNumberId, info.display_phone_number ?? null, dto.accessToken);
+    const suscripta = await this.suscribirApp(dto.wabaId, dto.accessToken);
+    return { connected: true as const, displayPhone: info.display_phone_number ?? null, suscripta };
+  }
+
+  /**
+   * Conexión por Embedded Signup (la incorporación integrada de Meta): el cliente inició sesión con Facebook, eligió
+   * o creó su cuenta de WhatsApp Business y el panel nos manda el código y los ids que Meta le dio. Acá:
+   *   1. se canjea el código por el token del negocio (el código vale unos segundos y es de un solo uso);
+   *   2. se comprueba contra Meta que el número sea de esa cuenta y que el token lo vea: así nadie conecta un número
+   *      que no es suyo mandando ids inventados;
+   *   3. se registra el número en la Cloud API (los números nuevos lo necesitan para poder enviar);
+   *   4. se guarda cifrado y se suscribe la app a la cuenta para recibir los mensajes por el webhook.
+   */
+  async conectarConEmbeddedSignup(businessId: string, dto: EmbeddedSignupDto) {
+    const token = await this.canjearCodigo(dto.code);
+
+    const numeros = await this.graphCall<{ data?: { id: string; display_phone_number?: string }[] }>(
+      `/${dto.wabaId}/phone_numbers?fields=id,display_phone_number`,
+      token,
+      { method: 'GET' },
+    ).catch(() => {
+      throw new UnprocessableEntityException('No pudimos acceder a esa cuenta de WhatsApp Business. Volvé a intentar la conexión.');
+    });
+    const numero = numeros.data?.find((n) => n.id === dto.phoneNumberId);
+    if (!numero) throw new UnprocessableEntityException('Ese número no pertenece a la cuenta de WhatsApp Business que elegiste.');
+
+    await this.registrarNumero(dto.phoneNumberId, token);
+    await this.guardarConexion(businessId, dto.wabaId, dto.phoneNumberId, numero.display_phone_number ?? null, token);
+    const suscripta = await this.suscribirApp(dto.wabaId, token);
+    return { connected: true as const, displayPhone: numero.display_phone_number ?? null, suscripta };
+  }
+
+  /** Canjea el código de Embedded Signup por el token de acceso del negocio. */
+  private async canjearCodigo(code: string): Promise<string> {
+    const appId = this.config.get<string>('WHATSAPP_APP_ID');
+    const secret = this.config.get<string>('WHATSAPP_APP_SECRET');
+    if (!appId || !secret) throw new ServiceUnavailableException('La conexión de WhatsApp no está configurada en este entorno');
+    let res: Response;
+    try {
+      const query = new URLSearchParams({ client_id: appId, client_secret: secret, code });
+      res = await fetch(`${this.graph}/oauth/access_token?${query.toString()}`, { signal: AbortSignal.timeout(15_000) });
+    } catch (e) {
+      this.logger.error(`WhatsApp (red) al canjear el código: ${describeError(e)}`);
+      throw new BadGatewayException('No se pudo comunicar con Meta. Probá de nuevo en un momento.');
+    }
+    const json = (await res.json().catch(() => ({}))) as { access_token?: string; error?: { message?: string; code?: number } };
+    if (!res.ok || !json.access_token) {
+      this.logger.warn(`WhatsApp: no se pudo canjear el código de Embedded Signup → ${res.status} código ${json.error?.code ?? '?'}: ${json.error?.message ?? ''}`);
+      throw new BadRequestException('La autorización de Meta venció o ya se usó. Volvé a tocar "Conectar" y completá el proceso sin demorar.');
+    }
+    return json.access_token;
+  }
+
+  /**
+   * Registra el número en la Cloud API. El PIN de verificación en dos pasos se deriva del número con el secreto de la
+   * app: es el mismo siempre (no hay que guardarlo) y nadie de afuera lo puede adivinar. Si falla (por ejemplo, el
+   * número ya estaba registrado) no se corta la conexión: se avisa en el log.
+   */
+  private async registrarNumero(phoneNumberId: string, token: string): Promise<void> {
+    try {
+      await this.graphCall(`/${phoneNumberId}/register`, token, {
+        method: 'POST',
+        body: JSON.stringify({ messaging_product: 'whatsapp', pin: this.pinDelNumero(phoneNumberId) }),
+      });
+    } catch (e) {
+      this.logger.warn(`No se pudo registrar el número ${phoneNumberId} (puede que ya esté registrado): ${describeError(e)}`);
+    }
+  }
+
+  private pinDelNumero(phoneNumberId: string): string {
+    const secret = this.config.get<string>('WHATSAPP_APP_SECRET') ?? '';
+    const n = createHmac('sha256', secret).update(`pin:${phoneNumberId}`).digest().readUInt32BE(0) % 1_000_000;
+    return String(n).padStart(6, '0');
+  }
+
+  private async guardarConexion(businessId: string, wabaId: string, phoneNumberId: string, displayPhone: string | null, token: string): Promise<void> {
     try {
       await this.prisma.$executeRaw`
         INSERT INTO whatsapp_connections (id, business_id, waba_id, phone_number_id, display_phone, access_token, status, created_at, updated_at)
         VALUES (
-          ${randomUUID()}, ${businessId}, ${dto.wabaId}, ${dto.phoneNumberId}, ${info.display_phone_number ?? null},
-          encode(pgp_sym_encrypt(${dto.accessToken}, ${this.tokenKey}), 'base64'),
+          ${randomUUID()}, ${businessId}, ${wabaId}, ${phoneNumberId}, ${displayPhone},
+          encode(pgp_sym_encrypt(${token}, ${this.tokenKey}), 'base64'),
           'ACTIVE'::"WhatsappConnectionStatus", now(), now()
         )
         ON CONFLICT (business_id) DO UPDATE SET
@@ -329,18 +409,18 @@ export class WhatsappService {
       }
       throw e;
     }
+  }
 
-    // Para recibir los mensajes de esa cuenta, la app tiene que estar
-    // suscripta a su WABA. Se intenta y se informa: no se corta la conexión,
-    // que ya quedó guardada, pero el dueño tiene que saber si no va a recibir.
-    let suscripta = true;
+  // Para recibir los mensajes de esa cuenta, la app tiene que estar suscripta a su WABA. Se intenta y se informa: no
+  // se corta la conexión, que ya quedó guardada, pero el dueño tiene que saber si no va a recibir.
+  private async suscribirApp(wabaId: string, token: string): Promise<boolean> {
     try {
-      await this.graphCall(`/${dto.wabaId}/subscribed_apps`, dto.accessToken, { method: 'POST', body: '{}' });
+      await this.graphCall(`/${wabaId}/subscribed_apps`, token, { method: 'POST', body: '{}' });
+      return true;
     } catch (e) {
-      suscripta = false;
-      this.logger.warn(`No se pudo suscribir la app al WABA ${dto.wabaId}: ${describeError(e)}`);
+      this.logger.warn(`No se pudo suscribir la app al WABA ${wabaId}: ${describeError(e)}`);
+      return false;
     }
-    return { connected: true as const, displayPhone: info.display_phone_number ?? null, suscripta };
   }
 
   async desconectar(businessId: string) {

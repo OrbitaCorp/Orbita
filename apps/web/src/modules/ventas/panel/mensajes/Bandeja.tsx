@@ -7,6 +7,7 @@ import { SelectorDeCanal, type EstadoDeWhatsapp } from './components/SelectorDeC
 import { WhatsappModal } from './components/WhatsappConexion'
 import { ConectarWhatsapp } from './whatsapp/ConectarWhatsapp'
 import { WhatsAppWeb } from './whatsapp/WhatsAppWeb'
+import { useConexionIntegrada } from './whatsapp/useConexionIntegrada'
 import { repartirCharlas, type CanalDeMensajes } from './whatsapp/utilidades'
 import type { Conversacion, Plantilla, CategoriaPlantilla } from './mock/mensajes.mock'
 import {
@@ -134,6 +135,10 @@ function BandejaMensajes({ canal, onCanal, convId, onAbrir, onCerrar, ir, onToas
   })
   useEffect(() => { void cargarWhatsapp() }, [])
 
+  // Conectar con el botón de Meta (Embedded Signup). El SDK se carga de antes, mientras se ve la pantalla de conectar.
+  const sinCuenta = canal === 'whatsapp' && typeof whatsapp === 'object' && !whatsapp.connected
+  const conexion = useConexionIntegrada({ activo: sinCuenta, onConectado: () => { void cargarWhatsapp() } })
+
   useEffect(() => {
     let cancelado = false
     const cargar = () => listConversations().then(r => { if (!cancelado) setRows(r) }).catch(() => {}).finally(() => { if (!cancelado) setLoading(false) })
@@ -201,7 +206,16 @@ function BandejaMensajes({ canal, onCanal, convId, onAbrir, onCerrar, ir, onToas
         {selector}
         {whatsapp === 'cargando' && <BandejaSkeleton />}
         {whatsapp === 'no-disponible' && <ConectarWhatsapp caso="no-disponible" onConectar={() => undefined} />}
-        {typeof whatsapp === 'object' && !whatsapp.connected && <ConectarWhatsapp caso="sin-conectar" onConectar={() => setModalWhatsapp(true)} />}
+        {typeof whatsapp === 'object' && !whatsapp.connected && (
+          <ConectarWhatsapp
+            caso="sin-conectar"
+            estado={conexion.estado}
+            error={conexion.error}
+            aviso={conexion.aviso}
+            onConectar={conexion.conectar}
+            onManual={() => setModalWhatsapp(true)}
+          />
+        )}
         {conectado && (
           <WhatsAppWeb
             charlas={deWhatsapp}

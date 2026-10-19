@@ -1,22 +1,30 @@
 import { Button } from '@/design-system/components/Button'
+import type { EstadoDeConexion } from './useConexionIntegrada'
 import { IconoWhatsapp } from './WhatsAppWeb'
 
 // Lo que se ve en Mensajes → WhatsApp cuando todavía no hay una cuenta conectada (o cuando WhatsApp no está habilitado
-// para el negocio): explica qué es, qué hace falta y deja conectar. Las dos pantallas comparten la misma tarjeta.
+// para el negocio): explica qué es, qué se necesita y deja conectar con el botón de Meta, sin pegar datos a mano.
 
 interface Props {
   /** `no-disponible`: el negocio todavía no tiene WhatsApp habilitado (no se ofrece conectar). */
   caso: 'sin-conectar' | 'no-disponible'
+  estado?: EstadoDeConexion
+  error?: string | null
+  aviso?: string | null
+  /** Abre el flujo de Meta. */
   onConectar: () => void
+  /** Abre el formulario manual (para cuentas de prueba de Meta). */
+  onManual?: () => void
 }
 
 const PASOS = [
-  { titulo: 'Tené a mano los datos de tu app de Meta', texto: 'En developers.facebook.com, dentro de tu app, en WhatsApp → API Setup: el ID del número de teléfono, el ID de la cuenta de WhatsApp Business y un token de acceso.' },
-  { titulo: 'Pegalos en Órbita', texto: 'Tocá el botón de abajo y completá los tres datos. El token se guarda cifrado y no se vuelve a mostrar.' },
+  { titulo: 'Tocá el botón de abajo', texto: 'Se abre una ventana de Meta, la empresa dueña de WhatsApp.' },
+  { titulo: 'Iniciá sesión con Facebook y elegí tu número', texto: 'Elegí tu cuenta de WhatsApp Business (o creá una) y el número con el que atendés. Meta te manda un código por SMS o llamada para confirmar que es tuyo.' },
   { titulo: 'Atendé tus chats desde acá', texto: 'Los mensajes de tus clientes llegan a esta pantalla, con el aspecto de WhatsApp Web, y tus respuestas salen por tu número.' },
 ]
 
-export function ConectarWhatsapp({ caso, onConectar }: Props) {
+export function ConectarWhatsapp({ caso, estado = 'libre', error, aviso, onConectar, onManual }: Props) {
+  const ocupado = estado !== 'libre'
   return (
     <section className="cw-raiz" aria-label="Conectar WhatsApp">
       <style>{CSS}</style>
@@ -31,7 +39,7 @@ export function ConectarWhatsapp({ caso, onConectar }: Props) {
         </>
       ) : (
         <>
-          <h2 className="cw-titulo">Conectá tu cuenta de WhatsApp Business</h2>
+          <h2 className="cw-titulo">Conectá tu WhatsApp Business</h2>
           <p className="cw-texto">
             Atendé a tus clientes por WhatsApp sin salir de Órbita: los chats llegan acá, con el mismo aspecto que WhatsApp Web, y respondés desde el panel por tu propio número.
           </p>
@@ -46,10 +54,20 @@ export function ConectarWhatsapp({ caso, onConectar }: Props) {
               </li>
             ))}
           </ol>
-          <Button size="lg" onClick={onConectar} className="cw-boton">Conectar cuenta de WhatsApp Business</Button>
+
+          <Button size="lg" loading={ocupado} onClick={onConectar} className="cw-boton">
+            {estado === 'meta' ? 'Completá el proceso en la ventana de Meta…' : estado === 'guardando' ? 'Conectando tu cuenta…' : 'Conectar cuenta de WhatsApp Business'}
+          </Button>
+          {error && <p className="cw-error" role="alert">{error}</p>}
+          {aviso && <p className="cw-aviso" role="status">{aviso}</p>}
+
           <p className="cw-nota">
-            Usa la API oficial de WhatsApp Business de Meta. WhatsApp solo permite responder dentro de las 24 horas del último mensaje del cliente.
+            Usa la API oficial de WhatsApp Business de Meta. Necesitás una cuenta de Facebook con acceso a tu negocio y un número que pueda recibir SMS o llamadas.
+            WhatsApp solo permite responder dentro de las 24 horas del último mensaje del cliente.
           </p>
+          {onManual && (
+            <button type="button" className="cw-manual" onClick={onManual}>¿Tenés una cuenta de prueba de Meta? Conectala a mano</button>
+          )}
         </>
       )}
     </section>
@@ -66,7 +84,12 @@ const CSS = `
 .cw-numero { width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12.5px; font-weight: 700; color: var(--color-muted); border: 1.5px solid var(--color-border); }
 .cw-pasos strong { display: block; font-size: 14px; font-weight: 600; color: var(--color-text); }
 .cw-paso-texto { display: block; margin-top: 2px; font-size: 13px; line-height: 1.55; color: var(--color-muted); }
-.cw-raiz .cw-boton { min-width: 280px; justify-content: center; background: #00a884; border-color: #00a884; }
+.cw-raiz .cw-boton { min-width: 300px; justify-content: center; background: #00a884; border-color: #00a884; }
+.cw-error { margin: 12px 0 0; max-width: 52ch; font-size: 13px; line-height: 1.5; color: var(--color-error); }
+.cw-aviso { margin: 12px 0 0; max-width: 52ch; font-size: 13px; line-height: 1.5; color: var(--color-text); }
 .cw-nota { margin: 14px 0 0; max-width: 52ch; font-size: 12.5px; line-height: 1.5; color: var(--color-muted); }
+.cw-manual { margin-top: 12px; border: none; background: transparent; padding: 0; cursor: pointer; font: inherit; font-size: 12.5px; color: var(--color-muted); text-decoration: underline; text-underline-offset: 3px; }
+.cw-manual:hover { color: var(--color-text); }
+.cw-manual:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 4px; }
 @media (max-width: 520px) { .cw-raiz { padding: 28px 18px 24px; } .cw-raiz .cw-boton { width: 100%; min-width: 0; } }
 `

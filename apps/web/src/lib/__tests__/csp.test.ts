@@ -32,14 +32,14 @@ describe('armarCspReportOnly', () => {
   const politica = armarCspReportOnly({ hashTema: 'HASH', apiOrigin: 'https://api.orbita.site' })
   const directiva = (nombre: string) => politica.split('; ').find(d => d.startsWith(`${nombre} `))
 
-  it('autoriza scripts propios y el de tema por hash, sin unsafe-inline ni unsafe-eval', () => {
-    expect(directiva('script-src')).toBe("script-src 'self' 'sha256-HASH'")
+  it('autoriza scripts propios, el de tema por hash y el SDK de Facebook (conexión de WhatsApp), sin unsafe-inline ni unsafe-eval', () => {
+    expect(directiva('script-src')).toBe("script-src 'self' 'sha256-HASH' https://connect.facebook.net")
     expect(directiva('script-src')).not.toContain('unsafe')
   })
 
-  it('deja conectar a la API, Supabase, Nominatim y datos.gob.ar', () => {
+  it('deja conectar a la API, Supabase, Nominatim, datos.gob.ar y Facebook', () => {
     expect(directiva('connect-src')).toBe(
-      "connect-src 'self' https://api.orbita.site https://*.supabase.co https://nominatim.openstreetmap.org https://apis.datos.gob.ar",
+      "connect-src 'self' https://api.orbita.site https://*.supabase.co https://nominatim.openstreetmap.org https://apis.datos.gob.ar https://*.facebook.com",
     )
   })
 
@@ -52,7 +52,7 @@ describe('armarCspReportOnly', () => {
     expect(directiva('img-src')).toBe("img-src 'self' data: blob: https:")
     expect(directiva('style-src')).toBe("style-src 'self' 'unsafe-inline' https://fonts.googleapis.com")
     expect(directiva('font-src')).toBe("font-src 'self' data: https://fonts.gstatic.com")
-    expect(directiva('frame-src')).toBe("frame-src 'self'")
+    expect(directiva('frame-src')).toBe("frame-src 'self' https://*.facebook.com")
     expect(directiva('report-uri')).toBe(`report-uri ${CSP_REPORT_PATH}`)
     expect(CSP_REPORT_PATH).toBe('/api/csp-report')
   })

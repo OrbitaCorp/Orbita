@@ -811,6 +811,28 @@ gcloud scheduler jobs describe NOMBRE_DEL_JOB --project=orbita-api-corp --locati
 gcloud scheduler jobs run NOMBRE_DEL_JOB --project=orbita-api-corp --location=southamerica-east1  # dispara ahora, a mano
 ```
 
+## WhatsApp: conexión por Embedded Signup (cada negocio conecta su cuenta)
+
+Órbita es **proveedor de tecnología** de Meta (app «Orbita», id `1634368494718041`): cada negocio conecta su WhatsApp
+Business desde Mensajes → WhatsApp con el botón de Meta, sin pegar datos a mano.
+
+- **Cómo funciona:** el panel abre `FB.login` con la configuración de inicio de sesión (`config_id` en
+  `apps/web/src/lib/meta/embeddedSignup.ts`, o `NEXT_PUBLIC_WHATSAPP_CONFIG_ID`). Meta devuelve un código (vale unos
+  segundos) y, por un mensaje de su ventana, los ids de la cuenta y el número. `POST /whatsapp/embedded-signup` canjea el
+  código por el token del negocio (`/oauth/access_token` con `WHATSAPP_APP_ID` + `WHATSAPP_APP_SECRET`), **comprueba contra
+  Meta que el número sea de esa cuenta**, registra el número en la Cloud API (PIN derivado del secreto: no se guarda),
+  guarda el token cifrado y suscribe la app a la cuenta (`subscribed_apps`).
+- **Variables:** `WHATSAPP_APP_ID` (no secreta, en `env-vars.yaml`) y `WHATSAPP_NEGOCIOS_HABILITADOS` (`*` = todos los
+  negocios; una lista de subdominios la restringe). `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN` y
+  `WHATSAPP_TOKEN_KEY` siguen en Secret Manager.
+- **En Meta (panel de la app):** el dominio de la web (`orbita.site`) tiene que estar en los dominios permitidos del
+  inicio de sesión con Facebook / SDK de JavaScript, y el webhook de WhatsApp Business Account apunta a
+  `https://api.orbita.site/api/v1/webhooks/whatsapp` (un solo webhook para todos los negocios: el negocio se resuelve por
+  `phone_number_id`).
+- **Probar sin un número real:** cuenta sandbox desde el panel de Meta (WhatsApp → Testear integraciones) o el formulario
+  manual («Conectala a mano» en la pantalla de conectar).
+- **Cobro:** en Embedded Signup cada cliente agrega su propio medio de pago en Meta y paga ahí sus conversaciones.
+
 ## Troubleshooting — problemas ya resueltos (para no repetir la pelea)
 
 - **`prisma: not found` en el build** — `pnpm install --prod` (o `pnpm prune

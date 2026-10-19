@@ -97,12 +97,15 @@ TRUST_PROXY_HOPS: "2"
 # Estudio de Fondo con IA activo en producción
 FONDO_IA_MANTENIMIENTO: "false"
 FONDO_IA_MOTOR: "workers"
-# WhatsApp Business en la bandeja de Mensajes (whatsapp.service.ts). La conexión es
-# manual todavía: solo se ve y se usa en los negocios listados acá (subdominios
-# separados por coma). Sin esta variable, en producción no la ve ninguno.
-# WHATSAPP_APP_SECRET, WHATSAPP_VERIFY_TOKEN y WHATSAPP_TOKEN_KEY son secretos:
-# viven en Secret Manager (ver SECRETS en deploy.sh).
-WHATSAPP_NEGOCIOS_HABILITADOS: "negocio"
+# WhatsApp Business en Mensajes → WhatsApp (whatsapp.service.ts). Desde que Órbita es proveedor de tecnología de
+# Meta, cada negocio conecta su propia cuenta con el botón de Meta (Embedded Signup), sin pegar datos a mano: por eso
+# "*" = lo ve y lo usa cualquier negocio. Para volver a restringirlo, una lista de subdominios separados por coma;
+# sin esta variable, en producción no la ve ninguno.
+# WHATSAPP_APP_ID es el id de la app de Meta (no es secreto) y lo usa el canje del código de Embedded Signup.
+# WHATSAPP_APP_SECRET, WHATSAPP_VERIFY_TOKEN y WHATSAPP_TOKEN_KEY son secretos: viven en Secret Manager (ver
+# SECRETS en deploy.sh).
+WHATSAPP_APP_ID: "1634368494718041"
+WHATSAPP_NEGOCIOS_HABILITADOS: "*"
 # Search Console (search-console/): la cuenta de servicio que la API suplanta para verificar los
 # dominios propios de las tiendas en Google y enviarle los sitemaps. SIN CLAVES: la organizacion
 # prohibe crearlas, asi que la cuenta de Cloud Run pide un token de esta (permiso

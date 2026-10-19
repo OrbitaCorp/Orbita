@@ -3341,6 +3341,10 @@ export function getWhatsappConnection() { return panelRequest<WhatsappEstado>('/
 export function connectWhatsapp(input: { phoneNumberId: string; wabaId: string; accessToken: string }) {
   return panelRequest<{ connected: true; displayPhone: string | null; suscripta: boolean }>('/whatsapp/connection', { method: 'POST', body: JSON.stringify(input) })
 }
+// Conexión por Embedded Signup (el botón de Meta): el código y los ids que dio Meta al terminar el proceso.
+export function connectWhatsappIntegrado(input: { code: string; phoneNumberId: string; wabaId: string; businessId?: string }) {
+  return panelRequest<{ connected: true; displayPhone: string | null; suscripta: boolean }>('/whatsapp/embedded-signup', { method: 'POST', body: JSON.stringify(input) })
+}
 export function disconnectWhatsapp() { return panelRequest<{ connected: false }>('/whatsapp/connection', { method: 'DELETE' }) }
 
 // Instagram — conexión del negocio (solo propietario/admin). Conectar devuelve la
