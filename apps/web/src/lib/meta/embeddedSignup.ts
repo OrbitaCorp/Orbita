@@ -121,8 +121,11 @@ export function precargarSdk(): Promise<FbSdk> {
  * Abre el flujo de Meta y devuelve el código y los ids cuando el cliente termina. Se tiene que llamar DIRECTO desde un
  * clic y con el SDK ya cargado (ver `precargarSdk`): FB.login abre una ventana y los navegadores bloquean las que no
  * salen de un gesto de la persona.
+ *
+ * Si la persona cierra la ventana de Meta con la X, el SDK no siempre avisa: por eso `cancelar` (un AbortSignal) deja
+ * que la pantalla ofrezca "Cancelar" y corte la espera en vez de quedarse esperando para siempre.
  */
-export function iniciarEmbeddedSignup(): Promise<ResultadoDeSignup> {
+export function iniciarEmbeddedSignup(cancelar?: AbortSignal): Promise<ResultadoDeSignup> {
   const sdk = typeof window === 'undefined' ? undefined : window.FB
   if (!sdk) return Promise.reject(new ErrorDeSignup('Todavía se está cargando el inicio de sesión de Meta. Esperá un segundo y probá de nuevo.'))
 
@@ -134,6 +137,7 @@ export function iniciarEmbeddedSignup(): Promise<ResultadoDeSignup> {
     const cerrar = () => {
       cerrado = true
       window.removeEventListener('message', alMensaje)
+      cancelar?.removeEventListener('abort', alCancelar)
       clearTimeout(timer)
     }
     const terminarSiEstaTodo = () => {
@@ -155,6 +159,9 @@ export function iniciarEmbeddedSignup(): Promise<ResultadoDeSignup> {
       else if (m.tipo === 'cancelado') fallar(new ErrorDeSignup('Cancelaste la conexión con WhatsApp.', true))
       else fallar(new ErrorDeSignup(m.mensaje))
     }
+    const alCancelar = () => fallar(new ErrorDeSignup('Cancelaste la conexión con WhatsApp.', true))
+    if (cancelar?.aborted) return reject(new ErrorDeSignup('Cancelaste la conexión con WhatsApp.', true))
+    cancelar?.addEventListener('abort', alCancelar)
     const timer = setTimeout(() => fallar(new ErrorDeSignup('Pasó demasiado tiempo sin terminar la conexión. Volvé a intentarlo.')), ESPERA_MAXIMA_MS)
     window.addEventListener('message', alMensaje)
 

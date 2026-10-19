@@ -15,6 +15,8 @@ interface Props {
   onConectar: () => void
   /** Abre el formulario manual (para cuentas de prueba de Meta). */
   onManual?: () => void
+  /** Corta la espera de la ventana de Meta (si se cerró con la X, Meta no siempre avisa). */
+  onCancelar?: () => void
 }
 
 const PASOS = [
@@ -23,7 +25,7 @@ const PASOS = [
   { titulo: 'Seguí usando tu app y atendé también desde acá', texto: 'Tu app WhatsApp Business del celular sigue funcionando igual: lo que escribas ahí también se ve en Órbita, y lo que respondas desde Órbita le llega a tu cliente.' },
 ]
 
-export function ConectarWhatsapp({ caso, estado = 'libre', error, aviso, onConectar, onManual }: Props) {
+export function ConectarWhatsapp({ caso, estado = 'libre', error, aviso, onConectar, onManual, onCancelar }: Props) {
   const ocupado = estado !== 'libre'
   return (
     <section className="cw-raiz" aria-label="Conectar WhatsApp">
@@ -58,6 +60,9 @@ export function ConectarWhatsapp({ caso, estado = 'libre', error, aviso, onConec
           <Button size="lg" loading={ocupado} onClick={onConectar} className="cw-boton">
             {estado === 'meta' ? 'Completá el proceso en la ventana de Meta…' : estado === 'guardando' ? 'Conectando tu cuenta…' : 'Conectar cuenta de WhatsApp Business'}
           </Button>
+          {estado === 'meta' && onCancelar && (
+            <button type="button" className="cw-manual" onClick={onCancelar}>¿Cerraste la ventana de Meta? Cancelar y volver a intentar</button>
+          )}
           {error && <p className="cw-error" role="alert">{error}</p>}
           {aviso && <p className="cw-aviso" role="status">{aviso}</p>}
 

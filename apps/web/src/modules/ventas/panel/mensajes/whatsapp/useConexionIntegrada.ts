@@ -19,7 +19,8 @@ export function useConexionIntegrada({ activo, onConectado }: Opciones) {
   const [error, setError] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const montado = useRef(true)
-  useEffect(() => () => { montado.current = false }, [])
+  const corte = useRef<AbortController | null>(null)
+  useEffect(() => () => { montado.current = false; corte.current?.abort() }, [])
 
   // El SDK se carga de antes: FB.login tiene que salir directo del clic, y cargarlo recién ahí lo hace bloqueable.
   useEffect(() => {
@@ -30,7 +31,10 @@ export function useConexionIntegrada({ activo, onConectado }: Opciones) {
   // OJO: nada de `await` antes de `iniciarEmbeddedSignup()`: se llama en el mismo turno del clic.
   const conectar = () => {
     setError(null); setAviso(null)
-    const flujo = iniciarEmbeddedSignup()
+    corte.current?.abort()
+    const control = new AbortController()
+    corte.current = control
+    const flujo = iniciarEmbeddedSignup(control.signal)
     setEstado('meta')
     flujo
       .then(async (r) => {
@@ -46,8 +50,11 @@ export function useConexionIntegrada({ activo, onConectado }: Opciones) {
         if (e instanceof ErrorDeSignup && e.cancelado) setAviso(e.message)
         else setError(e instanceof ErrorDeSignup || e instanceof ApiError ? e.message : 'No se pudo conectar. Probá de nuevo.')
       })
-      .finally(() => { if (montado.current) setEstado('libre') })
+      .finally(() => { if (montado.current && corte.current === control) setEstado('libre') })
   }
 
-  return { estado, error, aviso, conectar }
+  /** Corta la espera de la ventana de Meta (por ejemplo, si la persona la cerró con la X). */
+  const cancelar = () => corte.current?.abort()
+
+  return { estado, error, aviso, conectar, cancelar }
 }

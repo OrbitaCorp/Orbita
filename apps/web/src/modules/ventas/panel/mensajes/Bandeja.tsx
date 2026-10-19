@@ -222,6 +222,7 @@ function BandejaMensajes({ canal, onCanal, convId, onAbrir, onCerrar, ir, onToas
             aviso={conexion.aviso}
             onConectar={conexion.conectar}
             onManual={() => setModalWhatsapp(true)}
+            onCancelar={conexion.cancelar}
           />
         )}
         {conectado && (
