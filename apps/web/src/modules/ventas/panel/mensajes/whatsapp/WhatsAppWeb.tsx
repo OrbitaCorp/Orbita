@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import { Archive, ArrowLeft, EllipsisVertical, FileText, Search, SendHorizontal, Smile, X } from 'lucide-react'
+import { Archive, ArrowLeft, EllipsisVertical, FileText, ImagePlus, Search, SendHorizontal, Smile, X } from 'lucide-react'
 import {
-  ApiError, getConversationMessages, sendConversationMessage,
+  ApiError, getConversationMessages, sendConversationImage, sendConversationMessage,
   type ChatMessage, type ConversationRow, type WhatsappEstado,
 } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { resolverVariables, type Plantilla } from '../mock/mensajes.mock'
 import {
-  armarFilas, colorDeAvatar, estadoDeEntrega, hora, iniciales, marcaDeLaLista, puedeResponderHasta, type EstadoDeEntrega,
+  armarFilas, colorDeAvatar, errorDeFoto, estadoDeEntrega, fotoDelMensaje, hora, iniciales, marcaDeLaLista, pieDeFoto, puedeResponderHasta,
+  TIPOS_DE_FOTO, vistaPreviaDeLaLista, type EstadoDeEntrega,
 } from './utilidades'
 
 // Mensajes → WhatsApp: la bandeja de WhatsApp con el aspecto de WhatsApp Web (el de escritorio): lista de chats a la
@@ -15,11 +16,14 @@ import {
 // tildes de entrega, los separadores de día y la barra de escribir abajo. Los colores y las medidas son los de
 // WhatsApp a propósito (no los del panel), en claro y en oscuro.
 //
-// Lo que hace es real: lee y manda por la API de WhatsApp Business (solo texto, solo dentro de las 24 horas del último
-// mensaje del cliente, que es la regla de WhatsApp), archiva, y abre la ficha del cliente.
+// Lo que hace es real: lee y manda por la API de WhatsApp Business (texto y fotos, solo dentro de las 24 horas del
+// último mensaje del cliente, que es la regla de WhatsApp), muestra las fotos que llegan, archiva, y abre la ficha del
+// cliente. El audio, el video y los documentos no se ven: llegan como una etiqueta.
 
 const POLL_MS = 2500
 const MAX_TEXTO = 4096
+// El pie de una foto puede tener hasta 1024 caracteres.
+const MAX_PIE = 1024
 const EMOJIS = [
   '😀', '😃', '😄', '😁', '😊', '🙂', '😉', '😍', '🥰', '😘', '😎', '🤗', '🤩', '😅', '😂', '🤣',
   '🙏', '👍', '👌', '👏', '🙌', '💪', '🤝', '👋', '❤️', '🧡', '💛', '💚', '💙', '🔥', '✨', '🎉',
@@ -132,7 +136,7 @@ export function WhatsAppWeb({ charlas, estado, convId, plantillas, onAbrir, onCe
                     <span className="wa-fila-abajo">
                       <span className="wa-fila-preview">
                         {entrega && <Tildes estado={entrega} chico />}
-                        <span>{m?.text ?? ''}</span>
+                        <span>{vistaPreviaDeLaLista(m)}</span>
                       </span>
                       {c.isUnread && <span className="wa-punto" role="img" aria-label="Sin leer" />}
                     </span>
@@ -190,6 +194,10 @@ function Chat({ charla, plantillas, onVolver, onArchivar, onPerfil, onToast, onE
   const [texto, setTexto] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [panel, setPanel] = useState<Panel>(null)
+  // La foto elegida para mandar (con su vista previa) y la foto abierta en grande.
+  const [foto, setFoto] = useState<{ archivo: File; vista: string } | null>(null)
+  const [visor, setVisor] = useState<string | null>(null)
+  const selector = useRef<HTMLInputElement>(null)
   const [ahora, setAhora] = useState(() => Date.now())
   const lista = useRef<HTMLDivElement>(null)
   const cerca = useRef(true)
@@ -197,6 +205,14 @@ function Chat({ charla, plantillas, onVolver, onArchivar, onPerfil, onToast, onE
   const barra = useRef<HTMLDivElement>(null)
   const montado = useRef(true)
   useEffect(() => () => { montado.current = false }, [])
+  // La vista previa es una dirección temporal del navegador: se libera al cambiar de foto o al salir.
+  useEffect(() => () => { if (foto) URL.revokeObjectURL(foto.vista) }, [foto])
+  useEffect(() => {
+    if (!visor) return
+    const tecla = (e: globalThis.KeyboardEvent) => { if (e.key === 'Escape') setVisor(null) }
+    document.addEventListener('keydown', tecla)
+    return () => document.removeEventListener('keydown', tecla)
+  }, [visor])
 
   // Mensajes reales + sondeo mientras el chat está abierto (y al volver a la pestaña, que el navegador frena).
   useEffect(() => {
@@ -234,23 +250,27 @@ function Chat({ charla, plantillas, onVolver, onArchivar, onPerfil, onToast, onE
 
   const hasta = useMemo(() => puedeResponderHasta(mensajes ?? [], ahora), [mensajes, ahora])
   const puedeResponder = hasta !== null
-  const puedeEnviar = puedeResponder && !enviando && texto.trim().length > 0 && texto.length <= MAX_TEXTO
+  const limite = foto ? MAX_PIE : MAX_TEXTO
+  const puedeEnviar = puedeResponder && !enviando && (foto !== null || texto.trim().length > 0) && texto.length <= limite
   const filas = useMemo(() => armarFilas(mensajes ?? []), [mensajes])
 
   const enviar = async () => {
     if (!puedeEnviar) return
     setEnviando(true)
     try {
-      const nuevo = await sendConversationMessage(charla.id, { text: texto.trim(), canal: 'WHATSAPP' })
+      const nuevo = foto
+        ? await sendConversationImage(charla.id, { foto: foto.archivo, texto })
+        : await sendConversationMessage(charla.id, { text: texto.trim(), canal: 'WHATSAPP' })
       if (!montado.current) return
       cerca.current = true
       setMensajes((previos) => [...(previos ?? []), nuevo])
       setTexto('')
+      setFoto(null)
       setPanel(null)
       onEnviado()
     } catch (e) {
       // Los rechazos de WhatsApp (ventana vencida, número inválido) traen el motivo: se muestra.
-      onToast(e instanceof ApiError && e.status < 500 ? e.message : 'No se pudo enviar el mensaje')
+      onToast(e instanceof ApiError && e.status < 500 ? e.message : foto ? 'No se pudo enviar la foto' : 'No se pudo enviar el mensaje')
     } finally {
       if (montado.current) setEnviando(false)
     }
@@ -259,7 +279,17 @@ function Chat({ charla, plantillas, onVolver, onArchivar, onPerfil, onToast, onE
   const alTeclear = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void enviar() }
   }
-  const poner = (t: string) => { setTexto((a) => `${a}${t}`.slice(0, MAX_TEXTO)); entrada.current?.focus() }
+  const poner = (t: string) => { setTexto((a) => `${a}${t}`.slice(0, limite)); entrada.current?.focus() }
+
+  const elegirFoto = (archivo: File | undefined) => {
+    if (!archivo) return
+    const motivo = errorDeFoto(archivo)
+    if (motivo) { onToast(motivo); return }
+    setFoto({ archivo, vista: URL.createObjectURL(archivo) })
+    setTexto((t) => t.slice(0, MAX_PIE))
+    setPanel(null)
+    entrada.current?.focus()
+  }
 
   return (
     <div className="wa-chat-interno">
@@ -290,12 +320,27 @@ function Chat({ charla, plantillas, onVolver, onArchivar, onPerfil, onToast, onE
             <div key={m.id}>
               {dia && <p className="wa-dia"><span>{dia}</span></p>}
               <div className={`wa-linea ${propio ? 'wa-linea-propia' : 'wa-linea-ajena'}${primeroDeRacha ? ' wa-linea-primera' : ''}`}>
-                <div className={`wa-burbuja ${propio ? 'wa-burbuja-propia' : 'wa-burbuja-ajena'}${primeroDeRacha ? ' wa-burbuja-colita' : ''}${entrega === 'fallo' ? ' wa-burbuja-fallo' : ''}`}>
-                  <span className="wa-burbuja-texto">{m.text}</span>
-                  <span className="wa-burbuja-meta">
-                    {hora(m.createdAt)}
-                    {entrega && <Tildes estado={entrega} />}
-                  </span>
+                <div className={`wa-burbuja ${propio ? 'wa-burbuja-propia' : 'wa-burbuja-ajena'}${fotoDelMensaje(m) ? ' wa-burbuja-con-foto' : ''}${primeroDeRacha ? ' wa-burbuja-colita' : ''}${entrega === 'fallo' ? ' wa-burbuja-fallo' : ''}`}>
+                  {fotoDelMensaje(m) ? (
+                    <>
+                      <button type="button" className="wa-foto" onClick={() => setVisor(fotoDelMensaje(m))} aria-label="Ver la foto en grande">
+                        <img src={fotoDelMensaje(m) ?? ''} alt={pieDeFoto(m) || 'Foto'} loading="lazy" />
+                      </button>
+                      {pieDeFoto(m) && <span className="wa-burbuja-texto wa-foto-pie">{pieDeFoto(m)}</span>}
+                      <span className={`wa-burbuja-meta${pieDeFoto(m) ? ' wa-foto-pie' : ' wa-meta-sobre-foto'}`}>
+                        {hora(m.createdAt)}
+                        {entrega && <Tildes estado={entrega} />}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="wa-burbuja-texto">{m.text}</span>
+                      <span className="wa-burbuja-meta">
+                        {hora(m.createdAt)}
+                        {entrega && <Tildes estado={entrega} />}
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
               {entrega === 'fallo' && <p className="wa-fallo">No se pudo entregar este mensaje.</p>}
@@ -308,6 +353,14 @@ function Chat({ charla, plantillas, onVolver, onArchivar, onPerfil, onToast, onE
         <p className="wa-plazo" role="status">
           Pasaron más de 24 horas desde el último mensaje de {charla.customerName}. WhatsApp solo permite responder dentro de ese plazo: cuando te vuelva a escribir vas a poder contestarle.
         </p>
+      )}
+
+      {foto && (
+        <div className="wa-foto-previa" role="group" aria-label="Foto para mandar">
+          <img src={foto.vista} alt="Vista previa de la foto" />
+          <p>Se manda como foto. Lo que escribas abajo va de pie de foto (hasta {MAX_PIE} caracteres).</p>
+          <button type="button" className="wa-icono" onClick={() => setFoto(null)} aria-label="Quitar la foto"><X size={20} /></button>
+        </div>
       )}
 
       <div className="wa-barra" ref={barra}>
@@ -345,6 +398,10 @@ function Chat({ charla, plantillas, onVolver, onArchivar, onPerfil, onToast, onE
         <button type="button" className={`wa-icono${panel === 'plantillas' ? ' wa-icono-activo' : ''}`} disabled={!puedeResponder} aria-label="Respuestas rápidas" aria-expanded={panel === 'plantillas'} onClick={() => setPanel((p) => (p === 'plantillas' ? null : 'plantillas'))}>
           <FileText size={22} />
         </button>
+        <input ref={selector} type="file" accept={TIPOS_DE_FOTO.join(',')} hidden onChange={(e) => { elegirFoto(e.target.files?.[0]); e.target.value = '' }} />
+        <button type="button" className="wa-icono" disabled={!puedeResponder || enviando} aria-label="Mandar una foto" title="Mandar una foto" onClick={() => selector.current?.click()}>
+          <ImagePlus size={22} />
+        </button>
         <textarea
           ref={entrada}
           className="wa-escribir"
@@ -353,13 +410,20 @@ function Chat({ charla, plantillas, onVolver, onArchivar, onPerfil, onToast, onE
           onKeyDown={alTeclear}
           disabled={!puedeResponder}
           rows={1}
-          placeholder={puedeResponder ? 'Escribe un mensaje' : 'No se puede responder todavía'}
+          placeholder={!puedeResponder ? 'No se puede responder todavía' : foto ? 'Agregá un pie de foto' : 'Escribe un mensaje'}
           aria-label="Escribe un mensaje"
         />
         <button type="button" className="wa-enviar" disabled={!puedeEnviar} onClick={() => void enviar()} aria-label="Enviar">
           {enviando ? <span className="wa-giro" aria-hidden /> : <SendHorizontal size={22} />}
         </button>
       </div>
+
+      {visor && (
+        <div className="wa-visor" role="dialog" aria-modal="true" aria-label="Foto" onClick={() => setVisor(null)}>
+          <button type="button" className="wa-visor-cerrar" onClick={() => setVisor(null)} aria-label="Cerrar"><X size={24} /></button>
+          <img src={visor} alt="Foto del chat" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
     </div>
   )
 }
@@ -498,6 +562,21 @@ const CSS = `
 .wa-tildes-fallo { color: var(--wa-error); }
 .wa-fallo { margin: 2px 0 0; text-align: right; font-size: 11.5px; color: var(--wa-error); }
 
+.wa-burbuja-con-foto { padding: 3px 3px 6px; }
+.wa-foto { display: block; padding: 0; border: none; border-radius: 6px; overflow: hidden; background: transparent; cursor: zoom-in; line-height: 0; }
+.wa-foto img { display: block; max-width: min(330px, 100%); max-height: 340px; width: auto; height: auto; min-width: 140px; object-fit: cover; }
+.wa-foto-pie { display: block; padding: 4px 6px 0; }
+.wa-burbuja-con-foto .wa-burbuja-meta.wa-foto-pie { display: flex; justify-content: flex-end; padding: 0 4px; margin: 0; float: none; }
+.wa-meta-sobre-foto { position: absolute; right: 8px; bottom: 8px; margin: 0 !important; padding: 1px 6px; border-radius: 10px; color: #fff !important; background: rgba(11,20,26,0.5); }
+.wa-meta-sobre-foto .wa-tildes { color: #fff; }
+.wa-meta-sobre-foto .wa-tildes-leido { color: var(--wa-visto); }
+.wa-foto-previa { flex-shrink: 0; display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: var(--wa-cabecera); border-top: 1px solid var(--wa-borde); }
+.wa-foto-previa img { width: 64px; height: 64px; flex-shrink: 0; border-radius: 8px; object-fit: cover; }
+.wa-foto-previa p { flex: 1; min-width: 0; margin: 0; font-size: 13px; line-height: 1.45; color: var(--wa-texto-2); }
+.wa-visor { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(11,20,26,0.92); cursor: zoom-out; }
+.wa-visor img { max-width: 100%; max-height: 100%; border-radius: 4px; cursor: default; }
+.wa-visor-cerrar { position: absolute; top: 14px; right: 14px; width: 44px; height: 44px; border: none; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: #fff; background: rgba(255,255,255,0.12); }
+.wa-visor-cerrar:hover { background: rgba(255,255,255,0.22); }
 .wa-plazo { margin: 0; padding: 10px 24px; text-align: center; font-size: 13px; line-height: 1.5; color: var(--wa-aviso-texto); background: var(--wa-aviso); }
 .wa-barra { position: relative; flex-shrink: 0; display: flex; align-items: flex-end; gap: 6px; padding: 10px 16px; background: var(--wa-cabecera); }
 .wa-escribir { flex: 1; min-width: 0; max-height: 120px; padding: 9px 12px; border: none; border-radius: 8px; outline: none !important; resize: none; background: var(--wa-entrada); font: inherit; font-size: 15px; line-height: 20px; color: var(--wa-texto); field-sizing: content; }

@@ -107,6 +107,35 @@ export function estadoDeEntrega(m: Pick<ChatMessage, 'sender' | 'deliveryStatus'
   }
 }
 
+/** La foto de un mensaje, si la tiene (solo se muestran imágenes; lo demás llega como etiqueta). */
+export function fotoDelMensaje(m: Pick<ChatMessage, 'attachments'>): string | null {
+  return m.attachments?.find((a) => a.tipo === 'image' && a.url)?.url ?? null
+}
+
+/** El texto que acompaña a la foto: el pie de foto, o nada si el texto es solo la etiqueta "[Imagen]". */
+export function pieDeFoto(m: Pick<ChatMessage, 'text' | 'attachments'>): string {
+  if (!fotoDelMensaje(m)) return m.text
+  return m.text.trim() === '[Imagen]' ? '' : m.text
+}
+
+/** Lo que dice la lista de chats debajo del nombre: las fotos se anuncian como "Foto" (o con su pie de foto). */
+export function vistaPreviaDeLaLista(m: Pick<ChatMessage, 'text' | 'attachments'> | null): string {
+  if (!m) return ''
+  if (!fotoDelMensaje(m)) return m.text
+  const pie = pieDeFoto(m)
+  return pie ? `📷 ${pie}` : '📷 Foto'
+}
+
+export const TIPOS_DE_FOTO = ['image/jpeg', 'image/png', 'image/webp']
+export const MAX_BYTES_FOTO = 10 * 1024 * 1024
+
+/** Revisa la foto elegida antes de subirla: devuelve el motivo si no sirve, o null si está bien. */
+export function errorDeFoto(f: Pick<File, 'type' | 'size'>): string | null {
+  if (!TIPOS_DE_FOTO.includes(f.type)) return 'Elegí una foto JPG, PNG o WebP.'
+  if (f.size > MAX_BYTES_FOTO) return 'La foto pesa más de 10 MB.'
+  return null
+}
+
 export interface FilaDelChat {
   mensaje: ChatMessage
   /** Separador de día que va antes de este mensaje (el primero de cada día). */

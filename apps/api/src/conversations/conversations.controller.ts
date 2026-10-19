@@ -1,10 +1,13 @@
-import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { FullModeOnly } from '../common/decorators/full-mode-only.decorator';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
 import { CANALES_DE_BANDEJA, ConversationsService, type CanalDeBandeja } from './conversations.service';
+import { SUBIDA_IMAGEN } from '../common/utils/subida-imagen';
+import { SendImageDto } from './dto/send-image.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { UpdateConversationDto } from './dto/update-conversation.dto';
 
@@ -54,6 +57,16 @@ export class ConversationsController {
   sendMessage(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: SendMessageDto) {
     const member = assertMemberContext(ctx);
     return this.conversationsService.sendMessage(member.businessId, id, dto);
+  }
+
+  // Una foto por WhatsApp (campo `file`, y `texto` como pie de foto): solo desde la bandeja de WhatsApp.
+  @Post(':id/messages/image')
+  @FullModeOnly()
+  @RequirePermission('messages.manage')
+  @UseInterceptors(FileInterceptor('file', SUBIDA_IMAGEN))
+  sendImage(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: SendImageDto, @UploadedFile() file?: Express.Multer.File) {
+    const member = assertMemberContext(ctx);
+    return this.conversationsService.enviarImagen(member.businessId, id, file, dto.texto);
   }
 
   @Patch(':id')

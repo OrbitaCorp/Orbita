@@ -843,6 +843,11 @@ Business desde Mensajes → WhatsApp con el botón de Meta, sin pegar datos a ma
 - **Las dos bandejas de Mensajes no se mezclan:** `GET /conversations` devuelve `canales` (último mensaje y «sin leer» de
   cada canal), `GET /conversations/:id/messages?canal=` filtra por canal y `POST .../messages` acepta `canal` para
   responder siempre por el de la bandeja desde la que se contesta.
+- **Fotos en los chats (solo imágenes):** las que mandan los clientes se bajan de Meta (`GET /{media_id}` → `url`, con el
+  token del negocio) y las que manda el panel salen por `POST /conversations/:id/messages/image`; en los dos casos se
+  guardan como JPEG (≤ 2048 px, ≤ 5 MB) en el bucket **`whatsapp-media`** de Supabase Storage, que se crea solo la primera
+  vez (público, rutas con UUID: WhatsApp tiene que poder bajar la imagen por su dirección). No hace falta migración ni
+  variable nueva. Audio, video y documentos no se guardan: siguen entrando como etiqueta en el texto.
 - **Probar sin un número real:** cuenta sandbox desde el panel de Meta (WhatsApp → Testear integraciones) o el formulario
   manual («Conectala a mano» en la pantalla de conectar).
 - **Cobro:** en Embedded Signup cada cliente agrega su propio medio de pago en Meta y paga ahí sus conversaciones.

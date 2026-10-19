@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { ChatMessage, ConversationRow } from '@/lib/api'
 import {
-  VENTANA_WHATSAPP_MS, armarFilas, colorDeAvatar, estadoDeEntrega, iniciales, marcaDeLaLista, puedeResponderHasta, repartirCharlas, separadorDeDia,
+  MAX_BYTES_FOTO, VENTANA_WHATSAPP_MS, armarFilas, colorDeAvatar, errorDeFoto, estadoDeEntrega, fotoDelMensaje, iniciales, marcaDeLaLista, pieDeFoto, puedeResponderHasta,
+  repartirCharlas, separadorDeDia, vistaPreviaDeLaLista,
 } from './utilidades'
 
 const AHORA = new Date(2026, 9, 17, 15, 30) // sábado 17 de octubre de 2026, 15:30
@@ -96,5 +97,33 @@ describe('armarFilas', () => {
     ], AHORA)
     expect(filas.map((f) => f.dia)).toEqual(['AYER', null, null, 'HOY'])
     expect(filas.map((f) => f.primeroDeRacha)).toEqual([true, false, true, true])
+  })
+})
+
+describe('fotos en el chat', () => {
+  const conFoto = (text: string) => ({ text, attachments: [{ tipo: 'image' as const, url: 'https://almacen/a.jpg' }] })
+
+  it('una foto se detecta por su adjunto, y un mensaje sin adjunto no tiene foto', () => {
+    expect(fotoDelMensaje(conFoto('[Imagen]'))).toBe('https://almacen/a.jpg')
+    expect(fotoDelMensaje({ attachments: null })).toBeNull()
+    expect(fotoDelMensaje({})).toBeNull()
+  })
+  it('el pie de foto es el texto, salvo que sea solo la etiqueta', () => {
+    expect(pieDeFoto(conFoto('[Imagen]'))).toBe('')
+    expect(pieDeFoto(conFoto('Así queda'))).toBe('Así queda')
+    expect(pieDeFoto({ text: '[Imagen]', attachments: null })).toBe('[Imagen]')
+  })
+  it('la lista anuncia la foto como "Foto" o con su pie', () => {
+    expect(vistaPreviaDeLaLista(null)).toBe('')
+    expect(vistaPreviaDeLaLista({ text: 'hola', attachments: null })).toBe('hola')
+    expect(vistaPreviaDeLaLista(conFoto('[Imagen]'))).toBe('📷 Foto')
+    expect(vistaPreviaDeLaLista(conFoto('Así queda'))).toBe('📷 Así queda')
+  })
+  it('solo se aceptan JPG, PNG o WebP de hasta 10 MB', () => {
+    expect(errorDeFoto({ type: 'image/png', size: 1000 })).toBeNull()
+    expect(errorDeFoto({ type: 'image/webp', size: MAX_BYTES_FOTO })).toBeNull()
+    expect(errorDeFoto({ type: 'application/pdf', size: 1000 })).toMatch(/JPG, PNG o WebP/)
+    expect(errorDeFoto({ type: 'image/gif', size: 1000 })).not.toBeNull()
+    expect(errorDeFoto({ type: 'image/jpeg', size: MAX_BYTES_FOTO + 1 })).toMatch(/10 MB/)
   })
 })

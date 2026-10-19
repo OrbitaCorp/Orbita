@@ -6,6 +6,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
   ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -15,6 +16,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { describeError } from '../common/utils/describe-error.util';
 import { ConnectWhatsappDto } from './dto/connect-whatsapp.dto';
 import type { EmbeddedSignupDto } from './dto/embedded-signup.dto';
+import { WhatsappMediosService } from './whatsapp-medios.service';
 
 // WhatsApp Business (Cloud API de Meta) dentro de la bandeja de Mensajes.
 //
@@ -42,6 +44,8 @@ const ORDEN_ESTADO: Record<string, number> = { sent: 1, delivered: 2, read: 3 };
 const ESTADO_DEL_HISTORIAL: Record<string, string> = { SENT: 'sent', DELIVERED: 'delivered', READ: 'read', PLAYED: 'read', ERROR: 'failed' };
 
 interface WaMedia {
+  /** Id de la imagen en Meta: con él se pide la dirección temporal para bajarla. */
+  id?: string;
   caption?: string;
   filename?: string;
 }
@@ -125,6 +129,8 @@ export class WhatsappService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    // Opcional: guarda las imágenes (las que llegan y las que se mandan). Sin él, las imágenes entran como etiqueta.
+    @Optional() private readonly medios?: WhatsappMediosService,
   ) {}
 
   private get graph(): string {
@@ -240,13 +246,43 @@ export class WhatsappService {
     return detalle ? `${etiqueta} ${detalle}` : etiqueta;
   }
 
+  /**
+   * Las imágenes se bajan de Meta y se guardan (la dirección que da Meta vence). Devuelve los adjuntos del mensaje:
+   * vacío si no es una imagen o no se pudo bajar (el mensaje entra igual, como etiqueta).
+   */
+  private async adjuntosDe(businessId: string, tipo: string, imagen?: WaMedia): Promise<{ tipo: 'image'; url: string }[]> {
+    if (tipo !== 'image' || !imagen?.id || !this.medios) return [];
+    const url = await this.descargarImagen(businessId, imagen.id);
+    return url ? [{ tipo: 'image', url }] : [];
+  }
+
+  /** Con foto, el texto es el pie de foto (o la etiqueta si no tiene), sin el "[Imagen]" delante. */
+  private textoConAdjuntos(adjuntos: unknown[], imagen: WaMedia | undefined, textoBase: string): string {
+    return adjuntos.length > 0 ? (imagen?.caption?.trim() || '[Imagen]') : textoBase;
+  }
+
+  private async descargarImagen(businessId: string, mediaId: string): Promise<string | null> {
+    try {
+      const cred = await this.credenciales(businessId);
+      if (!cred || !this.medios) return null;
+      const meta = await this.graphCall<{ url?: string }>(`/${mediaId}`, cred.access_token, { method: 'GET' });
+      if (!meta.url) return null;
+      return await this.medios.guardarImagenDeMeta(businessId, meta.url, cred.access_token);
+    } catch (e) {
+      this.logger.warn(`No se pudo bajar la imagen ${mediaId}: ${describeError(e)}`);
+      return null;
+    }
+  }
+
   private async guardarEntrante(businessId: string, m: WaMessage, nombrePerfil?: string): Promise<void> {
-    const texto = this.textoDe(m);
-    if (!texto) return;
+    const textoBase = this.textoDe(m);
+    if (!textoBase) return;
     // Meta reintenta si no recibe 200 a tiempo: sin esto un mismo mensaje se
     // guardaría dos veces. `externalId` es único, pero se mira antes para no
     // depender de capturar el error de la base.
     if (await this.prisma.message.findUnique({ where: { externalId: m.id }, select: { id: true } })) return;
+    const adjuntos = await this.adjuntosDe(businessId, m.type, m.image);
+    const texto = this.textoConAdjuntos(adjuntos, m.image, textoBase);
 
     const customerId = await this.resolverCliente(businessId, m.from, nombrePerfil);
     if (!customerId) return;
@@ -258,7 +294,10 @@ export class WhatsappService {
     const creado = m.timestamp ? new Date(Number(m.timestamp) * 1000) : new Date();
     await this.prisma.$transaction([
       this.prisma.message.create({
-        data: { conversationId: conv.id, sender: 'CUSTOMER', text: texto, channel: 'WHATSAPP', externalId: m.id, createdAt: creado },
+        data: {
+          conversationId: conv.id, sender: 'CUSTOMER', text: texto, channel: 'WHATSAPP', externalId: m.id, createdAt: creado,
+          ...(adjuntos.length > 0 ? { attachments: adjuntos } : {}),
+        },
       }),
       this.prisma.conversation.update({ where: { id: conv.id }, data: { isUnread: true, isArchived: false, updatedAt: new Date() } }),
     ]);
@@ -282,9 +321,11 @@ export class WhatsappService {
       return;
     }
 
-    const texto = this.textoDe({ id: e.id, from: e.to, type: e.type, text: e.text, image: e.image, video: e.video, document: e.document });
-    if (!texto) return;
+    const textoBase = this.textoDe({ id: e.id, from: e.to, type: e.type, text: e.text, image: e.image, video: e.video, document: e.document });
+    if (!textoBase) return;
     if (await this.prisma.message.findUnique({ where: { externalId: e.id }, select: { id: true } })) return;
+    const adjuntos = await this.adjuntosDe(businessId, e.type, e.image);
+    const texto = this.textoConAdjuntos(adjuntos, e.image, textoBase);
 
     const customerId = await this.resolverCliente(businessId, e.to);
     if (!customerId) return;
@@ -295,7 +336,10 @@ export class WhatsappService {
     const creado = e.timestamp ? new Date(Number(e.timestamp) * 1000) : new Date();
     await this.prisma.$transaction([
       this.prisma.message.create({
-        data: { conversationId: conv.id, sender: 'STORE', text: texto, channel: 'WHATSAPP', externalId: e.id, deliveryStatus: 'sent', createdAt: creado },
+        data: {
+          conversationId: conv.id, sender: 'STORE', text: texto, channel: 'WHATSAPP', externalId: e.id, deliveryStatus: 'sent', createdAt: creado,
+          ...(adjuntos.length > 0 ? { attachments: adjuntos } : {}),
+        },
       }),
       this.prisma.conversation.update({ where: { id: conv.id }, data: { updatedAt: new Date() } }),
     ]);
@@ -599,6 +643,22 @@ export class WhatsappService {
    * aprobada (todavía no soportadas): se rechaza antes de llamar a Meta.
    */
   async enviarTexto(businessId: string, conversationId: string, waId: string, texto: string): Promise<string> {
+    return this.enviarCarga(businessId, conversationId, waId, { type: 'text', text: { body: texto, preview_url: false } });
+  }
+
+  /** Manda una imagen (de una dirección pública de nuestro almacenamiento), con un pie de foto opcional. Mismas reglas de plazo. */
+  async enviarImagen(businessId: string, conversationId: string, waId: string, url: string, pieDeFoto?: string): Promise<string> {
+    const caption = pieDeFoto?.trim();
+    return this.enviarCarga(businessId, conversationId, waId, { type: 'image', image: { link: url, ...(caption ? { caption } : {}) } });
+  }
+
+  /** La foto que el negocio manda desde el panel: validada, preparada y guardada. Devuelve su dirección pública. */
+  async prepararFoto(businessId: string, archivo: Express.Multer.File | undefined): Promise<string> {
+    if (!this.medios) throw new ServiceUnavailableException('Las imágenes no están disponibles en este entorno');
+    return this.medios.prepararFotoDelPanel(businessId, archivo);
+  }
+
+  private async enviarCarga(businessId: string, conversationId: string, waId: string, carga: Record<string, unknown>): Promise<string> {
     const ultimo = await this.prisma.message.findFirst({
       where: { conversationId, channel: 'WHATSAPP', sender: 'CUSTOMER' },
       orderBy: { createdAt: 'desc' },
@@ -620,8 +680,7 @@ export class WhatsappService {
           messaging_product: 'whatsapp',
           recipient_type: 'individual',
           to,
-          type: 'text',
-          text: { body: texto, preview_url: false },
+          ...carga,
         }),
       });
 

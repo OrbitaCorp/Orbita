@@ -25,7 +25,7 @@ const SIN_SOLO_INSTAGRAM = {
 export type CanalDeBandeja = 'STOREFRONT' | 'WHATSAPP';
 export const CANALES_DE_BANDEJA: CanalDeBandeja[] = ['STOREFRONT', 'WHATSAPP'];
 
-type MensajeRow = { id: string; sender: string; text: string; orderId: string | null; channel: string; deliveryStatus: string | null; createdAt: Date };
+type MensajeRow = { id: string; sender: string; text: string; orderId: string | null; channel: string; deliveryStatus: string | null; createdAt: Date; attachments?: unknown };
 
 @Injectable()
 export class ConversationsService {
@@ -56,7 +56,11 @@ export class ConversationsService {
   }
 
   private aMensaje(m: MensajeRow) {
-    return { id: m.id, sender: m.sender, text: m.text, orderId: m.orderId, channel: m.channel, deliveryStatus: m.deliveryStatus, createdAt: m.createdAt };
+    return {
+      id: m.id, sender: m.sender, text: m.text, orderId: m.orderId, channel: m.channel, deliveryStatus: m.deliveryStatus, createdAt: m.createdAt,
+      // Fotos del mensaje (WhatsApp): [{ tipo: 'image', url }].
+      attachments: Array.isArray(m.attachments) ? m.attachments : null,
+    };
   }
 
   // ── Panel (staff) ──────────────────────────────────────────────────────────
@@ -75,9 +79,9 @@ export class ConversationsService {
     // Lo último de cada canal y por dónde escribió el cliente por última vez: con eso cada bandeja arma SU lista, con su
     // propio último mensaje y su propio "sin leer", sin mezclar lo del otro canal.
     const ids = rows.map((r) => r.id);
-    const ultimosPorCanal = ids.length === 0 ? [] : await this.prisma.$queryRaw<{ conversation_id: string; id: string; sender: string; text: string; order_id: string | null; channel: string; delivery_status: string | null; created_at: Date }[]>`
+    const ultimosPorCanal = ids.length === 0 ? [] : await this.prisma.$queryRaw<{ conversation_id: string; id: string; sender: string; text: string; order_id: string | null; channel: string; delivery_status: string | null; created_at: Date; attachments: unknown }[]>`
       SELECT DISTINCT ON (conversation_id, channel)
-        conversation_id, id, sender::text AS sender, text, order_id, channel::text AS channel, delivery_status, created_at
+        conversation_id, id, sender::text AS sender, text, order_id, channel::text AS channel, delivery_status, created_at, attachments
       FROM messages
       WHERE conversation_id IN (${Prisma.join(ids)}) AND channel IN ('STOREFRONT'::"MessageChannel", 'WHATSAPP'::"MessageChannel")
       ORDER BY conversation_id, channel, created_at DESC`;
@@ -92,7 +96,7 @@ export class ConversationsService {
       for (const m of ultimosPorCanal) {
         if (m.conversation_id !== conversationId) continue;
         canales[m.channel as CanalDeBandeja] = {
-          lastMessage: this.aMensaje({ id: m.id, sender: m.sender, text: m.text, orderId: m.order_id, channel: m.channel, deliveryStatus: m.delivery_status, createdAt: m.created_at }),
+          lastMessage: this.aMensaje({ id: m.id, sender: m.sender, text: m.text, orderId: m.order_id, channel: m.channel, deliveryStatus: m.delivery_status, createdAt: m.created_at, attachments: m.attachments }),
           // "Sin leer" es de la bandeja donde llegó el último mensaje del cliente; la otra no se entera.
           isUnread: sinLeer && canalDelUltimoCliente.get(conversationId) === m.channel,
         };
@@ -200,6 +204,34 @@ export class ConversationsService {
     // propio punto de vista.
     // Si lo pendiente era de la otra bandeja, contestar acá no lo borra.
     const limpiaPendiente = !forzado || !ultimoDelCliente || ultimoDelCliente.channel === forzado;
+    await this.prisma.conversation.update({ where: { id: conversationId }, data: { ...(limpiaPendiente ? { isUnread: false } : {}), updatedAt: new Date() } });
+    return this.aMensaje(msg);
+  }
+
+  /**
+   * Manda una foto por WhatsApp (con un pie de foto opcional) desde la bandeja de WhatsApp. Solo WhatsApp y solo fotos.
+   * Como el texto: se manda PRIMERO y recién después se guarda, así una respuesta que WhatsApp rechazó (plazo de 24 h
+   * vencido) no queda en el hilo como si el cliente la hubiera recibido.
+   */
+  async enviarImagen(businessId: string, conversationId: string, archivo: Express.Multer.File | undefined, pieDeFoto?: string) {
+    const conv = await this.prisma.conversation.findFirst({ where: { id: conversationId, businessId } });
+    if (!conv) throw new NotFoundException('Conversación no encontrada');
+    const cliente = await this.prisma.customer.findUnique({ where: { id: conv.customerId }, select: { whatsappId: true } });
+    if (!cliente?.whatsappId) throw new BadRequestException('Este cliente no tiene un número de WhatsApp asociado');
+
+    const url = await this.whatsapp.prepararFoto(businessId, archivo);
+    const pie = pieDeFoto?.trim().slice(0, 1024) || undefined;
+    const externalId = await this.whatsapp.enviarImagen(businessId, conversationId, cliente.whatsappId, url, pie);
+
+    const msg = await this.prisma.message.create({
+      data: {
+        conversationId, sender: 'STORE', text: pie ?? '[Imagen]', channel: 'WHATSAPP', externalId, deliveryStatus: 'sent',
+        attachments: [{ tipo: 'image', url }],
+      },
+    });
+    // Si lo pendiente era del chat de la tienda, contestar por WhatsApp no lo apaga.
+    const ultimoDelCliente = await this.canalDelUltimoMensajeDelCliente(conversationId);
+    const limpiaPendiente = !ultimoDelCliente || ultimoDelCliente === 'WHATSAPP';
     await this.prisma.conversation.update({ where: { id: conversationId }, data: { ...(limpiaPendiente ? { isUnread: false } : {}), updatedAt: new Date() } });
     return this.aMensaje(msg);
   }

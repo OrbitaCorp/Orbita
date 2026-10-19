@@ -3307,7 +3307,9 @@ export function meRevokeAllSessions() { return bffRequest<{ ok: boolean }>('/api
 // usan el cliente (storefront) y el panel (dueño/staff).
 // `channel`/`deliveryStatus` son de WhatsApp: los mensajes del chat de la tienda vienen como STOREFRONT y sin estado.
 export type ChatChannel = 'STOREFRONT' | 'WHATSAPP' | 'INSTAGRAM'
-export type ChatMessage = { id: string; sender: 'CUSTOMER' | 'STORE'; text: string; orderId: string | null; channel?: ChatChannel; deliveryStatus?: string | null; createdAt: string }
+// `attachments`: las fotos del mensaje (solo WhatsApp). El resto de los archivos llega como etiqueta en el texto.
+export type ChatAttachment = { tipo: 'image'; url: string }
+export type ChatMessage = { id: string; sender: 'CUSTOMER' | 'STORE'; text: string; orderId: string | null; channel?: ChatChannel; deliveryStatus?: string | null; attachments?: ChatAttachment[] | null; createdAt: string }
 
 // Storefront (cliente logueado)
 export type MeConversation = { id: string | null; messages: ChatMessage[] }
@@ -3332,6 +3334,19 @@ export function getConversationMessages(id: string, canal?: CanalDeBandeja) {
 }
 export function sendConversationMessage(id: string, input: { text: string; orderId?: string; canal?: CanalDeBandeja }) {
   return panelRequest<ChatMessage>(`/conversations/${id}/messages`, { method: 'POST', body: JSON.stringify(input) })
+}
+// Manda una foto por WhatsApp (JPG, PNG o WebP, hasta 10 MB). `texto` es el pie de foto.
+export async function sendConversationImage(id: string, input: { foto: File; texto?: string }) {
+  const form = new FormData()
+  form.append('file', input.foto, input.foto.name)
+  if (input.texto?.trim()) form.append('texto', input.texto.trim())
+  const res = await authedFetch(`${API_BASE}/conversations/${id}/messages/image`, { method: 'POST', body: form })
+  const body = await res.json().catch(() => null)
+  if (!res.ok) {
+    const message = mensajeDeError(res.status, body)
+    throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
+  }
+  return body as ChatMessage
 }
 export function updateConversation(id: string, input: { isUnread?: boolean; isArchived?: boolean }) {
   return panelRequest<{ ok: boolean }>(`/conversations/${id}`, { method: 'PATCH', body: JSON.stringify(input) })
