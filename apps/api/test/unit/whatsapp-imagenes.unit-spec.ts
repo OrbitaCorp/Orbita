@@ -1,4 +1,4 @@
-import { BadRequestException, UnprocessableEntityException } from '@nestjs/common';
+import { BadRequestException, ConflictException, UnprocessableEntityException } from '@nestjs/common';
 import sharp from 'sharp';
 import { WhatsappMediosService } from '../../src/whatsapp/whatsapp-medios.service';
 import { WhatsappService, type WaWebhookBody } from '../../src/whatsapp/whatsapp.service';
@@ -276,5 +276,21 @@ describe('ConversationsService.enviarImagen', () => {
     const { svc, prisma } = armar({ ultimoDelCliente: 'STOREFRONT' });
     await svc.enviarImagen(BIZ, 'cv-1', file);
     expect(prisma.conversation.update.mock.calls[0][0].data).not.toHaveProperty('isUnread');
+  });
+});
+
+describe('token de WhatsApp vencido (error 190 de Meta)', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it('se le explica al dueño que tiene que volver a conectar la cuenta, sin reintentar', async () => {
+    const prisma: any = {
+      message: { findFirst: jest.fn().mockResolvedValue({ createdAt: new Date() }) },
+      $queryRaw: jest.fn().mockResolvedValue([{ phone_number_id: PHONE, waba_id: 'w', access_token: 'tok-vencido' }]),
+    };
+    const svc = new WhatsappService(prisma, { get: (k: string) => ({ WHATSAPP_TOKEN_KEY: 'clave' } as Record<string, string>)[k] } as any);
+    const f = jest.spyOn(global, 'fetch').mockResolvedValue(respuesta({ error: { code: 190, message: 'Authentication Error' } }, false, 401));
+    await expect(svc.enviarTexto(BIZ, 'cv-1', WA_ID, 'hola')).rejects.toBeInstanceOf(ConflictException);
+    await expect(svc.enviarTexto(BIZ, 'cv-1', WA_ID, 'hola')).rejects.toThrow(/Volvé a conectar tu cuenta/);
+    expect(f).toHaveBeenCalledTimes(2); // un intento por llamada: no se reintenta con otro formato de número
   });
 });

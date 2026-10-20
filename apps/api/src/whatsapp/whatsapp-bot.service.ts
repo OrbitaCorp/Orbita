@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
 import type { WhatsappBotConfig } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
@@ -286,8 +286,8 @@ export class WhatsappBotService {
       try {
         return await this.whatsapp.enviarInteractivo(m.businessId, m.conversationId, m.waId, interactivo);
       } catch (e) {
-        // El plazo de 24 h no se arregla con texto; cualquier otro rechazo del interactivo sí.
-        if (e instanceof UnprocessableEntityException) throw e;
+        // Ni el plazo de 24 h vencido ni un token vencido se arreglan con texto; cualquier otro rechazo del interactivo sí.
+        if (e instanceof UnprocessableEntityException || e instanceof ConflictException) throw e;
         this.logger.warn(`WhatsApp no aceptó el menú interactivo en ${m.conversationId}; va en texto: ${describeError(e)}`);
         return this.whatsapp.enviarTexto(m.businessId, m.conversationId, m.waId, guardado);
       }

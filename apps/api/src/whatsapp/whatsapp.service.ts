@@ -39,6 +39,8 @@ const VENTANA_MS = 24 * 60 * 60 * 1000;
 // prueba. En Argentina pasa porque el wa_id que llega por webhook trae el 9 de
 // celular (549…) y la lista permitida se carga sin él (54…).
 const ERR_DESTINATARIO_NO_PERMITIDO = 131030;
+// Meta 190: el token de acceso de la conexión venció o fue revocado (los de prueba de la pantalla de API duran ~24 h).
+const ERR_TOKEN_INVALIDO = 190;
 
 const ORDEN_ESTADO: Record<string, number> = { sent: 1, delivered: 2, read: 3 };
 // Estado de entrega que trae el historial → el que guarda Órbita.
@@ -709,6 +711,10 @@ export class WhatsappService {
     try {
       res = await enviar(waId);
     } catch (e) {
+      // Un token vencido no se arregla reintentando: se le dice al dueño qué hacer (un 409 llega al panel con su mensaje).
+      if (e instanceof GraphError && e.code === ERR_TOKEN_INVALIDO) {
+        throw new ConflictException('La conexión con WhatsApp venció o fue revocada. Volvé a conectar tu cuenta: tres puntitos de la lista de chats → Administrar la cuenta conectada.');
+      }
       const sin9 = /^549(\d{10})$/.exec(waId);
       if (sin9 && e instanceof GraphError && e.code === ERR_DESTINATARIO_NO_PERMITIDO) res = await enviar(`54${sin9[1]}`);
       else throw e;

@@ -580,6 +580,14 @@ describe('modalidades de Orbi (la elige el dueño)', () => {
       expect(texto).toContain('1. Ver el catálogo');
       expect(texto).toContain(MARCA_MENU_TEXTO);
     });
+    it('un token vencido tampoco se arregla con texto: no insiste y deja el chat para una persona', async () => {
+      const { ConflictException } = await import('@nestjs/common');
+      const t = armar({ cfg: { modalidad: 'SOLO_MENU' } });
+      t.whatsapp.enviarInteractivo.mockRejectedValue(new ConflictException('La conexión con WhatsApp venció'));
+      await t.bot.atender([dice('hola')]);
+      expect(t.whatsapp.enviarTexto).not.toHaveBeenCalled();
+      expect(t.prisma.conversation.updateMany.mock.calls.at(-1)[0].data).toMatchObject({ botEstado: 'DERIVADO' });
+    });
     it('pero el plazo de 24 horas vencido no se arregla con texto: queda para una persona', async () => {
       const { UnprocessableEntityException } = await import('@nestjs/common');
       const t = armar({ cfg: { modalidad: 'SOLO_MENU' } });
