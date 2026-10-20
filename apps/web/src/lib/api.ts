@@ -2441,6 +2441,11 @@ export type ApiDashboardReport = {
   hasta: string
   kpis: {
     ventas: number
+    // Ganancia del período: ingresos de productos con costo cargado − su costo − devoluciones
+    // aprobadas (puede ser negativa). `gananciaCoberturaPct` es qué parte de los ingresos de
+    // productos tiene costo cargado (0–100); null si no hubo ventas de productos.
+    ganancias?: number
+    gananciaCoberturaPct?: number | null
     pedidos: number
     ticketPromedio: number
     clientesNuevos: number
@@ -2452,7 +2457,7 @@ export type ApiDashboardReport = {
     visitasDominio?: number
     visitasTotalSubdominio?: number
     visitasTotalDominio?: number
-    deltas: { ventas: number; pedidos: number; ticketPromedio: number; clientesNuevos: number; comisionMp: number; visitas?: number }
+    deltas: { ventas: number; ganancias?: number; pedidos: number; ticketPromedio: number; clientesNuevos: number; comisionMp: number; visitas?: number }
   }
   alertas: {
     stockCritico: number

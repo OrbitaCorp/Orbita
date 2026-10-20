@@ -197,9 +197,9 @@ export const CAPITULOS: Capitulo[] = [
             bloques: [
                 { tipo: 'parrafo', texto: 'Son la fila de tarjetas de arriba. Cada una muestra el valor del período elegido y, abajo, cuánto subió o bajó respecto del anterior.' },
                 { tipo: 'campos', items: [
-                    { label: 'Ventas', texto: 'La plata que entró, **neta de devoluciones**: a lo vendido se le restan las devoluciones ya aprobadas del período. Es lo que realmente quedó, no lo que se facturó bruto.' },
+                    { label: 'Ganancias', texto: 'Lo que te quedó de lo vendido en el período: **ingresos de tus productos − lo que te costaron − las devoluciones ya aprobadas**. Ya tiene en cuenta los descuentos que diste y no cuenta el envío. Usa el campo **Costo** de cada producto (el costo de hoy), así que **solo cuenta los productos que tienen el costo cargado**: si hay ventas de productos sin costo, abajo del número te avisa qué parte de lo vendido está incluida, y para sumar el resto tenés que cargar el costo en Productos. Puede dar negativo si devolviste más de lo que ganaste.' },
                     { label: 'Pedidos', texto: 'Cuántas compras entraron. Si hay pedidos esperando, abajo del número te avisa cuántos están pendientes.' },
-                    { label: 'Ticket promedio', texto: 'Cuánto gasta en promedio cada compra (Ventas dividido Pedidos). Es el número que mirás cuando querés que cada cliente se lleve más: si sube, las promos por monto mínimo o los 2x1 están funcionando.' },
+                    { label: 'Ticket promedio', texto: 'Cuánto gasta en promedio cada compra (lo facturado dividido la cantidad de pedidos). Es el número que mirás cuando querés que cada cliente se lleve más: si sube, las promos por monto mínimo o los 2x1 están funcionando.' },
                     { label: 'Clientes nuevos', texto: 'Cuántas personas te compraron por primera vez en el período. Mide si estás llegando a gente nueva o vendiéndole siempre a los mismos.' },
                     { label: 'Comisión MP', texto: 'Cuánto se llevó Mercado Pago de tus cobros en el período. Acá el color está al revés a propósito: que SUBA es malo, así que sube en rojo. Mercado Pago no cobra un porcentaje fijo — varía según el medio de pago y las cuotas —, por eso este número se calcula sobre los cobros reales.' },
                 ] },
@@ -352,7 +352,7 @@ export const CAPITULOS: Capitulo[] = [
                     { label: 'Notas de crédito', texto: 'Si en vez de devolver la plata preferís dejarle saldo a favor para su próxima compra, se emite una nota de crédito y el cliente la usa en el checkout.' },
                 ] },
                 { tipo: 'nota', variante: 'aviso', texto: 'Qué puede pedir tu cliente y con qué tipo de reembolso lo definís vos en Configuración → Cancelaciones y devoluciones. Aprobar cada caso puntual sigue siendo decisión tuya, siempre.' },
-                { tipo: 'parrafo', texto: 'Las devoluciones aprobadas se le restan al KPI **Ventas** del Inicio: por eso ese número dice "neto de devoluciones".' },
+                { tipo: 'parrafo', texto: 'Las devoluciones aprobadas se le restan al KPI **Ganancias** del Inicio: por eso esa tarjeta dice "neta de costos y devoluciones".' },
             ],
             ir: { label: 'Ver devoluciones', seccion: 'pedidos', query: { vista: 'devoluciones' } },
         },

@@ -31,6 +31,48 @@ const DIAS_POR_DEFECTO = 30;
 // un pedido pendiente ya reservó la intención de compra y el panel lo muestra.
 const ESTADOS_VENDIDOS: Prisma.EnumOrderStatusFilter = { not: 'CANCELLED' };
 
+// Un renglón de pedido ya con su ingreso neto y su costo, si el producto lo
+// tiene. Lo comparten el KPI "Ganancias" del inicio y las "Métricas avanzadas",
+// para que los dos números salgan de la misma cuenta.
+//
+// El ingreso neto es cantidad × precio de lista menos TODOS los descuentos del
+// pedido (los de cada ítem y los del ticket, repartidos en proporción al precio
+// de cada ítem); el envío y los ítems libres (isConcept, sin costo) quedan
+// afuera. El costo es el que el producto tiene HOY (el pedido no guarda un
+// costo congelado) y es null cuando el producto no tiene costo cargado.
+type OrdenConRenglones = {
+  discountTotal: Prisma.Decimal | number;
+  items: {
+    quantity: number;
+    unitPrice: Prisma.Decimal | number;
+    isConcept: boolean;
+    variant: {
+      product: {
+        cost: Prisma.Decimal | null;
+        categoryId?: string | null;
+        category?: { name: string } | null;
+      };
+    };
+  }[];
+};
+
+export function renglonesNetosDe(o: OrdenConRenglones) {
+  const bruto = o.items.reduce((s, it) => s + it.quantity * Number(it.unitPrice), 0);
+  const factor = bruto > 0 ? Math.min(1, Math.max(0, 1 - Number(o.discountTotal) / bruto)) : 1;
+  return o.items
+    .filter((it) => !it.isConcept)
+    .map((it) => {
+      const costoUnitario = it.variant.product.cost;
+      return {
+        unidades: it.quantity,
+        neto: it.quantity * Number(it.unitPrice) * factor,
+        costo: costoUnitario !== null ? it.quantity * Number(costoUnitario) : null,
+        categoriaId: it.variant.product.categoryId ?? 'sin-categoria',
+        categoriaNombre: it.variant.product.category?.name ?? 'Sin categoría',
+      };
+    });
+}
+
 @Injectable()
 export class ReportsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -341,7 +383,7 @@ export class ReportsService {
     const desdeAnterior = new Date(desde.getTime() - duracion);
 
     const kpisDe = async (gte: Date, lt: Date) => {
-      const [grupos, clientesNuevos, devueltoAgg, comisionMpAgg, visitasPeriodo, visitasCustomPeriodo] = await Promise.all([
+      const [grupos, clientesNuevos, devueltoAgg, comisionMpAgg, visitasPeriodo, visitasCustomPeriodo, ordenesGanancia] = await Promise.all([
         this.prisma.order.groupBy({
           by: ['status'],
           where: { businessId, deletedAt: null, createdAt: { gte, lt } },
@@ -373,6 +415,22 @@ export class ReportsService {
         this.prisma.storeVisit.count({
           where: { businessId, isCustom: true, createdAt: { gte, lt } },
         }),
+        // Renglones de los pedidos no cancelados del período, para la ganancia
+        // (mismos pedidos que cuentan en "ventas").
+        this.prisma.order.findMany({
+          where: { businessId, deletedAt: null, status: ESTADOS_VENDIDOS, createdAt: { gte, lt } },
+          select: {
+            discountTotal: true,
+            items: {
+              select: {
+                quantity: true,
+                unitPrice: true,
+                isConcept: true,
+                variant: { select: { product: { select: { cost: true } } } },
+              },
+            },
+          },
+        }),
       ]);
       let pedidos = 0;
       let ventasBrutas = 0;
@@ -386,10 +444,39 @@ export class ReportsService {
       }
       const devuelto = devueltoAgg._sum.amount != null ? Number(devueltoAgg._sum.amount) : 0;
       const comisionMp = comisionMpAgg._sum.mpFeeAmount != null ? Number(comisionMpAgg._sum.mpFeeAmount) : 0;
+      // GANANCIAS (KPI del inicio). Criterio:
+      //   ingresos netos de los productos CON costo cargado − su costo − las
+      //   devoluciones aprobadas del período.
+      // - Los productos sin costo cargado NO entran: tratarlos como costo cero
+      //   inflaría la ganancia al 100%. Se avisa aparte con `gananciaCoberturaPct`
+      //   (qué parte de los ingresos de productos tiene costo) para que el panel
+      //   diga "sobre el X% de lo vendido".
+      // - Es la misma cuenta de "Ganancia estimada" de Métricas avanzadas (renglonesNetosDe:
+      //   descuentos aplicados, sin envío, costo de HOY), más la resta de las
+      //   devoluciones, que es lo que la hace "neta" como el KPI Ventas. Se les resta
+      //   la plata devuelta completa y no se le suma el costo de lo devuelto: es una
+      //   aproximación conservadora (no sabemos qué ítems volvieron al stock).
+      // - Puede dar negativa (devolvió más de lo que ganó en el período): se muestra así.
+      let ingresosConCosto = 0;
+      let ingresosSinCosto = 0;
+      let costoVendido = 0;
+      for (const o of ordenesGanancia) {
+        for (const r of renglonesNetosDe(o)) {
+          if (r.costo === null) ingresosSinCosto += r.neto;
+          else {
+            ingresosConCosto += r.neto;
+            costoVendido += r.costo;
+          }
+        }
+      }
+      const ingresosProductos = ingresosConCosto + ingresosSinCosto;
       // El ticket promedio queda BRUTO a proposito: mide cuanto gasta un
       // cliente por compra, y una devolucion posterior no cambia eso.
       return {
         ventas: Math.round((ventasBrutas - devuelto) * 100) / 100,
+        ganancias: redondear2(ingresosConCosto - costoVendido - devuelto),
+        // null = no hubo ventas de productos en el período (nada que cubrir).
+        gananciaCoberturaPct: ingresosProductos > 0 ? Math.round((ingresosConCosto / ingresosProductos) * 1000) / 10 : null,
         pedidos,
         ticketPromedio: pedidos > 0 ? Math.round((ventasBrutas / pedidos) * 100) / 100 : 0,
         clientesNuevos,
@@ -561,6 +648,7 @@ export class ReportsService {
         visitasTotalSubdominio: Math.max(0, visitasTotal - visitasTotalDominio),
         deltas: {
           ventas: variacion(actual.ventas, anterior.ventas),
+          ganancias: variacion(actual.ganancias, anterior.ganancias),
           pedidos: variacion(actual.pedidos, anterior.pedidos),
           ticketPromedio: variacion(actual.ticketPromedio, anterior.ticketPromedio),
           clientesNuevos: variacion(actual.clientesNuevos, anterior.clientesNuevos),
@@ -654,24 +742,7 @@ export class ReportsService {
     type OrdenAv = (typeof ordenes)[number];
     const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 1000) / 10 : null);
 
-    // Los renglones de un pedido ya con su ingreso neto (el descuento del pedido
-    // repartido en proporción al precio de cada ítem) y su costo, si lo tiene.
-    const renglonesNetos = (o: OrdenAv) => {
-      const bruto = o.items.reduce((s, it) => s + it.quantity * Number(it.unitPrice), 0);
-      const factor = bruto > 0 ? Math.min(1, Math.max(0, 1 - Number(o.discountTotal) / bruto)) : 1;
-      return o.items
-        .filter((it) => !it.isConcept)
-        .map((it) => {
-          const costoUnitario = it.variant.product.cost;
-          return {
-            unidades: it.quantity,
-            neto: it.quantity * Number(it.unitPrice) * factor,
-            costo: costoUnitario !== null ? it.quantity * Number(costoUnitario) : null,
-            categoriaId: it.variant.product.categoryId ?? 'sin-categoria',
-            categoriaNombre: it.variant.product.category?.name ?? 'Sin categoría',
-          };
-        });
-    };
+    const renglonesNetos = renglonesNetosDe;
 
     // Compradores identificados del período y cuántos de ellos ya habían comprado
     // antes (o compraron más de una vez dentro del período).
