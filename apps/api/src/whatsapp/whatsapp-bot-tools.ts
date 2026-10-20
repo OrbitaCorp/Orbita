@@ -7,6 +7,8 @@ import type { StorefrontService } from '../storefront/storefront.service';
 // nunca costos) más los pedidos de la propia persona. Nada de acá escribe.
 
 export interface ContextoDelBot {
+  /** Solo si Orbi puede tomar pedidos: arma el borrador del pedido en el chat (ver whatsapp-bot-pedidos.ts). */
+  prepararPedido?: (items: unknown) => Promise<ResultadoDeHerramienta>;
   businessId: string;
   /** Subdominio de la tienda (así se resuelve el catálogo público). */
   slug: string;
@@ -15,6 +17,30 @@ export interface ContextoDelBot {
 }
 
 export type ResultadoDeHerramienta = { ok: true; datos: unknown } | { ok: false; error: string };
+
+export const HERRAMIENTA_PREPARAR_PEDIDO: LlmToolDefinition = {
+  name: 'preparar_pedido',
+  description:
+    'Arma el pedido del cliente. Usala SOLO cuando ya dijo qué productos y cuántos quiere, con talle/color definidos (los ids de variante salen de detalle_producto). El sistema valida el stock y los precios y le muestra el resumen al cliente con botones para confirmar: no escribas tu propio resumen ni preguntes si confirma. Si devuelve un error, contáselo al cliente y ofrecé alternativas.',
+  parameters: {
+    type: 'object',
+    properties: {
+      items: {
+        type: 'array',
+        description: 'Los productos del pedido.',
+        items: {
+          type: 'object',
+          properties: { variante_id: { type: 'string', description: 'El id de la variante (de detalle_producto).' }, cantidad: { type: 'integer', description: 'Cuántas unidades.' } },
+          required: ['variante_id', 'cantidad'],
+        },
+      },
+    },
+    required: ['items'],
+  },
+};
+
+/** Las herramientas de Orbi: las de lectura de siempre y, si el dueño lo encendió, la de armar pedidos. */
+export const herramientasDelBot = (tomaPedidos: boolean): LlmToolDefinition[] => (tomaPedidos ? [...HERRAMIENTAS_DEL_BOT, HERRAMIENTA_PREPARAR_PEDIDO] : HERRAMIENTAS_DEL_BOT);
 
 export const HERRAMIENTAS_DEL_BOT: LlmToolDefinition[] = [
   {
@@ -100,6 +126,8 @@ export class HerramientasDelBot {
           return await this.detalleProducto(ctx, typeof args.producto_id === 'string' ? args.producto_id : '');
         case 'datos_de_la_tienda':
           return { ok: true, datos: await this.datosDeLaTienda(ctx) };
+        case 'preparar_pedido':
+          return ctx.prepararPedido ? await ctx.prepararPedido(args.items) : { ok: false, error: 'Esta tienda no toma pedidos por el chat: pasale el link para que compre ahí.' };
         case 'cupones_y_descuentos':
           return { ok: true, datos: await this.cuponesYDescuentos(ctx) };
         case 'estado_de_mi_pedido':
@@ -161,6 +189,8 @@ export class HerramientasDelBot {
         se_hace_por_pedido: p.byOrder,
         caracteristicas: (p.specs ?? []).slice(0, 12).map((s) => `${s.label}: ${s.value}`),
         variantes: p.variants.map((v) => ({
+          // Con este id se arma un pedido (preparar_pedido).
+          variante_id: v.id,
           opciones: v.optionValues.map((ov) => `${opciones.get(ov.optionValueId) ?? 'Opción'}: ${ov.value}`).join(', ') || 'Única',
           precio: v.price,
           hay_stock: v.inStock,

@@ -872,6 +872,22 @@ Business desde Mensajes → WhatsApp con el botón de Meta, sin pegar datos a ma
   (`menu_opciones`, `bienvenida`, `menu_estilo`, `modalidad`); migración `20261019020000_whatsapp_bot_modalidades`
   (aplicar en producción antes de desplegar la API). A confirmar con una cuenta real: cómo se ven los interactivos en la
   app WhatsApp Business del celular cuando el número está en coexistencia.
+- **Orbi toma pedidos (el dueño lo enciende, apagado por defecto):** `whatsapp_bot_configs.toma_pedidos` + topes
+  `max_unidades` / `max_monto`. Solo en las modalidades con IA. Flujo (`whatsapp-bot-pedidos.ts`): el modelo llama a
+  `preparar_pedido`; el servicio valida contra la tienda (`StorefrontService.validateCart`: precios con descuentos y stock reales,
+  nunca lo que diga el modelo) y deja un **borrador** en `conversations.bot_borrador` (vence a los 30 min). Al cliente le llega el
+  resumen que arma el sistema, con botones `pedido-confirmar` / `pedido-cambiar` (o "sí" / "cambiar" en texto). Al confirmar, el
+  borrador se **reclama** (updateMany; dos toques no crean dos pedidos) y se llama a `OrdersService.create` como el checkout
+  público (`publicCheckout`, canal ONLINE, PENDIENTE, `TRANSFER` = "Coordinar por WhatsApp", o sin método si la tienda coordina el pago
+  después) con la opción nueva `porWhatsapp` (el cliente de WhatsApp no tiene email: no se exige). Orbi nunca cobra ni pide dirección.
+  Requiere tienda en modo FULL y `acceptsTransfer` o `acceptsCoordinateLater`.
+- **Avisos al dueño por correo:** dos eventos nuevos del motor de notificaciones (`NOTIFICATION_EVENTS`): `orbi_necesita_atencion`
+  (cada vez que un chat pasa a DERIVADO, a lo sumo uno por chat cada 30 min: `conversations.bot_aviso_at`) y `orbi_pedido_pendiente`.
+  Llegan por panel **y** email aunque el dueño no haya configurado nada (`PREFS_POR_EVENTO`); él puede apagarlos en Notificaciones.
+  Se despachan dentro del pedido del webhook (con `await`), no con el emisor de eventos: Cloud Run con `--cpu-throttling` no corre lo
+  que queda después de responder. Migración `20261020010000_whatsapp_bot_pedidos` (aplicar en producción antes de desplegar la API).
+- **Eliminar pedidos del listado:** `DELETE /orders/:id` (permiso `orders.manage`) hace soft-delete (`deletedAt`) y deja registro en
+  `audit_logs`. Es solo de pantalla: no devuelve stock ni anula cobros; el pedido sigue en la base y sale de lista, detalle y reportes.
 - **Probar sin un número real:** cuenta sandbox desde el panel de Meta (WhatsApp → Testear integraciones) o el formulario
   manual («Conectala a mano» en la pantalla de conectar).
 - **Cobro:** en Embedded Signup cada cliente agrega su propio medio de pago en Meta y paga ahí sus conversaciones.

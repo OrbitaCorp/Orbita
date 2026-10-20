@@ -1659,6 +1659,10 @@ export function rejectCancellation(id: string, rejectionMessage?: string) {
   })
 }
 
+/** "Eliminar" un pedido del listado: lo oculta, no lo borra de la base (ver OrdersController.eliminar). */
+export function deleteOrder(id: string) {
+  return panelRequest<{ ok: boolean }>(`/orders/${id}`, { method: 'DELETE' })
+}
 export function updateOrderStatus(id: string, status: ApiOrderStatus) {
   return panelRequest<ApiOrderDetail>(`/orders/${id}/status`, {
     method: 'PATCH',
@@ -3364,12 +3368,15 @@ export type WhatsappBotEstado = {
   disponible: boolean; conectado: boolean; enabled: boolean; modo: BotModo
   instrucciones: string | null; topeCreditos: number | null
   modalidad: BotModalidad; menuEstilo: MenuEstilo; bienvenida: string | null; bienvenidaPorDefecto: string; menuOpciones: OpcionDeMenu[]
+  // Orbi toma pedidos (quedan pendientes, "coordinar por WhatsApp"), sus topes por pedido y si la tienda puede (o qué le falta).
+  tomaPedidos: boolean; maxUnidades: number; maxMonto: number; pedidos: { disponible: boolean; motivo?: string }
   cupo: { mes: string; usados: number; total: number; limite: number; porcentaje: number }
 }
 export function getWhatsappBot() { return panelRequest<WhatsappBotEstado>('/whatsapp/bot') }
 export function updateWhatsappBot(input: {
   enabled?: boolean; modo?: BotModo; instrucciones?: string | null; topeCreditos?: number | null
   modalidad?: BotModalidad; menuEstilo?: MenuEstilo; bienvenida?: string | null; menuOpciones?: OpcionDeMenu[]
+  tomaPedidos?: boolean; maxUnidades?: number; maxMonto?: number
 }) {
   return panelRequest<WhatsappBotEstado>('/whatsapp/bot', { method: 'PATCH', body: JSON.stringify(input) })
 }

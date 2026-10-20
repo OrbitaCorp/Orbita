@@ -65,11 +65,18 @@ export class NotificationsService {
   // default que muestra la pantalla de Configuración (Notificaciones.tsx).
   private static readonly PREFS_POR_DEFECTO: NotificationChannels = { panel: true, email: false };
 
+  // Los avisos de Orbi en WhatsApp piden atención de una persona: llegan por panel y por email aunque el dueño nunca haya
+  // tocado la matriz (un `email: false` guardado a propósito sí los silencia). Idéntico al default de Notificaciones.tsx.
+  private static readonly PREFS_POR_EVENTO: Record<string, NotificationChannels> = {
+    orbi_necesita_atencion: { panel: true, email: true },
+    orbi_pedido_pendiente: { panel: true, email: true },
+  };
+
   // ── Motor de despacho — único punto de entrada ────────────────────────────
   async dispatch(event: string, businessId: string, payload: DispatchPayload): Promise<void> {
     const config = await this.prisma.notificationConfig.findUnique({ where: { businessId } });
     const matrix = (config?.matrix ?? {}) as Record<string, NotificationChannels>;
-    const prefs = matrix[event] ?? NotificationsService.PREFS_POR_DEFECTO;
+    const prefs = matrix[event] ?? NotificationsService.PREFS_POR_EVENTO[event] ?? NotificationsService.PREFS_POR_DEFECTO;
 
     const level = payload.level ?? NotificationLevel.INFO;
 

@@ -30,6 +30,8 @@ export function OrbiWhatsapp({ bot, onCambio, onVolver, onToast }: Props) {
   const [estilo, setEstilo] = useState<MenuEstilo>(bot.menuEstilo)
   const [bienvenida, setBienvenida] = useState(bot.bienvenida ?? '')
   const [opciones, setOpciones] = useState(bot.menuOpciones)
+  const [maxUnidades, setMaxUnidades] = useState(String(bot.maxUnidades))
+  const [maxMonto, setMaxMonto] = useState(String(bot.maxMonto))
 
   const guardar = async (cambios: Parameters<typeof updateWhatsappBot>[0], aviso?: string, sincronizarFormulario = false) => {
     setGuardando(true)
@@ -40,6 +42,7 @@ export function OrbiWhatsapp({ bot, onCambio, onVolver, onToast }: Props) {
       if (sincronizarFormulario) {
         setInstrucciones(nuevo.instrucciones ?? ''); setTope(nuevo.topeCreditos === null ? '' : String(nuevo.topeCreditos))
         setEstilo(nuevo.menuEstilo); setBienvenida(nuevo.bienvenida ?? ''); setOpciones(nuevo.menuOpciones)
+        setMaxUnidades(String(nuevo.maxUnidades)); setMaxMonto(String(nuevo.maxMonto))
       }
       if (aviso) onToast(aviso)
     } catch (e) {
@@ -54,7 +57,11 @@ export function OrbiWhatsapp({ bot, onCambio, onVolver, onToast }: Props) {
   const conMenu = bot.modalidad !== 'CONVERSACIONAL'
   const errorMenu = conMenu ? errorDelMenu(opciones, estilo) : null
   const cambioMenu = estilo !== bot.menuEstilo || (bienvenida.trim() || null) !== (bot.bienvenida ?? null) || menuCambio(opciones, bot.menuOpciones)
-  const hayCambios = (instrucciones.trim() || null) !== (bot.instrucciones ?? null) || topeNumero !== bot.topeCreditos || cambioMenu
+  const unidadesNum = Number(maxUnidades)
+  const montoNum = Number(maxMonto)
+  const topesValidos = Number.isInteger(unidadesNum) && unidadesNum >= 1 && unidadesNum <= 1000 && Number.isInteger(montoNum) && montoNum >= 1000
+  const cambioTopes = unidadesNum !== bot.maxUnidades || montoNum !== bot.maxMonto
+  const hayCambios = (instrucciones.trim() || null) !== (bot.instrucciones ?? null) || topeNumero !== bot.topeCreditos || cambioMenu || cambioTopes
   const bloqueado = !bot.disponible || !bot.conectado
   const { cupo } = bot
 
@@ -63,6 +70,7 @@ export function OrbiWhatsapp({ bot, onCambio, onVolver, onToast }: Props) {
       {
         instrucciones: instrucciones.trim() || null,
         topeCreditos: topeNumero,
+        ...(cambioTopes ? { maxUnidades: unidadesNum, maxMonto: montoNum } : {}),
         ...(cambioMenu ? { menuEstilo: estilo, bienvenida: bienvenida.trim() || null, menuOpciones: opcionesParaGuardar(opciones) } : {}),
       },
       'Cambios guardados',
@@ -142,6 +150,45 @@ export function OrbiWhatsapp({ bot, onCambio, onVolver, onToast }: Props) {
           </section>
         )}
 
+        {bot.modalidad !== 'SOLO_MENU' && (
+          <section className="orb-bloque">
+            <div className="orb-fila">
+              <div>
+                <p className="orb-titulo">Orbi puede tomar pedidos</p>
+                <p className="orb-ayuda">
+                  Cuando un cliente quiere comprar, Orbi arma el pedido con los datos reales de tu tienda, se lo muestra para que confirme y lo deja <strong>pendiente</strong> con “Coordinar por WhatsApp”: el equipo cierra el pago y la entrega. Orbi nunca cobra ni pide datos de pago.
+                </p>
+              </div>
+              <button
+                type="button" role="switch" aria-checked={bot.tomaPedidos} aria-label="Orbi puede tomar pedidos"
+                className={`orb-switch${bot.tomaPedidos ? ' orb-switch-on' : ''}`}
+                disabled={guardando || bloqueado || (!bot.pedidos.disponible && !bot.tomaPedidos)}
+                onClick={() => void guardar({ tomaPedidos: !bot.tomaPedidos }, bot.tomaPedidos ? 'Orbi dejó de tomar pedidos' : 'Orbi ya puede tomar pedidos')}
+              ><i /></button>
+            </div>
+            {!bot.pedidos.disponible && bot.pedidos.motivo && <p className="orb-error" role="status">{bot.pedidos.motivo}</p>}
+            {(bot.tomaPedidos || bot.pedidos.disponible) && (
+              <div className="orb-topes">
+                <label htmlFor="orbi-max-unidades">
+                  <span className="orb-titulo orb-chico">Máximo de unidades por pedido</span>
+                  <input id="orbi-max-unidades" className="orb-campo orb-campo-chico" inputMode="numeric" value={maxUnidades} disabled={bloqueado} onChange={(e) => setMaxUnidades(e.target.value.replace(/[^0-9]/g, ''))} />
+                </label>
+                <label htmlFor="orbi-max-monto">
+                  <span className="orb-titulo orb-chico">Monto máximo por pedido ($)</span>
+                  <input id="orbi-max-monto" className="orb-campo orb-campo-chico" inputMode="numeric" value={maxMonto} disabled={bloqueado} onChange={(e) => setMaxMonto(e.target.value.replace(/[^0-9]/g, ''))} />
+                </label>
+              </div>
+            )}
+            {(bot.tomaPedidos || bot.pedidos.disponible) && <p className="orb-ayuda">Si alguien pide más que esto, Orbi no arma el pedido y te pasa el chat. Cuando Orbi deja un pedido pendiente, te llega un correo y queda en <strong>Ventas</strong> como cualquier otro.</p>}
+          </section>
+        )}
+        {bot.modalidad === 'SOLO_MENU' && (
+          <section className="orb-bloque">
+            <p className="orb-titulo">Pedidos por chat</p>
+            <p className="orb-ayuda">Para que Orbi tome pedidos, elegí “Conversación” o “Menú y conversación”: en “Solo menú” no usa inteligencia artificial y no puede armar pedidos.</p>
+          </section>
+        )}
+
         <section className="orb-bloque" aria-disabled={!bot.enabled}>
           <p className="orb-titulo">En qué chats contesta</p>
           <label className={`orb-opcion${bot.modo === 'SELECCIONADOS' ? ' orb-opcion-sel' : ''}`}>
@@ -186,7 +233,7 @@ export function OrbiWhatsapp({ bot, onCambio, onVolver, onToast }: Props) {
           <p className="orb-ayuda">Si querés gastar menos que tu cupo, poné acá un número menor.</p>
         </section>
 
-        <button type="button" className="orb-guardar" disabled={guardando || bloqueado || !hayCambios || !topeValido || !!errorMenu} onClick={guardarCambios}>
+        <button type="button" className="orb-guardar" disabled={guardando || bloqueado || !hayCambios || !topeValido || !topesValidos || !!errorMenu} onClick={guardarCambios}>
           {guardando ? 'Guardando…' : 'Guardar cambios'}
         </button>
       </div>
@@ -221,7 +268,9 @@ const CSS = `
 .orb-opcion-sel { border-color: var(--wa-verde); }
 .orb-opcion input { margin-top: 4px; accent-color: var(--wa-verde); }
 .orb-opcion small { display: block; margin-top: 2px; font-size: 12.5px; line-height: 1.45; color: var(--wa-texto-2); }
-.orb-estilos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.orb-topes { display: flex; flex-wrap: wrap; gap: 14px; }
+.orb-topes label { display: flex; flex-direction: column; gap: 4px; }
+.orb-estilos { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .orb-campo { width: 100%; box-sizing: border-box; padding: 9px 12px; border: 1px solid var(--wa-borde); border-radius: 8px; resize: vertical; background: var(--wa-entrada); font: inherit; font-size: 14px; line-height: 1.5; color: var(--wa-texto); }
 .orb-campo-chico { width: 180px; }
 .orb-campo:disabled { opacity: 0.6; cursor: not-allowed; }

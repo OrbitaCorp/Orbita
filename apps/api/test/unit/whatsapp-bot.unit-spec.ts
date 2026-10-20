@@ -5,6 +5,7 @@ import { HerramientasDelBot } from '../../src/whatsapp/whatsapp-bot-tools';
 import { WhatsappBotService } from '../../src/whatsapp/whatsapp-bot.service';
 import { MENSAJE_DE_DERIVACION, MENSAJE_SIN_MEDIOS, promptDelBot } from '../../src/whatsapp/whatsapp-bot-prompt';
 import { MARCA_MENU_TEXTO, PEDIDO_DE_OPCION } from '../../src/whatsapp/whatsapp-bot-menu';
+import { ID_CAMBIAR, ID_CONFIRMAR } from '../../src/whatsapp/whatsapp-bot-pedidos';
 
 // Orbi como atención al público por WhatsApp: cuándo atiende un chat, cuándo se calla, qué lee y qué hace ante la duda.
 
@@ -70,11 +71,17 @@ describe('pausarSiAtendiaOrbi (entró una persona al chat)', () => {
 // ─── El servicio ─────────────────────────────────────────────────────────────
 
 type Opciones = {
-  cfg?: Partial<{ enabled: boolean; modo: string; instrucciones: string | null; topeCreditos: number | null; modalidad: string; menuEstilo: string; bienvenida: string | null; menuOpciones: unknown }> | null;
+  cfg?: Partial<{ enabled: boolean; modo: string; instrucciones: string | null; topeCreditos: number | null; modalidad: string; menuEstilo: string; bienvenida: string | null; menuOpciones: unknown; tomaPedidos: boolean; maxUnidades: number; maxMonto: number }> | null;
   /** Cuántas respuestas de Orbi hay ya en el chat (0 = primer contacto). */
   respuestasPrevias?: number;
   /** El último mensaje que mandó Orbi (para entender un "2" suelto como opción de un menú en texto). */
   ultimoDeOrbi?: { text: string } | null;
+  /** El borrador de pedido que hay en el chat (si Orbi ya armó uno). */
+  borrador?: unknown;
+  /** Qué contesta el servicio de pedidos al confirmar. */
+  confirmacion?: unknown;
+  /** El aviso de "necesita atención" ya salió hace poco (el reclamo del aviso devuelve 0). */
+  avisoReciente?: boolean;
   botEstado?: string;
   ultimo?: { id: string; sender: string } | null;
   /** Qué ve cada consulta del último mensaje del chat, en orden (la última se repite). Pisa a `ultimo`. */
@@ -90,7 +97,7 @@ const uso = (prompt = 1000, salida = 200): LlmEvent => ({ type: 'usage', usage: 
 
 function armar(o: Opciones = {}) {
   const cfg = o.cfg === null ? null : { id: 'c', businessId: BIZ, enabled: true, modo: 'SELECCIONADOS', instrucciones: null, topeCreditos: null, ...o.cfg };
-  const propio = { id: MSG.messageId, sender: 'CUSTOMER' };
+  const propio = { id: MSG.messageId, sender: 'CUSTOMER', text: 'necesito ayuda' };
   const ultimoMock = jest.fn().mockResolvedValue(o.ultimo === undefined ? propio : o.ultimo);
   for (const u of o.ultimos ?? []) ultimoMock.mockResolvedValueOnce(u);
   const prisma: any = {
@@ -101,8 +108,8 @@ function armar(o: Opciones = {}) {
     business: { findFirst: jest.fn().mockResolvedValue({ name: 'Rama', subdomain: 'rama' }) },
     customer: { findFirst: jest.fn().mockResolvedValue({ firstName: 'Ana' }) },
     conversation: {
-      findFirst: jest.fn().mockResolvedValue({ botEstado: o.botEstado ?? 'ON', isArchived: false }),
-      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      findFirst: jest.fn().mockResolvedValue({ botEstado: o.botEstado ?? 'ON', isArchived: false, botBorrador: o.borrador ?? null, customer: { firstName: 'Ana', lastName: 'Paz' } }),
+      updateMany: jest.fn().mockImplementation(async ({ where }: any) => ({ count: where?.OR && o.avisoReciente ? 0 : 1 })),
     },
     message: {
       findFirst: jest.fn().mockImplementation((args: any) => (args?.where?.viaOrbi ? Promise.resolve(o.ultimoDeOrbi ?? null) : ultimoMock(args))),
@@ -145,9 +152,19 @@ function armar(o: Opciones = {}) {
       for (const ev of vueltas.shift() ?? [{ type: 'text', chunk: 'ok' }, { type: 'done' }]) yield ev;
     }),
   };
-  const bot = new WhatsappBotService(prisma, config, whatsapp, storefront, llm);
-  return { bot, prisma, whatsapp, storefront, llm, llmMensajes };
+  const pedidos: any = {
+    disponibilidad: jest.fn().mockResolvedValue({ ok: true }),
+    preparar: jest.fn().mockResolvedValue({ ok: true, datos: { listo: true } }),
+    descartar: jest.fn().mockResolvedValue(undefined),
+    confirmar: jest.fn().mockResolvedValue(o.confirmacion ?? { ok: true, texto: '¡Listo, Ana! Tu pedido *#57* quedó registrado ✅', pedido: { id: 'ord-1', numero: 57, total: 20000 } }),
+  };
+  const notificaciones: any = { dispatch: jest.fn().mockResolvedValue(undefined) };
+  const bot = new WhatsappBotService(prisma, config, whatsapp, storefront, llm, pedidos, notificaciones);
+  return { bot, prisma, whatsapp, storefront, llm, llmMensajes, pedidos, notificaciones };
 }
+
+/** La actualización del chat que cambia su estado de Orbi (después puede haber otra: la que reclama el aviso al dueño). */
+const cambioDeEstado = (t: { prisma: any }) => t.prisma.conversation.updateMany.mock.calls.map((c: any) => c[0]).filter((c: any) => c.data.botEstado).at(-1);
 
 const llamada = (name: string, args: Record<string, unknown> = {}): LlmEvent => ({ type: 'tool_call', call: { id: `c-${name}`, name, arguments: args } });
 
@@ -240,7 +257,7 @@ describe('WhatsappBotService.atender', () => {
     });
     await t.bot.atender([MSG]);
     expect(t.whatsapp.enviarTexto).toHaveBeenCalledWith(BIZ, CONV, MSG.waId, 'Ya avisé al equipo.');
-    const upd = t.prisma.conversation.updateMany.mock.calls.at(-1)[0];
+    const upd = cambioDeEstado(t);
     expect(upd.data).toMatchObject({ botEstado: 'DERIVADO', botMotivo: 'Reclama por un pedido', isUnread: true });
     expect(t.prisma.whatsappBotTurn.create.mock.calls[0][0].data.status).toBe('derivado');
   });
@@ -265,7 +282,7 @@ describe('WhatsappBotService.atender', () => {
     await t.bot.atender([MSG]);
     expect(t.llm.streamChat).not.toHaveBeenCalled();
     expect(t.whatsapp.enviarTexto).toHaveBeenCalledWith(BIZ, CONV, MSG.waId, MENSAJE_DE_DERIVACION);
-    expect(t.prisma.conversation.updateMany.mock.calls.at(-1)[0].data).toMatchObject({ botEstado: 'DERIVADO' });
+    expect(cambioDeEstado(t).data).toMatchObject({ botEstado: 'DERIVADO' });
     expect(t.prisma.whatsappBotTurn.create.mock.calls[0][0].data.status).toBe('quota');
   });
 
@@ -280,7 +297,7 @@ describe('WhatsappBotService.atender', () => {
     await t.bot.atender([MSG]);
     expect(t.llm.streamChat).not.toHaveBeenCalled();
     expect(t.whatsapp.enviarTexto).not.toHaveBeenCalled();
-    expect(t.prisma.conversation.updateMany.mock.calls.at(-1)[0].data).toMatchObject({ botEstado: 'DERIVADO' });
+    expect(cambioDeEstado(t).data).toMatchObject({ botEstado: 'DERIVADO' });
   });
 
   it('un audio o una imagen no se leen: contesta una frase fija, sin gastar modelo', async () => {
@@ -295,7 +312,7 @@ describe('WhatsappBotService.atender', () => {
     t.llm.streamChat.mockImplementation(async function* () { throw new Error('429'); });
     await t.bot.atender([MSG]);
     expect(t.whatsapp.enviarTexto).not.toHaveBeenCalled();
-    expect(t.prisma.conversation.updateMany.mock.calls.at(-1)[0].data).toMatchObject({ botEstado: 'DERIVADO' });
+    expect(cambioDeEstado(t).data).toMatchObject({ botEstado: 'DERIVADO' });
     expect(t.prisma.whatsappBotTurn.create.mock.calls[0][0].data.status).toBe('error');
   });
 
@@ -303,7 +320,7 @@ describe('WhatsappBotService.atender', () => {
     const t = armar({ falloEnvio: true });
     await t.bot.atender([MSG]);
     expect(t.prisma.message.create).not.toHaveBeenCalled();
-    expect(t.prisma.conversation.updateMany.mock.calls.at(-1)[0].data).toMatchObject({ botEstado: 'DERIVADO' });
+    expect(cambioDeEstado(t).data).toMatchObject({ botEstado: 'DERIVADO' });
   });
 });
 
@@ -490,7 +507,7 @@ describe('modalidades de Orbi (la elige el dueño)', () => {
       const t = armar({ cfg });
       await t.bot.atender([toco('persona')]);
       expect(t.whatsapp.enviarTexto).toHaveBeenCalledWith(BIZ, CONV, MSG.waId, MENSAJE_DE_DERIVACION);
-      expect(t.prisma.conversation.updateMany.mock.calls.at(-1)[0].data).toMatchObject({ botEstado: 'DERIVADO' });
+      expect(cambioDeEstado(t).data).toMatchObject({ botEstado: 'DERIVADO' });
     });
 
     it('una opción propia del dueño contesta con su texto fijo', async () => {
@@ -586,7 +603,7 @@ describe('modalidades de Orbi (la elige el dueño)', () => {
       t.whatsapp.enviarInteractivo.mockRejectedValue(new ConflictException('La conexión con WhatsApp venció'));
       await t.bot.atender([dice('hola')]);
       expect(t.whatsapp.enviarTexto).not.toHaveBeenCalled();
-      expect(t.prisma.conversation.updateMany.mock.calls.at(-1)[0].data).toMatchObject({ botEstado: 'DERIVADO' });
+      expect(cambioDeEstado(t).data).toMatchObject({ botEstado: 'DERIVADO' });
     });
     it('pero el plazo de 24 horas vencido no se arregla con texto: queda para una persona', async () => {
       const { UnprocessableEntityException } = await import('@nestjs/common');
@@ -594,7 +611,7 @@ describe('modalidades de Orbi (la elige el dueño)', () => {
       t.whatsapp.enviarInteractivo.mockRejectedValue(new UnprocessableEntityException('24 horas'));
       await t.bot.atender([dice('hola')]);
       expect(t.whatsapp.enviarTexto).not.toHaveBeenCalled();
-      expect(t.prisma.conversation.updateMany.mock.calls.at(-1)[0].data).toMatchObject({ botEstado: 'DERIVADO' });
+      expect(cambioDeEstado(t).data).toMatchObject({ botEstado: 'DERIVADO' });
     });
   });
 
@@ -626,5 +643,187 @@ describe('modalidades de Orbi (la elige el dueño)', () => {
       expect(e.bienvenidaPorDefecto).toContain('Rama');
       expect(e.menuOpciones).toHaveLength(6);
     });
+  });
+});
+
+describe('Orbi toma pedidos', () => {
+  const dice = (texto: string): MensajeEntrante => ({ ...MSG, texto });
+  const toco = (opcionId: string): MensajeEntrante => ({ ...MSG, texto: 'x', opcionId });
+  const BORRADOR = {
+    lineas: [{ variantId: '11111111-1111-4111-8111-111111111111', nombre: 'Remera', variante: 'M', cantidad: 2, precio: 10000 }],
+    subtotal: 20000, descuento: 0, total: 20000, creadoEn: new Date().toISOString(),
+  };
+  const cfg = { modalidad: 'CONVERSACIONAL', tomaPedidos: true, maxUnidades: 5, maxMonto: 50000 };
+  const pedidoPreparado: LlmEvent[][] = [
+    [llamada('preparar_pedido', { items: [{ variante_id: '11111111-1111-4111-8111-111111111111', cantidad: 2 }] }), uso(), { type: 'done' }],
+    [{ type: 'text', chunk: 'Ya te armo el resumen, te lo escribo yo.' }, uso(), { type: 'done' }],
+  ];
+
+  it('con la función encendida, el modelo recibe la herramienta de armar pedidos; apagada, no', async () => {
+    const on = armar({ cfg });
+    await on.bot.atender([dice('quiero comprar')]);
+    expect(on.llm.streamChat.mock.calls[0][0].tools.map((t: any) => t.name)).toContain('preparar_pedido');
+    expect(on.llmMensajes[0][0].content).toContain('Tomar pedidos');
+    const off = armar({ cfg: { modalidad: 'CONVERSACIONAL', tomaPedidos: false } });
+    await off.bot.atender([dice('quiero comprar')]);
+    expect(off.llm.streamChat.mock.calls[0][0].tools.map((t: any) => t.name)).not.toContain('preparar_pedido');
+    expect(off.llmMensajes[0][0].content).not.toContain('Tomar pedidos');
+  });
+
+  it('en "solo menú" nunca toma pedidos, aunque el interruptor esté prendido', async () => {
+    const t = armar({ cfg: { ...cfg, modalidad: 'SOLO_MENU' } });
+    await t.bot.atender([dice('quiero comprar')]);
+    expect(t.llm.streamChat).not.toHaveBeenCalled();
+  });
+
+  it('cuando Orbi arma el pedido, al cliente le llega el resumen DEL SISTEMA con botones (no lo que escribió el modelo)', async () => {
+    const t = armar({ cfg, eventos: pedidoPreparado, borrador: BORRADOR });
+    await t.bot.atender([dice('dos remeras M')]);
+    expect(t.pedidos.preparar).toHaveBeenCalledWith(
+      expect.objectContaining({ businessId: BIZ, customerId: 'cli-1', conversationId: CONV }),
+      { maxUnidades: 5, maxMonto: 50000 },
+      [{ variante_id: '11111111-1111-4111-8111-111111111111', cantidad: 2 }],
+    );
+    const botones = t.whatsapp.enviarInteractivo.mock.calls[0][3];
+    expect(botones.type).toBe('button');
+    expect(botones.body.text).toContain('Total estimado: $20.000');
+    expect(botones.action.buttons.map((b: any) => b.reply.id)).toEqual([ID_CONFIRMAR, ID_CAMBIAR]);
+    expect(t.whatsapp.enviarTexto).not.toHaveBeenCalled();
+    expect(JSON.stringify(t.prisma.message.create.mock.calls.at(-1))).not.toContain('te lo escribo yo');
+  });
+
+  it('si WhatsApp no deja los botones, el resumen sale en texto pidiendo "sí" o "cambiar"', async () => {
+    const t = armar({ cfg, eventos: pedidoPreparado, borrador: BORRADOR });
+    t.whatsapp.enviarInteractivo.mockRejectedValue(Object.assign(new Error('Graph 400'), { status: 400 }));
+    await t.bot.atender([dice('dos remeras M')]);
+    expect(t.whatsapp.enviarTexto.mock.calls[0][3]).toMatch(/Respondé \*sí\* para confirmar/);
+  });
+
+  it('si preparar_pedido falla (sin stock, tope), no hay resumen: sigue la respuesta del modelo', async () => {
+    const t = armar({ cfg, eventos: pedidoPreparado });
+    t.pedidos.preparar.mockResolvedValue({ ok: false, error: 'Sin stock' });
+    await t.bot.atender([dice('dos remeras M')]);
+    expect(t.whatsapp.enviarInteractivo).not.toHaveBeenCalled();
+    expect(t.whatsapp.enviarTexto).toHaveBeenCalledWith(BIZ, CONV, MSG.waId, 'Ya te armo el resumen, te lo escribo yo.');
+  });
+
+  it('al tocar "Confirmar pedido" se crea el pedido y el chat queda para coordinar, sin el aviso de "necesita atención" (ya sale el de pedido pendiente)', async () => {
+    const t = armar({ cfg, borrador: BORRADOR });
+    await t.bot.atender([toco(ID_CONFIRMAR)]);
+    expect(t.pedidos.confirmar).toHaveBeenCalledWith(expect.objectContaining({ businessId: BIZ, customerId: 'cli-1', waId: MSG.waId, slug: 'rama', tienda: 'Rama', borrador: BORRADOR }));
+    expect(t.whatsapp.enviarTexto).toHaveBeenCalledWith(BIZ, CONV, MSG.waId, expect.stringContaining('#57'));
+    expect(cambioDeEstado(t).data).toMatchObject({ botEstado: 'DERIVADO', botMotivo: expect.stringContaining('Pedido #57'), isUnread: true });
+    expect(t.notificaciones.dispatch).not.toHaveBeenCalled();
+  });
+
+  it('escribir "sí" con un resumen pendiente equivale a confirmar; "cambiar" lo descarta y sigue la charla', async () => {
+    const si = armar({ cfg, borrador: BORRADOR });
+    await si.bot.atender([dice('sí')]);
+    expect(si.pedidos.confirmar).toHaveBeenCalledTimes(1);
+    const no = armar({ cfg, borrador: BORRADOR });
+    await no.bot.atender([dice('cambiar')]);
+    expect(no.pedidos.descartar).toHaveBeenCalledWith(BIZ, CONV);
+    expect(no.pedidos.confirmar).not.toHaveBeenCalled();
+    expect(no.whatsapp.enviarTexto.mock.calls[0][3]).toContain('qué querés cambiar');
+    // sin resumen pendiente, un "sí" suelto es un mensaje más para la IA
+    const sin = armar({ cfg });
+    await sin.bot.atender([dice('sí')]);
+    expect(sin.pedidos.confirmar).not.toHaveBeenCalled();
+    expect(sin.llm.streamChat).toHaveBeenCalledTimes(1);
+  });
+
+  it('el botón "Cambiar" descarta el borrador', async () => {
+    const t = armar({ cfg, borrador: BORRADOR });
+    await t.bot.atender([toco(ID_CAMBIAR)]);
+    expect(t.pedidos.descartar).toHaveBeenCalledTimes(1);
+  });
+
+  it('con la función apagada, el botón de un resumen viejo no crea ningún pedido', async () => {
+    const t = armar({ cfg: { modalidad: 'CONVERSACIONAL', tomaPedidos: false }, borrador: BORRADOR });
+    await t.bot.atender([toco(ID_CONFIRMAR)]);
+    expect(t.pedidos.confirmar).not.toHaveBeenCalled();
+  });
+
+  it('si no se pudo crear el pedido, el cliente lo sabe y el chat va a una persona (con aviso)', async () => {
+    const t = armar({ cfg, borrador: BORRADOR, confirmacion: { ok: false, texto: 'No pude cargar tu pedido. Ya le avisé al equipo.', derivar: 'Orbi no pudo cargar un pedido que el cliente confirmó: revisalo.' } });
+    await t.bot.atender([toco(ID_CONFIRMAR)]);
+    expect(t.whatsapp.enviarTexto).toHaveBeenCalledWith(BIZ, CONV, MSG.waId, expect.stringContaining('No pude cargar'));
+    expect(t.prisma.conversation.updateMany.mock.calls.find((c: any) => c[0].data.botEstado === 'DERIVADO')).toBeTruthy();
+    expect(t.notificaciones.dispatch).toHaveBeenCalledWith('orbi_necesita_atencion', BIZ, expect.anything());
+  });
+
+  it('un resumen vencido: se le avisa y no se deriva ni se avisa al dueño', async () => {
+    const t = armar({ cfg, borrador: BORRADOR, confirmacion: { ok: false, texto: 'El resumen venció o ya no está.', derivar: '' } });
+    await t.bot.atender([toco(ID_CONFIRMAR)]);
+    expect(t.whatsapp.enviarTexto).toHaveBeenCalledWith(BIZ, CONV, MSG.waId, expect.stringContaining('venció'));
+    expect(t.prisma.conversation.updateMany.mock.calls.find((c: any) => c[0].data.botEstado === 'DERIVADO')).toBeUndefined();
+    expect(t.notificaciones.dispatch).not.toHaveBeenCalled();
+  });
+
+  it('la configuración: encender pedidos exige que la tienda pueda tomarlos y el estado trae los topes', async () => {
+    const t = armar();
+    t.pedidos.disponibilidad.mockResolvedValue({ ok: false, motivo: 'Activá "Coordinar por WhatsApp"' });
+    await expect(t.bot.guardar(BIZ, { tomaPedidos: true })).rejects.toThrow(/Coordinar por WhatsApp/);
+    expect(t.prisma.whatsappBotConfig.upsert).not.toHaveBeenCalled();
+    t.pedidos.disponibilidad.mockResolvedValue({ ok: true });
+    await t.bot.guardar(BIZ, { tomaPedidos: true, maxUnidades: 4, maxMonto: 80000 });
+    expect(t.prisma.whatsappBotConfig.upsert.mock.calls[0][0].update).toMatchObject({ tomaPedidos: true, maxUnidades: 4, maxMonto: 80000 });
+    const e = await armar({ cfg: { tomaPedidos: true, maxUnidades: 4, maxMonto: 80000 } }).bot.estado(BIZ);
+    expect(e).toMatchObject({ tomaPedidos: true, maxUnidades: 4, maxMonto: 80000, pedidos: { disponible: true } });
+  });
+});
+
+describe('aviso al dueño: un chat necesita atención', () => {
+  const dice = (texto: string): MensajeEntrante => ({ ...MSG, texto });
+  const derivaPorHerramienta: LlmEvent[][] = [
+    [llamada('derivar_a_una_persona', { motivo: 'Reclama por un pedido' }), uso(), { type: 'done' }],
+    [{ type: 'text', chunk: 'Ya avisé al equipo.' }, uso(), { type: 'done' }],
+  ];
+
+  it('cuando Orbi pasa el chat, el dueño recibe el aviso (campanita y correo) con el motivo, el último mensaje y el link al chat', async () => {
+    const t = armar({ eventos: derivaPorHerramienta });
+    await t.bot.atender([dice('mi pedido no llegó')]);
+    expect(t.notificaciones.dispatch).toHaveBeenCalledTimes(1);
+    const [evento, biz, payload] = t.notificaciones.dispatch.mock.calls[0];
+    expect(evento).toBe('orbi_necesita_atencion');
+    expect(biz).toBe(BIZ);
+    expect(payload.title).toBe('Ana Paz necesita atención en WhatsApp');
+    expect(payload.body).toBe('Reclama por un pedido');
+    expect(payload.emailBody).toContain('Motivo: Reclama por un pedido');
+    expect(payload.emailBody).toContain('necesito ayuda');
+    expect(payload.emailBody).toContain(`/admin/${BIZ}/ventas/mensajes?canal=whatsapp&conv=${CONV}`);
+    expect(payload).toMatchObject({ resourceType: 'conversation', resourceId: CONV });
+  });
+
+  it('un chat que ya avisó hace menos de 30 minutos no manda otro correo', async () => {
+    const t = armar({ eventos: derivaPorHerramienta, avisoReciente: true });
+    await t.bot.atender([dice('sigo esperando')]);
+    expect(t.notificaciones.dispatch).not.toHaveBeenCalled();
+  });
+
+  it('también avisa cuando el cliente elige "Hablar con alguien", cuando se agota el cupo o cuando Orbi falla', async () => {
+    const persona = armar({ cfg: { modalidad: 'SOLO_MENU' } });
+    await persona.bot.atender([{ ...MSG, texto: 'x', opcionId: 'persona' }]);
+    expect(persona.notificaciones.dispatch).toHaveBeenCalledWith('orbi_necesita_atencion', BIZ, expect.objectContaining({ body: expect.stringContaining('Hablar con alguien') }));
+    const cupo = armar({ usados: 999999 });
+    await cupo.bot.atender([dice('hola')]);
+    expect(cupo.notificaciones.dispatch).toHaveBeenCalledWith('orbi_necesita_atencion', BIZ, expect.objectContaining({ body: expect.stringContaining('cupo') }));
+    const falla = armar();
+    falla.llm.streamChat.mockImplementation(async function* () { throw new Error('429'); });
+    await falla.bot.atender([dice('hola')]);
+    expect(falla.notificaciones.dispatch).toHaveBeenCalledWith('orbi_necesita_atencion', BIZ, expect.anything());
+  });
+
+  it('un error al avisar no rompe la respuesta al cliente', async () => {
+    const t = armar({ eventos: derivaPorHerramienta });
+    t.notificaciones.dispatch.mockRejectedValue(new Error('mail caído'));
+    await t.bot.atender([dice('mi pedido no llegó')]);
+    expect(t.whatsapp.enviarTexto).toHaveBeenCalledWith(BIZ, CONV, MSG.waId, 'Ya avisé al equipo.');
+  });
+
+  it('una respuesta normal de Orbi no avisa a nadie', async () => {
+    const t = armar();
+    await t.bot.atender([dice('hola tienen zapatillas?')]);
+    expect(t.notificaciones.dispatch).not.toHaveBeenCalled();
   });
 });

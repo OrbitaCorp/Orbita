@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, Logger, Optional, UnprocessableEntityException } from '@nestjs/common';
 import type { WhatsappBotConfig } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
@@ -10,7 +10,9 @@ import { costoDelTurno } from '../orbi/turno/costo-del-turno';
 import { vueltaDeTools } from '../orbi/turno/vuelta';
 import { mesArgentina, rangoDeMesArgentina } from '../common/utils/hora-argentina';
 import { describeError } from '../common/utils/describe-error.util';
-import { HERRAMIENTAS_DEL_BOT, HerramientasDelBot, type ContextoDelBot } from './whatsapp-bot-tools';
+import { herramientasDelBot, HerramientasDelBot, type ContextoDelBot } from './whatsapp-bot-tools';
+import { ID_CAMBIAR, ID_CONFIRMAR, WhatsappBotPedidosService, borradorVigente, esAfirmativo, esNegativo, textoDelResumen } from './whatsapp-bot-pedidos';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
   MARCA_MENU_TEXTO, PEDIDO_DE_OPCION, armarMenuInteractivo, armarMenuTexto, bienvenidaPorDefecto, esSaludoOPedidoDeMenu, opcionDeNumero, opcionesActivas,
   opcionesDelMenu, validarMenu, LIMITES_MENU, type MenuEstilo, type Modalidad, type OpcionDeMenu,
@@ -31,6 +33,8 @@ const RESPUESTAS_POR_HORA = 20;
 const CREDITOS_MES_POR_DEFECTO = 2000;
 // Tope de todo el pedido al modelo, con la cadena de respaldos adentro (Groq y Workers AI tienen 15 s cada uno).
 const TIEMPO_MAX_MS = 50_000;
+// Un aviso de "necesita atención" por chat cada 30 minutos: sin esto llegaría un correo por cada mensaje del cliente.
+const AVISO_CADA_MS = 30 * 60 * 1000;
 const dormir = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 export interface EstadoDelBot {
@@ -49,6 +53,12 @@ export interface EstadoDelBot {
   bienvenidaPorDefecto: string;
   /** Las opciones del menú, en orden, con las del dueño (o las de fábrica si no editó nada). */
   menuOpciones: OpcionDeMenu[];
+  /** Orbi toma pedidos (quedan pendientes, "coordinar por WhatsApp") y sus topes por pedido. */
+  tomaPedidos: boolean;
+  maxUnidades: number;
+  maxMonto: number;
+  /** Si la tienda puede tomar pedidos por chat, o qué le falta. */
+  pedidos: { disponible: boolean; motivo?: string };
   cupo: { mes: string; usados: number; total: number; limite: number; porcentaje: number };
 }
 
@@ -63,6 +73,9 @@ export class WhatsappBotService {
     private readonly whatsapp: WhatsappService,
     private readonly storefront: StorefrontService,
     @Inject(LLM_ADAPTER_BOT) private readonly llm: Pick<LlmAdapter, 'streamChat'>,
+    // Opcionales por compatibilidad con los specs anteriores; Nest los inyecta siempre (WhatsappModule).
+    @Optional() private readonly pedidos?: WhatsappBotPedidosService,
+    @Optional() private readonly notificaciones?: NotificationsService,
   ) {
     this.herramientas = new HerramientasDelBot(this.prisma, this.storefront);
   }
@@ -116,8 +129,19 @@ export class WhatsappBotService {
       bienvenida: cfg?.bienvenida ?? null,
       bienvenidaPorDefecto: bienvenidaPorDefecto(negocio?.name ?? 'la tienda'),
       menuOpciones: opcionesDelMenu(cfg?.menuOpciones),
+      tomaPedidos: cfg?.tomaPedidos ?? false,
+      maxUnidades: cfg?.maxUnidades ?? 10,
+      maxMonto: cfg?.maxMonto ?? 200000,
+      pedidos: await this.disponibilidadDePedidos(businessId),
       cupo: await this.cupo(businessId, cfg?.topeCreditos ?? null),
     };
+  }
+
+  /** Si la tienda puede tomar pedidos por chat (ventas online + "coordinar por WhatsApp"), o qué le falta. */
+  private async disponibilidadDePedidos(businessId: string): Promise<{ disponible: boolean; motivo?: string }> {
+    if (!this.pedidos) return { disponible: false, motivo: 'No disponible en este entorno.' };
+    const d = await this.pedidos.disponibilidad(businessId);
+    return { disponible: d.ok, ...(d.motivo ? { motivo: d.motivo } : {}) };
   }
 
   async guardar(
@@ -125,6 +149,7 @@ export class WhatsappBotService {
     dto: {
       enabled?: boolean; modo?: BotModo; instrucciones?: string | null; topeCreditos?: number | null;
       modalidad?: Modalidad; menuEstilo?: MenuEstilo; bienvenida?: string | null; menuOpciones?: unknown[];
+      tomaPedidos?: boolean; maxUnidades?: number; maxMonto?: number;
     },
   ): Promise<EstadoDelBot> {
     if (dto.enabled === true && !(await this.tienePack(businessId))) {
@@ -133,6 +158,11 @@ export class WhatsappBotService {
     if (dto.enabled === true) {
       const conexion = await this.prisma.whatsappConnection.findUnique({ where: { businessId }, select: { status: true } });
       if (conexion?.status !== 'ACTIVE') throw new BadRequestException('Primero conectá tu cuenta de WhatsApp Business.');
+    }
+    // Encender la toma de pedidos pide que la tienda venda online y tenga "coordinar por WhatsApp": si no, se dice qué falta.
+    if (dto.tomaPedidos === true) {
+      const disp = this.pedidos ? await this.pedidos.disponibilidad(businessId) : { ok: false, motivo: 'No disponible en este entorno.' };
+      if (!disp.ok) throw new BadRequestException(disp.motivo);
     }
     const instrucciones = dto.instrucciones === undefined ? undefined : dto.instrucciones?.trim() || null;
     const bienvenida = dto.bienvenida === undefined ? undefined : dto.bienvenida?.trim().slice(0, LIMITES_MENU.bienvenida) || null;
@@ -151,6 +181,9 @@ export class WhatsappBotService {
       ...(dto.menuEstilo !== undefined ? { menuEstilo: dto.menuEstilo } : {}),
       ...(bienvenida !== undefined ? { bienvenida } : {}),
       ...(menuOpciones !== undefined ? { menuOpciones: menuOpciones as unknown as object[] } : {}),
+      ...(dto.tomaPedidos !== undefined ? { tomaPedidos: dto.tomaPedidos } : {}),
+      ...(dto.maxUnidades !== undefined ? { maxUnidades: dto.maxUnidades } : {}),
+      ...(dto.maxMonto !== undefined ? { maxMonto: dto.maxMonto } : {}),
       ...(dto.enabled !== undefined ? { enabled: dto.enabled } : {}),
       ...(dto.modo !== undefined ? { modo: dto.modo } : {}),
       ...(instrucciones !== undefined ? { instrucciones } : {}),
@@ -204,7 +237,7 @@ export class WhatsappBotService {
   }
 
   private async leerChat(businessId: string, conversationId: string) {
-    return this.prisma.conversation.findFirst({ where: { id: conversationId, businessId }, select: { botEstado: true, isArchived: true } });
+    return this.prisma.conversation.findFirst({ where: { id: conversationId, businessId }, select: { botEstado: true, isArchived: true, botBorrador: true } });
   }
 
   private async atenderUno(m: MensajeEntrante): Promise<void> {
@@ -236,6 +269,19 @@ export class WhatsappBotService {
       await this.derivar(businessId, conversationId, 'Muchos mensajes seguidos en poco tiempo: lo revisa una persona.');
       await this.registrar({ businessId, conversationId, status: 'limite' });
       return;
+    }
+
+    // Pedidos: el cliente confirma o cambia el resumen que Orbi le mostró (con los botones o escribiendo "sí" / "cambiar").
+    const tomaPedidos = !!cfg.tomaPedidos && modalidad !== 'SOLO_MENU' && !!this.pedidos;
+    if (tomaPedidos) {
+      const hayBorrador = borradorVigente(ahora.botBorrador) !== null;
+      const dijo = m.esTexto && !m.opcionId ? m.texto ?? '' : '';
+      if (m.opcionId === ID_CONFIRMAR || (hayBorrador && esAfirmativo(dijo))) return this.confirmarPedido(m, ahora.botBorrador, negocio);
+      if (m.opcionId === ID_CAMBIAR || (hayBorrador && esNegativo(dijo))) {
+        await this.pedidos!.descartar(businessId, conversationId);
+        await this.contestar(m, 'Sin problema. Contame qué querés cambiar o agregar y lo armamos de nuevo.', { status: 'ok', derivar: null });
+        return;
+      }
     }
 
     // El cliente eligió una opción del menú (la tocó, o respondió con su número).
@@ -327,6 +373,10 @@ export class WhatsappBotService {
       const cliente = await this.prisma.customer.findFirst({ where: { id: m.customerId, businessId }, select: { firstName: true } });
       const previas = await this.prisma.message.count({ where: { conversationId, viaOrbi: true } });
       const historial = await this.historial(conversationId);
+      const tomaPedidos = !!cfg.tomaPedidos && cfg.modalidad !== 'SOLO_MENU' && !!this.pedidos;
+      const ctxIa: ContextoDelBot = tomaPedidos
+        ? { ...ctx, prepararPedido: (items) => this.pedidos!.preparar({ ...ctx, conversationId }, { maxUnidades: cfg.maxUnidades, maxMonto: cfg.maxMonto }, items) }
+        : ctx;
       // Al tocar una opción, el último mensaje del cliente es solo el título ("Mis pedidos"): se le explica qué quiso decir.
       if (pedido && historial.length > 0 && historial[historial.length - 1].role === 'user') historial[historial.length - 1] = { role: 'user', content: pedido };
       const r = await this.correrModelo({
@@ -336,9 +386,11 @@ export class WhatsappBotService {
           cliente: cliente?.firstName ?? null,
           instrucciones: cfg.instrucciones,
           esPrimeraRespuesta: previas === 0,
+          tomaPedidos,
         }),
         historial,
-        ctx,
+        ctx: ctxIa,
+        tomaPedidos,
       });
       const texto = r.texto.trim().slice(0, MAX_CARACTERES_RESPUESTA);
       // El modelo tarda: mientras pensaba, el cliente pudo seguir escribiendo o contestar una persona. En ese caso esta
@@ -346,6 +398,15 @@ export class WhatsappBotService {
       if (!(await this.esElUltimoSinContestar(conversationId, m.messageId))) {
         await this.registrar({ businessId, conversationId, status: 'descartado', ...r.metricas, latencyMs: Date.now() - inicio });
         return;
+      }
+      // Si Orbi armó un pedido, al cliente le llega el resumen del sistema con los botones (no lo que escribió el modelo).
+      if (r.borradorListo) {
+        const chat = await this.leerChat(businessId, conversationId);
+        const borrador = borradorVigente(chat?.botBorrador);
+        if (borrador) {
+          await this.enviarResumen(m, textoDelResumen(borrador), { status: 'ok', derivar: null, ...r.metricas, latencyMs: Date.now() - inicio });
+          return;
+        }
       }
       if (!texto && !r.derivar) {
         await this.contestar(m, MENSAJE_DE_DERIVACION, { status: 'error', derivar: 'Orbi no pudo armar una respuesta.', ...r.metricas, latencyMs: Date.now() - inicio });
@@ -387,19 +448,20 @@ export class WhatsappBotService {
   }
 
   /** El loop del modelo: hasta VUELTAS_MAX llamadas, con herramientas de lectura. Devuelve el texto, si derivó y lo que gastó. */
-  private async correrModelo(p: { sistema: string; historial: LlmMessage[]; ctx: { businessId: string; slug: string; customerId: string } }) {
+  private async correrModelo(p: { sistema: string; historial: LlmMessage[]; ctx: ContextoDelBot; tomaPedidos?: boolean }) {
     const progreso = nuevoProgresoDelTurno();
     const mensajes: LlmMessage[] = [{ role: 'system', content: p.sistema }, ...p.historial];
     const corte = AbortSignal.timeout(TIEMPO_MAX_MS);
     let derivar: string | null = null;
     let texto = '';
+    let borradorListo = false;
 
     for (let vuelta = 1; vuelta <= VUELTAS_MAX; vuelta++) {
       progreso.llamadasAlModelo++;
       const v = vueltaDeTools();
       let textoVuelta = '';
       let pidioTools = false;
-      for await (const ev of this.llm.streamChat({ messages: mensajes, tools: HERRAMIENTAS_DEL_BOT, model: this.modelo(), signal: corte })) {
+      for await (const ev of this.llm.streamChat({ messages: mensajes, tools: herramientasDelBot(!!p.tomaPedidos), model: this.modelo(), signal: corte })) {
         if (ev.type === 'text') textoVuelta += ev.chunk;
         else if (ev.type === 'usage') {
           sumarConsumo(progreso.consumo, ev.usage);
@@ -412,7 +474,9 @@ export class WhatsappBotService {
             derivar = motivo || 'Orbi pidió que lo atienda una persona.';
             v.responder(ev.call, JSON.stringify({ ok: true, datos: 'Listo: el equipo ya está avisado. Despedite en una línea.' }));
           } else {
-            v.responder(ev.call, JSON.stringify(await this.herramientas.ejecutar(ev.call.name, ev.call.arguments, p.ctx)));
+            const resultado = await this.herramientas.ejecutar(ev.call.name, ev.call.arguments, p.ctx);
+            if (ev.call.name === 'preparar_pedido' && resultado.ok) borradorListo = true;
+            v.responder(ev.call, JSON.stringify(resultado));
           }
         }
       }
@@ -435,6 +499,7 @@ export class WhatsappBotService {
     return {
       texto,
       derivar,
+      borradorListo,
       metricas: {
         rounds: progreso.llamadasAlModelo,
         toolsUsed: progreso.toolsPedidas,
@@ -449,9 +514,9 @@ export class WhatsappBotService {
   }
 
   /** Manda la respuesta por WhatsApp, la guarda en el chat marcada como de Orbi y, si hay que derivar, deja el chat para una persona. */
-  private async contestar(m: MensajeEntrante, texto: string, d: Omit<TurnoParaGuardar, 'businessId' | 'conversationId'> & { derivar: string | null }, enviar?: () => Promise<string>) {
+  private async contestar(m: MensajeEntrante, texto: string, d: Omit<TurnoParaGuardar, 'businessId' | 'conversationId'> & { derivar: string | null; sinAviso?: boolean }, enviar?: () => Promise<string>) {
     const { businessId, conversationId } = m;
-    const { derivar, ...turno } = d;
+    const { derivar, sinAviso, ...turno } = d;
     let externalId: string;
     try {
       externalId = enviar ? await enviar() : await this.whatsapp.enviarTexto(businessId, conversationId, m.waId, texto);
@@ -476,6 +541,8 @@ export class WhatsappBotService {
       }),
     ]);
     await this.registrar({ ...turno, businessId, conversationId });
+    // Quedó para una persona: se le avisa al dueño (por correo y en el panel), salvo que ya haya otro aviso para este caso.
+    if (derivar !== null && !sinAviso) await this.avisarAtencion(businessId, conversationId, derivar);
   }
 
   private async derivar(businessId: string, conversationId: string, motivo: string): Promise<void> {
@@ -483,6 +550,71 @@ export class WhatsappBotService {
       where: { id: conversationId, businessId },
       data: { botEstado: 'DERIVADO', botMotivo: motivo, botCambiadoAt: new Date(), isUnread: true },
     });
+    await this.avisarAtencion(businessId, conversationId, motivo);
+  }
+
+  /**
+   * Le avisa al propietario que un chat necesita a una persona: campanita y correo (el evento orbi_necesita_atencion, que
+   * el dueño puede apagar en Notificaciones). Uno por chat cada 30 minutos. Nunca tira: es un aviso, no puede romper la respuesta.
+   */
+  private async avisarAtencion(businessId: string, conversationId: string, motivo: string): Promise<void> {
+    if (!this.notificaciones) return;
+    try {
+      const reclamado = await this.prisma.conversation.updateMany({
+        where: { id: conversationId, businessId, OR: [{ botAvisoAt: null }, { botAvisoAt: { lt: new Date(Date.now() - AVISO_CADA_MS) } }] },
+        data: { botAvisoAt: new Date() },
+      });
+      if (reclamado.count === 0) return;
+      const [chat, ultimo] = await Promise.all([
+        this.prisma.conversation.findFirst({ where: { id: conversationId, businessId }, select: { customer: { select: { firstName: true, lastName: true } } } }),
+        this.prisma.message.findFirst({ where: { conversationId, sender: 'CUSTOMER' }, orderBy: { createdAt: 'desc' }, select: { text: true } }),
+      ]);
+      const nombre = chat ? `${chat.customer.firstName}${chat.customer.lastName ? ` ${chat.customer.lastName}` : ''}` : 'Un cliente';
+      const frontend = process.env.FRONTEND_URL ?? 'http://localhost:3001';
+      const link = `${frontend}/admin/${businessId}/ventas/mensajes?canal=whatsapp&conv=${conversationId}`;
+      await this.notificaciones.dispatch('orbi_necesita_atencion', businessId, {
+        title: `${nombre} necesita atención en WhatsApp`,
+        body: motivo,
+        emailSubject: `${nombre} necesita atención en WhatsApp`,
+        emailBody: `Orbi te pasó un chat de WhatsApp: ${nombre} necesita que lo atienda una persona.\n\nMotivo: ${motivo}${ultimo ? `\nSu último mensaje: «${ultimo.text.slice(0, 200)}»` : ''}\n\nAbrir el chat: ${link}`,
+        resourceType: 'conversation',
+        resourceId: conversationId,
+      });
+    } catch (e) {
+      this.logger.warn(`No se pudo avisar que el chat ${conversationId} necesita atención: ${describeError(e)}`);
+    }
+  }
+
+  /** El resumen del pedido con los botones "Confirmar pedido" / "Cambiar" (o, si WhatsApp no deja los botones, con "sí" / "cambiar"). */
+  private async enviarResumen(m: MensajeEntrante, resumen: string, d: Omit<TurnoParaGuardar, 'businessId' | 'conversationId'> & { derivar: string | null }) {
+    const fallback = `${resumen}\n\nRespondé *sí* para confirmar o *cambiar* para modificarlo.`;
+    const interactivo = {
+      type: 'button',
+      body: { text: resumen.slice(0, 1024) },
+      action: { buttons: [{ type: 'reply', reply: { id: ID_CONFIRMAR, title: 'Confirmar pedido' } }, { type: 'reply', reply: { id: ID_CAMBIAR, title: 'Cambiar' } }] },
+    };
+    await this.contestar(m, fallback, d, async () => {
+      try {
+        return await this.whatsapp.enviarInteractivo(m.businessId, m.conversationId, m.waId, interactivo);
+      } catch (e) {
+        if (e instanceof UnprocessableEntityException || e instanceof ConflictException) throw e;
+        this.logger.warn(`WhatsApp no aceptó los botones del pedido en ${m.conversationId}; va en texto: ${describeError(e)}`);
+        return this.whatsapp.enviarTexto(m.businessId, m.conversationId, m.waId, fallback);
+      }
+    });
+  }
+
+  /** El cliente confirmó el resumen: se crea el pedido pendiente y el chat queda para que una persona coordine el pago y la entrega. */
+  private async confirmarPedido(m: MensajeEntrante, borrador: unknown, negocio: { name: string; subdomain: string }) {
+    const r = await this.pedidos!.confirmar({
+      businessId: m.businessId, conversationId: m.conversationId, customerId: m.customerId, waId: m.waId, slug: negocio.subdomain, tienda: negocio.name, borrador,
+    });
+    if (r.ok) {
+      // El aviso al dueño ya salió como "pedido pendiente": no se manda además el de "necesita atención".
+      await this.contestar(m, r.texto, { status: 'ok', derivar: `Pedido #${r.pedido.numero} tomado por Orbi: falta coordinar el pago y la entrega.`, sinAviso: true });
+    } else {
+      await this.contestar(m, r.texto, { status: r.derivar ? 'derivado' : 'ok', derivar: r.derivar || null });
+    }
   }
 
   private async registrar(t: TurnoParaGuardar): Promise<void> {

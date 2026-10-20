@@ -1601,6 +1601,11 @@ model Conversation {
   botEstado     WhatsappBotChatEstado @default(DEFAULT) @map("bot_estado")
   botMotivo     String?               @map("bot_motivo") // por qué está PAUSADO o DERIVADO, para mostrarlo en el chat
   botCambiadoAt DateTime?             @map("bot_cambiado_at")
+  // El pedido que Orbi está armando con el cliente (items validados con su precio), a la espera de que confirme: se vence a
+  // los 30 minutos. null = no hay ninguno.
+  botBorrador   Json?                 @map("bot_borrador")
+  // Cuándo se le avisó por última vez al dueño que este chat necesita atención: evita mandar un correo por cada mensaje.
+  botAvisoAt    DateTime?             @map("bot_aviso_at")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
@@ -1824,6 +1829,10 @@ model WhatsappBotConfig {
   menuEstilo    WhatsappMenuEstilo   @default(LISTA) @map("menu_estilo")
   bienvenida    String? // saludo antes del menú; null = el de siempre
   menuOpciones  Json?   @map("menu_opciones") // [{ id, titulo, descripcion?, activa, respuesta? }] en orden; null = el menú por defecto
+  // Orbi puede tomar pedidos (quedan pendientes, "coordinar por WhatsApp"): apagado por defecto, con topes por pedido.
+  tomaPedidos   Boolean @default(false) @map("toma_pedidos")
+  maxUnidades   Int     @default(10) @map("max_unidades")
+  maxMonto      Int     @default(200000) @map("max_monto") // en pesos
   topeCreditos  Int?            @map("tope_creditos") // tope mensual propio del dueño, por debajo del cupo del plan
   createdAt     DateTime        @default(now()) @map("created_at")
   updatedAt     DateTime        @updatedAt @map("updated_at")

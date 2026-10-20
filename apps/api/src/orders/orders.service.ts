@@ -575,7 +575,9 @@ export class OrdersService {
     // aviso al equipo del negocio, "primera venta" — NO salen acá: salen cuando el
     // pago se aprueba (ver avisarPedidoPagado, lo llama el webhook de MP). Si el
     // comprador abandona en Mercado Pago, no le llega nada a nadie.
-    opts?: { publicCheckout?: boolean; paymentMethodChosen?: boolean; memberId?: string; pagoPendiente?: boolean },
+    // `porWhatsapp`: lo tomó Orbi por el chat de WhatsApp. El cliente de WhatsApp no tiene email cargado (llega solo con su
+    // número), así que acá no se exige: se lo contacta por el mismo chat.
+    opts?: { publicCheckout?: boolean; paymentMethodChosen?: boolean; memberId?: string; pagoPendiente?: boolean; porWhatsapp?: boolean },
   ) {
     const esPresencial = dto.channel === 'POS';
     if (esPresencial && opts?.publicCheckout) {
@@ -680,7 +682,7 @@ export class OrdersService {
     // con el nombre. Si el pedido es de un cliente YA registrado, en cambio,
     // necesitamos poder contactarlo más adelante -- ahí el email sigue siendo
     // obligatorio (y tiene que venir cargado en la ficha del cliente).
-    if (dto.customerId && !buyerEmail) {
+    if (dto.customerId && !buyerEmail && !opts?.porWhatsapp) {
       throw new BadRequestException(
         'Ese cliente no tiene email cargado, agregaselo o elegí otro.',
       );
@@ -1335,6 +1337,29 @@ export class OrdersService {
         },
       });
     }
+  }
+
+  /**
+   * Oculta un pedido del listado (soft-delete: `deletedAt`). Es una acción "de pantalla": el pedido sigue en la base (y en el
+   * registro de auditoría), pero deja de verse en la lista, el detalle y los reportes. No toca el stock, los cobros ni los
+   * avisos ya enviados.
+   */
+  async eliminar(businessId: string, memberId: string | null, id: string) {
+    const order = await this.prisma.order.findFirst({ where: { id, businessId, deletedAt: null }, select: { id: true, orderNumber: true, status: true } });
+    if (!order) throw new NotFoundException('Pedido no encontrado');
+    await this.prisma.order.updateMany({ where: { id, businessId, deletedAt: null }, data: { deletedAt: new Date() } });
+    await this.audit?.registrar({
+      businessId,
+      memberId: memberId ?? undefined,
+      entityType: 'order',
+      entityId: id,
+      action: 'DELETE',
+      changes: [
+        { field: 'numero', before: order.orderNumber, after: null },
+        { field: 'estado', before: order.status, after: null },
+      ],
+    });
+    return { ok: true };
   }
 
   async updateStatus(
