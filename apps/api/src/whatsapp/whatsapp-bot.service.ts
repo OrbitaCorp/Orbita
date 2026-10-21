@@ -35,6 +35,8 @@ const CREDITOS_MES_POR_DEFECTO = 2000;
 const TIEMPO_MAX_MS = 50_000;
 // Un aviso de "necesita atención" por chat cada 30 minutos: sin esto llegaría un correo por cada mensaje del cliente.
 const AVISO_CADA_MS = 30 * 60 * 1000;
+// Fotos de producto que Orbi puede mandar en una misma respuesta (cada una es un mensaje más de WhatsApp).
+const FOTOS_MAX_POR_RESPUESTA = 3;
 const dormir = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 export interface EstadoDelBot {
@@ -374,9 +376,11 @@ export class WhatsappBotService {
       const previas = await this.prisma.message.count({ where: { conversationId, viaOrbi: true } });
       const historial = await this.historial(conversationId);
       const tomaPedidos = !!cfg.tomaPedidos && cfg.modalidad !== 'SOLO_MENU' && !!this.pedidos;
-      const ctxIa: ContextoDelBot = tomaPedidos
-        ? { ...ctx, prepararPedido: (items) => this.pedidos!.preparar({ ...ctx, conversationId }, { maxUnidades: cfg.maxUnidades, maxMonto: cfg.maxMonto }, items) }
-        : ctx;
+      const ctxIa: ContextoDelBot = {
+        ...ctx,
+        enviarFoto: this.enviadorDeFotos(m),
+        ...(tomaPedidos ? { prepararPedido: (items) => this.pedidos!.preparar({ ...ctx, conversationId }, { maxUnidades: cfg.maxUnidades, maxMonto: cfg.maxMonto }, items) } : {}),
+      };
       // Al tocar una opción, el último mensaje del cliente es solo el título ("Mis pedidos"): se le explica qué quiso decir.
       if (pedido && historial.length > 0 && historial[historial.length - 1].role === 'user') historial[historial.length - 1] = { role: 'user', content: pedido };
       const r = await this.correrModelo({
@@ -510,6 +514,33 @@ export class WhatsappBotService {
         costUsd: costo.costUsd,
         credits: costo.credits,
       },
+    };
+  }
+
+  /**
+   * Lo que usa la herramienta de fotos: manda la foto del producto y la deja en el chat, marcada como de Orbi. Tiene tope
+   * por respuesta y no repite una foto. No cuesta nada de IA, pero cada foto es un mensaje más de WhatsApp.
+   */
+  private enviadorDeFotos(m: MensajeEntrante): NonNullable<ContextoDelBot['enviarFoto']> {
+    const mandadas = new Set<string>();
+    return async ({ url, pie }) => {
+      if (mandadas.has(url)) return { ok: false, error: 'Esa foto ya se la mandaste: seguí con la charla.' };
+      if (mandadas.size >= FOTOS_MAX_POR_RESPUESTA) return { ok: false, error: `Ya mandaste ${FOTOS_MAX_POR_RESPUESTA} fotos en este mensaje: para ver más, pasale el link de la tienda.` };
+      try {
+        const foto = await this.whatsapp.enviarFotoDeProducto(m.businessId, m.conversationId, m.waId, url, pie);
+        if (!foto) return { ok: false, error: 'No se pudo mandar la foto ahora: pasale el link del producto.' };
+        mandadas.add(url);
+        await this.prisma.message.create({
+          data: {
+            conversationId: m.conversationId, sender: 'STORE', text: pie, channel: 'WHATSAPP', externalId: foto.externalId, deliveryStatus: 'sent', viaOrbi: true,
+            attachments: [{ tipo: 'image', url: foto.url }],
+          },
+        });
+        return { ok: true, datos: 'Foto enviada.' };
+      } catch (e) {
+        this.logger.warn(`Orbi no pudo mandar una foto en ${m.conversationId}: ${describeError(e)}`);
+        return { ok: false, error: 'No se pudo mandar la foto ahora: pasale el link del producto.' };
+      }
     };
   }
 

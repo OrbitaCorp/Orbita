@@ -129,6 +129,7 @@ function armar(o: Opciones = {}) {
   const whatsapp: any = {
     enviarTexto: o.falloEnvio ? jest.fn().mockRejectedValue(new Error('rechazado')) : jest.fn().mockResolvedValue('wamid.ORBI'),
     enviarInteractivo: jest.fn().mockResolvedValue('wamid.MENU'),
+    enviarFotoDeProducto: jest.fn().mockResolvedValue({ externalId: 'wamid.FOTO', url: 'https://almacen/p.jpg' }),
   };
   const storefront: any = {
     listProducts: jest.fn().mockResolvedValue({ total: 1, data: [{ id: 'abcdef12-0000', name: 'Zapatilla Run', categoryName: 'Calzado', price: 50000, comparePrice: 60000, priceTo: null, promoLabel: null, inStock: true, byOrder: false, variantOptions: [{ name: 'Talle', values: [{ value: '40' }, { value: '41' }] }] }] }),
@@ -275,6 +276,65 @@ describe('WhatsappBotService.atender', () => {
     const resultado = segunda.find((m) => m.role === 'tool');
     expect(resultado?.content).toContain('https://rama.orbita.site/p/abcdef12');
     expect(t.prisma.whatsappBotTurn.create.mock.calls[0][0].data.toolsUsed).toEqual(['buscar_productos']);
+  });
+
+  describe('fotos de producto', () => {
+    const producto = {
+      id: 'abcdef12-0000', name: 'Zapatilla Run', description: null, categoryName: 'Calzado', price: 50000, comparePrice: null, promoLabel: null, promo: null, byOrder: false, specs: [],
+      options: [{ name: 'Color', values: [{ id: 'ov-rojo' }, { id: 'ov-azul' }] }],
+      variants: [{ id: 'var-rojo', optionValues: [{ optionValueId: 'ov-rojo', value: 'Rojo' }], price: 50000, inStock: true }],
+      images: [
+        { url: 'https://supa/a.webp', isPrimary: true, optionValueId: null },
+        { url: 'https://supa/rojo.webp', isPrimary: false, optionValueId: 'ov-rojo' },
+      ],
+    };
+    const pide = (...fotos: Record<string, unknown>[]): LlmEvent[][] => [
+      [...fotos.map((a, i): LlmEvent => ({ type: 'tool_call', call: { id: `c-${i}`, name: 'mostrar_foto_producto', arguments: a } })), uso(), { type: 'done' }],
+      [{ type: 'text', chunk: 'Mirá, y sale $50.000.' }, uso(), { type: 'done' }],
+    ];
+
+    it('manda la foto del producto con su nombre, la deja en el chat como de Orbi y después contesta el texto', async () => {
+      const t = armar({ eventos: pide({ producto_id: 'abcdef12-0000' }) });
+      t.storefront.getProduct.mockResolvedValue(producto);
+      await t.bot.atender([MSG]);
+      expect(t.whatsapp.enviarFotoDeProducto).toHaveBeenCalledWith(BIZ, CONV, MSG.waId, 'https://supa/a.webp', 'Zapatilla Run');
+      expect(t.prisma.message.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ conversationId: CONV, sender: 'STORE', viaOrbi: true, externalId: 'wamid.FOTO', text: 'Zapatilla Run', attachments: [{ tipo: 'image', url: 'https://almacen/p.jpg' }] }),
+      });
+      expect(t.whatsapp.enviarTexto).toHaveBeenCalledWith(BIZ, CONV, MSG.waId, 'Mirá, y sale $50.000.');
+    });
+
+    it('con variante_id manda la foto de ese color y lo aclara en el pie', async () => {
+      const t = armar({ eventos: pide({ producto_id: 'abcdef12-0000', variante_id: 'var-rojo' }) });
+      t.storefront.getProduct.mockResolvedValue(producto);
+      await t.bot.atender([MSG]);
+      expect(t.whatsapp.enviarFotoDeProducto).toHaveBeenCalledWith(BIZ, CONV, MSG.waId, 'https://supa/rojo.webp', 'Zapatilla Run (Rojo)');
+    });
+
+    it('manda como mucho 3 fotos por respuesta y no repite una', async () => {
+      const t = armar({ eventos: pide({ producto_id: 'abcdef12-0001' }, { producto_id: 'abcdef12-0002' }, { producto_id: 'abcdef12-0003' }, { producto_id: 'abcdef12-0004' }, { producto_id: 'abcdef12-0004' }) });
+      t.storefront.getProduct.mockImplementation(async (_s: string, id: string) => ({ ...producto, id, images: [{ url: `https://supa/${id}.webp`, isPrimary: true, optionValueId: null }] }));
+      await t.bot.atender([MSG]);
+      expect(t.whatsapp.enviarFotoDeProducto).toHaveBeenCalledTimes(3);
+      const resultados = t.llmMensajes[1].filter((m) => m.role === 'tool').map((m) => m.content);
+      expect(resultados.some((c) => /Ya mandaste 3 fotos/.test(c))).toBe(true);
+    });
+
+    it('si la foto no se pudo preparar, no la anota en el chat y le dice al modelo que pase el link', async () => {
+      const t = armar({ eventos: pide({ producto_id: 'abcdef12-0000' }) });
+      t.storefront.getProduct.mockResolvedValue(producto);
+      t.whatsapp.enviarFotoDeProducto.mockResolvedValue(null);
+      await t.bot.atender([MSG]);
+      expect(t.prisma.message.create).toHaveBeenCalledTimes(1); // solo la respuesta de texto
+      expect(t.llmMensajes[1].find((m) => m.role === 'tool')?.content).toContain('pasale el link');
+    });
+
+    it('un producto sin fotos no manda nada', async () => {
+      const t = armar({ eventos: pide({ producto_id: 'abcdef12-0000' }) });
+      t.storefront.getProduct.mockResolvedValue({ ...producto, images: [] });
+      await t.bot.atender([MSG]);
+      expect(t.whatsapp.enviarFotoDeProducto).not.toHaveBeenCalled();
+    });
   });
 
   it('con el cupo del mes agotado no gasta en el modelo: avisa que lo ve una persona y deja el chat derivado', async () => {

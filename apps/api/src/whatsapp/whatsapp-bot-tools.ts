@@ -14,6 +14,8 @@ export interface ContextoDelBot {
   slug: string;
   /** La persona que escribe: sus pedidos son los únicos que se pueden consultar. */
   customerId: string;
+  /** Manda una foto de producto al chat (la prepara, la envía y la deja en la conversación). Ver whatsapp-bot.service.ts. */
+  enviarFoto?: (foto: { url: string; pie: string }) => Promise<ResultadoDeHerramienta>;
 }
 
 export type ResultadoDeHerramienta = { ok: true; datos: unknown } | { ok: false; error: string };
@@ -58,6 +60,19 @@ export const HERRAMIENTAS_DEL_BOT: LlmToolDefinition[] = [
     parameters: {
       type: 'object',
       properties: { producto_id: { type: 'string', description: 'El id del producto.' } },
+      required: ['producto_id'],
+    },
+  },
+  {
+    name: 'mostrar_foto_producto',
+    description:
+      'Le manda al cliente la foto de UN producto (con su nombre). Usala cuando pida ver un producto o una foto, o cuando ayude a decidir; con variante_id manda la foto de ese color/variante si la tiene. Máximo 3 fotos por mensaje: no la uses para listar muchos productos, para eso pasá el link.',
+    parameters: {
+      type: 'object',
+      properties: {
+        producto_id: { type: 'string', description: 'El id del producto.' },
+        variante_id: { type: 'string', description: 'Opcional: el id de la variante (de detalle_producto) cuya foto querés mostrar.' },
+      },
       required: ['producto_id'],
     },
   },
@@ -124,6 +139,8 @@ export class HerramientasDelBot {
           return { ok: true, datos: await this.buscarProductos(ctx, typeof args.consulta === 'string' ? args.consulta : '') };
         case 'detalle_producto':
           return await this.detalleProducto(ctx, typeof args.producto_id === 'string' ? args.producto_id : '');
+        case 'mostrar_foto_producto':
+          return await this.mostrarFoto(ctx, typeof args.producto_id === 'string' ? args.producto_id : '', typeof args.variante_id === 'string' ? args.variante_id : undefined);
         case 'datos_de_la_tienda':
           return { ok: true, datos: await this.datosDeLaTienda(ctx) };
         case 'preparar_pedido':
@@ -200,6 +217,28 @@ export class HerramientasDelBot {
         link: enlaceDeProducto(ctx.slug, p.id),
       },
     };
+  }
+
+  /** La foto del producto (o la de la variante pedida, si tiene una propia) con su nombre de pie. */
+  private async mostrarFoto(ctx: ContextoDelBot, id: string, varianteId?: string): Promise<ResultadoDeHerramienta> {
+    if (!ctx.enviarFoto) return { ok: false, error: 'En este chat no se pueden mandar fotos: pasale el link del producto.' };
+    if (!/^[0-9a-f-]{8,36}$/i.test(id)) return { ok: false, error: 'Ese id de producto no es válido: buscalo de nuevo con buscar_productos.' };
+    const p = await this.tienda.getProduct(ctx.slug, id);
+    const variante = varianteId ? p.variants.find((v) => v.id === varianteId) : undefined;
+    const propias = new Set(variante?.optionValues.map((ov) => ov.optionValueId) ?? []);
+    const foto =
+      p.images.find((im) => im.optionValueId && propias.has(im.optionValueId)) ??
+      p.images.find((im) => im.isPrimary && !im.optionValueId) ??
+      p.images.find((im) => !im.optionValueId) ??
+      p.images[0];
+    if (!foto) return { ok: false, error: 'Ese producto no tiene fotos cargadas: pasale el link para que lo vea en la tienda.' };
+    // Solo el nombre (y la variante, si se pidió una): el precio lo dice Orbi, que sabe cuál corresponde a cada variante.
+    const detalle = variante?.optionValues.map((ov) => ov.value).join(' / ');
+    const pie = recortar(detalle ? `${p.name} (${detalle})` : p.name, 200) ?? p.name;
+    const r = await ctx.enviarFoto({ url: foto.url, pie });
+    return r.ok
+      ? { ok: true, datos: 'La foto ya le llegó al cliente con el nombre del producto. No la describas ni repitas el nombre: seguí la charla (precio, talles, si le interesa).' }
+      : r;
   }
 
   private async datosDeLaTienda(ctx: ContextoDelBot) {

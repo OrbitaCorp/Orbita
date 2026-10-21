@@ -1,5 +1,6 @@
-import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+import { BadRequestException, Injectable, Logger, Optional, ServiceUnavailableException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { createHash, randomUUID } from 'crypto';
 import sharp from 'sharp';
 import { SupabaseService } from '../supabase/supabase.service';
 import { describeError } from '../common/utils/describe-error.util';
@@ -25,7 +26,10 @@ export class WhatsappMediosService {
   private readonly logger = new Logger(WhatsappMediosService.name);
   private bucketListo: Promise<void> | undefined;
 
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    @Optional() private readonly config?: ConfigService,
+  ) {}
 
   private get almacen() {
     return this.supabase.adminClient.storage.from(BUCKET_WHATSAPP);
@@ -84,6 +88,47 @@ export class WhatsappMediosService {
       throw new BadRequestException('El archivo no es una foto válida o es demasiado grande.');
     }
     return this.guardar(businessId, jpeg);
+  }
+
+  /**
+   * La foto de un producto de la tienda, lista para mandarla por WhatsApp. Las fotos del catálogo están en WebP y WhatsApp
+   * solo acepta JPG y PNG, así que se convierte una vez y se guarda con una ruta que sale de la foto original: la próxima
+   * vez que se pida la misma foto ya está lista. Solo se baja de nuestro propio almacenamiento. Mejor esfuerzo: si algo
+   * falla devuelve null.
+   */
+  async prepararFotoDeProducto(businessId: string, urlOrigen: string): Promise<string | null> {
+    try {
+      const origen = new URL(urlOrigen);
+      const nuestro = this.hostDelAlmacenamiento();
+      if (origen.protocol !== 'https:' || !nuestro || origen.hostname.toLowerCase() !== nuestro) return null;
+      await this.asegurarBucket();
+      const ruta = `${businessId}/productos/${createHash('sha256').update(urlOrigen).digest('hex').slice(0, 40)}.jpg`;
+      const publica = this.almacen.getPublicUrl(ruta).data.publicUrl;
+      const lista = await fetch(publica, { method: 'HEAD', signal: AbortSignal.timeout(5_000) }).catch(() => null);
+      if (lista?.ok) return publica;
+      const res = await fetch(origen, { signal: AbortSignal.timeout(15_000) });
+      if (!res.ok) return null;
+      const original = Buffer.from(await res.arrayBuffer());
+      if (original.length > MAX_BYTES_DESCARGA) return null;
+      const { error } = await this.almacen.upload(ruta, await this.aJpeg(original), { contentType: 'image/jpeg', upsert: false });
+      // Otra respuesta la pudo subir justo antes: es la misma foto, sirve igual.
+      if (error && !/already exists|duplicate|409/i.test(`${error.message} ${(error as { statusCode?: string }).statusCode ?? ''}`)) {
+        this.logger.warn(`Subida de ${ruta} falló: ${error.message}`);
+        return null;
+      }
+      return publica;
+    } catch (e) {
+      this.logger.warn(`No se pudo preparar la foto de un producto: ${describeError(e)}`);
+      return null;
+    }
+  }
+
+  private hostDelAlmacenamiento(): string | null {
+    try {
+      return new URL(this.config?.get<string>('SUPABASE_URL') ?? process.env.SUPABASE_URL ?? '').hostname.toLowerCase() || null;
+    } catch {
+      return null;
+    }
   }
 
   /**

@@ -886,6 +886,10 @@ Business desde Mensajes → WhatsApp con el botón de Meta, sin pegar datos a ma
   Llegan por panel **y** email aunque el dueño no haya configurado nada (`PREFS_POR_EVENTO`); él puede apagarlos en Notificaciones.
   Se despachan dentro del pedido del webhook (con `await`), no con el emisor de eventos: Cloud Run con `--cpu-throttling` no corre lo
   que queda después de responder. Migración `20261020010000_whatsapp_bot_pedidos` (aplicar en producción antes de desplegar la API).
+- **Fotos de producto:** herramienta `mostrar_foto_producto` (hasta 3 por respuesta, sin repetir). Las fotos del catálogo están en WebP y WhatsApp
+  no las acepta como imagen, así que `WhatsappMediosService.prepararFotoDeProducto` las baja (solo del host de `SUPABASE_URL`), las convierte a
+  JPEG y las guarda en el bucket `whatsapp-media` en `<negocio>/productos/<hash de la URL>.jpg`: se convierte una sola vez por foto. No usa IA
+  extra, pero cada foto es un mensaje de WhatsApp más (cuenta para los 1.000 gratis por mes). Se guarda en el chat con `attachments` y `viaOrbi`.
 - **Eliminar pedidos del listado:** `DELETE /orders/:id` (permiso `orders.manage`) hace soft-delete (`deletedAt`) y deja registro en
   `audit_logs`. Es solo de pantalla: no devuelve stock ni anula cobros; el pedido sigue en la base y sale de lista, detalle y reportes.
 - **Probar sin un número real:** cuenta sandbox desde el panel de Meta (WhatsApp → Testear integraciones) o el formulario

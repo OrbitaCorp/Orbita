@@ -156,6 +156,56 @@ const archivo = (buffer: Buffer, mimetype = 'image/png', size = buffer.length) =
 describe('WhatsappMediosService', () => {
   afterEach(() => jest.restoreAllMocks());
 
+  describe('prepararFotoDeProducto', () => {
+    const SUPA = 'https://proyecto.supabase.co/storage/v1/object/public/products/b/p/uno.webp';
+    const armarProducto = (fetchMock: jest.Mock) => {
+      const t = armarMedios();
+      process.env.SUPABASE_URL = 'https://proyecto.supabase.co';
+      jest.spyOn(global, 'fetch').mockImplementation(fetchMock as never);
+      return t;
+    };
+
+    it('baja la foto del catálogo, la convierte a JPEG, la guarda con una ruta que sale de la original y devuelve su dirección', async () => {
+      const original = await sharp({ create: { width: 40, height: 30, channels: 3, background: '#cc3333' } }).webp().toBuffer();
+      const fetchMock = jest.fn().mockImplementation(async (_u: unknown, init?: { method?: string }) =>
+        init?.method === 'HEAD' ? { ok: false } : { ok: true, arrayBuffer: async () => original.buffer.slice(original.byteOffset, original.byteOffset + original.byteLength) });
+      const { svc, upload } = armarProducto(fetchMock);
+      const url = await svc.prepararFotoDeProducto(BIZ, SUPA);
+      expect(url).toMatch(new RegExp(`^https://almacen/${BIZ}/productos/[0-9a-f]{40}\\.jpg$`));
+      const [ruta, cuerpo, opts] = upload.mock.calls[0];
+      expect(opts).toMatchObject({ contentType: 'image/jpeg', upsert: false });
+      expect((await sharp(cuerpo).metadata()).format).toBe('jpeg');
+      // La misma foto da la misma ruta.
+      await svc.prepararFotoDeProducto(BIZ, SUPA);
+      expect(upload.mock.calls[1][0]).toBe(ruta);
+    });
+
+    it('si la foto ya está convertida, la reutiliza sin bajarla ni subirla otra vez', async () => {
+      const fetchMock = jest.fn().mockResolvedValue({ ok: true });
+      const { svc, upload } = armarProducto(fetchMock);
+      const url = await svc.prepararFotoDeProducto(BIZ, SUPA);
+      expect(url).toContain('/productos/');
+      expect(upload).not.toHaveBeenCalled();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('solo baja fotos de nuestro almacenamiento: ni otro servidor ni http', async () => {
+      const fetchMock = jest.fn();
+      const { svc, upload } = armarProducto(fetchMock);
+      await expect(svc.prepararFotoDeProducto(BIZ, 'https://otro-sitio.com/x.webp')).resolves.toBeNull();
+      await expect(svc.prepararFotoDeProducto(BIZ, 'http://proyecto.supabase.co/x.webp')).resolves.toBeNull();
+      await expect(svc.prepararFotoDeProducto(BIZ, 'https://proyecto.supabase.co.malo.com/x.webp')).resolves.toBeNull();
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(upload).not.toHaveBeenCalled();
+    });
+
+    it('si la descarga falla devuelve null (la foto es un extra, no rompe la respuesta)', async () => {
+      const fetchMock = jest.fn().mockResolvedValue({ ok: false });
+      const { svc } = armarProducto(fetchMock);
+      await expect(svc.prepararFotoDeProducto(BIZ, SUPA)).resolves.toBeNull();
+    });
+  });
+
   describe('prepararFotoDelPanel', () => {
     it('guarda la foto como JPEG en la carpeta de chats del negocio y devuelve su dirección', async () => {
       const { svc, upload } = armarMedios();

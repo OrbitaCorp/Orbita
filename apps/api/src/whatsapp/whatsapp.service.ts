@@ -675,6 +675,16 @@ export class WhatsappService {
     return this.enviarCarga(businessId, conversationId, waId, { type: 'image', image: { link: url, ...(caption ? { caption } : {}) } });
   }
 
+  /**
+   * Manda la foto de un producto del catálogo (la prepara en JPEG, porque WhatsApp no acepta WebP). Devuelve el id del
+   * mensaje en Meta y la dirección con la que se guardó, o null si la foto no se pudo preparar.
+   */
+  async enviarFotoDeProducto(businessId: string, conversationId: string, waId: string, urlOrigen: string, pieDeFoto: string): Promise<{ externalId: string; url: string } | null> {
+    const url = await this.medios?.prepararFotoDeProducto(businessId, urlOrigen);
+    if (!url) return null;
+    return { externalId: await this.enviarImagen(businessId, conversationId, waId, url, pieDeFoto), url };
+  }
+
   /** La foto que el negocio manda desde el panel: validada, preparada y guardada. Devuelve su dirección pública. */
   async prepararFoto(businessId: string, archivo: Express.Multer.File | undefined): Promise<string> {
     if (!this.medios) throw new ServiceUnavailableException('Las imágenes no están disponibles en este entorno');
