@@ -228,4 +228,24 @@ describe('Fotos de producto: quitar fondo persistente', () => {
     await svc.removeImage(BIZ, 'p-1', 'img-1');
     expect(remove).toHaveBeenCalledWith([`${BIZ}/p-1/sinfondo.webp`, `${BIZ}/p-1/orig.webp`]);
   });
+
+  // duplicate() reusa las URLs: borrar la foto de la copia no puede borrar el
+  // archivo que la ficha original sigue mostrando.
+  it('borrar una foto cuyo archivo usa otra ficha: borra el registro pero no el archivo', async () => {
+    const guardada = { id: 'img-1', productId: 'p-1', url: `${URL_BASE}${BIZ}/p-0/compartida.webp`, backgroundRemoved: false, originalUrl: null };
+    const { svc, prisma, remove } = armar(guardada);
+    prisma.productImage.count.mockResolvedValue(1);
+    await svc.removeImage(BIZ, 'p-1', 'img-1');
+    expect(prisma.productImage.deleteMany).toHaveBeenCalled();
+    expect(remove).not.toHaveBeenCalled();
+  });
+
+  it('rotar una foto cuyo archivo usa otra ficha: sube la nueva y no borra la vieja', async () => {
+    const guardada = { id: 'img-1', productId: 'p-1', url: `${URL_BASE}${BIZ}/p-0/compartida.webp`, backgroundRemoved: false, originalUrl: null };
+    const { svc, prisma, remove, upload } = armar(guardada);
+    prisma.productImage.count.mockResolvedValue(1);
+    await svc.rotateImage(BIZ, 'p-1', 'img-1');
+    expect(upload).toHaveBeenCalledTimes(1);
+    expect(remove).not.toHaveBeenCalled();
+  });
 });

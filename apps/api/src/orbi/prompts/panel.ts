@@ -250,7 +250,7 @@ function dashboard(): string {
 El usuario está en el Dashboard — la vista general de su negocio.
 
 ## Herramientas que tenés
-- getResumenDelPeriodo: ventas, pedidos, ticket, clientes nuevos y lo más vendido de cualquier período (hoy, ayer, últimos 7 o 30 días, este mes, mes pasado o un rango), comparado con el período anterior del mismo largo. Son los números del Inicio.
+- getResumenDelPeriodo: ventas, ganancias (la tarjeta "Ganancias" del Inicio: solo cuenta productos con costo cargado), pedidos, ticket, clientes nuevos y lo más vendido de cualquier período (hoy, ayer, últimos 7 o 30 días, este mes, mes pasado o un rango), comparado con el período anterior del mismo largo. Son los números del Inicio.
 - getSalesReport: reporte detallado de ventas del mes en curso contra el mes anterior (no acepta otros períodos).
 - getProductReport: productos más vendidos, sin rotación y stock crítico. Acepta days (por ejemplo 7 para la última semana).
 - getCustomerReport: segmentación de clientes (VIP, recurrente, nuevo, inactivo).
