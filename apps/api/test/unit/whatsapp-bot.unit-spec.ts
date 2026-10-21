@@ -132,7 +132,7 @@ function armar(o: Opciones = {}) {
     enviarFotoDeProducto: jest.fn().mockResolvedValue({ externalId: 'wamid.FOTO', url: 'https://almacen/p.jpg' }),
   };
   const storefront: any = {
-    listProducts: jest.fn().mockResolvedValue({ total: 1, data: [{ id: 'abcdef12-0000', name: 'Zapatilla Run', categoryName: 'Calzado', price: 50000, comparePrice: 60000, priceTo: null, promoLabel: null, inStock: true, byOrder: false, variantOptions: [{ name: 'Talle', values: [{ value: '40' }, { value: '41' }] }] }] }),
+    listProducts: jest.fn().mockResolvedValue({ total: 1, data: [{ id: 'abcdef12-0000-4000-8000-000000000000', name: 'Zapatilla Run', categoryName: 'Calzado', price: 50000, comparePrice: 60000, priceTo: null, promoLabel: null, inStock: true, byOrder: false, variantOptions: [{ name: 'Talle', values: [{ value: '40' }, { value: '41' }] }] }] }),
     getProduct: jest.fn(),
     listCoupons: jest.fn().mockResolvedValue([
       { code: 'OCTUBRE10', name: 'Octubre', type: 'PERCENT_TICKET', value: 10, minAmount: 50000, endDate: '2026-10-31T23:59:59.000Z', categories: [] },
@@ -280,7 +280,7 @@ describe('WhatsappBotService.atender', () => {
 
   describe('fotos de producto', () => {
     const producto = {
-      id: 'abcdef12-0000', name: 'Zapatilla Run', description: null, categoryName: 'Calzado', price: 50000, comparePrice: null, promoLabel: null, promo: null, byOrder: false, specs: [],
+      id: 'abcdef12-0000-4000-8000-000000000000', name: 'Zapatilla Run', description: null, categoryName: 'Calzado', price: 50000, comparePrice: null, promoLabel: null, promo: null, byOrder: false, specs: [],
       options: [{ name: 'Color', values: [{ id: 'ov-rojo' }, { id: 'ov-azul' }] }],
       variants: [{ id: 'var-rojo', optionValues: [{ optionValueId: 'ov-rojo', value: 'Rojo' }], price: 50000, inStock: true }],
       images: [
@@ -294,7 +294,7 @@ describe('WhatsappBotService.atender', () => {
     ];
 
     it('manda la foto del producto con su nombre, la deja en el chat como de Orbi y después contesta el texto', async () => {
-      const t = armar({ eventos: pide({ producto_id: 'abcdef12-0000' }) });
+      const t = armar({ eventos: pide({ producto_id: 'abcdef12-0000-4000-8000-000000000000' }) });
       t.storefront.getProduct.mockResolvedValue(producto);
       await t.bot.atender([MSG]);
       expect(t.whatsapp.enviarFotoDeProducto).toHaveBeenCalledWith(BIZ, CONV, MSG.waId, 'https://supa/a.webp', 'Zapatilla Run');
@@ -305,14 +305,14 @@ describe('WhatsappBotService.atender', () => {
     });
 
     it('con variante_id manda la foto de ese color y lo aclara en el pie', async () => {
-      const t = armar({ eventos: pide({ producto_id: 'abcdef12-0000', variante_id: 'var-rojo' }) });
+      const t = armar({ eventos: pide({ producto_id: 'abcdef12-0000-4000-8000-000000000000', variante_id: 'var-rojo' }) });
       t.storefront.getProduct.mockResolvedValue(producto);
       await t.bot.atender([MSG]);
       expect(t.whatsapp.enviarFotoDeProducto).toHaveBeenCalledWith(BIZ, CONV, MSG.waId, 'https://supa/rojo.webp', 'Zapatilla Run (Rojo)');
     });
 
     it('manda como mucho 3 fotos por respuesta y no repite una', async () => {
-      const t = armar({ eventos: pide({ producto_id: 'abcdef12-0001' }, { producto_id: 'abcdef12-0002' }, { producto_id: 'abcdef12-0003' }, { producto_id: 'abcdef12-0004' }, { producto_id: 'abcdef12-0004' }) });
+      const t = armar({ eventos: pide({ producto_id: 'abcdef12-0000-4000-8000-000000000001' }, { producto_id: 'abcdef12-0000-4000-8000-000000000002' }, { producto_id: 'abcdef12-0000-4000-8000-000000000003' }, { producto_id: 'abcdef12-0000-4000-8000-000000000004' }, { producto_id: 'abcdef12-0000-4000-8000-000000000004' }) });
       t.storefront.getProduct.mockImplementation(async (_s: string, id: string) => ({ ...producto, id, images: [{ url: `https://supa/${id}.webp`, isPrimary: true, optionValueId: null }] }));
       await t.bot.atender([MSG]);
       expect(t.whatsapp.enviarFotoDeProducto).toHaveBeenCalledTimes(3);
@@ -321,7 +321,7 @@ describe('WhatsappBotService.atender', () => {
     });
 
     it('si la foto no se pudo preparar, no la anota en el chat y le dice al modelo que pase el link', async () => {
-      const t = armar({ eventos: pide({ producto_id: 'abcdef12-0000' }) });
+      const t = armar({ eventos: pide({ producto_id: 'abcdef12-0000-4000-8000-000000000000' }) });
       t.storefront.getProduct.mockResolvedValue(producto);
       t.whatsapp.enviarFotoDeProducto.mockResolvedValue(null);
       await t.bot.atender([MSG]);
@@ -330,7 +330,7 @@ describe('WhatsappBotService.atender', () => {
     });
 
     it('un producto sin fotos no manda nada', async () => {
-      const t = armar({ eventos: pide({ producto_id: 'abcdef12-0000' }) });
+      const t = armar({ eventos: pide({ producto_id: 'abcdef12-0000-4000-8000-000000000000' }) });
       t.storefront.getProduct.mockResolvedValue({ ...producto, images: [] });
       await t.bot.atender([MSG]);
       expect(t.whatsapp.enviarFotoDeProducto).not.toHaveBeenCalled();
@@ -437,6 +437,26 @@ describe('HerramientasDelBot', () => {
     expect(r).toMatchObject({ ok: true, datos: { pedidos: [{ numero: 12, estado: 'Enviado', productos: ['2 × Remera (M)'] }] } });
   });
 
+  it('el detalle de un producto acepta el código corto del link y lo completa solo con productos publicados de este negocio', async () => {
+    const { h, tienda } = herramientas();
+    const prisma: any = { order: { findMany: jest.fn() }, product: { findFirst: jest.fn().mockResolvedValue({ id: 'abcdef12-0000-4000-8000-000000000000' }) } };
+    const hh = new HerramientasDelBot(prisma, tienda);
+    tienda.getProduct.mockResolvedValue({ id: 'abcdef12-0000-4000-8000-000000000000', name: 'Reloj', description: null, categoryName: null, price: 1, comparePrice: null, promoLabel: null, promo: null, byOrder: false, specs: [], options: [], variants: [], images: [] });
+    const r = await hh.ejecutar('detalle_producto', { producto_id: 'abcdef12' }, ctx);
+    expect(r.ok).toBe(true);
+    expect(prisma.product.findFirst.mock.calls[0][0].where).toMatchObject({ businessId: BIZ, id: { startsWith: 'abcdef12' }, status: 'PUBLISHED', deletedAt: null });
+    expect(tienda.getProduct).toHaveBeenCalledWith('rama', 'abcdef12-0000-4000-8000-000000000000');
+    void h;
+  });
+
+  it('un código corto que no existe en la tienda se rechaza sin consultar el catálogo', async () => {
+    const tienda: any = { getProduct: jest.fn() };
+    const prisma: any = { order: { findMany: jest.fn() }, product: { findFirst: jest.fn().mockResolvedValue(null) } };
+    const r = await new HerramientasDelBot(prisma, tienda).ejecutar('detalle_producto', { producto_id: 'deadbeef' }, ctx);
+    expect(r.ok).toBe(false);
+    expect(tienda.getProduct).not.toHaveBeenCalled();
+  });
+
   it('los datos de la tienda no incluyen CBU, alias ni datos bancarios', async () => {
     const t = armar();
     const h = new HerramientasDelBot(t.prisma, t.storefront);
@@ -462,11 +482,11 @@ describe('HerramientasDelBot', () => {
   it('el detalle de un producto cuenta su promo 2x1 y a qué alcanza', async () => {
     const { h, tienda } = herramientas();
     tienda.getProduct.mockResolvedValue({
-      id: 'abcdef12-0000', name: 'Remera', description: null, categoryName: 'Remeras', price: 10000, comparePrice: null, promoLabel: '2x1', byOrder: false, specs: [],
+      id: 'abcdef12-0000-4000-8000-000000000000', name: 'Remera', description: null, categoryName: 'Remeras', price: 10000, comparePrice: null, promoLabel: '2x1', byOrder: false, specs: [],
       promo: { label: '2x1', llevaCantidad: 2, pagaCantidad: 1, scope: 'CATEGORY', categoryName: 'Remeras', otherProducts: [] },
       options: [], variants: [],
     });
-    const r = (await h.ejecutar('detalle_producto', { producto_id: 'abcdef12-0000' }, ctx)) as { ok: true; datos: any };
+    const r = (await h.ejecutar('detalle_producto', { producto_id: 'abcdef12-0000-4000-8000-000000000000' }, ctx)) as { ok: true; datos: any };
     expect(r.datos.promocion).toMatchObject({ lleva: 2, paga: 1, aplica_a: 'toda la categoría Remeras' });
   });
 

@@ -23,7 +23,7 @@ export type ResultadoDeHerramienta = { ok: true; datos: unknown } | { ok: false;
 export const HERRAMIENTA_PREPARAR_PEDIDO: LlmToolDefinition = {
   name: 'preparar_pedido',
   description:
-    'Arma el pedido del cliente. Usala SOLO cuando ya dijo qué productos y cuántos quiere, con talle/color definidos (los ids de variante salen de detalle_producto). El sistema valida el stock y los precios y le muestra el resumen al cliente con botones para confirmar: no escribas tu propio resumen ni preguntes si confirma. Si devuelve un error, contáselo al cliente y ofrecé alternativas.',
+    'Arma el pedido del cliente. Usala SOLO cuando ya dijo qué productos y cuántos quiere, con talle/color definidos (los ids de variante salen de detalle_producto; si el producto no tiene variantes alcanza con su producto_id). El sistema valida el stock y los precios y le muestra el resumen al cliente con botones para confirmar: no escribas tu propio resumen ni preguntes si confirma. Si devuelve un error, contáselo al cliente y ofrecé alternativas: no inventes que no hay stock si el error es de otra cosa.',
   parameters: {
     type: 'object',
     properties: {
@@ -32,8 +32,12 @@ export const HERRAMIENTA_PREPARAR_PEDIDO: LlmToolDefinition = {
         description: 'Los productos del pedido.',
         items: {
           type: 'object',
-          properties: { variante_id: { type: 'string', description: 'El id de la variante (de detalle_producto).' }, cantidad: { type: 'integer', description: 'Cuántas unidades.' } },
-          required: ['variante_id', 'cantidad'],
+          properties: {
+            variante_id: { type: 'string', description: 'El id de la variante (de detalle_producto).' },
+            producto_id: { type: 'string', description: 'Solo si el producto no tiene variantes: el id del producto.' },
+            cantidad: { type: 'integer', description: 'Cuántas unidades.' },
+          },
+          required: ['cantidad'],
         },
       },
     },
@@ -59,7 +63,7 @@ export const HERRAMIENTAS_DEL_BOT: LlmToolDefinition[] = [
     description: 'Detalle de UN producto: descripción, precio, cada variante (talle/color) con su stock y características. Usá el id que devolvió buscar_productos.',
     parameters: {
       type: 'object',
-      properties: { producto_id: { type: 'string', description: 'El id del producto.' } },
+      properties: { producto_id: { type: 'string', description: 'El id del producto (el de buscar_productos; sirve también el código corto del final del link).' } },
       required: ['producto_id'],
     },
   },
@@ -127,7 +131,7 @@ const enlaceDeProducto = (slug: string, id: string) => `https://${slug}.orbita.s
 
 export class HerramientasDelBot {
   constructor(
-    private readonly prisma: Pick<PrismaService, 'order'>,
+    private readonly prisma: Pick<PrismaService, 'order' | 'product'>,
     private readonly tienda: Pick<StorefrontService, 'listProducts' | 'getProduct' | 'getConfig' | 'listCoupons'>,
   ) {}
 
@@ -180,8 +184,9 @@ export class HerramientasDelBot {
   }
 
   private async detalleProducto(ctx: ContextoDelBot, id: string): Promise<ResultadoDeHerramienta> {
-    if (!/^[0-9a-f-]{8,36}$/i.test(id)) return { ok: false, error: 'Ese id de producto no es válido: buscalo de nuevo con buscar_productos.' };
-    const p = await this.tienda.getProduct(ctx.slug, id);
+    const completo = await this.idCompleto(ctx, id);
+    if (!completo) return { ok: false, error: 'Ese id de producto no es válido: buscalo de nuevo con buscar_productos.' };
+    const p = await this.tienda.getProduct(ctx.slug, completo);
     const opciones = new Map(p.options.flatMap((o) => o.values.map((v) => [v.id, o.name] as const)));
     return {
       ok: true,
@@ -219,11 +224,23 @@ export class HerramientasDelBot {
     };
   }
 
+  /**
+   * El id completo de un producto. El modelo a veces usa el código corto del final del link de la tienda (8 caracteres) en
+   * vez del id: se completa buscándolo, solo entre los productos publicados de este negocio.
+   */
+  private async idCompleto(ctx: ContextoDelBot, id: string): Promise<string | null> {
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return id;
+    if (!/^[0-9a-f-]{8,35}$/i.test(id)) return null;
+    const p = await this.prisma.product.findFirst({ where: { businessId: ctx.businessId, id: { startsWith: id.toLowerCase() }, status: 'PUBLISHED', deletedAt: null }, select: { id: true } });
+    return p?.id ?? null;
+  }
+
   /** La foto del producto (o la de la variante pedida, si tiene una propia) con su nombre de pie. */
   private async mostrarFoto(ctx: ContextoDelBot, id: string, varianteId?: string): Promise<ResultadoDeHerramienta> {
     if (!ctx.enviarFoto) return { ok: false, error: 'En este chat no se pueden mandar fotos: pasale el link del producto.' };
-    if (!/^[0-9a-f-]{8,36}$/i.test(id)) return { ok: false, error: 'Ese id de producto no es válido: buscalo de nuevo con buscar_productos.' };
-    const p = await this.tienda.getProduct(ctx.slug, id);
+    const completo = await this.idCompleto(ctx, id);
+    if (!completo) return { ok: false, error: 'Ese id de producto no es válido: buscalo de nuevo con buscar_productos.' };
+    const p = await this.tienda.getProduct(ctx.slug, completo);
     const variante = varianteId ? p.variants.find((v) => v.id === varianteId) : undefined;
     const propias = new Set(variante?.optionValues.map((ov) => ov.optionValueId) ?? []);
     const foto =

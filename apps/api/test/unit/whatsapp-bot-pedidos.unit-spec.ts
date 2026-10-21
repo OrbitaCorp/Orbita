@@ -19,8 +19,11 @@ const ctx = { businessId: BIZ, slug: 'rama', customerId: CLI, conversationId: CO
 
 const linea = (v: string, cantidad: number, precio: number, extra: Record<string, unknown> = {}) => ({ variantId: v, ok: true, nombre: 'Remera', variante: 'M / Negro', precio, maxQty: 9, ...extra });
 
-function armar(o: { carrito?: any; pago?: any; modo?: string; clienteLinea?: any; creacion?: 'ok' | Error; claim?: number } = {}) {
+function armar(o: { carrito?: any; pago?: any; modo?: string; clienteLinea?: any; creacion?: 'ok' | Error; claim?: number; productos?: any[]; variantesDeLaTienda?: string[] } = {}) {
   const prisma: any = {
+    // Por defecto, todo id que llega es de una variante de la tienda (el caso normal).
+    productVariant: { findMany: jest.fn().mockImplementation(async ({ where }: any) => where.id.in.filter((i: string) => !o.variantesDeLaTienda || o.variantesDeLaTienda.includes(i)).map((id: string) => ({ id }))) },
+    product: { findMany: jest.fn().mockResolvedValue(o.productos ?? []) },
     businessConfig: { findUnique: jest.fn().mockResolvedValue(o.pago === undefined ? { acceptsTransfer: true, acceptsCoordinateLater: false, transferDiscountPercent: null } : o.pago) },
     business: { findFirst: jest.fn().mockResolvedValue({ mode: o.modo ?? 'FULL' }) },
     customer: { findFirst: jest.fn().mockResolvedValue(o.clienteLinea === undefined ? { firstName: 'Ana', lastName: 'Paz', email: null, phone: null } : o.clienteLinea) },
@@ -80,6 +83,40 @@ describe('disponibilidad', () => {
     expect(sin.ok).toBe(false);
     expect(sin.motivo).toContain('Coordinar por WhatsApp');
     expect((await armar({ modo: 'SHOWCASE' }).svc.disponibilidad(BIZ)).motivo).toContain('vidriera');
+  });
+});
+
+describe('preparar: ids que el modelo confunde', () => {
+  const PROD = '48177a7e-8701-4dba-b26a-0ca1809680bc';
+  const VAR = '89aebc34-ec89-4547-b980-7533fe39e49a';
+
+  it('si en lugar del id de la variante manda el del producto y tiene una sola variante, usa esa', async () => {
+    const t = armar({ variantesDeLaTienda: [], productos: [{ id: PROD, name: 'Reloj', variants: [{ id: VAR }] }], carrito: { items: [linea(VAR, 1, 25000)], ticketDiscount: null, coupon: null } });
+    const r = await t.svc.preparar(ctx, TOPES, [{ variante_id: PROD, cantidad: 1 }]);
+    expect(r.ok).toBe(true);
+    expect(t.storefront.validateCart).toHaveBeenCalledWith('rama', [{ variantId: VAR, quantity: 1 }], { customerId: CLI });
+    expect(t.prisma.product.findMany.mock.calls[0][0].where).toMatchObject({ businessId: BIZ, deletedAt: null, status: 'PUBLISHED' });
+    expect(t.prisma.productVariant.findMany.mock.calls[0][0].where).toMatchObject({ product: { businessId: BIZ } });
+  });
+
+  it('acepta producto_id y el código corto del link', async () => {
+    const t = armar({ variantesDeLaTienda: [], productos: [{ id: PROD, name: 'Reloj', variants: [{ id: VAR }] }], carrito: { items: [linea(VAR, 2, 25000)], ticketDiscount: null, coupon: null } });
+    expect((await t.svc.preparar(ctx, TOPES, [{ producto_id: '48177a7e', cantidad: 2 }])).ok).toBe(true);
+    expect(t.storefront.validateCart).toHaveBeenCalledWith('rama', [{ variantId: VAR, quantity: 2 }], { customerId: CLI });
+  });
+
+  it('si el producto tiene varias variantes, no adivina: le pide al modelo que consulte el detalle', async () => {
+    const t = armar({ variantesDeLaTienda: [], productos: [{ id: PROD, name: 'Remera', variants: [{ id: V1 }, { id: V2 }] }] });
+    const r = await t.svc.preparar(ctx, TOPES, [{ variante_id: PROD, cantidad: 1 }]);
+    expect(r).toMatchObject({ ok: false, error: expect.stringContaining('detalle_producto') });
+    expect(t.storefront.validateCart).not.toHaveBeenCalled();
+  });
+
+  it('un id que no es de este negocio (ni variante ni producto) no llega a la tienda', async () => {
+    const t = armar({ variantesDeLaTienda: [], productos: [] });
+    const r = await t.svc.preparar(ctx, TOPES, [{ variante_id: V1, cantidad: 1 }]);
+    expect(r.ok).toBe(false);
+    expect(t.storefront.validateCart).not.toHaveBeenCalled();
   });
 });
 

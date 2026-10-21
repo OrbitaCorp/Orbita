@@ -118,16 +118,23 @@ export class WhatsappBotPedidosService {
     // Se juntan los renglones repetidos y se descartan los inválidos: nada de lo que llega del modelo se da por bueno.
     const porVariante = new Map<string, number>();
     for (const r of Array.isArray(crudos) ? crudos : []) {
-      const item = r as { variante_id?: unknown; cantidad?: unknown };
-      if (typeof item.variante_id !== 'string' || !/^[0-9a-f-]{36}$/i.test(item.variante_id)) return { ok: false, error: 'Falta el id de la variante: consultá detalle_producto para elegir talle/color y usá ese id.' };
+      const item = r as { variante_id?: unknown; producto_id?: unknown; cantidad?: unknown };
+      const id = [item.variante_id, item.producto_id].find((x): x is string => typeof x === 'string' && /^[0-9a-f-]{8,36}$/i.test(x));
+      if (!id) return { ok: false, error: 'Falta el id de la variante: consultá detalle_producto para elegir talle/color y usá ese id.' };
       const cantidad = Number(item.cantidad);
       if (!Number.isInteger(cantidad) || cantidad < 1) return { ok: false, error: 'La cantidad tiene que ser un número entero de 1 en adelante.' };
-      porVariante.set(item.variante_id, (porVariante.get(item.variante_id) ?? 0) + cantidad);
+      porVariante.set(id.toLowerCase(), (porVariante.get(id.toLowerCase()) ?? 0) + cantidad);
     }
     if (porVariante.size === 0) return { ok: false, error: 'Falta saber qué productos quiere el cliente.' };
     if (porVariante.size > MAX_LINEAS) return { ok: false, error: `Un pedido por chat puede tener hasta ${MAX_LINEAS} productos distintos.` };
     const unidades = [...porVariante.values()].reduce((a, b) => a + b, 0);
     if (unidades > topes.maxUnidades) return { ok: false, error: `Por chat se pueden pedir hasta ${topes.maxUnidades} unidades. Para más cantidad, ofrecé que lo vea una persona.` };
+
+    // El modelo a veces manda el id del producto (o su código corto) donde va el de la variante: se corrige si el producto tiene una sola.
+    const corregido = await this.variantesReales(ctx.businessId, porVariante);
+    if (typeof corregido === 'string') return { ok: false, error: corregido };
+    porVariante.clear();
+    for (const [id, cantidad] of corregido) porVariante.set(id, cantidad);
 
     let validado: Awaited<ReturnType<StorefrontService['validateCart']>>;
     try {
@@ -158,6 +165,34 @@ export class WhatsappBotPedidosService {
         aviso: 'El sistema le va a mostrar el resumen al cliente con los botones para confirmar. NO escribas tu propio resumen ni le preguntes si confirma.',
       },
     };
+  }
+
+  /**
+   * Cada id del pedido tiene que ser de una variante de ESTE negocio. Si no lo es pero es el id de un producto publicado con una
+   * sola variante, se usa esa; si tiene varias, se le dice al modelo que elija. Devuelve los renglones corregidos o el error.
+   */
+  private async variantesReales(businessId: string, pedidas: Map<string, number>): Promise<Map<string, number> | string> {
+    const ids = [...pedidas.keys()];
+    const esVariante = new Set(
+      (await this.prisma.productVariant.findMany({ where: { id: { in: ids.filter((i) => i.length === 36) }, isActive: true, product: { businessId } }, select: { id: true } })).map((v) => v.id),
+    );
+    const otros = ids.filter((i) => !esVariante.has(i));
+    const productos = otros.length === 0 ? [] : await this.prisma.product.findMany({
+      where: { businessId, deletedAt: null, status: 'PUBLISHED', OR: otros.map((i) => (i.length === 36 ? { id: i } : { id: { startsWith: i } })) },
+      select: { id: true, name: true, variants: { where: { isActive: true }, select: { id: true } } },
+    });
+    const resultado = new Map<string, number>();
+    for (const [id, cantidad] of pedidas) {
+      let real = id;
+      if (!esVariante.has(id)) {
+        const producto = productos.find((p) => p.id === id || p.id.startsWith(id));
+        if (!producto) return 'Ese id no es de una variante ni de un producto de la tienda: buscalo con buscar_productos y detalle_producto, y usá el variante_id.';
+        if (producto.variants.length !== 1) return `${producto.name} tiene varias variantes (talle/color): consultá detalle_producto y usá el variante_id de la que eligió el cliente.`;
+        real = producto.variants[0].id;
+      }
+      resultado.set(real, (resultado.get(real) ?? 0) + cantidad);
+    }
+    return resultado;
   }
 
   async descartar(businessId: string, conversationId: string): Promise<void> {
