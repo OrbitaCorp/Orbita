@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req, ServiceUnavailableException, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { PlatformAdminGuard } from '../common/guards/platform-admin.guard';
-import { SoloSuperadmin } from '../common/decorators/platform-role.decorator';
+import { SoloSuperadmin, TodoElEquipo } from '../common/decorators/platform-role.decorator';
 import { PlatformAdminContext } from '../common/types/auth-context.type';
 import { PlatformService } from './platform.service';
 import { WizardAnalyticsService } from '../wizard-analytics/wizard-analytics.service';
@@ -76,13 +76,18 @@ export class PlatformController {
 
   // ── Dashboard / lecturas ──────────────────────────────────────────────────
 
+  // Marketing ve cómo crece la plataforma, no la facturación: a su rol se le saca lo que es plata (el resto del Resumen es conteo de negocios).
   @Get('overview')
-  overview() {
-    return this.platformService.overview();
+  @TodoElEquipo()
+  async overview(@Req() req: RequestWithAdmin) {
+    const resumen = await this.platformService.overview();
+    if (req.user.adminRole !== 'MARKETING') return resumen;
+    return { ...resumen, subscriptions: { byStatus: {}, byOrigin: {}, mrr: 0, currency: resumen.subscriptions.currency } };
   }
 
   // Series para los gráficos del dashboard (RBT — dashboard de super admin).
   @Get('growth-series')
+  @TodoElEquipo()
   growthSeries(@Query() query: SeriesQueryDto) {
     return this.platformService.growthSeries(query);
   }

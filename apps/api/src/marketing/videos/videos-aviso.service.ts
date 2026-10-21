@@ -107,10 +107,10 @@ export class VideosAvisoService {
     return { enviados, pendientes: pendientes.length };
   }
 
-  /** Todo el equipo: superadmins activos con correo del equipo, en su correo de la cuenta y en el personal (si lo cargó). */
+  /** Todo el equipo: superadmins y marketing activos con correo del equipo, en su correo de la cuenta y en el personal (si lo cargó). */
   private async destinos(pendientes: Pendiente[]): Promise<Destino[]> {
     const admins = await this.prisma.platformAdmin.findMany({
-      where: { isActive: true, role: 'SUPERADMIN' },
+      where: { isActive: true, role: { in: ['SUPERADMIN', 'MARKETING'] } },
       select: { email: true, personalEmail: true },
     });
     const dominios = dominiosDelEquipo(this.config);

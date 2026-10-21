@@ -7,7 +7,7 @@ import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 // (SuperAdminDashboard) y la página de detalle de negocio (BusinessDetailPage)
 // — extraídas de lo que antes vivía todo en pages/superadmin/index.tsx.
 
-export const ROLE_LABELS: Record<string, string> = { SUPERADMIN: 'Super administrador', OPERATOR: 'Operador' }
+export const ROLE_LABELS: Record<string, string> = { SUPERADMIN: 'Super administrador', OPERATOR: 'Operador', MARKETING: 'Marketing' }
 // Mismos strings que escribe PlatformService en platformAdminLog.create (ver platform.service.ts).
 export const ACTION_LABELS: Record<string, string> = {
   suspend_business: 'Suspender negocio',

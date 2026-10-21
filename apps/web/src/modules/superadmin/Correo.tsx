@@ -38,7 +38,7 @@ function leerBorrador(): Partial<Borrador> {
 const dominioDe = (email: string) => email.split('@')[1] ?? ''
 const textarea: React.CSSProperties = { ...inputStyle, height: 'auto', minHeight: 300, padding: '11px 13px', lineHeight: 1.6, resize: 'vertical', width: '100%' }
 
-export function TabCorreo({ puedeEnviar }: { puedeEnviar: boolean }) {
+export function TabCorreo({ puedeEnviar, puedeEditarCasillas }: { puedeEnviar: boolean; puedeEditarCasillas: boolean }) {
   const [tickCasillas, setTickCasillas] = useState(0)
   const [tickEnviados, setTickEnviados] = useState(0)
   const { data: casillas, error: errorCasillas } = useFetch(() => platformApi.correoCasillas(), [tickCasillas])
@@ -276,7 +276,7 @@ export function TabCorreo({ puedeEnviar }: { puedeEnviar: boolean }) {
       )}
 
       {gestionando && (
-        <ModalCasillas casillas={casillas} puedeEditar={puedeEnviar} onClose={() => setGestionando(false)} onCambio={recargarCasillas} />
+        <ModalCasillas casillas={casillas} puedeEditar={puedeEditarCasillas} onClose={() => setGestionando(false)} onCambio={recargarCasillas} />
       )}
 
       {aviso && (

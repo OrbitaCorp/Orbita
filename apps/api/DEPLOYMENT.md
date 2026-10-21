@@ -429,6 +429,17 @@ su cantidad.
 Sin los tres secretos cargados, la pantalla de Marketing avisa que TikTok no está configurado y el resto
 de la API sigue igual.
 
+## Rol Marketing del super panel
+
+Tercer rol de `platform_admins.role` (`MARKETING`, migración `20261021010000_platform_admin_rol_marketing`: agrega el valor al enum, no toca datos).
+Es para quien lleva las redes y los videos (por ejemplo, Milagros). A diferencia del OPERATOR, que **lee todo** y no escribe lo sensible, un MARKETING
+solo entra a lo que lo nombra a propósito (`PlatformAdminGuard`: sin `@SuperadminYMarketing()` / `@TodoElEquipo()` lo rechaza, también en lectura).
+Hoy puede: Resumen (sin facturación: `overview` le saca el MRR y las suscripciones), Marketing completo (TikTok, Instagram con mensajes directos y
+contenido, videos, tutoriales, prospección y el conector de Claude), y Correo (ver, vista previa y enviar; las casillas siguen siendo de SUPERADMIN).
+No ve Negocios, Soporte, Costos, Admins, Actividad, Auditoría ni campañas. La lista exacta está fijada en `test/unit/platform.rol-marketing.unit-spec.ts`.
+Dar el rol: Super panel → Admins → editar → Rol «Marketing». Ahí mismo se le saca el acceso total a quien lo tenga como SUPERADMIN.
+Sus videos los aprueba la dirección (`politica-aprobacion.ts` sigue mandando por quién subió); los avisos por correo de videos también le llegan.
+
 ## Prospección: consulta de cuentas de Instagram y conector de Claude
 
 Qué hace (código en `src/marketing/prospeccion/`): Superadmin → Marketing → Prospección consulta cuentas

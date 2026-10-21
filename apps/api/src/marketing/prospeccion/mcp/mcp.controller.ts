@@ -2,7 +2,7 @@ import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get,
 import { SkipThrottle } from '@nestjs/throttler';
 import { Public } from '../../../common/decorators/public.decorator';
 import { PlatformAdminGuard } from '../../../common/guards/platform-admin.guard';
-import { SoloSuperadmin } from '../../../common/decorators/platform-role.decorator';
+import { SuperadminYMarketing } from '../../../common/decorators/platform-role.decorator';
 import { PlatformAdminContext } from '../../../common/types/auth-context.type';
 import { TutorialesService } from '../../videos/tutoriales.service';
 import { VideosService } from '../../videos/videos.service';
@@ -109,7 +109,7 @@ export class McpOauthController {
 // ── Consentimiento (lo usa la página del panel, con la sesión del superadmin) ───────────────────────────────
 
 @UseGuards(PlatformAdminGuard)
-@SoloSuperadmin()
+@SuperadminYMarketing()
 @Controller('platform/mcp')
 export class McpConsentimientoController {
   constructor(private readonly oauth: McpOauthService) {}

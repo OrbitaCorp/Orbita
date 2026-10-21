@@ -629,7 +629,7 @@ export interface OrbiConversacionAbierta {
   mensajes: { rol: 'user' | 'assistant'; texto: string; fecha: string | null }[]
 }
 
-export type PlatformAdminRole = 'SUPERADMIN' | 'OPERATOR'
+export type PlatformAdminRole = 'SUPERADMIN' | 'OPERATOR' | 'MARKETING'
 
 export interface AdminRow {
   id: string

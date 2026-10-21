@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { PlatformAdminGuard } from '../../common/guards/platform-admin.guard';
-import { SoloSuperadmin } from '../../common/decorators/platform-role.decorator';
+import { SuperadminYMarketing } from '../../common/decorators/platform-role.decorator';
 import { PlatformAdminContext } from '../../common/types/auth-context.type';
 import { ActualizarTutorialDto, ComentarVideoDto, PublicarVideoInstagramDto } from './dto/videos.dto';
 import { VideosPublicarService } from './videos-publicar.service';
@@ -12,9 +12,10 @@ interface RequestWithAdmin {
 }
 
 // Superadmin → Marketing → Videos: la cola de videos que generó el equipo con su Claude (ver videos.service.ts).
-// Aprobar, rechazar y pasar a TikTok o Instagram queda a la vista de todos y sale con el nombre de la empresa: solo SUPERADMIN.
+// Es del equipo de marketing y de los fundadores (SUPERADMIN y MARKETING); un OPERATOR no entra. Quién puede aprobar lo decide la política
+// de aprobación (según quién subió el video), no el rol: marketing sube y comenta, la dirección aprueba.
 @UseGuards(PlatformAdminGuard)
-@SoloSuperadmin()
+@SuperadminYMarketing()
 @Controller('platform/marketing/videos')
 export class VideosController {
   constructor(
@@ -75,7 +76,7 @@ export class VideosController {
 
 // La lista de tutoriales (qué hay y qué falta). La actualiza el Claude de cada persona por el conector; acá se mira y se corrige.
 @UseGuards(PlatformAdminGuard)
-@SoloSuperadmin()
+@SuperadminYMarketing()
 @Controller('platform/marketing/tutoriales')
 export class TutorialesController {
   constructor(private readonly tutoriales: TutorialesService) {}

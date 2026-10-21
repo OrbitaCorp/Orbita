@@ -161,6 +161,10 @@ describe('quién puede conectar a Claude', () => {
       expect(code).toBeTruthy();
     }
   });
+  it('alguien de marketing con correo de la organización también puede (trabaja la prospección y los videos con su Claude)', async () => {
+    const { code } = await conectar(armar({ email: 'milagros@orbita.site', role: 'MARKETING' }));
+    expect(code).toBeTruthy();
+  });
   it.each([
     ['un correo de otro dominio', { email: 'mateo@gmail.com' }],
     ['un subdominio parecido', { email: 'x@orbita-corp.com.evil.com' }],

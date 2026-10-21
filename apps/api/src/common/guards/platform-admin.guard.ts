@@ -19,6 +19,9 @@ interface RequestWithUser {
  *    rol del admin esté entre los permitidos. Sin ese decorador, cualquier
  *    admin de plataforma pasa: la mayoría de `/platform` es de lectura y la
  *    ve todo el equipo (ver platform-role.decorator.ts para el criterio).
+ * 3. El rol MARKETING va al revés: lo que no lo nombra a propósito le queda
+ *    cerrado, también la lectura. Así una función nueva del super panel no
+ *    queda abierta para marketing sin que nadie lo decida.
  */
 @Injectable()
 export class PlatformAdminGuard implements CanActivate {
@@ -34,6 +37,9 @@ export class PlatformAdminGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
+    if (user.adminRole === 'MARKETING' && !rolesPermitidos?.includes('MARKETING')) {
+      throw new ForbiddenException('Tu cuenta es de marketing: esta parte del panel no está disponible para tu rol');
+    }
     if (rolesPermitidos?.length && !rolesPermitidos.includes(user.adminRole)) {
       throw new ForbiddenException('Esta acción es exclusiva de un superadmin');
     }

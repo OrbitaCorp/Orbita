@@ -2638,6 +2638,9 @@ model PlatformOutboundMail {
 enum PlatformAdminRole {
   SUPERADMIN // acceso total (fundadores)
   OPERATOR // soporte / operaciones (acceso acotado)
+  // Marketing (por ejemplo, Milagros): solo ve y usa lo que se le habilita a propósito (Marketing, Correo, Resumen y el
+  // conector de Claude). Cualquier otra parte del super panel le queda cerrada, aunque sea de lectura: ver PlatformAdminGuard.
+  MARKETING
 }
 
 // Segundo factor del login de platform admin (RBT-647): código de 6 dígitos
