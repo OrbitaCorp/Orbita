@@ -33,7 +33,7 @@ const guard = new PlatformAdminGuard(new Reflector());
 // de un negocio.
 const SOLO_SUPERADMIN = [
   'suspend', 'reactivate', 'grantComp', 'cancelBusiness',
-  'createAdmin', 'updateAdmin', 'removeAdmin',
+  'createAdmin', 'updateAdmin', 'removeAdmin', 'reactivateAdmin',
   'createDiscountCode', 'updateDiscountCode', 'sendDiscountOffer',
 ];
 

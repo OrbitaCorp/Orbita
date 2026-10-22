@@ -255,6 +255,13 @@ export class PlatformController {
     return this.platformService.removeAdmin(req.user.adminId, id);
   }
 
+  // Vuelve a habilitar a un admin que se había desactivado.
+  @Post('admins/:id/reactivate')
+  @SoloSuperadmin()
+  reactivateAdmin(@Req() req: RequestWithAdmin, @Param('id') id: string) {
+    return this.platformService.reactivateAdmin(req.user.adminId, id);
+  }
+
   // ── Testeo de plantillas de email (RBT-607) ─────────────────────────────
 
   @Get('mail-templates')

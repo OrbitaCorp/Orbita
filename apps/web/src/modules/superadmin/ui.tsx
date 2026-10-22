@@ -33,6 +33,7 @@ export const ACTION_LABELS: Record<string, string> = {
   create_admin: 'Crear admin',
   update_admin: 'Editar admin',
   deactivate_admin: 'Desactivar admin',
+  reactivate_admin: 'Reactivar admin',
   reset_admin_password: 'Restablecer la contraseña de un admin',
   change_own_password: 'Cambiar su propia contraseña',
   audit_item_update: 'Actualizar ítem de auditoría',

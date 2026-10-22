@@ -509,6 +509,7 @@ function TabAdmins({ currentAdminId }: { currentAdminId: string }) {
   const [reloadKey, setReloadKey] = useState(0)
   const [editando, setEditando] = useState<AdminRow | 'nuevo' | null>(null)
   const [desactivando, setDesactivando] = useState<AdminRow | null>(null)
+  const [reactivando, setReactivando] = useState<AdminRow | null>(null)
   const [restableciendo, setRestableciendo] = useState<AdminRow | null>(null)
   const [aviso, setAviso] = useState('')
   const { data, error } = useFetch(() => platformApi.admins(), [reloadKey])
@@ -562,6 +563,9 @@ function TabAdmins({ currentAdminId }: { currentAdminId: string }) {
                 {a.isActive && a.id !== currentAdminId && (
                   <button onClick={() => { setAviso(''); setRestableciendo(a) }} className="ds-hover" style={btnGhostSm}>Restablecer contraseña</button>
                 )}
+                {!a.isActive && (
+                  <button onClick={() => { setAviso(''); setReactivando(a) }} className="ds-hover" style={btnGhostSm}>Reactivar</button>
+                )}
                 {a.isActive && a.id !== currentAdminId && (
                   <button onClick={() => setDesactivando(a)} className="ds-hover" style={{ ...btnGhostSm, color: 'var(--color-error)', borderColor: 'var(--color-error)' }}>Desactivar</button>
                 )}
@@ -592,12 +596,26 @@ function TabAdmins({ currentAdminId }: { currentAdminId: string }) {
       {desactivando && (
         <ConfirmModal
           title={`¿Desactivar a ${desactivando.name}?`}
-          body="No va a poder iniciar sesión hasta que lo reactives creándolo de nuevo con el mismo email."
+          body="No va a poder iniciar sesión hasta que lo reactives con el botón «Reactivar» de esta misma lista."
           confirmLabel="Desactivar"
           onCancel={() => setDesactivando(null)}
           onConfirm={async () => {
             await platformApi.removeAdmin(desactivando.id)
             setDesactivando(null)
+            recargar()
+          }}
+        />
+      )}
+      {reactivando && (
+        <ConfirmModal
+          title={`¿Reactivar a ${reactivando.name}?`}
+          body="Vuelve a poder iniciar sesión con su misma cuenta, rol y contraseña. Se cierran sus sesiones viejas. Si no recuerda la contraseña, restablecésela después."
+          confirmLabel="Reactivar"
+          onCancel={() => setReactivando(null)}
+          onConfirm={async () => {
+            await platformApi.reactivateAdmin(reactivando.id)
+            setAviso(`${reactivando.name} quedó activo de nuevo.`)
+            setReactivando(null)
             recargar()
           }}
         />

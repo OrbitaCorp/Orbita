@@ -967,6 +967,28 @@ export class PlatformService {
     return { ok: true };
   }
 
+  // Vuelve a habilitar a un admin desactivado con removeAdmin. Conserva su cuenta, rol y contraseña; se limpian el
+  // bloqueo por intentos fallidos y las sesiones viejas, para que entre de cero. Si no recuerda la contraseña, se
+  // usa "Restablecer contraseña", que ahora queda disponible porque la cuenta vuelve a estar activa.
+  async reactivateAdmin(actingAdminId: string, id: string) {
+    const admin = await this.prisma.platformAdmin.findUnique({ where: { id } });
+    if (!admin) throw new NotFoundException('Admin no encontrado');
+    if (admin.isActive) throw new BadRequestException('Ese admin ya está activo.');
+
+    await this.prisma.platformAdmin.update({
+      where: { id },
+      data: { isActive: true, failedLoginAttempts: 0, lockedUntil: null },
+    });
+    await this.prisma.refreshToken.updateMany({
+      where: { userId: id, userType: 'PLATFORM_ADMIN', revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    await this.prisma.platformAdminLog.create({
+      data: { adminId: actingAdminId, action: 'reactivate_admin', targetType: 'platform_admin', targetId: id },
+    });
+    return { ok: true };
+  }
+
   // ── Códigos de descuento de plataforma ────────────────────────────────────
 
   // El código se guarda y se busca SIEMPRE en mayúsculas: el que lo tipea no

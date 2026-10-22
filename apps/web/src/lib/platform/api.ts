@@ -1241,6 +1241,7 @@ export const platformApi = {
   createAdmin: (input: UpsertAdminInput) => sendJSON<{ id: string }>('/platform/admins', 'POST', input),
   updateAdmin: (id: string, input: UpsertAdminInput) => sendJSON<{ id: string }>(`/platform/admins/${id}`, 'PUT', input),
   removeAdmin: (id: string) => sendJSON<{ ok: true }>(`/platform/admins/${id}`, 'DELETE'),
+  reactivateAdmin: (id: string) => sendJSON<{ ok: true }>(`/platform/admins/${id}/reactivate`, 'POST', {}),
   // Genera una contraseña temporal y se la manda por mail al correo personal (no vuelve en la respuesta).
   resetAdminPassword: (id: string, personalEmail?: string) =>
     sendJSON<{ ok: true; enviadoA: string }>(`/platform/admins/${id}/reset-password`, 'POST', personalEmail ? { personalEmail } : {}),
