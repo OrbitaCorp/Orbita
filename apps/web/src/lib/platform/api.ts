@@ -69,6 +69,17 @@ export type CorreoEnviado = {
   createdAt: string
 }
 export type CorreoInput = { senderId: string; to: string; subject: string; body: string }
+export type CorreoRecibido = {
+  messageId: string
+  folderId: string
+  fromEmail: string
+  fromName: string
+  to: string
+  subject: string
+  summary: string
+  receivedAt: string
+  unread: boolean
+}
 
 // Un negocio que pidió acceso anticipado a Instagram: PENDING hasta que el equipo lo suma como
 // evaluador en Meta y lo habilita.
@@ -1336,4 +1347,7 @@ export const platformApi = {
   correoVistaPrevia: (input: { senderId: string; body: string }) => sendJSON<{ html: string }>('/platform/correo/vista-previa', 'POST', input),
   enviarCorreo: (input: CorreoInput) => sendJSON<{ sent: boolean; simulated: boolean; error: string | null }>('/platform/correo/enviar', 'POST', input),
   correosEnviados: () => getJSON<CorreoEnviado[]>('/platform/correo/enviados'),
+  correosRecibidos: () => getJSON<CorreoRecibido[]>('/platform/correo/recibidos'),
+  correoRecibidoDetalle: (folderId: string, messageId: string) =>
+    getJSON<{ html: string }>(`/platform/correo/recibidos/${encodeURIComponent(folderId)}/${encodeURIComponent(messageId)}`),
 }

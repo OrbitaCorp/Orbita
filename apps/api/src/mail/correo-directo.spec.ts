@@ -1,5 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { cuerpoAHtml, extraerDestinatarios, firmaAHtml, remitenteParaFrom } from './correo-directo';
+import { decodificarEntidades, esEmailDeCeo } from '../platform/correo/zoho-ceo';
 import { MailService } from './mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -101,5 +102,14 @@ describe('correo directo del super panel', () => {
     });
     expect(fallo.status).toBe('FAILED');
     expect(send).not.toHaveBeenCalled();
+  });
+
+  it('restringe la bandeja de recibidos únicamente a las cuentas del CEO y decodifica entidades de Zoho', () => {
+    expect(esEmailDeCeo('ceo@orbita.site')).toBe(true);
+    expect(esEmailDeCeo('mateo@orbita.site')).toBe(true);
+    expect(esEmailDeCeo('ceo@orbita-corp.com')).toBe(true);
+    expect(esEmailDeCeo('alan@orbita.site')).toBe(false);
+    expect(esEmailDeCeo('cto@orbita-corp.com')).toBe(false);
+    expect(decodificarEntidades('&lt;mateo@orbita.site&gt; &amp; &quot;Órbita&quot;')).toBe('<mateo@orbita.site> & "Órbita"');
   });
 });

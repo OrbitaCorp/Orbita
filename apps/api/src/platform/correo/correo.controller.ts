@@ -70,4 +70,20 @@ export class CorreoPlataformaController {
   enviados() {
     return this.correo.enviados();
   }
+
+  @Get('recibidos')
+  @SoloSuperadmin()
+  recibidos(@Req() req: RequestWithAdmin) {
+    return this.correo.recibidos(req.user.adminId);
+  }
+
+  @Get('recibidos/:folderId/:messageId')
+  @SoloSuperadmin()
+  recibidoDetalle(
+    @Req() req: RequestWithAdmin,
+    @Param('folderId') folderId: string,
+    @Param('messageId') messageId: string,
+  ) {
+    return this.correo.recibidoDetalle(req.user.adminId, folderId, messageId);
+  }
 }

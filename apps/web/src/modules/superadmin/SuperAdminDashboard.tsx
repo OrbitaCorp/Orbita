@@ -122,7 +122,7 @@ export function SuperAdminDashboard() {
       {tab === 'auditoria' && <TabAuditoria currentAdminId={user.admin.id} />}
       {tab === 'admins' && <TabAdmins currentAdminId={user.admin.id} />}
       {tab === 'logs' && <TabLogs />}
-      {tab === 'correo' && <TabCorreo puedeEnviar={user.admin.role !== 'OPERATOR'} puedeEditarCasillas={user.admin.role === 'SUPERADMIN'} />}
+      {tab === 'correo' && <TabCorreo puedeEnviar={user.admin.role !== 'OPERATOR'} puedeEditarCasillas={user.admin.role === 'SUPERADMIN'} adminEmail={user.admin.email} />}
       {tab === 'marketing' && <TabMarketing puedePublicar={user.admin.role !== 'OPERATOR'} />}
       {tab === 'instagram' && <TabInstagram puedeHabilitar={user.admin.role === 'SUPERADMIN'} onCambio={refrescarSoporte} />}
       {tab === 'testeo' && <TabTesteo />}

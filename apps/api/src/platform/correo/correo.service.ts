@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Injectable,
@@ -17,6 +18,7 @@ import { extraerDestinatarios, MAX_DESTINATARIOS_DIRECTO } from '../../mail/corr
 import { SupabaseService } from '../../supabase/supabase.service';
 import { ENTRADA_IMAGEN } from '../../common/utils/subida-imagen';
 import { EnviarCorreoDto, UpsertCasillaDto, VistaPreviaCorreoDto } from './correo.dto';
+import { esEmailDeCeo, listarRecibidosZoho, obtenerContenidoRecibidoZoho } from './zoho-ceo';
 
 // Mismo bucket público que los logos de los negocios, con prefijo propio.
 const BUCKET = 'business-logos';
@@ -173,6 +175,23 @@ export class CorreoPlataformaService {
       adminName: f.admin.name,
       createdAt: f.createdAt.toISOString(),
     }));
+  }
+
+  async recibidos(adminId: string) {
+    await this.exigirCeo(adminId);
+    return listarRecibidosZoho();
+  }
+
+  async recibidoDetalle(adminId: string, folderId: string, messageId: string) {
+    await this.exigirCeo(adminId);
+    return obtenerContenidoRecibidoZoho(folderId, messageId);
+  }
+
+  private async exigirCeo(adminId: string) {
+    const admin = await this.prisma.platformAdmin.findUnique({ where: { id: adminId }, select: { email: true } });
+    if (!admin || !esEmailDeCeo(admin.email)) {
+      throw new ForbiddenException('La bandeja de recibidos es exclusiva de la cuenta de CEO');
+    }
   }
 
   private async casilla(id: string): Promise<PlatformMailSender> {
