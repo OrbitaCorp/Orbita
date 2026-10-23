@@ -272,7 +272,7 @@ export function TabCorreo({ puedeEnviar, puedeEditarCasillas, adminEmail }: { pu
 
       {esCeo && (
         errorRecibidos ? (
-          <ErrorBox msg={`No se pudieron cargar los correos recibidos: ${errorRecibidos}`} />
+          <ErrorBox msg="No se pudieron cargar los correos recibidos." />
         ) : !recibidos ? (
           <Loader />
         ) : (
@@ -390,7 +390,7 @@ export function TabCorreo({ puedeEnviar, puedeEditarCasillas, adminEmail }: { pu
       )}
 
       {recibidoAbierto && (
-        <ModalShell title={recibidoAbierto.subject} onClose={() => setRecibidoAbierto(null)} width={680}>
+        <ModalShell title={recibidoAbierto.subject} onClose={() => setRecibidoAbierto(null)}>
           <div style={{ fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.6, overflowWrap: 'anywhere' }}>
             De <strong>{recibidoAbierto.fromName}</strong> &lt;{recibidoAbierto.fromEmail}&gt; para {recibidoAbierto.to || 'mateo@orbita.site'}<br />
             {dateTime(recibidoAbierto.receivedAt)}
