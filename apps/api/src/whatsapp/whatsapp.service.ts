@@ -412,7 +412,7 @@ export class WhatsappService {
   // Un cliente de WhatsApp es un Customer del negocio, identificado por su
   // wa_id. Si ya había un cliente con ese teléfono (compró por la tienda, o
   // está cargado a mano) se lo vincula en vez de duplicarlo — solo si el match
-  // es único: ante la duda, un cliente nuevo es mejor que mezclar dos personas.
+  // es único: ante la duda, un cliente nuevo es mejor que mezclar dos personas. El nuevo es solo el dueño técnico de\r\n  // la charla: va marcado isChatContact y no aparece en Clientes mientras no compre (ver soloClientesReales).
   private async resolverCliente(businessId: string, waId: string, nombrePerfil?: string): Promise<string | null> {
     const existente = await this.prisma.customer.findUnique({
       where: { businessId_whatsappId: { businessId, whatsappId: waId } },
@@ -439,7 +439,7 @@ export class WhatsappService {
     }
 
     const creado = await this.prisma.customer.create({
-      data: { businessId, firstName: nombrePerfil?.trim() || `+${waId}`, phone: `+${waId}`, whatsappId: waId },
+      data: { businessId, firstName: nombrePerfil?.trim() || `+${waId}`, phone: `+${waId}`, whatsappId: waId, isChatContact: true },
       select: { id: true },
     });
     return creado.id;

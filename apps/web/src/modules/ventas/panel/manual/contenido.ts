@@ -317,7 +317,7 @@ export const CAPITULOS: Capitulo[] = [
             bloques: [
                 { tipo: 'parrafo', texto: 'El botón [[Nuevo pedido]] sirve para todo lo que vendés por fuera de la tienda: mostrador, WhatsApp, Instagram, un pedido por teléfono.' },
                 { tipo: 'pasos', items: [
-                    { titulo: 'Buscá los productos', texto: 'Escribís en el buscador, elegís y ponés cantidades. Usa tu catálogo real, así que descuenta stock igual que una venta online.' },
+                    { titulo: 'Buscá los productos', texto: 'Escribís en el buscador, elegís y ponés cantidades. Para achicar el catálogo podés filtrar por **categoría** y por **estado** (publicados, borradores o sin stock); con [[Limpiar]] volvés a verlos todos. Usa tu catálogo real, así que descuenta stock igual que una venta online.' },
                     { titulo: 'Cargá el cliente', texto: 'Si ya existe, lo encontrás en el buscador. Si no, tocás [[Cargar un comprador a mano]] y escribís su nombre y su email: con el email queda guardado en tu lista de Clientes. Sin email la venta se registra igual, pero esa persona no queda guardada.' },
                     { titulo: 'Elegí cómo se cobró y cerrá la venta', texto: 'Y el pedido entra a tus números como cualquier otro.' },
                 ] },
@@ -379,6 +379,7 @@ export const CAPITULOS: Capitulo[] = [
                     { label: 'Última compra', texto: 'Cuándo fue la última vez. Es tu lista de "a quién hay que despertar".' },
                 ] },
                 { tipo: 'parrafo', texto: 'La flechita de cada fila despliega sus últimos pedidos sin salir de la lista, y desde ahí entrás a [[Ver perfil completo →]].' },
+                { tipo: 'nota', variante: 'dato', texto: 'Quien solo te escribe por WhatsApp o Instagram **no aparece en Clientes** ni suma a los números del negocio: sus chats viven en la bandeja de mensajes. Pasa a ser cliente cuando te compra.' },
             ],
         },
         {

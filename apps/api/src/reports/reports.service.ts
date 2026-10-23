@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { soloClientesReales } from '../customers/clientes-visibles';
 import { pickPrimaryImageUrl } from '../common/utils/product-image.util';
 import { diaYHoraArgentina, fechaArgentina, inicioDeDiaArgentina, inicioDeMesArgentina } from '../common/utils/hora-argentina';
 import { redondear2, valorizarInventario } from '../common/utils/inventario';
@@ -392,7 +393,7 @@ export class ReportsService {
           _sum: { total: true },
         }),
         this.prisma.customer.count({
-          where: { businessId, deletedAt: null, createdAt: { gte, lt } },
+          where: { businessId, deletedAt: null, createdAt: { gte, lt }, AND: [soloClientesReales] },
         }),
         // Devoluciones aprobadas del periodo: esa plata se devolvio (nota de
         // credito o reembolso) y resta de "ventas" — mostrarla como vendida
@@ -1008,7 +1009,7 @@ export class ReportsService {
 
     const [clientes, pedidosPorCliente] = await Promise.all([
       this.prisma.customer.findMany({
-        where: { businessId, deletedAt: null },
+        where: { businessId, deletedAt: null, AND: [soloClientesReales] },
         select: { id: true, firstName: true, lastName: true, createdAt: true },
       }),
       this.prisma.order.groupBy({
@@ -1069,8 +1070,8 @@ export class ReportsService {
       : 0;
 
     const [nuevosMes, nuevosMesPasado] = await Promise.all([
-      this.prisma.customer.count({ where: { businessId, deletedAt: null, createdAt: { gte: inicioMes } } }),
-      this.prisma.customer.count({ where: { businessId, deletedAt: null, createdAt: { gte: inicioMesPasado, lt: inicioMes } } }),
+      this.prisma.customer.count({ where: { businessId, deletedAt: null, createdAt: { gte: inicioMes }, AND: [soloClientesReales] } }),
+      this.prisma.customer.count({ where: { businessId, deletedAt: null, createdAt: { gte: inicioMesPasado, lt: inicioMes }, AND: [soloClientesReales] } }),
     ]);
 
     // Altas por semana: las últimas 4 semanas (la 4 es la que corre).

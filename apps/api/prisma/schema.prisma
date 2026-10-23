@@ -638,6 +638,9 @@ model Customer {
   avatarUrl           String?   @map("avatar_url")
   whatsappId          String?   @map("whatsapp_id") // wa_id de Meta (dígitos, con código de país): identifica al cliente en el canal WhatsApp
   instagramId         String?   @map("instagram_id") // IGSID: id de la persona en Instagram, propio de cada cuenta de negocio (no es un teléfono)
+  // true = el Customer lo creó solo un chat de WhatsApp/Instagram (es el "dueño" técnico de la charla, no un cliente del
+  // negocio): no se lista en Clientes ni cuenta en los números mientras no tenga pedidos. Ver `soloClientesReales`.
+  isChatContact       Boolean   @default(false) @map("is_chat_contact")
   passwordHash        String?   @map("password_hash")
   googleId            String?   @map("google_id") // sub del id_token de Google — vincula, no reemplaza el password
   emailVerified       Boolean   @default(false) @map("email_verified")

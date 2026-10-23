@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { soloClientesReales } from '../../customers/clientes-visibles';
 import type { ModuleSnapshot, DashboardSnapshot, PedidosSnapshot, ClientesSnapshot, CatalogoSnapshot, MensajesSnapshot } from './module-data.types';
 import { fechaArgentina, inicioDeMesArgentina } from '../../common/utils/hora-argentina';
 
@@ -84,8 +85,8 @@ export class ModuleDataService {
         this.devuelto(businessId, inicioMesPasado, inicioMes),
         this.prisma.product.count({ where: { businessId, deletedAt: null } }),
         this.productosSinStock(businessId),
-        this.prisma.customer.count({ where: { businessId, deletedAt: null } }),
-        this.prisma.customer.count({ where: { businessId, deletedAt: null, createdAt: { gte: inicioMes } } }),
+        this.prisma.customer.count({ where: { businessId, deletedAt: null, AND: [soloClientesReales] } }),
+        this.prisma.customer.count({ where: { businessId, deletedAt: null, createdAt: { gte: inicioMes }, AND: [soloClientesReales] } }),
         this.prisma.conversation.count({ where: { businessId, isUnread: true, isArchived: false } }),
         this.prisma.order.count({ where: { businessId, deletedAt: null, status: 'PENDING' } }),
       ]);
@@ -225,8 +226,8 @@ export class ModuleDataService {
         ordersByCustomer,
         inactiveCount,
       ] = await Promise.all([
-        this.prisma.customer.count({ where: { businessId, deletedAt: null } }),
-        this.prisma.customer.count({ where: { businessId, deletedAt: null, createdAt: { gte: inicioMes } } }),
+        this.prisma.customer.count({ where: { businessId, deletedAt: null, AND: [soloClientesReales] } }),
+        this.prisma.customer.count({ where: { businessId, deletedAt: null, createdAt: { gte: inicioMes }, AND: [soloClientesReales] } }),
         this.prisma.order.groupBy({
           by: ['customerId'],
           where: { businessId, deletedAt: null, customerId: { not: null } },

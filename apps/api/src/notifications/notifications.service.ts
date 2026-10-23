@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { NotificationLevel } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { soloClientesReales } from '../customers/clientes-visibles';
 import { MailService } from '../mail/mail.service';
 import { escaparHtml } from '../common/utils/html';
 import { fmtPesos } from '../common/utils/pesos';
@@ -364,7 +365,7 @@ export class NotificationsService {
       const [hoy, ayerAgg, clientesNuevos, stockCriticoCount] = await Promise.all([
         this.agregarVentas(businessId, desde, ahora),
         this.agregarVentas(businessId, ayer, desde),
-        this.prisma.customer.count({ where: { businessId, createdAt: { gte: desde }, deletedAt: null } }),
+        this.prisma.customer.count({ where: { businessId, createdAt: { gte: desde }, deletedAt: null, AND: [soloClientesReales] } }),
         this.contarStockCritico(businessId),
       ]);
       const cambio = ayerAgg.total > 0 ? Math.round(((hoy.total - ayerAgg.total) / ayerAgg.total) * 100) : null;

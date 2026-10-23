@@ -9,7 +9,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "d690cc10b8b73853",
+  "version": "329b8f1336aa5877",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -154,7 +154,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "nuevo-pedido",
       "capitulo": "Pedidos",
       "titulo": "Cargar una venta a mano",
-      "texto": "El botón \"Nuevo pedido\" sirve para todo lo que vendés por fuera de la tienda: mostrador, WhatsApp, Instagram, un pedido por teléfono.\n\n1. Buscá los productos: Escribís en el buscador, elegís y ponés cantidades. Usa tu catálogo real, así que descuenta stock igual que una venta online.\n2. Cargá el cliente: Si ya existe, lo encontrás en el buscador. Si no, tocás \"Cargar un comprador a mano\" y escribís su nombre y su email: con el email queda guardado en tu lista de Clientes. Sin email la venta se registra igual, pero esa persona no queda guardada.\n3. Elegí cómo se cobró y cerrá la venta: Y el pedido entra a tus números como cualquier otro.\n\nConsejo: Cargar las ventas de mostrador acá es lo que hace que el Inicio te muestre tu negocio COMPLETO y no solo la parte online. También es lo que alimenta la pestaña \"Canal\" del top.",
+      "texto": "El botón \"Nuevo pedido\" sirve para todo lo que vendés por fuera de la tienda: mostrador, WhatsApp, Instagram, un pedido por teléfono.\n\n1. Buscá los productos: Escribís en el buscador, elegís y ponés cantidades. Para achicar el catálogo podés filtrar por categoría y por estado (publicados, borradores o sin stock); con \"Limpiar\" volvés a verlos todos. Usa tu catálogo real, así que descuenta stock igual que una venta online.\n2. Cargá el cliente: Si ya existe, lo encontrás en el buscador. Si no, tocás \"Cargar un comprador a mano\" y escribís su nombre y su email: con el email queda guardado en tu lista de Clientes. Sin email la venta se registra igual, pero esa persona no queda guardada.\n3. Elegí cómo se cobró y cerrá la venta: Y el pedido entra a tus números como cualquier otro.\n\nConsejo: Cargar las ventas de mostrador acá es lo que hace que el Inicio te muestre tu negocio COMPLETO y no solo la parte online. También es lo que alimenta la pestaña \"Canal\" del top.",
       "destino": {
         "seccion": "pedidos",
         "vista": "nuevo",
@@ -198,7 +198,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "lista-clientes",
       "capitulo": "Clientes",
       "titulo": "La lista y lo que dice de cada uno",
-      "texto": "Acá no hay que cargar nada: la base se llena sola con cada venta, sea de la tienda o cargada a mano. Por cada persona vas a ver:\n\n- Pedidos: Cuántas veces te compró. Distingue de un vistazo al que vino una vez del que ya es cliente.\n- Total gastado: Cuánta plata dejó en tu negocio desde el día uno.\n- Ticket promedio: Cuánto gasta por compra. El que compra seguido pero poco necesita otra promo que el que compra una vez y fuerte.\n- Última compra: Cuándo fue la última vez. Es tu lista de \"a quién hay que despertar\".\n\nLa flechita de cada fila despliega sus últimos pedidos sin salir de la lista, y desde ahí entrás a \"Ver perfil completo →\".",
+      "texto": "Acá no hay que cargar nada: la base se llena sola con cada venta, sea de la tienda o cargada a mano. Por cada persona vas a ver:\n\n- Pedidos: Cuántas veces te compró. Distingue de un vistazo al que vino una vez del que ya es cliente.\n- Total gastado: Cuánta plata dejó en tu negocio desde el día uno.\n- Ticket promedio: Cuánto gasta por compra. El que compra seguido pero poco necesita otra promo que el que compra una vez y fuerte.\n- Última compra: Cuándo fue la última vez. Es tu lista de \"a quién hay que despertar\".\n\nLa flechita de cada fila despliega sus últimos pedidos sin salir de la lista, y desde ahí entrás a \"Ver perfil completo →\".\n\nDato: Quien solo te escribe por WhatsApp o Instagram no aparece en Clientes ni suma a los números del negocio: sus chats viven en la bandeja de mensajes. Pasa a ser cliente cuando te compra.",
       "destino": {
         "seccion": "clientes",
         "label": "Ir a Clientes"

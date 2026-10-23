@@ -1759,7 +1759,7 @@ export type ApiProductListItem = {
   status: string
 }
 
-export function panelGetProducts(params: { search?: string; page?: number; limit?: number } = {}) {
+export function panelGetProducts(params: { search?: string; categoryId?: string; status?: ProductStatusFilter; page?: number; limit?: number } = {}) {
   const qs = new URLSearchParams()
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined && v !== null && v !== '') qs.set(k, String(v))

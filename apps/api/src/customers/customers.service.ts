@@ -1,6 +1,7 @@
 import { ConflictException, HttpException, HttpStatus, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma } from '@prisma/client';
+import { soloClientesReales } from './clientes-visibles';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { UpsertCustomerDto } from './dto/upsert-customer.dto';
@@ -121,7 +122,7 @@ export class CustomersService {
   // Filtro de la lista: lo comparten la pantalla y la exportación, así lo que
   // se baja es exactamente lo que se estaba viendo.
   private whereLista(businessId: string, search?: string): Prisma.CustomerWhereInput {
-    const where: Prisma.CustomerWhereInput = { businessId, deletedAt: null };
+    const where: Prisma.CustomerWhereInput = { businessId, deletedAt: null, AND: [soloClientesReales] };
     const s = search?.trim();
     if (s) {
       where.OR = [
@@ -362,7 +363,7 @@ export class CustomersService {
   // cuántos y con qué asunto (sin el cuerpo).
   async sendEmail(businessId: string, dto: { customerIds: string[]; subject: string; body: string }, actorId?: string) {
     const clientes = await this.prisma.customer.findMany({
-      where: { id: { in: dto.customerIds }, businessId, deletedAt: null, email: { not: null } },
+      where: { id: { in: dto.customerIds }, businessId, deletedAt: null, email: { not: null }, AND: [soloClientesReales] },
     });
     if (clientes.length === 0) return { sent: 0 };
 

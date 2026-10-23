@@ -107,7 +107,7 @@ describe('WhatsappService (unit)', () => {
       await svc.procesarWebhook(payload([TEXTO]));
 
       expect(prisma.customer.create).toHaveBeenCalledWith({
-        data: { businessId: BIZ, firstName: 'Lucía', phone: '+5491122334455', whatsappId: '5491122334455' },
+        data: { businessId: BIZ, firstName: 'Lucía', phone: '+5491122334455', whatsappId: '5491122334455', isChatContact: true },
         select: { id: true },
       });
       expect(prisma.conversation.create).toHaveBeenCalled();
