@@ -36,6 +36,20 @@ function leerBorrador(): Partial<Borrador> {
 }
 
 const dominioDe = (email: string) => email.split('@')[1] ?? ''
+const EMAIL_VALIDO = /^[^\s@,;<>"()]+@[^\s@,;<>"()]+\.[^\s@,;<>"()]+$/
+const MAX_DESTINATARIOS = 20
+
+function extraerDestinatarios(raw: string): string[] {
+  const vistos = new Set<string>()
+  const lista: string[] = []
+  for (const parte of raw.split(/[,;]+/)) {
+    const limpio = parte.trim().toLowerCase()
+    if (!limpio || vistos.has(limpio)) continue
+    vistos.add(limpio)
+    lista.push(limpio)
+  }
+  return lista
+}
 const textarea: React.CSSProperties = { ...inputStyle, height: 'auto', minHeight: 300, padding: '11px 13px', lineHeight: 1.6, resize: 'vertical', width: '100%' }
 
 export function TabCorreo({ puedeEnviar, puedeEditarCasillas }: { puedeEnviar: boolean; puedeEditarCasillas: boolean }) {
@@ -98,7 +112,17 @@ export function TabCorreo({ puedeEnviar, puedeEditarCasillas }: { puedeEnviar: b
     e.preventDefault()
     setError('')
     if (!casilla) { setError('Elegí desde qué casilla sale.'); return }
-    if (!/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(to.trim())) { setError('Escribí un solo email de destino, válido.'); return }
+    const destinatarios = extraerDestinatarios(to)
+    if (destinatarios.length === 0) { setError('Escribí al menos un email de destino.'); return }
+    const invalido = destinatarios.find((d) => !EMAIL_VALIDO.test(d))
+    if (invalido) {
+      setError(destinatarios.length === 1 ? 'Escribí un email de destino válido.' : `"${invalido}" no es un email válido.`)
+      return
+    }
+    if (destinatarios.length > MAX_DESTINATARIOS) {
+      setError(`Podés enviar a hasta ${MAX_DESTINATARIOS} destinatarios por correo.`)
+      return
+    }
     if (subject.trim().length < 3) { setError('Ponele un asunto.'); return }
     if (body.trim().length < 10) { setError('El mensaje está vacío.'); return }
     setConfirmando(true)
@@ -108,7 +132,8 @@ export function TabCorreo({ puedeEnviar, puedeEditarCasillas }: { puedeEnviar: b
     if (!casilla) return
     setEnviando(true)
     try {
-      const r = await platformApi.enviarCorreo({ senderId: casilla.id, to: to.trim(), subject: subject.trim(), body })
+      const destino = extraerDestinatarios(to).join(', ')
+      const r = await platformApi.enviarCorreo({ senderId: casilla.id, to: destino, subject: subject.trim(), body })
       setConfirmando(false)
       setTickEnviados((k) => k + 1)
       if (!r.sent) {
@@ -117,7 +142,7 @@ export function TabCorreo({ puedeEnviar, puedeEditarCasillas }: { puedeEnviar: b
       }
       setAviso(r.simulated
         ? { variant: 'success', title: 'Envío simulado', description: 'Este entorno no tiene proveedor de correo: quedó registrado, pero no salió.' }
-        : { variant: 'success', title: `Enviado a ${to.trim()}`, description: `Las respuestas llegan a ${casilla.email}.` })
+        : { variant: 'success', title: `Enviado a ${destino}`, description: `Las respuestas llegan a ${casilla.email}.` })
       setTo(''); setSubject(''); setBody('')
     } catch (err) {
       setConfirmando(false)
@@ -165,8 +190,8 @@ export function TabCorreo({ puedeEnviar, puedeEditarCasillas }: { puedeEnviar: b
                 </p>
               )}
 
-              <Field label="Para">
-                <input type="email" value={to} onChange={(e) => setTo(e.target.value)} placeholder="nombre@empresa.com" autoComplete="off" className="ds-field" style={{ ...inputStyle, width: '100%' }} />
+              <Field label="Para" hint="Si son varios, separalos con coma.">
+                <input type="text" inputMode="email" value={to} onChange={(e) => setTo(e.target.value)} placeholder="nombre@empresa.com, otro@empresa.com" autoComplete="off" className="ds-field" style={{ ...inputStyle, width: '100%' }} />
               </Field>
 
               <Field label="Asunto">
@@ -240,7 +265,7 @@ export function TabCorreo({ puedeEnviar, puedeEditarCasillas }: { puedeEnviar: b
             <dt style={{ color: 'var(--color-muted)' }}>De</dt>
             <dd style={{ margin: 0, color: 'var(--color-text)', overflowWrap: 'anywhere' }}>{casilla.name} &lt;{casilla.email}&gt;</dd>
             <dt style={{ color: 'var(--color-muted)' }}>Para</dt>
-            <dd style={{ margin: 0, color: 'var(--color-text)', fontWeight: 600, overflowWrap: 'anywhere' }}>{to.trim()}</dd>
+            <dd style={{ margin: 0, color: 'var(--color-text)', fontWeight: 600, overflowWrap: 'anywhere' }}>{extraerDestinatarios(to).join(', ')}</dd>
             <dt style={{ color: 'var(--color-muted)' }}>Asunto</dt>
             <dd style={{ margin: 0, color: 'var(--color-text)', overflowWrap: 'anywhere' }}>{subject.trim()}</dd>
           </dl>

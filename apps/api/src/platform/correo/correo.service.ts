@@ -12,7 +12,8 @@ import {
 import { EmailSendStatus, PlatformMailSender, Prisma } from '@prisma/client';
 import sharp from 'sharp';
 import { PrismaService } from '../../prisma/prisma.service';
-import { MailService } from '../../mail/mail.service';
+import { esDestinatarioUnico, MailService } from '../../mail/mail.service';
+import { extraerDestinatarios, MAX_DESTINATARIOS_DIRECTO } from '../../mail/correo-directo';
 import { SupabaseService } from '../../supabase/supabase.service';
 import { ENTRADA_IMAGEN } from '../../common/utils/subida-imagen';
 import { EnviarCorreoDto, UpsertCasillaDto, VistaPreviaCorreoDto } from './correo.dto';
@@ -124,7 +125,22 @@ export class CorreoPlataformaService {
       throw new HttpException(`Ya salieron ${TOPE_DIARIO} correos en las últimas 24 horas. Probá más tarde.`, HttpStatus.TOO_MANY_REQUESTS);
     }
 
-    const to = dto.to.trim().toLowerCase();
+    const destinatarios = extraerDestinatarios(dto.to);
+    if (destinatarios.length === 0) {
+      throw new BadRequestException('Escribí al menos un email de destino');
+    }
+    const invalido = destinatarios.find((d) => !esDestinatarioUnico(d));
+    if (invalido) {
+      throw new BadRequestException(
+        destinatarios.length === 1
+          ? 'El destinatario no es un email válido'
+          : `"${invalido}" no es un email válido`,
+      );
+    }
+    if (destinatarios.length > MAX_DESTINATARIOS_DIRECTO) {
+      throw new BadRequestException(`Podés enviar a hasta ${MAX_DESTINATARIOS_DIRECTO} destinatarios por correo`);
+    }
+    const to = destinatarios.join(', ');
     const subject = dto.subject.trim();
     const { status, error } = await this.mail.sendDirecto({ to, subject, cuerpo: dto.body, firma: this.firma(casilla) });
 
