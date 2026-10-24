@@ -4,6 +4,7 @@ import {
   crearOrigenPermitido,
   hostDeOrigenHttps,
   OrigenDeCors,
+  subdominiosDelFrontend,
   TTL_CACHE_MS,
 } from '../../src/common/cors/origen-permitido';
 
@@ -208,5 +209,41 @@ describe('CORS — helpers', () => {
     expect(candidatosDeHost('www.tefaltacalleok.com')).toEqual(['www.tefaltacalleok.com', 'tefaltacalleok.com']);
     expect(candidatosDeHost('tefaltacalleok.com')).toEqual(['tefaltacalleok.com']);
     expect(candidatosDeHost('www.')).toEqual(['www.']);
+  });
+});
+
+// Staging (docs/superpowers/specs/2026-10-24-entorno-staging-design.md): las
+// tiendas viven en *.<dominio de FRONTEND_URL>, que no es orbita.site.
+describe('CORS — subdominios del FRONTEND_URL', () => {
+  it('acepta el apex y cualquier subdominio del dominio de FRONTEND_URL', () => {
+    const re = subdominiosDelFrontend('https://caudaliguazu.com.ar')!;
+    expect(re.test('https://caudaliguazu.com.ar')).toBe(true);
+    expect(re.test('https://negocio.caudaliguazu.com.ar')).toBe(true);
+    expect(re.test('https://www.caudaliguazu.com.ar')).toBe(true);
+  });
+
+  it('no acepta otro dominio que solo termina parecido, ni http, ni puerto', () => {
+    const re = subdominiosDelFrontend('https://caudaliguazu.com.ar')!;
+    expect(re.test('https://evilcaudaliguazu.com.ar')).toBe(false);
+    expect(re.test('https://caudaliguazu.com.ar.evil.com')).toBe(false);
+    expect(re.test('https://caudaliguazuxcom.ar')).toBe(false);
+    expect(re.test('http://negocio.caudaliguazu.com.ar')).toBe(false);
+    expect(re.test('https://negocio.caudaliguazu.com.ar:8443')).toBe(false);
+    expect(re.test('https://a.b.caudaliguazu.com.ar')).toBe(false);
+  });
+
+  it('en producción da la misma regla que la de orbita.site', () => {
+    const re = subdominiosDelFrontend('https://orbita.site')!;
+    expect(re.test('https://orbita.site')).toBe(true);
+    expect(re.test('https://tienda.orbita.site')).toBe(true);
+    expect(re.test('https://orbita.site.evil.com')).toBe(false);
+  });
+
+  it('sin FRONTEND_URL, con http (dev local) o con algo inválido, no agrega nada', () => {
+    expect(subdominiosDelFrontend(undefined)).toBeNull();
+    expect(subdominiosDelFrontend('')).toBeNull();
+    expect(subdominiosDelFrontend('http://localhost:3001')).toBeNull();
+    expect(subdominiosDelFrontend('no es una url')).toBeNull();
+    expect(subdominiosDelFrontend('https://localhost')).toBeNull();
   });
 });

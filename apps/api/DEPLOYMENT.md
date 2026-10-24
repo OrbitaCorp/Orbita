@@ -182,6 +182,65 @@ Variables de entorno:
   una tty) aborta, así ningún script ni agente lo puede usar sin una persona
   adelante. Dejar constancia en el reporte de la tarea de que se usó y por qué.
 
+## Staging: probar en la nube sin tocar producción
+
+Un entorno aparte, "el `.env` de dev en la nube", para probar una rama antes de que llegue a
+`main`. Diseño y decisiones: `docs/superpowers/specs/2026-10-24-entorno-staging-design.md`.
+
+```
+https://caudaliguazu.com.ar (panel) · https://<subdominio>.caudaliguazu.com.ar (tiendas)
+   Vercel, proyecto "orbita-staging" (equipo OrbitaCorp), SIN git conectado
+        ▼
+https://orbita-api-staging-681215569277.southamerica-east1.run.app/api/v1
+   Cloud Run "orbita-api-staging" (mismo proyecto GCP), cuenta de servicio propia
+        ▼
+Base de DEV (hhaqlzrcskmwnvhgydon), la misma del .env local
+```
+
+```bash
+cd apps/api
+./deploy/staging.sh            # API + frontend, desde cualquier rama, sin push
+./deploy/staging.sh --solo-api
+./deploy/staging.sh --solo-web
+```
+
+- **Sube lo que está en el disco**, commiteado o no (la imagen queda con tag
+  `staging-<sha>[-sucio]`). No exige `main` ni CI: para eso existe. No pushea nada, así que no
+  interfiere con los deploys de producción de Vercel.
+- **Aplica las migraciones pendientes en DEV** (`prisma migrate deploy` con el `.env` local)
+  antes de desplegar la API. Producción no se toca.
+- **Secrets `STAGING_*`** en Secret Manager. Los carga `./deploy/staging-secretos.sh` desde el
+  `.env` de dev, sin imprimirlos, y se niega si las URLs de la base no son las de dev.
+  `JWT_SECRET` y `CRON_SECRET` son propios de staging. Solo la cuenta de servicio
+  `orbita-api-staging@` los puede leer, y esa cuenta **no** puede leer los de producción.
+  Para agregar uno: sumarlo a `DESDE_ENV` en ese script y a `SECRETS` en `staging.sh`.
+- **Variables no sensibles:** `deploy/env-vars.staging.yaml`. Diferencias con producción:
+  `TRUST_PROXY_HOPS=1` (no hay Firebase delante), `MAIL_FROM=onboarding@resend.dev` (Resend solo
+  entrega al dueño de la cuenta), WhatsApp/Instagram/TikTok apagados, sin `VERCEL_TOKEN` (daría
+  de alta dominios en el proyecto de producción), Google y Mercado Pago con los valores de dev
+  (la API no arranca sin ellos, pero el login con Google y la conexión con MP no andan).
+- **Archivos:** las fotos van al Supabase Storage de **dev** (`STAGING_SUPABASE_URL` /
+  `STAGING_SUPABASE_SERVICE_ROLE_KEY`; `staging-secretos.sh` pide la clave con el `SUPABASE_PAT`
+  del `.env`, siempre para el ref de dev, y con `ACTUALIZAR_ENV_LOCAL=1` también la agrega al
+  `.env` local). Los videos van al bucket R2 `orbita-dev` (cuenta de Cloudflare de Órbita, la misma
+  del bucket `orbita`; región ENAM, URL pública `pub-0959482d4a3a49f98c6481f59c779ee5.r2.dev`, mismo
+  CORS que producción), compartido con el entorno local. Su clave (`R2_ACCESS_KEY_ID` /
+  `R2_SECRET_ACCESS_KEY` del `.env` → `STAGING_R2_*`) es un token de R2 *Object Read & Write*
+  limitado a `orbita-dev`, sin vencimiento: contra `orbita` recibe AccessDenied (probado el
+  24/10). Si hay que rotarla, crear otro igual en *R2 → Manage R2 API Tokens*, reemplazarla en el
+  `.env` y correr `staging-secretos.sh`.
+- **Sin crons:** no hay jobs de Cloud Scheduler para staging; se disparan a mano con su
+  `CRON_SECRET`.
+- **Frontend:** `vercel deploy --prod` desde `apps/web` con los IDs del proyecto (no con
+  `vercel link`, que podría conectarle git). Lo que se sube lo filtra `apps/web/.vercelignore`.
+  Variables del proyecto: `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_ROOT_DOMAIN=caudaliguazu.com.ar` y
+  `NOINDEX=1` (header `X-Robots-Tag: noindex` en todo el sitio, ver `next.config.ts`).
+- **DNS** en Cloudflare (zona `caudaliguazu.com.ar`, todo en "DNS only"): `@` A a Vercel, `www` y
+  `*` CNAME al proyecto, y `_acme-challenge` NS a `ns1/ns2.vercel-dns.com` para que Vercel
+  renueve solo el certificado comodín. No borrar esos dos NS.
+- **Links con `orbita.site` fijo** (cupones, URL de la tienda, mails de dominios): en staging
+  apuntan a producción. Es conocido; no rompe nada.
+
 ## Actualizar secrets
 
 Los valores sensibles (`DATABASE_URL`, `JWT_SECRET`, API keys, etc.) viven en

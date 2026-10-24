@@ -1,0 +1,44 @@
+# Variables de entorno NO sensibles del servicio de STAGING (orbita-api-staging).
+# Se commitea: no hay secrets acá. Los secrets son los STAGING_* de Secret
+# Manager (los carga deploy/staging-secretos.sh y los monta deploy/staging.sh).
+# Diseño: docs/superpowers/specs/2026-10-24-entorno-staging-design.md
+#
+# Regla: staging es "el .env de dev en la nube". Lo que acá falta a propósito
+# (WhatsApp, Instagram, TikTok, Mercado Pago, Google login, Search Console,
+# VERCEL_*) queda apagado: sin sus variables, cada módulo se apaga solo.
+
+NODE_ENV: "production"
+FRONTEND_URL: "https://caudaliguazu.com.ar"
+JWT_EXPIRES_IN: "15m"
+# GoogleAuthService y MercadoPagoService exigen estas variables al arrancar
+# (getOrThrow en el constructor): sin ellas el contenedor no levanta. Staging usa
+# lo mismo que el .env de dev: el cliente OAuth de Google de siempre (el secret
+# sale de STAGING_GOOGLE_CLIENT_SECRET) y los valores de relleno de Mercado Pago.
+# Las URLs de retorno apuntan a staging y no están registradas ni en Google ni
+# en MP, así que el login con Google y la conexión con MP no funcionan acá: es
+# lo esperado (ver el diseño).
+GOOGLE_CLIENT_ID: "271663449184-phgk621gvpo1cdjrknbrmjdo3tljn48q.apps.googleusercontent.com"
+GOOGLE_REDIRECT_URI: "https://orbita-api-staging-681215569277.southamerica-east1.run.app/api/v1/auth/google/callback"
+MERCADOPAGO_CLIENT_ID: "local-dev-placeholder"
+MERCADOPAGO_REDIRECT_URI: "https://orbita-api-staging-681215569277.southamerica-east1.run.app/api/v1/mercadopago/oauth/callback"
+# Remitente de prueba de Resend: solo entrega al dueño de la cuenta de Resend,
+# así staging nunca le manda un mail a un cliente real.
+MAIL_FROM: "onboarding@resend.dev"
+# Sin Firebase Hosting delante: el X-Forwarded-For llega con una sola entrada
+# (la IP del cliente). Con "2", como en producción, cualquiera podría falsear su
+# IP y saltear los límites por IP (ver common/utils/proxy.ts).
+TRUST_PROXY_HOPS: "1"
+# Cloudflare R2 (videos): bucket orbita-dev en la cuenta de Órbita, compartido con
+# el entorno local. La clave (STAGING_R2_*) solo puede leer y escribir ese bucket:
+# con el de producción ("orbita") recibe AccessDenied. Las fotos van a Supabase
+# Storage de dev (STAGING_SUPABASE_*), no acá.
+R2_ACCOUNT_ID: "916763f034006cc39e6269a421fedecb"
+R2_BUCKET: "orbita-dev"
+R2_PUBLIC_URL: "https://pub-0959482d4a3a49f98c6481f59c779ee5.r2.dev"
+SUBSCRIPTION_ABANDONED_DAYS: "7"
+SUBSCRIPTION_SWEEP_DELETE: "false"
+FONDO_IA_MANTENIMIENTO: "false"
+FONDO_IA_MOTOR: "workers"
+# Listas vacías = apagado en producción (NODE_ENV=production) para todos.
+WHATSAPP_NEGOCIOS_HABILITADOS: ""
+INSTAGRAM_NEGOCIOS_HABILITADOS: ""

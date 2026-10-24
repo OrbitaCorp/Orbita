@@ -63,6 +63,10 @@ const nextConfig: NextConfig = {
           { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'Content-Security-Policy', value: "frame-ancestors 'self'; base-uri 'self'; object-src 'none'" },
+          // Staging (docs/superpowers/specs/2026-10-24-entorno-staging-design.md):
+          // NOINDEX=1 solo está en el proyecto de Vercel de staging, para que
+          // Google no indexe tiendas de prueba. Producción no la tiene.
+          ...(process.env.NOINDEX === '1' ? [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] : []),
         ],
       },
     ];

@@ -4,7 +4,7 @@ import { json, urlencoded } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-import { crearOrigenPermitido } from './common/cors/origen-permitido';
+import { crearOrigenPermitido, subdominiosDelFrontend } from './common/cors/origen-permitido';
 import { saltosDeProxy } from './common/utils/proxy';
 import { PrismaService } from './prisma/prisma.service';
 
@@ -72,6 +72,9 @@ async function bootstrap(): Promise<void> {
         // producción (auditoría interna 10/09, ítem trans.cors-headers).
         ...(isProd ? [] : ['http://localhost:3001', 'http://localhost:3000', ORBITA_LOCAL_ORIGIN]),
         ORBITA_SITE_ORIGIN,
+        // Staging: las tiendas en *.<dominio de FRONTEND_URL> (en producción
+        // repite la regla de orbita.site).
+        ...[subdominiosDelFrontend(process.env.FRONTEND_URL)].filter((re): re is RegExp => re !== null),
       ],
       esDominioPropioActivo: (host) =>
         prisma.customDomain

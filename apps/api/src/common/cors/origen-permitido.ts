@@ -63,6 +63,25 @@ export function candidatosDeHost(host: string): string[] {
   return host.startsWith('www.') && host.length > 4 ? [host, host.slice(4)] : [host];
 }
 
+// El dominio de FRONTEND_URL y sus subdominios de un nivel (las tiendas). En
+// producción da la misma regla que la fija de orbita.site; existe para que
+// staging (FRONTEND_URL=https://caudaliguazu.com.ar, ver
+// docs/superpowers/specs/2026-10-24-entorno-staging-design.md) acepte sus
+// tiendas sin hardcodear otro dominio acá. Solo https y un host con punto:
+// http://localhost (dev) no agrega nada, ya está en la lista de dev de main.ts.
+export function subdominiosDelFrontend(frontendUrl: string | undefined): RegExp | null {
+  if (!frontendUrl) return null;
+  let url: URL;
+  try {
+    url = new URL(frontendUrl);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:' || url.port || !url.hostname.includes('.')) return null;
+  const host = url.hostname.replace(/^www\./, '').replace(/\./g, '\\.');
+  return new RegExp(`^https:\\/\\/([a-z0-9-]+\\.)?${host}$`);
+}
+
 const logger = new Logger('CORS');
 
 export function crearOrigenPermitido(opciones: OpcionesOrigenPermitido): OrigenDeCors {
