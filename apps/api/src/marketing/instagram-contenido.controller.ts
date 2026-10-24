@@ -1,7 +1,7 @@
 import { BadRequestException, Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { PlatformAdminGuard } from '../common/guards/platform-admin.guard';
-import { SoloSuperadmin } from '../common/decorators/platform-role.decorator';
+import { SuperadminYMarketing } from '../common/decorators/platform-role.decorator';
 import { PlatformAdminContext } from '../common/types/auth-context.type';
 import { SUBIDA_IMAGEN } from '../common/utils/subida-imagen';
 import { OcultarComentarioDto, ResponderComentarioDto } from '../instagram/dto/comentarios-instagram.dto';
@@ -20,9 +20,9 @@ interface RequestWithAdmin {
 // Superadmin → Marketing → Instagram: el contenido de la cuenta de la empresa (publicaciones, comentarios y
 // estadísticas). Usa los mismos servicios que Difusión en el panel de un negocio, ya atados al negocio de la empresa:
 // desde acá no se puede tocar la cuenta de ningún otro negocio. Publicar y contestar queda a la vista de los
-// seguidores y sale con el nombre de la empresa: todo es solo de SUPERADMIN, y queda anotado quién lo hizo.
+// seguidores y sale con el nombre de la empresa: todo es de SUPERADMIN y MARKETING (un OPERATOR no entra), y queda anotado quién lo hizo.
 @UseGuards(PlatformAdminGuard)
-@SoloSuperadmin()
+@SuperadminYMarketing()
 @Controller('platform/marketing/instagram')
 export class InstagramContenidoController {
   constructor(

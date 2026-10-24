@@ -772,7 +772,7 @@ export class InstagramService {
 
   // Un cliente de Instagram es un Customer del negocio identificado por su IGSID.
   // A diferencia de WhatsApp no hay teléfono con el cual vincularlo a un cliente
-  // existente: se crea uno nuevo (el dueño lo ve igual en la bandeja).
+  // existente: se crea uno nuevo (el dueño lo ve igual en la bandeja). Ese Customer es solo el dueño técnico de la\r\n  // charla: va marcado isChatContact y no aparece en Clientes mientras no compre (ver soloClientesReales).
   private async resolverCliente(businessId: string, igsid: string): Promise<string | null> {
     const existente = await this.prisma.customer.findUnique({
       where: { businessId_instagramId: { businessId, instagramId: igsid } },
@@ -787,7 +787,7 @@ export class InstagramService {
     }
     const nombre = await this.nombreDelPerfil(businessId, igsid);
     const creado = await this.prisma.customer.create({
-      data: { businessId, firstName: nombre ?? `Instagram ${igsid.slice(-4)}`, instagramId: igsid },
+      data: { businessId, firstName: nombre ?? `Instagram ${igsid.slice(-4)}`, instagramId: igsid, isChatContact: true },
       select: { id: true },
     });
     return creado.id;

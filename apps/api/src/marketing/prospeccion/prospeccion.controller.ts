@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { PlatformAdminGuard } from '../../common/guards/platform-admin.guard';
-import { SoloSuperadmin } from '../../common/decorators/platform-role.decorator';
+import { SuperadminYMarketing } from '../../common/decorators/platform-role.decorator';
 import { PlatformAdminContext } from '../../common/types/auth-context.type';
 import { ActualizarProspectoDto, ConsultarCuentasDto, GuardarAnalisisDto } from './dto/prospeccion.dto';
 import { ProspeccionService } from './prospeccion.service';
@@ -12,7 +12,7 @@ interface RequestWithAdmin {
 // Marketing → Prospección del super panel. Es una herramienta del equipo fundador: consulta cuentas por la API de
 // Meta (cuenta de la cuota) y guarda a quién se le escribió, así que es solo para SUPERADMIN.
 @UseGuards(PlatformAdminGuard)
-@SoloSuperadmin()
+@SuperadminYMarketing()
 @Controller('platform/marketing/prospeccion')
 export class ProspeccionController {
   constructor(private readonly prospeccion: ProspeccionService) {}

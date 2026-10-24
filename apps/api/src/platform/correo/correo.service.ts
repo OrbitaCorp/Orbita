@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Injectable,
@@ -12,10 +13,12 @@ import {
 import { EmailSendStatus, PlatformMailSender, Prisma } from '@prisma/client';
 import sharp from 'sharp';
 import { PrismaService } from '../../prisma/prisma.service';
-import { MailService } from '../../mail/mail.service';
+import { esDestinatarioUnico, MailService } from '../../mail/mail.service';
+import { extraerDestinatarios, MAX_DESTINATARIOS_DIRECTO } from '../../mail/correo-directo';
 import { SupabaseService } from '../../supabase/supabase.service';
 import { ENTRADA_IMAGEN } from '../../common/utils/subida-imagen';
 import { EnviarCorreoDto, UpsertCasillaDto, VistaPreviaCorreoDto } from './correo.dto';
+import { esEmailDeCeo, listarRecibidosZoho, obtenerContenidoRecibidoZoho } from './zoho-ceo';
 
 // Mismo bucket público que los logos de los negocios, con prefijo propio.
 const BUCKET = 'business-logos';
@@ -124,7 +127,22 @@ export class CorreoPlataformaService {
       throw new HttpException(`Ya salieron ${TOPE_DIARIO} correos en las últimas 24 horas. Probá más tarde.`, HttpStatus.TOO_MANY_REQUESTS);
     }
 
-    const to = dto.to.trim().toLowerCase();
+    const destinatarios = extraerDestinatarios(dto.to);
+    if (destinatarios.length === 0) {
+      throw new BadRequestException('Escribí al menos un email de destino');
+    }
+    const invalido = destinatarios.find((d) => !esDestinatarioUnico(d));
+    if (invalido) {
+      throw new BadRequestException(
+        destinatarios.length === 1
+          ? 'El destinatario no es un email válido'
+          : `"${invalido}" no es un email válido`,
+      );
+    }
+    if (destinatarios.length > MAX_DESTINATARIOS_DIRECTO) {
+      throw new BadRequestException(`Podés enviar a hasta ${MAX_DESTINATARIOS_DIRECTO} destinatarios por correo`);
+    }
+    const to = destinatarios.join(', ');
     const subject = dto.subject.trim();
     const { status, error } = await this.mail.sendDirecto({ to, subject, cuerpo: dto.body, firma: this.firma(casilla) });
 
@@ -157,6 +175,23 @@ export class CorreoPlataformaService {
       adminName: f.admin.name,
       createdAt: f.createdAt.toISOString(),
     }));
+  }
+
+  async recibidos(adminId: string) {
+    await this.exigirCeo(adminId);
+    return listarRecibidosZoho();
+  }
+
+  async recibidoDetalle(adminId: string, folderId: string, messageId: string) {
+    await this.exigirCeo(adminId);
+    return obtenerContenidoRecibidoZoho(folderId, messageId);
+  }
+
+  private async exigirCeo(adminId: string) {
+    const admin = await this.prisma.platformAdmin.findUnique({ where: { id: adminId }, select: { email: true } });
+    if (!admin || !esEmailDeCeo(admin.email)) {
+      throw new ForbiddenException('La bandeja de recibidos es exclusiva de la cuenta de CEO');
+    }
   }
 
   private async casilla(id: string): Promise<PlatformMailSender> {

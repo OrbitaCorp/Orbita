@@ -1,4 +1,6 @@
+import { pausarSiAtendiaOrbi } from '../whatsapp/whatsapp-bot-estado';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SendMessageDto } from './dto/send-message.dto';
 import { UpdateConversationDto } from './dto/update-conversation.dto';
@@ -19,7 +21,12 @@ const SIN_SOLO_INSTAGRAM = {
   OR: [{ messages: { none: {} } }, { messages: { some: { channel: { not: 'INSTAGRAM' as const } } } }],
 };
 
-type MensajeRow = { id: string; sender: string; text: string; orderId: string | null; channel: string; deliveryStatus: string | null; createdAt: Date };
+// Las dos bandejas del panel (Mensajes locales = el chat de la tienda; WhatsApp) NO se mezclan: cada una trabaja solo con
+// los mensajes de su canal. Una misma persona puede escribir por los dos y su charla aparece en las dos, cada una con lo suyo.
+export type CanalDeBandeja = 'STOREFRONT' | 'WHATSAPP';
+export const CANALES_DE_BANDEJA: CanalDeBandeja[] = ['STOREFRONT', 'WHATSAPP'];
+
+type MensajeRow = { id: string; sender: string; text: string; orderId: string | null; channel: string; deliveryStatus: string | null; createdAt: Date; attachments?: unknown; viaOrbi?: boolean };
 
 @Injectable()
 export class ConversationsService {
@@ -40,9 +47,9 @@ export class ConversationsService {
   // persona, los WhatsApp de esa persona se vinculan a la cuenta del impostor
   // (ver WhatsappService.resolverCliente) y, sin este filtro, los vería —con las
   // respuestas del negocio— en su chat de la tienda.
-  private async ultimosMensajes(conversationId: string, soloTienda = false) {
+  private async ultimosMensajes(conversationId: string, soloTienda = false, canal?: CanalDeBandeja) {
     const recientes = await this.prisma.message.findMany({
-      where: { conversationId, ...(soloTienda ? { channel: 'STOREFRONT' as const } : {}) },
+      where: { conversationId, ...(soloTienda ? { channel: 'STOREFRONT' as const } : canal ? { channel: canal } : {}) },
       orderBy: { createdAt: 'desc' },
       take: 500,
     });
@@ -50,7 +57,13 @@ export class ConversationsService {
   }
 
   private aMensaje(m: MensajeRow) {
-    return { id: m.id, sender: m.sender, text: m.text, orderId: m.orderId, channel: m.channel, deliveryStatus: m.deliveryStatus, createdAt: m.createdAt };
+    return {
+      id: m.id, sender: m.sender, text: m.text, orderId: m.orderId, channel: m.channel, deliveryStatus: m.deliveryStatus, createdAt: m.createdAt,
+      // Fotos del mensaje (WhatsApp): [{ tipo: 'image', url }].
+      attachments: Array.isArray(m.attachments) ? m.attachments : null,
+      // Lo contestó Orbi (el bot de atención de WhatsApp).
+      viaOrbi: m.viaOrbi === true,
+    };
   }
 
   // ── Panel (staff) ──────────────────────────────────────────────────────────
@@ -66,6 +79,34 @@ export class ConversationsService {
         messages: { orderBy: { createdAt: 'desc' }, take: 1 },
       },
     });
+    // Lo último de cada canal y por dónde escribió el cliente por última vez: con eso cada bandeja arma SU lista, con su
+    // propio último mensaje y su propio "sin leer", sin mezclar lo del otro canal.
+    const ids = rows.map((r) => r.id);
+    const ultimosPorCanal = ids.length === 0 ? [] : await this.prisma.$queryRaw<{ conversation_id: string; id: string; sender: string; text: string; order_id: string | null; channel: string; delivery_status: string | null; created_at: Date; attachments: unknown; via_orbi: boolean }[]>`
+      SELECT DISTINCT ON (conversation_id, channel)
+        conversation_id, id, sender::text AS sender, text, order_id, channel::text AS channel, delivery_status, created_at, attachments, via_orbi
+      FROM messages
+      WHERE conversation_id IN (${Prisma.join(ids)}) AND channel IN ('STOREFRONT'::"MessageChannel", 'WHATSAPP'::"MessageChannel")
+      ORDER BY conversation_id, channel, created_at DESC`;
+    const ultimoDelCliente = ids.length === 0 ? [] : await this.prisma.$queryRaw<{ conversation_id: string; channel: string }[]>`
+      SELECT DISTINCT ON (conversation_id) conversation_id, channel::text AS channel
+      FROM messages
+      WHERE conversation_id IN (${Prisma.join(ids)}) AND sender = 'CUSTOMER'::"MessageSender"
+      ORDER BY conversation_id, created_at DESC`;
+    const canalDelUltimoCliente = new Map(ultimoDelCliente.map((u) => [u.conversation_id, u.channel]));
+    const canalesDe = (conversationId: string, sinLeer: boolean) => {
+      const canales: Partial<Record<CanalDeBandeja, { lastMessage: MensajeRow; isUnread: boolean }>> = {};
+      for (const m of ultimosPorCanal) {
+        if (m.conversation_id !== conversationId) continue;
+        canales[m.channel as CanalDeBandeja] = {
+          lastMessage: this.aMensaje({ id: m.id, sender: m.sender, text: m.text, orderId: m.order_id, channel: m.channel, deliveryStatus: m.delivery_status, createdAt: m.created_at, attachments: m.attachments, viaOrbi: m.via_orbi }),
+          // "Sin leer" es de la bandeja donde llegó el último mensaje del cliente; la otra no se entera.
+          isUnread: sinLeer && canalDelUltimoCliente.get(conversationId) === m.channel,
+        };
+      }
+      return canales;
+    };
+
     return rows.map((c) => ({
       id: c.id,
       customerId: c.customerId,
@@ -77,6 +118,9 @@ export class ConversationsService {
       // Por dónde sigue la charla (WhatsApp o el chat de la tienda): el panel lo muestra en la lista.
       lastChannel: c.messages[0]?.channel ?? 'STOREFRONT',
       lastMessage: c.messages[0] ? this.aMensaje(c.messages[0]) : null,
+      canales: canalesDe(c.id, c.isUnread),
+      // Orbi en este chat de WhatsApp: su estado y, si está pausado o derivado, por qué.
+      bot: { estado: c.botEstado, motivo: c.botMotivo },
       updatedAt: c.updatedAt,
     }));
   }
@@ -89,12 +133,15 @@ export class ConversationsService {
   // abrir el hilo no puede tocar la conversación, que es de todos — el "sin
   // leer" sembrado se le apagaba a los demás con la primera apertura. El
   // visitante lleva lo leído en su navegador (lib/demo/recursos/mensajes.ts).
-  async getMessages(businessId: string, conversationId: string, marcarLeida = true) {
+  async getMessages(businessId: string, conversationId: string, marcarLeida = true, canal?: CanalDeBandeja) {
     const conv = await this.prisma.conversation.findFirst({ where: { id: conversationId, businessId } });
     if (!conv) throw new NotFoundException('Conversación no encontrada');
 
-    const messages = await this.ultimosMensajes(conversationId);
-    if (conv.isUnread && marcarLeida) {
+    const messages = await this.ultimosMensajes(conversationId, false, canal);
+    // Con una bandeja elegida, abrir la charla solo la marca leída si lo que estaba sin leer es de ESA bandeja: lo
+    // pendiente del otro canal sigue pendiente hasta que se abra allá.
+    const loPendienteEsDeEstaBandeja = !canal || (await this.canalDelUltimoMensajeDelCliente(conversationId)) === canal;
+    if (conv.isUnread && marcarLeida && loPendienteEsDeEstaBandeja) {
       // Raw UPDATE a propósito: prisma.update() dispara @updatedAt y la bandeja
       // (findAllForBusiness) ordena por updatedAt, así que abrir una
       // conversación para leerla la subía al tope de la lista. updatedAt tiene
@@ -103,6 +150,11 @@ export class ConversationsService {
       await this.prisma.$executeRaw`UPDATE "conversations" SET "is_unread" = false WHERE "id" = ${conversationId}`;
     }
     return messages.map((m) => this.aMensaje(m));
+  }
+
+  private async canalDelUltimoMensajeDelCliente(conversationId: string): Promise<string | null> {
+    const m = await this.prisma.message.findFirst({ where: { conversationId, sender: 'CUSTOMER' }, orderBy: { createdAt: 'desc' }, select: { channel: true } });
+    return m?.channel ?? null;
   }
 
   async sendMessage(businessId: string, conversationId: string, dto: SendMessageDto) {
@@ -130,12 +182,16 @@ export class ConversationsService {
     });
     let externalId: string | undefined;
     let canal: 'WHATSAPP' | 'INSTAGRAM' | undefined;
-    if (ultimoDelCliente?.channel === 'WHATSAPP') {
+    // Con una bandeja elegida, la respuesta sale por el canal de ESA bandeja, aunque el cliente haya escrito después por
+    // el otro: la de WhatsApp siempre sale por WhatsApp y la local siempre queda en el chat de la tienda.
+    const forzado = dto.canal;
+    const canalDeSalida = forzado ?? ultimoDelCliente?.channel;
+    if (canalDeSalida === 'WHATSAPP') {
       const cliente = await this.prisma.customer.findUnique({ where: { id: conv.customerId }, select: { whatsappId: true } });
       if (!cliente?.whatsappId) throw new BadRequestException('Este cliente no tiene un número de WhatsApp asociado');
       externalId = await this.whatsapp.enviarTexto(businessId, conversationId, cliente.whatsappId, dto.text);
       canal = 'WHATSAPP';
-    } else if (ultimoDelCliente?.channel === 'INSTAGRAM') {
+    } else if (!forzado && ultimoDelCliente?.channel === 'INSTAGRAM') {
       if (!this.instagram) throw new BadRequestException('Instagram no está disponible');
       const cliente = await this.prisma.customer.findUnique({ where: { id: conv.customerId }, select: { instagramId: true } });
       if (!cliente?.instagramId) throw new BadRequestException('Este cliente no tiene una cuenta de Instagram asociada');
@@ -151,8 +207,50 @@ export class ConversationsService {
     });
     // El staff acaba de contestar: la conversación queda "al día" desde su
     // propio punto de vista.
-    await this.prisma.conversation.update({ where: { id: conversationId }, data: { isUnread: false, updatedAt: new Date() } });
+    // Si lo pendiente era de la otra bandeja, contestar acá no lo borra.
+    const limpiaPendiente = !forzado || !ultimoDelCliente || ultimoDelCliente.channel === forzado;
+    await this.prisma.conversation.update({ where: { id: conversationId }, data: { ...(limpiaPendiente ? { isUnread: false } : {}), updatedAt: new Date() } });
+    // Contestó una persona por WhatsApp: si Orbi atendía este chat, se calla.
+    if (canal === 'WHATSAPP') await this.pausarOrbi(businessId, conversationId);
     return this.aMensaje(msg);
+  }
+
+  /**
+   * Manda una foto por WhatsApp (con un pie de foto opcional) desde la bandeja de WhatsApp. Solo WhatsApp y solo fotos.
+   * Como el texto: se manda PRIMERO y recién después se guarda, así una respuesta que WhatsApp rechazó (plazo de 24 h
+   * vencido) no queda en el hilo como si el cliente la hubiera recibido.
+   */
+  async enviarImagen(businessId: string, conversationId: string, archivo: Express.Multer.File | undefined, pieDeFoto?: string) {
+    const conv = await this.prisma.conversation.findFirst({ where: { id: conversationId, businessId } });
+    if (!conv) throw new NotFoundException('Conversación no encontrada');
+    const cliente = await this.prisma.customer.findUnique({ where: { id: conv.customerId }, select: { whatsappId: true } });
+    if (!cliente?.whatsappId) throw new BadRequestException('Este cliente no tiene un número de WhatsApp asociado');
+
+    const url = await this.whatsapp.prepararFoto(businessId, archivo);
+    const pie = pieDeFoto?.trim().slice(0, 1024) || undefined;
+    const externalId = await this.whatsapp.enviarImagen(businessId, conversationId, cliente.whatsappId, url, pie);
+
+    const msg = await this.prisma.message.create({
+      data: {
+        conversationId, sender: 'STORE', text: pie ?? '[Imagen]', channel: 'WHATSAPP', externalId, deliveryStatus: 'sent',
+        attachments: [{ tipo: 'image', url }],
+      },
+    });
+    // Si lo pendiente era del chat de la tienda, contestar por WhatsApp no lo apaga.
+    const ultimoDelCliente = await this.canalDelUltimoMensajeDelCliente(conversationId);
+    const limpiaPendiente = !ultimoDelCliente || ultimoDelCliente === 'WHATSAPP';
+    await this.prisma.conversation.update({ where: { id: conversationId }, data: { ...(limpiaPendiente ? { isUnread: false } : {}), updatedAt: new Date() } });
+    await this.pausarOrbi(businessId, conversationId);
+    return this.aMensaje(msg);
+  }
+
+  // Mejor esfuerzo: que no se pueda pausar a Orbi no puede hacer fallar un mensaje que ya salió.
+  private async pausarOrbi(businessId: string, conversationId: string): Promise<void> {
+    try {
+      await pausarSiAtendiaOrbi(this.prisma, businessId, conversationId);
+    } catch {
+      /* se reintenta con el próximo mensaje de la persona */
+    }
   }
 
   async update(businessId: string, conversationId: string, dto: UpdateConversationDto) {

@@ -1,5 +1,6 @@
 import { ConfigService } from '@nestjs/config';
-import { cuerpoAHtml, firmaAHtml, remitenteParaFrom } from './correo-directo';
+import { cuerpoAHtml, extraerDestinatarios, firmaAHtml, remitenteParaFrom } from './correo-directo';
+import { decodificarEntidades, esEmailDeCeo } from '../platform/correo/zoho-ceo';
 import { MailService } from './mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -60,5 +61,55 @@ describe('correo directo del super panel', () => {
     expect(html).toContain('orbita.site');
     expect(html).not.toContain('para tu negocio');
     expect(html).not.toContain('Hecho por Órbita');
+  });
+
+  it('separa múltiples destinatarios por coma o punto y coma y quita duplicados', () => {
+    expect(extraerDestinatarios(' Alexander@orbita.site, alan@orbita.site ; alexander@orbita.site, ')).toEqual([
+      'alexander@orbita.site',
+      'alan@orbita.site',
+    ]);
+  });
+
+  it('envía correo directo a varios destinatarios y rechaza si alguno es inválido', async () => {
+    const send = jest.fn().mockResolvedValue({ error: null });
+    const createLog = jest.fn().mockResolvedValue({});
+    const mail = new MailService(
+      { get: (k: string) => (k === 'RESEND_API_KEY' ? 're_test' : undefined) } as unknown as ConfigService,
+      { emailLog: { create: createLog } } as unknown as PrismaService,
+    );
+    (mail as unknown as { _resend: unknown })._resend = { emails: { send } };
+
+    const ok = await mail.sendDirecto({
+      to: 'alexander@orbita.site, alan@orbita.site',
+      subject: 'Reunión de equipo',
+      cuerpo: 'Hola a los dos',
+      firma: { name: 'Mateo Rojas', email: 'mateo@orbita.site' },
+    });
+    expect(ok.status).toBe('SENT');
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: ['alexander@orbita.site', 'alan@orbita.site'],
+        subject: 'Reunión de equipo',
+      }),
+    );
+
+    send.mockClear();
+    const fallo = await mail.sendDirecto({
+      to: 'alexander@orbita.site, no-es-un-email',
+      subject: 'Reunión de equipo',
+      cuerpo: 'Hola a los dos',
+      firma: { name: 'Mateo Rojas', email: 'mateo@orbita.site' },
+    });
+    expect(fallo.status).toBe('FAILED');
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('restringe la bandeja de recibidos únicamente a las cuentas del CEO y decodifica entidades de Zoho', () => {
+    expect(esEmailDeCeo('ceo@orbita.site')).toBe(true);
+    expect(esEmailDeCeo('mateo@orbita.site')).toBe(true);
+    expect(esEmailDeCeo('ceo@orbita-corp.com')).toBe(true);
+    expect(esEmailDeCeo('alan@orbita.site')).toBe(false);
+    expect(esEmailDeCeo('cto@orbita-corp.com')).toBe(false);
+    expect(decodificarEntidades('&lt;mateo@orbita.site&gt; &amp; &quot;Órbita&quot;')).toBe('<mateo@orbita.site> & "Órbita"');
   });
 });

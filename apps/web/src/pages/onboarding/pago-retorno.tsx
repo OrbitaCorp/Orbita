@@ -25,7 +25,7 @@ import { borrarAlta } from '@/modules/turnos/onboarding/estadoAlta'
 // activado.tsx, que confirma una preapproval — no un PendingSignup, que ahí
 // no existe (el negocio ya existe).
 
-type Estado = 'verificando' | 'ok' | 'pendiente' | 'error'
+type Estado = 'verificando' | 'ok' | 'creada' | 'pendiente' | 'error'
 
 export default function PagoRetornoPage() {
   const router = useRouter()
@@ -108,6 +108,14 @@ export default function PagoRetornoPage() {
           // lo cargado (ver el comentario en plan.tsx#pagar).
           resetWizard()
           borrarAlta()
+        } else if (data.status === 'ya_creada') {
+          // El webhook de MP llegó antes que el navegador y ya creó la cuenta;
+          // acá no hay sesión que devolver (se la llevó el webhook). El pago
+          // está acreditado: solo falta que entre con el mail y la contraseña
+          // que eligió en el alta.
+          setEstado('creada')
+          resetWizard()
+          borrarAlta()
         } else if (preapprovalId.startsWith('FREE-')) {
           // No hay MercadoPago de por medio en este caso — si no se activó es
           // que el PendingSignup ya no estaba (doble click, o la pestaña
@@ -118,7 +126,11 @@ export default function PagoRetornoPage() {
         } else {
           // MP puede tardar en pasar de "pending" a "authorized".
           setEstado('pendiente')
-          setMensaje(`MercadoPago todavía no confirmó la suscripción (estado: ${data.status}).`)
+          setMensaje(
+            data.status === 'already_consumed_or_unknown' || data.status === 'unknown'
+              ? 'No encontramos tu pago todavía. Si ya pagaste, escribinos y lo activamos a mano.'
+              : `MercadoPago todavía no confirmó la suscripción (estado: ${data.status}).`,
+          )
         }
       } catch {
         setEstado('error')
@@ -214,6 +226,40 @@ export default function PagoRetornoPage() {
               }}
             >
               Continuar al panel
+              <ArrowRight size={16} strokeWidth={2} />
+            </button>
+          </>
+        )}
+
+        {estado === 'creada' && (
+          <>
+            <div style={{
+              width: 72, height: 72, margin: '0 auto 20px', borderRadius: '50%',
+              background: 'linear-gradient(135deg, #059669 0%, #10B981 100%)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 8px 32px rgba(16,185,129,0.35)',
+              animation: 'prScale 0.55s cubic-bezier(0.34,1.56,0.64,1)',
+            }}>
+              <Check size={36} color="white" strokeWidth={2.5} />
+            </div>
+            <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-text)', margin: '0 0 8px' }}>
+              ¡Pago confirmado!
+            </h1>
+            <p style={{ fontSize: 14, color: 'var(--color-muted)', margin: '0 0 28px', lineHeight: 1.5 }}>
+              Tu cuenta ya está creada y publicada. Iniciá sesión con el mail y la contraseña que elegiste para entrar a tu panel.
+            </p>
+            <button
+              onClick={() => { window.location.href = '/login' }}
+              className="ds-hover"
+              style={{
+                width: '100%', height: 50, borderRadius: 12, border: 'none',
+                background: 'var(--color-primary)', color: 'white',
+                fontSize: 15, fontWeight: 700,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                boxShadow: '0 4px 16px rgba(37,99,235,0.30)',
+              }}
+            >
+              Iniciar sesión
               <ArrowRight size={16} strokeWidth={2} />
             </button>
           </>

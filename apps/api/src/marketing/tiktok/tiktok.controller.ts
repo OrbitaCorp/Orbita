@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Logger, Param, Post, Query, Req, Res, Us
 import { ConfigService } from '@nestjs/config';
 import { SkipThrottle } from '@nestjs/throttler';
 import { PlatformAdminGuard } from '../../common/guards/platform-admin.guard';
-import { SoloSuperadmin } from '../../common/decorators/platform-role.decorator';
+import { SuperadminYMarketing, TodoElEquipo } from '../../common/decorators/platform-role.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { PlatformAdminContext } from '../../common/types/auth-context.type';
 import { describeError } from '../../common/utils/describe-error.util';
@@ -22,19 +22,21 @@ interface RequestWithAdmin {
 
 // Marketing → TikTok del super panel. Leer el estado lo puede cualquier admin de plataforma;
 // conectar, publicar y desconectar son cosa de superadmin (publican con el nombre de la empresa).
+// El rol MARKETING también usa todo esto: es quien maneja las redes de la empresa.
 @UseGuards(PlatformAdminGuard)
 @Controller('platform/marketing/tiktok')
 export class TiktokController {
   constructor(private readonly tiktok: TiktokService) {}
 
   @Get()
+  @TodoElEquipo()
   estado() {
     return this.tiktok.estado();
   }
 
   // Devuelve la dirección del login de TikTok: el panel redirige ahí al superadmin.
   @Post('connect')
-  @SoloSuperadmin()
+  @SuperadminYMarketing()
   conectar(@Req() req: RequestWithAdmin) {
     return { url: this.tiktok.urlDeAutorizacion(req.user.adminId) };
   }
@@ -42,49 +44,52 @@ export class TiktokController {
   // Lo que TikTok deja hacer con la cuenta ahora (privacidades, límites): la pantalla de
   // publicar tiene que mostrarlo, es parte de lo que TikTok revisa en la auditoría.
   @Get('creator-info')
+  @TodoElEquipo()
   infoDelCreador() {
     return this.tiktok.infoDelCreador();
   }
 
   // Una dirección para subir el video desde la computadora, directo a R2, y la dirección pública con la que después se publica.
   @Post('video-upload-url')
-  @SoloSuperadmin()
+  @SuperadminYMarketing()
   urlDeSubida(@Body() dto: SubidaVideoTiktokDto) {
     return this.tiktok.urlDeSubida(dto.mimetype);
   }
 
   // Lo que ya está publicado en la cuenta, con sus números (vistas, me gusta, comentarios, compartidos).
   @Get('content')
-  @SoloSuperadmin()
+  @SuperadminYMarketing()
   contenido(@Query('limit') limit?: string) {
     return this.tiktok.contenidoDeLaCuenta(limit ? Number(limit) || 20 : 20);
   }
 
   @Get('posts')
+  @TodoElEquipo()
   publicaciones(@Query('limit') limit?: string) {
     return this.tiktok.publicaciones(limit ? Number(limit) || 20 : 20);
   }
 
   @Post('posts')
-  @SoloSuperadmin()
+  @SuperadminYMarketing()
   publicar(@Req() req: RequestWithAdmin, @Body() dto: PublicarTiktokDto) {
     return this.tiktok.publicar(dto, req.user.adminId);
   }
 
   // Manda el video a los borradores de la cuenta: una persona lo termina y lo publica en la app de TikTok.
   @Post('posts/draft')
-  @SoloSuperadmin()
+  @SuperadminYMarketing()
   enviarABorradores(@Req() req: RequestWithAdmin, @Body() dto: BorradorTiktokDto) {
     return this.tiktok.enviarABorradores(dto.videoUrl, req.user.adminId);
   }
 
   @Get('posts/:publishId')
+  @TodoElEquipo()
   estadoDePublicacion(@Param('publishId') publishId: string) {
     return this.tiktok.consultarEstado(publishId);
   }
 
   @Delete()
-  @SoloSuperadmin()
+  @SuperadminYMarketing()
   desconectar(@Req() req: RequestWithAdmin) {
     return this.tiktok.desconectar(req.user.adminId);
   }

@@ -3,7 +3,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { PlatformAdminGuard } from '../../common/guards/platform-admin.guard';
-import { SoloSuperadmin } from '../../common/decorators/platform-role.decorator';
+import { SoloSuperadmin, SuperadminYMarketing, TodoElEquipo } from '../../common/decorators/platform-role.decorator';
 import { PlatformAdminContext } from '../../common/types/auth-context.type';
 import { SUBIDA_IMAGEN } from '../../common/utils/subida-imagen';
 import { CorreoPlataformaService } from './correo.service';
@@ -14,14 +14,15 @@ interface RequestWithAdmin {
 }
 
 // Pestaña Correo del super panel. Leer (casillas, enviados, vista previa) lo
-// puede cualquier admin; enviar y tocar las casillas es solo de SUPERADMIN:
-// es escribirle a un tercero en nombre de Órbita, desde la casilla de un fundador.
+// puede cualquier admin; tocar las casillas es solo de SUPERADMIN. Enviar es de SUPERADMIN y MARKETING:
+// es escribirle a un tercero en nombre de Órbita, desde la casilla elegida.
 @UseGuards(PlatformAdminGuard)
 @Controller('platform/correo')
 export class CorreoPlataformaController {
   constructor(private readonly correo: CorreoPlataformaService) {}
 
   @Get('casillas')
+  @TodoElEquipo()
   casillas() {
     return this.correo.casillas();
   }
@@ -53,18 +54,36 @@ export class CorreoPlataformaController {
   }
 
   @Post('vista-previa')
+  @TodoElEquipo()
   vistaPrevia(@Body() dto: VistaPreviaCorreoDto) {
     return this.correo.vistaPrevia(dto);
   }
 
   @Post('enviar')
-  @SoloSuperadmin()
+  @SuperadminYMarketing()
   enviar(@Req() req: RequestWithAdmin, @Body() dto: EnviarCorreoDto) {
     return this.correo.enviar(req.user.adminId, dto);
   }
 
   @Get('enviados')
+  @TodoElEquipo()
   enviados() {
     return this.correo.enviados();
+  }
+
+  @Get('recibidos')
+  @SoloSuperadmin()
+  recibidos(@Req() req: RequestWithAdmin) {
+    return this.correo.recibidos(req.user.adminId);
+  }
+
+  @Get('recibidos/:folderId/:messageId')
+  @SoloSuperadmin()
+  recibidoDetalle(
+    @Req() req: RequestWithAdmin,
+    @Param('folderId') folderId: string,
+    @Param('messageId') messageId: string,
+  ) {
+    return this.correo.recibidoDetalle(req.user.adminId, folderId, messageId);
   }
 }

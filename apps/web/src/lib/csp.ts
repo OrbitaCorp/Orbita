@@ -123,7 +123,8 @@ export interface OpcionesCsp {
 // Política en modo Report-Only. Inventario real de orígenes (grep sobre
 // apps/web/src del 15/09):
 //   scripts:  solo los chunks propios de /_next/static + el script de tema
-//             inline (hash). No hay SDK de Mercado Pago (se redirige al
+//             inline (hash) + el SDK de Facebook (connect.facebook.net), que
+//             carga Mensajes → WhatsApp para la conexión con Meta. No hay SDK de Mercado Pago (se redirige al
 //             init_point con location.href), ni Google Identity (OAuth por
 //             redirección a la API), ni Vercel Analytics/Speed Insights.
 //   connect:  la API (NEXT_PUBLIC_API_URL) y el BFF propio (/api, 'self');
@@ -140,22 +141,23 @@ export interface OpcionesCsp {
 //             _app.tsx) + 'unsafe-inline' por los style={} de React, el
 //             <style> de colores por tienda en _app.tsx y Leaflet.
 //   font:     fonts.gstatic.com (+ data: por fuentes embebidas en CSS).
-//   frame:    solo el iframe srcDoc de la previsualización de mails del
-//             superadmin y las vistas de celular del mismo origen — nada
-//             externo (Mercado Pago no se embebe, YouTube no se usa).
+//   frame:    el iframe srcDoc de la previsualización de mails del
+//             superadmin, las vistas de celular del mismo origen y Facebook
+//             (la ventana de la conexión de WhatsApp de Mensajes). Mercado
+//             Pago no se embebe y YouTube no se usa.
 // Sin nonce, sin 'unsafe-inline' ni 'unsafe-eval' en script-src: eso es lo
 // que la política va a medir durante la semana de reportes.
 export function armarCspReportOnly({ hashTema, apiOrigin }: OpcionesCsp): string {
-  const connect = ["'self'", apiOrigin, 'https://*.supabase.co', 'https://nominatim.openstreetmap.org', 'https://apis.datos.gob.ar']
+  const connect = ["'self'", apiOrigin, 'https://*.supabase.co', 'https://nominatim.openstreetmap.org', 'https://apis.datos.gob.ar', 'https://*.facebook.com']
     .filter((o): o is string => Boolean(o))
   const directivas = [
     "default-src 'self'",
-    `script-src 'self' 'sha256-${hashTema}'`,
+    `script-src 'self' 'sha256-${hashTema}' https://connect.facebook.net`,
     `connect-src ${connect.join(' ')}`,
     "img-src 'self' data: blob: https:",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' data: https://fonts.gstatic.com",
-    "frame-src 'self'",
+    "frame-src 'self' https://*.facebook.com",
     "object-src 'none'",
     "base-uri 'self'",
     `report-uri ${CSP_REPORT_PATH}`,

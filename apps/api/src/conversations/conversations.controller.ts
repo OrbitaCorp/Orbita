@@ -1,11 +1,16 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { FullModeOnly } from '../common/decorators/full-mode-only.decorator';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
-import { ConversationsService } from './conversations.service';
+import { CANALES_DE_BANDEJA, ConversationsService, type CanalDeBandeja } from './conversations.service';
+import { SUBIDA_IMAGEN } from '../common/utils/subida-imagen';
+import { SendImageDto } from './dto/send-image.dto';
 import { SendMessageDto } from './dto/send-message.dto';
+import { ChatBotDto } from './dto/chat-bot.dto';
+import { WhatsappBotService } from '../whatsapp/whatsapp-bot.service';
 import { UpdateConversationDto } from './dto/update-conversation.dto';
 
 // Bandeja de mensajes del panel. Hasta acá (17/09) andaba SIN gate de
@@ -18,7 +23,10 @@ import { UpdateConversationDto } from './dto/update-conversation.dto';
 // sin gate ninguno) — el propietario siempre pasa (ver PermissionsGuard).
 @Controller('conversations')
 export class ConversationsController {
-  constructor(private readonly conversationsService: ConversationsService) {}
+  constructor(
+    private readonly conversationsService: ConversationsService,
+    private readonly bot: WhatsappBotService,
+  ) {}
 
   @Get()
   @FullModeOnly()
@@ -42,9 +50,10 @@ export class ConversationsController {
   @Get(':id/messages')
   @FullModeOnly()
   @RequirePermission('messages.view')
-  messages(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
+  messages(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Query('canal') canal?: string) {
     const member = assertMemberContext(ctx);
-    return this.conversationsService.getMessages(member.businessId, id, !member.readOnly);
+    if (canal !== undefined && !CANALES_DE_BANDEJA.includes(canal as CanalDeBandeja)) throw new BadRequestException('Canal inválido');
+    return this.conversationsService.getMessages(member.businessId, id, !member.readOnly, canal as CanalDeBandeja | undefined);
   }
 
   @Post(':id/messages')
@@ -53,6 +62,25 @@ export class ConversationsController {
   sendMessage(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: SendMessageDto) {
     const member = assertMemberContext(ctx);
     return this.conversationsService.sendMessage(member.businessId, id, dto);
+  }
+
+  // Una foto por WhatsApp (campo `file`, y `texto` como pie de foto): solo desde la bandeja de WhatsApp.
+  @Post(':id/messages/image')
+  @FullModeOnly()
+  @RequirePermission('messages.manage')
+  @UseInterceptors(FileInterceptor('file', SUBIDA_IMAGEN))
+  sendImage(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: SendImageDto, @UploadedFile() file?: Express.Multer.File) {
+    const member = assertMemberContext(ctx);
+    return this.conversationsService.enviarImagen(member.businessId, id, file, dto.texto);
+  }
+
+  // Orbi en un chat de WhatsApp: encenderlo, apagarlo o reactivarlo (levanta la pausa y la derivación). Es decisión de quien atiende.
+  @Patch(':id/bot')
+  @FullModeOnly()
+  @RequirePermission('messages.manage')
+  cambiarBot(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: ChatBotDto) {
+    const member = assertMemberContext(ctx);
+    return this.bot.cambiarEstadoDelChat(member.businessId, id, dto.estado);
   }
 
   @Patch(':id')

@@ -38,13 +38,18 @@ import { LineSeriesChart, AreaSeriesChart, BarDistribution, ChartSkeleton, Range
 
 const ES_TAB = (v: unknown): v is Tab => typeof v === 'string' && NAV.some((n) => n.id === v)
 
+// El rol de marketing ve solo estas secciones (el servidor además le cierra todo lo demás, aunque llame a la API a mano).
+const SECCIONES_DE_MARKETING: Tab[] = ['resumen', 'marketing', 'correo']
+export const navDelRol = (rol: string | undefined) => (rol === 'MARKETING' ? NAV.filter((n) => SECCIONES_DE_MARKETING.includes(n.id)) : NAV)
+
 export function SuperAdminDashboard() {
   const { user, logout, marcarContrasenaPropia } = useAuth()
   const router = useRouter()
   // La sección vive en la URL (?seccion=negocios), no en un useState: así cada
   // sección queda enlazable, el botón "atrás" del navegador funciona, y el
   // "volver" de la ficha de un negocio aterriza en Negocios y no en Resumen.
-  const tab: Tab = ES_TAB(router.query.seccion) ? router.query.seccion : 'resumen'
+  const rol = user?.type === 'platform_admin' ? user.admin.role : undefined
+  const tab: Tab = ES_TAB(router.query.seccion) && (rol !== 'MARKETING' || SECCIONES_DE_MARKETING.includes(router.query.seccion)) ? router.query.seccion : 'resumen'
   const setTab = (t: Tab) => void router.push(`/superadmin?seccion=${t}`, undefined, { shallow: true })
 
   // Consultas de soporte abiertas, para la pastilla del sidebar: es lo único
@@ -52,7 +57,8 @@ export function SuperAdminDashboard() {
   // cualquier sección, no solo entrando a Soporte. Se vuelve a pedir cada
   // minuto (solo con la pestaña visible) y cada vez que Soporte avisa que
   // respondió o cerró algo, para que el número no quede viejo un minuto.
-  const esAdmin = !!user && user.type === 'platform_admin'
+  // Marketing no ve soporte ni el estado de Orbi ni los pedidos de Instagram: no se piden (el servidor se los negaría).
+  const esAdmin = !!user && user.type === 'platform_admin' && user.admin.role !== 'MARKETING'
   const [tickSoporte, setTickSoporte] = useState(0)
   const refrescarSoporte = () => setTickSoporte((k) => k + 1)
   useEffect(() => {
@@ -79,7 +85,7 @@ export function SuperAdminDashboard() {
     [esAdmin, tickSoporte],
   )
   const instagramPendientes = pedidosInstagram?.filter((p) => p.status === 'PENDING').length ?? 0
-  const items = NAV.map((n) => (
+  const items = navDelRol(rol).map((n) => (
     n.id === 'soporte' ? { ...n, badge: abiertas }
       : n.id === 'orbi' ? { ...n, badge: orbiApagado, badgeLabel: 'apagado' }
         : n.id === 'instagram' ? { ...n, badge: instagramPendientes, badgeLabel: `${instagramPendientes} pendientes` }
@@ -103,7 +109,7 @@ export function SuperAdminDashboard() {
       usuario={{ nombre: user.admin.name, rol: ROLE_LABELS[user.admin.role] ?? user.admin.role }}
       onCerrarSesion={cerrarSesion}
     >
-      {tab === 'resumen' && <TabResumen />}
+      {tab === 'resumen' && <TabResumen sinFacturacion={user.admin.role === 'MARKETING'} />}
       {tab === 'wizard' && <TabWizard />}
       {tab === 'negocios' && <TabNegocios />}
       {tab === 'soporte' && <TabSoporte currentAdminId={user.admin.id} onCambio={refrescarSoporte} />}
@@ -116,8 +122,8 @@ export function SuperAdminDashboard() {
       {tab === 'auditoria' && <TabAuditoria currentAdminId={user.admin.id} />}
       {tab === 'admins' && <TabAdmins currentAdminId={user.admin.id} />}
       {tab === 'logs' && <TabLogs />}
-      {tab === 'correo' && <TabCorreo puedeEnviar={user.admin.role === 'SUPERADMIN'} />}
-      {tab === 'marketing' && <TabMarketing puedePublicar={user.admin.role === 'SUPERADMIN'} />}
+      {tab === 'correo' && <TabCorreo puedeEnviar={user.admin.role !== 'OPERATOR'} puedeEditarCasillas={user.admin.role === 'SUPERADMIN'} adminEmail={user.admin.email} />}
+      {tab === 'marketing' && <TabMarketing puedePublicar={user.admin.role !== 'OPERATOR'} />}
       {tab === 'instagram' && <TabInstagram puedeHabilitar={user.admin.role === 'SUPERADMIN'} onCambio={refrescarSoporte} />}
       {tab === 'testeo' && <TabTesteo />}
     </SuperAdminShell>
@@ -165,15 +171,16 @@ export const NAV: ItemNav<Tab>[] = [
 ]
 
 // ─── Resumen ──────────────────────────────────────────────────────────────────
-function TabResumen() {
+function TabResumen({ sinFacturacion = false }: { sinFacturacion?: boolean }) {
   const { data, error } = useFetch(() => platformApi.overview(), [])
   // Un solo rango para toda la pantalla: antes había un selector adentro de
   // cada tarjeta y los dos gráficos podían quedar mirando períodos distintos,
   // que es la forma más fácil de sacar una conclusión equivocada.
   const [range, setRange] = useRange(30)
   const { data: growth, loading: cargandoGrowth } = useFetch(() => platformApi.growthSeries(range), [range])
-  const { data: revenue, loading: cargandoRevenue } = useFetch(() => platformApi.revenueSeries(range), [range])
-  const { data: subs } = useFetch(() => platformApi.subscriptions(), [])
+  // Sin facturación (rol de marketing) no se piden los ingresos ni las suscripciones: el servidor se las niega.
+  const { data: revenue, loading: cargandoRevenue } = useFetch(() => (sinFacturacion ? Promise.resolve(null) : platformApi.revenueSeries(range)), [range, sinFacturacion])
+  const { data: subs } = useFetch(() => (sinFacturacion ? Promise.resolve(null) : platformApi.subscriptions()), [sinFacturacion])
 
   if (error) return <ErrorBox msg="No se pudo cargar el resumen." />
   if (!data) return <Loader />
@@ -187,12 +194,12 @@ function TabResumen() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <PageHeader
         title="Resumen"
-        subtitle="Cómo viene la plataforma hoy: facturación, negocios y dominios."
+        subtitle={sinFacturacion ? 'Cómo viene la plataforma hoy: negocios y altas.' : 'Cómo viene la plataforma hoy: facturación, negocios y dominios.'}
         action={<RangePicker value={range} onChange={setRange} />}
       />
 
       <Grid>
-        <Kpi label="Facturación mensual" value={money(data.subscriptions.mrr)} accent hint="Suma de las suscripciones pagas activas" />
+        {!sinFacturacion && <Kpi label="Facturación mensual" value={money(data.subscriptions.mrr)} accent hint="Suma de las suscripciones pagas activas" />}
         <Kpi label="Negocios totales" value={String(data.businesses.total)} hint={`${data.businesses.active} funcionando hoy`} />
         <Kpi label="Altas últimos 30 días" value={`+${data.businesses.newLast30Days}`} hint="Negocios nuevos" />
         <Kpi label="Negocios activos" value={String(data.businesses.active)} hint="Vendiendo con normalidad" />
@@ -222,6 +229,8 @@ function TabResumen() {
         )}
       </Card>
 
+      {!sinFacturacion && (
+      <>
       <Card
         title="Ingresos por día"
         subtitle="Solo pagos ya aprobados"
@@ -269,6 +278,8 @@ function TabResumen() {
           <BarDistribution items={reparto(data.subscriptions.byOrigin, SUB_ORIGIN_LABELS)} />
         </Card>
       </Row2>
+      </>
+      )}
 
       <Row2>
         <Card title="Negocios por modo" subtitle="Vidriera (solo catálogo) o checkout (venden y cobran online)">
@@ -498,6 +509,7 @@ function TabAdmins({ currentAdminId }: { currentAdminId: string }) {
   const [reloadKey, setReloadKey] = useState(0)
   const [editando, setEditando] = useState<AdminRow | 'nuevo' | null>(null)
   const [desactivando, setDesactivando] = useState<AdminRow | null>(null)
+  const [reactivando, setReactivando] = useState<AdminRow | null>(null)
   const [restableciendo, setRestableciendo] = useState<AdminRow | null>(null)
   const [aviso, setAviso] = useState('')
   const { data, error } = useFetch(() => platformApi.admins(), [reloadKey])
@@ -551,6 +563,9 @@ function TabAdmins({ currentAdminId }: { currentAdminId: string }) {
                 {a.isActive && a.id !== currentAdminId && (
                   <button onClick={() => { setAviso(''); setRestableciendo(a) }} className="ds-hover" style={btnGhostSm}>Restablecer contraseña</button>
                 )}
+                {!a.isActive && (
+                  <button onClick={() => { setAviso(''); setReactivando(a) }} className="ds-hover" style={btnGhostSm}>Reactivar</button>
+                )}
                 {a.isActive && a.id !== currentAdminId && (
                   <button onClick={() => setDesactivando(a)} className="ds-hover" style={{ ...btnGhostSm, color: 'var(--color-error)', borderColor: 'var(--color-error)' }}>Desactivar</button>
                 )}
@@ -581,12 +596,26 @@ function TabAdmins({ currentAdminId }: { currentAdminId: string }) {
       {desactivando && (
         <ConfirmModal
           title={`¿Desactivar a ${desactivando.name}?`}
-          body="No va a poder iniciar sesión hasta que lo reactives creándolo de nuevo con el mismo email."
+          body="No va a poder iniciar sesión hasta que lo reactives con el botón «Reactivar» de esta misma lista."
           confirmLabel="Desactivar"
           onCancel={() => setDesactivando(null)}
           onConfirm={async () => {
             await platformApi.removeAdmin(desactivando.id)
             setDesactivando(null)
+            recargar()
+          }}
+        />
+      )}
+      {reactivando && (
+        <ConfirmModal
+          title={`¿Reactivar a ${reactivando.name}?`}
+          body="Vuelve a poder iniciar sesión con su misma cuenta, rol y contraseña. Se cierran sus sesiones viejas. Si no recuerda la contraseña, restablecésela después."
+          confirmLabel="Reactivar"
+          onCancel={() => setReactivando(null)}
+          onConfirm={async () => {
+            await platformApi.reactivateAdmin(reactivando.id)
+            setAviso(`${reactivando.name} quedó activo de nuevo.`)
+            setReactivando(null)
             recargar()
           }}
         />
@@ -646,6 +675,7 @@ function AdminFormModal({ admin, onClose, onSaved }: { admin: AdminRow | null; o
         <Field label="Rol">
           <select value={role} onChange={(e) => setRole(e.target.value as PlatformAdminRole)} className="ds-field" style={inputStyle}>
             <option value="OPERATOR">Operador</option>
+            <option value="MARKETING">Marketing (solo Marketing, Correo y Resumen)</option>
             <option value="SUPERADMIN">Super administrador</option>
           </select>
         </Field>

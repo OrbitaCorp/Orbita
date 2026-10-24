@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { PlatformAdminGuard } from '../common/guards/platform-admin.guard';
-import { SoloSuperadmin } from '../common/decorators/platform-role.decorator';
+import { SuperadminYMarketing } from '../common/decorators/platform-role.decorator';
 import { PlatformAdminContext } from '../common/types/auth-context.type';
 import { SendMessageDto } from '../conversations/dto/send-message.dto';
 import { InstagramBandejaService } from './instagram-bandeja.service';
@@ -13,7 +13,7 @@ interface RequestWithAdmin {
 // Son conversaciones privadas con personas de afuera: ver y contestar es solo de SUPERADMIN (un OPERATOR
 // lee el resto del super panel, pero no estos mensajes).
 @UseGuards(PlatformAdminGuard)
-@SoloSuperadmin()
+@SuperadminYMarketing()
 @Controller('platform/marketing/instagram')
 export class InstagramBandejaController {
   constructor(private readonly bandeja: InstagramBandejaService) {}

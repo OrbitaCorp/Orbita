@@ -13,6 +13,7 @@ import { ENTRADA_IMAGEN } from '../common/utils/subida-imagen';
 import { MIME_VIDEO_PERMITIDOS, EXTENSION_POR_MIME_VIDEO } from '../common/utils/subida-video';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { soloClientesReales } from '../customers/clientes-visibles';
 import { cuitValido, limpiarCuit } from '../common/utils/cuit';
 import { suspendidoPorPlataforma } from './suspension';
 import { AuditService } from '../audit/audit.service';
@@ -121,7 +122,7 @@ export class BusinessesService {
       // Los tres con soft-delete se cuentan vivos: si borró todo, la tarea
       // vuelve a estar pendiente (mismo criterio que productos).
       this.prisma.order.count({ where: { businessId, deletedAt: null } }),
-      this.prisma.customer.count({ where: { businessId, deletedAt: null } }),
+      this.prisma.customer.count({ where: { businessId, deletedAt: null, AND: [soloClientesReales] } }),
       this.prisma.messageTemplate.count({ where: { businessId } }),
       // Descuento automático o cupón (code null o no): cualquiera cumple.
       this.prisma.discount.count({ where: { businessId, deletedAt: null } }),

@@ -488,6 +488,17 @@ su cantidad.
 Sin los tres secretos cargados, la pantalla de Marketing avisa que TikTok no está configurado y el resto
 de la API sigue igual.
 
+## Rol Marketing del super panel
+
+Tercer rol de `platform_admins.role` (`MARKETING`, migración `20261021010000_platform_admin_rol_marketing`: agrega el valor al enum, no toca datos).
+Es para quien lleva las redes y los videos (por ejemplo, Milagros). A diferencia del OPERATOR, que **lee todo** y no escribe lo sensible, un MARKETING
+solo entra a lo que lo nombra a propósito (`PlatformAdminGuard`: sin `@SuperadminYMarketing()` / `@TodoElEquipo()` lo rechaza, también en lectura).
+Hoy puede: Resumen (sin facturación: `overview` le saca el MRR y las suscripciones), Marketing completo (TikTok, Instagram con mensajes directos y
+contenido, videos, tutoriales, prospección y el conector de Claude), y Correo (ver, vista previa y enviar; las casillas siguen siendo de SUPERADMIN).
+No ve Negocios, Soporte, Costos, Admins, Actividad, Auditoría ni campañas. La lista exacta está fijada en `test/unit/platform.rol-marketing.unit-spec.ts`.
+Dar el rol: Super panel → Admins → editar → Rol «Marketing». Ahí mismo se le saca el acceso total a quien lo tenga como SUPERADMIN.
+Sus videos los aprueba la dirección (`politica-aprobacion.ts` sigue mandando por quién subió); los avisos por correo de videos también le llegan.
+
 ## Prospección: consulta de cuentas de Instagram y conector de Claude
 
 Qué hace (código en `src/marketing/prospeccion/`): Superadmin → Marketing → Prospección consulta cuentas
@@ -528,28 +539,57 @@ Migraciones (3, tablas `marketing_prospectos`, `marketing_prospeccion_lotes`, `m
 
 ### Cola de videos (Marketing → Videos)
 
-Cada persona le pide a SU Claude, con el conector (por ejemplo «generame 3 videos»); Claude los hace en su computadora
-(HyperFrames, repo `Orbita-Videos`) y por el conector: `videos_pedir_subida` (reserva un lugar y devuelve una dirección
-firmada), sube el mp4 con un PUT directo a R2 (`marketing/videos/<uuid>.mp4`) y `videos_registrar` (lo deja en la cola con
-su guion, texto sugerido y controles de calidad). No hay pedidos en el panel ni se renderiza nada en la nube. Código en
-`src/marketing/videos/`, tabla `marketing_videos` (migración `20261014140000_marketing_videos`, con RLS).
+Cada persona le pide a SU Claude, con el conector (por ejemplo «generame 3 videos» o «hacé el tutorial de Atender un pedido»);
+Claude los hace en su computadora (HyperFrames; skills y agentes en el repo público `Orbita-Videos`: las instrucciones del conector le dicen a Claude Code que lo clone en `~/orbita-videos/repo` la primera vez, avisando antes; también existe como plugin de Claude Code, opcional) y por el conector: `videos_pedir_subida` (reserva un lugar y
+devuelve una dirección firmada), sube el mp4 con un PUT directo a R2 (`marketing/videos/<uuid>.mp4`) y `videos_registrar` (lo deja
+en la cola con su guion, texto sugerido y controles de calidad). No hay pedidos en el panel ni se renderiza nada en la nube.
+Código en `src/marketing/videos/`; tablas `marketing_videos`, `marketing_video_comentarios` y `marketing_tutoriales`
+(migraciones `20261014140000_marketing_videos`, `20261014180000_marketing_videos_tipos_y_tutoriales` y
+`20261014190000_marketing_videos_comentarios`, todas con RLS).
 
-- **Estados:** SUBIENDO (vence en 1 h) → PENDIENTE (vence a los 7 días si nadie lo revisa) → APROBADO (queda como registro,
-  con su archivo, sin vencer) → PUBLICADO (se pasó a un borrador). **Rechazar borra el archivo de R2 y el registro.**
-- **Sin cron:** los vencidos se borran al listar la cola y al pedir una subida (`purgarVencidos`). Como los aprobados
-  conservan su archivo, el almacenamiento solo crece con ellos (≈ 20–40 MB por video; tope 50 MB por video, que es el de
-  Instagram).
-- **Aviso por correo:** cuando entra un video, un correo (por Resend, con el diseño de Órbita) a los superadmins ACTIVOS con correo
-  `@orbita.site` u `@orbita-corp.com` (`MCP_DOMINIOS_PERMITIDOS`): «Hay N videos para aprobar», con los títulos y un botón al panel.
-  Sale **uno por tanda**: no repite si ya salió otro hace menos de 10 minutos, y al terminar Claude llama a `videos_avisar` (fin de
-  tanda) que avisa solo si quedó algún pendiente sin anunciar. El último aviso se lee del registro de acciones (`video_aviso`); no
-  hay tabla nueva. Es mejor esfuerzo: si el correo falla, el video queda registrado igual. El botón usa `FRONTEND_URL`.
-- **Tope de la cola:** 20 videos entre SUBIENDO y PENDIENTE; con más, `videos_pedir_subida` avisa que hay que revisar.
-- **Pasar a TikTok / Instagram:** siempre como BORRADOR y solo por una persona (nada se publica solo). TikTok: borradores
-  de la cuenta (la persona lo termina en la app). Instagram: borrador en Marketing → Instagram → Publicaciones, desde donde
-  se publica o se programa. El video se copia al almacenamiento de Instagram (bucket de la cuenta de la empresa).
+- **Dos tipos que no se mezclan** (pestañas del panel): **MARKETING** (se usa afuera; se puede pasar como borrador a TikTok o
+  Instagram; vence a los 7 días sin aprobar) y **TUTORIAL** (interno, no se pasa a redes; vence a los 30 días; puede cubrir un ítem
+  de la lista de tutoriales). **No hay tope de peso** en ninguno de los dos (R2 no lo pide); el único límite que queda es el de la
+  vía de Instagram (50 MB, del bucket de la cuenta): un video más pesado se descarga y se sube a mano a Instagram.
+- **Estados:** SUBIENDO (vence en 1 h) → PENDIENTE → APROBADO (queda como registro, con su archivo, sin vencer) → PUBLICADO (se
+  pasó a un borrador). **Rechazar borra el archivo de R2, el registro y sus comentarios.**
+- **Quién aprueba depende de QUIÉN LO SUBIÓ** (`politica-aprobacion.ts`, con tests). Es interno: el panel solo ofrece «Aprobar» a quien
+  puede y nunca muestra quién aprobó ni qué falta.
+  - Lo sube un **socio** (CEO, CTO o CPO): se aprueba a sí mismo, para verificar lo que hizo su Claude. **Ningún socio aprueba ni
+    rechaza el video de otro socio.**
+  - Lo sube **cualquier otra persona** (por ejemplo, Milagros, de marketing): lo aprueba la dirección. Alcanza con el CEO; el
+    CTO y el CPO también pueden, pero entonces tienen que aprobar los dos. Quien lo subió nunca aprueba el suyo.
+  - Quién es «la dirección» (`MARKETING_DIRECCION`): una lista de ROLES separados por coma (el primero es el CEO) y los correos de
+    cada rol separados por `|`, porque cada socio tiene dos cuentas y son la misma persona. Por defecto
+    `ceo@orbita-corp.com|ceo@orbita.site,cto@orbita-corp.com|cto@orbita.site,cpo@orbita-corp.com|cpo@orbita.site`. Con una cuenta no se
+    aprueba lo que subió la otra del mismo rol, y las dos cuentas de un rol cuentan como una sola aprobación. **Si en producción
+    usan otros correos, hay que fijarla en `deploy/env-vars.yaml`: si no coincide, nadie puede aprobar lo de Milagros** (falla del
+    lado seguro).
+- **Comentarios** (`/platform/marketing/videos/:id/comentarios`): cualquiera del equipo puede opinar sobre cualquier video en todas
+  sus fases (para aprobar, aprobado, pasado a borrador) y borrar los suyos.
+- **Mejorar un video:** el botón «Mejorar con Claude» abre Claude con el video si la persona tiene el conector
+  (`GET /platform/mcp/estado`); si no, le explica cómo conectarlo. Claude lee el video y los comentarios con `videos_obtener` y
+  registra la versión nueva con `videos_registrar` + `mejora_de`: queda como un video aparte que apunta al original, que no se toca
+  (sirve también para videos ya aprobados). La mejora se aprueba según quién la subió.
+- **Lista de tutoriales** (`marketing_tutoriales`, cargada en la migración con los 39 tutoriales definidos): estados FALTA,
+  EN_PROCESO, EN_REVISION, HECHO. La actualiza el Claude de cada persona (`tutoriales_listar` / `tutoriales_actualizar`); registrar el
+  video de un tutorial lo pasa a EN_REVISION y aprobarlo, a HECHO; rechazarlo o que venza lo devuelve a FALTA. También se corrige
+  desde el panel.
+- **Aviso por correo a TODO el equipo:** cuando entra un video, un correo (por Resend, con el diseño de Órbita) a los superadmins
+  ACTIVOS con correo `@orbita.site` u `@orbita-corp.com` (`MCP_DOMINIOS_PERMITIDOS`) y también a su correo personal si lo cargó:
+  «Hay N videos nuevos para ver y comentar», con los títulos y un botón al panel (el texto no habla de aprobaciones). Sale **uno por
+  tanda y por tipo**: no repite si ya salió otro hace menos de 10 minutos, y al terminar Claude llama a `videos_avisar` (fin de tanda),
+  que avisa solo si quedó algún pendiente sin anunciar. El último aviso se lee del registro de acciones (`video_aviso`). Es mejor
+  esfuerzo: si el correo falla, el video queda registrado igual. El botón usa `FRONTEND_URL`.
+- **Sin cron:** los vencidos se borran al listar la cola y al pedir una subida (`purgarVencidos`). Como los aprobados conservan su
+  archivo, el almacenamiento solo crece con ellos (≈ 20–40 MB por video de marketing).
+- **Tope de la cola:** 20 videos de cada tipo entre SUBIENDO y PENDIENTE; con más, `videos_pedir_subida` avisa que hay que revisar.
+- **Pasar a TikTok / Instagram** (solo marketing aprobado): siempre como BORRADOR y solo por una persona (nada se publica solo).
+  TikTok: borradores de la cuenta (la persona lo termina en la app). Instagram: borrador en Marketing → Instagram → Publicaciones,
+  desde donde se publica o se programa. El video se copia al almacenamiento de Instagram (bucket de la cuenta de la empresa).
 - Usa las variables de R2 que ya existen (`R2_*`, `R2_PUBLIC_URL`); no hay secretos nuevos.
-- Migración aditiva (una tabla nueva): `./deploy/prisma-prod.sh migrate deploy` antes de `deploy.sh`, como siempre.
+- Migraciones aditivas (columnas con valor por defecto y tablas nuevas): `./deploy/prisma-prod.sh migrate deploy` antes de
+  `deploy.sh`, como siempre. Los videos que ya existían quedan como MARKETING.
 
 Para agregar el conector en Claude (una vez por persona): Configuración → Conectores → «Agregar conector personalizado»
 con `https://api.orbita.site/api/v1/mcp`. Requiere un plan de Claude que permita conectores personalizados.
@@ -840,6 +880,91 @@ No pasa por `correrUnaVez` a propósito: es idempotente (cada publicación se to
 gcloud scheduler jobs describe NOMBRE_DEL_JOB --project=orbita-api-corp --location=southamerica-east1
 gcloud scheduler jobs run NOMBRE_DEL_JOB --project=orbita-api-corp --location=southamerica-east1  # dispara ahora, a mano
 ```
+
+## WhatsApp: conexión por Embedded Signup (cada negocio conecta su cuenta)
+
+Órbita es **proveedor de tecnología** de Meta (app «Orbita», id `1634368494718041`): cada negocio conecta su WhatsApp
+Business desde Mensajes → WhatsApp con el botón de Meta, sin pegar datos a mano.
+
+- **Cómo funciona:** el panel abre `FB.login` con la configuración de inicio de sesión (`config_id` en
+  `apps/web/src/lib/meta/embeddedSignup.ts`, o `NEXT_PUBLIC_WHATSAPP_CONFIG_ID`). Meta devuelve un código (vale unos
+  segundos) y, por un mensaje de su ventana, los ids de la cuenta y el número. `POST /whatsapp/embedded-signup` canjea el
+  código por el token del negocio (`/oauth/access_token` con `WHATSAPP_APP_ID` + `WHATSAPP_APP_SECRET`), **comprueba contra
+  Meta que el número sea de esa cuenta**, registra el número en la Cloud API (PIN derivado del secreto: no se guarda),
+  guarda el token cifrado y suscribe la app a la cuenta (`subscribed_apps`).
+- **Variables:** `WHATSAPP_APP_ID` (no secreta, en `env-vars.yaml`) y `WHATSAPP_NEGOCIOS_HABILITADOS` (`*` = todos los
+  negocios; una lista de subdominios la restringe). `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN` y
+  `WHATSAPP_TOKEN_KEY` siguen en Secret Manager.
+- **En Meta (panel de la app):** el dominio de la web (`orbita.site`) tiene que estar en los dominios permitidos del
+  inicio de sesión con Facebook / SDK de JavaScript, y el webhook de WhatsApp Business Account apunta a
+  `https://api.orbita.site/api/v1/webhooks/whatsapp` (un solo webhook para todos los negocios: el negocio se resuelve por
+  `phone_number_id`).
+- **Coexistencia (el número sigue en la app WhatsApp Business):** el flujo del panel usa `featureType:
+  whatsapp_business_app_onboarding` y `version: v4` (`embeddedSignup.ts`; `NEXT_PUBLIC_WHATSAPP_FEATURE_TYPE` lo cambia).
+  Meta termina con `FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING` y solo da el id de la cuenta: la API busca el número que
+  sigue en la app (`is_on_biz_app`), **no lo registra** y pide el volcado de contactos e historial
+  (`POST /{phone}/smb_app_data`, una sola vez y dentro de las 24 h de conectar). Para que esto llegue, **en el panel de Meta
+  (WhatsApp → Configuración → Webhook) hay que suscribir los campos `smb_message_echoes`, `history` y
+  `smb_app_state_sync`** además de `messages`: los dos primeros los procesa `whatsapp.service.ts` (lo que el dueño escribe
+  desde el celular y el historial de chats); `smb_app_state_sync` (contactos) todavía se ignora. Límites de Meta: la app tiene
+  que ser WhatsApp Business ≥ 2.24.17, los grupos no se sincronizan, se desvinculan los dispositivos vinculados (Web y
+  Desktop) y con ~14 días sin abrir la app en el celular Meta corta la conexión (`PARTNER_REMOVED`). Disponibilidad por país:
+  confirmarla en la documentación de Meta.
+- **Las dos bandejas de Mensajes no se mezclan:** `GET /conversations` devuelve `canales` (último mensaje y «sin leer» de
+  cada canal), `GET /conversations/:id/messages?canal=` filtra por canal y `POST .../messages` acepta `canal` para
+  responder siempre por el de la bandeja desde la que se contesta.
+- **Fotos en los chats (solo imágenes):** las que mandan los clientes se bajan de Meta (`GET /{media_id}` → `url`, con el
+  token del negocio) y las que manda el panel salen por `POST /conversations/:id/messages/image`; en los dos casos se
+  guardan como JPEG (≤ 2048 px, ≤ 5 MB) en el bucket **`whatsapp-media`** de Supabase Storage, que se crea solo la primera
+  vez (público, rutas con UUID: WhatsApp tiene que poder bajar la imagen por su dirección). No hace falta migración ni
+  variable nueva. Audio, video y documentos no se guardan: siguen entrando como etiqueta en el texto.
+- **Orbi como atención al público (paquete Avanzado):** el bot (`src/whatsapp/whatsapp-bot*.ts`) contesta los chats de
+  WhatsApp donde el dueño lo activó. Corre DENTRO del pedido del webhook (Cloud Run corre con `--cpu-throttling`: lo que
+  queda después de responder no recibe CPU), con una espera de ~3,5 s para juntar mensajes seguidos
+  (`WHATSAPP_BOT_ESPERA_MS`). Modelo de IA con respaldos, del más barato al más caro: **Groq** (`GROQ_MODEL`,
+  gpt-oss-120b) → **Workers AI de Cloudflare** (`CF_LLM_MODEL`, `@cf/openai/gpt-oss-120b`; usa `R2_ACCOUNT_ID` +
+  `CF_WORKERS_AI_API_TOKEN`, que necesita el permiso de Workers AI) → **Gemini** (`ORBI_MODEL_WHATSAPP` →
+  `ORBI_MODEL_PANEL` → `ORBI_MODEL`). Cada uno tiene 15 s para contestar; si se cae (429, 5xx, red) o no contesta,
+  sigue el próximo, y los que no tienen credenciales se saltean (`cadenaDeRespaldos` en `llm-adapter.provider.ts`). Sin
+  secrets nuevos. Herramientas de solo lectura: el catálogo sale de `StorefrontService` (lo mismo que ve un comprador) y
+  los pedidos solo los de la persona que escribe. **Cupo aparte** del de Orbi del panel: `WHATSAPP_BOT_CREDITOS_MES`
+  (2000 por defecto), con tope propio opcional del dueño; lo gastado sale de `whatsapp_bot_turns`. Habilitación: el
+  addon `ADVANCED` activo; `WHATSAPP_BOT_SIN_PACK=true` lo salta y es SOLO para desarrollo (nunca en `env-vars.yaml`).
+  Tablas nuevas: `whatsapp_bot_configs`, `whatsapp_bot_turns` y columnas en `conversations` (`bot_estado`, `bot_motivo`,
+  `bot_cambiado_at`) y `messages` (`via_orbi`); migración `20261019010000_whatsapp_bot` (aplicar en producción con
+  `prisma-prod.sh migrate deploy` ANTES de desplegar la API).
+- **Modalidades de Orbi (las elige el dueño):** `CONVERSACIONAL` (todo con IA), `MENU_Y_CONVERSACION` (el primer contacto
+  y los saludos abren con un menú; lo demás, IA) y `SOLO_MENU` (menú y respuestas fijas, sin IA: no gasta cupo y sigue
+  andando con el cupo agotado). El menú sale como mensaje **interactivo** (lista de hasta 10 opciones o hasta 3 botones;
+  no necesita plantilla aprobada, solo dentro de las 24 h) y, si WhatsApp lo rechaza, como texto numerado (el "2" suelto
+  se entiende como la opción 2 solo si lo último que mandó Orbi fue ese menú). Lo que el cliente toca llega en el webhook
+  como `interactive.list_reply` / `button_reply` con el `id` de la opción. Opciones y saludo en `whatsapp_bot_configs`
+  (`menu_opciones`, `bienvenida`, `menu_estilo`, `modalidad`); migración `20261019020000_whatsapp_bot_modalidades`
+  (aplicar en producción antes de desplegar la API). A confirmar con una cuenta real: cómo se ven los interactivos en la
+  app WhatsApp Business del celular cuando el número está en coexistencia.
+- **Orbi toma pedidos (el dueño lo enciende, apagado por defecto):** `whatsapp_bot_configs.toma_pedidos` + topes
+  `max_unidades` / `max_monto`. Solo en las modalidades con IA. Flujo (`whatsapp-bot-pedidos.ts`): el modelo llama a
+  `preparar_pedido`; el servicio valida contra la tienda (`StorefrontService.validateCart`: precios con descuentos y stock reales,
+  nunca lo que diga el modelo) y deja un **borrador** en `conversations.bot_borrador` (vence a los 30 min). Al cliente le llega el
+  resumen que arma el sistema, con botones `pedido-confirmar` / `pedido-cambiar` (o "sí" / "cambiar" en texto). Al confirmar, el
+  borrador se **reclama** (updateMany; dos toques no crean dos pedidos) y se llama a `OrdersService.create` como el checkout
+  público (`publicCheckout`, canal ONLINE, PENDIENTE, `TRANSFER` = "Coordinar por WhatsApp", o sin método si la tienda coordina el pago
+  después) con la opción nueva `porWhatsapp` (el cliente de WhatsApp no tiene email: no se exige). Orbi nunca cobra ni pide dirección.
+  Requiere tienda en modo FULL y `acceptsTransfer` o `acceptsCoordinateLater`.
+- **Avisos al dueño por correo:** dos eventos nuevos del motor de notificaciones (`NOTIFICATION_EVENTS`): `orbi_necesita_atencion`
+  (cada vez que un chat pasa a DERIVADO, a lo sumo uno por chat cada 30 min: `conversations.bot_aviso_at`) y `orbi_pedido_pendiente`.
+  Llegan por panel **y** email aunque el dueño no haya configurado nada (`PREFS_POR_EVENTO`); él puede apagarlos en Notificaciones.
+  Se despachan dentro del pedido del webhook (con `await`), no con el emisor de eventos: Cloud Run con `--cpu-throttling` no corre lo
+  que queda después de responder. Migración `20261020010000_whatsapp_bot_pedidos` (aplicar en producción antes de desplegar la API).
+- **Fotos de producto:** herramienta `mostrar_foto_producto` (hasta 3 por respuesta, sin repetir). Las fotos del catálogo están en WebP y WhatsApp
+  no las acepta como imagen, así que `WhatsappMediosService.prepararFotoDeProducto` las baja (solo del host de `SUPABASE_URL`), las convierte a
+  JPEG y las guarda en el bucket `whatsapp-media` en `<negocio>/productos/<hash de la URL>.jpg`: se convierte una sola vez por foto. No usa IA
+  extra, pero cada foto es un mensaje de WhatsApp más (cuenta para los 1.000 gratis por mes). Se guarda en el chat con `attachments` y `viaOrbi`.
+- **Eliminar pedidos del listado:** `DELETE /orders/:id` (permiso `orders.manage`) hace soft-delete (`deletedAt`) y deja registro en
+  `audit_logs`. Es solo de pantalla: no devuelve stock ni anula cobros; el pedido sigue en la base y sale de lista, detalle y reportes.
+- **Probar sin un número real:** cuenta sandbox desde el panel de Meta (WhatsApp → Testear integraciones) o el formulario
+  manual («Conectala a mano» en la pantalla de conectar).
+- **Cobro:** en Embedded Signup cada cliente agrega su propio medio de pago en Meta y paga ahí sus conversaciones.
 
 ## Troubleshooting — problemas ya resueltos (para no repetir la pelea)
 

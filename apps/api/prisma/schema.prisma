@@ -100,6 +100,8 @@ model Business {
   payments             Payment[]
   mpCredentials        MpCredentials?
   whatsappConnection   WhatsappConnection?
+  whatsappBotConfig    WhatsappBotConfig?
+  whatsappBotTurns     WhatsappBotTurn[]
   instagramConnection  InstagramConnection?
   instagramEarlyAccess InstagramEarlyAccess?
   instagramPosts       InstagramPost[]
@@ -636,6 +638,9 @@ model Customer {
   avatarUrl           String?   @map("avatar_url")
   whatsappId          String?   @map("whatsapp_id") // wa_id de Meta (dígitos, con código de país): identifica al cliente en el canal WhatsApp
   instagramId         String?   @map("instagram_id") // IGSID: id de la persona en Instagram, propio de cada cuenta de negocio (no es un teléfono)
+  // true = el Customer lo creó solo un chat de WhatsApp/Instagram (es el "dueño" técnico de la charla, no un cliente del
+  // negocio): no se lista en Clientes ni cuenta en los números mientras no tenga pedidos. Ver `soloClientesReales`.
+  isChatContact       Boolean   @default(false) @map("is_chat_contact")
   passwordHash        String?   @map("password_hash")
   googleId            String?   @map("google_id") // sub del id_token de Google — vincula, no reemplaza el password
   emailVerified       Boolean   @default(false) @map("email_verified")
@@ -1593,6 +1598,17 @@ model Conversation {
   customerId String   @map("customer_id") // FK real (antes era string nombre)
   isUnread   Boolean  @default(true) @map("is_unread")
   isArchived Boolean  @default(false) @map("is_archived")
+  // Orbi atendiendo este chat de WhatsApp: DEFAULT sigue el modo general del negocio, ON/OFF lo decide el dueño para
+  // este chat, PAUSADO es que entró una persona y Orbi se calló, DERIVADO que Orbi pidió que lo atienda una persona.
+  // PAUSADO y DERIVADO solo los levanta el dueño (a mano).
+  botEstado     WhatsappBotChatEstado @default(DEFAULT) @map("bot_estado")
+  botMotivo     String?               @map("bot_motivo") // por qué está PAUSADO o DERIVADO, para mostrarlo en el chat
+  botCambiadoAt DateTime?             @map("bot_cambiado_at")
+  // El pedido que Orbi está armando con el cliente (items validados con su precio), a la espera de que confirme: se vence a
+  // los 30 minutos. null = no hay ninguno.
+  botBorrador   Json?                 @map("bot_borrador")
+  // Cuándo se le avisó por última vez al dueño que este chat necesita atención: evita mandar un correo por cada mensaje.
+  botAvisoAt    DateTime?             @map("bot_aviso_at")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
@@ -1614,6 +1630,7 @@ model Message {
   channel        MessageChannel @default(STOREFRONT) // por dónde entró/salió: el chat de la tienda o WhatsApp
   externalId     String?        @unique @map("external_id") // id del mensaje en Meta (wamid): idempotencia del webhook y cruce con los estados
   deliveryStatus String?        @map("delivery_status") // solo WhatsApp saliente: sent | delivered | read | failed
+  viaOrbi        Boolean        @default(false) @map("via_orbi") // lo contestó Orbi (el bot de atención de WhatsApp), no una persona
   attachments    Json? // Instagram: [{ tipo: image|video|audio|file, url }] — archivos que llegaron o se mandaron con el mensaje
   createdAt      DateTime       @default(now()) @map("created_at") // timestamp real (antes string display)
 
@@ -1774,6 +1791,83 @@ model WhatsappConnection {
   business Business @relation(fields: [businessId], references: [id])
 
   @@map("whatsapp_connections")
+}
+
+enum WhatsappBotModo {
+  SELECCIONADOS // Orbi atiende solo los chats donde el dueño lo activa
+  TODOS // Orbi atiende todos los chats, salvo donde el dueño lo apaga o entra una persona
+}
+
+// Cómo atiende Orbi (lo elige el dueño): CONVERSACIONAL contesta todo con IA; MENU_Y_CONVERSACION saluda con un menú de
+// opciones y después conversa con IA; SOLO_MENU responde solo con el menú y respuestas fijas, sin gastar IA.
+enum WhatsappBotModalidad {
+  CONVERSACIONAL
+  MENU_Y_CONVERSACION
+  SOLO_MENU
+}
+
+// El menú como lista desplegable (hasta 10 opciones) o como botones (hasta 3).
+enum WhatsappMenuEstilo {
+  LISTA
+  BOTONES
+}
+
+enum WhatsappBotChatEstado {
+  DEFAULT
+  ON
+  OFF
+  PAUSADO
+  DERIVADO
+}
+
+// Orbi como atención al público por WhatsApp (función del paquete Avanzado): el interruptor general del negocio, cómo
+// elige los chats y lo que el dueño quiere que Orbi sepa. Una fila por negocio.
+model WhatsappBotConfig {
+  id            String          @id @default(uuid())
+  businessId    String          @unique @map("business_id")
+  enabled       Boolean         @default(false)
+  modo          WhatsappBotModo @default(SELECCIONADOS)
+  instrucciones String? // indicaciones del dueño para Orbi (tono, promociones, políticas), hasta 1000 caracteres
+  modalidad     WhatsappBotModalidad @default(CONVERSACIONAL)
+  menuEstilo    WhatsappMenuEstilo   @default(LISTA) @map("menu_estilo")
+  bienvenida    String? // saludo antes del menú; null = el de siempre
+  menuOpciones  Json?   @map("menu_opciones") // [{ id, titulo, descripcion?, activa, respuesta? }] en orden; null = el menú por defecto
+  // Orbi puede tomar pedidos (quedan pendientes, "coordinar por WhatsApp"): apagado por defecto, con topes por pedido.
+  tomaPedidos   Boolean @default(false) @map("toma_pedidos")
+  maxUnidades   Int     @default(10) @map("max_unidades")
+  maxMonto      Int     @default(200000) @map("max_monto") // en pesos
+  topeCreditos  Int?            @map("tope_creditos") // tope mensual propio del dueño, por debajo del cupo del plan
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@map("whatsapp_bot_configs")
+}
+
+// Una fila por respuesta de Orbi en WhatsApp: de acá sale lo que se gastó del cupo del mes. Sin texto a propósito (los
+// mensajes ya están en la conversación).
+model WhatsappBotTurn {
+  id               String   @id @default(uuid())
+  businessId       String   @map("business_id")
+  conversationId   String?  @map("conversation_id")
+  status           String // ok | error | quota | derivado | limite
+  rounds           Int      @default(0)
+  toolsUsed        String[] @default([]) @map("tools_used")
+  model            String?
+  provider         String?
+  promptTokens     Int?     @map("prompt_tokens")
+  completionTokens Int?     @map("completion_tokens")
+  costUsd          Decimal? @map("cost_usd") @db.Decimal(12, 6)
+  credits          Int      @default(0)
+  latencyMs        Int      @default(0) @map("latency_ms")
+  errorCategory    String?  @map("error_category")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@index([businessId, createdAt])
+  @@map("whatsapp_bot_turns")
 }
 
 enum WhatsappConnectionStatus {
@@ -2547,6 +2641,9 @@ model PlatformOutboundMail {
 enum PlatformAdminRole {
   SUPERADMIN // acceso total (fundadores)
   OPERATOR // soporte / operaciones (acceso acotado)
+  // Marketing (por ejemplo, Milagros): solo ve y usa lo que se le habilita a propósito (Marketing, Correo, Resumen y el
+  // conector de Claude). Cualquier otra parte del super panel le queda cerrada, aunque sea de lectura: ver PlatformAdminGuard.
+  MARKETING
 }
 
 // Segundo factor del login de platform admin (RBT-647): código de 6 dígitos
@@ -3569,46 +3666,94 @@ model MarketingMcpRefresh {
 // rechaza (se borra el archivo y el registro). Un pendiente que nadie revisa vence a los 7 días y se borra solo.
 // `estado`: SUBIENDO | PENDIENTE | APROBADO | PUBLICADO (lo rechazado no queda).
 model MarketingVideo {
-  id            String    @id @default(uuid())
+  id            String                     @id @default(uuid())
   /**
    * El superadmin cuyo Claude lo generó.
    */
-  creadoPor     String?   @map("creado_por")
+  creadoPor     String?                    @map("creado_por")
   titulo        String
   /**
    * REEL_9_16 | CUADRADO | HORIZONTAL_16_9
    */
   formato       String
-  guion         String    @default("")
+  guion         String                     @default("")
   /**
    * Texto sugerido para acompañar la publicación (con hashtags).
    */
-  caption       String    @default("")
-  duracionSeg   Int?      @map("duracion_seg")
-  bytes         Int       @default(0)
+  caption       String                     @default("")
+  duracionSeg   Int?                       @map("duracion_seg")
+  bytes         Int                        @default(0)
   /**
    * Clave del archivo en R2.
    */
-  ruta          String    @unique
-  estado        String    @default("SUBIENDO")
+  ruta          String                     @unique
+  estado        String                     @default("SUBIENDO")
   /**
    * Resultado de los controles de calidad automáticos: [{ nombre, ok, detalle }]
    */
-  controles     Json      @default("[]")
-  aprobadoPor   String?   @map("aprobado_por")
-  aprobadoAt    DateTime? @map("aprobado_at")
+  controles     Json                       @default("[]")
+  /// MARKETING (necesita la aprobación de la dirección) | TUTORIAL (interno: solo lo aprueba quien lo creó).
+  tipo          String                     @default("MARKETING")
+  /// Quiénes aprobaron: [{ adminId, fecha }]. La política (marketing/videos/politica-aprobacion.ts) decide cuándo alcanza.
+  /// Es interno: ni el panel ni el conector muestran quién aprobó.
+  aprobaciones  Json                       @default("[]")
+  /// El tutorial de la lista (marketing_tutoriales) que cubre este video, si es un tutorial.
+  tutorialId    String?                    @map("tutorial_id")
+  /// Si este video es una mejora de otro de la cola (se pide con «Mejorar con Claude»), el video que mejora.
+  mejoraDeId    String?                    @map("mejora_de_id")
+  comentarios   MarketingVideoComentario[]
+  aprobadoPor   String?                    @map("aprobado_por")
+  aprobadoAt    DateTime?                  @map("aprobado_at")
   /**
    * Dónde se publicó: [{ destino: 'tiktok' | 'instagram', id, fecha }]
    */
-  publicaciones Json      @default("[]")
+  publicaciones Json                       @default("[]")
   /**
    * Hasta cuándo vive sin que nadie lo apruebe (null una vez aprobado).
    */
-  expiraAt      DateTime? @map("expira_at")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  expiraAt      DateTime?                  @map("expira_at")
+  createdAt     DateTime                   @default(now()) @map("created_at")
+  updatedAt     DateTime                   @updatedAt @map("updated_at")
 
   @@index([estado, createdAt])
   @@index([expiraAt])
   @@map("marketing_videos")
+}
+
+// ─── Marketing de Órbita: lista de tutoriales (qué hay y qué falta) ───────────────
+// La lista de tutoriales del panel y de la tienda que el equipo va a ir produciendo. La actualiza el Claude de cada
+// persona por el conector (tutoriales_listar / tutoriales_actualizar) y también se puede corregir desde el panel.
+// `estado`: FALTA | EN_PROCESO | EN_REVISION (hay un video en la cola esperando) | HECHO.
+model MarketingTutorial {
+  id             String   @id @default(uuid())
+  grupo          String
+  grupoOrden     Int      @map("grupo_orden")
+  orden          Int
+  titulo         String   @unique
+  estado         String   @default("FALTA")
+  asignadoA      String?  @map("asignado_a")
+  /// Los de «Para mostrarle a tu cliente»: sirven también como promo.
+  opcional       Boolean  @default(false)
+  prioridadAlta  Boolean  @default(false) @map("prioridad_alta")
+  notas          String?
+  actualizadoPor String?  @map("actualizado_por")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([grupoOrden, orden])
+  @@map("marketing_tutoriales")
+}
+
+// Comentarios sobre un video de la cola: cualquiera del equipo puede opinar, en todas sus fases (para aprobar, aprobado,
+// pasado a borrador). Se borran junto con el video. Sirven también para que Claude sepa qué mejorar (videos_obtener).
+model MarketingVideoComentario {
+  id        String         @id @default(uuid())
+  videoId   String         @map("video_id")
+  video     MarketingVideo @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  adminId   String         @map("admin_id")
+  texto     String
+  createdAt DateTime       @default(now()) @map("created_at")
+
+  @@index([videoId, createdAt])
+  @@map("marketing_video_comentarios")
 }

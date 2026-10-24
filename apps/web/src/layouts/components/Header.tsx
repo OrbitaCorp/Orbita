@@ -15,6 +15,7 @@ import { adminPath, currentSlug } from '@/lib/tenant'
 import { esVisitanteDemo } from '@/lib/demo/modo'
 import { useOrbiStore } from '@/components/orbi/useOrbiStore'
 import { OrbiPet } from '@/components/orbi/pet/OrbiPet'
+import AyudaBoton from '@/modules/ventas/panel/ayuda/AyudaBoton'
 import { ID_PANEL_ORBI } from '@/components/orbi/types'
 
 const seccionLabels: Record<string, string> = {
@@ -406,6 +407,9 @@ export default function Header({ onMenuClick }: Props) {
                     )}
 
                     <span className="admin-header-sep" aria-hidden style={{ width: 1, height: 20, background: 'var(--color-border)', flexShrink: 0, margin: '0 2px' }} />
+
+                    {/* Tutorial de la pantalla en la que estás (solo donde hay uno). */}
+                    <AyudaBoton />
 
                     {/* Dark mode toggle */}
                     <button

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import { platformApi, type MarketingCanales, type TiktokCreador, type TiktokEstado, type TiktokPublicacion } from '@/lib/platform/api'
 import { Toast, type ToastVariant } from '@/design-system/components/Toast'
@@ -60,7 +60,7 @@ export function TabMarketing({ puedePublicar }: { puedePublicar: boolean }) {
   const { data: canales } = useFetch(() => platformApi.marketingCanales(), [tickCanales])
   const [canal, setCanal] = useState<Canal>('tiktok')
   const [aviso, setAviso] = useState<Aviso | null>(null)
-  // Desconectar una cuenta (pedido desde la tarjeta o desde el detalle del canal): se confirma acá, en un solo lugar.
+  // Desconectar una cuenta (pedido desde el detalle del canal): se confirma acá, en un solo lugar.
   const [confirmar, setConfirmar] = useState<'tiktok' | 'instagram' | null>(null)
 
   // TikTok vuelve a esta pantalla con el resultado de la conexión en la dirección.
@@ -80,43 +80,55 @@ export function TabMarketing({ puedePublicar }: { puedePublicar: boolean }) {
     if (r) { setCanal('instagram'); setTickCanales((n) => n + 1); void router.replace('/superadmin?seccion=marketing', undefined, { shallow: true }) }
   }, [router.query.ig]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Qué dice cada tarjeta de un vistazo. El estado siempre va en palabras: el color solo lo acompaña.
-  const estadoTiktok: Estado = !tiktok ? { texto: cargandoTiktok ? 'Cargando…' : 'No disponible', tono: 'gray' }
-    : !tiktok.configurado ? { texto: 'Sin configurar', tono: 'gray' }
-    : tiktok.conectado ? { texto: 'Conectado', tono: 'green' } : { texto: 'Sin conectar', tono: 'gray' }
-  const lineaTiktok = !tiktok ? '' : !tiktok.configurado ? 'Faltan los datos de la app' : tiktok.cuenta?.nombre ?? 'Todavía no hay una cuenta'
-
   const ig = canales?.instagram
-  const estadoInstagram: Estado = !canales ? { texto: 'Cargando…', tono: 'gray' } : ig?.conectado ? { texto: 'Conectado', tono: 'green' } : { texto: 'Sin conectar', tono: 'gray' }
   const sinLeer = ig?.conectado ? ig.mensajesSinLeer : 0
-  const lineaInstagram = !canales ? '' : ig?.conectado
-    ? `${ig.usuario ? `@${ig.usuario}` : 'Cuenta conectada'}${sinLeer > 0 ? ` · ${sinLeer} sin leer` : ''}`
-    : 'Todavía no hay una cuenta'
+  // Los videos que esperan revisión, para el número de la sección Videos (se vuelve a mirar al cambiar de sección).
+  const { data: cola } = useFetch(() => platformApi.videosCola(), [canal])
+  const porRevisar = (cola ?? []).filter((v) => v.estado === 'PENDIENTE').length
 
-  // WhatsApp todavía no se usa: hace falta una cuenta de WhatsApp Business con un número de la empresa.
-  const estadoWhatsapp: Estado = { texto: 'Próximamente', tono: 'gray' }
-  const lineaWhatsapp = 'Requiere una cuenta Business'
+  // Canales a la izquierda y herramientas a la derecha. El estado va siempre en palabras (lectores de pantalla): el punto solo lo acompaña.
+  const secciones: { id: Canal; texto: string; punto?: 'ok' | 'sin'; cuenta?: number; grupo: 'canales' | 'herramientas' }[] = [
+    { id: 'tiktok', texto: 'TikTok', punto: tiktok?.conectado ? 'ok' : 'sin', grupo: 'canales' },
+    { id: 'instagram', texto: 'Instagram', punto: ig?.conectado ? 'ok' : 'sin', cuenta: sinLeer, grupo: 'canales' },
+    { id: 'whatsapp', texto: 'WhatsApp', grupo: 'canales' },
+    { id: 'prospeccion', texto: 'Prospección', grupo: 'herramientas' },
+    { id: 'videos', texto: 'Videos', cuenta: porRevisar, grupo: 'herramientas' },
+  ]
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <style>{`
-        .mk-canal { transition: border-color 150ms, background-color 150ms; }
-        .mk-canal:hover { border-color: var(--color-muted); }
-        .mk-canal[aria-pressed="true"] { border-color: var(--color-primary); }
-        .mk-canal:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-        @media (prefers-reduced-motion: reduce) { .mk-canal { transition: none; } }
+        .mk-nav { display: flex; align-items: flex-end; gap: 2px; border-bottom: 1px solid var(--color-border); overflow-x: auto; scrollbar-width: none; }
+        .mk-nav::-webkit-scrollbar { display: none; }
+        .mk-tab { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; margin-bottom: -1px; border: none; border-bottom: 2px solid transparent; background: none;
+          color: var(--color-muted); font: inherit; font-size: 14px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: color 150ms, border-color 150ms; }
+        .mk-tab:hover { color: var(--color-text); }
+        .mk-tab[aria-selected="true"] { color: var(--color-text); border-bottom-color: var(--color-primary); }
+        .mk-tab:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; border-radius: 6px; }
+        .mk-punto { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .mk-punto.ok { background: #10b981; } .mk-punto.sin { background: #94a3b8; }
+        .mk-cuenta { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 99px; background: var(--color-primary); color: var(--color-on-primary); font-size: 11.5px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+        .mk-sep { align-self: center; width: 1px; height: 18px; margin: 0 10px; background: var(--color-border); flex-shrink: 0; }
+        .mk-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+        @media (prefers-reduced-motion: reduce) { .mk-tab { transition: none; } }
       `}</style>
 
-      <PageHeader title="Marketing" subtitle="Los canales de la empresa para llegar a más gente: conexión, publicaciones y mensajes" />
+      <PageHeader title="Marketing" subtitle="Los canales de la empresa, la prospección de clientes y los videos del equipo, en un solo lugar" />
 
       <ConectarClaude puedeEditar={puedePublicar} setAviso={setAviso} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
-        <CanalTarjeta nombre="TikTok" para="Videos de la marca y sus números" estado={estadoTiktok} linea={lineaTiktok} activo={canal === 'tiktok'} onElegir={() => setCanal('tiktok')} onDesconectar={puedePublicar && tiktok?.conectado ? () => setConfirmar('tiktok') : undefined} />
-        <CanalTarjeta nombre="Instagram" para="Mensajes, publicaciones, comentarios y estadísticas" estado={estadoInstagram} linea={lineaInstagram} activo={canal === 'instagram'} onElegir={() => setCanal('instagram')} onDesconectar={puedePublicar && ig?.conectado ? () => setConfirmar('instagram') : undefined} />
-        <CanalTarjeta nombre="WhatsApp" para="Atención por mensajes a clientes y contactos" estado={estadoWhatsapp} linea={lineaWhatsapp} activo={canal === 'whatsapp'} onElegir={() => setCanal('whatsapp')} />
-        <CanalTarjeta nombre="Prospección" para="Encontrar tiendas de Instagram que podrían usar Órbita" estado={{ texto: 'Herramienta interna', tono: 'gray' }} linea="Se analiza con tu Claude" activo={canal === 'prospeccion'} onElegir={() => setCanal('prospeccion')} />
-        <CanalTarjeta nombre="Videos" para="Los videos que genera el equipo con su Claude, para aprobar" estado={{ texto: 'Herramienta interna', tono: 'gray' }} linea="Cola de aprobación" activo={canal === 'videos'} onElegir={() => setCanal('videos')} />
+      <div role="tablist" aria-label="Secciones de Marketing" className="mk-nav">
+        {secciones.map((sec, i) => (
+          <Fragment key={sec.id}>
+            {i > 0 && secciones[i - 1].grupo !== sec.grupo && <span aria-hidden="true" className="mk-sep" />}
+            <button type="button" role="tab" aria-selected={canal === sec.id} className="mk-tab" onClick={() => setCanal(sec.id)}>
+              {sec.texto}
+              {sec.punto && <span aria-hidden="true" className={`mk-punto ${sec.punto}`} />}
+              {sec.punto && <span className="mk-sr">{sec.punto === 'ok' ? ', conectado' : ', sin conectar'}</span>}
+              {!!sec.cuenta && sec.cuenta > 0 && <span className="mk-cuenta">{sec.cuenta}<span className="mk-sr">{sec.id === 'videos' ? ' para revisar' : ' sin leer'}</span></span>}
+            </button>
+          </Fragment>
+        ))}
       </div>
 
       {canal === 'tiktok' && <PanelTiktok estado={tiktok} puedePublicar={puedePublicar} refrescar={tick} onCambio={() => setTick((n) => n + 1)} onDesconectar={() => setConfirmar('tiktok')} setAviso={setAviso} />}
@@ -154,46 +166,6 @@ export function TabMarketing({ puedePublicar }: { puedePublicar: boolean }) {
         />
       )}
       {aviso && <Toast variant={aviso.variant} title={aviso.title} description={aviso.description} onClose={() => setAviso(null)} />}
-    </div>
-  )
-}
-
-function CanalTarjeta({ nombre, para, estado, linea, activo, onElegir, onDesconectar }: {
-  nombre: string; para: string; estado: Estado; linea: string; activo: boolean; onElegir: () => void; onDesconectar?: () => void
-}) {
-  return (
-    // "Desconectar" va AL LADO del botón que elige la tarjeta y no adentro: un botón dentro de otro botón no es HTML válido
-    // (y el teclado y los lectores de pantalla lo tratan mal).
-    <div style={{ position: 'relative', display: 'flex' }}>
-      <button
-        type="button"
-        className="mk-canal"
-        onClick={onElegir}
-        aria-pressed={activo}
-        style={{
-          display: 'flex', flexDirection: 'column', gap: 6, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', width: '100%',
-          minHeight: 132, padding: onDesconectar ? '16px 18px 56px' : '16px 18px', borderRadius: 14, background: 'var(--color-bg)',
-          border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-card)',
-        }}
-      >
-        <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>{nombre}</span>
-        <span style={{ fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.45 }}>{para}</span>
-        <span style={{ marginTop: 'auto', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
-          <Chip text={estado.texto} tone={estado.tono} dot />
-          <span style={{ fontSize: 12.5, color: 'var(--color-body)', minHeight: 18, overflowWrap: 'anywhere' }}>{linea}</span>
-        </span>
-      </button>
-      {onDesconectar && (
-        <button
-          type="button"
-          onClick={onDesconectar}
-          className="ds-hover"
-          aria-label={`Desconectar ${nombre}`}
-          style={{ ...btnGhostSm, height: 32, position: 'absolute', left: 18, bottom: 14 }}
-        >
-          Desconectar
-        </button>
-      )}
     </div>
   )
 }

@@ -99,6 +99,25 @@ describe('Alta paga', () => {
     expect(onboarding.registerBusiness).not.toHaveBeenCalled();
   });
 
+  // 14/10: el webhook de MP creó la cuenta unos segundos antes de que volviera
+  // el navegador, que encontró el alta vacía y mostró "pago pendiente".
+  it('alta ya consumida con pago aprobado: avisa que la cuenta ya está creada, sin crear nada', async () => {
+    const { svc, prisma, onboarding } = suscripciones();
+    prisma.pendingSignup.findUnique.mockResolvedValue(null);
+    jest.spyOn(svc as any, 'mpConfigured', 'get').mockReturnValue(true);
+    (svc as any)._payment = { search: jest.fn().mockResolvedValue({ results: [{ id: 9, status: 'approved' }] }) };
+    await expect(svc.confirmAndCreate('PEND-abc')).resolves.toEqual({ activated: false, status: 'ya_creada' });
+    expect(onboarding.registerBusiness).not.toHaveBeenCalled();
+  });
+
+  it('ref que nunca existió y sin pago en MP: sigue siendo already_consumed_or_unknown', async () => {
+    const { svc, prisma } = suscripciones();
+    prisma.pendingSignup.findUnique.mockResolvedValue(null);
+    jest.spyOn(svc as any, 'mpConfigured', 'get').mockReturnValue(true);
+    (svc as any)._payment = { search: jest.fn().mockResolvedValue({ results: [] }) };
+    await expect(svc.confirmAndCreate('PEND-xyz')).resolves.toEqual({ activated: false, status: 'already_consumed_or_unknown' });
+  });
+
   it('pago de bienvenida completo: registra el negocio con el hash guardado', async () => {
     const { svc, prisma, onboarding } = suscripciones();
     prisma.pendingSignup.findUnique.mockResolvedValue({ payload: { account: { email: 'ana@x.com' }, passwordHash: 'hash-guardado', wizard: {}, plan: 'mensual' } });

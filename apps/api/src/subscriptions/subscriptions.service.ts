@@ -862,6 +862,26 @@ export class SubscriptionsService implements OnModuleInit {
   async confirmAndCreate(ref: string) {
     const pending = await this.prisma.pendingSignup.findUnique({ where: { preapprovalId: ref } });
     if (!pending) {
+      // Sin alta pendiente hay dos casos muy distintos: una ref que nunca
+      // existió, o una que el webhook de MP (o el barrido) YA consumió y de la
+      // que ya salió la cuenta. Quien vuelve de MP cae casi siempre en el
+      // segundo: el webhook llega unos segundos antes que el navegador, crea
+      // la cuenta y devuelve la sesión a MP (que la descarta), y la vuelta del
+      // navegador encontraba el alta vacía y mostraba "pago pendiente" a quien
+      // ya había pagado y ya tenía su cuenta (14/10, euge-joyas). Se le
+      // pregunta a MP: con un pago aprobado para esta ref, la cuenta existe y
+      // alcanza con que inicie sesión. No se emite sesión acá: la ref viaja en
+      // la URL y no debe servir para entrar más de una vez.
+      if (ref.startsWith(PENDING_REF_PREFIX) && this.mpConfigured) {
+        try {
+          const busqueda = await this.payment.search({ options: { external_reference: ref } });
+          if ((busqueda.results ?? []).some((p) => p.status === 'approved')) {
+            return { activated: false, status: 'ya_creada' };
+          }
+        } catch (err) {
+          this.logger.warn(`No se pudo buscar el pago de un alta ya consumida ${ref}: ${this.mpErrorMessage(err)}`);
+        }
+      }
       return { activated: false, status: 'already_consumed_or_unknown' };
     }
 

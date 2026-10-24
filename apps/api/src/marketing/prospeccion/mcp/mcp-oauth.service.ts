@@ -223,11 +223,11 @@ export class McpOauthService {
     return { cliente: s.nom, retorno: host, permisos: PERMISOS_MOSTRADOS, dominios: this.dominiosPermitidos };
   }
 
-  /** Un superadmin activo con correo de la organización. Si no, no hay acceso. */
+  /** Un superadmin o alguien de marketing, activo y con correo de la organización. Si no, no hay acceso. */
   async adminAutorizado(adminId: string): Promise<{ id: string; email: string }> {
     const admin = await this.prisma.platformAdmin.findUnique({ where: { id: adminId }, select: { id: true, email: true, role: true, isActive: true } });
     if (!admin || !admin.isActive) throw new AccesoDenegadoError('La cuenta de superadmin no está activa');
-    if (admin.role !== 'SUPERADMIN') throw new AccesoDenegadoError('Solo un superadmin puede conectar Claude a la Prospección');
+    if (admin.role !== 'SUPERADMIN' && admin.role !== 'MARKETING') throw new AccesoDenegadoError('Solo un superadmin o el equipo de marketing pueden conectar Claude a la Prospección');
     const dominio = admin.email.toLowerCase().split('@').pop() ?? '';
     if (!this.dominiosPermitidos.includes(dominio)) {
       throw new AccesoDenegadoError(`El correo tiene que ser de la organización (${this.dominiosPermitidos.map((d) => '@' + d).join(' o ')})`);
@@ -329,6 +329,12 @@ export class McpOauthService {
     if (!sub) throw new OAuthError('invalid_token', 'Token inválido', 401);
     const admin = await this.adminAutorizado(sub); // AccesoDenegadoError → 403
     return { adminId: admin.id, email: admin.email };
+  }
+
+  /** ¿Tiene esta persona algún Claude conectado ahora (un token de renovación vigente)? */
+  async estaConectado(adminId: string): Promise<boolean> {
+    const n = await this.prisma.marketingMcpRefresh.count({ where: { adminId, revocadoAt: null, expiraAt: { gt: new Date() } } });
+    return n > 0;
   }
 
   /** Desconecta todos los Claude de un superadmin (o de todos, si no se pasa adminId). */

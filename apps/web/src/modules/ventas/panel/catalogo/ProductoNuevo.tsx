@@ -717,8 +717,11 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                     clave: c.clave,
                     valores: c.valores,
                     sku: `${prod.sku || generarSKU(prod.nombre)}-${sufijo}`,
-                    precio: precioHeredado || prod.precio || '0',
-                    stock: vidriera ? '' : '0',
+                    // Vacíos: el "0" se ve solo como placeholder gris, para escribir el
+                    // número directo sin borrar nada. Vacío vale 0 al guardar y al sumar
+                    // (Number('') || 0; en la vidriera el stock vacío es "sin stock cargado").
+                    precio: precioHeredado || prod.precio || '',
+                    stock: '',
                     stockMin: prod.stockMinimo || '0',
                     activa: true,
                 }
@@ -1926,7 +1929,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         const anterior = prod.precio
         set('precio', v)
         if (prod.tieneVariantes) {
-            setFilas(prev => prev.map(f => (f.precio === '' || f.precio === '0' || f.precio === anterior) ? { ...f, precio: v || '0' } : f))
+            setFilas(prev => prev.map(f => (f.precio === '' || f.precio === '0' || f.precio === anterior) ? { ...f, precio: v } : f))
         }
     }
     const cambiarStockMasivo = (v: string) => {
@@ -1953,6 +1956,11 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const sinFotos = imagenes.length + guardadas.length === 0
     const hayGenerales = imagenes.some(i => !i.valorOpcion) || guardadas.some(g => !g.optionValueId)
     const inactivas = filas.filter(f => !f.activa).length
+    // Un stock en 0 se muestra vacío (con el "0" de placeholder): así, al volver a
+    // cargar unidades se escribe el número directo en vez de borrar el 0 primero.
+    // En la vidriera no: ahí "0" (se ve "Sin stock") y vacío (no se muestra) son
+    // cosas distintas, y el 0 tiene que verse.
+    const verCantidad = (v: string) => (!vidriera && v === '0' ? '' : v)
     const errorPrecioFila = (f: FilaVariante) => hayFalta('pn-variantes-tabla') && f.activa && !(Number(f.precio) > 0)
 
     // La misma vista previa en la columna de escritorio y en la hoja del celular.
@@ -2312,20 +2320,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <PField label={vidriera ? 'Stock (opcional)' : 'Stock'} value={prod.porPedido ? '' : prod.stock} onChange={v => set('stock', v.replace(/\D/g, ''))} mono error={hayFalta('pn-stock')} disabled={prod.porPedido} placeholder={prod.porPedido ? 'Por pedido' : undefined} />
-                                            )}
-                                            {/* En una vidriera nada se compra online y el stock ya es opcional: la casilla no aplica. */}
-                                            {!vidriera && (
-                                                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 8, cursor: 'pointer', fontSize: 12.5, color: 'var(--color-body)', lineHeight: 1.4 }}>
-                                                    <input
-                                                        type="checkbox" checked={prod.porPedido} style={{ marginTop: 2 }}
-                                                        onChange={e => { set('porPedido', e.target.checked); setStockMasivo('') }}
-                                                    />
-                                                    <span>
-                                                        <strong style={{ color: 'var(--color-text)', fontWeight: 600 }}>Se hace por pedido</strong>
-                                                        {' '}— sin stock. Se muestra en tu tienda pero no se puede comprar: el cliente te consulta por WhatsApp.
-                                                    </span>
-                                                </label>
+                                                <PField label={vidriera ? 'Stock (opcional)' : 'Stock'} value={prod.porPedido ? '' : verCantidad(prod.stock)} onChange={v => set('stock', v.replace(/\D/g, ''))} mono error={hayFalta('pn-stock')} disabled={prod.porPedido} placeholder={prod.porPedido ? 'Por pedido' : vidriera ? undefined : '0'} />
                                             )}
                                             {vidriera && (
                                                 <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 4 }}>
@@ -2334,6 +2329,17 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                             )}
                                             {hayFalta('pn-stock') && <div style={{ fontSize: 11.5, color: 'var(--color-error)', marginTop: 4 }}>Para publicar necesitás stock</div>}
                                         </div>
+                                        {/* En una vidriera nada se compra online y el stock ya es opcional: este interruptor no aplica. */}
+                                        {!vidriera && (
+                                            <div style={{ gridColumn: '1 / -1' }}>
+                                                <InterruptorFila
+                                                    on={prod.porPedido}
+                                                    onChange={v => { set('porPedido', v); setStockMasivo('') }}
+                                                    titulo="Se hace por pedido"
+                                                    detalle="Sin stock. Se muestra en tu tienda pero no se puede comprar: el cliente te consulta por WhatsApp."
+                                                />
+                                            </div>
+                                        )}
                                         <div id="pn-categoria" style={{ gridColumn: '1 / -1' }}>
                                             <label style={lbl}>Categoría <span style={{ color: 'var(--color-error)' }}>*</span></label>
                                             <CategoriaSelect
@@ -2599,6 +2605,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                                     deshabilitado={prod.porPedido}
                                                                     tipos={tiposValidos}
                                                                     filas={filas}
+                                                                    ceroVacio={!vidriera}
                                                                     onStock={(clave, valor) => setFilas(prev => prev.map(f => f.clave === clave ? { ...f, stock: valor.replace(/\D/g, '') } : f))}
                                                                 />
                                                                 <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 6 }}>
@@ -2643,7 +2650,8 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                                     <input
                                                                         className="ds-field"
                                                                         inputMode="numeric"
-                                                                        value={prod.porPedido ? '' : f.stock}
+                                                                        value={prod.porPedido ? '' : verCantidad(f.stock)}
+                                                                        placeholder="0"
                                                                         disabled={!f.activa || prod.porPedido}
                                                                         onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, stock: e.target.value.replace(/\D/g, '') } : x))}
                                                                         aria-label={`Stock de ${f.clave}`}
@@ -4075,6 +4083,17 @@ function ZonaSubida({ onArchivos }: { onArchivos: (files: FileList | null) => vo
 // (tarjeta con borde y un switch grande), no una línea de texto chica.
 function InterruptorVariantes({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
     return (
+        <InterruptorFila
+            on={on} onChange={onChange}
+            titulo="Este producto viene en varias opciones"
+            detalle="Talle, color, tamaño… cada combinación lleva su propio stock."
+        />
+    )
+}
+
+// La fila con interruptor (tarjeta con borde y un switch), compartida por "varias opciones" y "se hace por pedido".
+function InterruptorFila({ on, onChange, titulo, detalle }: { on: boolean; onChange: (v: boolean) => void; titulo: string; detalle: string }) {
+    return (
         <button
             type="button"
             role="switch"
@@ -4089,8 +4108,8 @@ function InterruptorVariantes({ on, onChange }: { on: boolean; onChange: (v: boo
             }}
         >
             <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Este producto viene en varias opciones</span>
-                <span style={{ display: 'block', fontSize: 12.5, color: 'var(--color-muted)', marginTop: 2 }}>Talle, color, tamaño… cada combinación lleva su propio stock.</span>
+                <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{titulo}</span>
+                <span style={{ display: 'block', fontSize: 12.5, color: 'var(--color-muted)', marginTop: 2 }}>{detalle}</span>
             </span>
             <span aria-hidden style={{ width: 44, height: 24, borderRadius: 12, flexShrink: 0, position: 'relative', transition: 'background 150ms', background: on ? 'var(--color-primary)' : 'var(--color-surface-alt)', border: on ? 'none' : '1px solid var(--color-border-strong, var(--color-border))' }}>
                 <span style={{ position: 'absolute', top: on ? 3 : 2, left: on ? 23 : 2, width: 18, height: 18, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(15,23,42,0.2)', transition: 'left 150ms' }} />
@@ -4104,8 +4123,10 @@ function InterruptorVariantes({ on, onChange }: { on: boolean; onChange: (v: boo
 // menos en columnas. Enter/flecha abajo pasa a la celda de abajo (y, al final de
 // la columna, a la siguiente); Tab recorre la fila. Al enfocar una celda se
 // selecciona su contenido, así escribir reemplaza el 0.
-function GrillaStock({ tipos, filas, onStock, deshabilitado }: {
+function GrillaStock({ tipos, filas, onStock, deshabilitado, ceroVacio }: {
     tipos: TipoVariante[]; filas: FilaVariante[]; onStock: (clave: string, valor: string) => void; deshabilitado?: boolean
+    /** Un stock en 0 se muestra vacío con el "0" de placeholder (no en la vidriera, donde 0 y vacío son distintos). */
+    ceroVacio?: boolean
 }) {
     const ref = useRef<HTMLDivElement>(null)
     const [ri, ci] = tipos[0].opciones.length >= tipos[1].opciones.length ? [0, 1] : [1, 0]
@@ -4158,7 +4179,8 @@ function GrillaStock({ tipos, filas, onStock, deshabilitado }: {
                                                 className="ds-field"
                                                 data-celda={`${i}-${j}`}
                                                 inputMode="numeric"
-                                                value={deshabilitado ? '' : f.stock}
+                                                value={deshabilitado || (ceroVacio && f.stock === '0') ? '' : f.stock}
+                                                placeholder="0"
                                                 disabled={!f.activa || deshabilitado}
                                                 title={f.activa ? undefined : 'No se ofrece — activala en "Precio y stock"'}
                                                 aria-label={`Stock de ${f.clave}`}

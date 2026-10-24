@@ -1659,6 +1659,10 @@ export function rejectCancellation(id: string, rejectionMessage?: string) {
   })
 }
 
+/** "Eliminar" un pedido del listado: lo oculta, no lo borra de la base (ver OrdersController.eliminar). */
+export function deleteOrder(id: string) {
+  return panelRequest<{ ok: boolean }>(`/orders/${id}`, { method: 'DELETE' })
+}
 export function updateOrderStatus(id: string, status: ApiOrderStatus) {
   return panelRequest<ApiOrderDetail>(`/orders/${id}/status`, {
     method: 'PATCH',
@@ -1755,7 +1759,7 @@ export type ApiProductListItem = {
   status: string
 }
 
-export function panelGetProducts(params: { search?: string; page?: number; limit?: number } = {}) {
+export function panelGetProducts(params: { search?: string; categoryId?: string; status?: ProductStatusFilter; page?: number; limit?: number } = {}) {
   const qs = new URLSearchParams()
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined && v !== null && v !== '') qs.set(k, String(v))
@@ -2441,6 +2445,11 @@ export type ApiDashboardReport = {
   hasta: string
   kpis: {
     ventas: number
+    // Ganancia del período: ingresos de productos con costo cargado − su costo − devoluciones
+    // aprobadas (puede ser negativa). `gananciaCoberturaPct` es qué parte de los ingresos de
+    // productos tiene costo cargado (0–100); null si no hubo ventas de productos.
+    ganancias?: number
+    gananciaCoberturaPct?: number | null
     pedidos: number
     ticketPromedio: number
     clientesNuevos: number
@@ -2452,7 +2461,7 @@ export type ApiDashboardReport = {
     visitasDominio?: number
     visitasTotalSubdominio?: number
     visitasTotalDominio?: number
-    deltas: { ventas: number; pedidos: number; ticketPromedio: number; clientesNuevos: number; comisionMp: number; visitas?: number }
+    deltas: { ventas: number; ganancias?: number; pedidos: number; ticketPromedio: number; clientesNuevos: number; comisionMp: number; visitas?: number }
   }
   alertas: {
     stockCritico: number
@@ -3307,7 +3316,9 @@ export function meRevokeAllSessions() { return bffRequest<{ ok: boolean }>('/api
 // usan el cliente (storefront) y el panel (dueño/staff).
 // `channel`/`deliveryStatus` son de WhatsApp: los mensajes del chat de la tienda vienen como STOREFRONT y sin estado.
 export type ChatChannel = 'STOREFRONT' | 'WHATSAPP' | 'INSTAGRAM'
-export type ChatMessage = { id: string; sender: 'CUSTOMER' | 'STORE'; text: string; orderId: string | null; channel?: ChatChannel; deliveryStatus?: string | null; createdAt: string }
+// `attachments`: las fotos del mensaje (solo WhatsApp). El resto de los archivos llega como etiqueta en el texto.
+export type ChatAttachment = { tipo: 'image'; url: string }
+export type ChatMessage = { id: string; sender: 'CUSTOMER' | 'STORE'; text: string; orderId: string | null; channel?: ChatChannel; deliveryStatus?: string | null; attachments?: ChatAttachment[] | null; viaOrbi?: boolean; createdAt: string }
 
 // Storefront (cliente logueado)
 export type MeConversation = { id: string | null; messages: ChatMessage[] }
@@ -3320,11 +3331,63 @@ export function meSendConversationMessage(text: string) {
 export type ConversationRow = {
   id: string; customerId: string; customerName: string; customerEmail: string | null; customerAvatar: string | null
   isUnread: boolean; isArchived: boolean; lastChannel?: ChatChannel; lastMessage: ChatMessage | null; updatedAt: string
+  // Lo último de cada bandeja y su propio "sin leer". Ausente en respuestas viejas o de la demo.
+  canales?: Partial<Record<CanalDeBandeja, { lastMessage: ChatMessage; isUnread: boolean }>>
+  // Orbi en este chat de WhatsApp: su estado y, si está pausado o derivado, por qué.
+  bot?: { estado: BotChatEstado; motivo: string | null }
 }
 export function listConversations() { return panelRequest<ConversationRow[]>('/conversations') }
-export function getConversationMessages(id: string) { return panelRequest<ChatMessage[]>(`/conversations/${id}/messages`) }
-export function sendConversationMessage(id: string, input: { text: string; orderId?: string }) {
+// `canal`: la bandeja desde la que se mira o se contesta (Mensajes locales = STOREFRONT, o WhatsApp). Las dos no se
+// mezclan: cada una ve solo los mensajes de su canal.
+export type CanalDeBandeja = 'STOREFRONT' | 'WHATSAPP'
+export function getConversationMessages(id: string, canal?: CanalDeBandeja) {
+  return panelRequest<ChatMessage[]>(`/conversations/${id}/messages${canal ? `?canal=${canal}` : ''}`)
+}
+export function sendConversationMessage(id: string, input: { text: string; orderId?: string; canal?: CanalDeBandeja }) {
   return panelRequest<ChatMessage>(`/conversations/${id}/messages`, { method: 'POST', body: JSON.stringify(input) })
+}
+// Manda una foto por WhatsApp (JPG, PNG o WebP, hasta 10 MB). `texto` es el pie de foto.
+export async function sendConversationImage(id: string, input: { foto: File; texto?: string }) {
+  const form = new FormData()
+  form.append('file', input.foto, input.foto.name)
+  if (input.texto?.trim()) form.append('texto', input.texto.trim())
+  const res = await authedFetch(`${API_BASE}/conversations/${id}/messages/image`, { method: 'POST', body: form })
+  const body = await res.json().catch(() => null)
+  if (!res.ok) {
+    const message = mensajeDeError(res.status, body)
+    throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
+  }
+  return body as ChatMessage
+}
+// ── Orbi como atención al público por WhatsApp (paquete Avanzado) ─────────────
+// DEFAULT sigue el modo general; ON/OFF lo decide el dueño para ese chat; PAUSADO = entró una persona y Orbi se calló;
+// DERIVADO = Orbi pidió que lo atienda una persona. PAUSADO y DERIVADO solo los levanta el dueño.
+export type BotModo = 'SELECCIONADOS' | 'TODOS'
+export type BotChatEstado = 'DEFAULT' | 'ON' | 'OFF' | 'PAUSADO' | 'DERIVADO'
+// Cómo atiende Orbi (lo elige el dueño): todo con IA, un menú de opciones y después IA, o solo menú (sin IA).
+export type BotModalidad = 'CONVERSACIONAL' | 'MENU_Y_CONVERSACION' | 'SOLO_MENU'
+export type MenuEstilo = 'LISTA' | 'BOTONES'
+/** Una opción del menú. Las de fábrica: catalogo, pedidos, promos, envios, horarios, persona. Las del dueño: custom-N (con su `respuesta`). */
+export type OpcionDeMenu = { id: string; titulo: string; descripcion?: string; activa: boolean; respuesta?: string }
+export type WhatsappBotEstado = {
+  disponible: boolean; conectado: boolean; enabled: boolean; modo: BotModo
+  instrucciones: string | null; topeCreditos: number | null
+  modalidad: BotModalidad; menuEstilo: MenuEstilo; bienvenida: string | null; bienvenidaPorDefecto: string; menuOpciones: OpcionDeMenu[]
+  // Orbi toma pedidos (quedan pendientes, "coordinar por WhatsApp"), sus topes por pedido y si la tienda puede (o qué le falta).
+  tomaPedidos: boolean; maxUnidades: number; maxMonto: number; pedidos: { disponible: boolean; motivo?: string }
+  cupo: { mes: string; usados: number; total: number; limite: number; porcentaje: number }
+}
+export function getWhatsappBot() { return panelRequest<WhatsappBotEstado>('/whatsapp/bot') }
+export function updateWhatsappBot(input: {
+  enabled?: boolean; modo?: BotModo; instrucciones?: string | null; topeCreditos?: number | null
+  modalidad?: BotModalidad; menuEstilo?: MenuEstilo; bienvenida?: string | null; menuOpciones?: OpcionDeMenu[]
+  tomaPedidos?: boolean; maxUnidades?: number; maxMonto?: number
+}) {
+  return panelRequest<WhatsappBotEstado>('/whatsapp/bot', { method: 'PATCH', body: JSON.stringify(input) })
+}
+/** Enciende (ON, también reactiva un chat pausado o derivado) o apaga (OFF) a Orbi en un chat de WhatsApp. */
+export function setConversationBot(id: string, estado: 'ON' | 'OFF') {
+  return panelRequest<{ botEstado: BotChatEstado }>(`/conversations/${id}/bot`, { method: 'PATCH', body: JSON.stringify({ estado }) })
 }
 export function updateConversation(id: string, input: { isUnread?: boolean; isArchived?: boolean }) {
   return panelRequest<{ ok: boolean }>(`/conversations/${id}`, { method: 'PATCH', body: JSON.stringify(input) })
@@ -3340,6 +3403,10 @@ export type WhatsappEstado = { connected: false } | { connected: true; displayPh
 export function getWhatsappConnection() { return panelRequest<WhatsappEstado>('/whatsapp/connection') }
 export function connectWhatsapp(input: { phoneNumberId: string; wabaId: string; accessToken: string }) {
   return panelRequest<{ connected: true; displayPhone: string | null; suscripta: boolean }>('/whatsapp/connection', { method: 'POST', body: JSON.stringify(input) })
+}
+// Conexión por Embedded Signup (el botón de Meta): el código y los ids que dio Meta al terminar el proceso.
+export function connectWhatsappIntegrado(input: { code: string; phoneNumberId?: string; wabaId: string; businessId?: string }) {
+  return panelRequest<{ connected: true; displayPhone: string | null; suscripta: boolean; coexistencia: boolean }>('/whatsapp/embedded-signup', { method: 'POST', body: JSON.stringify(input) })
 }
 export function disconnectWhatsapp() { return panelRequest<{ connected: false }>('/whatsapp/connection', { method: 'DELETE' }) }
 

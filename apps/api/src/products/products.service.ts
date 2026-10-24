@@ -706,7 +706,8 @@ export class ProductsService {
       }
 
       // Las imágenes se reusan por URL (no se copia el archivo en Storage): son
-      // públicas e inmutables. Ojo al borrar: ver PENDIENTES.md.
+      // públicas. Por eso removeImage()/rotateImage() no borran un archivo que
+      // otra foto sigue usando (archivoSinOtroUso).
       for (const img of original.images) {
         await tx.productImage.create({
           data: {
@@ -919,8 +920,9 @@ export class ProductsService {
     }
 
     const newUrl = await this.subirImagenWebp(businessId, productId, rotatedBuffer);
-    if (path) {
-      await this.supabase.adminClient.storage.from(PRODUCT_IMAGES_BUCKET).remove([path]).catch(() => {});
+    const pathViejo = await this.archivoSinOtroUso(image.id, image.url);
+    if (pathViejo) {
+      await this.supabase.adminClient.storage.from(PRODUCT_IMAGES_BUCKET).remove([pathViejo]).catch(() => {});
     }
 
     let rotatedOriginalUrl = image.originalUrl;
@@ -934,7 +936,10 @@ export class ProductsService {
               .rotate(degrees)
               .toBuffer();
             rotatedOriginalUrl = await this.subirImagenWebp(businessId, productId, rotOrig);
-            await this.supabase.adminClient.storage.from(PRODUCT_IMAGES_BUCKET).remove([origPath]).catch(() => {});
+            const origViejo = await this.archivoSinOtroUso(image.id, image.originalUrl);
+            if (origViejo) {
+              await this.supabase.adminClient.storage.from(PRODUCT_IMAGES_BUCKET).remove([origViejo]).catch(() => {});
+            }
           } catch {
             // si falla el original, mantenemos lo que había
           }
@@ -956,8 +961,8 @@ export class ProductsService {
 
     // Best-effort: si falla el borrado en Storage no bloqueamos el borrado
     // del registro (evita imágenes "zombie" en la UI por un error de red).
-    const path = this.extractStoragePath(image.url);
-    const pathOriginal = image.originalUrl ? this.extractStoragePath(image.originalUrl) : null;
+    const path = await this.archivoSinOtroUso(image.id, image.url);
+    const pathOriginal = await this.archivoSinOtroUso(image.id, image.originalUrl);
     const aBorrar = [path, pathOriginal].filter((x): x is string => !!x);
     if (aBorrar.length > 0) {
       await this.supabase.adminClient.storage.from(PRODUCT_IMAGES_BUCKET).remove(aBorrar).catch(() => {});
@@ -1379,5 +1384,19 @@ export class ProductsService {
     const marker = `/${PRODUCT_IMAGES_BUCKET}/`;
     const idx = url.indexOf(marker);
     return idx === -1 ? null : url.slice(idx + marker.length);
+  }
+
+  // duplicate() reusa las URLs de las fotos (no copia el archivo), así que el
+  // mismo archivo puede estar en varias fichas. Antes de borrarlo de Storage hay
+  // que ver que ninguna otra foto lo use (como `url` o como `originalUrl`): si
+  // no, borrar o rotar la foto de una copia rompe la del original (o al revés).
+  private async archivoSinOtroUso(imageId: string, url: string | null): Promise<string | null> {
+    if (!url) return null;
+    const path = this.extractStoragePath(url);
+    if (!path) return null;
+    const otros = await this.prisma.productImage.count({
+      where: { id: { not: imageId }, OR: [{ url }, { originalUrl: url }] },
+    });
+    return otros === 0 ? path : null;
   }
 }

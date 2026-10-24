@@ -116,7 +116,7 @@ export const CAPITULOS: Capitulo[] = [
                     { titulo: 'Definí cómo entregás', texto: 'Configuración → Envíos: envío a domicilio, retiro en el local, o los dos, con sus costos y zonas.' },
                     { titulo: 'Publicá la tienda', texto: 'Inicio → botón [[Publicar tienda]], arriba a la derecha. Ahí recién estás online.' },
                 ] },
-                { tipo: 'nota', variante: 'tip', texto: 'Si preferís que te lleven de la mano, el tutorial de Primeros pasos hace exactamente esta lista con el cursor guiándote pantalla por pantalla. Aparece solo la primera vez, y cuando lo terminás se abre una segunda tanda que recorre el resto del panel.' },
+                { tipo: 'nota', variante: 'tip', texto: 'La primera vez que entrás al panel te guiamos para crear tu primera categoría y tu primer producto, que es el corazón de esta lista. Si preferís hacerlo por tu cuenta, tocá "Más tarde": no te lo vuelve a pedir hasta el día siguiente.' },
             ],
             ir: { label: 'Ir al Inicio', seccion: 'dashboard' },
         },
@@ -197,9 +197,9 @@ export const CAPITULOS: Capitulo[] = [
             bloques: [
                 { tipo: 'parrafo', texto: 'Son la fila de tarjetas de arriba. Cada una muestra el valor del período elegido y, abajo, cuánto subió o bajó respecto del anterior.' },
                 { tipo: 'campos', items: [
-                    { label: 'Ventas', texto: 'La plata que entró, **neta de devoluciones**: a lo vendido se le restan las devoluciones ya aprobadas del período. Es lo que realmente quedó, no lo que se facturó bruto.' },
+                    { label: 'Ganancias', texto: 'Lo que te quedó de lo vendido en el período: **ingresos de tus productos − lo que te costaron − las devoluciones ya aprobadas**. Ya tiene en cuenta los descuentos que diste y no cuenta el envío. Usa el campo **Costo** de cada producto (el costo de hoy), así que **solo cuenta los productos que tienen el costo cargado**: si hay ventas de productos sin costo, abajo del número te avisa qué parte de lo vendido está incluida, y para sumar el resto tenés que cargar el costo en Productos. Puede dar negativo si devolviste más de lo que ganaste.' },
                     { label: 'Pedidos', texto: 'Cuántas compras entraron. Si hay pedidos esperando, abajo del número te avisa cuántos están pendientes.' },
-                    { label: 'Ticket promedio', texto: 'Cuánto gasta en promedio cada compra (Ventas dividido Pedidos). Es el número que mirás cuando querés que cada cliente se lleve más: si sube, las promos por monto mínimo o los 2x1 están funcionando.' },
+                    { label: 'Ticket promedio', texto: 'Cuánto gasta en promedio cada compra (lo facturado dividido la cantidad de pedidos). Es el número que mirás cuando querés que cada cliente se lleve más: si sube, las promos por monto mínimo o los 2x1 están funcionando.' },
                     { label: 'Clientes nuevos', texto: 'Cuántas personas te compraron por primera vez en el período. Mide si estás llegando a gente nueva o vendiéndole siempre a los mismos.' },
                     { label: 'Comisión MP', texto: 'Cuánto se llevó Mercado Pago de tus cobros en el período. Acá el color está al revés a propósito: que SUBA es malo, así que sube en rojo. Mercado Pago no cobra un porcentaje fijo — varía según el medio de pago y las cuotas —, por eso este número se calcula sobre los cobros reales.' },
                 ] },
@@ -308,6 +308,7 @@ export const CAPITULOS: Capitulo[] = [
             bloques: [
                 { tipo: 'parrafo', texto: 'Clickeás la fila y se abre el detalle: los productos con sus cantidades, el total, los datos del cliente, cómo pagó y cómo lo recibe.' },
                 { tipo: 'parrafo', texto: 'Desde ahí lo movés al estado que corresponde. Cada cambio queda registrado y, según lo que hayas configurado en Notificaciones, dispara el aviso al cliente.' },
+                { tipo: 'parrafo', texto: '**Sacar un pedido de la lista**: en cada fila hay un ícono de papelera ([[Eliminar]]) y, si tildás varios pedidos, aparece [[Eliminar]] en la barra de arriba. Te pide confirmación y el pedido deja de verse en la lista y en los reportes. **No se borra de forma definitiva** (queda guardado y registrado), pero tampoco se devuelve el stock ni se anula ningún cobro: es para ordenar la pantalla, por ejemplo para limpiar pedidos de prueba.' },
                 { tipo: 'nota', variante: 'dato', texto: 'Si el pago fue con Mercado Pago, en el detalle ves la comisión que se llevó esa venta puntual. Ese mismo número, sumado por período, es el KPI "Comisión MP" del Inicio.' },
             ],
         },
@@ -316,7 +317,7 @@ export const CAPITULOS: Capitulo[] = [
             bloques: [
                 { tipo: 'parrafo', texto: 'El botón [[Nuevo pedido]] sirve para todo lo que vendés por fuera de la tienda: mostrador, WhatsApp, Instagram, un pedido por teléfono.' },
                 { tipo: 'pasos', items: [
-                    { titulo: 'Buscá los productos', texto: 'Escribís en el buscador, elegís y ponés cantidades. Usa tu catálogo real, así que descuenta stock igual que una venta online.' },
+                    { titulo: 'Buscá los productos', texto: 'Escribís en el buscador, elegís y ponés cantidades. Para achicar el catálogo podés filtrar por **categoría** y por **estado** (publicados, borradores o sin stock); con [[Limpiar]] volvés a verlos todos. Usa tu catálogo real, así que descuenta stock igual que una venta online.' },
                     { titulo: 'Cargá el cliente', texto: 'Si ya existe, lo encontrás en el buscador. Si no, tocás [[Cargar un comprador a mano]] y escribís su nombre y su email: con el email queda guardado en tu lista de Clientes. Sin email la venta se registra igual, pero esa persona no queda guardada.' },
                     { titulo: 'Elegí cómo se cobró y cerrá la venta', texto: 'Y el pedido entra a tus números como cualquier otro.' },
                 ] },
@@ -352,7 +353,7 @@ export const CAPITULOS: Capitulo[] = [
                     { label: 'Notas de crédito', texto: 'Si en vez de devolver la plata preferís dejarle saldo a favor para su próxima compra, se emite una nota de crédito y el cliente la usa en el checkout.' },
                 ] },
                 { tipo: 'nota', variante: 'aviso', texto: 'Qué puede pedir tu cliente y con qué tipo de reembolso lo definís vos en Configuración → Cancelaciones y devoluciones. Aprobar cada caso puntual sigue siendo decisión tuya, siempre.' },
-                { tipo: 'parrafo', texto: 'Las devoluciones aprobadas se le restan al KPI **Ventas** del Inicio: por eso ese número dice "neto de devoluciones".' },
+                { tipo: 'parrafo', texto: 'Las devoluciones aprobadas se le restan al KPI **Ganancias** del Inicio: por eso esa tarjeta dice "neta de costos y devoluciones".' },
             ],
             ir: { label: 'Ver devoluciones', seccion: 'pedidos', query: { vista: 'devoluciones' } },
         },
@@ -378,6 +379,7 @@ export const CAPITULOS: Capitulo[] = [
                     { label: 'Última compra', texto: 'Cuándo fue la última vez. Es tu lista de "a quién hay que despertar".' },
                 ] },
                 { tipo: 'parrafo', texto: 'La flechita de cada fila despliega sus últimos pedidos sin salir de la lista, y desde ahí entrás a [[Ver perfil completo →]].' },
+                { tipo: 'nota', variante: 'dato', texto: 'Quien solo te escribe por WhatsApp o Instagram **no aparece en Clientes** ni suma a los números del negocio: sus chats viven en la bandeja de mensajes. Pasa a ser cliente cuando te compra.' },
             ],
         },
         {
@@ -521,6 +523,16 @@ export const CAPITULOS: Capitulo[] = [
             bloques: [
                 { tipo: 'parrafo', texto: 'Tus clientes te escriben desde la tienda y todo cae acá. A la izquierda la lista de conversaciones, con los no leídos marcados; a la derecha, el chat abierto.' },
                 { tipo: 'parrafo', texto: 'Cuando hay algo sin leer, aparece un punto rojo en **Mensajes** en el menú de la izquierda: no hace falta entrar a chequear.' },
+                { tipo: 'parrafo', texto: 'Arriba hay dos opciones y al elegir una cambia la bandeja de abajo; **las dos bandejas no se mezclan**. **Mensajes locales** son los mensajes del sistema: lo que te escriben tus clientes desde el chat de tu tienda online (el cliente los ve y recibe tus respuestas en su perfil de la tienda). **WhatsApp** son los chats de tu número de WhatsApp Business, con el mismo aspecto que WhatsApp Web: lista de chats con buscador y filtros (Todos, No leídos, Archivados) a la izquierda, y el chat con sus burbujas, tildes y barra para escribir a la derecha. Si una persona te escribe por los dos canales, aparece en las dos bandejas, y en cada una se ve solo lo de ese canal; lo pendiente de una no se apaga al abrir la otra.' },
+                { tipo: 'parrafo', texto: 'Para usar WhatsApp, elegí **WhatsApp** y tocá [[Conectar cuenta de WhatsApp Business]]. Se abre una ventana de Meta (la empresa dueña de WhatsApp): iniciás sesión con Facebook, conectás el número de tu app WhatsApp Business (Meta te manda un código que ingresás en la app) y elegís si querés traer el historial de tus chats. Al terminar, la ventana se cierra sola y tus chats aparecen en la pantalla. Tu app WhatsApp Business del celular **sigue funcionando igual**: lo que escribas ahí también se ve en Órbita, y lo que respondas desde Órbita le llega a tu cliente. Hace falta una cuenta de Facebook con acceso a tu negocio y la app WhatsApp Business actualizada (el WhatsApp personal no sirve). Si el navegador bloquea la ventana, permitila para esta página.' },
+                { tipo: 'parrafo', texto: 'En WhatsApp se pueden **mandar y ver fotos**. Las fotos que te mandan tus clientes (o que mandás vos desde el celular) se ven dentro del chat y, tocándolas, se abren en grande. Para mandar una, usá el botón de la imagen al lado del campo de escribir: elegís una foto JPG, PNG o WebP de hasta 10 MB, se ve una vista previa y lo que escribas abajo va de pie de foto. Los audios, los videos y los documentos no se pueden ver ni mandar desde Órbita: aparecen como una etiqueta en el chat (por ejemplo, Audio) y los abrís desde la app del celular.' },
+                { tipo: 'parrafo', texto: '**Orbi en WhatsApp** (función del paquete Avanzado): Orbi puede atender a tus clientes por vos. Les cuenta qué productos tenés, precios, ofertas, cupones y promos 2x1 o 3x2 vigentes, talles y stock, formas de pago, envíos, retiro, cambios y en qué estado está su pedido, siempre con los datos reales de tu tienda; no inventa, no promete descuentos ni toma pedidos por el chat (para comprar les manda el link) y nunca comparte datos bancarios ni de otros clientes. Ante un reclamo, un problema de pago o cualquier duda, **te pasa el chat** y deja de contestar. Para configurarlo, abrí los tres puntitos de la lista de chats y elegí [[Orbi en WhatsApp]] (también aparece como botón en la pantalla de inicio del chat): ahí lo prendés con el interruptor general, elegís si atiende **solo los chats que vos actives** (lo recomendado) o **todos**, le dejás indicaciones (tono, promociones del mes) y ves cuánto llevás gastado del **cupo del mes**, con la posibilidad de ponerte un tope propio más bajo. Si el cupo se agota, Orbi se calla y te lo avisa en los chats.' },
+                { tipo: 'parrafo', texto: 'En **Orbi en WhatsApp** elegís **cómo atiende** Orbi: **Conversación** (contesta todo con inteligencia artificial), **Menú y conversación** (cuando alguien escribe por primera vez, o saluda, le manda un saludo con un menú de opciones —catálogo, pedidos, promos, envíos y pagos, horarios, hablar con alguien— y después conversa con IA) o **Solo menú** (contesta únicamente con el menú y respuestas fijas armadas con los datos de tu tienda: no usa IA, así que no gasta cupo y sigue funcionando aunque se agote). El menú se manda como **Lista** (un botón que abre hasta 10 opciones) o como **Botones** (hasta 3 a la vista). Podés cambiar el saludo, apagar, renombrar y reordenar las opciones, y sumar las tuyas con [[Agregar una opción propia]] (por ejemplo Mayoristas), con el texto fijo que contesta Orbi. Mientras escribís ves una vista previa de cómo le llega al cliente, y los cambios del menú se guardan con [[Guardar cambios]]. Si WhatsApp no deja mostrar el menú con botones, Orbi lo manda igual como una lista numerada y el cliente responde con el número.' },
+                { tipo: 'parrafo', texto: '**Orbi puede tomar pedidos**: con el interruptor [[Orbi puede tomar pedidos]] (en Conversación y en Menú y conversación; en Solo menú no) Orbi, cuando un cliente quiere comprar, averigua qué productos, cuántos y con qué talle o color, y arma el pedido con los **precios y el stock reales de tu tienda**. Le muestra un resumen con los botones **Confirmar pedido** y **Cambiar** (o responde "sí" / "cambiar"); recién cuando confirma se crea el pedido, que queda **pendiente** con "Coordinar por WhatsApp" como medio de pago, y el chat queda marcado para que lo cierres vos. Orbi nunca cobra, no pide datos de pago ni dirección: el pago y la entrega los coordina tu equipo por el mismo chat. Necesita que tu tienda venda online y tenga activado "Coordinar por WhatsApp" en Configuración → Pagos; podés poner un tope de unidades y de monto por pedido (si alguien pide más, Orbi no arma el pedido y te pasa el chat). El pedido aparece en Pedidos como cualquier otro, con una nota que dice que lo tomó Orbi.' },
+                { tipo: 'parrafo', texto: '**Fotos de productos**: cuando un cliente pide ver un producto, o cuando ayuda a decidir, Orbi le manda la foto del producto con su nombre (hasta 3 fotos por respuesta; si pide un color puntual, manda la foto de ese color si la cargaste). Usa las fotos que ya tenés en el catálogo, no hay que configurar nada y no tiene costo de IA. Cada foto cuenta como un mensaje más de WhatsApp y aparece en el chat marcada como de Orbi.' },
+                { tipo: 'parrafo', texto: '**Avisos por email**: cuando Orbi te pasa un chat te llega un email (y una notificación en la campana) con el motivo, el último mensaje del cliente y el link para abrir el chat; y cuando deja un pedido pendiente te llega otro, distinto, con el detalle del pedido. Los dos se pueden apagar o dejar solo en el panel desde Configuración → Notificaciones.' },
+                { tipo: 'parrafo', texto: 'Dentro de cada chat, el botón [[Activar Orbi]] hace que Orbi conteste ahí (y pasa a decir Orbi atiende; tocándolo de nuevo lo apagás). Sus respuestas se distinguen con la etiqueta Orbi. **Cuando escribís vos en un chat** (desde el panel o desde el celular), Orbi se calla en ese chat y no vuelve solo: queda un aviso con el botón [[Reactivar Orbi]] para cuando quieras que siga. Lo mismo si Orbi te pasó el chat: lo ves marcado como Necesita atención hasta que lo reactives. Así nunca se pisan tus respuestas con las suyas. Orbi no lee audios, videos ni documentos: les pide que escriban su consulta.' },
+                { tipo: 'nota', variante: 'aviso', texto: 'Tené en cuenta lo que impone Meta: los chats de grupos no se traen a Órbita; al conectar se desvinculan WhatsApp Web y Desktop; algunas funciones de la app (mensajes temporales, de ver una vez y listas de difusión) quedan desactivadas para los chats individuales; y si pasan unas dos semanas sin abrir la app en el celular, Meta corta la conexión. Podés responder dentro de las 24 horas del último mensaje del cliente; pasado ese plazo el chat se lee pero no se responde hasta que el cliente escriba de nuevo, y el propio chat lo avisa. Con los tres puntitos de la lista de chats administrás o desconectás la cuenta.' },
                 { tipo: 'nota', variante: 'tip', texto: 'Los mensajes directos de Instagram no están en esta bandeja: se atienden en **Difusión → Mensajes**, con una bandeja parecida a la de Instagram. Ahí también se conecta la cuenta.' },
             ],
         },
@@ -861,9 +873,10 @@ export const CAPITULOS: Capitulo[] = [
         {
             id: 'cfg-apariencia', titulo: 'Apariencia',
             bloques: [
-                { tipo: 'parrafo', texto: 'Cómo se ve tu tienda. Es la pantalla más larga de Configuración, con su propio índice de secciones:' },
+                { tipo: 'parrafo', texto: 'Cómo se ve tu tienda. Es la pantalla más larga de Configuración, y se divide en secciones:' },
                 { tipo: 'lista', items: [
                     '**Identidad de marca**: logo y favicon.',
+                    '**Sliders del hero**: el carrusel de arriba de tu portada. Si no cargás ninguno, tu tienda muestra hasta tres automáticos, uno por categoría, con un texto genérico y un fondo de color; no se editan, y desaparecen apenas cargás el primero tuyo.',
                     '**Paleta de colores** y **Tipografía**: los colores y la letra de toda tu tienda, incluida la escala de texto.',
                     '**Diseño y layout**: cómo se acomoda el contenido.',
                     '**Banner con efecto parallax** y **Video en tu tienda**: las piezas grandes de la portada.',
@@ -872,6 +885,12 @@ export const CAPITULOS: Capitulo[] = [
                     '**Textos de tu tienda**: los títulos y frases de la portada.',
                     '**Barra de estadísticas** y **Pie de página**.',
                 ] },
+                { tipo: 'campos', titulo: 'Cómo ver lo que cambiás', items: [
+                    { label: 'En la computadora', texto: 'Tu tienda aparece al lado del formulario, y se ve en vivo. Cuando tocás un campo (o entrás a una sección), la vista previa se desplaza hasta esa parte de la tienda y la marca un momento: así sabés qué estás cambiando. A la izquierda hay un índice para saltar entre secciones.' },
+                    { label: 'En el celular', texto: 'Las secciones están plegadas: tocás una y se abre (de a una). La tienda no entra al lado del formulario, así que abajo hay una barra fija con [[Ver mi tienda]]: abre tu tienda a pantalla completa, justo en la parte que estabas editando. Para seguir editando, cerrala con la X.' },
+                    { label: 'Guardar', texto: 'Los cambios quedan sin publicar hasta que tocás [[Guardar cambios]]. En el celular el botón está en la misma barra de abajo, junto a [[Descartar]], que vuelve todo a lo que ya estaba publicado.' },
+                ] },
+                { tipo: 'nota', variante: 'dato', texto: 'Algunos ajustes no tienen una parte propia que marcar en la portada: los colores, la tipografía y el tamaño del texto cambian toda la tienda, así que la vista previa solo te lleva al inicio. Y las opiniones de clientes se ven en la ficha de cada producto, no en la portada.' },
                 { tipo: 'nota', variante: 'dato', texto: 'Si activaste una plantilla de Home (paquete Avanzado), la Apariencia clásica queda bloqueada: la portada la manda la plantilla. Se puede volver a la apariencia original desde la galería de plantillas.' },
             ],
             ir: { label: 'Abrir Apariencia', seccion: 'configuracion', query: { vista: 'apariencia' } },
@@ -898,6 +917,10 @@ export const CAPITULOS: Capitulo[] = [
                     { label: 'Pedido cancelado', texto: 'Un pedido se canceló.' },
                     { label: 'Cancelación pedida', texto: 'Un cliente pidió cancelar un pedido ya confirmado.' },
                     { label: 'Devolución', texto: 'Un cliente inició una devolución.' },
+                ] },
+                { tipo: 'campos', titulo: 'Orbi en WhatsApp', items: [
+                    { label: 'Un chat necesita atención', texto: 'Orbi te pasó un chat de WhatsApp: un reclamo, una duda que no pudo resolver o alguien que pidió hablar con una persona. Te llega por la campana **y por email** (a lo sumo uno por chat cada 30 minutos), con el motivo, el último mensaje y el link al chat.' },
+                    { label: 'Pedido pendiente de Orbi', texto: 'Orbi tomó un pedido por WhatsApp y quedó pendiente: falta coordinar el pago y la entrega. También te llega por la campana **y por email**.' },
                 ] },
                 { tipo: 'campos', titulo: 'Stock y clientes', items: [
                     { label: 'Stock crítico', texto: 'Un producto llegó a su stock mínimo.' },
@@ -1014,7 +1037,7 @@ export const CAPITULOS: Capitulo[] = [
 // ═══════════════════════════════════════════════════════════════════════════
 {
     id: 'ayuda', titulo: 'Si te trabás', Icon: LifeBuoy, ilustracion: 'orbi',
-    resumen: 'Orbi, el tutorial guiado y cómo escribirnos.',
+    resumen: 'Orbi, los tutoriales de cada módulo y cómo escribirnos.',
     temas: [
         {
             id: 'orbi', titulo: 'Preguntale a Orbi',
@@ -1034,10 +1057,11 @@ export const CAPITULOS: Capitulo[] = [
             ],
         },
         {
-            id: 'tutorial', titulo: 'El tutorial guiado',
+            id: 'tutorial', titulo: 'Los tutoriales de cada módulo',
             bloques: [
-                { tipo: 'parrafo', texto: 'Los **Primeros pasos** son la versión activa de este manual: en vez de contarte dónde está algo, te lleva hasta ahí con el cursor y te espera a que lo hagas.' },
-                { tipo: 'parrafo', texto: 'Tiene dos tandas: la primera son los siete pasos para salir a vender; la segunda recorre el resto del panel, agrupada en "Tu día a día", "La cara de tu tienda" y "Tu negocio". Se tildan solos a medida que vas cumpliendo.' },
+                { tipo: 'parrafo', texto: 'La primera vez que entrás a un módulo (Productos, Pedidos, Clientes…) te preguntamos si querés ver cómo funciona. Si tocás "Ver tutorial", te lo mostramos sobre la pantalla misma: un paso por vez, con la parte señalada nítida y el resto difuminado, y una explicación de dos renglones de qué es y cómo se hace. Con "Ahora no" o "Omitir" lo salteás sin perder nada.' },
+                { tipo: 'parrafo', texto: 'El tutorial no te mueve de pantalla ni hace nada por vos: solo señala y explica. Cada módulo lo ofrece una sola vez en cada dispositivo, y el detalle completo de todo está en este manual.' },
+                { tipo: 'parrafo', texto: 'De vez en cuando, además, te preguntamos si ya sabés hacer algo que todavía no hiciste (por ejemplo, crear un descuento). Si contestás que sí, no te lo volvemos a preguntar; si contestás que no, te mostramos el tutorial. Lo que ya hiciste nunca se sugiere.' },
             ],
             ir: { label: 'Ir al Inicio', seccion: 'dashboard' },
         },

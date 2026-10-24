@@ -32,7 +32,7 @@ export interface TurnoDeOrbi {
   /** Escrituras que el modelo pidió y no se pudieron proponer (permiso, demo, args). */
   writesRejected: number;
   status: EstadoDelTurno;
-  provider?: 'gemini' | 'groq' | 'mixto';
+  provider?: 'gemini' | 'groq' | 'workers-ai' | 'mixto';
   cachedTokens?: number;
   thinkingTokens?: number;
   /** Ms hasta el primer texto del modelo. */

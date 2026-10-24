@@ -17,12 +17,17 @@ function armar() {
     guardarAnalisis: jest.fn().mockResolvedValue({ guardadas: 1 }),
   };
   const videos = {
-    listar: jest.fn().mockResolvedValue([{ id: 'v-1', titulo: 'Reel', formato: 'REEL_9_16', estado: 'PENDIENTE', duracionSeg: 30, createdAt: new Date('2026-10-14T00:00:00Z') }]),
+    listar: jest.fn().mockResolvedValue([{ id: 'v-1', tipo: 'MARKETING', titulo: 'Reel', formato: 'REEL_9_16', estado: 'PENDIENTE', duracionSeg: 30, tutorialId: null, createdAt: new Date('2026-10-14T00:00:00Z') }]),
+    detalle: jest.fn().mockResolvedValue({ id: 'v-1', titulo: 'Reel', guion: 'hola', comentariosDelEquipo: [{ autor: 'Alan', texto: 'más corto', fecha: '2026-10-14' }] }),
     pedirSubida: jest.fn().mockResolvedValue({ videoId: 'v-2', uploadUrl: 'https://r2.example/put', tipo: 'video/mp4', venceEnMin: 10 }),
     registrar: jest.fn().mockResolvedValue({ id: 'v-2', estado: 'PENDIENTE' }),
     avisarTanda: jest.fn().mockResolvedValue({ enviados: 2, pendientes: 3 }),
   };
-  return { svc, videos, mcp: new McpProspeccion(svc as never, videos as never) };
+  const tutoriales = {
+    listar: jest.fn().mockResolvedValue({ resumen: { total: 39, hechos: 2 }, tutoriales: [{ id: 't-1', titulo: 'Cargar un producto', estado: 'HECHO' }] }),
+    actualizar: jest.fn().mockResolvedValue({ id: 't-2', titulo: 'Atender un pedido', estado: 'EN_PROCESO', notas: null }),
+  };
+  return { svc, videos, tutoriales, mcp: new McpProspeccion(svc as never, videos as never, tutoriales as never) };
 }
 
 const rpc = (method: string, params?: unknown, id: number | null = 1) => ({ jsonrpc: '2.0', id, method, params });
@@ -35,6 +40,10 @@ describe('protocolo', () => {
     expect(r.result.protocolVersion).toBe('2025-03-26');
     expect(r.result.capabilities).toEqual({ tools: { listChanged: false } });
     expect(r.result.instructions).toMatch(/Nunca envíes mensajes/);
+    expect(r.result.instructions).toMatch(/ELEVEN_KEY/); // la voz es ElevenLabs
+    expect(r.result.instructions).not.toMatch(/Gemini/);
+    expect(r.result.instructions).toMatch(/ffmpeg -version/); // revisar los requisitos de la PC antes de producir
+    expect(r.result.instructions).toMatch(/git pull/); // cómo bajar la skill de videos si no está
     expect(((await mcp.manejar(rpc('initialize', { protocolVersion: '1999-01-01' }), CTX)) as any).result.protocolVersion).toBe('2025-06-18');
   });
 
@@ -54,11 +63,12 @@ describe('protocolo', () => {
 });
 
 describe('herramientas', () => {
-  it('son las 6 de la prospección y las 3 de los videos, y ninguna envía, contacta, publica ni borra', () => {
+  it('son las 6 de la prospección, las de los videos y las de los tutoriales, y ninguna envía, contacta, publica ni borra', () => {
     expect(HERRAMIENTAS.map((h) => h.name)).toEqual([
       'prospeccion_criterio', 'prospeccion_listar_lotes', 'prospeccion_listar_prospectos',
       'prospeccion_consultar_cuentas', 'prospeccion_obtener_lote', 'prospeccion_guardar_analisis',
-      'videos_listar', 'videos_pedir_subida', 'videos_registrar', 'videos_avisar',
+      'videos_listar', 'videos_obtener', 'videos_pedir_subida', 'videos_registrar', 'videos_avisar',
+      'tutoriales_listar', 'tutoriales_actualizar',
     ]);
     for (const h of HERRAMIENTAS) {
       expect(h.name).not.toMatch(/enviar|mandar|borrar|eliminar|contactar|publicar/);
@@ -69,12 +79,12 @@ describe('herramientas', () => {
 
   it('las de solo lectura lo declaran, así Claude no pide confirmación de más', () => {
     const lectura = HERRAMIENTAS.filter((h) => h.annotations.readOnlyHint === true).map((h) => h.name);
-    expect(lectura).toEqual(['prospeccion_criterio', 'prospeccion_listar_lotes', 'prospeccion_listar_prospectos', 'prospeccion_obtener_lote', 'videos_listar']);
+    expect(lectura).toEqual(['prospeccion_criterio', 'prospeccion_listar_lotes', 'prospeccion_listar_prospectos', 'prospeccion_obtener_lote', 'videos_listar', 'videos_obtener', 'tutoriales_listar']);
   });
 
   it('tools/list las devuelve', async () => {
     const { mcp } = armar();
-    expect(((await mcp.manejar(rpc('tools/list'), CTX)) as any).result.tools).toHaveLength(10);
+    expect(((await mcp.manejar(rpc('tools/list'), CTX)) as any).result.tools).toHaveLength(13);
   });
 
   it('consultar y guardar usan al superadmin que autorizó, no un dato que mande Claude', async () => {
@@ -88,20 +98,50 @@ describe('herramientas', () => {
   it('los videos se piden y se registran como el superadmin que autorizó, y el listado no trae la dirección interna', async () => {
     const { mcp, videos } = armar();
     await mcp.manejar(rpc('tools/call', { name: 'videos_pedir_subida', arguments: { bytes: 1234, adminId: 'otro' } }), CTX);
-    expect(videos.pedirSubida).toHaveBeenCalledWith('admin-1', 1234);
+    expect(videos.pedirSubida).toHaveBeenCalledWith('admin-1', 1234, undefined);
     await mcp.manejar(rpc('tools/call', { name: 'videos_registrar', arguments: { video: 'v-2', titulo: 'Mi reel', caption: 'hola', duracionSeg: 30, controles: [{ nombre: 'audio', ok: true }], adminId: 'otro' } }), CTX);
     expect(videos.registrar).toHaveBeenCalledWith('admin-1', expect.objectContaining({ videoId: 'v-2', titulo: 'Mi reel', caption: 'hola', duracionSeg: 30, formato: undefined }));
     const lista = JSON.parse(texto(await mcp.manejar(rpc('tools/call', { name: 'videos_listar', arguments: {} }), CTX)));
-    expect(lista).toEqual([{ id: 'v-1', titulo: 'Reel', formato: 'REEL_9_16', estado: 'PENDIENTE', duracionSeg: 30, creado: '2026-10-14T00:00:00.000Z' }]);
+    expect(lista).toEqual([{ id: 'v-1', tipo: 'MARKETING', titulo: 'Reel', formato: 'REEL_9_16', estado: 'PENDIENTE', duracionSeg: 30, tutorialId: null, creado: '2026-10-14T00:00:00.000Z' }]);
+  });
+
+  it('el tipo y los filtros llegan a la cola; un tutorial se sube con su tipo y se vincula a la lista', async () => {
+    const { mcp, videos } = armar();
+    await mcp.manejar(rpc('tools/call', { name: 'videos_listar', arguments: { tipo: 'TUTORIAL', estado: 'PENDIENTE' } }), CTX);
+    expect(videos.listar).toHaveBeenCalledWith('PENDIENTE', 'TUTORIAL');
+    await mcp.manejar(rpc('tools/call', { name: 'videos_pedir_subida', arguments: { bytes: 99, tipo: 'TUTORIAL' } }), CTX);
+    expect(videos.pedirSubida).toHaveBeenCalledWith('admin-1', 99, 'TUTORIAL');
+    await mcp.manejar(rpc('tools/call', { name: 'videos_registrar', arguments: { video: 'v-3', titulo: 'T', tutorial: 'Cargar un producto', mejora_de: 'v-1' } }), CTX);
+    expect(videos.registrar).toHaveBeenCalledWith('admin-1', expect.objectContaining({ videoId: 'v-3', tutorial: 'Cargar un producto', mejoraDe: 'v-1' }));
+    await mcp.manejar(rpc('tools/call', { name: 'videos_avisar', arguments: { tipo: 'TUTORIAL' } }), CTX);
+    expect(videos.avisarTanda).toHaveBeenLastCalledWith('admin-1', 'TUTORIAL');
+  });
+
+  it('videos_obtener devuelve lo necesario para mejorar un video, con los comentarios del equipo', async () => {
+    const { mcp, videos } = armar();
+    const r = JSON.parse(texto(await mcp.manejar(rpc('tools/call', { name: 'videos_obtener', arguments: { video: 'v-1' } }), CTX)));
+    expect(videos.detalle).toHaveBeenCalledWith('v-1');
+    expect(r.comentariosDelEquipo).toEqual([{ autor: 'Alan', texto: 'más corto', fecha: '2026-10-14' }]);
+  });
+
+  it('la lista de tutoriales se lee y se actualiza como quien autorizó; el estado EN_REVISION no se puede poner a mano desde el esquema', async () => {
+    const { mcp, tutoriales } = armar();
+    const lista = JSON.parse(texto(await mcp.manejar(rpc('tools/call', { name: 'tutoriales_listar', arguments: { estado: 'FALTA' } }), CTX)));
+    expect(tutoriales.listar).toHaveBeenCalledWith('FALTA');
+    expect(lista.resumen.total).toBe(39);
+    await mcp.manejar(rpc('tools/call', { name: 'tutoriales_actualizar', arguments: { tutorial: 'Atender un pedido', estado: 'EN_PROCESO', notas: 'arranco hoy', adminId: 'otro' } }), CTX);
+    expect(tutoriales.actualizar).toHaveBeenCalledWith('admin-1', { tutorial: 'Atender un pedido', estado: 'EN_PROCESO', notas: 'arranco hoy' });
+    const esquema = HERRAMIENTAS.find((h) => h.name === 'tutoriales_actualizar')!.inputSchema as { properties: { estado: { enum: string[] } } };
+    expect(esquema.properties.estado.enum).toEqual(['FALTA', 'EN_PROCESO', 'HECHO']);
   });
 
   it('videos_avisar manda el aviso de fin de tanda como el superadmin que autorizó y no recibe texto libre', async () => {
     const { mcp, videos } = armar();
     const r = await mcp.manejar(rpc('tools/call', { name: 'videos_avisar', arguments: { adminId: 'otro', asunto: 'hola', texto: 'libre' } }), CTX)
-    expect(videos.avisarTanda).toHaveBeenCalledWith('admin-1')
+    expect(videos.avisarTanda).toHaveBeenCalledWith('admin-1', undefined)
     expect(JSON.parse(texto(r))).toEqual({ enviados: 2, pendientes: 3 })
     const herramienta = HERRAMIENTAS.find((h) => h.name === 'videos_avisar')!
-    expect(herramienta.inputSchema.properties).toEqual({})
+    expect(herramienta.inputSchema.properties).toEqual({ tipo: expect.objectContaining({ enum: ['MARKETING', 'TUTORIAL'] }) })
     expect(herramienta.inputSchema.additionalProperties).toBe(false)
   });
 

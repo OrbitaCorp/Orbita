@@ -10,7 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UsageMeteringService } from '../platform/costs/usage-metering.service';
 import { escaparHtml } from '../common/utils/html';
 import { FIXTURE_BUSINESS_BRANDING, MAIL_PREVIEW_FIXTURES } from './mail-preview.fixtures';
-import { cuerpoAHtml, firmaAHtml, remitenteParaFrom, type FirmaCorreo } from './correo-directo';
+import { cuerpoAHtml, extraerDestinatarios, firmaAHtml, MAX_DESTINATARIOS_DIRECTO, remitenteParaFrom, type FirmaCorreo } from './correo-directo';
 
 // Referencias opcionales para el registro de envíos: a qué negocio pertenece
 // el mail y a qué cliente/miembro le llegó. Todo opcional para que los flujos
@@ -563,7 +563,7 @@ export class MailService {
   // reintentarlos solo gasta tiempo. Devuelve el mismo shape { error } que la
   // llamada original para que sendOrLog lo maneje igual.
   private async enviarConReintento(
-    payload: { from: string; to: string; subject: string; html: string; replyTo?: string },
+    payload: { from: string; to: string | string[]; subject: string; html: string; replyTo?: string },
   ): Promise<{ error: { message: string } | null }> {
     const MAX_INTENTOS = 3;
     let ultimoError: unknown;
@@ -1332,29 +1332,31 @@ export class MailService {
   // la respuesta le llega a esa persona. El dominio de la casilla tiene que
   // estar verificado en Resend; si no, Resend lo rechaza y el motivo vuelve en
   // `error` para mostrarlo en el panel.
-  async sendDirecto(e: { to: string; subject: string; cuerpo: string; firma: FirmaCorreo }): Promise<{ status: EmailSendStatus; error?: string }> {
+  async sendDirecto(e: { to: string | string[]; subject: string; cuerpo: string; firma: FirmaCorreo }): Promise<{ status: EmailSendStatus; error?: string }> {
     const subject = limpiarAsunto(e.subject);
     const template = 'platform-direct';
-    if (!esDestinatarioUnico(e.to)) {
-      await this.rechazarDestinatario(e.to, subject, template);
+    const destinatarios = Array.isArray(e.to) ? e.to : extraerDestinatarios(e.to);
+    const paraRegistro = destinatarios.join(', ') || (Array.isArray(e.to) ? '' : e.to);
+    if (destinatarios.length === 0 || destinatarios.length > MAX_DESTINATARIOS_DIRECTO || destinatarios.some((d) => !esDestinatarioUnico(d))) {
+      await this.rechazarDestinatario(paraRegistro, subject, template);
       return { status: EmailSendStatus.FAILED, error: 'El destinatario no es un email válido' };
     }
     if (!this.isConfigured) {
-      this.logger.log(`[MAIL STUB] Correo directo → From: ${e.firma.email} | To: ${e.to} | Subject: ${subject}`);
-      await this.registrar(e.to, subject, template, EmailSendStatus.SIMULATED);
+      this.logger.log(`[MAIL STUB] Correo directo → From: ${e.firma.email} | To: ${paraRegistro} | Subject: ${subject}`);
+      await this.registrar(paraRegistro, subject, template, EmailSendStatus.SIMULATED);
       return { status: EmailSendStatus.SIMULATED };
     }
     try {
       const { error } = await this.enviarConReintento({
         from: remitenteParaFrom(e.firma.name, e.firma.email),
-        to: e.to,
+        to: destinatarios.length === 1 ? destinatarios[0] : destinatarios,
         subject,
         html: this.directoHtml(e.cuerpo, e.firma),
         replyTo: e.firma.email,
       });
       if (error) {
-        this.logger.error(`Resend rechazó el correo directo a ${e.to} desde ${e.firma.email}: ${error.message}`);
-        await this.registrar(e.to, subject, template, EmailSendStatus.FAILED, undefined, error.message);
+        this.logger.error(`Resend rechazó el correo directo a ${paraRegistro} desde ${e.firma.email}: ${error.message}`);
+        await this.registrar(paraRegistro, subject, template, EmailSendStatus.FAILED, undefined, error.message);
         // El rechazo más común, dicho en castellano y con qué hacer: Resend
         // solo deja enviar desde dominios verificados en su cuenta.
         const sinVerificar = /not verified/i.test(error.message);
@@ -1366,12 +1368,12 @@ export class MailService {
             : error.message,
         };
       }
-      await this.registrar(e.to, subject, template, EmailSendStatus.SENT);
+      await this.registrar(paraRegistro, subject, template, EmailSendStatus.SENT);
       this.usageMetering?.track({ providerSlug: 'resend', category: 'email_sent', quantity: 1, unit: 'emails' });
       return { status: EmailSendStatus.SENT };
     } catch (err) {
-      this.logger.error(`No se pudo enviar el correo directo a ${e.to}: ${err}`);
-      await this.registrar(e.to, subject, template, EmailSendStatus.FAILED, undefined, String(err));
+      this.logger.error(`No se pudo enviar el correo directo a ${paraRegistro}: ${err}`);
+      await this.registrar(paraRegistro, subject, template, EmailSendStatus.FAILED, undefined, String(err));
       return { status: EmailSendStatus.FAILED, error: 'No se pudo conectar con el proveedor de correo' };
     }
   }

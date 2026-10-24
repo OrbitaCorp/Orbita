@@ -6,7 +6,7 @@
 // cada tarjeta en components/apariencia/secciones/; los controles que
 // comparten (SecCard, ToggleRow, VisualPick…) están en components/apariencia/.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 // Para saber si la plantilla activa declara una sección de cupón — así esta
 // pantalla no tiene una lista hardcodeada de qué plantilla tiene qué.
 import { PLANTILLAS } from '@/modules/ventas/panel/avanzado/plantillas/datos'
@@ -16,6 +16,9 @@ import type { VistaConfig } from './components/ConfigTabs'
 import { AparienciaBloqueada } from './components/apariencia/AparienciaBloqueada'
 import { AparienciaSkeleton } from './components/apariencia/AparienciaSkeleton'
 import { BarraGuardado } from './components/apariencia/BarraGuardado'
+import { BarraMovil } from './components/apariencia/BarraMovil'
+import { CtxApariencia, useEsMovil } from './components/apariencia/contexto'
+import { EVENTO_TARJETA, FOCO_POR_TARJETA } from './components/apariencia/focoPreview'
 import { EncabezadoApariencia } from './components/apariencia/EncabezadoApariencia'
 import { StorePreview } from './components/apariencia/StorePreview'
 import { VistaPreviaCompleta } from './components/apariencia/VistaPreviaCompleta'
@@ -69,8 +72,32 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     const {
         ap, set, actualizar, dirty, publicado, cargando, errorCarga, categorias, productos,
         guardando, errorGuardado, homeTemplate, setHomeTemplateLocal, subdomain, guardar, descartar,
+        foco, pedirFoco,
     } = useApariencia(onToast, soloContenido)
     const [fullPreview, setFullPreview] = useState(false)
+
+    // En el celular las tarjetas son plegables, de a una, y la vista previa es
+    // una hoja a pantalla completa que se abre con "Ver mi tienda" (ver
+    // SecCard y VistaPreviaCompleta). Abrir una tarjeta le avisa a la vista
+    // previa qué parte de la tienda le toca, así la hoja abre ahí.
+    const movil = useEsMovil()
+    const [tarjetaAbierta, setTarjetaAbierta] = useState<string | null>(null)
+    const alternarTarjeta = (id: string) => {
+        const abrir = tarjetaAbierta !== id
+        setTarjetaAbierta(abrir ? id : null)
+        const objetivo = abrir ? FOCO_POR_TARJETA[id] : undefined
+        if (objetivo) pedirFoco(objetivo)
+    }
+    // El índice de la izquierda (escritorio) también lleva la previa a la parte
+    // de la tienda de la tarjeta que se elige.
+    useEffect(() => {
+        const alElegir = (e: Event) => {
+            const objetivo = FOCO_POR_TARJETA[(e as CustomEvent<string>).detail]
+            if (objetivo) pedirFoco(objetivo)
+        }
+        window.addEventListener(EVENTO_TARJETA, alElegir)
+        return () => window.removeEventListener(EVENTO_TARJETA, alElegir)
+    }, [pedirFoco])
 
     // Tope de slides del hero de la plantilla activa (ver heroMaxSlides en
     // tipos.ts) — undefined = sin tope. Sin sentido fuera de soloContenido,
@@ -270,9 +297,10 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                     </div>
                 </div>
             ) : (
+            <CtxApariencia.Provider value={{ movil, abierta: tarjetaAbierta, alternar: alternarTarjeta, pedirFoco }}>
             <div className="ap-split">
                 {/* Controles */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div className="ap-controles" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
                     {heroCard}
 
@@ -288,17 +316,34 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
 
                 </div>
 
-                <div className="ap-preview">
-                    <StorePreview ap={ap} publicado={dirty ? publicado : null} subdomain={subdomain} />
-                </div>
+                {/* Solo en pantallas anchas: en el celular no entra, y montarla
+                    cargaría la tienda entera en un iframe que nadie ve. */}
+                {!movil && (
+                    <div className="ap-preview">
+                        <StorePreview ap={ap} publicado={dirty ? publicado : null} subdomain={subdomain} foco={foco} />
+                    </div>
+                )}
             </div>
+            </CtxApariencia.Provider>
             )}
 
             {fullPreview && !soloContenido && (
-                <VistaPreviaCompleta ap={ap} publicado={dirty ? publicado : null} subdomain={subdomain} onCerrar={() => setFullPreview(false)} />
+                <VistaPreviaCompleta ap={ap} publicado={dirty ? publicado : null} subdomain={subdomain} onCerrar={() => setFullPreview(false)} movil={movil} foco={foco} />
             )}
 
-            {dirty && !fullPreview && (
+            {movil && !soloContenido && !fullPreview && (
+                <BarraMovil
+                    dirty={dirty}
+                    guardando={guardando}
+                    errorGuardado={errorGuardado}
+                    puedeDescartar={!!publicado}
+                    onVerTienda={() => setFullPreview(true)}
+                    onDescartar={descartar}
+                    onGuardar={guardar}
+                />
+            )}
+
+            {dirty && !fullPreview && !(movil && !soloContenido) && (
                 <BarraGuardado guardando={guardando} errorGuardado={errorGuardado} puedeDescartar={!!publicado} onDescartar={descartar} onGuardar={guardar} />
             )}
         </div>

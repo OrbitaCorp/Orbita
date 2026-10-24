@@ -33,7 +33,7 @@ const guard = new PlatformAdminGuard(new Reflector());
 // de un negocio.
 const SOLO_SUPERADMIN = [
   'suspend', 'reactivate', 'grantComp', 'cancelBusiness',
-  'createAdmin', 'updateAdmin', 'removeAdmin',
+  'createAdmin', 'updateAdmin', 'removeAdmin', 'reactivateAdmin',
   'createDiscountCode', 'updateDiscountCode', 'sendDiscountOffer',
 ];
 
@@ -55,10 +55,11 @@ describe('Super admin — qué puede cada rol', () => {
     }
   });
 
-  it('las lecturas y el soporte NO están restringidas', () => {
-    for (const metodo of CUALQUIER_ADMIN) {
+  it('las lecturas y el soporte NO están restringidas (salvo el Resumen, que se abre a propósito también a marketing)', () => {
+    for (const metodo of CUALQUIER_ADMIN.filter((m) => m !== 'overview')) {
       expect(Reflect.getMetadata(PLATFORM_ROLE_KEY, handlerDe(metodo))).toBeUndefined();
     }
+    expect(Reflect.getMetadata(PLATFORM_ROLE_KEY, handlerDe('overview'))).toEqual(['SUPERADMIN', 'OPERATOR', 'MARKETING']);
   });
 
   it('un OPERATOR no pasa por una acción sensible', () => {

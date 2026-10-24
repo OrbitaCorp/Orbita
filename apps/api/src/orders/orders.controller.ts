@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { OrderStatus } from '@prisma/client';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
@@ -47,6 +47,15 @@ export class OrdersController {
   create(@CurrentBusiness() ctx: AuthContext, @Body() dto: CreateOrderDto) {
     const member = assertMemberContext(ctx);
     return this.ordersService.create(member.businessId, dto, { memberId: member.memberId });
+  }
+
+  // "Eliminar" un pedido del listado: lo oculta (soft-delete, `deletedAt`), no lo borra de la base. Sale de la lista, del
+  // detalle y de los reportes; queda en el registro de auditoría. No devuelve el stock ni anula cobros: es solo de pantalla.
+  @Delete(':id')
+  @RequirePermission('orders.manage')
+  eliminar(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
+    const member = assertMemberContext(ctx);
+    return this.ordersService.eliminar(member.businessId, member.memberId, id);
   }
 
   @Patch(':id/status')

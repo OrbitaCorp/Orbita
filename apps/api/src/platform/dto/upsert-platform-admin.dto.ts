@@ -5,7 +5,7 @@ import { NormalizedEmail, normalizeEmail } from '../../common/decorators/normali
 export class UpsertPlatformAdminDto {
   @IsString() @MaxLength(80) name!: string;
   @NormalizedEmail() email!: string;
-  @IsIn(['SUPERADMIN', 'OPERATOR']) role!: 'SUPERADMIN' | 'OPERATOR';
+  @IsIn(['SUPERADMIN', 'OPERATOR', 'MARKETING']) role!: 'SUPERADMIN' | 'OPERATOR' | 'MARKETING';
   // Cargo con el que firma en Soporte ("CEO", "CTO"). Vacío = sin cargo.
   @IsOptional() @IsString() @MaxLength(40) jobTitle?: string;
   // Correo personal (Gmail, etc.): a donde viaja la contraseña temporal y, además del correo de la
