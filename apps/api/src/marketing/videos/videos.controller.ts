@@ -88,6 +88,6 @@ export class TutorialesController {
 
   @Patch(':id')
   actualizar(@Req() req: RequestWithAdmin, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ActualizarTutorialDto) {
-    return this.tutoriales.actualizar(req.user.adminId, { tutorial: id, estado: dto.estado, notas: dto.notas });
+    return this.tutoriales.actualizar(req.user.adminId, { tutorial: id, estado: dto.estado, asignadoA: dto.asignadoA, notas: dto.notas });
   }
 }

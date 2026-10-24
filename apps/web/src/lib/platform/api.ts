@@ -237,8 +237,9 @@ export type VideoDeCola = {
 }
 export type VideoComentario = { id: string; autor: string; texto: string; fecha: string; esTuyo: boolean }
 export type TutorialEstado = 'FALTA' | 'EN_PROCESO' | 'EN_REVISION' | 'HECHO'
+export type ResponsableTutorial = 'ALAN' | 'MATEO' | 'ALE'
 export type TutorialDeLaLista = {
-  id: string; grupo: string; titulo: string; estado: TutorialEstado; opcional: boolean; prioridadAlta: boolean
+  id: string; grupo: string; titulo: string; estado: TutorialEstado; asignadoA: ResponsableTutorial | null; opcional: boolean; prioridadAlta: boolean
   notas: string | null; videoId: string | null; updatedAt: string
 }
 export type TutorialesRespuesta = {
@@ -1223,7 +1224,7 @@ export const platformApi = {
   videoBorrarComentario: (id: string, comentarioId: string) => sendJSON<{ ok: true }>(`/platform/marketing/videos/${id}/comentarios/${comentarioId}`, 'DELETE'),
   // La lista de tutoriales: qué hay y qué falta. La actualiza el Claude de cada persona; acá se mira y se corrige.
   tutorialesLista: () => getJSONConMensaje<TutorialesRespuesta>('/platform/marketing/tutoriales'),
-  tutorialActualizar: (id: string, cambios: { estado?: Exclude<TutorialEstado, 'EN_REVISION'>; notas?: string }) => sendJSON<{ id: string; estado: TutorialEstado }>(`/platform/marketing/tutoriales/${id}`, 'PATCH', cambios),
+  tutorialActualizar: (id: string, cambios: { estado?: Exclude<TutorialEstado, 'EN_REVISION'>; asignadoA?: ResponsableTutorial | null; notas?: string }) => sendJSON<{ id: string; estado: TutorialEstado; asignadoA: ResponsableTutorial | null }>(`/platform/marketing/tutoriales/${id}`, 'PATCH', cambios),
   // ¿Tengo un Claude conectado? Decide si «Mejorar con Claude» abre Claude o pide conectarlo primero.
   mcpEstado: () => getJSONConMensaje<{ conectado: boolean }>('/platform/mcp/estado'),
   grantComp: (businessId: string, input: GrantCompInput) => sendJSON<SubscriptionRow>(`/platform/subscriptions/${businessId}/grant-comp`, 'POST', input),

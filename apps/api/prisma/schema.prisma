@@ -3731,6 +3731,7 @@ model MarketingTutorial {
   orden          Int
   titulo         String   @unique
   estado         String   @default("FALTA")
+  asignadoA      String?  @map("asignado_a")
   /// Los de «Para mostrarle a tu cliente»: sirven también como promo.
   opcional       Boolean  @default(false)
   prioridadAlta  Boolean  @default(false) @map("prioridad_alta")

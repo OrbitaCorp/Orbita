@@ -13,6 +13,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 
 export const ESTADOS_TUTORIAL = ['FALTA', 'EN_PROCESO', 'EN_REVISION', 'HECHO'] as const;
 export type EstadoTutorial = (typeof ESTADOS_TUTORIAL)[number];
+export const RESPONSABLES_TUTORIAL = ['ALAN', 'MATEO', 'ALE'] as const;
+export type ResponsableTutorial = (typeof RESPONSABLES_TUTORIAL)[number];
 /** Los que se pueden poner a mano: EN_REVISION lo decide el sistema según haya o no un video esperando. */
 const ESTADOS_A_MANO = ['FALTA', 'EN_PROCESO', 'HECHO'];
 
@@ -43,6 +45,7 @@ export class TutorialesService {
         opcional: f.opcional,
         prioridadAlta: f.prioridadAlta,
         notas: f.notas,
+        asignadoA: f.asignadoA as ResponsableTutorial | null,
         videoId: videos.find((v) => v.tutorialId === f.id)?.id ?? null,
         updatedAt: f.updatedAt,
       })),
@@ -50,7 +53,7 @@ export class TutorialesService {
   }
 
   /** Cambia el estado y/o las notas de un tutorial. Se acepta su id o su título exacto. */
-  async actualizar(adminId: string, input: { tutorial: unknown; estado?: unknown; notas?: unknown }) {
+  async actualizar(adminId: string, input: { tutorial: unknown; estado?: unknown; asignadoA?: unknown; notas?: unknown }) {
     const ref = String(input.tutorial ?? '').trim();
     if (!ref) throw new BadRequestException('Falta el tutorial (su id o su título)');
     const item = UUID.test(ref)
@@ -66,11 +69,18 @@ export class TutorialesService {
       data.estado = estado;
     }
     if (input.notas !== undefined) data.notas = limpio(input.notas, 1000).trim() || null;
-    if (input.estado === undefined && input.notas === undefined) throw new BadRequestException('No hay nada para cambiar: mandá estado o notas');
+    if (input.asignadoA !== undefined) {
+      const asignado = input.asignadoA ? String(input.asignadoA).trim().toUpperCase() : null;
+      if (asignado && !RESPONSABLES_TUTORIAL.includes(asignado as ResponsableTutorial)) {
+        throw new BadRequestException(`asignadoA tiene que ser uno de: ${RESPONSABLES_TUTORIAL.join(', ')} o vacío`);
+      }
+      data.asignadoA = asignado;
+    }
+    if (input.estado === undefined && input.notas === undefined && input.asignadoA === undefined) throw new BadRequestException('No hay nada para cambiar: mandá estado, asignadoA o notas');
 
     const r = await this.prisma.marketingTutorial.update({ where: { id: item.id }, data });
     await this.registrar(adminId, item.id, { titulo: item.titulo, antes: item.estado, estado: r.estado });
-    return { id: r.id, titulo: r.titulo, estado: r.estado as EstadoTutorial, notas: r.notas };
+    return { id: r.id, titulo: r.titulo, estado: r.estado as EstadoTutorial, asignadoA: r.asignadoA as ResponsableTutorial | null, notas: r.notas };
   }
 
   private async registrar(adminId: string, targetId: string, details: Record<string, unknown>) {

@@ -8,6 +8,7 @@ export class PublicarVideoInstagramDto {
 export class ActualizarTutorialDto {
   /** EN_REVISION no se pone a mano: lo decide el sistema según haya o no un video esperando. */
   @IsOptional() @IsIn(['FALTA', 'EN_PROCESO', 'HECHO']) estado?: string;
+  @IsOptional() @IsIn(['ALAN', 'MATEO', 'ALE']) asignadoA?: string;
   @IsOptional() @IsString() @MaxLength(1000) notas?: string;
 }
 
