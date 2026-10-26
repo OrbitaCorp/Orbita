@@ -4,10 +4,13 @@ import { Fragment, type ReactNode } from 'react'
 //
 // Deliberadamente chico y SIN innerHTML: parsea un subconjunto (títulos,
 // párrafos, listas, citas, tablas, bloques de código, separadores, negrita,
-// cursiva, código inline y links http/https) y devuelve elementos React. Lo
-// que no entiende lo muestra como texto plano, nunca como HTML. Alcanza para
-// documentar cómo está hecho un módulo y qué se verificó; si algún día hace
-// falta más, se cambia por una librería con sanitizado, no por innerHTML.
+// cursiva, código inline, links http/https e imágenes) y devuelve elementos
+// React. Lo que no entiende lo muestra como texto plano, nunca como HTML.
+// Alcanza para documentar cómo está hecho un módulo y qué se verificó; si
+// algún día hace falta más, se cambia por una librería con sanitizado, no por
+// innerHTML.
+
+type Imagen = { alt: string; src: string }
 
 type Bloque =
   | { tipo: 'h'; nivel: 1 | 2 | 3 | 4; texto: string }
@@ -18,6 +21,49 @@ type Bloque =
   | { tipo: 'code'; codigo: string; lang: string }
   | { tipo: 'table'; cabecera: string[]; filas: string[][] }
   | { tipo: 'hr' }
+  // Un párrafo hecho solo de imágenes: las capturas antes/después de una
+  // entrada de Módulos. Va como galería, no como texto.
+  | { tipo: 'imgs'; imagenes: Imagen[] }
+
+// Imágenes: solo https o una ruta de este mismo sitio bajo /auditoria/ (las
+// capturas viven en apps/web/public/auditoria/modulos/…). Nada de http, data:
+// ni javascript:, y nada de "..": un src es un GET con las cookies del panel,
+// así que no puede apuntar a cualquier ruta propia.
+const RE_SRC_HTTPS = /^https:\/\/[^\s"'<>()\\]+$/
+const RE_SRC_LOCAL = /^\/auditoria\/[A-Za-z0-9._~%/-]+$/
+
+export function srcSeguro(url: string): string | null {
+  if (RE_SRC_HTTPS.test(url)) return url
+  if (RE_SRC_LOCAL.test(url) && !url.split('/').includes('..')) return url
+  return null
+}
+
+// Proporción reservada antes de que cargue la imagen, para que la página no
+// salte: sale del ancho de la captura que dicen el alt o el archivo
+// ("Antes · 390", "agenda-despues-390.jpg"). Sin ancho, la de escritorio.
+export function anchoCaptura(alt: string, src: string): 390 | 768 | 1280 {
+  const pista = `${alt} ${src.split('/').pop() ?? ''}`
+  if (/(^|\D)390(\D|$)/.test(pista)) return 390
+  if (/(^|\D)768(\D|$)/.test(pista)) return 768
+  return 1280
+}
+const PROPORCION: Record<390 | 768 | 1280, string> = { 390: '390 / 844', 768: '768 / 1024', 1280: '16 / 10' }
+
+const RE_IMG = /!\[([^\]]*)\]\(([^)\s]+)\)/g
+const RE_SOLO_IMGS = /^(\s*!\[[^\]]*\]\([^)\s]+\)\s*)+$/
+
+function soloImagenes(texto: string): Imagen[] | null {
+  if (!RE_SOLO_IMGS.test(texto)) return null
+  const out: Imagen[] = []
+  for (const m of texto.matchAll(RE_IMG)) {
+    const src = srcSeguro(m[2])
+    // Una sola URL no permitida y el párrafo se muestra como texto: mejor ver
+    // el Markdown crudo que una galería con huecos.
+    if (!src) return null
+    out.push({ alt: m[1].trim(), src })
+  }
+  return out
+}
 
 const RE_H = /^(#{1,4})\s+(.*)$/
 const RE_UL = /^\s*[-*•]\s+(.*)$/
@@ -100,19 +146,42 @@ export function parsearMarkdown(src: string): Bloque[] {
       buf.push(s)
       i++
     }
-    out.push({ tipo: 'p', texto: buf.join(' ') })
+    const texto = buf.join(' ')
+    const imagenes = soloImagenes(texto)
+    out.push(imagenes ? { tipo: 'imgs', imagenes } : { tipo: 'p', texto })
   }
   return out
 }
 
-// Inline: **negrita**, *cursiva*, `código`, [texto](https://…). Todo lo demás
-// es texto. Los links solo http(s) y con rel seguro.
-const RE_INLINE = /(\*\*[^*]+?\*\*|`[^`]+?`|\[[^\]]+?\]\(https?:\/\/[^)\s]+\)|\*[^*\s][^*]*?\*)/g
+// Una imagen con su lugar reservado (aspect-ratio fijo). <img> y no
+// next/image: las capturas pueden estar en cualquier host https y next/image
+// exige declarar cada dominio. `inline` la usa dentro de un párrafo, así que
+// el envoltorio es un <span> (un <figure> no puede ir adentro de un <p>).
+function ImagenFija({ alt, src }: Imagen) {
+  const ancho = anchoCaptura(alt, src)
+  return (
+    <span className="md-img" data-ancho={ancho} style={{ aspectRatio: PROPORCION[ancho] }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt={alt} loading="lazy" decoding="async" />
+    </span>
+  )
+}
+
+// Inline: **negrita**, *cursiva*, `código`, [texto](https://…) y la imagen
+// ![alt](https://… o /auditoria/…). Todo lo demás es texto. Los links solo
+// http(s); las imágenes pasan por srcSeguro y van en un <img> con src
+// controlado, nunca por innerHTML.
+const RE_INLINE = /(!\[[^\]]*?\]\((?:https:\/\/|\/auditoria\/)[^)\s]+\)|\*\*[^*]+?\*\*|`[^`]+?`|\[[^\]]+?\]\(https?:\/\/[^)\s]+\)|\*[^*\s][^*]*?\*)/g
 
 export function inline(texto: string): ReactNode {
   const partes = texto.split(RE_INLINE)
   return partes.map((p, idx) => {
     if (!p) return null
+    if (p.startsWith('![')) {
+      const m = /^!\[([^\]]*)\]\(([^)\s]+)\)$/.exec(p)
+      const src = m ? srcSeguro(m[2]) : null
+      if (m && src) return <ImagenFija key={idx} alt={m[1]} src={src} />
+    }
     if (p.startsWith('**') && p.endsWith('**')) return <strong key={idx}>{p.slice(2, -2)}</strong>
     if (p.startsWith('`') && p.endsWith('`')) return <code key={idx} className="md-code">{p.slice(1, -1)}</code>
     if (p.startsWith('[')) {
@@ -140,6 +209,18 @@ export function MarkdownInforme({ texto, className }: { texto: string; className
           case 'quote': return <blockquote key={i}>{inline(b.texto)}</blockquote>
           case 'code': return <pre key={i} data-lang={b.lang || undefined}><code>{b.codigo}</code></pre>
           case 'hr': return <hr key={i} />
+          // Antes y después lado a lado desde 768 px, apilados abajo de eso
+          // (MD_CSS). El alt ("Antes · 1280") hace de epígrafe.
+          case 'imgs': return (
+            <div key={i} className="md-capturas" data-una={b.imagenes.length === 1 ? '' : undefined}>
+              {b.imagenes.map((img, j) => (
+                <figure key={j} className="md-captura">
+                  <ImagenFija alt={img.alt} src={img.src} />
+                  {img.alt && <figcaption>{img.alt}</figcaption>}
+                </figure>
+              ))}
+            </div>
+          )
           case 'table': return (
             <div key={i} className="md-table-wrap">
               <table>
@@ -179,6 +260,14 @@ export const MD_CSS = `
   .md-informe pre { margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; background: var(--md-code-bg, var(--color-surface-alt)); border: 1px solid var(--md-border, var(--color-border)); font-size: 12px; line-height: 1.5; overflow-x: auto; white-space: pre; break-inside: avoid; }
   .md-informe hr { border: none; border-top: 1px solid var(--md-border, var(--color-border)); margin: 16px 0; }
   .md-informe a { color: var(--md-accent, var(--color-primary)); text-decoration: underline; text-underline-offset: 2px; }
+  .md-informe .md-img { display: block; width: 100%; overflow: hidden; border-radius: 8px; border: 1px solid var(--md-border, var(--color-border)); background: var(--md-quote-bg, var(--color-surface-alt)); }
+  .md-informe .md-img > img { display: block; width: 100%; height: 100%; object-fit: contain; }
+  .md-informe .md-img[data-ancho="390"] { max-width: 320px; margin-inline: auto; }
+  .md-informe p > .md-img { margin: 4px 0 10px; }
+  .md-informe .md-capturas { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; margin: 4px 0 16px; }
+  .md-informe .md-captura { margin: 0; min-width: 0; break-inside: avoid; }
+  .md-informe .md-captura figcaption { margin-top: 6px; font-size: 12px; font-weight: 600; text-align: center; color: var(--md-muted, var(--color-muted)); }
+  @media (min-width: 768px) { .md-informe .md-capturas:not([data-una]) { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   .md-informe .md-table-wrap { overflow-x: auto; margin: 0 0 12px; border: 1px solid var(--md-border, var(--color-border)); border-radius: 10px; }
   .md-informe table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
   .md-informe th, .md-informe td { text-align: left; vertical-align: top; padding: 7px 10px; border-bottom: 1px solid var(--md-border, var(--color-border)); overflow-wrap: normal; }

@@ -50,7 +50,9 @@ describe('Platform audit (e2e)', () => {
     const res = await request(app.getHttpServer()).get('/api/v1/platform/audit').set(auth());
     expect(res.status).toBe(200);
     expect(res.body.items.length).toBeGreaterThanOrEqual(100);
-    expect(res.body.resumen.total).toBe(res.body.items.length);
+    // Los planes y las entradas de Módulos vienen en items pero no cuentan en el resumen del tablero.
+    const inventario = res.body.items.filter((i: { key: string }) => !i.key.startsWith('modulo.') && !i.key.startsWith('auditoria.'));
+    expect(res.body.resumen.total).toBe(inventario.length);
     expect(Array.isArray(res.body.admins)).toBe(true);
     const auth_ = res.body.items.find((i: { key: string }) => i.key === 'api.auth');
     expect(auth_).toBeDefined();

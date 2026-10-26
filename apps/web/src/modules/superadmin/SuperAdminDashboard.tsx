@@ -11,13 +11,14 @@ import {
 } from '@/lib/platform/api'
 import {
   LayoutDashboard, Store, Globe, Users, ShieldCheck, ScrollText, Mail, Ticket, Tag, Wand2, ClipboardCheck, LifeBuoy,
-  Search, Plus, DollarSign, Bot, Send,
+  Search, Plus, DollarSign, Bot, Send, Blocks,
 } from 'lucide-react'
 import { SuperAdminShell, type ItemNav } from './Shell'
 import { TabDescuentos } from './Descuentos'
 import { TabCampanias } from './Campanias'
 import { TabWizard } from './Wizard'
 import { TabAuditoria } from './Auditoria'
+import { TabModulos } from './Modulos'
 import { TabSoporte } from './Soporte'
 import { TabCostos } from './Costos'
 import { TabOrbi } from './Orbi'
@@ -94,6 +95,7 @@ export function SuperAdminDashboard() {
       {tab === 'campanias' && <TabCampanias />}
       {tab === 'costos' && <TabCostos />}
       {tab === 'orbi' && <TabOrbi />}
+      {tab === 'modulos' && <TabModulos currentAdminId={user.admin.id} />}
       {tab === 'auditoria' && <TabAuditoria currentAdminId={user.admin.id} />}
       {tab === 'admins' && <TabAdmins currentAdminId={user.admin.id} />}
       {tab === 'logs' && <TabLogs />}
@@ -103,7 +105,7 @@ export function SuperAdminDashboard() {
   )
 }
 
-export type Tab = 'resumen' | 'wizard' | 'negocios' | 'soporte' | 'dominios' | 'duenos' | 'descuentos' | 'campanias' | 'auditoria' | 'admins' | 'logs' | 'testeo' | 'costos' | 'orbi' | 'correo'
+export type Tab = 'resumen' | 'wizard' | 'negocios' | 'soporte' | 'dominios' | 'duenos' | 'descuentos' | 'campanias' | 'modulos' | 'auditoria' | 'admins' | 'logs' | 'testeo' | 'costos' | 'orbi' | 'correo'
 // Mismos 7 destinos de siempre, en el mismo orden, ahora agrupados en el
 // sidebar: primero la foto general, después lo que es de los clientes y al
 // final lo de puertas adentro de Órbita.
@@ -129,6 +131,9 @@ export const NAV: ItemNav<Tab>[] = [
   // Con una pastilla roja cuando Orbi está apagado (la pone el dashboard): un
   // apagón de la IA tiene que verse desde cualquier sección, no solo acá.
   { id: 'orbi', label: 'Orbi', Icono: Bot, grupo: 'Interno' },
+  // Antes de Auditoría: es el plan de trabajo de los módulos nuevos (Turnos,
+  // Gimnasio, Alquileres) y usa el tablero de auditoría solo como almacén.
+  { id: 'modulos', label: 'Módulos', Icono: Blocks, grupo: 'Interno' },
   { id: 'auditoria', label: 'Auditoría', Icono: ClipboardCheck, grupo: 'Interno' },
   { id: 'admins', label: 'Admins', Icono: ShieldCheck, grupo: 'Interno' },
   { id: 'logs', label: 'Actividad', Icono: ScrollText, grupo: 'Interno' },
