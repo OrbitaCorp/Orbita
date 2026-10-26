@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom'
 import { Printer, X } from 'lucide-react'
 import type { AuditArea, AuditItemRow, AuditListado } from '@/lib/platform/api'
 import { MarkdownInforme, MD_CSS } from './MarkdownInforme'
-import { esDeModulos } from './Modulos'
 
 // Documento imprimible de la auditoría: "Cómo está construida Órbita".
 //
@@ -39,11 +38,8 @@ export function DocumentoAuditoria({ data, onClose }: { data: AuditListado; onCl
     return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev }
   }, [onClose])
 
-  // El documento es el inventario: los planes de Módulos y sus entradas
-  // (modulo.*, auditoria.*) no entran ni en el cuerpo ni en "X de Y".
-  const inventario = useMemo(() => data.items.filter((i) => !esDeModulos(i.key)), [data.items])
-  const items = useMemo(() => (soloConInforme ? inventario.filter((i) => i.informe) : inventario), [inventario, soloConInforme])
-  const conInforme = inventario.filter((i) => i.informe).length
+  const items = useMemo(() => (soloConInforme ? data.items.filter((i) => i.informe) : data.items), [data.items, soloConInforme])
+  const conInforme = data.items.filter((i) => i.informe).length
 
   // área → grupo → ítems, respetando el orden del seed.
   const secciones = useMemo(() => {
@@ -86,7 +82,7 @@ export function DocumentoAuditoria({ data, onClose }: { data: AuditListado; onCl
           </div>
           <div className="au-doc-seg" role="tablist" aria-label="Qué incluir">
             <button role="tab" aria-selected={soloConInforme} className={soloConInforme ? 'on' : ''} onClick={() => setSoloConInforme(true)}>Solo con informe ({conInforme})</button>
-            <button role="tab" aria-selected={!soloConInforme} className={!soloConInforme ? 'on' : ''} onClick={() => setSoloConInforme(false)}>Todo el inventario ({inventario.length})</button>
+            <button role="tab" aria-selected={!soloConInforme} className={!soloConInforme ? 'on' : ''} onClick={() => setSoloConInforme(false)}>Todo el inventario ({data.items.length})</button>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="au-doc-btn primary" onClick={() => window.print()}>

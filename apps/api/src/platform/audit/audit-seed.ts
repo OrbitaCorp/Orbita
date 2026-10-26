@@ -15,33 +15,9 @@
 // "Expediente de seguridad — Storefront y wizard de pagos" (08-09/09) y la
 // auditoría técnica del 04/09 (Auditoria-Orbita-2026-09-04.html).
 
-import { MODULOS_SEED } from './modulos-seed';
-import { ENTRADAS_MODULOS } from './modulos-entradas';
-
 export type SeedArea = 'BACKEND' | 'FRONTEND' | 'TRANSVERSAL' | 'HALLAZGO';
 export type SeedSeveridad = 'CRITICA' | 'ALTA' | 'MEDIA' | 'BAJA' | 'INFO';
 export type SeedEstado = 'PENDIENTE' | 'EN_CURSO' | 'HECHO';
-// Nombre de pila de quien hace una tarea o es responsable de un plan. Se
-// resuelve a un PlatformAdmin al crear el ítem (asegurarSeed), no acá.
-export type SeedQuien = 'Ale' | 'Mateo' | 'Alan';
-
-// Una tarea diaria de un plan de Módulos (modulo.<slug>.plan). Es un check con
-// fecha, dueño y criterio de listo; ver modulos-seed.ts.
-export interface SeedTarea {
-  texto: string;
-  // ISO AAAA-MM-DD, siempre un día hábil del ciclo.
-  dia: string;
-  quien: SeedQuien;
-  // Qué tiene que pasar para marcarla hecha.
-  criterio: string;
-  // Semana del ciclo de 2 meses (1..8).
-  semana: number;
-  // Semana del ciclo de 1 mes (1..4), o null si queda fuera de ese ciclo.
-  semana1m: number | null;
-  // Key de la entrada (modulos-entradas.ts) que documenta una tarea ya hecha
-  // en la sesión. La tarea nace igual sin tildar: la tilda su responsable.
-  auditoria?: string;
-}
 
 export interface SeedItem {
   key: string;
@@ -59,17 +35,6 @@ export interface SeedItem {
   checksHechos?: boolean;
   informeUrl?: string;
   notas?: string;
-  // Informe en Markdown. Hoy solo lo traen las entradas de Módulos generadas
-  // en sesión (modulos-entradas.ts); el resto lo escribe el equipo.
-  informe?: string;
-  // Solo los planes de Módulos: si viene, cada tarea se vuelve un check con
-  // sus campos extra (día, quién, criterio, semana) y `checks` queda como
-  // espejo de los textos.
-  tareas?: SeedTarea[];
-  // Responsable del ítem por nombre de pila. asegurarSeed lo resuelve a un
-  // admin activo (elegirResponsable en platform-audit.service.ts); si no lo
-  // encuentra, queda sin responsable.
-  responsable?: SeedQuien;
 }
 
 // Verificaciones que aplican a CUALQUIER módulo de la API con endpoints. Se
@@ -938,10 +903,4 @@ export const AUDIT_SEED: SeedItem[] = [
   ...PANEL, ...CLIENTE, ...OTROS,
   ...TRANSVERSAL,
   ...HALLAZGOS,
-  // Planes diarios de los módulos nuevos (super admin → Módulos) y las
-  // entradas de auditoría que se generaron en sesión. Viven en la misma tabla
-  // pero no son parte del inventario: el tablero general y su resumen los
-  // dejan afuera (ver sinModulos en platform-audit.service.ts).
-  ...MODULOS_SEED,
-  ...ENTRADAS_MODULOS,
 ];

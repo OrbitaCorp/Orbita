@@ -12,7 +12,6 @@ import {
 import { MarkdownInforme, MD_CSS } from './MarkdownInforme'
 import { DocumentoAuditoria } from './DocumentoAuditoria'
 import { DecisionesAuditoria } from './DecisionesAuditoria'
-import { esDeModulos } from './Modulos'
 
 // Auditoría interna del equipo (super admin → Auditoría).
 //
@@ -113,7 +112,7 @@ export function TabAuditoria({ currentAdminId }: { currentAdminId: string }) {
   const actualizar = useCallback(async (id: string, input: UpdateAuditItemInput) => {
     try {
       const fila = await platformApi.updateAuditItem(id, input)
-      setData((d) => d ? { ...d, items: d.items.map((i) => (i.id === id ? fila : i)), resumen: resumirLocal(d.items.map((i) => (i.id === id ? fila : i)).filter((i) => !esDeModulos(i.key))) } : d)
+      setData((d) => d ? { ...d, items: d.items.map((i) => (i.id === id ? fila : i)), resumen: resumirLocal(d.items.map((i) => (i.id === id ? fila : i))) } : d)
       setErrorGuardar('')
     } catch (e) {
       setErrorGuardar(e instanceof Error ? e.message : 'No se pudo guardar.')
@@ -128,14 +127,10 @@ export function TabAuditoria({ currentAdminId }: { currentAdminId: string }) {
     return n
   })
 
-  // Los planes de Módulos y sus entradas (modulo.*, auditoria.*) viven en la
-  // misma tabla pero se ven en la pestaña Módulos, no acá: fuera ANTES de
-  // filtrar, agrupar y contar, así los números del tablero no cambian.
-  const inventario = useMemo(() => (data ? data.items.filter((i) => !esDeModulos(i.key)) : []), [data])
-
   const visibles = useMemo(() => {
+    if (!data) return []
     const q = busqueda.trim().toLowerCase()
-    return inventario.filter((i) => {
+    return data.items.filter((i) => {
       if (area !== 'TODO' && i.area !== area) return false
       if (soloPendientes && i.estado === 'HECHO') return false
       if (soloSinResponsable && (i.responsable || i.estado === 'HECHO')) return false
@@ -144,7 +139,7 @@ export function TabAuditoria({ currentAdminId }: { currentAdminId: string }) {
       const texto = [i.titulo, i.ruta, i.foco, i.grupo, i.notas, i.informe, i.responsable?.name, ...i.checks.map((c) => c.texto)].filter(Boolean).join(' ').toLowerCase()
       return texto.includes(q)
     })
-  }, [inventario, busqueda, area, soloPendientes, soloSinResponsable, soloMios, currentAdminId])
+  }, [data, busqueda, area, soloPendientes, soloSinResponsable, soloMios, currentAdminId])
 
   // Agrupa preservando el orden del seed.
   const grupos = useMemo(() => {
@@ -326,7 +321,7 @@ export function TabAuditoria({ currentAdminId }: { currentAdminId: string }) {
         )
       })}
 
-      {documento && <DocumentoAuditoria data={{ ...data, items: inventario }} onClose={() => setDocumento(false)} />}
+      {documento && <DocumentoAuditoria data={data} onClose={() => setDocumento(false)} />}
       {decisiones && (
         <DecisionesAuditoria
           data={data}
@@ -337,7 +332,7 @@ export function TabAuditoria({ currentAdminId }: { currentAdminId: string }) {
 
       {creando && (
         <CrearItemModal
-          grupos={Array.from(new Set(inventario.map((i) => i.grupo)))}
+          grupos={Array.from(new Set(data.items.map((i) => i.grupo)))}
           onClose={() => setCreando(false)}
           onCreado={() => { setCreando(false); void cargar(true) }}
         />

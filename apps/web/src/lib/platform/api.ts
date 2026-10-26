@@ -642,21 +642,7 @@ export type AuditArea = 'BACKEND' | 'FRONTEND' | 'TRANSVERSAL' | 'HALLAZGO'
 export type AuditEstado = 'PENDIENTE' | 'EN_CURSO' | 'HECHO'
 export type AuditSeveridad = 'CRITICA' | 'ALTA' | 'MEDIA' | 'BAJA' | 'INFO'
 
-export interface AuditCheck {
-  id: string
-  texto: string
-  hecho: boolean
-  // Solo en los planes de Módulos (modulo.<slug>.plan): cada check es una
-  // tarea diaria. Ver Modulos.tsx y modulos-seed.ts en el backend.
-  dia?: string
-  quien?: string
-  criterio?: string
-  semana?: number
-  semana1m?: number | null
-  // Key de la entrada de auditoría (auditoria.<slug>.*) que documenta la
-  // tarea. Con `hecho` en false: documentada, falta que el responsable la tilde.
-  auditoria?: string
-}
+export interface AuditCheck { id: string; texto: string; hecho: boolean }
 export interface AuditAdminRef { id: string; name: string }
 
 export interface AuditItemRow {
@@ -714,10 +700,7 @@ export interface UpdateAuditItemInput {
   informeUrl?: string | null
   notas?: string | null
   informe?: string | null
-  // En un plan de Módulos, marcar una tarea hecha exige una entrada de
-  // auditoría que exista (la del toggle o la que ya tenía); con hecho: false
-  // y `auditoria`, solo la vincula. El backend lo valida.
-  checks?: { id: string; hecho: boolean; auditoria?: string }[]
+  checks?: { id: string; hecho: boolean }[]
   nuevosChecks?: string[]
   // null vuelve el ítem a "sin decidir" y borra la nota.
   decision?: AuditDecision | null
@@ -725,9 +708,6 @@ export interface UpdateAuditItemInput {
 }
 
 export interface CreateAuditItemInput {
-  // Solo auditoria.<slug>.<nombre> o modulo.<slug>.<nombre> (las entradas de
-  // Módulos); sin key el backend asigna custom.<uuid>.
-  key?: string
   area: AuditArea
   grupo: string
   titulo: string
@@ -735,12 +715,6 @@ export interface CreateAuditItemInput {
   foco: string
   severidad?: AuditSeveridad | null
   checks: string[]
-  // Las entradas de Módulos: informe en Markdown, quién la hizo (admin
-  // activo) y sus datos en `notas` (JSON con quién, tipo y tarea).
-  informe?: string
-  estado?: AuditEstado
-  responsableId?: string | null
-  notas?: string | null
 }
 
 // ─── Soporte (super admin → Soporte) ────────────────────────────────────────

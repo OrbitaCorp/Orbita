@@ -21,21 +21,7 @@ export class CheckToggleDto {
 
   @IsBoolean()
   hecho!: boolean;
-
-  // Solo en los planes de Módulos: key de la entrada de auditoría
-  // (auditoria.<slug>.*) que documenta la tarea. El servicio exige una
-  // entrada que exista para marcarla hecha; con hecho: false solo la vincula.
-  @IsOptional()
-  @IsString()
-  @Length(3, 160)
-  auditoria?: string;
 }
-
-// Keys que se pueden elegir a mano al crear: las entradas de Módulos
-// (auditoria.<slug>.<fecha>-<titulo>) y, por si hace falta cargar un plan sin
-// seed, los planes (modulo.<slug>.plan). Cualquier otro ítem sigue naciendo
-// como custom.<uuid>.
-export const KEY_PERMITIDA = /^(auditoria|modulo)\.[a-z0-9][a-z0-9.-]{2,140}$/;
 
 export class UpdateAuditItemDto {
   @IsOptional()
@@ -96,11 +82,6 @@ export class UpdateAuditItemDto {
 }
 
 export class CreateAuditItemDto {
-  @IsOptional()
-  @IsString()
-  @Matches(KEY_PERMITIDA, { message: 'La key solo puede ser auditoria.<slug>.<nombre> o modulo.<slug>.<nombre>, en minúsculas' })
-  key?: string;
-
   @IsIn(AUDIT_AREAS)
   area!: (typeof AUDIT_AREAS)[number];
 
@@ -130,27 +111,4 @@ export class CreateAuditItemDto {
   @IsString({ each: true })
   @Length(3, 300, { each: true })
   checks!: string[];
-
-  // Las entradas de Módulos nacen con su informe (qué se hizo, archivos,
-  // capturas), el responsable de la tarea y sus datos en `notas` (JSON con
-  // quién, tipo y tarea). Nacen PENDIENTE y pasan a HECHO cuando el
-  // responsable las confirma; el estado se puede mandar igual por si alguien
-  // carga algo ya revisado.
-  @IsOptional()
-  @IsString()
-  @Length(0, 80_000)
-  informe?: string;
-
-  @IsOptional()
-  @IsIn(AUDIT_ESTADOS)
-  estado?: (typeof AUDIT_ESTADOS)[number];
-
-  @IsOptional()
-  @IsString()
-  responsableId?: string | null;
-
-  @IsOptional()
-  @IsString()
-  @Length(0, 4000)
-  notas?: string | null;
 }

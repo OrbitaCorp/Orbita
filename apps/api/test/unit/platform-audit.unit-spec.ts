@@ -10,10 +10,6 @@ describe('Auditoría interna — seed', () => {
     const keys = AUDIT_SEED.map((i) => i.key);
     expect(new Set(keys).size).toBe(keys.length);
     for (const i of AUDIT_SEED) {
-      // Los planes de Módulos (modulo.<slug>.plan) y sus entradas
-      // (auditoria.<slug>.*) no son inventario: tienen su propio test
-      // (modulos-plan.unit-spec.ts).
-      if (i.key.startsWith('modulo.') || i.key.startsWith('auditoria.')) continue;
       const prefijo = { BACKEND: 'api.', FRONTEND: 'web.', TRANSVERSAL: 'trans.', HALLAZGO: 'hallazgo.' }[i.area];
       expect(i.key.startsWith(prefijo)).toBe(true);
     }

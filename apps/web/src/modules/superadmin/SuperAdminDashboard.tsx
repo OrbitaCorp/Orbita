@@ -98,7 +98,7 @@ export function SuperAdminDashboard() {
       {tab === 'campanias' && <TabCampanias />}
       {tab === 'costos' && <TabCostos />}
       {tab === 'orbi' && <TabOrbi />}
-      {tab === 'modulos' && <TabModulos currentAdminId={user.admin.id} />}
+      {tab === 'modulos' && <TabModulos />}
       {tab === 'auditoria' && <TabAuditoria currentAdminId={user.admin.id} />}
       {tab === 'admins' && <TabAdmins currentAdminId={user.admin.id} />}
       {tab === 'logs' && <TabLogs />}
@@ -135,7 +135,8 @@ export const NAV: ItemNav<Tab>[] = [
   // apagón de la IA tiene que verse desde cualquier sección, no solo acá.
   { id: 'orbi', label: 'Orbi', Icono: Bot, grupo: 'Interno' },
   // Antes de Auditoría: es el plan de trabajo de los módulos nuevos (Turnos,
-  // Gimnasio, Alquileres) y usa el tablero de auditoría solo como almacén.
+  // Gimnasio, Alquileres). Solo visual: sus datos viven en la web
+  // (modules/superadmin/modulos/) y lo que se marca, en el navegador.
   { id: 'modulos', label: 'Módulos', Icono: Blocks, grupo: 'Interno' },
   { id: 'auditoria', label: 'Auditoría', Icono: ClipboardCheck, grupo: 'Interno' },
   { id: 'admins', label: 'Admins', Icono: ShieldCheck, grupo: 'Interno' },

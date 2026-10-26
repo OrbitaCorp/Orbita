@@ -50,9 +50,9 @@ Un cambio acá le llega a todos los que lo usan: corré `pnpm exec vitest run sr
   (Tienda, Turnos, Alquileres y Gimnasio), en un solo sentido: el alta los importa a ellos, ninguno
   importa el alta. El código de Alquileres y Gimnasio se carga recién cuando alguien elige uno de
   esos módulos, así el alta real de producción no lo baja.
-- **Backend:** los módulos no tienen. Lo único en `apps/api` es la sección **Módulos** del
-  superadmin, que guarda el plan de trabajo y la auditoría de los tres en el tablero de auditoría
-  que ya existía (sin migración). Ahí están juntos porque es la gestión del equipo, quién hace qué y
-  para cuándo, no una parte de los módulos: ningún módulo lo lee ni lo necesita para andar.
+- **Backend:** los módulos no tienen, y la sección **Módulos** del superadmin tampoco: es solo
+  visual. El plan de trabajo y la auditoría de los tres viven en `src/modules/superadmin/modulos/`
+  y lo que se marca queda en el navegador. Ahí están juntos porque es la gestión del equipo, quién
+  hace qué y para cuándo, no una parte de los módulos: ningún módulo lo lee ni lo necesita para andar.
 - **eslint** (`apps/web/eslint.config.mjs`) marca como error un import de un módulo a otro, para que
   nadie los mezcle sin darse cuenta.

@@ -1,51 +1,46 @@
 import {
-  useCallback, useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, type KeyboardEvent as TeclaEvent,
+  useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, type KeyboardEvent as TeclaEvent,
 } from 'react'
 import { useRouter } from 'next/router'
 import {
-  AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, CircleDashed, Clock, FilePlus2, Plus, RefreshCw, X,
+  AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, CircleDashed, Clock, FilePlus2, Laptop, Plus, Undo2, X,
 } from 'lucide-react'
-import {
-  platformApi,
-  type AuditAdminRef, type AuditCheck, type AuditItemRow, type AuditListado, type CreateAuditItemInput,
-} from '@/lib/platform/api'
-import { Chip, Empty, ErrorBox, Loader, PageHeader, btnGhost, btnPrimary, inputStyle, dateTime } from './ui'
+import { Chip, Empty, ErrorBox, PageHeader, btnGhost, btnPrimary, inputStyle } from './ui'
 import { MarkdownInforme, MD_CSS, srcSeguro } from './MarkdownInforme'
+import { CICLO, PERSONAS, PLANES, type ConPlan, type Persona, type PlanModulo, type Tarea } from './modulos/plan'
+import { AVISO_SESION, ENTRADAS, type Entrada, type TipoEntrada } from './modulos/entradas'
+import { DECISIONES } from './modulos/decisiones'
+import { accionesModulos, idTarea, useEstadoModulos, type EstadoModulos, type Horizonte } from './modulos/estado'
 
 // Módulos (super admin → Interno → Módulos): el plan de trabajo de los módulos
-// nuevos (Turnos, Gimnasio y Alquileres) y su auditoría.
+// nuevos (Turnos, Gimnasio y Alquileres), su auditoría y sus decisiones.
 //
-// No tiene backend propio: el tablero de auditoría (PlatformAuditItem) es el
-// almacén. Cada módulo con plan es UN ítem `modulo.<slug>.plan` cuyos checks
-// son las tareas diarias (día, quién, criterio de listo, semana en cada
-// horizonte), y cada cosa hecha es una entrada `auditoria.<slug>.<fecha>-<slug>`
-// con su informe en Markdown. Los siembra la API (platform/audit/modulos-seed.ts
-// y modulos-entradas.ts) y la pestaña Auditoría los deja afuera de sus números
-// con esDeModulos.
+// Solo visual, sin API (pedido de Ale, 26/10/2026): los datos son archivos de
+// la web, en ./modulos/ (plan.ts, entradas.ts y decisiones.ts), y lo que cada
+// uno tilda, confirma o carga, y el horizonte elegido, queda en su navegador
+// (estado.ts). La pantalla lo avisa: "Se guarda en este navegador".
 //
-// Reglas que viven acá y en la API a la vez:
-//   - Una tarea se tilda solo si su entrada está cargada (la API lo exige).
+// Reglas:
+//   - Una tarea se tilda solo con su entrada de auditoría.
 //   - Una entrada generada en sesión queda "Pendiente de confirmación" hasta
-//     que la confirma su responsable, y confirmarla tilda la tarea que
-//     documenta: es el mismo "lo hice yo", no hay que decirlo dos veces.
-//   - El horizonte (2 meses o 1 mes) se guarda en `notas` del plan. En 1 mes
-//     las tareas se reubican por `semana1m` y las que quedan afuera van a
-//     "Queda para el próximo ciclo"; lo hecho no se pierde al cambiar.
+//     que la confirma su responsable, y confirmarla tilda las tareas que
+//     documenta: es el mismo "lo hice yo", no hay que decirlo dos veces. Una
+//     entrada con `confirmada` en el código está confirmada para todos.
+//   - Una decisión abierta (decisiones.ts) no se confirma: la decide quien
+//     figura, y entonces pasa a entradas.ts como decisión tomada.
+//   - En 1 mes las tareas se reubican por `semana1m` y las que quedan afuera
+//     van a "Queda para el próximo ciclo"; lo hecho no se pierde al cambiar.
 //   - El estado de cada semana (pendiente, en curso, hecha, atrasada) sale de
 //     sus tareas; no se guarda en ningún lado.
 //
 // Vive en la URL como el resto del superadmin:
 // ?seccion=modulos&modulo=gimnasio&vista=auditoria.
 
-type Slug = 'tienda' | 'turnos' | 'gimnasio' | 'alquileres'
-type ConPlan = Exclude<Slug, 'tienda'>
-type Persona = 'Ale' | 'Mateo' | 'Alan'
+type Slug = 'tienda' | ConPlan
 type Vista = 'plan' | 'auditoria' | 'resumen'
-type Horizonte = '2m' | '1m'
-type TipoEntrada = 'tarea' | 'diseño' | 'decisión'
-type EstadoTarea = 'hecha' | 'por-confirmar' | 'sin-cargar' | 'pendiente'
+type EstadoTarea = 'hecha' | 'por-confirmar' | 'pendiente'
 
-interface DefModulo { slug: Slug; nombre: string; persona: Persona | null }
+export interface DefModulo { slug: Slug; nombre: string; persona: Persona | null }
 
 // El orden de las tarjetas. Tienda no tiene plan: ya está en producción.
 const MODULOS: DefModulo[] = [
@@ -54,7 +49,6 @@ const MODULOS: DefModulo[] = [
   { slug: 'gimnasio', nombre: 'Gimnasio', persona: 'Ale' },
   { slug: 'alquileres', nombre: 'Alquileres', persona: 'Alan' },
 ]
-const PERSONAS: Persona[] = ['Ale', 'Mateo', 'Alan']
 const esConPlan = (v: unknown): v is ConPlan => v === 'turnos' || v === 'gimnasio' || v === 'alquileres'
 
 const VISTAS: { id: Vista; label: string }[] = [
@@ -63,34 +57,13 @@ const VISTAS: { id: Vista; label: string }[] = [
   { id: 'resumen', label: 'Resumen' },
 ]
 
-// El tipo de una entrada va al final de su grupo ("Módulo · Turnos · diseño").
-// Una decisión de módulo NO crea un ítem decision.*: esos son lo que la
-// Auditoría general tiene pendiente de decidir (cuentan en su botón
-// Decisiones) y la key decision. no se puede elegir desde el alta. Lo de acá
-// ya está decidido: va como entrada auditoria.* con la sección "Decisión y
-// porqué".
+// El tipo de cada entrada. Las decisiones son las tomadas (entradas.ts) y las
+// abiertas (decisiones.ts): las dos van en el mismo filtro.
 const TIPOS: { id: TipoEntrada; label: string; filtro: string }[] = [
   { id: 'tarea', label: 'Tarea', filtro: 'Tarea hecha' },
   { id: 'diseño', label: 'Diseño', filtro: 'Cambio de diseño' },
   { id: 'decisión', label: 'Decisión', filtro: 'Decisión' },
 ]
-
-// Mismo ciclo que modulos-seed.ts: vale si el plan llega sin notas o con notas
-// editadas a mano.
-const CICLO = { inicio: '2026-10-26', fin2m: '2026-12-18', fin1m: '2026-11-20' }
-// Los dos checks de toda entrada, igual que CHECKS_ENTRADA en
-// modulos-entradas.ts: el primero lo tilda "Confirmar".
-const CHECKS_ENTRADA = ['Confirmada por el responsable', 'Revisada por Ale']
-
-const REFRESCO_MS = 20_000
-
-// Los planes de Módulos y sus entradas viven en la misma tabla que el
-// inventario de la auditoría, pero no son parte de él: Auditoria.tsx y
-// DocumentoAuditoria.tsx los sacan antes de contar. Mismo criterio que
-// esDeModulos en platform-audit.service.ts.
-export function esDeModulos(key: string): boolean {
-  return key.startsWith('modulo.') || key.startsWith('auditoria.')
-}
 
 // ─── Fechas (ISO AAAA-MM-DD, siempre en UTC para no correrse un día) ─────────
 
@@ -114,7 +87,6 @@ function indiceDia(iso: string): number {
   return (Math.floor(aUtc(iso) / DIA_MS) + 3) % 7
 }
 const lunesDe = (inicio: string, semana: number) => sumarDias(inicio, (semana - 1) * 7)
-const semanaDe = (inicio: string, dia: string) => Math.floor(diasEntre(inicio, dia) / 7) + 1
 const corta = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`
 const larga = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`
 const conDia = (iso: string) => `${DIAS_LARGOS[indiceDia(iso)]} ${larga(iso)}`
@@ -133,77 +105,50 @@ function suscribirHoy(avisar: () => void) {
 }
 const hoyServidor = () => null
 
-// ─── Lectura de los ítems ─────────────────────────────────────────────────────
-
-// `semanas1m` (opcional): los títulos del ciclo de 1 mes. Ahí las semanas 3 y
-// 4 absorben otras y la estadía de Alquileres queda afuera, así que el título
-// de 2 meses ("Checkpoint y estadía, parte 1") contaba algo que no pasa.
-interface NotasPlan { horizonte: Horizonte; inicio: string; fin2m: string; fin1m: string; semanas: string[]; semanas1m: string[] }
-
-function crudoDe(notas: string | null): Record<string, unknown> {
-  if (!notas) return {}
-  try {
-    const v: unknown = JSON.parse(notas)
-    return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {}
-  } catch {
-    return {}
-  }
-}
-
-function leerNotasPlan(notas: string | null): NotasPlan {
-  const c = crudoDe(notas)
-  const iso = (v: unknown, def: string) => (typeof v === 'string' && RE_ISO.test(v) ? v : def)
-  const titulos = (v: unknown) => (Array.isArray(v) ? v.map((s) => (typeof s === 'string' ? s : '')) : [])
-  return {
-    horizonte: c.horizonte === '1m' ? '1m' : '2m',
-    inicio: iso(c.inicio, CICLO.inicio),
-    fin2m: iso(c.fin2m, CICLO.fin2m),
-    fin1m: iso(c.fin1m, CICLO.fin1m),
-    semanas: titulos(c.semanas),
-    semanas1m: titulos(c.semanas1m),
-  }
-}
-
-// El aviso con que nace toda entrada generada en sesión (AVISO_SESION en
-// modulos-entradas.ts; el test los compara). Es texto fijo del informe: una
-// vez confirmada la entrada, "pendiente de confirmación" ya no es cierto.
-export const AVISO_SESION = '> **Generada en sesión, pendiente de confirmación del responsable.**'
+// El aviso con que nace toda entrada generada en sesión (AVISO_SESION, en
+// entradas.ts). Es texto fijo del informe: una vez confirmada la entrada,
+// "pendiente de confirmación" ya no es cierto.
 const AVISO_CONFIRMADA = '> **Generada en sesión y confirmada por el responsable.**'
 export function informeVisible(informe: string, confirmada: boolean): string {
   return confirmada ? informe.replace(AVISO_SESION, AVISO_CONFIRMADA) : informe
 }
 
-const tipoDe = (e: AuditItemRow): TipoEntrada => {
-  const t = e.grupo.split(' · ')[2]
-  return t === 'diseño' || t === 'decisión' ? t : 'tarea'
-}
-const fechaDe = (e: AuditItemRow): string | null => /^auditoria\.[a-z0-9-]+\.(\d{4}-\d{2}-\d{2})-/.exec(e.key)?.[1] ?? null
-const quienDe = (e: AuditItemRow): string | null => {
-  const q = crudoDe(e.notas).quien
-  return typeof q === 'string' && q.trim() ? q : (e.responsable?.name ?? e.hechoPor?.name ?? null)
-}
-
-const sinAcentos = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
-// Mismo criterio que elegirResponsable en la API: una palabra del nombre que
-// empiece con el nombre de pila ("Alan Vega" es Alan; "Valeria" no es Ale).
-const esLaPersona = (nombre: string, persona: string) =>
-  sinAcentos(nombre).split(/[^a-z0-9]+/).some((p) => p.startsWith(sinAcentos(persona)))
-
-// "Alan Vega" si la cuenta es suya; "Ale · CPO" si usa la de su cargo.
-function nombreResponsable(persona: Persona | null, admin: AuditAdminRef | null): string {
-  if (!persona) return 'Sin responsable'
-  if (!admin) return persona
-  return esLaPersona(admin.name, persona) ? admin.name : `${persona} · ${admin.name}`
-}
+const sinAcentos = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
 // ─── Modelo derivado de un módulo ─────────────────────────────────────────────
 
+// Todas las entradas: las del código (entradas.ts y decisiones.ts) y las
+// cargadas en este navegador. Si una cargada acá repite la key de una del
+// código, vale la del código.
+export function todasLasEntradas(estado: EstadoModulos): Entrada[] {
+  const delCodigo = [...ENTRADAS, ...DECISIONES]
+  const keys = new Set(delCodigo.map((e) => e.key))
+  return [...delCodigo, ...estado.nuevas.filter((e) => !keys.has(e.key))]
+}
+
+// Confirmada para todos (en el código) o en este navegador; null = pendiente.
+export interface Confirmacion { dia: string; local: boolean }
+export function confirmacionDe(e: Entrada, estado: EstadoModulos): Confirmacion | null {
+  if (e.abierta) return null
+  if (e.confirmada) return { dia: e.confirmada, local: false }
+  const dia = estado.confirmadas[e.key]
+  return dia ? { dia, local: true } : null
+}
+
+export interface DatosModulos { planes: PlanModulo[]; entradas: Entrada[]; estado: EstadoModulos }
+
 interface TareaVista {
-  check: AuditCheck
-  // Fecha y semana en el horizonte elegido; null = fuera del ciclo o sin fecha.
+  // La tarea con su `auditoria` resuelta: la del plan o la vinculada en este navegador.
+  tarea: Tarea
+  hecha: boolean
+  // Hecha para todos: su entrada está confirmada en el código.
+  fija: boolean
+  // Fecha y semana en el horizonte elegido; null = fuera del ciclo de 1 mes.
   dia: string | null
   semana: number | null
-  entrada: AuditItemRow | null
+  entrada: Entrada | null
+  // Su entrada ya está confirmada (en el código o en este navegador).
+  confirmada: boolean
   estado: EstadoTarea
   atraso: number
 }
@@ -212,73 +157,73 @@ interface Semana { n: number; titulo: string; desde: string; hasta: string; tare
 
 interface Modulo {
   def: DefModulo
-  plan: AuditItemRow | null
-  notas: NotasPlan
+  plan: PlanModulo | null
+  horizonte: Horizonte
   fin: string
   semanas: Semana[]
+  // Las tareas que entran en el horizonte elegido, y todas (con las de afuera).
   tareas: TareaVista[]
+  todas: TareaVista[]
   fuera: TareaVista[]
-  sinFecha: TareaVista[]
-  entradas: AuditItemRow[]
+  entradas: Entrada[]
+  abiertas: Entrada[]
   hechas: number
   porConfirmar: number
   atrasadas: TareaVista[]
   diasAtraso: number
 }
 
-function vistaDeTarea(c: AuditCheck, notas: NotasPlan, porKey: Map<string, AuditItemRow>, hoy: string | null): TareaVista {
-  const entrada = c.auditoria ? (porKey.get(c.auditoria) ?? null) : null
-  const estado: EstadoTarea = c.hecho ? 'hecha' : c.auditoria ? (entrada ? 'por-confirmar' : 'sin-cargar') : 'pendiente'
-  let dia: string | null = null
-  let semana: number | null = null
-  if (c.dia) {
-    const s2 = c.semana ?? semanaDe(notas.inicio, c.dia)
-    if (notas.horizonte === '2m') {
-      dia = c.dia
-      semana = s2
-    } else {
-      // En 1 mes la tarea va a su semana1m, el mismo día de la semana. Sin el
-      // dato, la misma regla que el seed: 1 a 4 iguales, el resto a la 4.
-      const s1 = c.semana1m === undefined ? Math.min(s2, 4) : c.semana1m
-      if (s1 !== null) {
-        semana = s1
-        dia = sumarDias(lunesDe(notas.inicio, s1), indiceDia(c.dia))
-      }
-    }
+function vistaDeTarea(base: Tarea, modulo: ConPlan, horizonte: Horizonte, porKey: Map<string, Entrada>, estado: EstadoModulos, hoy: string | null): TareaVista {
+  const auditoria = base.auditoria ?? estado.vinculos[idTarea(modulo, base.id)]
+  const tarea = auditoria ? { ...base, auditoria } : base
+  // Una decisión abierta no documenta tareas: si alguna apuntara a una, no cuenta.
+  const encontrada = auditoria ? (porKey.get(auditoria) ?? null) : null
+  const entrada = encontrada && !encontrada.abierta ? encontrada : null
+  const fija = !!entrada?.confirmada
+  const hecha = fija || estado.tildadas[idTarea(modulo, base.id)] === true
+  const confirmada = !!entrada && (!!entrada.confirmada || !!estado.confirmadas[entrada.key])
+  const est: EstadoTarea = hecha ? 'hecha' : entrada ? 'por-confirmar' : 'pendiente'
+  let dia: string | null = base.dia
+  let semana: number | null = base.semana
+  if (horizonte === '1m') {
+    // En 1 mes la tarea va a su semana1m, el mismo día de la semana.
+    semana = base.semana1m
+    dia = semana === null ? null : sumarDias(lunesDe(CICLO.inicio, semana), indiceDia(base.dia))
   }
   // Atrasada = sin hacer ni documentar y con la fecha ya pasada. Lo
   // documentado en sesión ya está hecho: le falta la firma, no el trabajo.
-  const atraso = estado === 'pendiente' && dia && hoy && dia < hoy ? diasEntre(dia, hoy) : 0
-  return { check: c, dia, semana, entrada, estado, atraso }
+  const atraso = est === 'pendiente' && dia && hoy && dia < hoy ? diasEntre(dia, hoy) : 0
+  return { tarea, hecha, fija, dia, semana, entrada, confirmada, estado: est, atraso }
 }
 
-export function armarModulo(def: DefModulo, items: AuditItemRow[], porKey: Map<string, AuditItemRow>, hoy: string | null): Modulo {
-  const plan = items.find((i) => i.key === `modulo.${def.slug}.plan`) ?? null
-  const notas = leerNotasPlan(plan?.notas ?? null)
-  const fin = notas.horizonte === '1m' ? notas.fin1m : notas.fin2m
-  const entradas = items
-    .filter((i) => i.key.startsWith(`auditoria.${def.slug}.`))
-    .sort((a, b) => (fechaDe(b) ?? '').localeCompare(fechaDe(a) ?? '') || a.titulo.localeCompare(b.titulo))
-  const vistas = (plan?.checks ?? []).map((c) => vistaDeTarea(c, notas, porKey, hoy))
-  const tareas = vistas.filter((t) => t.semana !== null)
-  const cantidad = Math.max(1, Math.ceil((diasEntre(notas.inicio, fin) + 1) / 7))
-  const titulos = notas.horizonte === '1m' && notas.semanas1m.length > 0 ? notas.semanas1m : notas.semanas
+export function armarModulo(def: DefModulo, datos: DatosModulos, hoy: string | null): Modulo {
+  const plan = datos.planes.find((p) => p.modulo === def.slug) ?? null
+  const horizonte: Horizonte = plan ? (datos.estado.horizonte[plan.modulo] ?? '2m') : '2m'
+  const fin = horizonte === '1m' ? CICLO.fin1m : CICLO.fin2m
+  const porKey = new Map(datos.entradas.map((e) => [e.key, e]))
+  const entradas = datos.entradas
+    .filter((e) => e.modulo === def.slug)
+    .sort((a, b) => b.fecha.localeCompare(a.fecha) || a.titulo.localeCompare(b.titulo))
+  const todas = plan ? plan.tareas.map((t) => vistaDeTarea(t, plan.modulo, horizonte, porKey, datos.estado, hoy)) : []
+  const tareas = todas.filter((t) => t.semana !== null)
+  const cantidad = Math.max(1, Math.ceil((diasEntre(CICLO.inicio, fin) + 1) / 7))
+  const titulos = plan ? (horizonte === '1m' ? plan.semanas1m : plan.semanas) : []
   const semanas: Semana[] = []
   for (let n = 1; n <= cantidad; n++) {
-    const desde = lunesDe(notas.inicio, n)
+    const desde = lunesDe(CICLO.inicio, n)
     const deLaSemana = tareas
       .filter((t) => t.semana === n)
-      .sort((a, b) => (a.dia ?? '').localeCompare(b.dia ?? '') || (a.check.dia ?? '').localeCompare(b.check.dia ?? ''))
-    const comprimidas = Array.from(new Set(deLaSemana.map((t) => t.check.semana ?? n).filter((s) => s !== n))).sort((a, b) => a - b)
-    semanas.push({ n, titulo: titulos[n - 1]?.trim() || notas.semanas[n - 1]?.trim() || `Semana ${n}`, desde, hasta: sumarDias(desde, 4), tareas: deLaSemana, comprimidas })
+      .sort((a, b) => (a.dia ?? '').localeCompare(b.dia ?? '') || a.tarea.dia.localeCompare(b.tarea.dia))
+    const comprimidas = Array.from(new Set(deLaSemana.map((t) => t.tarea.semana).filter((s) => s !== n))).sort((a, b) => a - b)
+    semanas.push({ n, titulo: titulos[n - 1]?.trim() || `Semana ${n}`, desde, hasta: sumarDias(desde, 4), tareas: deLaSemana, comprimidas })
   }
   const atrasadas = tareas.filter((t) => t.atraso > 0).sort((a, b) => b.atraso - a.atraso)
   return {
-    def, plan, notas, fin, semanas, tareas, entradas, atrasadas,
-    fuera: vistas.filter((t) => t.semana === null && t.check.dia),
-    sinFecha: vistas.filter((t) => !t.check.dia),
+    def, plan, horizonte, fin, semanas, tareas, todas, entradas, atrasadas,
+    fuera: todas.filter((t) => t.semana === null),
+    abiertas: entradas.filter((e) => e.abierta),
     hechas: tareas.filter((t) => t.estado === 'hecha').length,
-    porConfirmar: tareas.filter((t) => t.estado === 'por-confirmar' || t.estado === 'sin-cargar').length,
+    porConfirmar: tareas.filter((t) => t.estado === 'por-confirmar').length,
     diasAtraso: atrasadas[0]?.atraso ?? 0,
   }
 }
@@ -333,6 +278,10 @@ const CSS = `
   .mo-semaforo { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
   .mo-boton { min-height: 44px; height: auto !important; }
   .mo-volver { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px 0 8px; margin-left: -8px; border: none; border-radius: 10px; background: transparent; color: var(--color-body); font: inherit; font-size: 14px; font-weight: 600; }
+  /* El aviso de que todo queda en este navegador: chico, en muted sobre el
+     fondo (4,7:1), sin tapar nada. */
+  .mo-guardado { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--color-muted); }
+  .mo-guardado > svg { flex-shrink: 0; }
   .mo-seg { display: inline-flex; border: 1px solid var(--color-border); border-radius: 12px; overflow: hidden; background: var(--color-bg); }
   .mo-seg button { min-height: 44px; padding: 0 16px; border: none; background: transparent; color: var(--color-body); font: inherit; font-size: 13.5px; font-weight: 600; }
   .mo-seg button + button { border-left: 1px solid var(--color-border); }
@@ -403,62 +352,18 @@ const CSS = `
 
 // ─── Pestaña ──────────────────────────────────────────────────────────────────
 
-interface Guardar { tarea: AuditCheck | null; plan: AuditItemRow | null; quien: Persona; input: CreateAuditItemInput }
+interface Guardar { tarea: Tarea | null; entrada: Entrada }
 
-export function TabModulos({ currentAdminId }: { currentAdminId: string }) {
+export function TabModulos() {
   const router = useRouter()
   const hoy = useSyncExternalStore(suscribirHoy, hoyLocal, hoyServidor)
-  const [data, setData] = useState<AuditListado | null>(null)
-  const [error, setError] = useState('')
-  // Lo último que no se pudo guardar. Aparte de `error` porque la recarga que
-  // sigue a un fallo (y la de cada 20 s) limpia `error` al salir bien: el
-  // aviso desaparecía en el acto y el cambio se deshacía sin explicación.
-  const [errorGuardar, setErrorGuardar] = useState('')
-  const [refrescando, setRefrescando] = useState(false)
-  const [guardando, setGuardando] = useState<string | null>(null)
-  const cargandoRef = useRef(false)
-  const tieneDatosRef = useRef(false)
-
-  // Mismo patrón que Auditoria.tsx: refresco de fondo cada 20 s y al volver a
-  // la pestaña (lo que tilda otro aparece solo); `silencioso` no pisa la
-  // pantalla con un error si ya hay datos.
-  const cargar = useCallback(async (silencioso: boolean) => {
-    if (cargandoRef.current) return
-    cargandoRef.current = true
-    if (!silencioso) setRefrescando(true)
-    try {
-      const r = await platformApi.audit()
-      tieneDatosRef.current = true
-      setData(r)
-      setError('')
-    } catch (e) {
-      if (!silencioso || !tieneDatosRef.current) setError(e instanceof Error ? e.message : 'No se pudo cargar Módulos.')
-    } finally {
-      cargandoRef.current = false
-      if (!silencioso) setRefrescando(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    // setTimeout 0 y no la llamada directa: el linter del React Compiler no
-    // acepta un efecto que dispare setState sincrónico (igual que Auditoría).
-    const primera = window.setTimeout(() => void cargar(true), 0)
-    const id = window.setInterval(() => { if (document.visibilityState === 'visible') void cargar(true) }, REFRESCO_MS)
-    const alVolver = () => { if (document.visibilityState === 'visible') void cargar(true) }
-    document.addEventListener('visibilitychange', alVolver)
-    window.addEventListener('focus', alVolver)
-    return () => {
-      window.clearTimeout(primera)
-      window.clearInterval(id)
-      document.removeEventListener('visibilitychange', alVolver)
-      window.removeEventListener('focus', alVolver)
-    }
-  }, [cargar])
+  const estado = useEstadoModulos()
+  const entradas = todasLasEntradas(estado)
+  const modulos = MODULOS.map((def) => armarModulo(def, { planes: PLANES, entradas, estado }, hoy))
 
   const abierto = esConPlan(router.query.modulo) ? router.query.modulo : null
   const vista: Vista = router.query.vista === 'auditoria' || router.query.vista === 'resumen' ? router.query.vista : 'plan'
   const ir = (modulo: ConPlan | null, v: Vista = 'plan') => {
-    if (modulo !== abierto) setErrorGuardar('')
     const q = modulo ? `&modulo=${modulo}${v !== 'plan' ? `&vista=${v}` : ''}` : ''
     void router.push(`/superadmin?seccion=modulos${q}`, undefined, { shallow: true })
   }
@@ -472,86 +377,21 @@ export function TabModulos({ currentAdminId }: { currentAdminId: string }) {
     anteriorRef.current = abierto
   }, [abierto])
 
-  if (error && !data) return <ErrorBox msg={error} action={<button onClick={() => void cargar(false)} className="ds-hover mo-boton" style={btnGhost}>Reintentar</button>} />
-  if (!data) return <Loader />
-
-  const porKey = new Map(data.items.map((i) => [i.key, i]))
-  const modulos = MODULOS.map((def) => armarModulo(def, data.items, porKey, hoy))
-  const planDe = (p: Persona) => modulos.find((m) => m.def.persona === p)?.plan ?? null
-  const adminDe = (p: Persona) => planDe(p)?.responsable ?? null
-
-  const aplicar = (fila: AuditItemRow) => setData((d) => (d ? { ...d, items: d.items.map((i) => (i.id === fila.id ? fila : i)) } : d))
-  const fallo = (e: unknown, texto: string) => {
-    setErrorGuardar(e instanceof Error ? `${texto}: ${e.message}` : texto)
-    void cargar(true)
+  // Confirmar una entrada tilda las tareas que documenta, en cualquier plan.
+  const confirmar = (e: Entrada) => {
+    const tareas = modulos.flatMap((m) => m.todas.filter((t) => t.tarea.auditoria === e.key).map((t) => ({ modulo: m.def.slug as ConPlan, id: t.tarea.id })))
+    accionesModulos.confirmar(e.key, hoy ?? hoyLocal(), tareas)
   }
-
-  // Pasa la entrada a HECHO, tilda "Confirmada por el responsable" y las
-  // tareas que documenta: la API registra quién y cuándo (hechoPor/hechoAt).
-  const confirmarEntrada = async (entrada: AuditItemRow) => {
-    setGuardando(entrada.id)
-    setErrorGuardar('')
-    try {
-      const c1 = entrada.checks.find((c) => c.texto === CHECKS_ENTRADA[0])
-      aplicar(await platformApi.updateAuditItem(entrada.id, { estado: 'HECHO', ...(c1 ? { checks: [{ id: c1.id, hecho: true }] } : {}) }))
-      for (const m of modulos) {
-        const toggles = (m.plan?.checks ?? []).filter((c) => c.auditoria === entrada.key && !c.hecho).map((c) => ({ id: c.id, hecho: true, auditoria: entrada.key }))
-        if (m.plan && toggles.length) aplicar(await platformApi.updateAuditItem(m.plan.id, { checks: toggles }))
-      }
-    } catch (e) {
-      fallo(e, 'No se pudo confirmar la entrada')
-    } finally {
-      setGuardando(null)
-    }
-  }
-
-  const tildar = async (plan: AuditItemRow, t: TareaVista, hecho: boolean) => {
+  const tildar = (modulo: ConPlan, t: TareaVista, hecha: boolean) => {
     // Tildar una tarea cuya entrada sigue pendiente es confirmarla: se hace
     // por la entrada, que tilda la tarea de paso.
-    if (hecho && t.entrada && t.entrada.estado !== 'HECHO') return confirmarEntrada(t.entrada)
-    setGuardando(t.check.id)
-    setErrorGuardar('')
-    try {
-      const toggle = hecho && t.check.auditoria ? { id: t.check.id, hecho, auditoria: t.check.auditoria } : { id: t.check.id, hecho }
-      aplicar(await platformApi.updateAuditItem(plan.id, { checks: [toggle] }))
-    } catch (e) {
-      fallo(e, 'No se pudo guardar la tarea')
-    } finally {
-      setGuardando(null)
-    }
+    if (hecha && t.entrada && !t.confirmada) return confirmar(t.entrada)
+    accionesModulos.tildar(modulo, t.tarea.id, hecha)
   }
-
-  const cambiarHorizonte = async (plan: AuditItemRow, horizonte: Horizonte) => {
-    // Se conserva todo lo que haya en notas (ciclo, títulos): solo cambia el horizonte.
-    const notas = JSON.stringify({ ...crudoDe(plan.notas), horizonte })
-    aplicar({ ...plan, notas })
-    setErrorGuardar('')
-    try {
-      aplicar(await platformApi.updateAuditItem(plan.id, { notas }))
-    } catch (e) {
-      fallo(e, 'No se pudo guardar el horizonte')
-    }
-  }
-
-  // Alta desde el modal. La entrada nace pendiente con el responsable de la
-  // tarea; si quien la carga es ese responsable, se confirma en el acto. Si
-  // vino de una tarea, la tarea queda vinculada (y tildada si se confirmó).
-  const guardarEntrada = async ({ tarea, plan, quien, input }: Guardar) => {
-    setErrorGuardar('')
-    const admin = adminDe(quien)
-    const fila = await platformApi.createAuditItem({ ...input, responsableId: admin?.id ?? null })
-    setData((d) => (d ? { ...d, items: [...d.items, fila] } : d))
-    const confirmar = admin?.id === currentAdminId
-    try {
-      if (confirmar) {
-        const c1 = fila.checks.find((c) => c.texto === CHECKS_ENTRADA[0])
-        aplicar(await platformApi.updateAuditItem(fila.id, { estado: 'HECHO', ...(c1 ? { checks: [{ id: c1.id, hecho: true }] } : {}) }))
-      }
-      if (tarea && plan) aplicar(await platformApi.updateAuditItem(plan.id, { checks: [{ id: tarea.id, hecho: confirmar, auditoria: fila.key }] }))
-    } catch (e) {
-      fallo(e, 'La entrada se guardó, pero no se pudo vincular o confirmar')
-    }
-  }
+  // Alta desde la hoja: la entrada nace pendiente, como las de sesión, y si
+  // vino de una tarea, la tarea queda vinculada (documentada, falta confirmar).
+  const guardarEntrada = (modulo: ConPlan, { tarea, entrada }: Guardar) =>
+    accionesModulos.agregar(entrada, tarea ? { modulo, id: tarea.id } : undefined)
 
   const actual = abierto ? modulos.find((m) => m.def.slug === abierto) : undefined
 
@@ -565,30 +405,23 @@ export function TabModulos({ currentAdminId }: { currentAdminId: string }) {
           modulo={actual}
           vista={vista}
           hoy={hoy}
-          error={errorGuardar || error}
-          guardando={guardando}
-          keysUsadas={new Set(porKey.keys())}
-          confirmaAlGuardar={(quien) => adminDe(quien)?.id === currentAdminId}
+          estado={estado}
+          keysUsadas={new Set(entradas.map((e) => e.key))}
           onIr={(v) => ir(actual.def.slug as ConPlan, v)}
           onVolver={() => ir(null)}
-          onHorizonte={(h) => actual.plan && void cambiarHorizonte(actual.plan, h)}
-          onTildar={(t, hecho) => actual.plan && void tildar(actual.plan, t, hecho)}
-          onConfirmar={(e) => void confirmarEntrada(e)}
-          onGuardarEntrada={guardarEntrada}
+          onHorizonte={(h) => accionesModulos.horizonte(actual.def.slug as ConPlan, h)}
+          onTildar={(t, hecha) => tildar(actual.def.slug as ConPlan, t, hecha)}
+          onConfirmar={confirmar}
+          onDesconfirmar={(e) => accionesModulos.desconfirmar(e.key)}
+          onGuardarEntrada={(g) => guardarEntrada(actual.def.slug as ConPlan, g)}
         />
       ) : (
         <>
           <PageHeader
             title="Módulos"
             subtitle="El plan de trabajo de cada módulo nuevo, quién lo lleva y cómo viene. Cada tarea hecha tiene su entrada de auditoría."
-            action={
-              <button onClick={() => void cargar(false)} className="ds-hover mo-boton" style={btnGhost} title="Actualizar ahora (también se actualiza solo cada 20 s)">
-                <RefreshCw size={15} strokeWidth={2} style={{ animation: refrescando ? 'orbita-spin 0.7s linear infinite' : undefined }} aria-hidden />
-                Actualizar
-              </button>
-            }
           />
-          {error && <ErrorBox msg={error} />}
+          <AvisoGuardado />
           <div className="mo-grid">
             {modulos.map((m) => (
               <TarjetaModulo key={m.def.slug} modulo={m} hoy={hoy} onAbrir={esConPlan(m.def.slug) && m.plan ? () => { window.scrollTo({ top: 0 }); ir(m.def.slug as ConPlan) } : undefined} />
@@ -597,6 +430,16 @@ export function TabModulos({ currentAdminId }: { currentAdminId: string }) {
         </>
       )}
     </div>
+  )
+}
+
+// Lo que se marca en Módulos no sale de este navegador (modulos/estado.ts): el
+// aviso queda siempre a la vista, chico, para que nadie crea que lo ve el resto.
+function AvisoGuardado() {
+  return (
+    <p className="mo-guardado">
+      <Laptop size={14} strokeWidth={2} aria-hidden /> Se guarda en este navegador: lo que tildás, confirmás o cargás acá no lo ven los demás.
+    </p>
   )
 }
 
@@ -614,9 +457,9 @@ function TarjetaModulo({ modulo: m, hoy, onAbrir }: { modulo: Modulo; hoy: strin
         </h3>
         <Chip text={enProduccion ? 'En producción' : 'En desarrollo'} tone={enProduccion ? 'green' : 'blue'} />
       </div>
-      {enProduccion ? (
+      {!m.plan ? (
         <div className="mo-datos">
-          <div>Sin responsable · en producción</div>
+          <div>{enProduccion ? 'Sin responsable · en producción' : `Responsable ${m.def.persona ?? '—'}`}</div>
           <div className="mo-rotulo" style={{ fontWeight: 500 }}>Sin plan en este ciclo.</div>
         </div>
       ) : (
@@ -625,26 +468,23 @@ function TarjetaModulo({ modulo: m, hoy, onAbrir }: { modulo: Modulo; hoy: strin
               dos renglones: en la grilla de 4 columnas "Fin estimado … · 2
               meses" no entraba y cortaba entre el 2 y "meses". */}
           <div className="mo-datos">
-            <div><span className="mo-rotulo">Responsable </span>{nombreResponsable(m.def.persona, m.plan?.responsable ?? null)}</div>
-            {m.plan && <div><span className="mo-rotulo">Fin estimado </span>{larga(m.fin)}</div>}
-            {m.plan && <div><span className="mo-rotulo">Horizonte </span>{m.notas.horizonte === '1m' ? '1 mes' : '2 meses'}</div>}
+            <div><span className="mo-rotulo">Responsable </span>{m.plan.responsable}</div>
+            <div><span className="mo-rotulo">Fin estimado </span>{larga(m.fin)}</div>
+            <div><span className="mo-rotulo">Horizonte </span>{m.horizonte === '1m' ? '1 mes' : '2 meses'}</div>
           </div>
-          {m.plan ? (
-            <>
-              <Medidor hechas={m.hechas} total={m.tareas.length} atraso={m.diasAtraso > 0} etiqueta={`Progreso de ${m.def.nombre}`} />
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                <Semaforo hoy={hoy} dias={m.diasAtraso} />
-                {m.porConfirmar > 0 && <span className="mo-rotulo" style={{ fontWeight: 500 }}>{m.porConfirmar} por confirmar</span>}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 'auto', fontSize: 13, fontWeight: 600, color: 'var(--chip-primary-fg)' }} aria-hidden>
-                Ver plan <ChevronRight size={15} strokeWidth={2.2} />
-              </div>
-            </>
-          ) : (
-            <div className="mo-rotulo" style={{ fontWeight: 500, lineHeight: 1.45 }}>
-              Plan sin cargar: aparece cuando la API con el seed de Módulos esté desplegada.
-            </div>
+          <Medidor hechas={m.hechas} total={m.tareas.length} atraso={m.diasAtraso > 0} etiqueta={`Progreso de ${m.def.nombre}`} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+            <Semaforo hoy={hoy} dias={m.diasAtraso} />
+            {m.porConfirmar > 0 && <span className="mo-rotulo" style={{ fontWeight: 500 }}>{m.porConfirmar} por confirmar</span>}
+          </div>
+          {m.abiertas.length > 0 && (
+            <span className="mo-rotulo" style={{ fontWeight: 500 }}>
+              {m.abiertas.length} {m.abiertas.length === 1 ? 'decisión abierta' : 'decisiones abiertas'}
+            </span>
           )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 'auto', fontSize: 13, fontWeight: 600, color: 'var(--chip-primary-fg)' }} aria-hidden>
+            Ver plan <ChevronRight size={15} strokeWidth={2.2} />
+          </div>
         </>
       )}
     </div>
@@ -699,18 +539,15 @@ interface PropsVista {
   modulo: Modulo
   vista: Vista
   hoy: string | null
-  error: string
-  guardando: string | null
+  estado: EstadoModulos
   keysUsadas: Set<string>
-  // Si quien hizo la tarea es el admin con la sesión abierta: su entrada se
-  // confirma al guardarla.
-  confirmaAlGuardar: (quien: Persona) => boolean
   onIr: (v: Vista) => void
   onVolver: () => void
   onHorizonte: (h: Horizonte) => void
-  onTildar: (t: TareaVista, hecho: boolean) => void
-  onConfirmar: (e: AuditItemRow) => void
-  onGuardarEntrada: (g: Guardar) => Promise<void>
+  onTildar: (t: TareaVista, hecha: boolean) => void
+  onConfirmar: (e: Entrada) => void
+  onDesconfirmar: (e: Entrada) => void
+  onGuardarEntrada: (g: Guardar) => void
 }
 
 function VistaModulo(p: PropsVista) {
@@ -721,8 +558,8 @@ function VistaModulo(p: PropsVista) {
   useEffect(() => { tituloRef.current?.focus() }, [m.def.slug])
 
   // Hoja de nueva entrada: null = cerrada; `tarea` = vino de "Registrar en auditoría".
-  const [hoja, setHoja] = useState<{ tarea: AuditCheck | null } | null>(null)
-  // Entrada a la que llevó "Ver entrada" desde el plan: se abre y se muestra.
+  const [hoja, setHoja] = useState<{ tarea: Tarea | null } | null>(null)
+  // Entrada a la que llevó "Ver entrada" desde el plan o el resumen: se abre y se muestra.
   const [enfocar, setEnfocar] = useState<string | null>(null)
 
   const irA = (v: Vista, entrada?: string) => {
@@ -753,7 +590,7 @@ function VistaModulo(p: PropsVista) {
             <Chip text="En desarrollo" tone="blue" />
           </div>
           <p style={{ margin: '6px 0 0', fontSize: 14, color: 'var(--color-muted)', lineHeight: 1.5 }}>
-            Responsable: <strong style={{ color: 'var(--color-body)' }}>{nombreResponsable(m.def.persona, m.plan?.responsable ?? null)}</strong>
+            Responsable: <strong style={{ color: 'var(--color-body)' }}>{m.plan?.responsable ?? m.def.persona ?? 'Sin responsable'}</strong>
             {m.plan && <> · Fin estimado {larga(m.fin)}</>}
           </p>
         </div>
@@ -766,9 +603,9 @@ function VistaModulo(p: PropsVista) {
                   key={h}
                   type="button"
                   role="radio"
-                  aria-checked={m.notas.horizonte === h}
-                  data-selected={m.notas.horizonte === h ? 'true' : undefined}
-                  onClick={() => m.notas.horizonte !== h && p.onHorizonte(h)}
+                  aria-checked={m.horizonte === h}
+                  data-selected={m.horizonte === h ? 'true' : undefined}
+                  onClick={() => m.horizonte !== h && p.onHorizonte(h)}
                   className="ds-hover"
                 >
                   {h === '2m' ? '2 meses' : '1 mes'}
@@ -779,11 +616,11 @@ function VistaModulo(p: PropsVista) {
         )}
       </div>
 
-      {p.error && <ErrorBox msg={p.error} />}
+      <AvisoGuardado />
 
       {!m.plan ? (
         <div className="mo-card">
-          <Empty text="Plan sin cargar: aparece cuando la API con el seed de Módulos esté desplegada." />
+          <Empty text="Este módulo no tiene plan en este ciclo." />
         </div>
       ) : (
         <>
@@ -809,7 +646,6 @@ function VistaModulo(p: PropsVista) {
               <PanelPlan
                 modulo={m}
                 hoy={hoy}
-                guardando={p.guardando}
                 onTildar={p.onTildar}
                 onRegistrar={(tarea) => setHoja({ tarea })}
                 onVerEntrada={(key) => irA('auditoria', key)}
@@ -818,13 +654,14 @@ function VistaModulo(p: PropsVista) {
             {vista === 'auditoria' && (
               <PanelAuditoria
                 modulo={m}
-                guardando={p.guardando}
+                estado={p.estado}
                 enfocar={enfocar}
                 onConfirmar={p.onConfirmar}
+                onDesconfirmar={p.onDesconfirmar}
                 onNueva={() => setHoja({ tarea: null })}
               />
             )}
-            {vista === 'resumen' && <PanelResumen modulo={m} hoy={hoy} />}
+            {vista === 'resumen' && <PanelResumen modulo={m} hoy={hoy} onVerEntrada={(key) => irA('auditoria', key)} />}
           </div>
         </>
       )}
@@ -835,10 +672,9 @@ function VistaModulo(p: PropsVista) {
           tarea={hoja.tarea}
           hoy={hoy}
           keysUsadas={p.keysUsadas}
-          confirmaAlGuardar={p.confirmaAlGuardar}
           onCerrar={() => setHoja(null)}
-          onGuardar={async (g) => {
-            await p.onGuardarEntrada({ ...g, plan: m.plan })
+          onGuardar={(g) => {
+            p.onGuardarEntrada(g)
             setHoja(null)
           }}
         />
@@ -849,24 +685,23 @@ function VistaModulo(p: PropsVista) {
 
 // ─── Plan ─────────────────────────────────────────────────────────────────────
 
-function PanelPlan({ modulo: m, hoy, guardando, onTildar, onRegistrar, onVerEntrada }: {
+function PanelPlan({ modulo: m, hoy, onTildar, onRegistrar, onVerEntrada }: {
   modulo: Modulo
   hoy: string | null
-  guardando: string | null
-  onTildar: (t: TareaVista, hecho: boolean) => void
-  onRegistrar: (tarea: AuditCheck) => void
+  onTildar: (t: TareaVista, hecha: boolean) => void
+  onRegistrar: (tarea: Tarea) => void
   onVerEntrada: (key: string) => void
 }) {
-  const dosMeses = m.notas.horizonte === '2m'
+  const dosMeses = m.horizonte === '2m'
   const fila = (t: TareaVista) => (
-    <FilaTarea key={t.check.id} t={t} guardando={guardando === t.check.id || (!!t.entrada && guardando === t.entrada.id)} onTildar={onTildar} onRegistrar={onRegistrar} onVerEntrada={onVerEntrada} />
+    <FilaTarea key={t.tarea.id} t={t} onTildar={onTildar} onRegistrar={onRegistrar} onVerEntrada={onVerEntrada} />
   )
   return (
     <>
       <p style={{ margin: 0, fontSize: 13.5, color: 'var(--color-body)', lineHeight: 1.6 }}>
-        Inicio <strong>{conDia(m.notas.inicio)}</strong> · Fin estimado <strong>{conDia(m.fin)}</strong> · Horizonte{' '}
+        Inicio <strong>{conDia(CICLO.inicio)}</strong> · Fin estimado <strong>{conDia(m.fin)}</strong> · Horizonte{' '}
         <strong>{dosMeses ? '2 meses' : '1 mes'}</strong> ({m.semanas.length} semanas).{' '}
-        Una tarea se tilda con su entrada de auditoría cargada.
+        Una tarea se tilda con su entrada de auditoría.
       </p>
 
       {m.semanas.map((s) => {
@@ -920,15 +755,6 @@ function PanelPlan({ modulo: m, hoy, guardando, onTildar, onRegistrar, onVerEntr
           <div style={{ padding: '6px 16px 10px' }}>{m.fuera.map(fila)}</div>
         </section>
       )}
-
-      {m.sinFecha.length > 0 && (
-        <section className="mo-card" style={{ padding: 0, gap: 0 }} aria-labelledby="mo-sin-fecha">
-          <div className="mo-semana-cab">
-            <h3 id="mo-sin-fecha" style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--color-text)' }}>Sin fecha</h3>
-          </div>
-          <div style={{ padding: '6px 16px 10px' }}>{m.sinFecha.map(fila)}</div>
-        </section>
-      )}
     </>
   )
 }
@@ -936,34 +762,34 @@ function PanelPlan({ modulo: m, hoy, guardando, onTildar, onRegistrar, onVerEntr
 const ESTADO_TAREA: Record<EstadoTarea, { label: string; color: string; Icono: typeof CheckCircle2 }> = {
   hecha: { label: 'Hecha', color: 'var(--chip-success-fg)', Icono: CheckCircle2 },
   'por-confirmar': { label: 'Documentada · falta confirmar', color: 'var(--chip-primary-fg)', Icono: Clock },
-  'sin-cargar': { label: 'Documentada en sesión · falta cargar la entrada', color: 'var(--color-muted)', Icono: Clock },
   pendiente: { label: 'Pendiente', color: 'var(--color-muted)', Icono: CircleDashed },
 }
 
-function FilaTarea({ t, guardando, onTildar, onRegistrar, onVerEntrada }: {
+function FilaTarea({ t, onTildar, onRegistrar, onVerEntrada }: {
   t: TareaVista
-  guardando: boolean
-  onTildar: (t: TareaVista, hecho: boolean) => void
-  onRegistrar: (tarea: AuditCheck) => void
+  onTildar: (t: TareaVista, hecha: boolean) => void
+  onRegistrar: (tarea: Tarea) => void
   onVerEntrada: (key: string) => void
 }) {
-  const { check: c } = t
-  // Se tilda con la entrada cargada; destildar siempre se puede.
-  const habilitada = !guardando && (t.estado === 'hecha' || t.estado === 'por-confirmar')
+  const { tarea: c } = t
+  // Se tilda con la entrada cargada; destildar siempre se puede, salvo lo que
+  // quedó hecho para todos en el código.
+  const habilitada = !t.fija && (t.estado === 'hecha' || t.estado === 'por-confirmar')
   // Con la entrada ya confirmada no falta confirmar nada: alguien la destildó.
   const est = t.atraso > 0
     ? { label: `Atrasada ${t.atraso} ${t.atraso === 1 ? 'día' : 'días'}`, color: 'var(--chip-warning-fg)', Icono: AlertTriangle }
-    : t.estado === 'por-confirmar' && t.entrada?.estado === 'HECHO'
+    : t.estado === 'por-confirmar' && t.confirmada
       ? { ...ESTADO_TAREA['por-confirmar'], label: 'Documentada · falta tildar' }
       : ESTADO_TAREA[t.estado]
   const idEstado = `mo-est-${c.id}`
-  const movida = t.dia && c.dia && t.dia !== c.dia
+  const movida = t.dia && t.dia !== c.dia
+  const ayuda = t.fija ? 'Confirmada en el código: está hecha para todos' : habilitada ? undefined : 'Se tilda cuando la tarea tiene su entrada de auditoría'
   return (
     <div className="mo-tarea">
-      <label className="mo-check" title={habilitada ? undefined : 'Se tilda cuando la tarea tiene su entrada de auditoría cargada'}>
+      <label className="mo-check" title={ayuda}>
         <input
           type="checkbox"
-          checked={c.hecho}
+          checked={t.hecha}
           disabled={!habilitada}
           aria-describedby={idEstado}
           aria-label={c.texto}
@@ -971,22 +797,20 @@ function FilaTarea({ t, guardando, onTildar, onRegistrar, onVerEntrada }: {
         />
       </label>
       <div className="mo-tarea-texto">
-        <div style={{ fontSize: 13.5, fontWeight: 600, color: c.hecho ? 'var(--color-muted)' : 'var(--color-text)', lineHeight: 1.45, textDecoration: c.hecho ? 'line-through' : undefined, textDecorationColor: 'var(--color-border-strong)' }}>
+        <div style={{ fontSize: 13.5, fontWeight: 600, color: t.hecha ? 'var(--color-muted)' : 'var(--color-text)', lineHeight: 1.45, textDecoration: t.hecha ? 'line-through' : undefined, textDecorationColor: 'var(--color-border-strong)' }}>
           {c.texto}
         </div>
-        {c.criterio && (
-          <div style={{ fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.45, marginTop: 2 }}>Listo cuando: {c.criterio}</div>
-        )}
+        <div style={{ fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.45, marginTop: 2 }}>Listo cuando: {c.criterio}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px 10px', flexWrap: 'wrap', marginTop: 4 }}>
           <span id={idEstado} className="mo-estado" style={{ color: est.color }}>
             <est.Icono size={13} strokeWidth={2.2} aria-hidden /> {est.label}
           </span>
-          {movida && <span className="mo-rotulo" style={{ fontWeight: 500 }}>En el plan de 2 meses: {corta(c.dia!)}</span>}
-          {!t.dia && c.dia && <span className="mo-rotulo" style={{ fontWeight: 500 }}>{corta(c.dia)} en el plan de 2 meses</span>}
+          {movida && <span className="mo-rotulo" style={{ fontWeight: 500 }}>En el plan de 2 meses: {corta(c.dia)}</span>}
+          {!t.dia && <span className="mo-rotulo" style={{ fontWeight: 500 }}>{corta(c.dia)} en el plan de 2 meses</span>}
         </div>
       </div>
       <div className="mo-tarea-acc">
-        {c.quien && <span className="mo-etiqueta" title="Responsable de la tarea">{c.quien}</span>}
+        <span className="mo-etiqueta" title="Responsable de la tarea">{c.quien}</span>
         {t.estado === 'pendiente' && (
           <button type="button" onClick={() => onRegistrar(c)} className="ds-hover mo-boton" style={{ ...btnGhost, fontSize: 13 }}>
             <FilePlus2 size={15} strokeWidth={2} aria-hidden /> Registrar en auditoría
@@ -1004,18 +828,19 @@ function FilaTarea({ t, guardando, onTildar, onRegistrar, onVerEntrada }: {
 
 // ─── Auditoría del módulo ─────────────────────────────────────────────────────
 
-function PanelAuditoria({ modulo: m, guardando, enfocar, onConfirmar, onNueva }: {
+function PanelAuditoria({ modulo: m, estado, enfocar, onConfirmar, onDesconfirmar, onNueva }: {
   modulo: Modulo
-  guardando: string | null
+  estado: EstadoModulos
   enfocar: string | null
-  onConfirmar: (e: AuditItemRow) => void
+  onConfirmar: (e: Entrada) => void
+  onDesconfirmar: (e: Entrada) => void
   onNueva: () => void
 }) {
   const [filtro, setFiltro] = useState<TipoEntrada | 'todas'>('todas')
-  const visibles = m.entradas.filter((e) => filtro === 'todas' || tipoDe(e) === filtro)
-  const cuantas = (t: TipoEntrada) => m.entradas.filter((e) => tipoDe(e) === t).length
+  const visibles = m.entradas.filter((e) => filtro === 'todas' || e.tipo === filtro)
+  const cuantas = (t: TipoEntrada) => m.entradas.filter((e) => e.tipo === t).length
   // Qué tareas del plan documenta cada entrada (para mostrarlo en la tarjeta).
-  const tareasDe = (key: string) => (m.plan?.checks ?? []).filter((c) => c.auditoria === key)
+  const tareasDe = (key: string) => m.todas.filter((t) => t.tarea.auditoria === key).map((t) => t.tarea)
 
   return (
     <>
@@ -1041,24 +866,26 @@ function PanelAuditoria({ modulo: m, guardando, enfocar, onConfirmar, onNueva }:
 
       {visibles.map((e) => (
         <TarjetaEntrada
-          key={e.id}
+          key={e.key}
           entrada={e}
+          confirmacion={confirmacionDe(e, estado)}
           tareas={tareasDe(e.key)}
-          guardando={guardando === e.id}
           enfocar={enfocar === e.key}
           onConfirmar={() => onConfirmar(e)}
+          onDesconfirmar={() => onDesconfirmar(e)}
         />
       ))}
     </>
   )
 }
 
-function TarjetaEntrada({ entrada: e, tareas, guardando, enfocar, onConfirmar }: {
-  entrada: AuditItemRow
-  tareas: AuditCheck[]
-  guardando: boolean
+function TarjetaEntrada({ entrada: e, confirmacion, tareas, enfocar, onConfirmar, onDesconfirmar }: {
+  entrada: Entrada
+  confirmacion: Confirmacion | null
+  tareas: Tarea[]
   enfocar: boolean
   onConfirmar: () => void
+  onDesconfirmar: () => void
 }) {
   const [abierta, setAbierta] = useState(enfocar)
   const ref = useRef<HTMLElement>(null)
@@ -1069,12 +896,10 @@ function TarjetaEntrada({ entrada: e, tareas, guardando, enfocar, onConfirmar }:
     ref.current?.scrollIntoView({ block: 'start', behavior: quieto ? 'auto' : 'smooth' })
   }, [enfocar])
 
-  const tipo = TIPOS.find((t) => t.id === tipoDe(e)) ?? TIPOS[0]
-  const confirmada = e.estado === 'HECHO'
-  const fecha = fechaDe(e)
-  const quien = quienDe(e)
-  const idCuerpo = `mo-entrada-${e.id}`
-  const idTitulo = `mo-entrada-titulo-${e.id}`
+  const tipo = TIPOS.find((t) => t.id === e.tipo) ?? TIPOS[0]
+  const id = sinAcentos(e.key).replace(/[^a-z0-9]+/g, '-')
+  const idCuerpo = `mo-entrada-${id}`
+  const idTitulo = `mo-entrada-titulo-${id}`
 
   return (
     <article ref={ref} className="mo-card" style={{ padding: 0, gap: 0, scrollMarginTop: 80 }} aria-labelledby={idTitulo}>
@@ -1084,16 +909,18 @@ function TarjetaEntrada({ entrada: e, tareas, guardando, enfocar, onConfirmar }:
             {tipo.id === 'tarea'
               ? <span className="mo-etiqueta">{tipo.label}</span>
               : <Chip text={tipo.label} tone={tipo.id === 'decisión' ? 'violet' : 'blue'} />}
-            {confirmada
-              ? <Chip text="Confirmada" tone="green" />
-              : <Chip text="Pendiente de confirmación" tone="amber" />}
+            {e.abierta
+              ? <Chip text={`Abierta · la decide ${e.quien}`} tone="amber" />
+              : confirmacion
+                ? <Chip text="Confirmada" tone="green" />
+                : <Chip text="Pendiente de confirmación" tone="amber" />}
           </div>
           <h3 id={idTitulo} style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--color-text)', lineHeight: 1.35 }}>{e.titulo}</h3>
           <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--color-body)', lineHeight: 1.5 }}>{e.foco}</p>
           <p style={{ margin: '6px 0 0', fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.5 }}>
-            {quien ? <>Lo hizo <strong style={{ color: 'var(--color-body)' }}>{quien}</strong></> : 'Sin responsable'}
-            {fecha && <> · {larga(fecha)}</>}
-            {confirmada && e.hechoPor && e.hechoAt && <> · confirmada por {e.hechoPor.name} el {dateTime(e.hechoAt)}</>}
+            {e.abierta ? 'La decide' : 'Lo hizo'} <strong style={{ color: 'var(--color-body)' }}>{e.quien}</strong> · {larga(e.fecha)}
+            {confirmacion && <> · confirmada el {larga(confirmacion.dia)}{confirmacion.local ? ' en este navegador' : ''}</>}
+            {e.origen === 'navegador' && <> · cargada en este navegador</>}
           </p>
           {tareas.length > 0 && (
             <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.5 }}>
@@ -1102,9 +929,14 @@ function TarjetaEntrada({ entrada: e, tareas, guardando, enfocar, onConfirmar }:
           )}
         </div>
         <div className="mo-entrada-acc">
-          {!confirmada && (
-            <button type="button" onClick={onConfirmar} disabled={guardando} className="ds-hover mo-boton" style={{ ...btnPrimary, opacity: guardando ? 0.6 : 1 }}>
-              <CheckCircle2 size={16} strokeWidth={2} aria-hidden /> {guardando ? 'Confirmando…' : 'Confirmar'}
+          {!e.abierta && !confirmacion && (
+            <button type="button" onClick={onConfirmar} className="ds-hover mo-boton" style={btnPrimary}>
+              <CheckCircle2 size={16} strokeWidth={2} aria-hidden /> Confirmar
+            </button>
+          )}
+          {confirmacion?.local && (
+            <button type="button" onClick={onDesconfirmar} className="ds-hover mo-boton" style={btnGhost} aria-label={`Deshacer la confirmación de ${e.titulo}`}>
+              <Undo2 size={15} strokeWidth={2} aria-hidden /> Deshacer
             </button>
           )}
           <button type="button" onClick={() => setAbierta((v) => !v)} aria-expanded={abierta} aria-controls={idCuerpo} className="ds-hover mo-boton" style={btnGhost}>
@@ -1114,7 +946,7 @@ function TarjetaEntrada({ entrada: e, tareas, guardando, enfocar, onConfirmar }:
       </div>
       {abierta && (
         <div id={idCuerpo} className="mo-entrada-cuerpo">
-          {e.informe ? <MarkdownInforme texto={informeVisible(e.informe, confirmada)} /> : <Empty text="Esta entrada no tiene informe." />}
+          <MarkdownInforme texto={informeVisible(e.informe, !!confirmacion)} />
         </div>
       )}
     </article>
@@ -1123,11 +955,11 @@ function TarjetaEntrada({ entrada: e, tareas, guardando, enfocar, onConfirmar }:
 
 // ─── Resumen ──────────────────────────────────────────────────────────────────
 
-function PanelResumen({ modulo: m, hoy }: { modulo: Modulo; hoy: string | null }) {
+function PanelResumen({ modulo: m, hoy, onVerEntrada }: { modulo: Modulo; hoy: string | null; onVerEntrada: (key: string) => void }) {
   const hito = proximoHito(m, hoy)
   const porPersona = PERSONAS
     .map((persona) => {
-      const suyas = m.tareas.filter((t) => t.check.quien === persona)
+      const suyas = m.tareas.filter((t) => t.tarea.quien === persona)
       return { persona, total: suyas.length, hechas: suyas.filter((t) => t.estado === 'hecha').length, atrasadas: suyas.filter((t) => t.atraso > 0).length }
     })
     .filter((x) => x.total > 0)
@@ -1172,15 +1004,37 @@ function PanelResumen({ modulo: m, hoy }: { modulo: Modulo; hoy: string | null }
         ))}
       </section>
 
+      {m.abiertas.length > 0 && (
+        <section className="mo-card" style={{ padding: 0, gap: 0 }} aria-labelledby="mo-abiertas">
+          <div className="mo-semana-cab">
+            <div>
+              <h3 id="mo-abiertas" style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--color-text)' }}>Decisiones abiertas</h3>
+              <div className="mo-rotulo" style={{ fontWeight: 500, marginTop: 3 }}>No se destraban con código: las decide la persona que figura.</div>
+            </div>
+          </div>
+          {m.abiertas.map((e) => (
+            <div key={e.key} className="mo-fila-lista">
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)', lineHeight: 1.45 }}>{e.titulo}</div>
+                <div className="mo-rotulo" style={{ fontWeight: 500, marginTop: 2 }}>La decide {e.quien}</div>
+              </div>
+              <button type="button" onClick={() => onVerEntrada(e.key)} className="ds-hover mo-boton" style={{ ...btnGhost, fontSize: 13 }} aria-label={`Ver la decisión: ${e.titulo}`}>
+                Ver
+              </button>
+            </div>
+          ))}
+        </section>
+      )}
+
       <section className="mo-card" style={{ padding: 0, gap: 0 }} aria-labelledby="mo-atrasos">
         <div className="mo-semana-cab"><h3 id="mo-atrasos" style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--color-text)' }}>Atrasos</h3></div>
         {hoy === null && <Empty text="…" />}
         {hoy !== null && m.atrasadas.length === 0 && <Empty text="Nada atrasado: todo lo que ya pasó está hecho o documentado." />}
         {hoy !== null && m.atrasadas.map((t) => (
-          <div key={t.check.id} className="mo-fila-lista">
+          <div key={t.tarea.id} className="mo-fila-lista">
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)', lineHeight: 1.45 }}>{t.check.texto}</div>
-              <div className="mo-rotulo" style={{ fontWeight: 500, marginTop: 2 }}>{t.dia ? conDia(t.dia) : ''}{t.check.quien ? ` · ${t.check.quien}` : ''}</div>
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)', lineHeight: 1.45 }}>{t.tarea.texto}</div>
+              <div className="mo-rotulo" style={{ fontWeight: 500, marginTop: 2 }}>{t.dia ? conDia(t.dia) : ''} · {t.tarea.quien}</div>
             </div>
             <span className="mo-estado" style={{ color: 'var(--chip-warning-fg)', whiteSpace: 'nowrap' }}>{t.atraso} {t.atraso === 1 ? 'día' : 'días'}</span>
           </div>
@@ -1196,8 +1050,8 @@ function PanelResumen({ modulo: m, hoy }: { modulo: Modulo; hoy: string | null }
             </div>
           </div>
           {hito.tareas.filter((t) => t.estado !== 'hecha').map((t) => (
-            <div key={t.check.id} className="mo-fila-lista">
-              <div style={{ fontSize: 13.5, color: 'var(--color-body)', lineHeight: 1.45, minWidth: 0 }}>{t.check.texto}</div>
+            <div key={t.tarea.id} className="mo-fila-lista">
+              <div style={{ fontSize: 13.5, color: 'var(--color-body)', lineHeight: 1.45, minWidth: 0 }}>{t.tarea.texto}</div>
               <span className="mo-rotulo" style={{ whiteSpace: 'nowrap' }}>{t.dia ? `${DIAS[indiceDia(t.dia)]} ${corta(t.dia)}` : ''}</span>
             </div>
           ))}
@@ -1226,9 +1080,9 @@ export function focoDe(que: string): string {
   return linea.length > 280 ? `${linea.slice(0, 279)}…` : linea
 }
 
-interface Capturas { antes1280: string; despues1280: string; antes390: string; despues390: string }
+interface CapturasHoja { antes1280: string; despues1280: string; antes390: string; despues390: string }
 
-export function armarInforme(d: { que: string; quien: Persona; fecha: string; archivos: string[]; tipo: TipoEntrada; capturas: Capturas; decision: string; porque: string }): string {
+export function armarInforme(d: { que: string; quien: Persona; fecha: string; archivos: string[]; tipo: TipoEntrada; capturas: CapturasHoja; decision: string; porque: string }): string {
   const partes = ['## Qué se hizo', d.que.trim(), '## Quién', d.quien, '## Cuándo', conDia(d.fecha)]
   if (d.archivos.length) partes.push('## Archivos', d.archivos.map((a) => `- \`${a.replace(/`/g, '')}\``).join('\n'))
   if (d.tipo === 'diseño') {
@@ -1241,34 +1095,31 @@ export function armarInforme(d: { que: string; quien: Persona; fecha: string; ar
   return partes.join('\n\n')
 }
 
-function HojaNuevaEntrada({ modulo: m, tarea, hoy, keysUsadas, confirmaAlGuardar, onCerrar, onGuardar }: {
+function HojaNuevaEntrada({ modulo: m, tarea, hoy, keysUsadas, onCerrar, onGuardar }: {
   modulo: Modulo
-  tarea: AuditCheck | null
+  tarea: Tarea | null
   hoy: string | null
   keysUsadas: Set<string>
-  confirmaAlGuardar: (quien: Persona) => boolean
   onCerrar: () => void
-  onGuardar: (g: Omit<Guardar, 'plan'>) => Promise<void>
+  onGuardar: (g: Guardar) => void
 }) {
-  const quienInicial = (PERSONAS as string[]).includes(tarea?.quien ?? '') ? (tarea!.quien as Persona) : (m.def.persona ?? 'Ale')
   const [tipo, setTipo] = useState<TipoEntrada>('tarea')
-  const [quien, setQuien] = useState<Persona>(quienInicial)
+  const [quien, setQuien] = useState<Persona>(tarea?.quien ?? m.def.persona ?? 'Ale')
   const [fecha, setFecha] = useState(hoy ?? CICLO.inicio)
   const [titulo, setTitulo] = useState(tarea?.texto ?? '')
   const [que, setQue] = useState('')
   const [archivos, setArchivos] = useState('')
-  const [capturas, setCapturas] = useState<Capturas>({ antes1280: '', despues1280: '', antes390: '', despues390: '' })
+  const [capturas, setCapturas] = useState<CapturasHoja>({ antes1280: '', despues1280: '', antes390: '', despues390: '' })
   const [decision, setDecision] = useState('')
   const [porque, setPorque] = useState('')
   const [error, setError] = useState('')
-  const [guardando, setGuardando] = useState(false)
   const primerCampo = useRef<HTMLInputElement>(null)
 
   // Escape cierra, la página de atrás no scrollea y el foco arranca en el
   // título (y vuelve a donde estaba al cerrar). Corre una sola vez: con
-  // onCerrar en las deps se volvía a ejecutar en cada refresco de fondo y le
-  // robaba el foco a quien estaba escribiendo.
-  const cerrarConEscape = useEffectEvent((e: KeyboardEvent) => { if (e.key === 'Escape' && !guardando) onCerrar() })
+  // onCerrar en las deps se volvía a ejecutar en cada render y le robaba el
+  // foco a quien estaba escribiendo.
+  const cerrarConEscape = useEffectEvent((e: KeyboardEvent) => { if (e.key === 'Escape') onCerrar() })
   useEffect(() => {
     const previo = document.activeElement as HTMLElement | null
     const onKey = (e: KeyboardEvent) => cerrarConEscape(e)
@@ -1283,7 +1134,7 @@ function HojaNuevaEntrada({ modulo: m, tarea, hoy, keysUsadas, confirmaAlGuardar
     }
   }, [])
 
-  const enviar = async (e: React.FormEvent) => {
+  const enviar = (e: React.FormEvent) => {
     e.preventDefault()
     const t = titulo.trim()
     if (t.length < 2) return setError('Poné un título.')
@@ -1301,43 +1152,27 @@ function HojaNuevaEntrada({ modulo: m, tarea, hoy, keysUsadas, confirmaAlGuardar
     const base = `auditoria.${m.def.slug}.${fecha}-${slugDe(t)}`
     let key = base
     for (let n = 2; keysUsadas.has(key); n++) key = `${base}-${n}`
-    const limpias = Object.fromEntries(Object.entries(capturas).map(([k, v]) => [k, v.trim()])) as unknown as Capturas
+    const limpias = Object.fromEntries(Object.entries(capturas).map(([k, v]) => [k, v.trim()])) as unknown as CapturasHoja
     const informe = armarInforme({
       que, quien, fecha, tipo, decision, porque, capturas: limpias,
       archivos: archivos.split('\n').map((a) => a.trim()).filter(Boolean),
     })
     if (informe.length > 80_000) return setError('El informe es demasiado largo (más de 80.000 caracteres).')
-
-    // El DTO pide al menos 2 caracteres de foco: con una primera línea de una
-    // letra, va el título.
+    // Con una primera línea de una letra, el resumen es el título.
     const foco = focoDe(que)
     setError('')
-    setGuardando(true)
-    try {
-      await onGuardar({
-        tarea,
-        quien,
-        input: {
-          key,
-          area: t.startsWith('Transversal: ') ? 'TRANSVERSAL' : 'FRONTEND',
-          grupo: `Módulo · ${m.def.nombre} · ${tipo}`,
-          titulo: t,
-          foco: foco.length >= 2 ? foco : t,
-          checks: CHECKS_ENTRADA,
-          informe,
-          estado: 'PENDIENTE',
-          notas: JSON.stringify({ quien, tipo, ...(tarea && m.plan ? { plan: m.plan.key, tarea: tarea.id } : {}) }),
-        },
-      })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo guardar la entrada.')
-      setGuardando(false)
-    }
+    onGuardar({
+      tarea,
+      entrada: {
+        key, modulo: m.def.slug as ConPlan, tipo, transversal: t.startsWith('Transversal: '), titulo: t, foco: foco.length >= 2 ? foco : t,
+        quien, fecha, informe, abierta: false, origen: 'navegador', confirmada: null,
+      },
+    })
   }
 
   const campo = { ...inputStyle, width: '100%' }
   const area = { ...inputStyle, width: '100%', height: 'auto', padding: '10px 13px', lineHeight: 1.5, resize: 'vertical' as const }
-  const captura = (k: keyof Capturas, label: string, ayuda?: string) => (
+  const captura = (k: keyof CapturasHoja, label: string, ayuda?: string) => (
     <label className="mo-campo">
       {label}
       <input value={capturas[k]} onChange={(e) => setCapturas((c) => ({ ...c, [k]: e.target.value }))} placeholder="/auditoria/modulos/… o https://…" inputMode="url" className="ds-field" style={campo} />
@@ -1346,7 +1181,7 @@ function HojaNuevaEntrada({ modulo: m, tarea, hoy, keysUsadas, confirmaAlGuardar
   )
 
   return (
-    <div className="mo-hoja-fondo" onClick={guardando ? undefined : onCerrar}>
+    <div className="mo-hoja-fondo" onClick={onCerrar}>
       <div className="mo-hoja" role="dialog" aria-modal="true" aria-labelledby="mo-hoja-titulo" onClick={(e) => e.stopPropagation()}>
         <div className="mo-hoja-cab">
           <h3 id="mo-hoja-titulo" style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--color-text)' }}>Nueva entrada · {m.def.nombre}</h3>
@@ -1354,13 +1189,16 @@ function HojaNuevaEntrada({ modulo: m, tarea, hoy, keysUsadas, confirmaAlGuardar
             <X size={18} aria-hidden />
           </button>
         </div>
-        <form onSubmit={(e) => void enviar(e)}>
+        <form onSubmit={enviar}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: 20 }}>
             {tarea && (
               <p style={{ margin: 0, fontSize: 13, color: 'var(--color-muted)', lineHeight: 1.5 }}>
-                Documenta la tarea <strong style={{ color: 'var(--color-body)' }}>{tarea.texto}</strong>. Al guardarla, la tarea queda vinculada; si la confirmás vos, queda tildada.
+                Documenta la tarea <strong style={{ color: 'var(--color-body)' }}>{tarea.texto}</strong>. Al guardarla, la tarea queda vinculada y se tilda cuando se confirma la entrada.
               </p>
             )}
+            <p className="mo-campo-ayuda" style={{ margin: 0 }}>
+              Se guarda en este navegador. Para que la vea todo el equipo, pasala a <code>modules/superadmin/modulos/entradas.ts</code>.
+            </p>
             {error && <ErrorBox msg={error} />}
 
             <div className="mo-campo">
@@ -1384,9 +1222,7 @@ function HojaNuevaEntrada({ modulo: m, tarea, hoy, keysUsadas, confirmaAlGuardar
                 <select value={quien} onChange={(e) => setQuien(e.target.value as Persona)} className="ds-field" style={campo}>
                   {PERSONAS.map((x) => <option key={x} value={x}>{x}</option>)}
                 </select>
-                <span className="mo-campo-ayuda">
-                  {confirmaAlGuardar(quien) ? 'Sos vos: queda confirmada al guardarla.' : `Queda pendiente hasta que la confirme ${quien}.`}
-                </span>
+                <span className="mo-campo-ayuda">Queda pendiente hasta que la confirme {quien}.</span>
               </label>
               <label className="mo-campo">
                 Cuándo
@@ -1433,10 +1269,8 @@ function HojaNuevaEntrada({ modulo: m, tarea, hoy, keysUsadas, confirmaAlGuardar
             )}
           </div>
           <div className="mo-hoja-pie">
-            <button type="button" onClick={onCerrar} disabled={guardando} className="ds-hover mo-boton" style={btnGhost}>Cancelar</button>
-            <button type="submit" disabled={guardando} className="ds-hover mo-boton" style={{ ...btnPrimary, opacity: guardando ? 0.6 : 1 }}>
-              {guardando ? 'Guardando…' : 'Guardar entrada'}
-            </button>
+            <button type="button" onClick={onCerrar} className="ds-hover mo-boton" style={btnGhost}>Cancelar</button>
+            <button type="submit" className="ds-hover mo-boton" style={btnPrimary}>Guardar entrada</button>
           </div>
         </form>
       </div>
