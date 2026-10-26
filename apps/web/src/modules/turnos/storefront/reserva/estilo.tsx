@@ -460,6 +460,8 @@ export const CSS_RESERVA = `
   }
   .tur-toast { position: fixed; left: 50%; bottom: 24px; z-index: 200; display: flex; align-items: center; gap: 10px; max-width: calc(100vw - 32px); padding: 14px 18px; border-radius: 14px;
     background: var(--color-text); color: var(--color-bg); font-size: 15px; font-weight: 600; box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.55); transform: translateX(-50%); animation: turToast 300ms var(--tur-ease) both; }
+  /* Con un diálogo abierto el aviso sube: abajo taparía sus botones (en celular el diálogo es una hoja que sale de abajo). */
+  .tur-cont:has(.tur-velo) .tur-toast { top: 56px; bottom: auto; }
 
   /* ── Estado vacío ──────────────────────────────────────────────────────── */
   .tur-vacio { max-width: 520px; margin: 0 auto; text-align: center; }

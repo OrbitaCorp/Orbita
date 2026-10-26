@@ -33,7 +33,7 @@ type Filtro = 'todas' | 'recomendadas' | 'activas'
 const CSS_HUB = `
   .tua-vidriera { border-radius: 24px; padding: 34px; margin-bottom: 24px; border: 1px solid var(--color-border); display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 28px; align-items: center; }
   .tua-vidriera h1 { font-size: 34px; line-height: 1.08; max-width: 18ch; }
-  .tua-vidriera-panel { display: flex; align-items: center; gap: 18px; padding: 18px 20px; border-radius: 20px; background: rgba(11,16,29,0.62); border: 1px solid var(--color-border-strong); backdrop-filter: blur(8px); }
+  .tua-vidriera-panel { display: flex; align-items: center; gap: 18px; padding: 18px 20px; border-radius: 20px; background: var(--color-surface); border: 1px solid var(--color-border); }
   .tua-barra { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 26px; }
   .tua-grupo { margin-bottom: 34px; }
   .tua-grupo-cab { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
@@ -97,6 +97,7 @@ export default function AvanzadoTurnos({ rubro }: { rubro: RubroTurnos }) {
   }
 
   const recomendadas = FUNCIONES.filter(f => f.recomendada(rubro))
+  const hayRecomendadas = recomendadas.length > 0
   const nActivas = FUNCIONES.filter(f => activas[f.id]).length // lo guardado de funciones que ya no existen no cuenta
   const q = busca.trim().toLowerCase()
   const visibles = (f: Funcion) =>
@@ -104,7 +105,7 @@ export default function AvanzadoTurnos({ rubro }: { rubro: RubroTurnos }) {
     && (!q || `${f.label} ${f.desc} ${grupoPorId(f.grupo).label}`.toLowerCase().includes(q))
   const hayAlguna = FUNCIONES.some(visibles)
   const clientes = pluralCliente(rubro).toLowerCase()
-  const filtros: [Filtro, string, number][] = [['todas', 'Todas', FUNCIONES.length], ['recomendadas', 'Recomendadas', recomendadas.length], ['activas', 'Activas', nActivas]]
+  const filtros: [Filtro, string, number][] = [['todas', 'Todas', FUNCIONES.length], ...(hayRecomendadas ? [['recomendadas', 'Recomendadas', recomendadas.length] as [Filtro, string, number]] : []), ['activas', 'Activas', nActivas]]
 
   let orden = 0
   return (
@@ -116,13 +117,18 @@ export default function AvanzadoTurnos({ rubro }: { rubro: RubroTurnos }) {
         <div style={{ minWidth: 0 }}>
           <div className="tuo-eyebrow" style={{ marginBottom: 14 }}>Paquete Avanzado</div>
           <h1 id="tua-titulo" className="tuo-h1">Que tu agenda trabaje con vos</h1>
+          {/* Con tres funciones hay rubros (la barbería) sin ninguna recomendada: ahí no se ofrece "ver las 0". */}
           <p className="tuo-bajada" style={{ fontSize: 15, color: 'var(--color-body)', marginTop: 12 }}>
             {FUNCIONES.length} herramientas para llenar huecos y cobrar por adelantado a tus {clientes}.
-            Las recomendadas son las que mejor le calzan a {rubro.label.toLowerCase()} ({MODO_LABEL[rubro.modo].toLowerCase()}).
+            {hayRecomendadas
+              ? <> Las recomendadas son las que mejor le calzan a {rubro.label.toLowerCase()} ({MODO_LABEL[rubro.modo].toLowerCase()}).</>
+              : <> Para {rubro.label.toLowerCase()} sirven todas por igual: elegí por lo que más te importa hoy.</>}
           </p>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 20 }}>
-            <Boton variant="primary" icon={<Sparkles size={15} aria-hidden />} onClick={() => setFiltro('recomendadas')}>Ver las {recomendadas.length} recomendadas</Boton>
-          </div>
+          {hayRecomendadas && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 20 }}>
+              <Boton variant="primary" icon={<Sparkles size={15} aria-hidden />} onClick={() => setFiltro('recomendadas')}>Ver {recomendadas.length === 1 ? 'la recomendada' : `las ${recomendadas.length} recomendadas`}</Boton>
+            </div>
+          )}
         </div>
         <div className="tua-vidriera-panel">
           <Anillo valor={nActivas / FUNCIONES.length} size={84} grosor={8} color="#60A5FA" label={`${nActivas} de ${FUNCIONES.length} funciones activas`}>

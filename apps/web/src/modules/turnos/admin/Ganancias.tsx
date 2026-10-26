@@ -23,9 +23,17 @@ import {
   type Liquidacion, type Pago, type Periodo, type Persona, type Rol,
 } from '../datos/equipo'
 
+// Ganancias vive adentro de Configuración (al lado de su menú) y también suelta,
+// a todo el ancho: el ancho que manda es el de la pantalla, no el de la ventana.
+// Por eso los números y la tabla se acomodan con container queries. El
+// contenedor va en envoltorios sin nada fijo adentro: un container también
+// puede quedar como referencia de lo que va position: fixed (los modales).
 export const CSS_GANANCIAS = `
-  .tu-gan-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 18px; }
+  .tu-gan-kpis-marco { container: tu-gan-kpis / inline-size; margin-bottom: 18px; }
+  .tu-gan-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+  @container tu-gan-kpis (max-width: 900px) { .tu-gan-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   .tu-gan-kpis .tuo-ind-valor { font-size: 26px !important; }
+  .tu-gan-tabla { container: tu-gan-tabla / inline-size; }
   .tu-gan-barra { display: flex; height: 14px; border-radius: 999px; overflow: hidden; background: var(--color-surface-alt); }
   .tu-gan-barra > span { min-width: 3px; transition: width 600ms cubic-bezier(0.22, 1, 0.36, 1); }
   .tu-gan-barra > span + span { box-shadow: -2px 0 0 var(--color-bg); }
@@ -48,7 +56,8 @@ export const CSS_GANANCIAS = `
   .tu-gan-renglon { display: grid; grid-template-columns: 92px minmax(0, 1fr) 92px 92px; gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--color-border); font-size: 13px; }
   .tu-gan-renglon:first-child { border-top: none; }
   .tu-gan-renglon > span:nth-child(n+3) { text-align: right; }
-  @media (max-width: 1180px) {
+  /* La tabla entera pide unos 1000 px (las columnas de números son fijas): con menos, cada persona es una tarjeta. */
+  @container tu-gan-tabla (max-width: 1000px) {
     .tu-gan-head { display: none; }
     .tu-gan-fila { grid-template-columns: minmax(0, 1fr) auto 18px; row-gap: 10px; padding: 14px 16px; }
     .tu-gan-fila > .tu-gan-forma { display: none; }
@@ -64,8 +73,8 @@ export const CSS_GANANCIAS = `
     .tu-gan-kpis .tuo-ind-valor { font-size: 20px !important; }
     .tu-gan-kpis .tuo-ind .tuo-rotulo { white-space: normal !important; letter-spacing: 0.06em; line-height: 1.25; }
   }
+  @container tu-gan-tabla (max-width: 520px) { .tu-gan-fila > .tu-gan-nums { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 560px) {
-    .tu-gan-fila > .tu-gan-nums { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .tu-gan-tiles { grid-template-columns: minmax(0, 1fr); }
     .tu-gan-renglon { grid-template-columns: 76px minmax(0, 1fr) 78px; }
     .tu-gan-renglon > span:nth-child(3) { display: none; }
@@ -168,25 +177,25 @@ export default function Ganancias({ rubro, personas, roles, clientes, turnosDelD
         }
       />
 
-      <div className="tu-gan-kpis">
+      <div className="tu-gan-kpis-marco"><div className="tu-gan-kpis">
         {yo ? (
           <>
-            <Indicador i={1} label="Turnos atendidos" valor={yo.l.turnos} Icon={CalendarCheck} color="#3B82F6" />
-            <Indicador i={2} label="Facturaste" valor={plata(yo.l.facturado)} Icon={Wallet} color="#8B5CF6" />
-            <Indicador i={3} label="Te corresponde" valor={plata(yo.l.paraLaPersona)} Icon={HandCoins} color="#10B981" nota={pagoTxt(yo.p.pago, rubro)} />
+            <Indicador i={1} label="Turnos atendidos" valor={yo.l.turnos} Icon={CalendarCheck} />
+            <Indicador i={2} label="Facturaste" valor={plata(yo.l.facturado)} Icon={Wallet} />
+            <Indicador i={3} label="Te corresponde" valor={plata(yo.l.paraLaPersona)} Icon={HandCoins} nota={pagoTxt(yo.p.pago, rubro)} />
             {yo.p.pago?.forma === 'alquiler'
-              ? <Indicador i={4} label="Alquiler por pagar" valor={plata(aCobrar(yo.p, yo.pend))} Icon={Clock3} color="#F59E0B" nota={aCobrar(yo.p, yo.pend) > 0 ? `lo pagás ${CADA_TXT[yo.p.pago.cada]}` : 'Estás al día'} />
-              : <Indicador i={4} label="Pendiente de cobro" valor={plata(aPagar(yo.p, yo.pend))} Icon={Clock3} color="#F59E0B" nota={aPagar(yo.p, yo.pend) > 0 ? `se te liquida ${yo.p.pago ? CADA_TXT[yo.p.pago.cada] : ''}` : 'Estás al día'} />}
+              ? <Indicador i={4} label="Alquiler por pagar" valor={plata(aCobrar(yo.p, yo.pend))} Icon={Clock3} nota={aCobrar(yo.p, yo.pend) > 0 ? `lo pagás ${CADA_TXT[yo.p.pago.cada]}` : 'Estás al día'} />
+              : <Indicador i={4} label="Pendiente de cobro" valor={plata(aPagar(yo.p, yo.pend))} Icon={Clock3} nota={aPagar(yo.p, yo.pend) > 0 ? `se te liquida ${yo.p.pago ? CADA_TXT[yo.p.pago.cada] : ''}` : 'Estás al día'} />}
           </>
         ) : (
           <>
-            <Indicador i={1} label="Facturado" valor={plata(negocioTotal.total)} Icon={Wallet} color="#3B82F6" nota={`${negocioTotal.turnos} turno${negocioTotal.turnos === 1 ? '' : 's'} atendido${negocioTotal.turnos === 1 ? '' : 's'}`} />
-            <Indicador i={2} label="Para el equipo" valor={plata(equipo)} Icon={Users} color="#8B5CF6" nota="comisiones y sueldos" />
-            <Indicador i={3} label="Queda para el negocio" valor={plata(negocio)} Icon={Building2} color="#10B981" nota={negocioTotal.total > 0 ? `${Math.round((negocio / negocioTotal.total) * 100)}% de lo facturado` : undefined} />
-            <Indicador i={4} label="Pendiente de pago" valor={plata(pendiente)} Icon={Clock3} color="#F59E0B" nota={conPendiente ? `a ${conPendiente} persona${conPendiente === 1 ? '' : 's'}` : 'Estás al día'} />
+            <Indicador i={1} label="Facturado" valor={plata(negocioTotal.total)} Icon={Wallet} nota={`${negocioTotal.turnos} turno${negocioTotal.turnos === 1 ? '' : 's'} atendido${negocioTotal.turnos === 1 ? '' : 's'}`} />
+            <Indicador i={2} label="Para el equipo" valor={plata(equipo)} Icon={Users} nota="comisiones y sueldos" />
+            <Indicador i={3} label="Queda para el negocio" valor={plata(negocio)} Icon={Building2} nota={negocioTotal.total > 0 ? `${Math.round((negocio / negocioTotal.total) * 100)}% de lo facturado` : undefined} />
+            <Indicador i={4} label="Pendiente de pago" valor={plata(pendiente)} Icon={Clock3} nota={conPendiente ? `a ${conPendiente} persona${conPendiente === 1 ? '' : 's'}` : 'Estás al día'} />
           </>
         )}
-      </div>
+      </div></div>
 
       {!propio && suma > 0 && (
         <section className="tuo-card tuo-card--pad tuo-entra" style={{ ['--i' as string]: 5, marginBottom: 18 }} aria-label="Cómo se reparte lo facturado">
@@ -220,7 +229,7 @@ export default function Ganancias({ rubro, personas, roles, clientes, turnosDelD
           )}
         </div>
       ) : (
-        <div className="tuo-card tuo-entra" style={{ ['--i' as string]: 6 }}>
+        <div className="tuo-card tuo-entra tu-gan-tabla" style={{ ['--i' as string]: 6 }}>
           <div className="tu-gan-head tuo-rotulo">
             <span>Persona</span><span>Cómo cobra</span>
             {['Turnos', 'Facturó', 'Le corresponde', 'Para el negocio'].map(k => <span key={k} className="tu-gan-num">{k}</span>)}

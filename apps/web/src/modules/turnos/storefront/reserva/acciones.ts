@@ -1,31 +1,27 @@
 // Lo que pasa después de reservar: calendario, mapa y WhatsApp. Son las únicas
 // acciones que hacen algo de verdad en la demo, y las tres salen del navegador
 // (un archivo .ics, un link a Maps, un link a wa.me): no dependen de ninguna API.
+import { generarICS, descargarICS as bajarICS } from '@/lib/reservas/ics'
+import { iso } from '@/lib/reservas/fechas'
 import type { Fecha } from './calendario'
 
 export const CODIGO_DEMO = 'ORB-4F7K'
 
-const dos = (n: number) => String(n).padStart(2, '0')
-const limpio = (s: string) => s.replace(/([,;\\])/g, '\\$1')
-
-/** Baja un .ics con el turno: lo abren Google Calendar, el calendario del iPhone y Outlook. */
+/**
+ * Baja un .ics con el turno: lo abren Google Calendar, el calendario del iPhone
+ * y Outlook. Lo arma la librería de reservas, la misma de Alquileres y
+ * Gimnasio: hora de Argentina pasada a UTC (el turno queda a las 10 del local
+ * aunque el teléfono esté en otra zona), líneas plegadas y la URL del archivo
+ * liberada después de la descarga (si se libera en el acto, Safari la corta).
+ */
 export function descargarICS({ titulo, fecha, inicio, duracion, lugar }: { titulo: string; fecha: Fecha; inicio: number; duracion: number; lugar: string }) {
-  const sello = (m: number) => `2026${dos(fecha.mes)}${dos(fecha.dia)}T${dos(Math.floor(m / 60))}${dos(m % 60)}00`
-  const cuerpo = [
-    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Orbita//Turnos//ES', 'BEGIN:VEVENT',
-    `UID:${CODIGO_DEMO}-${sello(inicio)}@orbita.site`, 'DTSTAMP:20260926T134000',
-    `DTSTART:${sello(inicio)}`, `DTEND:${sello(Math.min(inicio + duracion, 23 * 60 + 59))}`,
-    `SUMMARY:${limpio(titulo)}`, `LOCATION:${limpio(lugar)}`,
-    'END:VEVENT', 'END:VCALENDAR',
-  ].join('\r\n')
-  const url = URL.createObjectURL(new Blob([cuerpo], { type: 'text/calendar;charset=utf-8' }))
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'turno.ics'
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  URL.revokeObjectURL(url)
+  const dia = iso(2026, fecha.mes, fecha.dia)
+  const contenido = generarICS([{
+    uid: `${CODIGO_DEMO}-${dia}-${inicio}@orbita.site`, titulo, lugar,
+    inicio: { fecha: dia, minuto: inicio },
+    fin: { fecha: dia, minuto: Math.min(inicio + duracion, 23 * 60 + 59) },
+  }], { nombre: titulo, ahora: new Date(Date.UTC(2026, 8, 26, 13, 40)) }) // el "ahora" de la demo: sábado 26/09 a las 10:40
+  bajarICS(contenido, 'turno.ics')
 }
 
 export const linkMapa = (direccion: string, barrio: string) =>

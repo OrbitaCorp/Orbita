@@ -3,8 +3,7 @@
 // dónde conviene; la vista previa muestra los horarios con su precio final.
 import { useState } from 'react'
 import { Plus, Trash2, TrendingDown, Percent, CalendarCheck } from 'lucide-react'
-import { Button } from '@/design-system/components/Button'
-import { ShellFuncion, Seccion, Segmentado, FilaSwitch, Dato, VistaCliente, BotonVista, BotonIcono, inputStyle } from './ui'
+import { Boton, ShellFuncion, Seccion, Segmentado, FilaSwitch, Dato, VistaCliente, BotonVista, BotonIcono, inputStyle } from './ui'
 import { ars, servicioBase, FRANJAS_INICIALES, OCUPACION, FRANJAS_OCUPACION, type Franja } from './datosAvanzado'
 import { DIAS_CORTOS } from '@/modules/turnos/datos'
 import type { PropsFuncion } from './tipos'
@@ -29,9 +28,9 @@ export default function PreciosHorario(p: PropsFuncion) {
       bajada="Poné un descuento en los horarios que cuesta llenar. El precio final se ve al elegir horario, así cada uno decide."
       textoOn="Los horarios con descuento se marcan en la reserva con el porcentaje y el precio final."
       kpis={<>
-        <Dato label="Ocupación en franjas con descuento" valor="+18 pts" nota="Antes vs. después · ejemplo" Icon={TrendingDown} acento="var(--color-success)" />
+        <Dato label="Ocupación en franjas con descuento" valor="+18 pts" nota="Antes vs. después · ejemplo" Icon={TrendingDown} />
         <Dato label="Descuento promedio" valor={`${Math.round(Math.abs(franjas.filter(f => f.ajuste < 0).reduce((s, f) => s + f.ajuste, 0) / Math.max(1, franjas.filter(f => f.ajuste < 0).length)))}%`} nota="Según tus franjas" Icon={Percent} />
-        <Dato label="Turnos con precio especial" valor="37" nota="Este mes · ejemplo" Icon={CalendarCheck} acento="#8B5CF6" />
+        <Dato label="Turnos con precio especial" valor="37" nota="Este mes · ejemplo" Icon={CalendarCheck} />
       </>}
       preview={<PreviewHorarios {...p} franjas={franjas} tachado={tachado} />}
     >
@@ -62,7 +61,7 @@ export default function PreciosHorario(p: PropsFuncion) {
       </Seccion>
 
       <Seccion titulo="Franjas con precio especial" accion={
-        <Button variant="outline" size="sm" icon={<Plus size={14} />} onClick={() => { setFranjas(l => [...l, { id: `f${siguiente}`, dias: 'Lun a vie', desde: '12:00', hasta: '14:00', ajuste: -10 }]); setSiguiente(n => n + 1) }}>Agregar</Button>
+        <Boton variant="outline" size="sm" icon={<Plus size={14} />} onClick={() => { setFranjas(l => [...l, { id: `f${siguiente}`, dias: 'Lun a vie', desde: '12:00', hasta: '14:00', ajuste: -10 }]); setSiguiente(n => n + 1) }}>Agregar</Boton>
       }>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {franjas.map((f, i) => (

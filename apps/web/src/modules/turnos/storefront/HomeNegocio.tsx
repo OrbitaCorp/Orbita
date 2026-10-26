@@ -13,13 +13,14 @@ import {
   ArrowRight, Clock, MapPin, Navigation, MessageCircle, CalendarCheck, BellRing, ShieldCheck, Sparkles, Phone, AtSign, MousePointerClick,
   ChevronLeft, ChevronRight, X, Check, Percent, Gift, Home, UserRoundCheck,
 } from 'lucide-react'
-import { duracionTxt, horaTxt, recursosDe, type RubroTurnos } from '@/modules/turnos/datos'
+import { duracionTxt, horaTxt, recursosDe, semanaDe, semanaDeRecurso, type RubroTurnos } from '@/modules/turnos/datos'
 import { beneficiosTxt, useNegocioDemo, type BeneficioTxt } from '@/modules/turnos/datos/negocio'
 import SitioNegocio from './SitioNegocio'
 import { CSS_PORTADA } from './estilos'
 import { Abierto, AnillosTema, Encabezado, Foto, HOY, HorasDia, Marca, OrbitaMini, Precio, ProximoLibre, Reveal, SemanaOrbita, TarjetaSellos, estadoLocal, proximoLibre, ruta, useDialogo } from './piezas'
 import { useContacto } from './ContactoDemo'
 import { linkMapa } from './reserva/acciones'
+import { enDias, esHoy, mismaFecha, nombreDia, proximosDias } from './reserva/calendario'
 import { RETRATOS, altFoto, temaDe, type TemaNegocio } from './tema'
 
 interface P { rubro: RubroTurnos; t: TemaNegocio }
@@ -405,13 +406,25 @@ function Carta({ rubro, t }: P) {
 function Equipo({ rubro }: { rubro: RubroTurnos }) {
   const equipo = recursosDe(rubro)
   const esp = rubro.servicios.map(s => s.nombre)
-  const horas = [[15 * 60 + 30, 17 * 60, 18 * 60 + 30], [17 * 60, 17 * 60 + 30, 18 * 60], [10 * 60, 11 * 60 + 30, 14 * 60]]
+  const semana = semanaDe(rubro)
+  const duracion = rubro.servicios[0]?.duracion ?? 30
+  // Los horarios que se ven son los libres de verdad de cada uno: los de su
+  // agenda (sus días y su horario, dentro del del negocio), como en el paso
+  // "con quién" de la reserva. Como ahí, cada uno arranca un lugar más adelante
+  // para que no den todos lo mismo; se muestran los de ese día, hasta tres.
+  const proximos = (i: number) => {
+    const libres = proximosDias(semanaDeRecurso(equipo[i], semana), duracion, 7).flatMap(d => d.grilla.filter(g => g.libre).map(g => ({ f: d.f, m: g.m })))
+    const desde = libres[Math.min(i, libres.length - 1)]
+    if (!desde) return null
+    const cuando = esHoy(desde.f) ? 'hoy' : enDias(desde.f) === 1 ? 'mañana' : `el ${nombreDia(desde.f).toLowerCase()}`
+    return { cuando, horas: libres.filter(x => mismaFecha(x.f, desde.f) && x.m >= desde.m).slice(0, 3).map(x => x.m) }
+  }
   return (
     <section id="equipo" className="tu-cont tu-sec tu-ancla">
       <Reveal><Encabezado eyebrow="El equipo" titulo={<>Elegí <em>con quién</em></>} bajada={`Cada ${rubro.profesional.toLowerCase()} tiene su propia agenda: tocá un horario y seguís la reserva con esa persona.`} /></Reveal>
       <div className="tu-grilla tu-grilla--eq">
         {equipo.map((r, i) => {
-          const manana = i % 3 === 2
+          const libre = proximos(i)
           return (
             <Reveal key={r.id} delay={i * 90}>
               <article className="tu-card tu-card-h tu-spot tup-pro">
@@ -423,9 +436,9 @@ function Equipo({ rubro }: { rubro: RubroTurnos }) {
                   </span>
                 </Foto>
                 <div className="tup-pro-pie">
-                  <div className="tu-rotulo" style={{ display: 'flex', alignItems: 'center', gap: 7 }}><span className="tu-vivo" aria-hidden /> Libre {manana ? 'el lunes' : 'hoy'}</div>
+                  <div className="tu-rotulo" style={{ display: 'flex', alignItems: 'center', gap: 7 }}>{libre ? <><span className="tu-vivo" aria-hidden /> Libre {libre.cuando}</> : 'Sin lugar esta semana'}</div>
                   <div className="tu-horas">
-                    {horas[i % 3].map(h => <Link key={h} href={ruta('reserva', rubro.key, { con: r.id })} className="tu-hora" aria-label={`Reservar con ${r.nombre} a las ${horaTxt(h)}`}>{horaTxt(h)}</Link>)}
+                    {libre?.horas.map(h => <Link key={h} href={ruta('reserva', rubro.key, { con: r.id })} className="tu-hora" aria-label={`Reservar con ${r.nombre} ${libre.cuando} a las ${horaTxt(h)}`}>{horaTxt(h)}</Link>)}
                     <Link href={ruta('reserva', rubro.key, { con: r.id })} aria-label={`Ver más horarios de ${r.nombre}`} className="tu-hora tu-hora--mas"><ArrowRight size={15} aria-hidden /></Link>
                   </div>
                 </div>

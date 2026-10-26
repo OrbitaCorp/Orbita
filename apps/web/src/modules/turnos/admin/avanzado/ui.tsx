@@ -75,7 +75,7 @@ export const CSS_AVANZADO = CSS_UI_CONFIG + `
     background: var(--color-surface); border-top: 1px solid var(--color-border); }
   .tua-escena > svg { position: absolute; z-index: -1; left: 50%; top: 50%; width: 560px; height: 560px; margin: -280px 0 0 -280px; color: var(--color-primary); opacity: 0.5; pointer-events: none; }
   .tua-escena > svg > g { transform-origin: 280px 280px; animation: tuoGira 40s linear infinite; }
-  .tua-tel { position: relative; width: min(304px, 100%); border-radius: 46px; padding: 10px; box-sizing: border-box; background: linear-gradient(145deg, #2A3350 0%, #0B0F19 38%, #0B0F19 62%, #1B2238 100%);
+  .tua-tel { position: relative; width: min(304px, 100%); border-radius: 46px; padding: 10px; box-sizing: border-box; background: #0B0F19;
     box-shadow: 0 0 0 1px rgba(255,255,255,0.10) inset, 0 40px 70px -28px rgba(3,6,14,0.65), 0 18px 30px -18px rgba(3,6,14,0.5);
     transform: perspective(1600px) rotateY(-6deg) rotateX(2deg); transition: transform 600ms var(--tuo-ease, ease), box-shadow 600ms ease; will-change: transform; }
   .tua-tel::before, .tua-tel::after { content: ''; position: absolute; width: 3px; border-radius: 2px; background: #1B2238; }
@@ -212,9 +212,9 @@ export function Seccion({ titulo, desc, children, accion, Icon }: { titulo: stri
   )
 }
 
-/** Número de contexto. La nota dice siempre si es un dato de ejemplo. */
-export function Dato({ label, valor, nota, Icon, acento = 'var(--color-primary)' }: { label: string; valor: string; nota?: string; Icon?: LucideIcon; acento?: string }) {
-  return <Indicador label={label} valor={valor} nota={nota} Icon={Icon ?? Sparkles} color={acento} />
+/** Número de contexto. La nota dice siempre si es un dato de ejemplo. Va en el acento, como todos los indicadores. */
+export function Dato({ label, valor, nota, Icon }: { label: string; valor: string; nota?: string; Icon?: LucideIcon }) {
+  return <Indicador label={label} valor={valor} nota={nota} Icon={Icon ?? Sparkles} />
 }
 
 export function Aviso({ children }: { children: ReactNode }) {
@@ -397,7 +397,7 @@ export function BotonVista({ children, aviso, href, variante = 'primario', chico
  * Celular pintado con la identidad del negocio (tema.ts): las mismas
  * variables --color-* que usa el sitio real, así el preview se ve como el
  * sitio de ese rubro y no como el panel. Es la estrella de la columna derecha:
- * marco con brillo, isla, leve inclinación que se endereza al acercar el mouse.
+ * marco liso, isla, leve inclinación que se endereza al acercar el mouse.
  */
 export function VistaCliente({ rubro, titulo = 'Así lo ve tu cliente', nota, children, fondo, cabecera = true }: { rubro: RubroTurnos; titulo?: string; nota?: ReactNode; children: ReactNode; fondo?: string; /** false = pantalla completa (ej. un chat de WhatsApp). */ cabecera?: boolean }) {
   const t = temaDe(rubro)

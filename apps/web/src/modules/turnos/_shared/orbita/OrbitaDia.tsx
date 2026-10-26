@@ -49,32 +49,19 @@ export function OrbitaDia({ recursos, turnos, ahora, apertura = 8 * 60, cierre =
       aria-label={`El día en órbita: ${activos.length} turnos entre las ${horaTxt(apertura)} y las ${horaTxt(cierre)}`}
       style={{ display: 'block', maxWidth: '100%', height: 'auto', overflow: 'visible' }}
     >
+      {/* Señalar un tramo lo engrosa y apaga los demás: sin brillo alrededor. */}
       <style>{`
-        .tuo-od-tramo { cursor: pointer; transition: stroke-width 180ms ease, opacity 180ms ease, filter 180ms ease; outline: none; }
-        .tuo-od-tramo:hover, .tuo-od-tramo:focus-visible, .tuo-od-tramo[data-foco="true"] { stroke-width: ${GROSOR + 6}px; opacity: 1 !important; filter: drop-shadow(0 0 7px currentColor); }
+        .tuo-od-tramo { cursor: pointer; transition: stroke-width 180ms ease, opacity 180ms ease; outline: none; }
+        .tuo-od-tramo:hover, .tuo-od-tramo:focus-visible, .tuo-od-tramo[data-foco="true"] { stroke-width: ${GROSOR + 6}px; opacity: 1 !important; }
         .tuo-od[data-con-foco="true"] .tuo-od-tramo:not([data-foco="true"]) { opacity: 0.3 !important; }
         .tuo-od-traza { stroke-dasharray: var(--largo); animation: tuoTraza 1100ms cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: calc(var(--i, 0) * 45ms + 200ms); }
         @media (prefers-reduced-motion: reduce) { .tuo-od-traza { animation: none; } .tuo-od-tramo { transition: none; } }
       `}</style>
-      <defs>
-        <linearGradient id="tuoOdTiempo" x1="0" y1="1" x2="1" y2="0">
-          <stop offset="0%" stopColor="#3B82F6" stopOpacity="0.15" />
-          <stop offset="100%" stopColor="#93C5FD" />
-        </linearGradient>
-        <radialGradient id="tuoOdNucleo" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#3B82F6" stopOpacity="0.30" />
-          <stop offset="60%" stopColor="#3B82F6" stopOpacity="0.07" />
-          <stop offset="100%" stopColor="#3B82F6" stopOpacity="0" />
-        </radialGradient>
-      </defs>
 
-      {/* Resplandor del planeta, detrás de la hora */}
-      <circle cx={C} cy={C} r={84} fill="url(#tuoOdNucleo)" />
-
-      {/* Órbita del tiempo: pista punteada + lo que ya pasó del día */}
+      {/* Órbita del tiempo: pista punteada + lo que ya pasó del día, en el acento y plano */}
       <path d={arco(C, C, R_TIEMPO, INICIO, INICIO + BARRIDO)} fill="none" stroke="var(--color-border-strong)" strokeWidth={1} strokeDasharray="1.5 6" strokeLinecap="round" />
       {ahora > apertura && (
-        <path d={arco(C, C, R_TIEMPO, INICIO, ang(ahora))} fill="none" stroke="url(#tuoOdTiempo)" strokeWidth={2} strokeLinecap="round" />
+        <path d={arco(C, C, R_TIEMPO, INICIO, ang(ahora))} fill="none" stroke="var(--color-primary)" strokeOpacity={0.7} strokeWidth={2} strokeLinecap="round" />
       )}
 
       {/* Horas */}
@@ -126,9 +113,9 @@ export function OrbitaDia({ recursos, turnos, ahora, apertura = 8 * 60, cierre =
       {/* Satélite: ahora */}
       {ahora >= apertura && ahora <= cierre && (
         <g aria-hidden>
-          <line x1={punto(C, C, 150 - (anillos.length - 1) * 23 - 12, ang(ahora))[0]} y1={punto(C, C, 150 - (anillos.length - 1) * 23 - 12, ang(ahora))[1]} x2={sx} y2={sy} stroke="#93C5FD" strokeWidth={1} strokeDasharray="2 3" opacity={0.7} />
-          <circle cx={sx} cy={sy} r={11} fill="#60A5FA" opacity={0.22} className="tuo-late" />
-          <circle cx={sx} cy={sy} r={5} fill="#BFDBFE" stroke="#3B82F6" strokeWidth={2} />
+          <line x1={punto(C, C, 150 - (anillos.length - 1) * 23 - 12, ang(ahora))[0]} y1={punto(C, C, 150 - (anillos.length - 1) * 23 - 12, ang(ahora))[1]} x2={sx} y2={sy} stroke="var(--color-primary)" strokeWidth={1} strokeDasharray="2 3" opacity={0.7} />
+          <circle cx={sx} cy={sy} r={9} fill="none" stroke="var(--color-primary)" strokeOpacity={0.45} strokeWidth={1} />
+          <circle cx={sx} cy={sy} r={5} fill="var(--color-bg)" stroke="var(--color-primary)" strokeWidth={2.5} />
         </g>
       )}
 

@@ -58,6 +58,20 @@ export const CSS_TURNOS = `
   .tuo-card--accion:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .tuo-card--sel { border-color: var(--color-primary) !important; box-shadow: 0 0 0 1px var(--color-primary) !important; }
 
+  /* ── Indicador: número grande con su tendencia ─────────────────────────────
+     Es su propio container: en una tarjeta angosta (cuatro en fila al lado del
+     menú) el número se achica y la tendencia se angosta, y si no entra se va;
+     nunca se sale de la tarjeta. */
+  .tuo-ind { container-type: inline-size; }
+  .tuo-ind-ico { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; flex-shrink: 0; color: var(--color-primary); background: var(--color-primary-bg); }
+  .tuo-ind-fila { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; min-width: 0; }
+  .tuo-ind-valor { font-family: var(--tuo-fh); font-size: 30px; line-height: 1; font-weight: 700; letter-spacing: -0.035em; color: var(--color-text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tuo-ind-chispa { flex: 0 1 96px; min-width: 0; display: flex; justify-content: flex-end; }
+  .tuo-ind-chispa > svg { width: 100%; max-width: 96px; height: auto; }
+  /* Los anchos son del contenido (la tarjeta menos su padding): 210 ≈ una tarjeta de 250 px. */
+  @container (max-width: 210px) { .tuo-ind-valor { font-size: 26px; } }
+  @container (max-width: 150px) { .tuo-ind-chispa { display: none; } }
+
   /* ── Botones ───────────────────────────────────────────────────────────── */
   .tuo-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 40px; padding: 0 16px; border-radius: var(--tuo-r-sm); border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text); font-family: inherit; font-size: 13.5px; font-weight: 600; white-space: nowrap; cursor: pointer; text-decoration: none; transition: border-color 150ms ease, background 150ms ease; }
   .tuo-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }

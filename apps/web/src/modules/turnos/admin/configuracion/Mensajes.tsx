@@ -149,7 +149,7 @@ function TarjetaMensaje({ meta, msj, abierto, onAbrir, onCambio, ejemplo, negoci
                   {([['wa', 'WhatsApp', MessageCircle], ['email', 'Email', Mail]] as [Canal, string, LucideIcon][]).map(([c, l, I]) => {
                     const a = msj.canales.includes(c)
                     return (
-                      <button key={c} type="button" aria-pressed={a} onClick={() => toggleCanal(c)} className="tuc-pastilla" style={{ minHeight: 42 }}>
+                      <button key={c} type="button" aria-pressed={a} onClick={() => toggleCanal(c)} className="tuc-pastilla tuc-canal">
                         <I size={14} aria-hidden />{l}
                       </button>
                     )
@@ -230,4 +230,7 @@ export const CSS_MENSAJES = `
   .dark .tuc-wa-burbuja { background: #005C4B; color: #E9EDEF; }
   .tuc-msj-cab:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 4px; border-radius: 6px; }
   @media (max-width: 760px) { .tuc-msj-cuerpo { grid-template-columns: minmax(0, 1fr) !important; } }
+  /* Los canales van a la par del selector de "Cuándo": 42 px como el campo, 46 en celular (también el campo crece). */
+  .tuc-pastilla.tuc-canal { min-height: 42px; }
+  @media (max-width: 768px) { .tuc-pastilla.tuc-canal { min-height: 46px; } }
 `

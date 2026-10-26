@@ -3,8 +3,7 @@
 // sesiones de kinesio, de electroestimulación o de estética.
 import { useState } from 'react'
 import { Plus, Trash2, Users, Wallet, CalendarClock, Check } from 'lucide-react'
-import { Button } from '@/design-system/components/Button'
-import { ShellFuncion, Seccion, Campo, Segmentado, FilaSwitch, Dato, VistaCliente, BotonVista, BotonIcono, inputStyle } from './ui'
+import { Boton, ShellFuncion, Seccion, Campo, Segmentado, FilaSwitch, Dato, VistaCliente, BotonVista, BotonIcono, inputStyle } from './ui'
 import { ars, planesDe, type PlanMembresia } from './datosAvanzado'
 import type { PropsFuncion } from './tipos'
 
@@ -34,13 +33,13 @@ export default function Membresias(p: PropsFuncion) {
       textoOn={`Los planes se ven en tu sitio y quien tiene uno activo reserva sus ${unidad} sin pagar en el momento.`}
       kpis={<>
         <Dato label="Con plan activo" valor={String(conPlan.reduce((a, b) => a + b, 0))} nota="Datos de ejemplo" Icon={Users} />
-        <Dato label="Ingreso mensual recurrente" valor={ars(recurrente)} nota="Si todos renuevan · ejemplo" Icon={Wallet} acento="var(--color-success)" />
-        <Dato label="Vencen esta semana" valor="7" nota="Se les avisa 3 días antes" Icon={CalendarClock} acento="var(--color-warning)" />
+        <Dato label="Ingreso mensual recurrente" valor={ars(recurrente)} nota="Si todos renuevan · ejemplo" Icon={Wallet} />
+        <Dato label="Vencen esta semana" valor="7" nota="Se les avisa 3 días antes" Icon={CalendarClock} />
       </>}
       preview={<PreviewPlanes planes={planes} detalle={detalle} renueva={renueva} pausa={pausa} diasPausa={diasPausa} matricula={matricula === '' ? 0 : matricula} unidad={unidad} {...p} />}
     >
       <Seccion titulo="Planes" desc="Marcá uno como “Más elegido” para destacarlo." accion={
-        <Button variant="outline" size="sm" icon={<Plus size={14} />} onClick={() => { setPlanes(l => [...l, { id: `m${siguiente}`, nombre: 'Plan nuevo', porSemana: 1, precio: 20000 }]); setSiguiente(n => n + 1) }}>Agregar</Button>
+        <Boton variant="outline" size="sm" icon={<Plus size={14} />} onClick={() => { setPlanes(l => [...l, { id: `m${siguiente}`, nombre: 'Plan nuevo', porSemana: 1, precio: 20000 }]); setSiguiente(n => n + 1) }}>Agregar</Boton>
       }>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {planes.map(x => (

@@ -89,7 +89,7 @@ const CSS_INDICE = `
   .tui-seg-scroll::-webkit-scrollbar { display: none; }
   .tui-grupo + .tui-grupo { margin-top: 30px; }
   .tui-familia { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; }
-  .tui-familia::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--color-border), transparent); }
+  .tui-familia::after { content: ''; flex: 1; height: 1px; background: var(--color-border); }
   .tui-rubros { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
   .tui-rubro { display: block; width: 100%; padding: 16px; }
   .tui-rubro-icono { width: 38px; height: 38px; border-radius: 11px; flex-shrink: 0; display: grid; place-items: center; background: var(--color-primary-bg); color: var(--color-primary); transition: background 220ms ease, color 220ms ease; }

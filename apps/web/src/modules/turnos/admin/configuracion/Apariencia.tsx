@@ -344,8 +344,9 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
                 const a = e.id === estiloBoton
                 return (
                   <button key={e.id} type="button" role="radio" aria-checked={a} onClick={() => b.set('estiloBoton', e.id)} className="tuc-opcion tuc-opcion--centro">
-                    <span aria-hidden style={{ display: 'grid', placeItems: 'center', width: '100%', minHeight: 62, borderRadius: 10, background: paleta.bg, border: `1px solid ${paleta.border}`, padding: '0 8px', boxSizing: 'border-box' }}>{muestraBoton(e.id, 'Reservar')}</span>
-                    <span>
+                    {/* El ancho va en la clase y no inline: en celular la muestra se angosta para dejarle lugar al texto. */}
+                    <span aria-hidden className="tuc-boton-muestra" style={{ background: paleta.bg, border: `1px solid ${paleta.border}` }}>{muestraBoton(e.id, 'Reservar')}</span>
+                    <span className="tuc-boton-txt">
                       <span style={{ display: 'block', fontSize: 12.5, fontWeight: a ? 700 : 600, color: a ? 'var(--color-primary)' : 'var(--color-text)' }}>{e.label}</span>
                       <span style={{ display: 'block', fontSize: 11.5, color: 'var(--color-muted)' }}>{e.ayuda}</span>
                     </span>
@@ -603,6 +604,8 @@ export const CSS_APARIENCIA = `
   .tuc-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
   .tuc-grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
   .tuc-opcion--centro { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding: 12px 10px; }
+  .tuc-boton-muestra { display: grid; place-items: center; width: 100%; min-height: 62px; border-radius: 10px; padding: 0 8px; box-sizing: border-box; }
+  .tuc-boton-txt { min-width: 0; }
   .tuc-opcion--mini { padding: 8px 8px 12px; }
   .tuc-opcion-marco { display: block; border-radius: 9px; overflow: hidden; border: 1px solid var(--color-border); }
   .tuc-opcion--mini .tuc-opcion-tilde { z-index: 3; top: 14px; right: 14px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
@@ -661,7 +664,8 @@ export const CSS_APARIENCIA = `
     .tuc-grid-2 { grid-template-columns: minmax(0, 1fr); }
     .tuc-grid-3 { grid-template-columns: minmax(0, 1fr); }
     .tuc-grid-3 > .tuc-opcion--centro { flex-direction: row; text-align: left; }
-    .tuc-grid-3 > .tuc-opcion--centro > span:first-child { width: 132px; flex-shrink: 0; }
+    .tuc-grid-3 > .tuc-opcion--centro > .tuc-boton-muestra { width: 132px; flex-shrink: 0; }
+    .tuc-grid-3 > .tuc-opcion--centro > .tuc-boton-txt { flex: 1; }
   }
   @media (prefers-reduced-motion: reduce) {
     .tuc-paleta, .tuc-foto > img, .tuc-foto-tilde, .tuc-subir > svg, .tuc-borde-muestra { transition: none !important; }

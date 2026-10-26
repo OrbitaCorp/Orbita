@@ -1,6 +1,6 @@
 // Piezas chicas del lenguaje de Turnos: cabecera de pantalla, indicador con
 // tendencia y llavecita. Todas pintan con las clases tuo- de estilo.tsx.
-import { useId, type CSSProperties, type ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { TrendingDown, TrendingUp } from 'lucide-react'
 
@@ -23,35 +23,33 @@ export function Cabecera({ rotulo, titulo, bajada, acciones, contador, style }: 
   )
 }
 
-/** Línea de tendencia mínima, sin ejes: acompaña al número, no lo reemplaza. */
-export function Chispa({ datos, color = 'var(--color-primary)', ancho = 96, alto = 32 }: { datos: number[]; color?: string; ancho?: number; alto?: number }) {
+/**
+ * Línea de tendencia mínima, sin ejes: acompaña al número, no lo reemplaza.
+ * La línea va en el tono que no compite (el gris de los textos secundarios) y
+ * solo el último punto, el de hoy, lleva el acento. Sin relleno ni degradado.
+ * Se achica con la tarjeta (viewBox) sin deformarse.
+ */
+export function Chispa({ datos, ancho = 96, alto = 32 }: { datos: number[]; ancho?: number; alto?: number }) {
   const max = Math.max(...datos), min = Math.min(...datos)
   const rango = max - min || 1
-  const pts = datos.map((d, i) => [(i / (datos.length - 1)) * ancho, alto - 3 - ((d - min) / rango) * (alto - 6)] as const)
+  const pts = datos.map((d, i) => [4 + (i / (datos.length - 1)) * (ancho - 8), alto - 4 - ((d - min) / rango) * (alto - 8)] as const)
   const linea = pts.map(([x, y], i) => `${i ? 'L' : 'M'} ${x.toFixed(1)} ${y.toFixed(1)}`).join(' ')
   const [ux, uy] = pts[pts.length - 1]
-  const id = `tuoCh${useId().replace(/[^a-zA-Z0-9]/g, '')}`
   return (
-    <svg aria-hidden width={ancho} height={alto} viewBox={`0 0 ${ancho} ${alto}`} style={{ display: 'block', overflow: 'visible', color }}>
-      <defs>
-        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="currentColor" stopOpacity="0.28" />
-          <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={`${linea} L ${ancho} ${alto} L 0 ${alto} Z`} fill={`url(#${id})`} />
-      <path d={linea} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={ux} cy={uy} r={3} fill="currentColor" stroke="var(--color-bg)" strokeWidth={1.5} />
+    <svg aria-hidden width={ancho} height={alto} viewBox={`0 0 ${ancho} ${alto}`} style={{ display: 'block' }}>
+      <path d={linea} fill="none" stroke="var(--color-muted)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" opacity={0.75} />
+      <circle cx={ux} cy={uy} r={3.5} fill="var(--color-primary)" stroke="var(--color-bg)" strokeWidth={1.5} />
     </svg>
   )
 }
 
 /**
  * Indicador del tablero. `bueno` dice hacia dónde es una mejora: en ausencias,
- * bajar es bueno, y el color del cambio se invierte.
+ * bajar es bueno, y el color del cambio se invierte. El ícono va siempre en el
+ * acento: el color con significado (subió, bajó) lo lleva el chip del cambio.
  */
-export function Indicador({ label, valor, Icon, color = 'var(--color-primary)', cambio, bueno = 'sube', nota, tendencia, i = 0 }: {
-  label: string; valor: ReactNode; Icon: LucideIcon; color?: string; cambio?: string; bueno?: 'sube' | 'baja'; nota?: string; tendencia?: number[]; i?: number
+export function Indicador({ label, valor, Icon, cambio, bueno = 'sube', nota, tendencia, i = 0 }: {
+  label: string; valor: ReactNode; Icon: LucideIcon; cambio?: string; bueno?: 'sube' | 'baja'; nota?: string; tendencia?: number[]; i?: number
 }) {
   const sube = cambio ? !cambio.trim().startsWith('-') && !cambio.trim().startsWith('−') : true
   const neutro = !cambio || /^[+−-]?0([.,]0+)?\s*%?$/.test(cambio.trim())
@@ -60,14 +58,12 @@ export function Indicador({ label, valor, Icon, color = 'var(--color-primary)', 
   return (
     <div className="tuo-card tuo-card--pad tuo-entra tuo-ind" style={{ ['--i' as string]: i, display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span style={{ width: 34, height: 34, borderRadius: 10, display: 'grid', placeItems: 'center', flexShrink: 0, color, background: `color-mix(in srgb, ${color} 14%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 22%, transparent)` }}>
-          <Icon size={17} strokeWidth={1.8} />
-        </span>
+        <span className="tuo-ind-ico"><Icon size={17} strokeWidth={1.8} /></span>
         <span className="tuo-rotulo" style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10 }}>
-        <span className="tuo-ind-valor" style={{ fontFamily: 'var(--tuo-fh)', fontSize: 30, lineHeight: 1, fontWeight: 700, letterSpacing: '-0.035em', color: 'var(--color-text)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{valor}</span>
-        {tendencia && <span className="tuo-ind-chispa"><Chispa datos={tendencia} color={color} /></span>}
+      <div className="tuo-ind-fila">
+        <span className="tuo-ind-valor">{valor}</span>
+        {tendencia && <span className="tuo-ind-chispa"><Chispa datos={tendencia} /></span>}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minHeight: 22 }}>
         {cambio && (

@@ -15,7 +15,7 @@ import { duracionTxt, horaTxt, pesos, type Cliente, type Recurso, type RubroTurn
 import type { Tramo } from '@/modules/turnos/horario'
 import { Campo, Dos, Selector } from './configuracion/ui'
 import { Modal, ErrorCampo, DatoFila, TiraDias, HorasLibres } from './piezasPanel'
-import { fechaLarga, libresPorTramo, sinAcentos, tieneTelefono, type NuevoTurnoPre, type ServicioPanel, type TurnoAgenda } from '../datos/agenda'
+import { fechaLarga, horariosLibres, libresPorTramo, sinAcentos, tieneTelefono, type NuevoTurnoPre, type ServicioPanel, type TurnoAgenda } from '../datos/agenda'
 import { clientesTxt, taparTelefono } from '../datos/equipo'
 
 const DIAS_A_LA_VISTA = 14
@@ -59,7 +59,17 @@ export default function NuevoTurno({ rubro, pre, clientes, recursos, servicios, 
   const [lista, setLista] = useState(false)
   const [cursor, setCursor] = useState(0)
   const [nuevo, setNuevo] = useState<{ nombre: string; telefono: string } | null>(null)
-  const [servicioId, setServicioId] = useState(servicios[0]?.id ?? '')
+  // Si se llega con la hora ya elegida (un hueco del Resumen, un toque en la agenda), arranca con
+  // el primer servicio que entra ahí: con el primero de la lista a secas, en un hueco de media
+  // hora uno de una hora no entraba y el modal decía "no quedan horarios" al lado del hueco libre.
+  const [servicioId, setServicioId] = useState(() => {
+    const h = pre.inicio
+    if (h === undefined) return servicios[0]?.id ?? ''
+    const d = Math.max(0, pre.dia ?? 0)
+    const rid = recursos.some(r => r.id === pre.recursoId) ? pre.recursoId ?? '' : recursos[0]?.id ?? ''
+    const entra = servicios.find(s => horariosLibres(turnosDelDia(d), jornada(rid, d), rid, s.duracion, d).includes(h))
+    return (entra ?? servicios[0])?.id ?? ''
+  })
   const [recursoElegido, setRecursoElegido] = useState(pre.recursoId ?? recursos[0]?.id ?? '')
   const [diaElegido, setDiaElegido] = useState(Math.max(0, pre.dia ?? 0))
   const [hora, setHora] = useState<number | null>(pre.inicio ?? null)

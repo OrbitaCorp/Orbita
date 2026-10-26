@@ -84,7 +84,12 @@ const CSS_SELECTOR = `
     .tu-selrubro:hover > svg:last-of-type { color: var(--color-text); transform: translateY(-50%) translateY(1px); }
   }
   /* En celular, 16px: con menos, iOS hace zoom al abrir el selector. */
-  @media (max-width: 640px) { .tu-selrubro > select { font-size: 16px; } .tu-selrubro[data-compacto='true'] > select { font-size: 16px; } }
+  @media (max-width: 640px) {
+    .tu-selrubro > select { font-size: 16px; }
+    .tu-selrubro[data-compacto='true'] > select { font-size: 16px; }
+    /* El selector grande (el del índice) mide un dedo; el compacto vive en la tira de 40 px. */
+    .tu-selrubro[data-compacto='false'] > select { height: 44px; }
+  }
   @media (prefers-reduced-motion: reduce) { .tu-selrubro > select, .tu-selrubro > svg { transition: none; } }
 `
 

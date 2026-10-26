@@ -18,7 +18,7 @@ import {
   ArrowRight, CalendarClock, CalendarPlus, Check, ChevronLeft, Clock, Coins, Gift, Home, Hourglass, LogOut, MapPin, MessageCircle,
   Navigation, RotateCcw, ShieldCheck, X,
 } from 'lucide-react'
-import { recursosDe, horaTxt, duracionTxt, pesos, type RubroTurnos } from '@/modules/turnos/datos'
+import { recursosDe, semanaDeRecurso, horaTxt, duracionTxt, pesos, type RubroTurnos } from '@/modules/turnos/datos'
 import { beneficiosTxt, plazoTxt, useNegocioDemo, type FormaSitio } from '@/modules/turnos/datos/negocio'
 import type { Semana } from '@/modules/turnos/horario'
 import { QR } from '@/modules/turnos/_shared/components/QR'
@@ -408,8 +408,9 @@ function Panel({ rubro, t, onSalir }: { rubro: RubroTurnos; t: TemaNegocio; onSa
         </div>
       )}
 
+      {/* Se reprograma con la misma persona: solo sus días y su horario (como en la reserva), no todo el del negocio. */}
       {reprog && (
-        <Reprogramar horarios={t.horarios} duracion={duracionDe(reprog)} actual={reprog} guardando={pendiente?.tipo === 'reprogramar'} onCerrar={() => !pendiente && setReprog(null)}
+        <Reprogramar horarios={persona ? semanaDeRecurso(recursos[reprog.recurso % recursos.length], t.horarios) : t.horarios} duracion={duracionDe(reprog)} actual={reprog} guardando={pendiente?.tipo === 'reprogramar'} onCerrar={() => !pendiente && setReprog(null)}
           onListo={(fecha, hora) => setPendiente({ tipo: 'reprogramar', id: reprog.id, fecha, hora })} />
       )}
       {cancelar && (

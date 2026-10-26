@@ -74,18 +74,34 @@ export default function LayoutTurnos({ negocio, rubro, fecha, items, activo, onI
   // Cada sección arranca arriba: el área que scrollea es <main>, no la ventana.
   useEffect(() => { principal.current?.scrollTo({ top: 0 }) }, [activo])
 
-  // El menú del celular: al abrir, el foco entra (al botón de cerrar); se
-  // cierra con Escape, como los paneles, y el foco vuelve al botón del menú.
+  // El menú del celular: al abrir, el foco entra (al botón de cerrar) y Tab da
+  // la vuelta adentro del cajón; lo de atrás queda inert (ni foco ni lector de
+  // pantalla). Se cierra con Escape, como los paneles, y el foco vuelve al botón
+  // del menú. Si la ventana crece a escritorio con el cajón abierto, se cierra
+  // solo: ahí no hay botón de menú y lo de atrás quedaría trabado.
   const botonMenu = useRef<HTMLButtonElement>(null)
   const botonCerrar = useRef<HTMLButtonElement>(null)
+  const lateral = useRef<HTMLElement>(null)
   useEffect(() => {
     if (!abierto) return
     const volver = botonMenu.current
+    const caja = lateral.current
     botonCerrar.current?.focus()
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setAbierto(false) }
-    window.addEventListener('keydown', esc)
+    const tecla = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setAbierto(false); return }
+      if (e.key !== 'Tab' || !caja) return
+      const f = Array.from(caja.querySelectorAll<HTMLElement>('button:not(:disabled), a[href]')).filter(x => x.offsetParent !== null)
+      if (f.length === 0) return
+      if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus() }
+      else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus() }
+    }
+    const escritorio = window.matchMedia('(min-width: 769px)')
+    const alCrecer = () => setAbierto(false)
+    window.addEventListener('keydown', tecla)
+    escritorio.addEventListener('change', alCrecer)
     return () => {
-      window.removeEventListener('keydown', esc)
+      window.removeEventListener('keydown', tecla)
+      escritorio.removeEventListener('change', alCrecer)
       volver?.focus({ preventScroll: true })
     }
   }, [abierto])
@@ -275,7 +291,7 @@ export default function LayoutTurnos({ negocio, rubro, fecha, items, activo, onI
 
       <div className="tu-backdrop" data-abierto={abierto} onClick={() => setAbierto(false)} />
 
-      <aside className="tu-sidebar admin-sidebar" data-abierto={abierto} style={{ display: 'flex', flexDirection: 'column', background: 'var(--color-bg)', borderRight: '1px solid var(--color-border)' }}>
+      <aside ref={lateral} className="tu-sidebar admin-sidebar" data-abierto={abierto} style={{ display: 'flex', flexDirection: 'column', background: 'var(--color-bg)', borderRight: '1px solid var(--color-border)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, height: 64, padding: '0 16px', borderBottom: '1px solid var(--color-border)', flexShrink: 0 }}>
           <OrbitaLogo size={28} />
           <div style={{ minWidth: 0, flex: 1 }}>
@@ -333,7 +349,8 @@ export default function LayoutTurnos({ negocio, rubro, fecha, items, activo, onI
         )}
       </aside>
 
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, overflow: 'hidden' }}>
+      {/* Con el cajón abierto, lo de atrás no recibe foco ni lo lee el lector de pantalla. */}
+      <div inert={abierto || undefined} style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, overflow: 'hidden' }}>
         <header style={{ display: 'flex', alignItems: 'center', gap: 10, height: 64, padding: '0 16px', flexShrink: 0, background: 'color-mix(in srgb, var(--color-bg) 88%, transparent)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--color-border)' }}>
           <button ref={botonMenu} type="button" onClick={() => setAbierto(true)} aria-label="Abrir menú" aria-expanded={abierto} className="tuo-btn tuo-btn--icono tu-menu-btn"><Menu size={18} strokeWidth={1.8} /></button>
           <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>

@@ -248,7 +248,7 @@ export function Rotulo({ children, ayuda, htmlFor }: { children: ReactNode; ayud
 }
 
 export function Divisor() {
-  return <div role="presentation" style={{ height: 1, background: 'linear-gradient(90deg, transparent, var(--color-border) 12%, var(--color-border) 88%, transparent)', margin: '16px 0' }} />
+  return <div role="presentation" style={{ height: 1, background: 'var(--color-border)', margin: '16px 0' }} />
 }
 
 // ─── Llavecita ───────────────────────────────────────────────────────────────

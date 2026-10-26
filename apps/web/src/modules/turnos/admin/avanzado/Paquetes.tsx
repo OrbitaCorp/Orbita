@@ -3,8 +3,7 @@
 // venta y, abajo, cómo ve el cliente su pack en curso.
 import { useState } from 'react'
 import { Plus, Trash2, Package, Wallet, Layers, Eye } from 'lucide-react'
-import { Button } from '@/design-system/components/Button'
-import { ShellFuncion, Seccion, Campo, Segmentado, FilaSwitch, Dato, VistaCliente, BotonVista, BotonIcono, inputStyle } from './ui'
+import { Boton, ShellFuncion, Seccion, Campo, Segmentado, FilaSwitch, Dato, VistaCliente, BotonVista, BotonIcono, inputStyle } from './ui'
 import { ars, paquetesDe, serviciosVendibles, redondear, USOS_PAQUETE, type Paquete } from './datosAvanzado'
 import type { PropsFuncion } from './tipos'
 import { pluralCliente } from '../Clientes'
@@ -52,8 +51,8 @@ export default function Paquetes(p: PropsFuncion) {
       textoOn="Los paquetes aparecen en tu sitio junto a los servicios, y al reservar se ofrece usar una sesión del pack."
       kpis={<>
         <Dato label="Packs vendidos" valor={String(paquetes.reduce((s, x) => s + x.vendidos, 0))} nota="Datos de ejemplo" Icon={Package} />
-        <Dato label="Cobrado por adelantado" valor={ars(cobrado)} nota="Datos de ejemplo" Icon={Wallet} acento="var(--color-success)" />
-        <Dato label="Sesiones por usar" valor="38" nota="En packs vigentes · ejemplo" Icon={Layers} acento="#8B5CF6" />
+        <Dato label="Cobrado por adelantado" valor={ars(cobrado)} nota="Datos de ejemplo" Icon={Wallet} />
+        <Dato label="Sesiones por usar" valor="38" nota="En packs vigentes · ejemplo" Icon={Layers} />
       </>}
       preview={<PreviewPaquete p={enPreview} precioSuelto={precioServicio(enPreview.servicio)} {...p} />}
     >
@@ -100,8 +99,8 @@ export default function Paquetes(p: PropsFuncion) {
         </Campo>
         <FilaSwitch titulo="Se puede compartir" desc="Por ejemplo, entre dos personas de la misma familia." on={compartir} onChange={v => { setCompartir(v); tocarBorrador() }} />
         <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-          <Button variant="outline" icon={<Plus size={15} />} onClick={agregar}>Agregar paquete</Button>
-          {verId !== 'borrador' && <Button variant="ghost" icon={<Eye size={15} />} onClick={tocarBorrador}>Ver borrador</Button>}
+          <Boton variant="outline" icon={<Plus size={15} />} onClick={agregar}>Agregar paquete</Boton>
+          {verId !== 'borrador' && <Boton variant="ghost" icon={<Eye size={15} />} onClick={tocarBorrador}>Ver borrador</Boton>}
         </div>
         <div role="status" className="tua-estado" style={{ marginTop: 8 }}>{estado}</div>
       </Seccion>

@@ -196,8 +196,11 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
 
   const ir = (v: string, tab?: string) => {
     setClienteSel(null)
-    const { tab: _t, ...resto } = router.query
-    void _t
+    // La pestaña de Configuración y la función abierta de Avanzado son de esa sección: al cambiar
+    // de sección se van. Si no, "Avanzado" en el menú no volvía al hub desde una función, y al
+    // volver más tarde se abría la última función en vez del hub.
+    const { tab: _t, funcion: _f, ...resto } = router.query
+    void _t; void _f
     void router.replace({ pathname: router.pathname, query: { ...resto, vista: v, ...(tab ? { tab } : {}) } }, undefined, { shallow: true })
   }
   /** Servicios, equipo, espacios y ganancias: dentro de Configuración para quien configura; sección suelta para el resto. */
@@ -449,8 +452,8 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
 
       {vista === 'resumen' && (
         <ResumenDia
-          negocio={negocio} saludo={como ? (yo?.nombre.split(' ')[0] ?? rolComo?.nombre ?? negocio) : negocio} rubro={rubro} turnos={turnos} clientes={clientes} recursos={recursosVista}
-          jornada={id => jornada(id, 0)} rango={rangoHoy} puedeAgendar={puedeAgendar} verNumeros={verNumeros}
+          negocio={negocio} saludo={como ? (yo?.nombre.split(' ')[0] ?? rolComo?.nombre ?? negocio) : negocio} rubro={rubro} turnos={turnos} turnosDelDia={delDiaVista} clientes={clientes} recursos={recursosVista}
+          jornada={id => jornada(id, 0)} duraciones={servicios.map(s => s.duracion)} rango={rangoHoy} puedeAgendar={puedeAgendar} verNumeros={verNumeros}
           onAbrir={abrir} onIr={ir} onNuevo={agendar} onCompartir={setMensaje}
         />
       )}

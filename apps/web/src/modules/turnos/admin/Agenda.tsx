@@ -202,6 +202,15 @@ export default function Agenda({ rubro, semana, recursos, turnosDelDia, jornada,
 
         @media (max-width: 768px) {
           .tu-ag-movil { display: flex; }
+          /* Un turno corto (20 min) mide menos que un dedo: en celular cada bloque tiene al menos 44 px.
+             Los turnos arrancan en punto o y media, así que el que sigue nunca queda tapado. */
+          .tu-ag-bloque { min-height: 44px; }
+          /* La semana en el celular tiene columnas de ~96 px: el nombre no entra y quedaba en una
+             letra. Ahí cada turno muestra la hora y su estado; el resto está en el detalle (y en
+             el nombre accesible del botón). */
+          .tu-ag-grid[data-vista="semana"] .tu-ag-bloque { flex-direction: row !important; align-items: center !important; padding: 0 8px 0 10px !important; }
+          .tu-ag-grid[data-vista="semana"] .tu-ag-nombre, .tu-ag-grid[data-vista="semana"] .tu-ag-serv, .tu-ag-grid[data-vista="semana"] .tu-ag-fin { display: none !important; }
+          .tu-ag-grid[data-vista="semana"] .tu-ag-hora { flex: 1 1 auto !important; width: auto !important; }
           .tu-ag-grid[data-vista="dia"] { grid-template-columns: 50px 1fr; }
           .tu-ag-grid[data-vista="dia"] [data-recurso]:not([data-visible="true"]) { display: none !important; }
           .tu-ag-grid[data-vista="semana"] { grid-template-columns: 44px repeat(var(--tu-cols), minmax(96px, 1fr)); }
@@ -403,7 +412,7 @@ export default function Agenda({ rubro, semana, recursos, turnosDelDia, jornada,
                   const corto = alto < 50
                   const enCurso = t.estado === 'en-curso'
                   return (
-                    <button key={t.id} onClick={e => { e.stopPropagation(); onAbrir(t) }} className="tu-ag-bloque" title={`${horaTxt(t.inicio)} · ${nombreCliente(t.clienteId)} · ${t.servicio} · ${est.label}`} style={{
+                    <button key={t.id} onClick={e => { e.stopPropagation(); onAbrir(t) }} className="tu-ag-bloque" title={`${horaTxt(t.inicio)} · ${nombreCliente(t.clienteId)} · ${t.servicio} · ${est.label}`} aria-label={`${horaTxt(t.inicio)}, ${nombreCliente(t.clienteId)}, ${t.servicio}, ${est.label}`} style={{
                       ['--c' as string]: c.color, ['--i' as string]: Math.min(k + ci * 2, 14), ['--op' as string]: apagado ? 0.62 : 1,
                       position: 'absolute', left: 6, right: 6, top: y(t.inicio) + 2, height: alto, overflow: 'hidden', zIndex: 2,
                       display: 'flex', flexDirection: corto ? 'row' : 'column', alignItems: corto ? 'center' : 'flex-start', gap: corto ? 7 : 2, padding: corto ? '0 10px 0 12px' : '6px 10px 6px 12px', textAlign: 'left',
@@ -414,16 +423,16 @@ export default function Agenda({ rubro, semana, recursos, turnosDelDia, jornada,
                       boxShadow: enCurso ? `0 0 0 1.5px ${c.color}` : undefined,
                     }}>
                       <span aria-hidden style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, background: c.color, opacity: apagado ? 0.5 : 1 }} />
-                      <span className="tuo-num" style={{ display: 'flex', alignItems: 'center', gap: 6, width: corto ? 'auto' : '100%', flexShrink: 0, fontSize: 11, color: 'var(--color-muted)' }}>
-                        {horaTxt(t.inicio)}{!corto && ` – ${horaTxt(t.inicio + t.duracion)}`}
+                      <span className="tuo-num tu-ag-hora" style={{ display: 'flex', alignItems: 'center', gap: 6, width: corto ? 'auto' : '100%', flexShrink: 0, fontSize: 11, color: 'var(--color-muted)' }}>
+                        {horaTxt(t.inicio)}{!corto && <span className="tu-ag-fin">{` – ${horaTxt(t.inicio + t.duracion)}`}</span>}
                         {!corto && <span aria-hidden className={enCurso ? 'tuo-late' : undefined} style={{ width: 7, height: 7, borderRadius: '50%', background: est.dot, marginLeft: 'auto', flexShrink: 0 }} />}
                       </span>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', flex: corto ? 1 : undefined, minWidth: 0, textDecoration: t.estado === 'cancelado' ? 'line-through' : undefined }}>
+                      <span className="tu-ag-nombre" style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', flex: corto ? 1 : undefined, minWidth: 0, textDecoration: t.estado === 'cancelado' ? 'line-through' : undefined }}>
                         {nombreCliente(t.clienteId)}
                       </span>
                       {corto && <span aria-hidden style={{ width: 7, height: 7, borderRadius: '50%', background: est.dot, flexShrink: 0 }} />}
                       {alto > 58 && (
-                        <span style={{ fontSize: 11.5, color: 'var(--color-body)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span className="tu-ag-serv" style={{ fontSize: 11.5, color: 'var(--color-body)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', display: 'flex', alignItems: 'center', gap: 4 }}>
                           {t.servicio}
                           {rubro.sena > 0 && t.senaPagada && <Coins size={11} aria-label="Seña pagada" style={{ flexShrink: 0, color: 'var(--color-success)' }} />}
                         </span>

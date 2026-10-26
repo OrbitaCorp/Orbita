@@ -1,6 +1,8 @@
 // Lista de turnos como línea de tiempo: la hora manda a la izquierda, un riel
 // une los turnos del día y el estado se lee en el punto del riel y en el chip.
-// En celular cada fila se apila (hora arriba, precio y estado abajo).
+// La lista se acomoda al ancho que le toca (container query), no al de la
+// ventana: en el Resumen vive al lado de otra columna. Angosta, quién atiende
+// pasa abajo del servicio; muy angosta (celular), cada fila se apila.
 import { ChevronRight, Coins } from 'lucide-react'
 import { Avatar } from '@/design-system/components/Avatar'
 import { ESTADO_TURNO, duracionTxt, horaTxt, pesos, type Turno, type Cliente, type Recurso } from '@/modules/turnos/datos'
@@ -14,7 +16,9 @@ export default function TurnosLista({ turnos, clientes, recursos, onAbrir, etiqu
   return (
     <div className="tuo-card tu-tl" style={{ overflow: 'hidden' }}>
       <style>{`
+        .tu-tl { container: tu-tl / inline-size; }
         .tu-tl-fila { display: grid; grid-template-columns: 74px 18px minmax(0, 1.5fr) minmax(0, 1fr) 96px 132px 18px; gap: 12px; align-items: center; width: 100%; min-height: 68px; padding: 10px 18px; border: none; border-bottom: 1px solid var(--color-border); background: transparent; text-align: left; font-family: inherit; color: inherit; }
+        .tu-tl-sub-rec { display: none; }
         .tu-tl-fila:last-child { border-bottom: none; }
         .tu-tl-flecha { color: var(--color-subtle); transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1), color 160ms ease; }
         .tu-tl-riel { position: relative; align-self: stretch; display: grid; place-items: center; }
@@ -26,9 +30,14 @@ export default function TurnosLista({ turnos, clientes, recursos, onAbrir, etiqu
           .tu-tl-fila:hover .tu-tl-flecha { transform: translateX(3px); color: var(--color-primary); }
           .tu-tl-fila:hover .tu-tl-punto { transform: scale(1.35); box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 22%, transparent); }
         }
-        @media (max-width: 900px) {
+        @container tu-tl (max-width: 780px) {
+          .tu-tl-fila { grid-template-columns: 64px 16px minmax(0, 1fr) auto auto 16px; gap: 10px; }
+          .tu-tl-rec { display: none !important; }
+          .tu-tl-sub-rec { display: inline; }
+        }
+        @container tu-tl (max-width: 520px) {
           .tu-tl-fila { grid-template-columns: 58px 14px minmax(0, 1fr) auto; row-gap: 6px; padding: 12px 14px; }
-          .tu-tl-rec, .tu-tl-flecha { display: none !important; }
+          .tu-tl-flecha { display: none !important; }
           .tu-tl-precio { grid-column: 3; justify-self: start; }
           .tu-tl-estado { grid-column: 4; grid-row: 1; justify-self: end; }
         }
@@ -52,7 +61,7 @@ export default function TurnosLista({ turnos, clientes, recursos, onAbrir, etiqu
               <Avatar name={cliente} size={36} />
               <span style={{ minWidth: 0 }}>
                 <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cliente}</span>
-                <span style={{ display: 'block', fontSize: 12.5, color: 'var(--color-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.servicio}</span>
+                <span style={{ display: 'block', fontSize: 12.5, color: 'var(--color-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.servicio}<span className="tu-tl-sub-rec"> · {r?.nombre}</span></span>
               </span>
             </span>
             <span className="tu-tl-rec" title={etiquetaRecurso} style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, fontSize: 13, color: 'var(--color-body)' }}>
