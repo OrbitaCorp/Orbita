@@ -1,13 +1,15 @@
 // "Tu negocio": lo mismo que pide el alta real de Tienda (logo, nombre,
 // descripción, teléfono y subdominio con chequeo de disponibilidad), para los
-// dos módulos. Tienda suma "¿Cómo vas a vender?", con un "qué es" por opción
-// (QueEs.tsx): la tarjeta lo resume y el modal lo explica a fondo.
+// cuatro módulos; los ejemplos y las ayudas cambian según el módulo (textos.ts).
+// Tienda suma "¿Cómo vas a vender?", con un "qué es" por opción (QueEs.tsx): la
+// tarjeta lo resume y el modal lo explica a fondo.
 import { useRef, useState, type ChangeEvent } from 'react'
 import { Camera, Check, Eye, LoaderCircle, ShoppingCart, TriangleAlert, Wand2 } from 'lucide-react'
+import { achicarLogo } from '@/lib/achicarImagen'
 import { AreaTexto, Aviso, Entrada, MensajeError, Opcion, Sugerido, type PropsPaso } from './campos'
-import { achicarLogo } from './imagen'
 import { aSlug, aSlugEscribiendo, iniciales, type Chequeo, type DatosAlta } from './modelo'
 import { ModalQueEs, QUE_ES_MODO_VENTA } from './QueEs'
+import { TEXTOS } from './textos'
 
 function CampoLogo({ d, poner }: Pick<PropsPaso, 'd' | 'poner'>) {
   const archivo = useRef<HTMLInputElement>(null)
@@ -83,6 +85,7 @@ export function PasoNegocio({ d, poner, error, tocar, sub, sugeridos }: PropsPas
   sugeridos?: ReadonlySet<string>
 }) {
   const tienda = d.modulo === 'tienda'
+  const textos = TEXTOS[d.modulo ?? 'turnos'].negocio
   // El "qué es" abierto de una de las dos formas de vender, o null.
   const [queEs, setQueEs] = useState<DatosAlta['modoVenta'] | null>(null)
   const sugerido = (campo: string) => sugeridos?.has(campo) ?? false
@@ -97,11 +100,9 @@ export function PasoNegocio({ d, poner, error, tocar, sub, sugeridos }: PropsPas
         <div className="tuob-form">
           <CampoLogo d={d} poner={poner} />
           <Entrada id="tuob-negocio" label="Nombre del negocio" valor={d.negocio} onCambio={v => poner('negocio', v)} onTocar={salirDelNombre}
-            error={error('negocio')} sugerido={sugerido('negocio')} placeholder={tienda ? 'Ej: Almacén del Sur' : 'Ej: Estudio Norte'} autoComplete="organization" maxLength={60} required />
+            error={error('negocio')} sugerido={sugerido('negocio')} placeholder={textos.ejemplo} autoComplete="organization" maxLength={60} required />
           <AreaTexto id="tuob-descripcion" label="Descripción corta" opcional valor={d.descripcion} onCambio={v => poner('descripcion', v)} filas={2} maxLength={160}
-            sugerido={sugerido('descripcion')}
-            ayuda={tienda ? 'Una o dos líneas que cuenten qué vendés. Aparece en tu tienda.' : 'Una o dos líneas que cuenten qué hacen. Aparece debajo del nombre en tu página.'}
-            placeholder={tienda ? 'Contá en pocas palabras qué vendés…' : 'Contá en pocas palabras qué ofrecés…'} />
+            sugerido={sugerido('descripcion')} ayuda={textos.ayudaDescripcion} placeholder={textos.ejemploDescripcion} />
           <div className="tuob-fila2">
             <Entrada id="tuob-telefono" label="Teléfono" type="tel" inputMode="tel" valor={d.telefono} onCambio={v => poner('telefono', v)} onTocar={() => tocar('telefono')}
               error={error('telefono')} sugerido={sugerido('telefono')} ayuda="Es tu contacto público: tus clientes te escriben por WhatsApp a este número." placeholder="11 5555-0101" autoComplete="tel" mono required />

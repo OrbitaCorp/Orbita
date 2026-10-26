@@ -6,10 +6,13 @@
 // "Empezar de nuevo". La contraseña NUNCA se guarda: al recargar se vuelve a
 // pedir.
 //
-// Mismo esquema que demo/negocioDemo.ts (useSyncExternalStore): el servidor y
-// el primer pintado ven el alta vacía, y recién después aparece lo guardado.
+// Mismo esquema que modules/turnos/datos/negocio.ts (useSyncExternalStore): el
+// servidor y el primer pintado ven el alta vacía, y recién después aparece lo
+// guardado.
 import { useSyncExternalStore } from 'react'
 import { JORNADA_INICIAL } from '@/modules/turnos/horario'
+import type { AltaAlquiler } from '@/modules/alquileres/onboarding/pasos'
+import type { AltaGym } from '@/modules/gimnasio/onboarding/pasos'
 import { DATOS_INICIALES, moduloHabilitado, type DatosAlta, type ServicioAlta } from './modelo'
 
 export interface EstadoAlta {
@@ -21,9 +24,17 @@ export interface EstadoAlta {
   /** Turnos: servicios editados y seña, por rubro, para no perderlos al ir y volver de rubro. */
   editados: Record<string, ServicioAlta[]>
   senas: Record<string, number>
+  /**
+   * Alquileres: qué alquila y lo que cargó de eso (los pasos son del módulo).
+   * Solo lo que se tocó: los valores de fábrica son del módulo y se ponen
+   * encima al usarlos (reservas.ts), así este archivo no baja su código.
+   */
+  alquileres: Partial<AltaAlquiler>
+  /** Gimnasio: rubro, actividades y precios (los pasos son del módulo). Igual que alquileres, solo lo que se tocó. */
+  gimnasio: Partial<AltaGym>
 }
 
-const INICIAL: EstadoAlta = { paso: 0, alcanzado: 0, datos: DATOS_INICIALES, editados: {}, senas: {} }
+const INICIAL: EstadoAlta = { paso: 0, alcanzado: 0, datos: DATOS_INICIALES, editados: {}, senas: {}, alquileres: {}, gimnasio: {} }
 const CLAVE = 'orbita_turnos_demo_alta'
 
 let cache: EstadoAlta = INICIAL
@@ -42,9 +53,12 @@ function leer(): EstadoAlta {
       // Lo guardado puede venir de una versión anterior del alta (tenía "online" y un horario de corrido).
       const modalidades = datos.modalidades?.filter(m => m === 'local' || m === 'domicilio') ?? null
       const jornada = datos.jornada?.manana && datos.jornada?.tarde ? datos.jornada : JORNADA_INICIAL
-      cache = { ...INICIAL, ...g, datos: { ...datos, modalidades, jornada } }
-      // Un alta empezada con un módulo que hoy está en "Próximamente" vuelve al primer paso.
-      if (cache.datos.modulo && !moduloHabilitado(cache.datos.modulo)) cache = { ...cache, paso: 0, alcanzado: 0, datos: { ...cache.datos, modulo: null } }
+      // Y de antes de Alquileres y Gimnasio: sin esas claves, arrancan de fábrica.
+      cache = {
+        ...INICIAL, ...g, datos: { ...datos, modalidades, jornada },
+        alquileres: g.alquileres ?? {},
+        gimnasio: g.gimnasio ?? {},
+      }
     }
   } catch { /* sin acceso al almacenamiento o JSON roto: se arranca de cero */ }
   return cache
@@ -73,11 +87,19 @@ function suscribir(f: () => void) {
   return () => { oyentes.delete(f); window.removeEventListener('pagehide', persistir) }
 }
 
-export function useAlta() {
-  const estado = useSyncExternalStore(suscribir, leer, () => INICIAL)
+/**
+ * Lo cargado en el alta. El alta real y las demos comparten la clave (es la
+ * misma pestaña): en el alta real (`real`), un alta empezada con un módulo que
+ * ahí está en "Próximamente" vuelve al primer paso en vez de seguir un
+ * recorrido que no se puede terminar.
+ */
+export function useAlta(real = false) {
+  const guardado = useSyncExternalStore(suscribir, leer, () => INICIAL)
+  const sanear = (e: EstadoAlta): EstadoAlta =>
+    e.datos.modulo && !moduloHabilitado(e.datos.modulo, real) ? { ...e, paso: 0, alcanzado: 0, datos: { ...e.datos, modulo: null } } : e
   return {
-    estado,
-    cambiar: (cambio: (e: EstadoAlta) => EstadoAlta) => escribir(cambio(leer())),
+    estado: sanear(guardado),
+    cambiar: (cambio: (e: EstadoAlta) => EstadoAlta) => escribir(cambio(sanear(leer()))),
     reiniciar: () => escribir(INICIAL),
   }
 }

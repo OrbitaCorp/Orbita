@@ -2,10 +2,11 @@
 // sobre un arco y el satélite avanza hasta el paso actual.
 //
 // Los pasos llegan con id porque la lista cambia según el módulo: antes de
-// elegir se ven los cinco que comparten Tienda y Turnos, y al elegir aparecen
-// los propios (seis en Tienda, ocho en Turnos). Cada estación conserva su nodo
-// (key = id), así que las que ya estaban se DESLIZAN por el arco hasta su lugar
-// nuevo en vez de saltar, y las nuevas aparecen en el hueco que se abre.
+// elegir se ven los cinco que comparten todos, y al elegir aparecen los propios
+// (seis en Tienda, ocho en Turnos y en Alquileres, nueve en Gimnasio). Cada
+// estación conserva su nodo (key = id), así que las que ya estaban se DESLIZAN
+// por el arco hasta su lugar nuevo en vez de saltar, y las nuevas aparecen en
+// el hueco que se abre.
 //
 // En celular el arco no entra con sus rótulos: ahí va la versión compacta, un
 // anillo con "2/8" y el nombre del paso.

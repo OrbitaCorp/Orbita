@@ -6,12 +6,15 @@
 //     web completo o página simple). Los dos muestran lo que se acaba de cargar.
 //   · Tienda → la tienda y el panel de DEMOSTRACIÓN (demo.orbita.site): en esta
 //     vista previa no se crea ninguna tienda de verdad, y se dice.
+//
+// Alquileres y Gimnasio no pasan por acá: al terminar siguen directo en el
+// panel de su demo, con el negocio recién armado (ver reservas.ts).
 import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { ArrowRight, CalendarCheck, Check, Clock, Copy, ExternalLink, Gift, Info, PanelsTopLeft, RotateCcw, Smartphone, Sparkles } from 'lucide-react'
 import { QR } from '@/modules/turnos/_shared/components/QR'
 import type { RubroTurnos } from '@/modules/turnos/datos'
-import { beneficiosTxt } from '@/modules/turnos/demo/negocioDemo'
+import { beneficiosTxt } from '@/modules/turnos/datos/negocio'
 import { Aviso } from './campos'
 import { diasTxt, horarioTxt, slugDe, type DatosAlta } from './modelo'
 

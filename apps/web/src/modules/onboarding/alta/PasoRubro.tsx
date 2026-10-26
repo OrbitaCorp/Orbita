@@ -9,7 +9,7 @@ import { OrbitaDia } from '@/modules/turnos/_shared/orbita/OrbitaDia'
 import { AHORA_DEMO } from '@/modules/turnos/_shared/components/ChipEstado'
 import { DESCRIPCION_MODO, plano } from './modelo'
 
-const FAMILIA_CORTA: Record<FamiliaId, string> = { belleza: 'Belleza', salud: 'Salud', deporte: 'Deporte', clases: 'Clases' }
+const FAMILIA_CORTA: Record<FamiliaId, string> = { belleza: 'Belleza', salud: 'Salud', deporte: 'Bienestar', clases: 'Clases' }
 
 export function PasoRubro({ elegido, onElegir }: { elegido: RubroTurnos | null; onElegir: (r: RubroTurnos) => void }) {
   const [busqueda, setBusqueda] = useState('')

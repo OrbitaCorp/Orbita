@@ -309,7 +309,7 @@ function Input({ type = 'text', value, onChange, placeholder, icon, rightIcon }:
   )
 }
 
-// El mismo lienzo del alta y del pago (modules/turnos/onboarding/Alta.tsx):
+// El mismo lienzo del alta y del pago (modules/onboarding/alta/Alta.tsx):
 // fondo negro con el cielo de estrellas. `.tuo-espacio` redefine los tokens de
 // color a la paleta oscura, así que el formulario se pinta solo; el fondo de
 // página pasa a transparente para dejar ver el cielo.

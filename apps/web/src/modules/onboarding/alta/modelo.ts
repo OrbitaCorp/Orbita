@@ -1,41 +1,71 @@
 // DEMO INTERNA — pasos, datos y validaciones del alta única de Órbita: un solo
-// recorrido que arranca eligiendo el módulo (Tienda o Turnos) y después pide lo
-// que ese módulo necesita. Todo vive en el navegador: no hay API ni se crea
-// ningún negocio. Las reglas de validación copian las del alta real de Tienda
-// (modules/onboarding/SetupUnificado) para que el recorrido se sienta igual.
-import { DIAS, DIAS_CORTOS, type RubroTurnos } from '@/modules/turnos/datos'
+// recorrido que arranca eligiendo el módulo (Tienda, Turnos, Alquileres o
+// Gimnasio) y después pide lo que ese módulo necesita. Todo vive en el
+// navegador: no hay API ni se crea ningún negocio. Las reglas de validación
+// copian las del alta real de Tienda (modules/onboarding/SetupUnificado) para
+// que el recorrido se sienta igual.
+//
+// Los pasos propios de Alquileres y de Gimnasio (qué alquilás, rubro,
+// actividades, precios) los escribe cada módulo en su onboarding/pasos.tsx: acá
+// solo se ordenan, y se validan con sus funciones, que llegan bajo demanda
+// (ContextoAlta.validarReservas). Este archivo no importa nada de esos dos
+// módulos: lo usan el alta real y /onboarding/plan, que no los bajan nunca.
+// El alta puede importar de los módulos; ningún módulo importa del alta.
+import { DIAS, type RubroTurnos } from '@/modules/turnos/datos'
 import {
   BENEFICIOS_INICIALES, modalidadesPosibles, modalidadesRubro,
   type BeneficiosCuenta, type FormaSitio, type IdentidadDemo, type Modalidad,
-} from '@/modules/turnos/demo/negocioDemo'
+} from '@/modules/turnos/datos/negocio'
 import { JORNADA_INICIAL, errorJornada, jornadaTxt, type Jornada } from '@/modules/turnos/horario'
+import { TEXTOS } from './textos'
 
 // ─── Pasos ───────────────────────────────────────────────────────────────────
 
-export type Modulo = 'tienda' | 'turnos'
-export type PasoId = 'modulo' | 'tipo' | 'rubro' | 'servicios' | 'negocio' | 'ubicacion' | 'pagina' | 'cuenta' | 'pago'
+export type Modulo = 'tienda' | 'turnos' | 'alquileres' | 'gimnasio'
+export const MODULOS_ORDEN: readonly Modulo[] = ['tienda', 'turnos', 'alquileres', 'gimnasio']
+/** Para leer el ?modulo= de la URL sin confiar en lo que venga. */
+export const esModulo = (x: unknown): x is Modulo => typeof x === 'string' && (MODULOS_ORDEN as readonly string[]).includes(x)
+
+export type PasoId =
+  | 'modulo' | 'tipo' | 'rubro' | 'servicios'
+  | 'tipo-alquiler' | 'que-alquilas' | 'rubro-gym' | 'actividades' | 'planes'
+  | 'negocio' | 'ubicacion' | 'pagina' | 'cuenta' | 'pago'
 export interface Paso { id: PasoId; label: string }
 
+// "Precios" y no "Planes" en el arco: el último paso ya habla del plan de Órbita.
 const ROTULO: Record<PasoId, string> = {
-  modulo: 'Módulo', tipo: 'Qué vendés', rubro: 'Rubro', servicios: 'Servicios', negocio: 'Tu negocio',
-  ubicacion: 'Ubicación', pagina: 'Tu página', cuenta: 'Tu cuenta', pago: 'Pago',
+  modulo: 'Módulo', tipo: 'Qué vendés', rubro: 'Rubro', servicios: 'Servicios',
+  'tipo-alquiler': 'Qué alquilás', 'que-alquilas': 'Tus espacios', 'rubro-gym': 'Rubro', actividades: 'Actividades', planes: 'Precios',
+  negocio: 'Tu negocio', ubicacion: 'Ubicación', pagina: 'Tu página', cuenta: 'Tu cuenta', pago: 'Pago',
 }
 const lista = (ids: PasoId[]): readonly Paso[] => ids.map(id => ({ id, label: ROTULO[id] }))
 
-// Antes de elegir módulo se ve la columna que comparten los dos caminos; al
+// Antes de elegir módulo se ve la columna que comparten todos los caminos; al
 // elegir, el arco suma las estaciones propias de ese módulo.
 const PASOS: Record<Modulo | 'ninguno', readonly Paso[]> = {
   ninguno: lista(['modulo', 'negocio', 'ubicacion', 'cuenta', 'pago']),
   tienda: lista(['modulo', 'tipo', 'negocio', 'ubicacion', 'cuenta', 'pago']),
   turnos: lista(['modulo', 'rubro', 'servicios', 'negocio', 'ubicacion', 'pagina', 'cuenta', 'pago']),
+  alquileres: lista(['modulo', 'tipo-alquiler', 'que-alquilas', 'negocio', 'ubicacion', 'pagina', 'cuenta', 'pago']),
+  gimnasio: lista(['modulo', 'rubro-gym', 'actividades', 'planes', 'negocio', 'ubicacion', 'pagina', 'cuenta', 'pago']),
 }
-export const pasosDe = (m: Modulo | null) => PASOS[m ?? 'ninguno']
 
-// Módulos que el alta muestra pero todavía no deja elegir: la tarjeta sale
-// como "Próximamente". Turnos se está terminando; para habilitarlo alcanza con
-// sacarlo de acá (su recorrido sigue armado).
-export const MODULOS_PROXIMAMENTE: Modulo[] = ['turnos']
-export const moduloHabilitado = (m: Modulo | null): m is Modulo => m !== null && !MODULOS_PROXIMAMENTE.includes(m)
+/** Los pasos del módulo. `rotulos` cambia el nombre de alguna estación (ej. "Tu salón" en vez de "Tus espacios"). */
+export function pasosDe(m: Modulo | null, rotulos?: Partial<Record<PasoId, string>>): readonly Paso[] {
+  const pasos = PASOS[m ?? 'ninguno']
+  return rotulos ? pasos.map(p => ({ ...p, label: rotulos[p.id] ?? p.label })) : pasos
+}
+
+// Los pasos propios de Alquileres y de Gimnasio: sus pantallas y sus reglas son de cada módulo.
+const PASOS_RESERVAS: readonly PasoId[] = ['tipo-alquiler', 'que-alquilas', 'rubro-gym', 'actividades', 'planes']
+export const esPasoReservas = (id: PasoId) => PASOS_RESERVAS.includes(id)
+
+// Módulos que el alta REAL muestra pero todavía no deja elegir: la tarjeta sale
+// como "Próximamente" y Tienda sigue su flujo de siempre. En las demos
+// (localhost) se recorren los cuatro. Para habilitar uno en producción alcanza
+// con sacarlo de acá: su recorrido ya está armado.
+export const MODULOS_PROXIMAMENTE: readonly Modulo[] = ['turnos', 'alquileres', 'gimnasio']
+export const moduloHabilitado = (m: Modulo | null, real: boolean): m is Modulo => m !== null && (!real || !MODULOS_PROXIMAMENTE.includes(m))
 
 // ─── Datos ───────────────────────────────────────────────────────────────────
 
@@ -68,6 +98,8 @@ export interface DatosAlta {
   forma: FormaSitio
   /** Turnos: la cuenta opcional del cliente y lo que gana con ella. */
   cuentas: BeneficiosCuenta
+  /** Alquileres y Gimnasio: la foto de portada elegida en "Tu página" (null = la primera que se ofrece). */
+  portada: string | null
   nombre: string
   email: string
   clave: string
@@ -87,7 +119,7 @@ export const DATOS_INICIALES: DatosAlta = {
   logo: null, negocio: '', descripcion: '', telefono: '', slug: '',
   modalidades: null, direccion: '', ciudad: '', latLng: PUERTO_IGUAZU, zonas: '',
   dias: [0, 1, 2, 3, 4, 5], jornada: JORNADA_INICIAL,
-  forma: 'web', cuentas: BENEFICIOS_INICIALES,
+  forma: 'web', cuentas: BENEFICIOS_INICIALES, portada: null,
   nombre: '', email: '', clave: '', clave2: '', acepta: false,
   plan: 'base', codigo: '',
 }
@@ -95,8 +127,6 @@ export const DATOS_INICIALES: DatosAlta = {
 export const DESCRIPCION_MODO: Record<RubroTurnos['modo'], string> = {
   profesional: 'Cada cliente elige con quién se atiende. Cada profesional tiene sus días y horarios.',
   recurso:     'Los turnos ocupan una sala o cabina. Sirve cuando varios atienden en el mismo espacio.',
-  cancha:      'Se reserva el espacio por hora. Ideal para canchas, salas de ensayo o boxes.',
-  cupo:        'Armás la grilla de clases y cada una tiene un cupo máximo de lugares.',
 }
 
 export const DURACIONES = [10, 15, 20, 30, 40, 45, 50, 60, 75, 90, 120, 150, 180, 240]
@@ -122,17 +152,37 @@ export const iniciales = (nombre: string) => nombre.trim().split(/\s+/).filter(B
 
 // ─── Dónde atiende ───────────────────────────────────────────────────────────
 
+/** Lo que pide el paso "Ubicación" según el módulo (los textos van en textos.ts). */
+interface ReglasUbicacion {
+  /** Dónde puede atender. Con una sola opción el paso no pregunta: va directo a la dirección. */
+  modalidades: Modalidad[]
+  /** La ciudad es obligatoria: sale en la página y en cada reserva. */
+  ciudad: boolean
+  /** Días y horarios de atención: de acá sale la agenda de Turnos. Los demás los ajustan en su panel. */
+  horario: boolean
+}
+
 /**
- * Qué opciones se ofrecen en "¿Dónde atendés?". En Turnos, las del rubro: en el
- * local, a domicilio o las dos. En Tienda son las mismas dos casillas con otro
- * texto ("Local físico" y "Online / A domicilio", como en el alta real).
+ * En Turnos se atiende en el local, a domicilio o las dos. En Tienda son las
+ * mismas dos casillas con otro texto ("Local físico" y "Online / A domicilio",
+ * como en el alta real). Una cancha, un salón, una cabaña o un gimnasio se usan
+ * siempre en el lugar.
  */
-export const modalidadesOfrecidas = (d: DatosAlta, rubro: RubroTurnos | null): Modalidad[] =>
-  d.modulo === 'turnos' && rubro ? modalidadesPosibles(rubro) : ['local', 'domicilio']
+export const UBICACION: Record<Modulo, ReglasUbicacion> = {
+  tienda: { modalidades: ['local', 'domicilio'], ciudad: false, horario: false },
+  turnos: { modalidades: modalidadesPosibles(), ciudad: true, horario: true },
+  alquileres: { modalidades: ['local'], ciudad: true, horario: false },
+  gimnasio: { modalidades: ['local'], ciudad: true, horario: false },
+}
+
+/** Qué opciones se ofrecen en "¿Dónde atendés?". */
+export const modalidadesOfrecidas = (d: DatosAlta): Modalidad[] => UBICACION[d.modulo ?? 'tienda'].modalidades
 
 /** Las marcadas (o, si todavía no tocó nada, las típicas del rubro), siempre dentro de las ofrecidas. */
 export function modalidadesAlta(d: DatosAlta, rubro: RubroTurnos | null): Modalidad[] {
-  const ofrecidas = modalidadesOfrecidas(d, rubro)
+  const ofrecidas = modalidadesOfrecidas(d)
+  // Con una sola opción no hay nada que marcar (y lo que quedó de otro módulo no cuenta).
+  if (ofrecidas.length === 1) return ofrecidas
   const base = d.modalidades ?? (d.modulo === 'turnos' && rubro ? modalidadesRubro(rubro) : ['local'])
   return ofrecidas.filter(m => base.includes(m))
 }
@@ -190,10 +240,23 @@ export const descuentoDe = (codigo: string) => (codigo.trim().toUpperCase() === 
 // ─── Validación ──────────────────────────────────────────────────────────────
 
 export type Errores = Record<string, string>
-export interface ContextoAlta { rubro: RubroTurnos | null; servicios: ServicioAlta[]; sub: Chequeo; mail: Chequeo }
+export interface ContextoAlta {
+  rubro: RubroTurnos | null
+  servicios: ServicioAlta[]
+  sub: Chequeo
+  mail: Chequeo
+  /**
+   * Las reglas de los pasos propios de Alquileres y de Gimnasio, con lo cargado
+   * en ellos. Son de cada módulo y llegan con su código (cargaReservas.ts):
+   * null = todavía no llegó, y el paso no deja seguir.
+   */
+  validarReservas: ((id: PasoId) => Errores) | null
+}
 
 /** Errores del paso, por campo. Vacío = se puede seguir. */
 export function validar(id: PasoId, d: DatosAlta, c: ContextoAlta): Errores {
+  // Los pasos propios de Alquileres y de Gimnasio los valida cada módulo.
+  if (esPasoReservas(id)) return c.validarReservas?.(id) ?? { cargando: 'Un segundo: estamos cargando este paso.' }
   const e: Errores = {}
   if (id === 'modulo' && !d.modulo) e.modulo = 'Elegí un módulo para seguir.'
   if (id === 'tipo' && d.tipos.length === 0) e.tipos = 'Elegí al menos un rubro para seguir.'
@@ -210,11 +273,14 @@ export function validar(id: PasoId, d: DatosAlta, c: ContextoAlta): Errores {
     else if (c.sub === 'verificando') e.slug = 'Estamos viendo si está libre. Probá de nuevo en un segundo.'
   }
   if (id === 'ubicacion') {
+    const modulo = d.modulo ?? 'tienda'
+    const reglas = UBICACION[modulo]
+    const textos = TEXTOS[modulo].ubicacion
     const m = modalidadesAlta(d, c.rubro)
     if (m.length === 0) e.modalidades = 'Marcá al menos una opción.'
-    if (m.includes('local') && d.direccion.trim().length < 4) e.direccion = 'Escribí la dirección del local.'
-    if (d.modulo === 'turnos') {
-      if (d.ciudad.trim().length < 3) e.ciudad = 'Escribí la ciudad donde atendés.'
+    if (m.includes('local') && d.direccion.trim().length < 4) e.direccion = textos.errorDireccion
+    if (reglas.ciudad && d.ciudad.trim().length < 3) e.ciudad = textos.errorCiudad
+    if (reglas.horario) {
       if (d.dias.length === 0) e.dias = 'Marcá al menos un día de atención.'
       const horario = errorJornada(d.jornada)
       if (horario) e.horario = horario

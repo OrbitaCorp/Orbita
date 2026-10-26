@@ -1,6 +1,8 @@
 // Estilos propios del alta (prefijo tuob-). Lo genérico —botones, chips,
-// tarjetas, segmentado, tipografía— sale del kit compartido
-// (_shared/orbita/estilo.tsx); acá va solo lo que es de esta pantalla.
+// tarjetas, segmentado, tipografía— sale del kit de Turnos
+// (modules/turnos/_shared/orbita/estilo.tsx); los pasos propios de Alquileres y
+// Gimnasio traen el suyo (design-system/reservas, prefijo rv-). Acá va solo lo
+// que es de esta pantalla.
 //
 // Todo se monta adentro de un .tuo-espacio, así que los tokens --color-* ya
 // vienen en "espacio profundo" sin importar el tema del sistema.
@@ -32,7 +34,7 @@ export const CSS_ONBOARDING = `
   a.tuob-marca:hover { opacity: 0.8; }
   a.tuob-marca:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 4px; }
   a.tuob-volver { text-decoration: none; }
-  /* El dibujo es siempre el mismo (viewBox 720×126); el marco es más ancho para que entren los ocho rótulos de Turnos. */
+  /* El dibujo es siempre el mismo (viewBox 720×126); el marco es más ancho para que entren los nueve rótulos de Gimnasio. */
   .tuob-pasos { position: relative; width: 100%; max-width: 880px; aspect-ratio: 720 / 126; margin: 0 auto; }
   .tuob-pasos > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
   .tuob-pasos ol { list-style: none; margin: 0; padding: 0; }
@@ -70,23 +72,23 @@ export const CSS_ONBOARDING = `
   .tuob-titulo p { font-size: 15px; line-height: 1.6; color: var(--color-body); margin: 10px 0 0; }
   .tuob-gira { transform-box: view-box; }
   .tuob-girando { animation: tuoGira 900ms linear infinite; }
+  /* Mientras baja un paso de Alquileres o Gimnasio (CargandoPaso, en Alta.tsx): guarda el lugar para que no salte nada. */
+  .tuob-cargando { min-height: 240px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px; color: var(--color-muted); }
 
-  /* ── Paso "Módulo": dos tarjetas grandes ──
-     Solo texto, sin dibujos: vidrio sobre el cielo, y lo elegido se enciende en
-     el azul de la marca. */
-  .tuob-modulos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
-  .tuob-modulo { position: relative; display: flex; flex-direction: column; overflow: hidden; border-radius: 20px; border: 1px solid rgba(255,255,255,0.10); background: var(--tuob-vidrio); -webkit-backdrop-filter: var(--tuob-desenfoque); backdrop-filter: var(--tuob-desenfoque); transition: transform 260ms var(--tuo-ease), border-color 200ms ease, background 200ms ease, box-shadow 260ms ease; }
-  /* Filo de luz arriba, que se enciende al elegir. */
-  .tuob-modulo::before { content: ''; position: absolute; left: 24px; right: 24px; top: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(147,197,253,0.9), transparent); opacity: 0; transition: opacity 240ms ease; pointer-events: none; }
-  .tuob-modulo[data-elegido='true']::before { opacity: 1; }
+  /* ── Paso "Módulo": cuatro tarjetas ──
+     Solo texto, sin dibujos: vidrio sobre el cielo, dos columnas desde tablet y
+     una en celular. Lo elegido se marca con el acento, plano: borde, un velo
+     del mismo azul y el ícono lleno, sin degradados ni brillos. */
+  .tuob-modulos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .tuob-modulo { position: relative; display: flex; flex-direction: column; overflow: hidden; border-radius: 20px; border: 1px solid rgba(255,255,255,0.10); background: var(--tuob-vidrio); -webkit-backdrop-filter: var(--tuob-desenfoque); backdrop-filter: var(--tuob-desenfoque); transition: border-color 200ms ease, background 200ms ease; }
   /* El radio ocupa toda la tarjeta, invisible y por encima: se elige tocando en cualquier lado. */
   .tuob-modulo > input { position: absolute; inset: 0; z-index: 3; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
   .tuob-modulo:has(input:focus-visible) { outline: 2px solid var(--color-primary); outline-offset: 3px; }
-  .tuob-modulo[data-elegido='true'] { border-color: #60A5FA; background: linear-gradient(180deg, rgba(37,99,235,0.20), rgba(30,58,138,0.07)); box-shadow: 0 0 0 3px rgba(96,165,250,0.16), 0 24px 60px rgba(37,99,235,0.20); }
-  .tuob-modulo-cuerpo { display: flex; flex-direction: column; gap: 20px; flex: 1; padding: 26px; }
+  .tuob-modulo[data-elegido='true'] { border-color: var(--color-primary); background: rgba(96,165,250,0.10); box-shadow: 0 0 0 1px var(--color-primary); }
+  .tuob-modulo-cuerpo { display: flex; flex-direction: column; gap: 18px; flex: 1; padding: 24px; }
   .tuob-modulo-cab { display: flex; align-items: flex-start; gap: 16px; }
-  .tuob-modulo-icono { width: 48px; height: 48px; border-radius: 14px; flex-shrink: 0; display: grid; place-items: center; color: var(--color-primary-h); background: rgba(96,165,250,0.10); border: 1px solid rgba(147,197,253,0.18); transition: background 220ms ease, color 220ms ease, box-shadow 240ms ease; }
-  .tuob-modulo[data-elegido='true'] .tuob-modulo-icono { background: var(--tuo-grad); color: #fff; border-color: transparent; box-shadow: 0 6px 18px rgba(37,99,235,0.45); }
+  .tuob-modulo-icono { width: 48px; height: 48px; border-radius: 14px; flex-shrink: 0; display: grid; place-items: center; color: var(--color-primary-h); background: rgba(96,165,250,0.10); border: 1px solid rgba(147,197,253,0.18); transition: background 220ms ease, color 220ms ease; }
+  .tuob-modulo[data-elegido='true'] .tuob-modulo-icono { background: var(--color-primary); color: var(--color-on-primary); border-color: transparent; }
   .tuob-modulo h2 { margin: 0; font-family: var(--tuo-fh); font-size: 20px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; color: var(--color-text); }
   .tuob-modulo-cab p { margin: 6px 0 0; font-size: 14px; line-height: 1.5; color: var(--color-body); }
   .tuob-modulo-lista { display: grid; gap: 12px; margin: 0; padding: 18px 0 0; list-style: none; border-top: 1px solid rgba(255,255,255,0.08); font-size: 14px; color: var(--color-body); }
@@ -95,13 +97,16 @@ export const CSS_ONBOARDING = `
   .tuob-modulo-pie { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 1.45; color: var(--color-muted); }
   .tuob-modulo-pie b { color: var(--color-body); font-weight: 600; }
   .tuob-modulo-pasos { flex-shrink: 0; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--chip-primary-fg); }
-  /* Módulo todavía no habilitado: se lee entero pero no se elige ni reacciona al mouse. */
+  /* Módulo todavía no habilitado (alta real): se lee entero pero apagado, no se
+     elige ni reacciona al mouse. El chip de "Próximamente" queda encendido. */
   .tuob-modulo[data-proximamente='true'] { border-style: dashed; border-color: rgba(255,255,255,0.14); }
   .tuob-modulo[data-proximamente='true'] > input { cursor: not-allowed; }
-  .tuob-modulo[data-proximamente='true'] .tuob-modulo-cab, .tuob-modulo[data-proximamente='true'] .tuob-modulo-lista, .tuob-modulo[data-proximamente='true'] .tuob-modulo-pie { opacity: 0.62; }
+  .tuob-modulo[data-proximamente='true'] :is(.tuob-modulo-icono, h2, .tuob-modulo-cab p, .tuob-modulo-lista, .tuob-modulo-pie) { opacity: 0.7; }
   .tuob-modulo[data-proximamente='true'] .tuob-modulo-lista svg { color: var(--color-muted); }
-  .tuob-modulo-pronto { flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; color: var(--chip-primary-fg); background: rgba(96,165,250,0.12); border: 1px solid rgba(147,197,253,0.28); }
-  .tuob-modulo-aviso { margin: 0; font-size: 13px; line-height: 1.5; color: var(--color-body); }
+  .tuob-modulo-pronto { margin-top: 10px; display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; color: var(--chip-primary-fg); background: rgba(96,165,250,0.12); border: 1px solid rgba(147,197,253,0.28); }
+  /* Un solo aviso abajo para todos los que están por llegar. */
+  .tuob-modulos-aviso { display: flex; align-items: flex-start; gap: 8px; max-width: 640px; margin: 16px auto 0; font-size: 13px; line-height: 1.55; color: var(--color-body); text-align: left; }
+  .tuob-modulos-aviso > svg { flex-shrink: 0; margin-top: 3px; color: var(--color-primary-h); }
   .tuob-ya-cuenta { margin: 22px 0 0; text-align: center; font-size: 14px; color: var(--color-muted); }
   .tuob-ya-cuenta a { display: inline-block; padding: 10px 4px; color: var(--color-primary-h); font-weight: 600; text-decoration: underline; text-decoration-color: rgba(147,197,253,0.4); text-underline-offset: 3px; border-radius: 6px; transition: color 160ms ease, text-decoration-color 160ms ease; }
   .tuob-ya-cuenta a:hover { color: #fff; text-decoration-color: #fff; }
@@ -310,6 +315,16 @@ export const CSS_ONBOARDING = `
   .tuob-benef li { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--color-border); background: var(--tuob-hueco); }
   .tuob-benef-ico { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; color: var(--color-primary-h); background: rgba(96,165,250,0.12); }
   .tuob-benef select.tuob-input { width: 140px; height: 44px; }
+  /* Alquileres y Gimnasio eligen la foto de portada: miniaturas con proporción
+     fija (no saltan al cargar), tres por fila en celular y hasta seis en escritorio. */
+  .tuob-portadas { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+  .tuob-portada { position: relative; display: block; overflow: hidden; aspect-ratio: 4 / 3; border-radius: 12px; border: 1px solid var(--color-border); background: var(--tuob-hueco); cursor: pointer; transition: border-color 180ms ease; }
+  .tuob-portada > input { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+  .tuob-portada > img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .tuob-portada > .tuob-marca-opcion { position: absolute; top: 6px; right: 6px; z-index: 1; }
+  .tuob-portada:not([data-elegido='true']) > .tuob-marca-opcion { background: rgba(5,8,15,0.5); border-color: rgba(255,255,255,0.75); }
+  .tuob-portada[data-elegido='true'] { border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary); }
+  .tuob-portada:has(input:focus-visible) { outline: 2px solid var(--color-primary); outline-offset: 3px; }
 
   .tuob-tel { position: relative; width: 272px; height: 548px; box-sizing: border-box; padding: 10px; border-radius: 42px; border: 1px solid rgba(147,197,253,0.3); background: linear-gradient(160deg, #1E293B, #0B101D); box-shadow: 0 30px 80px rgba(3,6,14,0.7), 0 0 90px rgba(59,130,246,0.2), inset 0 1px 0 rgba(255,255,255,0.12); }
   .tuob-tel-isla { position: absolute; top: 19px; left: 50%; z-index: 4; width: 70px; height: 19px; margin-left: -35px; border-radius: 999px; background: #05080F; }
@@ -478,9 +493,8 @@ export const CSS_ONBOARDING = `
   @media (hover: hover) {
     .tuob-punto[data-tocable='true']:hover > i { transform: scale(1.25); box-shadow: 0 0 20px rgba(96,165,250,0.9); }
     .tuob-punto[data-tocable='true']:hover > span { color: var(--color-text); }
-    .tuob-modulo:not([data-elegido='true']):not([data-proximamente='true']):hover { background: var(--tuob-vidrio-alto); }
-    .tuob-modulo:not([data-proximamente='true']):hover { transform: translateY(-3px); border-color: rgba(147,197,253,0.5); box-shadow: 0 22px 50px rgba(0,0,0,0.45); }
-    .tuob-modulo[data-elegido='true']:hover { border-color: #60A5FA; box-shadow: 0 0 0 3px rgba(96,165,250,0.24), 0 26px 64px rgba(37,99,235,0.28); }
+    .tuob-modulo:not([data-elegido='true']):not([data-proximamente='true']):hover { background: var(--tuob-vidrio-alto); border-color: var(--color-border-strong); }
+    .tuob-portada:not([data-elegido='true']):hover { border-color: var(--color-border-strong); }
     .tuob-rubro:not([aria-pressed='true']):hover { background: var(--tuob-vidrio-alto); }
     .tuob-rubro:hover { transform: translateY(-3px); border-color: rgba(147,197,253,0.5); box-shadow: 0 18px 40px rgba(0,0,0,0.45); }
     .tuob-rubro[aria-pressed='true']:hover { box-shadow: 0 0 0 3px rgba(96,165,250,0.3), 0 20px 46px rgba(37,99,235,0.4); }
@@ -523,14 +537,18 @@ export const CSS_ONBOARDING = `
     .tuob.tuo-espacio { padding-bottom: 150px; }
     .tuob-titulo { text-align: left; margin-bottom: 22px; }
     html:has(.tuob) { scroll-padding-bottom: 168px; }
-    /* Los dos módulos tienen que verse sin deslizar: el detalle de cada uno aparece recién cuando se lo elige. */
-    .tuob-modulos { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+    /* Los cuatro módulos tienen que verse casi sin deslizar: en celular cada
+       tarjeta es título y una línea, y el detalle aparece recién al elegirla. */
+    .tuob-modulos { grid-template-columns: minmax(0, 1fr); gap: 10px; }
     .tuob-modulo-cuerpo { padding: 16px; gap: 12px; }
     .tuob-modulo-icono { width: 44px; height: 44px; border-radius: 13px; }
+    .tuob-modulo h2 { font-size: 18px; }
+    .tuob-modulo-cab p { margin-top: 4px; font-size: 13.5px; }
     .tuob-modulo-lista { padding-top: 12px; gap: 9px; }
-    .tuob-modulo:not([data-elegido='true']) .tuob-modulo-lista { display: none; }
+    .tuob-modulo:not([data-elegido='true']) .tuob-modulo-lista, .tuob-modulo:not([data-elegido='true']) .tuob-modulo-pie { display: none; }
     .tuob-modulo[data-elegido='true'] .tuob-modulo-lista { animation: tuoEntra 280ms var(--tuo-ease) both; }
     .tuob-modulo-pie { padding-top: 12px; }
+    .tuob-modulos-aviso { margin-top: 14px; }
     .tuob-filtros .tuo-buscar { max-width: none; }
     .tuob-contador { margin-top: -8px; text-align: left; }
     .tuob .tuo-buscar > input, .tuob-input { font-size: 16px; height: 48px; }
@@ -587,7 +605,7 @@ export const CSS_ONBOARDING = `
     .tuob-esc, .tuob-dedo, .tuob-esc [data-el]::after, .tuob-esc-pulso, .tuob-esc-tilde, .tuob-esc-puntos i { animation: none !important; }
     .tuob-esc:first-child { opacity: 1; }
     .tuob-esc-puntos { display: none; }
-    .tuob-satelite, .tuob-recorrido, .tuob-rubro, .tuob-rubro-icono, .tuob-opcion, .tuob-modulo, .tuob-qr, .tuob-flecha, .tuob-agregar svg, .tuob-punto > i, .tuob-pasos li, .tuob-logo-marco, .tuob-marca-opcion, .tuob-que-es { transition: none !important; }
+    .tuob-satelite, .tuob-recorrido, .tuob-rubro, .tuob-rubro-icono, .tuob-opcion, .tuob-modulo, .tuob-qr, .tuob-flecha, .tuob-agregar svg, .tuob-punto > i, .tuob-pasos li, .tuob-logo-marco, .tuob-marca-opcion, .tuob-que-es, .tuob-portada { transition: none !important; }
     .tuob-rubro, .tuob-rubro-icono, .tuob-opcion, .tuob-modulo, .tuob-qr, .tuob-flecha, .tuob-agregar svg, .tuob-logo-marco, .tuob-que-es { transform: none !important; }
   }
   @media (max-width: 640px) { .tuob .tuo-btn--sm { min-height: 44px; } }

@@ -2,16 +2,20 @@
 // botón de pagar vive en la botonera fija de abajo (Alta.tsx).
 //
 // Los planes son los de Tienda (planesDatos.ts, los montos reales). El precio
-// de Turnos todavía no está definido: se dice de frente en vez de inventar uno.
-// En la demo no se cobra nada.
+// de Turnos, Alquileres y Gimnasio todavía no está definido: se dice de frente
+// en vez de inventar uno. En la demo no se cobra nada.
 import { useEffect, useState } from 'react'
 import { Check, Info, LoaderCircle, Package, Sparkles, Tag, X } from 'lucide-react'
 import { TARJETAS, fmt } from '@/modules/landing/components/v2/planesDatos'
 import { MODO_LABEL, type RubroTurnos } from '@/modules/turnos/datos'
-import { MODALIDAD_TXT, beneficiosTxt } from '@/modules/turnos/demo/negocioDemo'
+import { MODALIDAD_TXT, beneficiosTxt } from '@/modules/turnos/datos/negocio'
 import { Aviso, MensajeError, Opcion, type PropsPaso } from './campos'
 import { CODIGO_DEMO, descuentoDe, diasTxt, horarioTxt, modalidadesAlta, slugDe, type DatosAlta, type ServicioAlta } from './modelo'
 import { subrubroPorKey } from './subrubrosTienda'
+import { TEXTOS } from './textos'
+
+/** Filas propias de un módulo en el resumen (Alquileres y Gimnasio: ver reservas.ts). */
+export interface FilaResumen { dt: string; dd: string }
 
 /** Lo que se paga hoy por el plan elegido, con el código aplicado. */
 export function importeDe(d: DatosAlta) {
@@ -20,11 +24,23 @@ export function importeDe(d: DatosAlta) {
   return { plan, pct, hoy: Math.round(plan.precioLista * (1 - pct / 100)) }
 }
 
-function Resumen({ d, rubro, servicios, sena }: { d: DatosAlta; rubro: RubroTurnos | null; servicios: ServicioAlta[]; sena: number }) {
+function Resumen({ d, rubro, servicios, sena, filas }: { d: DatosAlta; rubro: RubroTurnos | null; servicios: ServicioAlta[]; sena: number; filas: FilaResumen[] }) {
   const marcadas = modalidadesAlta(d, rubro)
   const local = marcadas.includes('local')
   const direccion = [d.direccion.trim(), d.ciudad.trim()].filter(Boolean).join(', ')
   const link = <dd className="tuo-num" style={{ color: 'var(--color-primary-h)' }}>{slugDe(d)}.orbita.site</dd>
+
+  // Alquileres y Gimnasio: lo propio del módulo llega armado; dónde queda y el link son de todos.
+  if (d.modulo === 'alquileres' || d.modulo === 'gimnasio') {
+    return (
+      <dl className="tuob-resumen">
+        <div><dt>Negocio</dt><dd>{d.negocio.trim() || 'Sin nombre'}</dd></div>
+        {filas.map(f => <div key={f.dt}><dt>{f.dt}</dt><dd>{f.dd}</dd></div>)}
+        <div><dt>Dónde queda</dt><dd>{direccion || 'Sin dirección'}</dd></div>
+        <div><dt>Link de reservas</dt>{link}</div>
+      </dl>
+    )
+  }
 
   if (d.modulo === 'tienda') {
     const rubros = d.tipos.map(k => subrubroPorKey(k)?.label).filter(Boolean) as string[]
@@ -101,14 +117,20 @@ function Codigo({ d, poner }: Pick<PropsPaso, 'd' | 'poner'>) {
   )
 }
 
-export function PasoPago({ d, poner, rubro, servicios, sena }: Pick<PropsPaso, 'd' | 'poner'> & { rubro: RubroTurnos | null; servicios: ServicioAlta[]; sena: number }) {
+export function PasoPago({ d, poner, rubro, servicios, sena, filas = [] }: Pick<PropsPaso, 'd' | 'poner'> & {
+  rubro: RubroTurnos | null
+  servicios: ServicioAlta[]
+  sena: number
+  /** Lo propio de Alquileres o de Gimnasio en el resumen. */
+  filas?: FilaResumen[]
+}) {
   const { plan, pct, hoy } = importeDe(d)
   return (
     <div className="tuob-ancho tuob-ancho--form">
       <div style={{ display: 'grid', gap: 14 }}>
         <div className="tuob-form" style={{ gap: 14 }}>
           <span className="tuo-rotulo">Tu negocio</span>
-          <Resumen d={d} rubro={rubro} servicios={servicios} sena={sena} />
+          <Resumen d={d} rubro={rubro} servicios={servicios} sena={sena} filas={filas} />
         </div>
 
         <div className="tuob-form">
@@ -137,9 +159,7 @@ export function PasoPago({ d, poner, rubro, servicios, sena }: Pick<PropsPaso, '
           </div>
 
           <Aviso tono="aviso" Icon={Info}>
-            {d.modulo === 'turnos'
-              ? 'Los valores son los de los planes de Tienda de hoy, como referencia: el precio de Turnos todavía no está definido. '
-              : 'Los valores son los de los planes de Tienda de hoy. '}
+            {TEXTOS[d.modulo ?? 'tienda'].precios}
             En esta vista previa no se cobra nada ni se abre Mercado Pago.
           </Aviso>
         </div>

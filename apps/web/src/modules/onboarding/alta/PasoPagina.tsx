@@ -10,7 +10,7 @@
 // el dueño es si además ofrece una cuenta opcional y qué gana quien la crea.
 import { BellRing, Gift, PanelsTopLeft, Percent, Smartphone, UserRoundCheck } from 'lucide-react'
 import type { RubroTurnos } from '@/modules/turnos/datos'
-import type { BeneficiosCuenta } from '@/modules/turnos/demo/negocioDemo'
+import type { BeneficiosCuenta } from '@/modules/turnos/datos/negocio'
 import { Llave } from '@/modules/turnos/_shared/orbita/piezas'
 import { Opcion, type PropsPaso } from './campos'
 import type { ServicioAlta } from './modelo'
@@ -22,7 +22,7 @@ const SELLOS = [0, 5, 6, 8, 10]
 export function PasoPagina({ d, poner, rubro, servicios }: Pick<PropsPaso, 'd' | 'poner'> & { rubro: RubroTurnos; servicios: ServicioAlta[] }) {
   const c = d.cuentas
   const cuenta = (cambio: Partial<BeneficiosCuenta>) => poner('cuentas', { ...c, ...cambio })
-  const turno = rubro.modo === 'cupo' ? 'clase' : rubro.modo === 'cancha' ? 'reserva' : 'turno'
+  const turno = 'turno'
   const conEquipo = rubro.modo === 'profesional'
 
   return (

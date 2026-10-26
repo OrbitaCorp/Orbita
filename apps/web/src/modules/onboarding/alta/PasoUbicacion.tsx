@@ -4,17 +4,22 @@
 // la ciudad (hoy se atiende por ciudad: a domicilio es dentro de ella, sin
 // zonas aparte), y abajo van los días y los horarios de atención,
 // partidos en mañana y tarde (cada turno se prende, se apaga y se ajusta).
+// Alquileres y Gimnasio se usan siempre en el lugar: no hay nada que marcar y
+// el paso va directo a la dirección y la ciudad (sus horarios se ajustan en el
+// panel). Qué pide cada módulo está en UBICACION (modelo.ts).
 import { useRef, useState } from 'react'
 import { Check, CircleAlert, Globe, Home, LoaderCircle, LocateFixed, MapPin, Search, Sun, Sunset, type LucideIcon } from 'lucide-react'
 import { MapPicker } from '@/components/MapPicker'
 import { DIAS, DIAS_CORTOS, type RubroTurnos } from '@/modules/turnos/datos'
-import type { Modalidad } from '@/modules/turnos/demo/negocioDemo'
+import type { Modalidad } from '@/modules/turnos/datos/negocio'
 import { MEDIAS_HORAS, corteDe, hhmm, tramosDeJornada, type Bloque } from '@/modules/turnos/horario'
 import { Llave } from '@/modules/turnos/_shared/orbita/piezas'
 import { Aviso, Casilla, Entrada, MensajeError, type PropsPaso } from './campos'
-import { modalidadesAlta, modalidadesOfrecidas, type Modulo } from './modelo'
+import { UBICACION, modalidadesAlta, modalidadesOfrecidas, type Modulo } from './modelo'
+import { TEXTOS } from './textos'
 
-const OPCIONES: Record<Modulo, Record<Modalidad, { Icon: LucideIcon; titulo: string; texto: string }>> = {
+// Las casillas de "¿Dónde atendés?": solo en los módulos que ofrecen más de una opción.
+const OPCIONES: Partial<Record<Modulo, Record<Modalidad, { Icon: LucideIcon; titulo: string; texto: string }>>> = {
   turnos: {
     local: { Icon: MapPin, titulo: 'En mi local', texto: 'Tengo un lugar donde recibo a mis clientes.' },
     domicilio: { Icon: Home, titulo: 'A domicilio', texto: 'Voy yo a la casa o al lugar del cliente.' },
@@ -131,9 +136,11 @@ function Turno({ id, Icon, titulo, bloque, onCambio }: { id: string; Icon: Lucid
 export function PasoUbicacion({ d, poner, error, tocar, rubro }: PropsPaso & { rubro: RubroTurnos | null }) {
   const modulo: Modulo = d.modulo ?? 'tienda'
   const turnos = modulo === 'turnos'
-  const ofrecidas = modalidadesOfrecidas(d, rubro)
+  const reglas = UBICACION[modulo]
+  const textos = TEXTOS[modulo].ubicacion
+  const opciones = OPCIONES[modulo]
+  const ofrecidas = modalidadesOfrecidas(d)
   const marcadas = modalidadesAlta(d, rubro)
-  const unica = ofrecidas.length === 1
   const alternar = (m: Modalidad) => { poner('modalidades', marcadas.includes(m) ? marcadas.filter(x => x !== m) : [...marcadas, m]); tocar('modalidades') }
   const alternarDia = (dia: number) => poner('dias', d.dias.includes(dia) ? d.dias.filter(x => x !== dia) : [...d.dias, dia].sort((a, b) => a - b))
   const errorModalidades = error('modalidades')
@@ -148,21 +155,22 @@ export function PasoUbicacion({ d, poner, error, tocar, rubro }: PropsPaso & { r
     <div className="tuob-ancho tuob-ancho--form">
       <div style={{ display: 'grid', gap: 14 }}>
         <div className="tuob-form">
-          <fieldset className="tuob-campo" aria-describedby={errorModalidades ? 'tuob-modalidades-error' : undefined}>
-            <legend className="tuob-leyenda">{turnos ? '¿Dónde atendés?' : '¿Dónde operás?'}</legend>
-            <p className="tuob-ayuda" style={{ margin: '2px 0 5px' }}>
-              {unica ? 'En tu rubro se atiende siempre en el lugar.' : turnos ? 'Marcá todas las que correspondan: tus clientes eligen al reservar.' : 'Podés elegir una opción o las dos.'}
-            </p>
-            <div className="tuob-opciones" data-n={ofrecidas.length}>
-              {ofrecidas.map(m => {
-                const o = OPCIONES[modulo][m]
-                return <Casilla key={m} elegido={marcadas.includes(m)} onElegir={() => alternar(m)} Icon={o.Icon} titulo={o.titulo} texto={o.texto} deshabilitado={unica} />
-              })}
-            </div>
-            {errorModalidades && <MensajeError id="tuob-modalidades-error">{errorModalidades}</MensajeError>}
-          </fieldset>
+          {/* Con una sola opción (Alquileres, Gimnasio) no se pregunta: va directo a la dirección. */}
+          {opciones && ofrecidas.length > 1 && (
+            <fieldset className="tuob-campo" aria-describedby={errorModalidades ? 'tuob-modalidades-error' : undefined}>
+              <legend className="tuob-leyenda">{textos.leyenda}</legend>
+              <p className="tuob-ayuda" style={{ margin: '2px 0 5px' }}>{textos.ayuda}</p>
+              <div className="tuob-opciones" data-n={ofrecidas.length}>
+                {ofrecidas.map(m => {
+                  const o = opciones[m]
+                  return <Casilla key={m} elegido={marcadas.includes(m)} onElegir={() => alternar(m)} Icon={o.Icon} titulo={o.titulo} texto={o.texto} />
+                })}
+              </div>
+              {errorModalidades && <MensajeError id="tuob-modalidades-error">{errorModalidades}</MensajeError>}
+            </fieldset>
+          )}
 
-          {local && <Direccion d={d} poner={poner} error={error} tocar={tocar} ciudadObligatoria={turnos} />}
+          {local && <Direccion d={d} poner={poner} error={error} tocar={tocar} ciudadObligatoria={reglas.ciudad} />}
 
           {/* Sin local no hay dirección que pedir: alcanza con la ciudad. */}
           {turnos && !local && remoto && (
@@ -187,7 +195,7 @@ export function PasoUbicacion({ d, poner, error, tocar, rubro }: PropsPaso & { r
           )}
         </div>
 
-        {turnos && (
+        {reglas.horario && (
           <div className="tuob-form">
             <fieldset className="tuob-campo" aria-describedby={errorDias ? 'tuob-dias-error' : undefined}>
               <legend className="tuob-leyenda" style={{ marginBottom: 7 }}>Días de atención</legend>

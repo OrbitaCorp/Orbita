@@ -7,9 +7,9 @@
 // ubicacion y cuenta) y aplica sobre el alta lo que Orbi hace desde el chat:
 // elegir una opción, completar un campo, continuar.
 //
-// Solo se monta en el alta real (<Alta real />): la demo de /turnos-demo no
-// llama a la API y además useOrbiContext solo reconoce el wizard por la ruta
-// /onboarding.
+// Solo se monta en el alta real (<Alta real />): las demos (/turnos-demo,
+// /alquileres-demo, /gimnasio-demo) no llaman a la API y además
+// useOrbiContext solo reconoce el wizard por la ruta /onboarding.
 import { useEffect, useRef, type RefObject } from 'react'
 import { OrbiPanel } from '@/components/orbi/OrbiPanel'
 import { OrbiWizardFAB } from '@/components/orbi/OrbiWizardFAB'
@@ -26,7 +26,7 @@ import { marcarPasoOfrecido, puedeOfrecer, registrarNo } from '@/components/orbi
 import { track } from '@/lib/analytics/wizardTracker'
 import { MODULOS } from './PasoModulo'
 import { SUBRUBROS_TIENDA, alternarTipo } from './subrubrosTienda'
-import { aSlug, modalidadesAlta, moduloHabilitado, type DatosAlta, type Errores, type Modulo, type PasoId } from './modelo'
+import { aSlug, esModulo, modalidadesAlta, moduloHabilitado, type DatosAlta, type Errores, type Modulo, type PasoId } from './modelo'
 
 /**
  * Cómo se llama cada paso del alta para Orbi: los stepName que entiende la API
@@ -41,8 +41,8 @@ interface Opcion { key: string; label: string; description?: string }
 
 // Las opciones que Orbi puede elegir en cada paso (selectWizardOption), con los
 // keys que después vuelven por el evento orbi:select-option. Los módulos en
-// "Próximamente" no se ofrecen: no se pueden elegir.
-const OPCIONES_MODULO: Opcion[] = MODULOS.filter(m => moduloHabilitado(m.id)).map(m => ({ key: m.id, label: m.titulo, description: m.bajada }))
+// "Próximamente" no se ofrecen: no se pueden elegir (Orbi vive solo en el alta real).
+const OPCIONES_MODULO: Opcion[] = MODULOS.filter(m => moduloHabilitado(m.id, true)).map(m => ({ key: m.id, label: m.titulo, description: m.bajada }))
 const OPCIONES_TIPO: Opcion[] = SUBRUBROS_TIENDA.map(s => ({ key: s.key, label: s.label, description: s.descripcion }))
 const OPCIONES_MODO_VENTA: Opcion[] = [
   { key: 'ecommerce', label: 'Tienda online', description: 'Carrito, checkout y pagos online' },
@@ -163,7 +163,7 @@ export function OrbiAlta({ id, paso, total, datos, errores, pie, onElegirModulo,
       const key = String((e as CustomEvent<{ key?: unknown }>).detail?.key ?? '')
       const { datos: d, onElegirModulo: elegirModulo, onPoner: poner } = ultimo.current
       if (id === 'modulo') {
-        if ((key === 'tienda' || key === 'turnos') && moduloHabilitado(key)) elegirModulo(key)
+        if (esModulo(key) && moduloHabilitado(key, true)) elegirModulo(key)
       } else if (id === 'tipo') {
         if (SUBRUBROS_TIENDA.some(s => s.key === key) && !d.tipos.includes(key)) poner('tipos', alternarTipo(d.tipos, key))
       } else if (id === 'negocio') {

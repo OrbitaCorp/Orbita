@@ -15,7 +15,7 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { ArrowLeft, ArrowRight, CalendarCheck, Check, Clock, Gift, MapPin, Menu, MessageCircle, Sun, Sunset } from 'lucide-react'
 import { duracionTxt, pesos, type RubroTurnos } from '@/modules/turnos/datos'
-import { beneficiosTxt, type FormaSitio } from '@/modules/turnos/demo/negocioDemo'
+import { beneficiosTxt, type FormaSitio } from '@/modules/turnos/datos/negocio'
 import { hhmm, tramosDeJornada, type Bloque } from '@/modules/turnos/horario'
 import { RETRATOS, temaDe } from '@/modules/turnos/storefront/tema'
 import { diasTxt, horarioTxt, iniciales, modalidadesAlta, type DatosAlta, type ServicioAlta } from './modelo'
@@ -29,7 +29,7 @@ export function VistaPagina({ forma, rubro, d, servicios }: Props) {
   const t = temaDe(rubro)
   const nombre = d.negocio.trim() || 'Tu negocio'
   const descripcion = d.descripcion.trim() || `${rubro.label} con reserva online. Elegí día y horario en un minuto, sin llamar.`
-  const verbo = rubro.modo === 'cupo' ? 'Reservar lugar' : rubro.modo === 'cancha' ? 'Reservar cancha' : 'Reservar turno'
+  const verbo = 'Reservar turno'
   const marcadas = modalidadesAlta(d, rubro)
   const local = marcadas.includes('local')
   const lugar = local ? [d.direccion.trim(), d.ciudad.trim()].filter(Boolean).join(', ') || 'Tu dirección'
@@ -92,7 +92,7 @@ export function VistaPagina({ forma, rubro, d, servicios }: Props) {
 
             {/* 2 · Qué se quiere hacer */}
             {escena(1, <>
-              {cabecera(1, rubro.modo === 'cupo' ? 'Elegí la clase' : rubro.modo === 'cancha' ? '¿Qué querés jugar?' : 'Elegí el servicio')}
+              {cabecera(1, 'Elegí el servicio')}
               <div className="tuob-esc-lista">
                 {lista.map(s => (
                   <div key={s.id} className="tuob-esc-op" data-el={s.id === elegido?.id || undefined}>
@@ -162,7 +162,7 @@ export function VistaPagina({ forma, rubro, d, servicios }: Props) {
                 </div>
               </div>
               <div className="tuob-ms-sec">
-                <span className="tuob-ms-eyebrow">{rubro.modo === 'cupo' ? 'Actividades' : rubro.modo === 'cancha' ? 'Canchas' : 'Servicios'}</span>
+                <span className="tuob-ms-eyebrow">Servicios</span>
                 {lista.map(s => (
                   <div key={s.id} className="tuob-ms-serv">
                     <b>{s.nombre}</b>
