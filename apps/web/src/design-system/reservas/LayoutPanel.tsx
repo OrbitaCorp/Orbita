@@ -14,7 +14,7 @@ import { ArrowUpRight, Menu, Moon, Sun, X } from 'lucide-react'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 import { useDarkMode } from '@/hooks/useDarkMode'
 import { EstiloReservas } from './estilo'
-import { retenerFoco } from './piezas'
+import { frenarScroll, retenerFoco } from './piezas'
 
 export interface ItemNav { id: string; label: string; Icon: LucideIcon; badge?: number }
 
@@ -42,8 +42,10 @@ const CSS = `
   .rvp-main { flex: 1; min-width: 0; }
   .rvp-velo { display: none; }
   @media (max-width: 768px) {
-    /* visibility: hidden con retardo = sale de la pantalla con la animación y recién ahí deja de recibir el Tab. */
-    .rvp-lateral { position: fixed; left: 0; top: var(--rv-tope); bottom: 0; height: auto; width: min(280px, 86vw); transform: translateX(-100%); visibility: hidden; transition: transform 240ms var(--rv-ease, ease), visibility 0s linear 240ms; box-shadow: none; z-index: 140; padding-bottom: env(safe-area-inset-bottom, 0px); }
+    /* visibility: hidden con retardo = sale de la pantalla con la animación y recién ahí deja de recibir el Tab.
+       align-self: auto: el flex-start del sticky de escritorio también vale para un fixed, y el
+       cajón medía lo que su contenido en vez de ir de la tira hasta abajo. */
+    .rvp-lateral { position: fixed; left: 0; top: var(--rv-tope); bottom: 0; height: auto; align-self: auto; width: min(280px, 86vw); transform: translateX(-100%); visibility: hidden; transition: transform 240ms var(--rv-ease, ease), visibility 0s linear 240ms; box-shadow: none; z-index: 140; padding-bottom: env(safe-area-inset-bottom, 0px); }
     .rvp-lateral[data-abierto='true'] { transform: none; visibility: visible; transition: transform 240ms var(--rv-ease, ease), visibility 0s; box-shadow: 8px 0 32px rgba(0,0,0,0.25); }
     .rvp-menu { display: inline-flex; }
     .rvp-velo[data-abierto='true'] { display: block; position: fixed; inset: var(--rv-tope) 0 0 0; z-index: 130; background: rgba(15,23,42,0.5); }
@@ -92,13 +94,13 @@ export default function LayoutPanel({ negocio, rubro, items, activo, onIr, sitio
       if (caja) retenerFoco(e, caja)
     }
     window.addEventListener('keydown', tecla)
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    // En <html> y no en <body>: así el header del panel (sticky) no se va de la pantalla mientras el cajón está abierto.
+    const soltar = frenarScroll()
     // Si la ventana crece a escritorio con el cajón abierto, se cierra solo (ahí no hay botón de menú).
     const mq = window.matchMedia('(min-width: 769px)')
     const alCrecer = () => { devolverFoco.current = false; setAbierto(false) }
     mq.addEventListener('change', alCrecer)
-    return () => { window.removeEventListener('keydown', tecla); mq.removeEventListener('change', alCrecer); document.body.style.overflow = prev }
+    return () => { window.removeEventListener('keydown', tecla); mq.removeEventListener('change', alCrecer); soltar() }
   }, [abierto])
 
   const actual = items.find(i => i.id === activo)

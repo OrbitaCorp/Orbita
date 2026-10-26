@@ -127,6 +127,21 @@ export function retenerFoco(e: globalThis.KeyboardEvent, caja: HTMLElement) {
 }
 
 /**
+ * Frena el scroll de la página mientras hay un modal o un cajón abierto. Va en
+ * <html>, que es el que scrollea (globals.css le pone overflow-x): con
+ * overflow en <body>, body pasaba a ser un contenedor de scroll y todo lo
+ * sticky (la tira de la demo, el header del sitio y el del panel) se anclaba a
+ * él y se iba de la pantalla mientras el modal estaba abierto. Devuelve cómo
+ * dejarlo como estaba.
+ */
+export function frenarScroll(): () => void {
+  const raiz = document.documentElement
+  const antes = raiz.style.overflow
+  raiz.style.overflow = 'hidden'
+  return () => { raiz.style.overflow = antes }
+}
+
+/**
  * Modal centrado (hoja desde abajo en celular): Escape y el velo cierran, el
  * foco entra, da la vuelta adentro y vuelve a donde estaba al cerrar.
  */
@@ -145,9 +160,8 @@ export function Modal({ titulo, bajada, onCerrar, children, pie, ancho }: { titu
       if (caja.current) retenerFoco(e, caja.current)
     }
     document.addEventListener('keydown', tecla)
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => { document.removeEventListener('keydown', tecla); document.body.style.overflow = prev; antes?.focus?.() }
+    const soltar = frenarScroll()
+    return () => { document.removeEventListener('keydown', tecla); soltar(); antes?.focus?.() }
   }, [])
   return (
     <div className="rv-velo" onClick={e => { if (e.target === e.currentTarget) onCerrar() }}>
@@ -196,19 +210,25 @@ export function Kpi({ label, valor, nota, i = 0 }: { label: string; valor: React
 }
 
 /**
- * Barras simples: una serie, con rótulo abajo y el valor en el title y en el
- * aria-label de cada barra. Sin librería: es un gráfico de una serie y así se
- * lee igual en claro y en oscuro con el acento del sistema.
+ * Barras simples: una serie, con rótulo abajo. Sin librería: es un gráfico de
+ * una serie y así se lee igual en claro y en oscuro con el acento del sistema.
+ * La columna más alta lleva su valor escrito (da la escala); el de cada una se
+ * ve al pasar el mouse, al llegar con Tab o al tocarla (cada columna recibe el
+ * foco), así que ningún número depende del hover. El lector de pantalla las
+ * recorre como una lista: "2 nov: $ 85.000".
  */
 export function Barras({ datos, formato, label }: { datos: { rotulo: string; valor: number; suave?: boolean }[]; formato: (v: number) => string; label: string }) {
   const max = Math.max(1, ...datos.map(d => d.valor))
+  const alta = datos.reduce((m, d, i) => (d.valor > datos[m].valor ? i : m), 0)
   return (
-    <div className="rv-barras" role="img" aria-label={`${label}: ${datos.map(d => `${d.rotulo} ${formato(d.valor)}`).join(', ')}`}>
+    <div className="rv-barras" role="list" aria-label={label}>
       {/* El índice en la key: dos rótulos pueden repetirse (dos planes con el mismo nombre). */}
       {datos.map((d, i) => (
-        <div key={`${i}-${d.rotulo}`} className="rv-barra" title={`${d.rotulo}: ${formato(d.valor)}`}>
-          <i data-tono={d.suave ? 'suave' : undefined} style={{ height: `${Math.max(3, Math.round((d.valor / max) * 100))}%` }} />
-          <span>{d.rotulo}</span>
+        <div key={`${i}-${d.rotulo}`} className="rv-barra" role="listitem" tabIndex={0} aria-label={`${d.rotulo}: ${formato(d.valor)}`} data-max={(i === alta && d.valor > 0) || undefined}>
+          <i data-tono={d.suave ? 'suave' : undefined} style={{ height: `${Math.max(3, Math.round((d.valor / max) * 100))}%` }}>
+            <b className="rv-barra-dato" aria-hidden>{formato(d.valor)}</b>
+          </i>
+          <span aria-hidden>{d.rotulo}</span>
         </div>
       ))}
     </div>

@@ -137,9 +137,11 @@ export interface Rango { entrada: ISO | null; salida: ISO | null }
  * Dos toques: el primero marca la entrada, el segundo la salida. Un toque
  * antes de la entrada la reemplaza (empieza de nuevo desde ese día); un toque
  * sobre la entrada la borra; con el rango completo, el próximo toque arranca
- * otro. Entre medio, `salidaMaxima` acota hasta dónde se puede llegar sin
+ * otro, salvo sobre la salida: ese vuelve a elegir la salida (con la misma
+ * entrada). Entre medio, `salidaMaxima` acota hasta dónde se puede llegar sin
  * pisar una noche tomada (sin `salidaMaxima` no hay tope). La salida puede
- * caer en un día ocupado (ese día no se duerme).
+ * caer en un día ocupado (ese día no se duerme): igual se ve y se lee como la
+ * salida, no como un día tachado.
  */
 export function CalendarioRango({ mes, onMes, hoy, estadoDe, rango, onRango, salidaMaxima, minMes, maxMes, className }: Base & {
   rango: Rango
@@ -167,6 +169,8 @@ export function CalendarioRango({ mes, onMes, hoy, estadoDe, rango, onRango, sal
   /** Si `f` se puede tocar ahora (como entrada o como salida, según el paso). */
   const sePuede = (f: ISO, e: EstadoDia) => {
     if (e.deshabilitado) return false
+    // La salida elegida siempre se puede tocar (para cambiarla), aunque caiga en un día ocupado.
+    if (salida && f === salida) return true
     if (eligiendoSalida && entrada) {
       // Antes de la entrada o sobre ella: es reemplazar o borrar la entrada.
       if (f === entrada) return true
@@ -178,6 +182,7 @@ export function CalendarioRango({ mes, onMes, hoy, estadoDe, rango, onRango, sal
   }
 
   const elegir = (f: ISO) => {
+    if (entrada && salida && f === salida) { onRango({ entrada, salida: null }); return }
     if (!entrada || salida) { onRango({ entrada: f, salida: null }); return }
     if (f === entrada) { onRango({ entrada: null, salida: null }); return }
     if (esAntes(f, entrada)) { onRango({ entrada: f, salida: null }); return }
@@ -204,10 +209,12 @@ export function CalendarioRango({ mes, onMes, hoy, estadoDe, rango, onRango, sal
             else if (esAntes(entrada, f) && esAntes(f, salida)) rangoAttr = 'medio'
           } else if (entrada && f === entrada) rangoAttr = 'solo'
           const papel = rangoAttr === 'inicio' || rangoAttr === 'solo' ? ', entrada' : rangoAttr === 'fin' ? ', salida' : ''
+          // La entrada y la salida se leen por su papel: "ocupado" o "no disponible" ahí confundía (la salida puede caer en un día tomado).
+          const estado = papel ? '' : e.aria ? `, ${e.aria}` : !libre ? ', no disponible' : ''
           return (
             <button key={f} type="button" className="rv-cal-celda" data-fecha={f} data-fuera={!c.delMes} data-hoy={f === hoy} data-ocupado={e.ocupado && !rangoAttr ? true : undefined} data-rango={rangoAttr}
               aria-disabled={!libre || undefined} tabIndex={f === activo ? 0 : -1}
-              aria-label={`${diaParaLeer(f)}${f === hoy ? ', hoy' : ''}${papel}${e.aria ? `, ${e.aria}` : !libre ? ', no disponible' : ''}`}
+              aria-label={`${diaParaLeer(f)}${f === hoy ? ', hoy' : ''}${papel}${estado}`}
               onClick={() => { if (libre) elegir(f) }} onKeyDown={ev => teclas(ev, f)} onFocus={() => setFoco(f)}>
               {partes(f).dia}
             </button>

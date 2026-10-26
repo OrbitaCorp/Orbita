@@ -18,6 +18,10 @@ export const CSS_RESERVAS = `
   .rv { --rv-r: 12px; --rv-r-sm: 8px; --rv-ease: cubic-bezier(0.22, 1, 0.36, 1); --rv-mono: "Geist Mono", ui-monospace, monospace; color: var(--color-body); }
   .rv *, .rv *::before, .rv *::after { box-sizing: border-box; }
   .rv img { max-width: 100%; display: block; }
+  /* Un ícono metido en un texto va en la línea del texto: el preflight de Tailwind pone
+     todo svg en display: block y el ícono saltaba solo a su propio renglón. Adentro de un
+     flex o de un grid (botones, chips) no cambia nada: ahí ya es un ítem del contenedor. */
+  .rv :is(p, span, small, b, strong, em, dd, dt, li, label, h1, h2, h3, h4) > svg { display: inline-block; }
 
   /* ── Tipografía ── */
   .rv-h1 { font-size: 26px; line-height: 1.15; font-weight: 700; letter-spacing: -0.02em; color: var(--color-text); margin: 0; text-wrap: balance; }
@@ -78,7 +82,10 @@ export const CSS_RESERVAS = `
 
   /* ── Campos ── */
   .rv-campo { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-  .rv-campo > span { font-size: 13px; font-weight: 600; color: var(--color-text); }
+  /* Solo el rótulo (el span sin clase): la ayuda, el error y el prefijo también son hijos
+     directos del label y con ".rv-campo > span" salían como un segundo rótulo en negrita
+     (el error en negro, no en rojo) y el texto del input con prefijo, en negrita. */
+  .rv-campo > span:not([class]) { font-size: 13px; font-weight: 600; color: var(--color-text); }
   .rv-input, .rv-select, .rv-textarea { width: 100%; min-height: 42px; padding: 0 12px; border-radius: var(--rv-r-sm); border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text); font: inherit; font-size: 14px; outline: none; transition: border-color 150ms ease; }
   .rv-textarea { padding: 10px 12px; min-height: 88px; resize: vertical; line-height: 1.5; }
   .rv-select { appearance: none; -webkit-appearance: none; padding-right: 34px; background-image: linear-gradient(45deg, transparent 50%, var(--color-muted) 50%), linear-gradient(135deg, var(--color-muted) 50%, transparent 50%); background-position: calc(100% - 17px) 50%, calc(100% - 12px) 50%; background-size: 5px 5px; background-repeat: no-repeat; }
@@ -87,6 +94,11 @@ export const CSS_RESERVAS = `
   .rv-input[aria-invalid='true'], .rv-select[aria-invalid='true'] { border-color: var(--color-error); }
   .rv-ayuda { font-size: 12.5px; line-height: 1.45; color: var(--color-muted); }
   .rv-error { font-size: 12.5px; line-height: 1.45; color: var(--color-error); }
+  /* En el panel en oscuro, los controles nativos (el ícono de calendario de un input date, la
+     lista de un select) también en oscuro: si no, el ícono quedaba negro sobre el fondo oscuro.
+     Solo adentro del panel (.rvp): los sitios públicos son siempre claros aunque el sistema esté
+     en oscuro. */
+  .dark .rvp :is(.rv-input, .rv-select, .rv-textarea) { color-scheme: dark; }
   .rv-con-prefijo { position: relative; }
   .rv-con-prefijo > i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-style: normal; font-size: 14px; color: var(--color-muted); pointer-events: none; }
   .rv-con-prefijo > .rv-input { padding-left: 26px; }
@@ -157,11 +169,23 @@ export const CSS_RESERVAS = `
   .rv-kpis > .rv-kpi { container-type: inline-size; }
   .rv-kpi-valor { display: block; font-family: var(--rv-mono); font-size: 24px; font-size: clamp(16px, 13cqi, 24px); font-weight: 600; letter-spacing: -0.02em; color: var(--color-text); margin-top: 6px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
   .rv-kpi-nota { display: block; font-size: 12.5px; color: var(--color-muted); margin-top: 4px; }
-  .rv-barras { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; align-items: end; height: 140px; padding-top: 6px; }
-  .rv-barra { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 6px; min-width: 0; }
-  .rv-barra > i { width: 100%; max-width: 44px; border-radius: 4px 4px 0 0; background: var(--color-primary); display: block; }
+  /* Columnas finas (24 px como máximo: el resto del lugar es aire) que crecen desde la base. */
+  .rv-barras { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; align-items: end; height: 160px; padding-top: 22px; }
+  .rv-barra { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 6px; min-width: 0; border-radius: 6px; outline: none; }
+  .rv-barra > i { position: relative; width: 100%; max-width: 24px; border-radius: 4px 4px 0 0; background: var(--color-primary); display: block; }
   .rv-barra > i[data-tono='suave'] { background: var(--color-primary-bg); }
   .rv-barra > span { font-size: 11px; color: var(--color-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  /* El valor va escrito sobre la columna más alta (da la escala). El de las demás aparece al
+     pasar el mouse, al llegar con Tab o al tocar la columna: no hace falta el hover para
+     leerlo. Va en tinta de texto, no en el color del acento. */
+  .rv-barra-dato { position: absolute; left: 50%; bottom: calc(100% + 4px); transform: translateX(-50%); font-family: var(--rv-mono); font-size: 11px; font-style: normal; font-weight: 600; color: var(--color-text); white-space: nowrap; pointer-events: none; opacity: 0; }
+  .rv-barra[data-max] .rv-barra-dato, .rv-barra:focus .rv-barra-dato { opacity: 1; }
+  .rv-barras:has(.rv-barra:focus) .rv-barra[data-max]:not(:focus) .rv-barra-dato { opacity: 0; }
+  @media (hover: hover) {
+    .rv-barra:hover .rv-barra-dato { opacity: 1; }
+    .rv-barras:has(.rv-barra:hover) .rv-barra:not(:hover) .rv-barra-dato { opacity: 0; }
+  }
+  .rv-barra:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
   /* ── Calendario ── */
   .rv-cal { width: 100%; max-width: 420px; }
@@ -181,6 +205,9 @@ export const CSS_RESERVAS = `
   .rv-cal-celda[data-rango='inicio'] { background: var(--color-primary); color: var(--color-on-primary); border-radius: var(--rv-r-sm) 0 0 var(--rv-r-sm); }
   .rv-cal-celda[data-rango='fin'] { background: var(--color-primary); color: var(--color-on-primary); border-radius: 0 var(--rv-r-sm) var(--rv-r-sm) 0; }
   .rv-cal-celda[data-rango='solo'], .rv-cal-celda[aria-pressed='true'] { background: var(--color-primary); color: var(--color-on-primary); }
+  /* La entrada y la salida elegidas nunca van tachadas: la salida puede caer en un día ocupado
+     (esa noche no se duerme) y sigue siendo la salida. */
+  .rv-cal-celda[data-rango] { text-decoration: none; }
   .rv-cal-celda[data-rango='inicio']::after, .rv-cal-celda[data-rango='fin']::after, .rv-cal-celda[aria-pressed='true']::after { background: var(--color-on-primary); }
   /* Sobre el fondo del acento, un anillo del acento no se ve: el foco va con el color del texto. */
   .rv-cal-celda[aria-pressed='true']:focus-visible, .rv-cal-celda[data-rango='inicio']:focus-visible, .rv-cal-celda[data-rango='fin']:focus-visible, .rv-cal-celda[data-rango='solo']:focus-visible { outline: 2px solid var(--color-text); outline-offset: 1px; z-index: 1; }
@@ -213,7 +240,8 @@ export const CSS_RESERVAS = `
      del iPhone (safe-area). */
   @media (max-width: 768px) {
     .rv-velo { align-items: flex-end; padding: 0; }
-    .rv-modal { max-width: none; max-height: calc(100vh - var(--rv-tope, 0px) - 12px); max-height: calc(100dvh - var(--rv-tope, 0px) - 12px); border-radius: 20px 20px 0 0; border-bottom: none; border-left: none; border-right: none; box-shadow: 0 -8px 28px rgba(3,6,14,0.2); animation-name: rvHoja; }
+    /* Hasta 72 px del borde de arriba: ahí entra el aviso (rv-toast) sin tapar la hoja, y se ve que atrás sigue la página. */
+    .rv-modal { max-width: none; max-height: calc(100vh - var(--rv-tope, 0px) - 72px); max-height: calc(100dvh - var(--rv-tope, 0px) - 72px); border-radius: 20px 20px 0 0; border-bottom: none; border-left: none; border-right: none; box-shadow: 0 -8px 28px rgba(3,6,14,0.2); animation-name: rvHoja; }
     .rv-modal-cab { padding: 14px 12px 12px 16px; }
     .rv-modal-cuerpo { padding: 16px; }
     .rv-modal-cuerpo:last-child { padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
@@ -229,7 +257,8 @@ export const CSS_RESERVAS = `
   .rv-nota { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: var(--rv-r-sm); background: var(--color-surface); border: 1px solid var(--color-border); font-size: 13px; line-height: 1.5; color: var(--color-body); }
   .rv-nota--aviso { background: var(--color-warning-bg); border-color: transparent; color: var(--chip-warning-fg); }
   .rv-nota--info { background: var(--color-primary-bg); border-color: transparent; color: var(--chip-primary-fg); }
-  .rv-demo { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border-radius: 999px; font-family: var(--rv-mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; background: var(--color-warning-bg); color: var(--chip-warning-fg); }
+  /* Se lee tal cual está escrito ("Demo: sincronización simulada"), sin pasarlo a mayúsculas. */
+  .rv-demo { display: inline-flex; align-items: center; gap: 6px; min-height: 24px; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; line-height: 1.3; background: var(--color-warning-bg); color: var(--chip-warning-fg); }
 
   /* ── Filtros que se pliegan en celular (ver Filtros en piezas.tsx) ── */
   .rv-filtros { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
@@ -260,6 +289,10 @@ export const CSS_RESERVAS = `
     .rv-filtros-boton { display: inline-flex; align-self: flex-start; }
     .rv-filtros-cuerpo[data-abierto='false'] { display: none; }
     .rv-toast { left: 16px; right: 16px; max-width: none; display: flex; justify-content: center; }
+    /* Con una hoja abierta (va pegada abajo), el aviso sale arriba: abajo tapaba el texto y los
+       botones de la hoja. Y no se esconde: muchas acciones de adentro de la hoja (check-in,
+       anotar) avisan con él. */
+    body:has(.rv-velo) .rv-toast { top: calc(var(--rv-tope, 0px) + 8px); bottom: auto; }
   }
   @media (max-width: 640px) {
     .rv-h1 { font-size: 22px; }
