@@ -55,9 +55,13 @@ export const CSS_RESERVAS = `
   @media (hover: hover) { .rv-card--accion:hover { border-color: var(--color-border-strong); } }
   /* Tarjeta que es una opción de un grupo de radios (como el paso Módulo del alta): un radio
      nativo, invisible, la cubre entera. Se elige tocándola en cualquier lado y el grupo es de
-     radios de verdad: una sola parada de Tab, las flechas mueven y eligen, Espacio elige. */
+     radios de verdad: una sola parada de Tab, las flechas mueven y eligen, Espacio elige.
+     No pinta nada más: sirve igual para un chip o una franja horaria, que conservan su aspecto.
+     La opción que no se puede elegir lleva el radio disabled: el lector la anuncia como no
+     disponible y las flechas la saltean. */
   .rv-card--radio { position: relative; }
   .rv-card--radio > input[type='radio'] { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+  .rv-card--radio > input[type='radio']:disabled { cursor: not-allowed; }
   .rv-card--radio:has(> input:focus-visible) { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
   /* ── Botones ── */
@@ -225,10 +229,13 @@ export const CSS_RESERVAS = `
   .rv-franja { min-height: 44px; border-radius: var(--rv-r-sm); border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text); font: inherit; font-family: var(--rv-mono); font-size: 14px; cursor: pointer; display: grid; place-items: center; gap: 2px; padding: 6px 4px; }
   .rv-franja small { font-family: inherit; font-size: 11px; color: var(--color-muted); }
   .rv-franja:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-  .rv-franja:disabled { color: var(--color-subtle); background: var(--color-surface-alt); text-decoration: line-through; cursor: not-allowed; }
-  /* Elegida: como botón (aria-pressed) o como opción de un radiogroup (aria-checked), que es como las usa Alquileres. */
-  .rv-franja[aria-pressed='true'], .rv-franja[aria-checked='true'] { background: var(--color-primary); color: var(--color-on-primary); border-color: transparent; }
-  .rv-franja[aria-pressed='true'] small, .rv-franja[aria-checked='true'] small { color: inherit; opacity: 0.85; }
+  /* Una franja es un botón (aria-pressed, o aria-checked si es un role=radio) o un radio nativo:
+     <div class="rv-franja rv-card--radio"> con el input adentro, que es como las usa Alquileres. La
+     de radio lleva su estado en data-elegido y data-deshabilitado (el anillo de foco lo pone
+     rv-card--radio) y se ve igual que la de botón. */
+  .rv-franja:disabled, .rv-franja[data-deshabilitado='true'] { color: var(--color-subtle); background: var(--color-surface-alt); text-decoration: line-through; cursor: not-allowed; }
+  .rv-franja[aria-pressed='true'], .rv-franja[aria-checked='true'], .rv-franja[data-elegido='true'] { background: var(--color-primary); color: var(--color-on-primary); border-color: transparent; }
+  .rv-franja[aria-pressed='true'] small, .rv-franja[aria-checked='true'] small, .rv-franja[data-elegido='true'] small { color: inherit; opacity: 0.85; }
 
   /* ── Modal (hoja desde abajo en celular) ── */
   .rv-velo { position: fixed; inset: var(--rv-tope, 0px) 0 0 0; z-index: 150; display: flex; align-items: safe center; justify-content: center; padding: 24px; overflow-y: auto; overscroll-behavior: contain; background: rgba(15,23,42,0.5); animation: rvVelo 180ms ease; }

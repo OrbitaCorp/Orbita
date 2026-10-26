@@ -230,13 +230,16 @@ export function Mapa({ latLng, titulo }: { latLng: [number, number]; titulo: str
   return <div className="gis-mapa"><iframe title={`Mapa: ${titulo}`} src={src} loading="lazy" referrerPolicy="no-referrer" /></div>
 }
 
-/** Barra de cupo: cuánto se llenó una clase. El texto dice lo mismo que el color. Necesita CSS_CUPO montado. */
-export function BarraCupo({ anotados, cupo }: { anotados: number; cupo: number }) {
+/**
+ * Barra de cupo: cuánto se llenó una clase. El texto dice lo mismo que el color. Necesita CSS_CUPO montado.
+ * El id es para que la describa quien la usa (en Reservar, el radio de cada clase).
+ */
+export function BarraCupo({ anotados, cupo, id }: { anotados: number; cupo: number; id?: string }) {
   const libres = Math.max(0, cupo - anotados)
   const tono = libres === 0 ? 'lleno' : libres <= 3 ? 'aviso' : undefined
   const texto = libres === 0 ? 'Completa · lista de espera' : libres === 1 ? 'Último lugar' : `${libres} lugares libres`
   return (
-    <div className="gis-cupo">
+    <div className="gis-cupo" id={id}>
       {/* Un div no se nombra con aria-label (el lector lo ignora): la cuenta va como texto oculto. */}
       <span className="rv-sr">{`${anotados} de ${cupo} lugares ocupados. `}</span>
       <div className="gis-cupo-barra" aria-hidden><i data-tono={tono} style={{ width: `${Math.min(100, Math.round((anotados / Math.max(1, cupo)) * 100))}%` }} /></div>

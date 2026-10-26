@@ -160,7 +160,12 @@ export const CSS_SITIO = `
     .als-galeria[data-n='2'] > button:nth-child(2) { grid-column: span 2; }
     .als-galeria[data-n='1'] { grid-template-rows: 220px; }
   }
+  /* Lo que se enfoca con el teclado (las flechas en las opciones de la reserva) no queda escondido
+     debajo del header fijo: 40 de la tira de la demo más el header. */
+  html:has(.als) { scroll-padding-top: 112px; }
   @media (max-width: 768px) {
+    /* Ni detrás de la barra fija de reservar. */
+    html:has(.als[data-cta='true']) { scroll-padding-bottom: calc(86px + env(safe-area-inset-bottom, 0px)); }
     .als-cont { padding-inline: 16px; }
     .als-nav a:not([data-fijo]) { display: none; }
     .als-nav a { white-space: nowrap; }

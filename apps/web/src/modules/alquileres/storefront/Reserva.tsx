@@ -9,7 +9,7 @@
 // es simulado. Al confirmar, la reserva queda guardada en el navegador y
 // aparece en "Mis reservas" y en el panel del negocio. Todo el cálculo de
 // disponibilidad y precio es de lib/reservas.
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { ArrowRight, CalendarPlus, Check, ChevronLeft, Lock, MessageCircle, Users } from 'lucide-react'
@@ -36,6 +36,8 @@ const q1 = (v: unknown) => (typeof v === 'string' ? v : '')
 
 export default function Reserva({ negocio, reservas, onReservar }: P) {
   const router = useRouter()
+  // Nombre de cada grupo de radios y prefijo de los ids que los nombran y describen.
+  const prefijo = useId()
   const tipo = negocio.tipo
   const salon = negocio.salon
 
@@ -190,29 +192,43 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
           <div className="alr-paso">
             {paso > 0 && <button type="button" className="rv-btn rv-btn--fantasma rv-btn--sm" style={{ marginLeft: -12, marginBottom: 6 }} onClick={() => ir(paso - 1)} disabled={enviando}><ChevronLeft size={16} aria-hidden /> Volver</button>}
 
+            {/* Los grupos de opciones son radios de verdad (rv-card--radio del kit): una sola parada de
+                Tab, las flechas mueven y eligen, Espacio elige. Cada radio se nombra con el título de su
+                opción y se describe con lo demás; lo que no se puede elegir va disabled. Con botones
+                role=radio cada opción era una parada y las flechas no hacían nada. */}
             {actual === 'unidad' && tipo === 'cancha' && (
               <Bloque refTitulo={titulo} titulo="¿Qué cancha querés?" sub="Cada una tiene su precio por hora. Después elegís el día y el horario.">
                 <div className="alr-opciones" role="radiogroup" aria-label="Canchas">
-                  {negocio.unidades.map(u => (
-                    <button key={u.id} type="button" role="radio" aria-checked={unidadId === u.id} className="alr-op" onClick={() => { setUnidadId(u.id); setHora(null) }}>
-                      <img src={u.foto} alt="" loading="lazy" />
-                      <span><b>{u.nombre}</b><small>{u.detalle}</small><span className="als-precio">{pesos(u.tarifaHora)} <small>la hora</small></span></span>
-                      {unidadId === u.id && <Check size={18} aria-hidden className="alr-tilde" />}
-                    </button>
-                  ))}
+                  {negocio.unidades.map(u => {
+                    const sel = unidadId === u.id
+                    const op = `${prefijo}-cancha-${u.id}`
+                    return (
+                      <div key={u.id} className="alr-op rv-card--radio" data-elegido={sel}>
+                        <input type="radio" name={`${prefijo}-cancha`} value={u.id} checked={sel} onChange={() => { setUnidadId(u.id); setHora(null) }} aria-labelledby={op} aria-describedby={`${op}-d ${op}-p`} />
+                        <img src={u.foto} alt="" loading="lazy" />
+                        <span><b id={op}>{u.nombre}</b><small id={`${op}-d`}>{u.detalle}</small><span id={`${op}-p`} className="als-precio">{pesos(u.tarifaHora)} <small>la hora</small></span></span>
+                        {sel && <Check size={18} aria-hidden className="alr-tilde" />}
+                      </div>
+                    )
+                  })}
                 </div>
               </Bloque>
             )}
             {actual === 'unidad' && tipo === 'estadia' && (
               <Bloque refTitulo={titulo} titulo="¿Dónde te querés quedar?" sub="Elegí la propiedad. Después las fechas y cuántos vienen.">
                 <div className="alr-opciones" role="radiogroup" aria-label="Propiedades">
-                  {negocio.propiedades.map(p => (
-                    <button key={p.id} type="button" role="radio" aria-checked={unidadId === p.id} className="alr-op" onClick={() => { setUnidadId(p.id); setRango({ entrada: null, salida: null }); setDatos({ ...datos, huespedes: String(Math.min(Number(datos.huespedes) || 1, p.huespedes)) }) }}>
-                      <img src={p.fotos[0]} alt="" loading="lazy" />
-                      <span><b>{p.nombre}</b><small>{p.tipo} · hasta {cuenta(p.huespedes, 'huésped', 'huéspedes')} · mínimo {p.tarifa.minNoches} {p.tarifa.minNoches === 1 ? 'noche' : 'noches'}</small><span className="als-precio">{pesos(p.tarifa.precioNoche)} <small>la noche</small></span></span>
-                      {unidadId === p.id && <Check size={18} aria-hidden className="alr-tilde" />}
-                    </button>
-                  ))}
+                  {negocio.propiedades.map(p => {
+                    const sel = unidadId === p.id
+                    const op = `${prefijo}-propiedad-${p.id}`
+                    return (
+                      <div key={p.id} className="alr-op rv-card--radio" data-elegido={sel}>
+                        <input type="radio" name={`${prefijo}-propiedad`} value={p.id} checked={sel} onChange={() => { setUnidadId(p.id); setRango({ entrada: null, salida: null }); setDatos({ ...datos, huespedes: String(Math.min(Number(datos.huespedes) || 1, p.huespedes)) }) }} aria-labelledby={op} aria-describedby={`${op}-d ${op}-p`} />
+                        <img src={p.fotos[0]} alt="" loading="lazy" />
+                        <span><b id={op}>{p.nombre}</b><small id={`${op}-d`}>{p.tipo} · hasta {cuenta(p.huespedes, 'huésped', 'huéspedes')} · mínimo {p.tarifa.minNoches} {p.tarifa.minNoches === 1 ? 'noche' : 'noches'}</small><span id={`${op}-p`} className="als-precio">{pesos(p.tarifa.precioNoche)} <small>la noche</small></span></span>
+                        {sel && <Check size={18} aria-hidden className="alr-tilde" />}
+                      </div>
+                    )
+                  })}
                 </div>
               </Bloque>
             )}
@@ -231,12 +247,17 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
                     {fecha && (
                       franjasDia.length === 0 ? <p className="rv-ayuda">Ese día está cerrado.</p> : bloqueoEn(negocio, unidad.id, fecha) ? <p className="rv-ayuda">{unidad.nombre} no está disponible ese día. Probá con otro día o con otra cancha.</p> : (
                         <div className="rv-franjas" role="radiogroup" aria-label="Horarios">
-                          {franjasDia.map(f => (
-                            // data-en-rango: con dos o tres turnos seguidos, también se marcan los que quedan adentro (no solo el de inicio).
-                            <button key={f.inicio} type="button" role="radio" aria-checked={hora === f.inicio} data-en-rango={(hora !== null && f.inicio > hora && f.inicio < hora + negocio.duracionMin * seguidas) || undefined} className="rv-franja" disabled={!f.libre} onClick={() => { setHora(f.inicio); setFranjas(1) }}>
-                              {hhmm(f.inicio)}{negocio.reglasPrecio.length ? <small>{(() => { const a = precioPorHora(unidad.tarifaHora, negocio.duracionMin, diaSemana(fecha), f.inicio, negocio.reglasPrecio); return a.ajuste ? `${a.ajuste > 0 ? '+' : ''}${a.ajuste}%` : pesos(a.final) })()}</small> : null}
-                            </button>
-                          ))}
+                          {/* Se elige una sola hora de inicio: los turnos seguidos se eligen aparte, en "¿Cuánto tiempo?". */}
+                          {franjasDia.map(f => {
+                            const op = `${prefijo}-hora-${f.inicio}`
+                            return (
+                              // data-en-rango: con dos o tres turnos seguidos, también se marcan los que quedan adentro (no solo el de inicio).
+                              <div key={f.inicio} className="rv-franja rv-card--radio" data-elegido={hora === f.inicio} data-deshabilitado={!f.libre} data-en-rango={(hora !== null && f.inicio > hora && f.inicio < hora + negocio.duracionMin * seguidas) || undefined}>
+                                <input type="radio" name={`${prefijo}-hora`} value={f.inicio} checked={hora === f.inicio} disabled={!f.libre} onChange={() => { setHora(f.inicio); setFranjas(1) }} aria-label={hhmm(f.inicio)} aria-describedby={negocio.reglasPrecio.length ? `${op}-p` : undefined} />
+                                {hhmm(f.inicio)}{negocio.reglasPrecio.length ? <small id={`${op}-p`}>{(() => { const a = precioPorHora(unidad.tarifaHora, negocio.duracionMin, diaSemana(fecha), f.inicio, negocio.reglasPrecio); return a.ajuste ? `${a.ajuste > 0 ? '+' : ''}${a.ajuste}%` : pesos(a.final) })()}</small> : null}
+                              </div>
+                            )
+                          })}
                         </div>
                       )
                     )}
@@ -268,10 +289,12 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
                       <div className="alr-bloques" role="radiogroup" aria-label="Bloques">
                         {bloques.map(b => {
                           const libre = bloquesDelDia.includes(b.id)
+                          const op = `${prefijo}-bloque-${b.id}`
                           return (
-                            <button key={b.id} type="button" role="radio" aria-checked={bloqueId === b.id} className="alr-bloque" disabled={!libre} onClick={() => setBloqueId(b.id)}>
-                              <b>{b.nombre}</b><span className="rv-num">{hhmm(b.inicio)} – {hhmm(b.fin)}</span><small>{libre ? 'Libre' : 'Tomado'}</small>
-                            </button>
+                            <div key={b.id} className="alr-bloque rv-card--radio" data-elegido={bloqueId === b.id} data-deshabilitado={!libre}>
+                              <input type="radio" name={`${prefijo}-bloque`} value={b.id} checked={bloqueId === b.id} disabled={!libre} onChange={() => setBloqueId(b.id)} aria-labelledby={`${op} ${op}-h`} aria-describedby={`${op}-d`} />
+                              <b id={op}>{b.nombre}</b><span id={`${op}-h`} className="rv-num">{hhmm(b.inicio)} – {hhmm(b.fin)}</span><small id={`${op}-d`}>{libre ? 'Libre' : 'Tomado'}</small>
+                            </div>
                           )
                         })}
                       </div>
@@ -305,10 +328,12 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
                 <div className="alr-bloques alr-bloques--lista" role="radiogroup" aria-label="Paquetes" style={{ marginTop: 14 }}>
                   {salon.paquetes.map(p => {
                     const chico = invitados > p.hastaInvitados
+                    const op = `${prefijo}-paquete-${p.id}`
                     return (
-                      <button key={p.id} type="button" role="radio" aria-checked={paqueteId === p.id} className="alr-bloque" disabled={chico} onClick={() => setPaqueteId(p.id)} style={{ textAlign: 'left', alignItems: 'flex-start' }}>
-                        <b>{p.nombre}</b><span className="rv-num">{pesos(p.precio)}</span><small>{chico ? 'No alcanza para tus invitados' : p.incluye.join(' · ')}</small>
-                      </button>
+                      <div key={p.id} className="alr-bloque rv-card--radio" data-elegido={paqueteId === p.id} data-deshabilitado={chico} style={{ textAlign: 'left', alignItems: 'flex-start' }}>
+                        <input type="radio" name={`${prefijo}-paquete`} value={p.id} checked={paqueteId === p.id} disabled={chico} onChange={() => setPaqueteId(p.id)} aria-labelledby={op} aria-describedby={`${op}-p ${op}-d`} />
+                        <b id={op}>{p.nombre}</b><span id={`${op}-p`} className="rv-num">{pesos(p.precio)}</span><small id={`${op}-d`}>{chico ? 'No alcanza para tus invitados' : p.incluye.join(' · ')}</small>
+                      </div>
                     )
                   })}
                 </div>
@@ -487,20 +512,22 @@ export const CSS_RESERVA = `
   .alr-lateral { position: sticky; top: calc(var(--rv-tope, 0px) + 80px); }
   .alr-dos { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 24px; align-items: start; }
   .alr-opciones { display: flex; flex-direction: column; gap: 10px; }
+  /* Las canchas, las propiedades, los bloques, los paquetes y las franjas son radios nativos (rv-card--radio):
+     el estado va en data-elegido y data-deshabilitado, y el anillo de foco lo pone el kit. Los extras siguen
+     siendo botones (aria-pressed): se eligen de a varios. */
   .alr-op { position: relative; display: flex; align-items: center; gap: 14px; padding: 10px; border-radius: 14px; border: 1px solid var(--color-border); background: var(--color-bg); text-align: left; font: inherit; color: inherit; cursor: pointer; width: 100%; }
   .alr-op img { width: 96px; height: 72px; border-radius: 10px; object-fit: cover; flex-shrink: 0; }
   .alr-op > span { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   .alr-op b { font-size: 16px; color: var(--color-text); }
   .alr-op small { font-size: 13px; color: var(--color-muted); }
-  .alr-op[aria-checked='true'] { border-color: var(--color-primary); box-shadow: 0 0 0 1px var(--color-primary); }
-  .alr-op:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  .alr-op[data-elegido='true'] { border-color: var(--color-primary); box-shadow: 0 0 0 1px var(--color-primary); }
   .alr-tilde { color: var(--color-primary); flex-shrink: 0; margin-right: 6px; }
   .alr-bloques { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
   .alr-bloque { display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 76px; padding: 12px; border-radius: 12px; border: 1px solid var(--color-border); background: var(--color-bg); font: inherit; color: inherit; cursor: pointer; text-align: center; }
   .alr-bloque b { font-size: 14px; color: var(--color-text); }
   .alr-bloque small { font-size: 12px; color: var(--color-muted); line-height: 1.4; }
-  .alr-bloque:disabled { opacity: 0.5; cursor: not-allowed; }
-  .alr-bloque[aria-checked='true'], .alr-bloque[aria-pressed='true'] { border-color: var(--color-primary); box-shadow: 0 0 0 1px var(--color-primary); background: var(--color-primary-bg); }
+  .alr-bloque[data-deshabilitado='true'] { opacity: 0.5; cursor: not-allowed; }
+  .alr-bloque[data-elegido='true'], .alr-bloque[aria-pressed='true'] { border-color: var(--color-primary); box-shadow: 0 0 0 1px var(--color-primary); background: var(--color-primary-bg); }
   .alr-bloque:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .alr-ticket { margin: 0; display: flex; flex-direction: column; gap: 8px; }
   .alr-ticket > div { display: flex; justify-content: space-between; gap: 12px; font-size: 13.5px; }
@@ -509,9 +536,9 @@ export const CSS_RESERVA = `
   .alr-ticket dd { margin: 0; text-align: right; color: var(--color-text); font-weight: 500; min-width: 0; }
   .alr-lateral .alr-ticket dd.rv-num { flex-shrink: 0; white-space: nowrap; }
   .alr-ticket i { font-style: normal; color: var(--color-muted); font-weight: 400; }
-  /* Las franjas son radios (aria-checked) y el kit pinta solo aria-pressed: sin esto, la hora elegida no se ve. */
-  .alr .rv-franja[aria-checked='true'] { background: var(--color-primary); color: var(--color-on-primary); border-color: transparent; }
-  .alr .rv-franja[aria-checked='true'] small { color: inherit; opacity: 0.85; }
+  /* La hora elegida (data-elegido: la franja es un radio nativo) y, con dos o tres turnos seguidos, las que quedan adentro. */
+  .alr .rv-franja[data-elegido='true'] { background: var(--color-primary); color: var(--color-on-primary); border-color: transparent; }
+  .alr .rv-franja[data-elegido='true'] small { color: inherit; opacity: 0.85; }
   .alr .rv-franja[data-en-rango='true'] { background: var(--color-primary-bg); border-color: var(--color-primary); color: var(--chip-primary-fg); }
   .alr .rv-franja[data-en-rango='true'] small { color: inherit; }
   .alr-total { display: flex; justify-content: space-between; gap: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--color-border); font-size: 15px; font-weight: 700; color: var(--color-text); }

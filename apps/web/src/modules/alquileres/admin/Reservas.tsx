@@ -5,7 +5,7 @@
 // Desde cualquiera se abre el detalle (registrar seña, saldo o depósito,
 // cancelar, marcar realizada) y se agenda a mano. Los bloqueos (del dueño o
 // de un calendario externo) cierran la cancha, el salón o la propiedad ese día.
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { ArrowRight, Ban, Check, ChevronLeft, ChevronRight, Lock, Plus, Wallet } from 'lucide-react'
 import { MESES, diasDelMes, duracionTxt, fechaCorta, fechaLarga, fechaRelativa, hhmm, mesTxt, moverMes, partes, rangoTxt, sumarDias, diaSemana, diasEntre, type ISO } from '@/lib/reservas/fechas'
 import { consecutivasDesde, franjasDelDia } from '@/lib/reservas/disponibilidad'
@@ -77,8 +77,8 @@ const CSS = `
   .alg-cal-salon .rv-cal-celda[data-ocupado='true'] { text-decoration: none; }
   .alg-cal-salon .rv-cal-celda[data-ocupado='true']:not([aria-pressed='true']) { color: var(--color-text); }
   .alg-extras { display: flex; flex-wrap: wrap; gap: 8px; }
-  /* Las franjas son radios (aria-checked) y el kit pinta solo aria-pressed. */
-  .alg-nueva .rv-franja[aria-checked='true'] { background: var(--color-primary); color: var(--color-on-primary); border-color: transparent; }
+  /* La hora elegida (data-elegido: la franja es un radio nativo) y, con dos o tres turnos seguidos, las que quedan adentro. */
+  .alg-nueva .rv-franja[data-elegido='true'] { background: var(--color-primary); color: var(--color-on-primary); border-color: transparent; }
   .alg-nueva .rv-franja[data-en-rango='true'] { background: var(--color-primary-bg); border-color: var(--color-primary); color: var(--chip-primary-fg); }
   @media (max-width: 900px) { .alg-dos { grid-template-columns: minmax(0, 1fr); } }
   @media (max-width: 768px) {
@@ -485,6 +485,8 @@ export function Detalle({ negocio, reserva: r, cliente, onCerrar, onCambiar }: {
 function Nueva({ negocio, reservas, clientes, pre, onCerrar, onReservar }: { negocio: NegocioAlquiler; reservas: Reserva[]; clientes: Cliente[]; pre: Partial<Reserva>; onCerrar: () => void; onReservar: (r: Reserva, c: Cliente) => void }) {
   const tipo = negocio.tipo
   const s = negocio.salon
+  // Nombre del grupo de radios de los horarios.
+  const prefijo = useId()
   const [clienteId, setClienteId] = useState(clientes[0]?.id ?? '')
   const [nuevoNombre, setNuevoNombre] = useState('')
   const [nuevoTel, setNuevoTel] = useState('')
@@ -572,8 +574,15 @@ function Nueva({ negocio, reservas, clientes, pre, onCerrar, onReservar }: { neg
               <div className="rv-rotulo" style={{ marginBottom: 8 }}>Horario</div>
               {bloqueoDia ? <p className="rv-ayuda" style={{ margin: 0 }}>{unidad?.nombre} está bloqueada ese día: {bloqueoDia.motivo}.</p> : (
                 <div className="rv-franjas" role="radiogroup" aria-label="Horario">
-                  {/* Con dos o tres turnos seguidos se marcan también los que quedan adentro, como en el sitio. */}
-                  {franjas.map(f => <button key={f.inicio} type="button" role="radio" aria-checked={hora === f.inicio} data-en-rango={(hora !== '' && f.inicio > hora && f.inicio < hora + negocio.duracionMin * seguidas) || undefined} className="rv-franja" disabled={!f.libre} onClick={() => setHora(f.inicio)}>{hhmm(f.inicio)}</button>)}
+                  {/* Radios de verdad, como en el sitio: una sola parada de Tab, las flechas mueven y eligen, y
+                      una hora tomada va disabled. Se elige solo la hora de inicio (los turnos seguidos van en
+                      "Cuánto tiempo"); con dos o tres se marcan también los que quedan adentro. */}
+                  {franjas.map(f => (
+                    <div key={f.inicio} className="rv-franja rv-card--radio" data-elegido={hora === f.inicio} data-deshabilitado={!f.libre} data-en-rango={(hora !== '' && f.inicio > hora && f.inicio < hora + negocio.duracionMin * seguidas) || undefined}>
+                      <input type="radio" name={`${prefijo}-hora`} value={f.inicio} checked={hora === f.inicio} disabled={!f.libre} onChange={() => setHora(f.inicio)} aria-label={hhmm(f.inicio)} />
+                      {hhmm(f.inicio)}
+                    </div>
+                  ))}
                   {franjas.length === 0 && <p className="rv-ayuda">Ese día está cerrado.</p>}
                 </div>
               )}

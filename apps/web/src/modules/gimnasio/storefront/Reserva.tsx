@@ -12,7 +12,7 @@
 // Se puede entrar con la clase elegida desde la portada (?clase=&fecha=) o
 // con un plan (?plan=). El pago es simulado. Al confirmar, la inscripción
 // queda guardada en el navegador y aparece en "Mis clases" y en el panel.
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { ArrowRight, CalendarPlus, Check, ChevronLeft, Hourglass, Lock, Users } from 'lucide-react'
 import { DIAS_CORTOS, diaSemana, esISO, fechaLarga, hhmm, sumarDias, type ISO } from '@/lib/reservas/fechas'
@@ -34,6 +34,8 @@ interface Hecha { inscripcion: Inscripcion; nombre: string; detalle: string | nu
 const q1 = (v: unknown) => (typeof v === 'string' ? v : '')
 
 export default function Reserva({ negocio, inscripciones, socios, onInscribir, query }: P & { query: Record<string, unknown> }) {
+  // Nombre de cada grupo de radios y prefijo de los ids que los nombran y describen.
+  const prefijo = useId()
   const r = rubroPorKey(negocio.rubro)
   const fechaQ = esISO(q1(query.fecha)) && q1(query.fecha) >= HOY ? q1(query.fecha) : HOY
   const [fecha, setFecha] = useState<ISO>(fechaQ)
@@ -163,24 +165,36 @@ export default function Reserva({ negocio, inscripciones, socios, onInscribir, q
 
             {actual === 'clase' && (
               <Bloque refTitulo={titulo} titulo="¿A qué clase venís?" sub={`Podés reservar hasta ${negocio.anticipacionDias} días adelante. Cada clase muestra cuántos lugares quedan.`}>
+                {/* Los días, las clases y los planes son radios de verdad (rv-card--radio del kit): una sola
+                    parada de Tab por grupo, las flechas mueven y eligen, Espacio elige. Con botones
+                    role=radio cada opción era una parada y las flechas no hacían nada. Una clase llena se
+                    sigue pudiendo elegir: es para anotarse en la lista de espera. */}
                 <div className="gir-dias" role="radiogroup" aria-label="Día">
-                  {dias.map(f => <button key={f} type="button" role="radio" aria-checked={f === fecha} className="gir-dia" onClick={() => { setFecha(f); setClaseId(null) }} aria-label={fechaLarga(f)}><small>{f === HOY ? 'Hoy' : DIAS_CORTOS[diaSemana(f)]}</small><b>{Number(f.slice(-2))}</b></button>)}
+                  {dias.map(f => (
+                    <div key={f} className="gir-dia rv-card--radio" data-elegido={f === fecha}>
+                      <input type="radio" name={`${prefijo}-dia`} value={f} checked={f === fecha} onChange={() => { setFecha(f); setClaseId(null) }} aria-label={f === HOY ? `Hoy, ${fechaLarga(f).toLowerCase()}` : fechaLarga(f)} />
+                      <small>{f === HOY ? 'Hoy' : DIAS_CORTOS[diaSemana(f)]}</small><b>{Number(f.slice(-2))}</b>
+                    </div>
+                  ))}
                 </div>
                 {bloqueo ? <p className="rv-nota" style={{ marginTop: 14 }}>{bloqueo.motivo}: ese día no hay clases.</p> : delDia.length === 0 ? <p className="rv-ayuda" style={{ marginTop: 14 }}>{fecha === HOY ? 'Por hoy ya no quedan clases.' : 'Ese día no hay clases.'}</p> : (
                   <div className="gir-clases" role="radiogroup" aria-label="Clases" style={{ marginTop: 14 }}>
                     {delDia.map(c => {
                       const k = cupoDe(c, fecha, inscripciones)
                       const sel = claseId === c.id
+                      const op = `${prefijo}-clase-${c.id}`
                       return (
-                        <button key={c.id} type="button" role="radio" aria-checked={sel} className="gir-clase" onClick={() => setClaseId(c.id)}>
-                          <span className="gis-clase-hora">{hhmm(c.inicio)}</span>
+                        // Se nombra con la hora y la actividad, y se describe con quién la da y cuánto lugar queda.
+                        <div key={c.id} className="gir-clase rv-card--radio" data-elegido={sel}>
+                          <input type="radio" name={`${prefijo}-clase`} value={c.id} checked={sel} onChange={() => setClaseId(c.id)} aria-labelledby={`${op}-h ${op}`} aria-describedby={`${op}-d ${op}-c`} />
+                          <span id={`${op}-h`} className="gis-clase-hora">{hhmm(c.inicio)}</span>
                           <span style={{ flex: 1, minWidth: 0 }}>
-                            <b style={{ display: 'block', fontSize: 16, color: 'var(--color-text)' }}>{c.actividad?.nombre}</b>
-                            <span className="gis-clase-sub"><Users size={13} aria-hidden style={{ verticalAlign: '-2px' }} /> {c.profe?.nombre} · {c.sala} · {c.actividad?.duracion} min</span>
-                            <BarraCupo anotados={k.anotados} cupo={k.cupo} />
+                            <b id={op} style={{ display: 'block', fontSize: 16, color: 'var(--color-text)' }}>{c.actividad?.nombre}</b>
+                            <span id={`${op}-d`} className="gis-clase-sub"><Users size={13} aria-hidden style={{ verticalAlign: '-2px' }} /> {c.profe?.nombre} · {c.sala} · {c.actividad?.duracion} min</span>
+                            <BarraCupo id={`${op}-c`} anotados={k.anotados} cupo={k.cupo} />
                           </span>
                           {sel && <Check size={18} aria-hidden style={{ color: 'var(--color-primary)', flexShrink: 0 }} />}
-                        </button>
+                        </div>
                       )
                     })}
                   </div>
@@ -220,14 +234,17 @@ export default function Reserva({ negocio, inscripciones, socios, onInscribir, q
                   <div className="gir-planes" role="radiogroup" aria-label="Planes">
                     {negocio.planes.filter(p => p.activo).map(p => {
                       const sel = planId === p.id
+                      const op = `${prefijo}-plan-${p.id}`
                       return (
-                        <button key={p.id} type="button" role="radio" aria-checked={sel} className="gir-plan" onClick={() => setPlanId(p.id)}>
-                          <span className="rv-rotulo">{p.tipo === 'prueba' ? 'Primera vez' : p.tipo === 'suelta' ? 'Una clase' : p.tipo === 'pack' ? 'Pack' : 'Membresía'}</span>
-                          <b>{p.nombre}</b>
-                          <span className="gis-precio" style={{ fontSize: 18 }}>{p.precio ? pesos(p.precio) : 'Gratis'}</span>
-                          <small>{textoPlan(p)}</small>
+                        // Se nombra con el plan y se describe con el tipo, el precio y lo que incluye.
+                        <div key={p.id} className="gir-plan rv-card--radio" data-elegido={sel}>
+                          <input type="radio" name={`${prefijo}-plan`} value={p.id} checked={sel} onChange={() => setPlanId(p.id)} aria-labelledby={op} aria-describedby={`${op}-t ${op}-p ${op}-d`} />
+                          <span id={`${op}-t`} className="rv-rotulo">{p.tipo === 'prueba' ? 'Primera vez' : p.tipo === 'suelta' ? 'Una clase' : p.tipo === 'pack' ? 'Pack' : 'Membresía'}</span>
+                          <b id={op}>{p.nombre}</b>
+                          <span id={`${op}-p`} className="gis-precio" style={{ fontSize: 18 }}>{p.precio ? pesos(p.precio) : 'Gratis'}</span>
+                          <small id={`${op}-d`}>{textoPlan(p)}</small>
                           {sel && <Check size={16} aria-hidden className="gir-tilde" />}
-                        </button>
+                        </div>
                       )
                     })}
                   </div>
@@ -359,26 +376,25 @@ export const CSS_RESERVA = `
   .gir-pasos button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .gir-grilla { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 32px; align-items: start; }
   .gir-lateral { position: sticky; top: calc(var(--rv-tope, 0px) + 80px); }
+  /* Los días, las clases y los planes son radios nativos (rv-card--radio): la opción elegida lleva
+     data-elegido y el anillo de foco lo pone el kit. */
   /* El padding (y el margen negativo que lo compensa) deja lugar al anillo de foco: el overflow lo recortaba. */
   .gir-dias { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 4px; margin: -4px; }
   .gir-dias::-webkit-scrollbar { display: none; }
   .gir-dia { flex: 0 0 auto; min-width: 60px; min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border-radius: 10px; border: 1px solid var(--color-border); background: var(--color-bg); font: inherit; color: var(--color-body); cursor: pointer; }
   .gir-dia b { font-family: var(--rv-mono); font-size: 16px; color: var(--color-text); }
   .gir-dia small { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
-  .gir-dia[aria-checked='true'] { background: var(--color-primary); border-color: transparent; color: var(--color-on-primary); }
-  .gir-dia[aria-checked='true'] b { color: inherit; }
-  .gir-dia:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  .gir-dia[data-elegido='true'] { background: var(--color-primary); border-color: transparent; color: var(--color-on-primary); }
+  .gir-dia[data-elegido='true'] b { color: inherit; }
   .gir-clases { display: flex; flex-direction: column; gap: 10px; }
   .gir-clase { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--color-border); background: var(--color-bg); text-align: left; font: inherit; color: inherit; cursor: pointer; width: 100%; }
-  .gir-clase[aria-checked='true'] { border-color: var(--color-primary); box-shadow: 0 0 0 1px var(--color-primary); }
-  .gir-clase:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  .gir-clase[data-elegido='true'] { border-color: var(--color-primary); box-shadow: 0 0 0 1px var(--color-primary); }
   .gir-clase .gis-clase-hora { width: 64px; flex-shrink: 0; }
   .gir-planes { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
   .gir-plan { position: relative; display: flex; flex-direction: column; gap: 4px; padding: 14px; border-radius: 12px; border: 1px solid var(--color-border); background: var(--color-bg); text-align: left; font: inherit; color: inherit; cursor: pointer; }
   .gir-plan b { font-size: 15px; color: var(--color-text); }
   .gir-plan small { font-size: 12.5px; color: var(--color-muted); line-height: 1.45; }
-  .gir-plan[aria-checked='true'] { border-color: var(--color-primary); box-shadow: 0 0 0 1px var(--color-primary); background: var(--color-primary-bg); }
-  .gir-plan:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  .gir-plan[data-elegido='true'] { border-color: var(--color-primary); box-shadow: 0 0 0 1px var(--color-primary); background: var(--color-primary-bg); }
   .gir-tilde { position: absolute; top: 12px; right: 12px; color: var(--color-primary); }
   .gir-ticket { margin: 0; display: flex; flex-direction: column; gap: 8px; }
   .gir-ticket > div { display: flex; justify-content: space-between; gap: 12px; font-size: 13.5px; }
