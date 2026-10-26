@@ -1,0 +1,72 @@
+import { describe, expect, it } from 'vitest'
+import { chocaRango, cumpleMinimo, motivoNoReservable, nocheDeFinDeSemana, nochesDe, nochesEntre, precioEstadia, salidaMaxima, temporadaDe, type TarifaEstadia } from '../estadia'
+
+const tarifa: TarifaEstadia = {
+  precioNoche: 60000,
+  temporadas: [{ id: 'alta', nombre: 'Temporada alta', desde: '2026-12-20', hasta: '2027-02-28', precioNoche: 95000 }],
+  finDeSemanaPct: 20,
+  limpieza: 25000,
+  minNoches: 2,
+}
+
+describe('estadía', () => {
+  it('cuenta noches sin incluir la salida', () => {
+    expect(nochesEntre('2026-11-14', '2026-11-16')).toBe(2)
+    expect(nochesDe('2026-11-14', '2026-11-16')).toEqual(['2026-11-14', '2026-11-15'])
+    expect(cumpleMinimo('2026-11-14', '2026-11-15', 2)).toBe(false)
+  })
+
+  it('dos estadías pueden tocarse: la salida de una es la entrada de la otra', () => {
+    const ocupadas = [{ entrada: '2026-11-16', salida: '2026-11-19', id: 'r1' }]
+    expect(chocaRango('2026-11-14', '2026-11-16', ocupadas)).toBeNull()
+    expect(chocaRango('2026-11-19', '2026-11-21', ocupadas)).toBeNull()
+    expect(chocaRango('2026-11-15', '2026-11-17', ocupadas)?.id).toBe('r1')
+    expect(chocaRango('2026-11-17', '2026-11-18', ocupadas)?.id).toBe('r1')
+  })
+
+  it('desde una entrada, la salida máxima llega hasta la primera noche ocupada', () => {
+    const ocupadas = [{ entrada: '2026-11-16', salida: '2026-11-19' }]
+    expect(salidaMaxima('2026-11-14', ocupadas)).toBe('2026-11-16')
+    expect(salidaMaxima('2026-11-17', ocupadas)).toBeNull()
+    expect(salidaMaxima('2026-11-19', ocupadas, 3)).toBe('2026-11-22')
+  })
+
+  it('las noches de fin de semana son la del viernes y la del sábado, no la del domingo', () => {
+    expect(nocheDeFinDeSemana('2026-11-12')).toBe(false) // jueves
+    expect(nocheDeFinDeSemana('2026-11-13')).toBe(true) // viernes: se sale el sábado
+    expect(nocheDeFinDeSemana('2026-11-14')).toBe(true) // sábado
+    expect(nocheDeFinDeSemana('2026-11-15')).toBe(false) // domingo: se sale el lunes
+    // Sin recargo configurado, ninguna noche se marca de fin de semana.
+    const sinRecargo = precioEstadia('2026-11-13', '2026-11-15', { ...tarifa, finDeSemanaPct: 0 })
+    expect(sinRecargo.noches.map(n => n.finDeSemana)).toEqual([false, false])
+    expect(sinRecargo.subtotal).toBe(120000)
+  })
+
+  it('cobra por noche según temporada y fin de semana, más la limpieza', () => {
+    // 13/11 (viernes, +20%), 14/11 (sábado, +20%), 15/11 (domingo, base)
+    const p = precioEstadia('2026-11-13', '2026-11-16', tarifa)
+    expect(p.noches.map(n => n.precio)).toEqual([72000, 72000, 60000])
+    expect(p.subtotal).toBe(204000)
+    expect(p.limpieza).toBe(25000)
+    expect(p.total).toBe(229000)
+    // En temporada alta manda el precio de la temporada.
+    const alta = precioEstadia('2026-12-21', '2026-12-23', tarifa) // lunes y martes
+    expect(alta.noches.map(n => n.precio)).toEqual([95000, 95000])
+    expect(alta.noches[0].temporada).toBe('Temporada alta')
+  })
+
+  it('si dos temporadas se pisan, manda la más corta (Carnaval adentro de la alta)', () => {
+    const conCarnaval: TarifaEstadia = { ...tarifa, temporadas: [...tarifa.temporadas, { id: 'carnaval', nombre: 'Carnaval', desde: '2027-02-13', hasta: '2027-02-16', precioNoche: 120000 }] }
+    expect(temporadaDe('2027-02-14', conCarnaval.temporadas)?.nombre).toBe('Carnaval')
+    expect(temporadaDe('2027-02-20', conCarnaval.temporadas)?.nombre).toBe('Temporada alta')
+    expect(temporadaDe('2026-11-14', conCarnaval.temporadas)).toBeNull()
+  })
+
+  it('explica por qué un rango no se puede reservar', () => {
+    const ocupadas = [{ entrada: '2026-11-16', salida: '2026-11-19', tipo: 'bloqueo' as const }]
+    expect(motivoNoReservable('2026-11-14', '2026-11-16', tarifa, ocupadas)).toBeNull()
+    expect(motivoNoReservable('2026-11-14', '2026-11-15', tarifa, ocupadas)).toMatch(/mínima es de 2 noches/)
+    expect(motivoNoReservable('2026-11-15', '2026-11-18', tarifa, ocupadas)).toMatch(/no están disponibles/)
+    expect(motivoNoReservable('2026-11-16', '2026-11-14', tarifa, ocupadas)).toMatch(/después de la entrada/)
+  })
+})
