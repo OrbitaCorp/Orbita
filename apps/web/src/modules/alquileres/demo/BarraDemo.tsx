@@ -1,6 +1,6 @@
 // DEMO INTERNA — tira fija arriba de cada pantalla de /alquileres-demo: avisa
 // que es una vista previa local, deja cambiar de modo (canchas, salón,
-// estadía) y saltar entre pantallas. No forma parte del producto.
+// estadía; en el alta no) y saltar entre pantallas. No forma parte del producto.
 //
 // Mide 40 px de alto y es siempre oscura, así se lee como una herramienta
 // aparte y no como parte del negocio que se está mirando.
@@ -58,6 +58,9 @@ export function BarraDemo() {
   const [tipo, setTipo] = useTipoDemo()
   const { demo, reiniciar } = useDemoAlquiler()
   const navRef = useRef<HTMLElement>(null)
+  // En el alta no va el selector de modo: ahí lo que se alquila se elige en su primer
+  // paso, y la tira seguía diciendo "Canchas" aunque en el alta se eligiera otra cosa.
+  const enAlta = router.pathname === '/alquileres-demo/onboarding'
 
   useEffect(() => {
     const nav = navRef.current
@@ -82,9 +85,11 @@ export function BarraDemo() {
           <Link key={p.href} href={{ pathname: p.href, query: { tipo } }} aria-current={router.pathname === p.href ? 'page' : undefined}>{p.label}</Link>
         ))}
       </nav>
-      <select className="ald-sel" aria-label="Modo de ejemplo" value={tipo} onChange={e => setTipo(e.target.value as TipoAlquiler)}>
-        {TIPOS_ORDEN.map(t => <option key={t} value={t}>{TIPOS[t].label}</option>)}
-      </select>
+      {!enAlta && (
+        <select className="ald-sel" aria-label="Modo de ejemplo" value={tipo} onChange={e => setTipo(e.target.value as TipoAlquiler)}>
+          {TIPOS_ORDEN.map(t => <option key={t} value={t}>{TIPOS[t].label}</option>)}
+        </select>
+      )}
     </div>
   )
 }

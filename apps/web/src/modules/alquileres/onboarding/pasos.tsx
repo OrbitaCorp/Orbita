@@ -6,6 +6,7 @@
 //
 // Pinta con el kit rv- del design system y con los tokens del lugar donde se
 // monta: adentro del alta oscura sale oscuro, sin hacer nada.
+import { useId } from 'react'
 import { Check, Plus, Trash2 } from 'lucide-react'
 import { pesos } from '@/lib/reservas/precio'
 import { EstiloReservas } from '@/design-system/reservas/estilo'
@@ -67,24 +68,29 @@ export function negocioDesdeAlta(a: AltaAlquiler, base: { nombre: string; descri
 // ─── Paso: qué alquilás ──────────────────────────────────────────────────────
 
 export function PasoTipoAlquiler({ valor, onElegir, error }: { valor: TipoAlquiler | null; onElegir: (t: TipoAlquiler) => void; error?: string }) {
+  const id = useId()
   return (
     <div className="rv" style={{ maxWidth: 760, margin: '0 auto' }}>
       <EstiloReservas />
-      <div className="rv-grid rv-grid--3" role="radiogroup" aria-label="Qué alquilás">
+      {/* Radios de verdad, como el paso Módulo del alta (rv-card--radio): una sola parada de
+          Tab, las flechas mueven y eligen, Espacio elige. Con botones role=radio cada tarjeta
+          era una parada y las flechas no hacían nada. */}
+      <div className="rv-grid rv-grid--3" role="radiogroup" aria-label="Qué alquilás" aria-describedby={error ? `${id}-e` : undefined}>
         {TIPOS_ORDEN.map((t, i) => {
           const info = TIPOS[t]
           const sel = valor === t
           return (
-            <button key={t} type="button" role="radio" aria-checked={sel} className={`rv-card rv-card--pad rv-card--accion rv-entra${sel ? ' rv-card--sel' : ''}`} style={{ ['--i' as string]: i, display: 'flex', flexDirection: 'column', gap: 10, minHeight: 170, position: 'relative' } as React.CSSProperties} onClick={() => onElegir(t)}>
+            <div key={t} className={`rv-card rv-card--pad rv-card--accion rv-card--radio rv-entra${sel ? ' rv-card--sel' : ''}`} style={{ ['--i' as string]: i, display: 'flex', flexDirection: 'column', gap: 10, minHeight: 170 } as React.CSSProperties}>
+              <input type="radio" name={id} value={t} checked={sel} onChange={() => onElegir(t)} aria-labelledby={`${id}-${t}`} aria-describedby={`${id}-${t}-d`} />
               <span style={{ width: 40, height: 40, borderRadius: 11, display: 'grid', placeItems: 'center', background: sel ? 'var(--color-primary)' : 'var(--color-primary-bg)', color: sel ? 'var(--color-on-primary)' : 'var(--color-primary)' }}><info.Icon size={20} strokeWidth={1.8} aria-hidden /></span>
-              <span className="rv-h3" style={{ fontSize: 16 }}>{info.label}</span>
-              <span style={{ fontSize: 13, color: 'var(--color-muted)', lineHeight: 1.5 }}>{info.descripcion}</span>
+              <span id={`${id}-${t}`} className="rv-h3" style={{ fontSize: 16 }}>{info.label}</span>
+              <span id={`${id}-${t}-d`} style={{ fontSize: 13, color: 'var(--color-muted)', lineHeight: 1.5 }}>{info.descripcion}</span>
               {sel && <span aria-hidden style={{ position: 'absolute', top: 12, right: 12, width: 22, height: 22, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'var(--color-primary)', color: 'var(--color-on-primary)' }}><Check size={13} strokeWidth={3} /></span>}
-            </button>
+            </div>
           )
         })}
       </div>
-      {error && <p className="rv-error" role="alert" style={{ marginTop: 10, textAlign: 'center' }}>{error}</p>}
+      {error && <p id={`${id}-e`} className="rv-error" role="alert" style={{ marginTop: 10, textAlign: 'center' }}>{error}</p>}
     </div>
   )
 }

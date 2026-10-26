@@ -33,43 +33,62 @@ export function Seccion({ titulo, bajada, children, acciones }: { titulo: ReactN
   )
 }
 
+// Campo, Area y Selector: el <label> lleva solo el rótulo; la ayuda y el error van
+// debajo del control, fuera del label, y el control los enlaza con aria-describedby
+// (y aria-invalid si hay error). Adentro del label el lector de pantalla los leía dos
+// veces: como parte del nombre del campo y otra vez como su descripción.
+
+/** El id de lo que describe al control: el error si hay; si no, la ayuda. */
+const idNota = (id: string, error?: string, ayuda?: string) => (error ? `${id}-e` : ayuda ? `${id}-a` : undefined)
+
+/**
+ * La ayuda o el error de un campo. El error reemplaza a la ayuda y se anuncia solo
+ * (role=alert). La key los hace dos elementos distintos: si el error fuera la misma
+ * ayuda con otro texto y otro rol, el anuncio podía no salir.
+ */
+function NotaCampo({ id, error, ayuda }: { id: string; error?: string; ayuda?: string }) {
+  if (error) return <span key="e" id={`${id}-e`} className="rv-error" role="alert">{error}</span>
+  if (ayuda) return <span key="a" id={`${id}-a`} className="rv-ayuda">{ayuda}</span>
+  return null
+}
+
 export function Campo({ label, ayuda, error, prefijo, ...resto }: {
   label: string; ayuda?: string; error?: string; prefijo?: string; value: string; onChange: (v: string) => void
   type?: string; placeholder?: string; maxLength?: number; inputMode?: 'text' | 'numeric' | 'tel' | 'email' | 'decimal'; autoComplete?: string; children?: never
 }) {
   const id = useId()
   const { value, onChange, type = 'text', placeholder, maxLength, inputMode, autoComplete } = resto
-  const input = <input id={id} className="rv-input" type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} maxLength={maxLength} inputMode={inputMode} autoComplete={autoComplete} aria-invalid={error ? true : undefined} aria-describedby={error ? `${id}-e` : ayuda ? `${id}-a` : undefined} />
+  const input = <input id={id} className="rv-input" type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} maxLength={maxLength} inputMode={inputMode} autoComplete={autoComplete} aria-invalid={error ? true : undefined} aria-describedby={idNota(id, error, ayuda)} />
   return (
-    <label className="rv-campo" htmlFor={id}>
-      <span>{label}</span>
+    <div className="rv-campo">
+      <label htmlFor={id}>{label}</label>
       {prefijo ? <span className="rv-con-prefijo"><i>{prefijo}</i>{input}</span> : input}
-      {error ? <span id={`${id}-e`} className="rv-error" role="alert">{error}</span> : ayuda ? <span id={`${id}-a`} className="rv-ayuda">{ayuda}</span> : null}
-    </label>
+      <NotaCampo id={id} error={error} ayuda={ayuda} />
+    </div>
   )
 }
 
 export function Area({ label, ayuda, value, onChange, placeholder, maxLength }: { label: string; ayuda?: string; value: string; onChange: (v: string) => void; placeholder?: string; maxLength?: number }) {
   const id = useId()
   return (
-    <label className="rv-campo" htmlFor={id}>
-      <span>{label}</span>
-      <textarea id={id} className="rv-textarea" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} maxLength={maxLength} />
-      {ayuda && <span className="rv-ayuda">{ayuda}</span>}
-    </label>
+    <div className="rv-campo">
+      <label htmlFor={id}>{label}</label>
+      <textarea id={id} className="rv-textarea" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} maxLength={maxLength} aria-describedby={idNota(id, undefined, ayuda)} />
+      <NotaCampo id={id} ayuda={ayuda} />
+    </div>
   )
 }
 
 export function Selector<T extends string | number>({ label, ayuda, valor, onChange, opciones }: { label: string; ayuda?: string; valor: T; onChange: (v: T) => void; opciones: { id: T; label: string }[] }) {
   const id = useId()
   return (
-    <label className="rv-campo" htmlFor={id}>
-      <span>{label}</span>
-      <select id={id} className="rv-select" value={String(valor)} onChange={e => { const o = opciones.find(x => String(x.id) === e.target.value); if (o) onChange(o.id) }}>
+    <div className="rv-campo">
+      <label htmlFor={id}>{label}</label>
+      <select id={id} className="rv-select" value={String(valor)} onChange={e => { const o = opciones.find(x => String(x.id) === e.target.value); if (o) onChange(o.id) }} aria-describedby={idNota(id, undefined, ayuda)}>
         {opciones.map(o => <option key={String(o.id)} value={String(o.id)}>{o.label}</option>)}
       </select>
-      {ayuda && <span className="rv-ayuda">{ayuda}</span>}
-    </label>
+      <NotaCampo id={id} ayuda={ayuda} />
+    </div>
   )
 }
 

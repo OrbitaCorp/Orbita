@@ -2,6 +2,7 @@
 // crossfit, yoga…), las actividades con su cupo y los planes con sus precios.
 // El resto del alta (negocio, ubicación, página, cuenta, pago) es el mismo
 // para todos los módulos y vive en modules/onboarding/alta.
+import { useId } from 'react'
 import { Check, Plus, Trash2 } from 'lucide-react'
 import { pesos } from '@/lib/reservas/precio'
 import { EstiloReservas } from '@/design-system/reservas/estilo'
@@ -73,24 +74,49 @@ export function negocioDesdeAlta(a: AltaGym, base: { nombre: string; descripcion
 
 // ─── Paso: rubro ─────────────────────────────────────────────────────────────
 
+// Cuatro rubros por fila en escritorio y dos en tablet (rv-grid--4). En celular
+// también dos, compactas: ícono, título y bajada, que se parten en renglones y
+// nunca se cortan. En una sola columna eran ocho tarjetas altas y el último
+// rubro quedaba a más de 1.000 px del título del paso.
+const CSS_RUBROS = `
+  .gia-rubro { display: flex; flex-direction: column; gap: 8px; min-height: 132px; }
+  .gia-rubro-icono { width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0; display: grid; place-items: center; background: var(--color-primary-bg); color: var(--color-primary); }
+  .gia-rubro.rv-card--sel .gia-rubro-icono { background: var(--color-primary); color: var(--color-on-primary); }
+  .gia-rubro .rv-h3 { font-size: 15px; }
+  .gia-rubro-bajada { font-size: 12.5px; line-height: 1.45; color: var(--color-muted); }
+  .gia-rubro-marca { position: absolute; top: 10px; right: 10px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--color-primary); color: var(--color-on-primary); }
+  @media (max-width: 640px) {
+    .gia-rubros.rv-grid--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .gia-rubro.rv-card--pad { min-height: 0; padding: 12px; gap: 6px; }
+    .gia-rubro-icono { width: 32px; height: 32px; border-radius: 9px; margin-bottom: 2px; }
+    .gia-rubro .rv-h3 { font-size: 14px; }
+    .gia-rubro-marca { top: 8px; right: 8px; width: 20px; height: 20px; }
+  }
+`
+
 export function PasoRubroGym({ valor, onElegir, error }: { valor: string | null; onElegir: (key: string) => void; error?: string }) {
+  const id = useId()
   return (
     <div className="rv" style={{ maxWidth: 820, margin: '0 auto' }}>
       <EstiloReservas />
-      <div className="rv-grid rv-grid--4" role="radiogroup" aria-label="Rubro">
+      <style>{CSS_RUBROS}</style>
+      {/* Radios de verdad, como el paso Módulo del alta (rv-card--radio): una sola parada de
+          Tab, las flechas mueven y eligen, Espacio elige. */}
+      <div className="rv-grid rv-grid--4 gia-rubros" role="radiogroup" aria-label="Rubro" aria-describedby={error ? `${id}-e` : undefined}>
         {RUBROS_GYM.map((r, i) => {
           const sel = valor === r.key
           return (
-            <button key={r.key} type="button" role="radio" aria-checked={sel} className={`rv-card rv-card--pad rv-card--accion rv-entra${sel ? ' rv-card--sel' : ''}`} style={{ ['--i' as string]: i, display: 'flex', flexDirection: 'column', gap: 8, minHeight: 132, position: 'relative' } as React.CSSProperties} onClick={() => onElegir(r.key)}>
-              <span style={{ width: 36, height: 36, borderRadius: 10, display: 'grid', placeItems: 'center', background: sel ? 'var(--color-primary)' : 'var(--color-primary-bg)', color: sel ? 'var(--color-on-primary)' : 'var(--color-primary)' }}><r.Icon size={18} strokeWidth={1.8} aria-hidden /></span>
-              <span className="rv-h3" style={{ fontSize: 15 }}>{r.label}</span>
-              <span style={{ fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.45 }}>{r.descripcion}</span>
-              {sel && <span aria-hidden style={{ position: 'absolute', top: 10, right: 10, width: 22, height: 22, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'var(--color-primary)', color: 'var(--color-on-primary)' }}><Check size={13} strokeWidth={3} /></span>}
-            </button>
+            <div key={r.key} className={`rv-card rv-card--pad rv-card--accion rv-card--radio rv-entra gia-rubro${sel ? ' rv-card--sel' : ''}`} style={{ ['--i' as string]: i } as React.CSSProperties}>
+              <input type="radio" name={id} value={r.key} checked={sel} onChange={() => onElegir(r.key)} aria-labelledby={`${id}-${r.key}`} aria-describedby={`${id}-${r.key}-d`} />
+              <span className="gia-rubro-icono"><r.Icon size={18} strokeWidth={1.8} aria-hidden /></span>
+              <span id={`${id}-${r.key}`} className="rv-h3">{r.label}</span>
+              <span id={`${id}-${r.key}-d`} className="gia-rubro-bajada">{r.descripcion}</span>
+              {sel && <span className="gia-rubro-marca" aria-hidden><Check size={13} strokeWidth={3} /></span>}
+            </div>
           )
         })}
       </div>
-      {error && <p className="rv-error" role="alert" style={{ marginTop: 10, textAlign: 'center' }}>{error}</p>}
+      {error && <p id={`${id}-e`} className="rv-error" role="alert" style={{ marginTop: 10, textAlign: 'center' }}>{error}</p>}
     </div>
   )
 }

@@ -53,6 +53,12 @@ export const CSS_RESERVAS = `
   .rv-card--accion:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .rv-card--sel { border-color: var(--color-primary); box-shadow: 0 0 0 1px var(--color-primary); }
   @media (hover: hover) { .rv-card--accion:hover { border-color: var(--color-border-strong); } }
+  /* Tarjeta que es una opción de un grupo de radios (como el paso Módulo del alta): un radio
+     nativo, invisible, la cubre entera. Se elige tocándola en cualquier lado y el grupo es de
+     radios de verdad: una sola parada de Tab, las flechas mueven y eligen, Espacio elige. */
+  .rv-card--radio { position: relative; }
+  .rv-card--radio > input[type='radio'] { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+  .rv-card--radio:has(> input:focus-visible) { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
   /* ── Botones ── */
   .rv-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 40px; padding: 0 16px; border-radius: var(--rv-r-sm); border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text); font: inherit; font-size: 14px; font-weight: 600; white-space: nowrap; cursor: pointer; text-decoration: none; transition: background 150ms ease, border-color 150ms ease; }
@@ -82,10 +88,11 @@ export const CSS_RESERVAS = `
 
   /* ── Campos ── */
   .rv-campo { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-  /* Solo el rótulo (el span sin clase): la ayuda, el error y el prefijo también son hijos
-     directos del label y con ".rv-campo > span" salían como un segundo rótulo en negrita
-     (el error en negro, no en rojo) y el texto del input con prefijo, en negrita. */
-  .rv-campo > span:not([class]) { font-size: 13px; font-weight: 600; color: var(--color-text); }
+  /* El rótulo: el <label> de Campo, Area y Selector (la ayuda y el error van fuera de él)
+     o, en los campos armados a mano con <label class="rv-campo">, el span SIN clase: la
+     ayuda, el error y el prefijo también son spans hijos directos y con ".rv-campo > span"
+     salían como un segundo rótulo en negrita (el error en negro, no en rojo). */
+  .rv-campo > label, .rv-campo > span:not([class]) { font-size: 13px; font-weight: 600; color: var(--color-text); }
   .rv-input, .rv-select, .rv-textarea { width: 100%; min-height: 42px; padding: 0 12px; border-radius: var(--rv-r-sm); border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text); font: inherit; font-size: 14px; outline: none; transition: border-color 150ms ease; }
   .rv-textarea { padding: 10px 12px; min-height: 88px; resize: vertical; line-height: 1.5; }
   .rv-select { appearance: none; -webkit-appearance: none; padding-right: 34px; background-image: linear-gradient(45deg, transparent 50%, var(--color-muted) 50%), linear-gradient(135deg, var(--color-muted) 50%, transparent 50%); background-position: calc(100% - 17px) 50%, calc(100% - 12px) 50%; background-size: 5px 5px; background-repeat: no-repeat; }

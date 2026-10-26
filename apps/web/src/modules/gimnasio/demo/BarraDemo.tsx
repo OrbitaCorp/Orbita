@@ -1,6 +1,6 @@
 // DEMO INTERNA — tira fija arriba de cada pantalla de /gimnasio-demo: avisa
-// que es una vista previa local, deja cambiar de rubro y saltar entre
-// pantallas. No forma parte del producto. Mide 40 px y es siempre oscura.
+// que es una vista previa local, deja cambiar de rubro (en el alta no) y saltar
+// entre pantallas. No forma parte del producto. Mide 40 px y es siempre oscura.
 import { useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
@@ -49,6 +49,9 @@ export function BarraDemo() {
   const [rubro, setRubro] = useRubroDemo()
   const { demo, reiniciar } = useDemoGym()
   const navRef = useRef<HTMLElement>(null)
+  // En el alta no va el selector de rubro: ahí el rubro se elige en su propio paso, y la
+  // tira seguía diciendo "Crossfit" aunque en el alta se eligiera otro.
+  const enAlta = router.pathname === '/gimnasio-demo/onboarding'
   useEffect(() => {
     const nav = navRef.current
     const activa = nav?.querySelector<HTMLElement>('a[aria-current="page"]')
@@ -69,9 +72,11 @@ export function BarraDemo() {
       <nav ref={navRef} aria-label="Pantallas de la demo">
         {PANTALLAS.map(p => <Link key={p.href} href={{ pathname: p.href, query: { rubro: rubro.key } }} aria-current={router.pathname === p.href ? 'page' : undefined}>{p.label}</Link>)}
       </nav>
-      <select className="gid-sel" aria-label="Rubro de ejemplo" value={rubro.key} onChange={e => setRubro(e.target.value)}>
-        {RUBROS_GYM.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
-      </select>
+      {!enAlta && (
+        <select className="gid-sel" aria-label="Rubro de ejemplo" value={rubro.key} onChange={e => setRubro(e.target.value)}>
+          {RUBROS_GYM.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
+        </select>
+      )}
     </div>
   )
 }

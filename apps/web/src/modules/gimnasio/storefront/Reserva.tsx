@@ -297,14 +297,18 @@ function Bloque({ refTitulo, titulo, sub, children }: { refTitulo: React.RefObje
   )
 }
 
+// Como Campo del kit, pero con un id fijo: siguiente() lleva el foco al primer campo
+// con error. El label tiene solo el rótulo y el error va fuera, enlazado desde el
+// input (adentro del label, el lector de pantalla lo leía dos veces: en el nombre y
+// en la descripción).
 function CampoR(p: { id: string; label: string; value: string; onChange: (v: string) => void; error?: string; placeholder?: string; inputMode?: 'text' | 'tel' | 'email'; autoComplete?: string }) {
   const id = `gir-${p.id}`
   return (
-    <label className="rv-campo" htmlFor={id}>
-      <span>{p.label}</span>
+    <div className="rv-campo">
+      <label htmlFor={id}>{p.label}</label>
       <input id={id} className="rv-input" value={p.value} onChange={e => p.onChange(e.target.value)} placeholder={p.placeholder} inputMode={p.inputMode} autoComplete={p.autoComplete} aria-invalid={p.error ? true : undefined} aria-describedby={p.error ? `${id}-e` : undefined} />
       {p.error && <span id={`${id}-e`} className="rv-error" role="alert">{p.error}</span>}
-    </label>
+    </div>
   )
 }
 

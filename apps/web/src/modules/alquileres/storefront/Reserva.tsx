@@ -397,14 +397,19 @@ function Bloque({ refTitulo, titulo, sub, children }: { refTitulo: React.RefObje
   )
 }
 
+// Como Campo del kit, pero con un id fijo: siguiente() lleva el foco al primer campo
+// con error. El label tiene solo el rótulo; el error y la ayuda van fuera y el input
+// los enlaza (adentro del label, el lector de pantalla los leía dos veces: en el
+// nombre y en la descripción). Las keys hacen del error un elemento nuevo, así su
+// anuncio sale siempre.
 function CampoR(p: { id: string; label: string; value: string; onChange: (v: string) => void; error?: string; ayuda?: string; placeholder?: string; inputMode?: 'text' | 'numeric' | 'tel' | 'email'; autoComplete?: string; maxLength?: number }) {
   const id = `alr-${p.id}`
   return (
-    <label className="rv-campo" htmlFor={id}>
-      <span>{p.label}</span>
-      <input id={id} className="rv-input" value={p.value} onChange={e => p.onChange(e.target.value)} placeholder={p.placeholder} inputMode={p.inputMode} autoComplete={p.autoComplete} maxLength={p.maxLength} aria-invalid={p.error ? true : undefined} aria-describedby={p.error ? `${id}-e` : undefined} />
-      {p.error ? <span id={`${id}-e`} className="rv-error" role="alert">{p.error}</span> : p.ayuda ? <span className="rv-ayuda">{p.ayuda}</span> : null}
-    </label>
+    <div className="rv-campo">
+      <label htmlFor={id}>{p.label}</label>
+      <input id={id} className="rv-input" value={p.value} onChange={e => p.onChange(e.target.value)} placeholder={p.placeholder} inputMode={p.inputMode} autoComplete={p.autoComplete} maxLength={p.maxLength} aria-invalid={p.error ? true : undefined} aria-describedby={p.error ? `${id}-e` : p.ayuda ? `${id}-a` : undefined} />
+      {p.error ? <span key="e" id={`${id}-e`} className="rv-error" role="alert">{p.error}</span> : p.ayuda ? <span key="a" id={`${id}-a`} className="rv-ayuda">{p.ayuda}</span> : null}
+    </div>
   )
 }
 

@@ -44,10 +44,20 @@ export interface RubroGym {
   tagline: string
 }
 
+// Las fotos de cada rubro: la primera es la portada del negocio de ejemplo y
+// todas se ofrecen de portada en el alta ("Tu página": "elegí la que más se
+// parezca a tu lugar"), así que ninguna contradice al rubro: nada de racks ni
+// salas de musculación en yoga, danza o natación. Natación, danza y artes
+// marciales todavía no tienen fotos propias (pileta, salón de baile, dojo):
+// llevan las más neutras que hay, sin racks ni pesas, hasta que se sumen las suyas.
 const DEP = (n: string) => `/plantillas/dep-${n}.jpg`
-const FOTOS_GYM = [DEP('pesas'), DEP('press'), DEP('sentadilla'), DEP('abdominales'), DEP('bici')]
-const FOTOS_YOGA = ['/turnos/dep-yoga.jpg', DEP('estirar'), '/turnos/dep-hero.jpg']
-const FOTOS_BOX = ['/turnos/dep-barra.jpg', '/turnos/dep-soga.jpg', DEP('sentadilla'), DEP('correr')]
+const FOTOS_GYM = ['/turnos/dep-pesas.jpg', DEP('pesas'), DEP('press'), DEP('sentadilla'), DEP('abdominales')]
+const FOTOS_BOX = ['/turnos/dep-hero.jpg', '/turnos/dep-barra.jpg', DEP('press'), '/turnos/dep-soga.jpg', DEP('sentadilla')]
+const FOTOS_FUNCIONAL = ['/turnos/dep-soga.jpg', DEP('correr'), DEP('abdominales'), DEP('estirar')]
+const FOTOS_YOGA = ['/turnos/dep-yoga.jpg', DEP('estirar'), DEP('abdominales')]
+const FOTOS_DANZA = [DEP('abdominales'), '/turnos/dep-yoga.jpg', DEP('correr')]
+const FOTOS_MARCIALES = [DEP('zapatilla'), DEP('abdominales'), DEP('correr')]
+const FOTOS_NATACION = [DEP('correr'), DEP('abdominales'), DEP('zapatilla')]
 
 const PLANES_CLASES: PlanTipo[] = [
   { tipo: 'prueba', nombre: 'Clase de prueba', precio: 0 },
@@ -69,19 +79,19 @@ export const RUBROS_GYM: RubroGym[] = [
     planes: [{ tipo: 'prueba', nombre: 'WOD de prueba', precio: 0 }, { tipo: 'suelta', nombre: 'Clase suelta', precio: 10000 }, { tipo: 'pack', nombre: 'Pack de 8 WODs', precio: 64000, clases: 8 }, { tipo: 'membresia', nombre: '3 veces por semana', precio: 68000, porSemana: 3 }, { tipo: 'membresia', nombre: 'Ilimitado', precio: 85000, porSemana: 0 }] },
   { key: 'funcional', label: 'Entrenamiento funcional', descripcion: 'Grupos reducidos', Icon: Activity, profe: 'Entrenador/a', socio: 'Alumno/a', socios: 'Alumnos', negocio: 'Funcional Costanera', tagline: 'Grupos chicos, seguimiento de verdad.',
     actividades: [{ nombre: 'Funcional', duracion: 60, cupo: 10 }, { nombre: 'HIIT', duracion: 45, cupo: 10 }, { nombre: 'Core y movilidad', duracion: 45, cupo: 12 }],
-    salas: ['Sala 1', 'Parque'], profes: ['Flor', 'Seba', 'Nico'], fotos: [DEP('correr'), DEP('estirar'), DEP('abdominales')], planes: PLANES_CLASES },
+    salas: ['Sala 1', 'Parque'], profes: ['Flor', 'Seba', 'Nico'], fotos: FOTOS_FUNCIONAL, planes: PLANES_CLASES },
   { key: 'yoga', label: 'Yoga y pilates', descripcion: 'Clases con cupo y reformers', Icon: Flower2, profe: 'Instructora', socio: 'Alumno/a', socios: 'Alumnos', negocio: 'Espacio Sattva', tagline: 'Respirá, movete, volvé.',
     actividades: [{ nombre: 'Hatha yoga', duracion: 60, cupo: 14 }, { nombre: 'Vinyasa', duracion: 60, cupo: 14 }, { nombre: 'Pilates reformer', duracion: 50, cupo: 6 }, { nombre: 'Yin yoga', duracion: 75, cupo: 12 }],
     salas: ['Sala principal', 'Sala reformer'], profes: ['Caro', 'Flor', 'Mica'], fotos: FOTOS_YOGA, planes: PLANES_CLASES.map(p => (p.tipo === 'suelta' ? { ...p, precio: 12000 } : p)) },
   { key: 'danza', label: 'Danza y baile', descripcion: 'Estilos, niveles y cupos', Icon: Music, profe: 'Profe', socio: 'Alumno/a', socios: 'Alumnos', negocio: 'Estudio Compás', tagline: 'Un estilo para cada cuerpo.',
     actividades: [{ nombre: 'Salsa inicial', duracion: 60, cupo: 16 }, { nombre: 'Tango', duracion: 90, cupo: 14 }, { nombre: 'Ritmos urbanos', duracion: 60, cupo: 18 }, { nombre: 'Contemporáneo', duracion: 75, cupo: 12 }],
-    salas: ['Salón A', 'Salón B'], profes: ['Mica', 'Nico', 'Flor'], fotos: [DEP('estirar'), '/turnos/dep-hero.jpg', DEP('correr')], planes: PLANES_CLASES.map(p => (p.tipo === 'suelta' ? { ...p, precio: 10000 } : p)) },
+    salas: ['Salón A', 'Salón B'], profes: ['Mica', 'Nico', 'Flor'], fotos: FOTOS_DANZA, planes: PLANES_CLASES.map(p => (p.tipo === 'suelta' ? { ...p, precio: 10000 } : p)) },
   { key: 'artes-marciales', label: 'Artes marciales', descripcion: 'Disciplinas, grupos y graduaciones', Icon: Swords, profe: 'Sensei', socio: 'Alumno/a', socios: 'Alumnos', negocio: 'Dojo Kaizen', tagline: 'Disciplina, respeto, constancia.',
     actividades: [{ nombre: 'Jiu-jitsu', duracion: 90, cupo: 16 }, { nombre: 'Kickboxing', duracion: 60, cupo: 16 }, { nombre: 'Karate infantil', duracion: 60, cupo: 20 }, { nombre: 'Muay thai', duracion: 60, cupo: 14 }],
-    salas: ['Tatami', 'Ring'], profes: ['Seba', 'Nico', 'Caro'], fotos: FOTOS_BOX, planes: PLANES_CLASES },
+    salas: ['Tatami', 'Ring'], profes: ['Seba', 'Nico', 'Caro'], fotos: FOTOS_MARCIALES, planes: PLANES_CLASES },
   { key: 'natacion', label: 'Natación', descripcion: 'Andariveles, clases y pileta libre', Icon: Waves, profe: 'Profe', socio: 'Alumno/a', socios: 'Alumnos', negocio: 'Natatorio Delfín', tagline: 'Del primer chapuzón a la competencia.',
     actividades: [{ nombre: 'Natación adultos', duracion: 45, cupo: 10 }, { nombre: 'Matronatación', duracion: 45, cupo: 8 }, { nombre: 'Pileta libre', duracion: 60, cupo: 16 }, { nombre: 'Aquagym', duracion: 45, cupo: 14 }],
-    salas: ['Pileta 25 m', 'Pileta chica'], profes: ['Flor', 'Caro', 'Seba'], fotos: ['/turnos/dep-hero.jpg', DEP('correr'), DEP('estirar')], planes: PLANES_CLASES },
+    salas: ['Pileta 25 m', 'Pileta chica'], profes: ['Flor', 'Caro', 'Seba'], fotos: FOTOS_NATACION, planes: PLANES_CLASES },
   { key: 'talleres', label: 'Clases grupales y talleres', descripcion: 'Talleres con fecha y cupo', Icon: Presentation, profe: 'Tallerista', socio: 'Participante', socios: 'Participantes', negocio: 'Taller Raíz', tagline: 'Aprender con las manos, en grupo.',
     actividades: [{ nombre: 'Cerámica', duracion: 120, cupo: 8 }, { nombre: 'Cocina', duracion: 150, cupo: 10 }, { nombre: 'Acuarela', duracion: 90, cupo: 10 }, { nombre: 'Huerta urbana', duracion: 90, cupo: 12 }],
     salas: ['Taller', 'Cocina'], profes: ['Mica', 'Caro', 'Flor'], fotos: ['/turnos/cla-hero.jpg', '/turnos/cla-torno.jpg', '/turnos/cla-manos.jpg', '/turnos/cla-vasija.jpg'],
