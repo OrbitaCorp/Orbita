@@ -315,8 +315,14 @@ export default function Alta({ real = false, modulo: pedido }: {
     // de pantalla se entera de que cambió la pantalla y arranca desde arriba.
     requestAnimationFrame(() => raiz.current?.querySelector<HTMLElement>('[data-titulo]')?.focus({ preventScroll: true }))
   }
-  // Al primer campo con error, que recién queda marcado en el próximo pintado.
-  const alError = () => requestAnimationFrame(() => raiz.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus())
+  // Al primer campo con error, que recién queda marcado en el próximo pintado. En
+  // los pasos de elegir (rubro, qué vendés, qué alquilás) no hay un campo que
+  // marcar: se trae el aviso a la vista y lo lee el lector de pantalla (role=alert).
+  const alError = () => requestAnimationFrame(() => {
+    const campo = raiz.current?.querySelector<HTMLElement>('[aria-invalid="true"]')
+    if (campo) campo.focus()
+    else raiz.current?.querySelector<HTMLElement>('main .tuob-error, main .rv-error')?.scrollIntoView({ block: 'nearest' })
+  })
 
   const terminar = async () => {
     // Alquileres y Gimnasio: el negocio queda en la demo de su módulo y se sigue
@@ -468,8 +474,8 @@ export default function Alta({ real = false, modulo: pedido }: {
             {id === 'modulo' && real && (
               <p className="tuob-ya-cuenta">¿Ya tenés cuenta? <Link href="/login">Iniciá sesión</Link></p>
             )}
-            {id === 'tipo' && <PasoTipo elegidos={datos.tipos} onCambio={v => poner('tipos', v)} />}
-            {id === 'rubro' && <PasoRubro elegido={rubro} onElegir={r => setRubroDemo(r.key)} />}
+            {id === 'tipo' && <PasoTipo elegidos={datos.tipos} onCambio={v => poner('tipos', v)} error={intentado ? errores.tipos : undefined} />}
+            {id === 'rubro' && <PasoRubro elegido={rubro} onElegir={r => setRubroDemo(r.key)} error={intentado ? errores.rubro : undefined} />}
             {id === 'servicios' && rubro && (
               <PasoServicios rubro={rubro} servicios={servicios} onCambio={cambiarServicios} sena={sena}
                 onSena={p => cambiar(e => ({ ...e, senas: { ...e.senas, [rubro.key]: p } }))} errores={errores} intentado={intentado} />

@@ -30,7 +30,8 @@ export const CSS_ONBOARDING = `
   /* ── Cabecera con la órbita de pasos ── */
   .tuob-cab { position: relative; display: flex; align-items: flex-start; justify-content: center; padding: 22px 24px 0; }
   .tuob-marca { position: absolute; left: 24px; top: 22px; display: inline-flex; align-items: center; gap: 9px; color: var(--color-text); font-family: var(--tuo-fh); font-size: 16px; font-weight: 700; letter-spacing: -0.02em; text-decoration: none; border-radius: 8px; }
-  a.tuob-marca { cursor: pointer; transition: opacity 160ms ease; }
+  /* En el alta real la marca es un link: se toca en 44 px de alto sin mover nada (los márgenes devuelven lo que suma). */
+  a.tuob-marca { cursor: pointer; transition: opacity 160ms ease; min-height: 44px; margin: -9px 0; }
   a.tuob-marca:hover { opacity: 0.8; }
   a.tuob-marca:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 4px; }
   a.tuob-volver { text-decoration: none; }
@@ -47,7 +48,8 @@ export const CSS_ONBOARDING = `
   .tuob-punto > i svg { width: 10px; height: 10px; opacity: 0; transition: opacity 200ms ease; }
   .tuob-punto > span { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 12px; font-weight: 500; color: var(--color-muted); transition: color 200ms ease; }
   .tuob-punto[data-tocable='true'] { cursor: pointer; }
-  .tuob-punto[data-estado='hecho'] > i { width: 18px; height: 18px; border-color: transparent; background: var(--tuo-grad); box-shadow: 0 0 14px rgba(59,130,246,0.55); }
+  /* --tuo-grad es hoy el azul claro del acento (#60A5FA): encima va la tinta oscura (--color-on-primary); el blanco daba 2,5:1. */
+  .tuob-punto[data-estado='hecho'] > i { width: 18px; height: 18px; border-color: transparent; background: var(--tuo-grad); color: var(--color-on-primary); box-shadow: 0 0 14px rgba(59,130,246,0.55); }
   .tuob-punto[data-estado='hecho'] > i svg { opacity: 1; }
   .tuob-punto[data-estado='hecho'] > span { color: var(--color-body); }
   /* Ya se pasó por acá, pero se volvió para atrás: queda marcado y se puede saltar. */
@@ -101,14 +103,15 @@ export const CSS_ONBOARDING = `
      elige ni reacciona al mouse. El chip de "Próximamente" queda encendido. */
   .tuob-modulo[data-proximamente='true'] { border-style: dashed; border-color: rgba(255,255,255,0.14); }
   .tuob-modulo[data-proximamente='true'] > input { cursor: not-allowed; }
-  .tuob-modulo[data-proximamente='true'] :is(.tuob-modulo-icono, h2, .tuob-modulo-cab p, .tuob-modulo-lista, .tuob-modulo-pie) { opacity: 0.7; }
+  /* 0,8 y no menos: con 0,7 el "Para:" (gris de --color-muted) quedaba en 3,7:1, debajo de AA. */
+  .tuob-modulo[data-proximamente='true'] :is(.tuob-modulo-icono, h2, .tuob-modulo-cab p, .tuob-modulo-lista, .tuob-modulo-pie) { opacity: 0.8; }
   .tuob-modulo[data-proximamente='true'] .tuob-modulo-lista svg { color: var(--color-muted); }
   .tuob-modulo-pronto { margin-top: 10px; display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; color: var(--chip-primary-fg); background: rgba(96,165,250,0.12); border: 1px solid rgba(147,197,253,0.28); }
   /* Un solo aviso abajo para todos los que están por llegar. */
   .tuob-modulos-aviso { display: flex; align-items: flex-start; gap: 8px; max-width: 640px; margin: 16px auto 0; font-size: 13px; line-height: 1.55; color: var(--color-body); text-align: left; }
   .tuob-modulos-aviso > svg { flex-shrink: 0; margin-top: 3px; color: var(--color-primary-h); }
   .tuob-ya-cuenta { margin: 22px 0 0; text-align: center; font-size: 14px; color: var(--color-muted); }
-  .tuob-ya-cuenta a { display: inline-block; padding: 10px 4px; color: var(--color-primary-h); font-weight: 600; text-decoration: underline; text-decoration-color: rgba(147,197,253,0.4); text-underline-offset: 3px; border-radius: 6px; transition: color 160ms ease, text-decoration-color 160ms ease; }
+  .tuob-ya-cuenta a { display: inline-block; padding: 12px 4px; color: var(--color-primary-h); font-weight: 600; text-decoration: underline; text-decoration-color: rgba(147,197,253,0.4); text-underline-offset: 3px; border-radius: 6px; transition: color 160ms ease, text-decoration-color 160ms ease; }
   .tuob-ya-cuenta a:hover { color: #fff; text-decoration-color: #fff; }
   .tuob-ya-cuenta a:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   /* El tilde de las tarjetas elegibles: círculo (una sola) o cuadrado (varias). */
@@ -123,6 +126,9 @@ export const CSS_ONBOARDING = `
   .tuob .tuo-buscar > input { height: 44px; background: var(--tuob-panel); }
   .tuob .tuo-seg { background: var(--tuob-panel); }
   .tuob-contador { margin: -12px 0 20px; text-align: center; font-size: 12.5px; color: var(--color-muted); }
+  /* Se quiso seguir sin elegir: el aviso va entre el contador (o los filtros) y la grilla, a la vista. */
+  .tuob-contador + .tuob-error { justify-content: center; margin: -10px 0 18px; }
+  .tuob-filtros + .tuob-error { margin: -6px 0 18px; }
   .tuob-seg-scroll { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
   .tuob-seg-scroll::-webkit-scrollbar { display: none; }
   .tuob .tuo-seg > button { height: 36px; display: inline-flex; align-items: center; gap: 6px; }
@@ -136,7 +142,7 @@ export const CSS_ONBOARDING = `
   .tuob-rubro small { margin-top: 4px; font-size: 12px; line-height: 1.45; color: var(--color-muted); }
   .tuob-rubro:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .tuob-rubro[aria-pressed='true'] { border-color: #60A5FA; background: linear-gradient(180deg, rgba(37,99,235,0.26), rgba(30,58,138,0.12)); box-shadow: 0 0 0 3px rgba(96,165,250,0.18), 0 16px 40px rgba(37,99,235,0.22); }
-  .tuob-rubro[aria-pressed='true'] .tuob-rubro-icono { background: var(--tuo-grad); color: #fff; border-color: transparent; box-shadow: 0 6px 18px rgba(37,99,235,0.5); }
+  .tuob-rubro[aria-pressed='true'] .tuob-rubro-icono { background: var(--tuo-grad); color: var(--color-on-primary); border-color: transparent; box-shadow: 0 6px 18px rgba(37,99,235,0.5); }
   .tuob-rubro[aria-pressed='true'] small { color: var(--color-body); }
   .tuob-etiqueta { display: inline-flex; align-items: center; gap: 5px; margin-top: 10px; padding: 3px 8px; border-radius: 999px; background: rgba(96,165,250,0.12); font-size: 10.5px; font-weight: 600; color: var(--chip-primary-fg); }
   .tuob-tilde { position: absolute; top: 12px; right: 12px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: #fff; color: #1D4ED8; animation: tuobTilde 320ms var(--tuo-ease) both; }
@@ -205,6 +211,9 @@ export const CSS_ONBOARDING = `
   .tuob-cuenta { position: absolute; right: 12px; bottom: 7px; font-size: 11px; color: var(--color-muted); pointer-events: none; }
   .tuob-error { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12.5px; color: var(--color-error); animation: tuoEntra 220ms ease both; }
   .tuob-error > svg { flex-shrink: 0; }
+  /* Sin un campo que enfocar (elegir rubro, qué vendés, qué alquilás), el aviso se trae a la vista
+     (alError en Alta.tsx): con aire arriba, para que no quede debajo de la tira fija de las demos. */
+  .tuob .tuob-error, .tuob .rv-error { scroll-margin-top: 80px; }
   .tuob-ayuda { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--color-muted); }
   .tuob-ojo { position: absolute; right: 2px; width: 44px; height: 44px; display: grid; place-items: center; padding: 0; border: none; background: none; color: var(--color-muted); cursor: pointer; border-radius: 10px; transition: color 160ms ease; }
   .tuob-ojo:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -4px; }
@@ -224,7 +233,7 @@ export const CSS_ONBOARDING = `
   .tuob-logo-marco img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
   .tuob-logo-marco:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
   .tuob-logo-sigla { font-family: var(--tuo-fh); font-size: 28px; font-weight: 700; letter-spacing: -0.03em; color: var(--color-text); }
-  .tuob-logo-marco > i { position: absolute; right: -2px; bottom: -2px; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--tuo-grad); color: #fff; border: 2px solid #05070C; }
+  .tuob-logo-marco > i { position: absolute; right: -2px; bottom: -2px; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--tuo-grad); color: var(--color-on-primary); border: 2px solid #05070C; }
   .tuob-logo-botones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 
   /* Opciones tipo tarjeta: radio (una) o casilla (varias) */
@@ -268,7 +277,7 @@ export const CSS_ONBOARDING = `
   .tuob-plan-precio { font-size: 15px; font-weight: 600; color: var(--color-text); }
   .tuob-dias { display: flex; flex-wrap: wrap; gap: 8px; }
   .tuob-dia { min-width: 50px; height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--color-border); background: var(--tuob-hueco); color: var(--color-muted); font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; transition: border-color 160ms ease, background 160ms ease, color 160ms ease, box-shadow 200ms ease; }
-  .tuob-dia[aria-pressed='true'] { border-color: transparent; background: var(--tuo-grad); color: #fff; box-shadow: 0 6px 16px rgba(37,99,235,0.35); }
+  .tuob-dia[aria-pressed='true'] { border-color: transparent; background: var(--tuo-grad); color: var(--color-on-primary); box-shadow: 0 6px 16px rgba(37,99,235,0.35); }
   .tuob-dia:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .tuob-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
   /* Horarios: un renglón por turno de atención (mañana y tarde), cada uno con su llave y su "de… a…". */
@@ -282,7 +291,9 @@ export const CSS_ONBOARDING = `
   .tuob-turno-horas select.tuob-input { width: 112px; height: 44px; }
   .tuob-turno-off { font-size: 13px; color: var(--color-muted); }
   .tuob-check { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; font-size: 13px; line-height: 1.5; font-weight: 400; color: var(--color-body); cursor: pointer; }
-  .tuob-check input { width: 20px; height: 20px; margin: 1px 0 0; flex-shrink: 0; accent-color: #3B82F6; cursor: pointer; }
+  .tuob-check input { width: 20px; height: 20px; margin: 0; flex-shrink: 0; accent-color: #3B82F6; cursor: pointer; }
+  /* El área que se toca: 44 × 44 alrededor de la casilla; los márgenes negativos devuelven lo que suma, así nada se corre. */
+  .tuob-check-caja { display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; margin: -11px -12px -13px; cursor: pointer; }
   .tuob-check a { color: var(--color-primary-h); font-weight: 600; text-underline-offset: 3px; }
   .tuob-check a:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 4px; }
 
@@ -306,6 +317,9 @@ export const CSS_ONBOARDING = `
   /* ── "Tu página": las dos formas y el celular de vista previa ── */
   .tuob-pagina { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 32px; align-items: start; }
   .tuob-pagina-vista { position: sticky; top: 56px; display: grid; justify-items: center; gap: 14px; scroll-margin-top: 56px; }
+  /* La sombra del celular (.tuob-tel, posicionado) se pintaba ENCIMA de la leyenda de abajo y
+     la bajaba a 4,2:1: posicionada y después en el DOM, la leyenda queda arriba de la sombra. */
+  .tuob-pagina-vista > .tuob-ayuda { position: relative; }
   .tuob-sinreg { display: flex; align-items: flex-start; gap: 14px; }
   .tuob-sinreg-ico { width: 42px; height: 42px; border-radius: 13px; flex-shrink: 0; display: grid; place-items: center; color: #34D399; background: rgba(52,211,153,0.12); border: 1px solid rgba(52,211,153,0.26); }
   .tuob-sinreg strong, .tuob-llave-fila strong, .tuob-benef strong, .tuob-benef label { display: block; font-size: 14px; font-weight: 600; color: var(--color-text); }
@@ -475,7 +489,9 @@ export const CSS_ONBOARDING = `
   .tuob-qr { padding: 10px; border-radius: 16px; background: #fff; line-height: 0; box-shadow: 0 10px 30px rgba(3,6,14,0.5); transition: transform 260ms var(--tuo-ease), box-shadow 260ms ease; }
   .tuob-link { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 0 6px 0 14px; height: 48px; border-radius: 12px; border: 1px solid var(--color-border); background: rgba(255,255,255,0.035); }
   .tuob-link code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--tuo-mono); font-size: 14px; color: var(--color-primary-h); }
-  .tuob-listo-acciones { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 26px; }
+  /* Posicionados: si no, la sombra de la tarjeta del QR (contexto de apilamiento por el
+     backdrop-filter) se pinta encima de los botones y oscurece "Ir a mi panel". */
+  .tuob-listo-acciones { position: relative; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 26px; }
 
   /* ── Botonera fija ── */
   .tuob-pie { position: fixed; left: 0; right: 0; bottom: 0; z-index: 100; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.72); -webkit-backdrop-filter: blur(16px) saturate(140%); backdrop-filter: blur(16px) saturate(140%); padding: 14px 0 calc(14px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -18px 50px rgba(0,0,0,0.6); }
@@ -531,6 +547,8 @@ export const CSS_ONBOARDING = `
   }
   @media (max-width: 720px) {
     .tuob-cab { align-items: stretch; padding: 16px 16px 0; gap: 14px; }
+    /* La marca no se estira con la columna: en el alta real es un link y tocar en cualquier lado de la cabecera llevaba al inicio. */
+    .tuob-marca { align-self: flex-start; }
     .tuob-pasos { display: none; }
     .tuob-pasos-mini { display: flex; padding: 12px 14px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.10); background: var(--tuob-panel); }
     .tuob-ancho { padding: 0 16px; }
@@ -551,6 +569,7 @@ export const CSS_ONBOARDING = `
     .tuob-modulos-aviso { margin-top: 14px; }
     .tuob-filtros .tuo-buscar { max-width: none; }
     .tuob-contador { margin-top: -8px; text-align: left; }
+    .tuob-contador + .tuob-error { justify-content: flex-start; }
     .tuob .tuo-buscar > input, .tuob-input { font-size: 16px; height: 48px; }
     .tuob .tuo-seg > button { height: 44px; }
     .tuob-rubros { grid-template-columns: repeat(2, minmax(0, 1fr)); }

@@ -7,11 +7,17 @@ import { CalendarClock, Check, Coins, Search, SearchX, Users } from 'lucide-reac
 import { FAMILIAS, RUBROS_TURNOS, MODO_LABEL, pesos, duracionTxt, recursosDe, turnosDe, clientesDe, type FamiliaId, type RubroTurnos } from '@/modules/turnos/datos'
 import { OrbitaDia } from '@/modules/turnos/_shared/orbita/OrbitaDia'
 import { AHORA_DEMO } from '@/modules/turnos/_shared/components/ChipEstado'
+import { MensajeError } from './campos'
 import { DESCRIPCION_MODO, plano } from './modelo'
 
 const FAMILIA_CORTA: Record<FamiliaId, string> = { belleza: 'Belleza', salud: 'Salud', deporte: 'Bienestar', clases: 'Clases' }
 
-export function PasoRubro({ elegido, onElegir }: { elegido: RubroTurnos | null; onElegir: (r: RubroTurnos) => void }) {
+export function PasoRubro({ elegido, onElegir, error }: {
+  elegido: RubroTurnos | null
+  onElegir: (r: RubroTurnos) => void
+  /** Se quiso seguir sin elegir: el aviso va arriba de la grilla, no solo en la botonera. */
+  error?: string
+}) {
   const [busqueda, setBusqueda] = useState('')
   const [familia, setFamilia] = useState<'todas' | FamiliaId>('todas')
 
@@ -29,7 +35,8 @@ export function PasoRubro({ elegido, onElegir }: { elegido: RubroTurnos | null; 
           <div className="tuob-filtros">
             <label className="tuo-buscar">
               <Search size={16} aria-hidden />
-              <input type="search" value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscá tu rubro: barbería, pádel, yoga…" aria-label="Buscar rubro" />
+              {/* Ejemplos que estén en Turnos (canchas pasó a Alquileres y las clases con cupo, a Gimnasio), y cortos: el campo mide 300 px. */}
+              <input type="search" value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscá: barbería, uñas, kinesio…" aria-label="Buscar rubro" />
             </label>
             <div className="tuob-seg-scroll">
               <div className="tuo-seg" role="group" aria-label="Filtrar por familia">
@@ -42,6 +49,8 @@ export function PasoRubro({ elegido, onElegir }: { elegido: RubroTurnos | null; 
               </div>
             </div>
           </div>
+
+          {error && <MensajeError id="tuob-rubro-error">{error}</MensajeError>}
 
           <p role="status" aria-live="polite" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>
             {visibles.length} rubros a la vista.
@@ -106,7 +115,7 @@ function Previa({ rubro }: { rubro: RubroTurnos }) {
   return (
     <div className="tuob-previa-cuerpo">
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14 }}>
-        <span className="tuob-rubro-icono" style={{ margin: 0, background: 'var(--tuo-grad)', color: '#fff', borderColor: 'transparent' }}><rubro.Icon size={20} strokeWidth={1.75} aria-hidden /></span>
+        <span className="tuob-rubro-icono" style={{ margin: 0, background: 'var(--tuo-grad)', color: 'var(--color-on-primary)', borderColor: 'transparent' }}><rubro.Icon size={20} strokeWidth={1.75} aria-hidden /></span>
         <div style={{ minWidth: 0 }}>
           <div className="tuo-h2" style={{ fontSize: 17 }}>{rubro.label}</div>
           <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 2 }}>{rubro.descripcion}</div>

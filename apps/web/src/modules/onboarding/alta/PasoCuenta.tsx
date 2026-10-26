@@ -38,8 +38,11 @@ export function PasoCuenta({ d, poner, error, tocar, mail }: PropsPaso & { mail:
         </div>
         <div className="tuob-campo">
           <div className="tuob-check">
-            <input id="tuob-acepta" type="checkbox" checked={d.acepta} onChange={e => { poner('acepta', e.target.checked); tocar('acepta') }}
-              aria-invalid={errorAcepta ? true : undefined} aria-describedby={errorAcepta ? 'tuob-acepta-error' : undefined} />
+            {/* La casilla mide 20 px: su label vacío la deja tocar en 44 sin correr nada (estilo.ts). */}
+            <label className="tuob-check-caja" htmlFor="tuob-acepta">
+              <input id="tuob-acepta" type="checkbox" checked={d.acepta} onChange={e => { poner('acepta', e.target.checked); tocar('acepta') }}
+                aria-invalid={errorAcepta ? true : undefined} aria-describedby={errorAcepta ? 'tuob-acepta-error' : undefined} />
+            </label>
             <span>
               <label htmlFor="tuob-acepta">Acepto los</label>{' '}
               <a href="/terminos" target="_blank" rel="noopener noreferrer">términos y condiciones</a> y la{' '}

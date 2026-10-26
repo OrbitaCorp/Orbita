@@ -5,14 +5,21 @@
 // del alta nueva. La etiqueta de cada tarjeta avisa qué le suma ese rubro al
 // catálogo (variantes, número de serie o cantidad variable).
 import { Check } from 'lucide-react'
+import { MensajeError } from './campos'
 import { SUBRUBROS_TIENDA, TIPOS, alternarTipo } from './subrubrosTienda'
 
-export function PasoTipo({ elegidos, onCambio }: { elegidos: string[]; onCambio: (t: string[]) => void }) {
+export function PasoTipo({ elegidos, onCambio, error }: {
+  elegidos: string[]
+  onCambio: (t: string[]) => void
+  /** Se quiso seguir sin elegir: el aviso va arriba de la grilla, no solo en la botonera. */
+  error?: string
+}) {
   return (
     <div className="tuob-ancho tuob-ancho--medio">
       <p className="tuob-contador" role="status" aria-live="polite">
         {elegidos.length === 0 ? 'Podés elegir varios' : `${elegidos.length} elegido${elegidos.length === 1 ? '' : 's'}`}
       </p>
+      {error && <MensajeError id="tuob-tipos-error">{error}</MensajeError>}
       <div className="tuob-rubros tuob-rubros--tienda" role="group" aria-label="Qué vendés">
         {SUBRUBROS_TIENDA.map(s => {
           const sel = elegidos.includes(s.key)
