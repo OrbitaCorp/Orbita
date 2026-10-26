@@ -15,13 +15,13 @@ import { useRouter } from 'next/router'
 import { ArrowRight, CalendarPlus, Check, ChevronLeft, Lock, MessageCircle, Users } from 'lucide-react'
 import { duracionTxt, esISO, fechaLarga, hhmm, rangoTxt, sumarDias, diaSemana, fechaCorta, type ISO } from '@/lib/reservas/fechas'
 import { consecutivasDesde, franjasDelDia } from '@/lib/reservas/disponibilidad'
-import { pesos, precioBloque, precioPorHora, senaDe } from '@/lib/reservas/precio'
-import { motivoNoReservable, nochesEntre, precioEstadia, salidaMaxima, nochesOcupadas } from '@/lib/reservas/estadia'
+import { pesos, precioBloque, precioPorHora, precioTurnosSeguidos, senaDe } from '@/lib/reservas/precio'
+import { agruparNoches, motivoNoReservable, nochesEntre, precioEstadia, salidaMaxima, nochesOcupadas } from '@/lib/reservas/estadia'
 import { descargarICS, generarICS } from '@/lib/reservas/ics'
-import { AHORA, HOY, aperturaDe, bloqueoEn, bloquesDe, bloquesLibresEn, ocupadoDelDia, rangosOcupados, type Cliente, type NegocioAlquiler, type Reserva as ReservaT } from '../datos'
+import { AHORA, HOY, aperturaDe, bloqueoEn, bloquesDe, bloquesLibresEn, cuenta, nochesTxt, ocupadoDelDia, rangosOcupados, type Cliente, type NegocioAlquiler, type Reserva as ReservaT } from '../datos'
 import { CalendarioDia, CalendarioRango, type Rango } from '@/design-system/reservas/Calendario'
 import { Campo, Area, Selector } from '@/design-system/reservas/piezas'
-import Sitio, { ruta } from './Sitio'
+import Sitio, { lineaNoches, ruta } from './Sitio'
 
 interface P { negocio: NegocioAlquiler; reservas: ReservaT[]; onReservar: (r: ReservaT, c: Cliente) => void }
 
@@ -88,13 +88,16 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
   function calcularPrecio(): { total: number; detalle: [string, number][] } | null {
     const elegidos = listaExtras.filter(e => extras.includes(e.id)).map(e => [e.nombre, e.precio] as [string, number])
     if (tipo === 'cancha' && unidad && fecha && hora !== null) {
-      const p = precioPorHora(unidad.tarifaHora, negocio.duracionMin * seguidas, diaSemana(fecha), hora, negocio.reglasPrecio)
-      return { total: precioBloque(p.final, listaExtras, extras).total, detalle: [[`${unidad.nombre} · ${duracionTxt(negocio.duracionMin * seguidas)}${p.ajuste ? ` (${p.ajuste > 0 ? '+' : ''}${p.ajuste}%)` : ''}`, p.final], ...elegidos] }
+      // Cada turno con el ajuste de su franja: si cambia en el medio (15 a 17 con el descuento hasta las 16), va una línea por tramo.
+      const p = precioTurnosSeguidos(unidad.tarifaHora, negocio.duracionMin, seguidas, diaSemana(fecha), hora, negocio.reglasPrecio)
+      const lineas = p.tramos.map(t => [`${unidad.nombre} · ${p.tramos.length > 1 ? `${hhmm(t.inicio)} a ${hhmm(t.fin)}` : duracionTxt(t.fin - t.inicio)}${t.ajuste ? ` (${t.ajuste > 0 ? '+' : ''}${t.ajuste}%)` : ''}`, t.final] as [string, number])
+      return { total: precioBloque(p.final, listaExtras, extras).total, detalle: [...lineas, ...elegidos] }
     }
     if (tipo === 'bloque' && paquete) return { total: precioBloque(paquete.precio, listaExtras, extras).total, detalle: [[paquete.nombre, paquete.precio], ...elegidos] }
     if (tipo === 'estadia' && propiedad && rangoCompleto && !motivoRango) {
       const p = precioEstadia(rango.entrada!, rango.salida!, propiedad.tarifa)
-      return { total: p.total, detalle: [[`${p.noches.length} noches · ${rangoTxt(rango.entrada!, rango.salida!)}`, p.subtotal], ['Limpieza', p.limpieza]] }
+      // Una línea por precio: con temporada o fin de semana, un subtotal solo no explicaba el total.
+      return { total: p.total, detalle: [...agruparNoches(p.noches).map(lineaNoches), ['Limpieza', p.limpieza]] }
     }
     return null
   }
@@ -103,9 +106,11 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
   const sena = senaDe(total, negocio.senaPct)
 
   // ── Pasos ──
-  const pasos: PasoId[] = tipo === 'cancha' ? ['unidad', 'cuando', ...(listaExtras.length ? ['extras' as PasoId] : []), 'datos', ...(sena ? ['pago' as PasoId] : [])]
-    : tipo === 'bloque' ? ['cuando', 'paquete', 'extras', 'datos', ...(sena ? ['pago' as PasoId] : [])]
-      : ['unidad', 'cuando', 'datos', ...(sena ? ['pago' as PasoId] : [])]
+  // La Seña figura desde el principio si el negocio la cobra: antes aparecía recién al tener un total y la barra de pasos crecía en el medio.
+  const conSena = negocio.senaPct > 0 && (!precio || sena > 0)
+  const pasos: PasoId[] = tipo === 'cancha' ? ['unidad', 'cuando', ...(listaExtras.length ? ['extras' as PasoId] : []), 'datos', ...(conSena ? ['pago' as PasoId] : [])]
+    : tipo === 'bloque' ? ['cuando', 'paquete', 'extras', 'datos', ...(conSena ? ['pago' as PasoId] : [])]
+      : ['unidad', 'cuando', 'datos', ...(conSena ? ['pago' as PasoId] : [])]
   // Lo que vino por la URL también se revisa: una hora tomada o un bloque ocupado no dejan seguir.
   const listo: Record<PasoId, boolean> = {
     unidad: tipo === 'cancha' ? !!unidad : !!propiedad,
@@ -113,10 +118,13 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
     paquete: !!paquete && invitados > 0 && invitados <= paquete.hastaInvitados && !pasaCapacidad,
     extras: true, datos: true, pago: true,
   }
-  // Arranca en el primer paso que falta: lo que vino por la URL se saltea.
+  // Arranca en el primer paso que falta: lo que vino por la URL se saltea. Si
+  // vino todo (un horario de la portada, las fechas desde la ficha de la
+  // propiedad), arranca en Cuándo: ahí se ve lo elegido y todavía se decide
+  // cuánto tiempo o cuántos vienen. Antes volvía al primer paso, ya resuelto.
   const [paso, setPaso] = useState(() => {
     const i = pasos.findIndex(p => !listo[p] && p !== 'extras' && p !== 'datos' && p !== 'pago')
-    return i < 0 ? 0 : i
+    return i >= 0 ? i : Math.max(0, pasos.indexOf('cuando'))
   })
   const actual = pasos[Math.min(paso, pasos.length - 1)]
   const ultimo = paso >= pasos.length - 1
@@ -161,7 +169,7 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
   // ── Textos ──
   const cuando = tipo === 'cancha' && fecha && hora !== null ? `${fechaLarga(fecha)} · ${hhmm(hora)} a ${hhmm(hora + negocio.duracionMin * seguidas)}`
     : tipo === 'bloque' && fecha && bloque ? `${fechaLarga(fecha)} · ${bloque.nombre}, ${hhmm(bloque.inicio)} a ${hhmm(bloque.fin)}`
-      : tipo === 'estadia' && rangoCompleto ? `${rangoTxt(rango.entrada!, rango.salida!)} · ${nochesEntre(rango.entrada!, rango.salida!)} noches` : null
+      : tipo === 'estadia' && rangoCompleto ? `${rangoTxt(rango.entrada!, rango.salida!)} · ${nochesTxt(nochesEntre(rango.entrada!, rango.salida!))}` : null
   const que = unidad?.nombre ?? propiedad?.nombre ?? (tipo === 'bloque' ? negocio.nombre : null)
   const falta: Record<PasoId, string> = {
     unidad: tipo === 'estadia' ? 'Elegí una propiedad para seguir' : 'Elegí una cancha para seguir',
@@ -171,7 +179,8 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
   const textoBoton = actual === 'pago' ? `Pagar ${pesos(sena)}` : ultimo ? 'Confirmar reserva' : pasos[paso + 1] === 'pago' ? 'Ir a pagar la seña' : 'Continuar'
 
   return (
-    <Sitio negocio={negocio} pagina="reserva" cta={{ texto: textoBoton, sub: [que, cuando].filter(Boolean).join(' · ') || falta[actual], onClick: siguiente, deshabilitado: !listo[actual] || enviando }}>
+    // En la barra del pie: lo que falta mientras no se pueda seguir (en el salón el nombre ya venía elegido y tapaba el aviso), y si no, el resumen.
+    <Sitio negocio={negocio} pagina="reserva" cta={{ texto: textoBoton, sub: (!listo[actual] && falta[actual]) || [que, cuando].filter(Boolean).join(' · ') || undefined, onClick: siguiente, deshabilitado: !listo[actual] || enviando }}>
       <style>{CSS_RESERVA}</style>
       <div className="als-cont alr">
         <ol className="alr-pasos" aria-label="Pasos de la reserva">
@@ -200,7 +209,7 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
                   {negocio.propiedades.map(p => (
                     <button key={p.id} type="button" role="radio" aria-checked={unidadId === p.id} className="alr-op" onClick={() => { setUnidadId(p.id); setRango({ entrada: null, salida: null }); setDatos({ ...datos, huespedes: String(Math.min(Number(datos.huespedes) || 1, p.huespedes)) }) }}>
                       <img src={p.fotos[0]} alt="" loading="lazy" />
-                      <span><b>{p.nombre}</b><small>{p.tipo} · hasta {p.huespedes} huéspedes · mínimo {p.tarifa.minNoches} {p.tarifa.minNoches === 1 ? 'noche' : 'noches'}</small><span className="als-precio">{pesos(p.tarifa.precioNoche)} <small>la noche</small></span></span>
+                      <span><b>{p.nombre}</b><small>{p.tipo} · hasta {cuenta(p.huespedes, 'huésped', 'huéspedes')} · mínimo {p.tarifa.minNoches} {p.tarifa.minNoches === 1 ? 'noche' : 'noches'}</small><span className="als-precio">{pesos(p.tarifa.precioNoche)} <small>la noche</small></span></span>
                       {unidadId === p.id && <Check size={18} aria-hidden className="alr-tilde" />}
                     </button>
                   ))}
@@ -223,7 +232,8 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
                       franjasDia.length === 0 ? <p className="rv-ayuda">Ese día está cerrado.</p> : bloqueoEn(negocio, unidad.id, fecha) ? <p className="rv-ayuda">{unidad.nombre} no está disponible ese día. Probá con otro día o con otra cancha.</p> : (
                         <div className="rv-franjas" role="radiogroup" aria-label="Horarios">
                           {franjasDia.map(f => (
-                            <button key={f.inicio} type="button" role="radio" aria-checked={hora === f.inicio} className="rv-franja" disabled={!f.libre} onClick={() => { setHora(f.inicio); setFranjas(1) }}>
+                            // data-en-rango: con dos o tres turnos seguidos, también se marcan los que quedan adentro (no solo el de inicio).
+                            <button key={f.inicio} type="button" role="radio" aria-checked={hora === f.inicio} data-en-rango={(hora !== null && f.inicio > hora && f.inicio < hora + negocio.duracionMin * seguidas) || undefined} className="rv-franja" disabled={!f.libre} onClick={() => { setHora(f.inicio); setFranjas(1) }}>
                               {hhmm(f.inicio)}{negocio.reglasPrecio.length ? <small>{(() => { const a = precioPorHora(unidad.tarifaHora, negocio.duracionMin, diaSemana(fecha), f.inicio, negocio.reglasPrecio); return a.ajuste ? `${a.ajuste > 0 ? '+' : ''}${a.ajuste}%` : pesos(a.final) })()}</small> : null}
                             </button>
                           ))}
@@ -279,7 +289,7 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
                   <div>
                     {motivoRango && <p className="rv-error" role="alert" style={{ marginBottom: 12 }}>{motivoRango}</p>}
                     {rangoCompleto && !motivoRango && (
-                      <p style={{ margin: '0 0 12px', fontSize: 14 }}><b>{nochesEntre(rango.entrada!, rango.salida!)} noches</b> · {rangoTxt(rango.entrada!, rango.salida!)}</p>
+                      <p style={{ margin: '0 0 12px', fontSize: 14 }}><b>{nochesTxt(nochesEntre(rango.entrada!, rango.salida!))}</b> · {rangoTxt(rango.entrada!, rango.salida!)}</p>
                     )}
                     <Selector label="¿Cuántos vienen?" valor={datos.huespedes} onChange={v => setDatos({ ...datos, huespedes: v })} opciones={Array.from({ length: propiedad.huespedes }, (_, i) => ({ id: String(i + 1), label: `${i + 1} ${i === 0 ? 'huésped' : 'huéspedes'}` }))} />
                   </div>
@@ -289,8 +299,9 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
 
             {actual === 'paquete' && salon && (
               <Bloque refTitulo={titulo} titulo="¿Cuántos vienen?" sub="El paquete incluye mesas, sillas y vajilla para esa cantidad. Si son más, elegí el siguiente.">
+                {/* Pasarse del paquete elegido también se dice acá: antes solo se apagaba la tarjeta y el botón, sin explicar por qué. */}
                 <Campo label="Invitados" value={datos.invitados} onChange={v => setDatos({ ...datos, invitados: v.replace(/\D/g, '') })} inputMode="numeric" maxLength={3} placeholder="Ej.: 25"
-                  error={pasaCapacidad ? `El salón tiene lugar para ${salon.capacidad} personas como máximo.` : intento && errores.invitados ? errores.invitados : undefined} ayuda={`Hasta ${salon.capacidad} en total.`} />
+                  error={pasaCapacidad ? `El salón tiene lugar para ${salon.capacidad} personas como máximo.` : paquete && invitados > paquete.hastaInvitados ? `El paquete que elegiste es hasta ${paquete.hastaInvitados} invitados: elegí uno más grande.` : intento && errores.invitados ? errores.invitados : undefined} ayuda={`Hasta ${salon.capacidad} en total.`} />
                 <div className="alr-bloques alr-bloques--lista" role="radiogroup" aria-label="Paquetes" style={{ marginTop: 14 }}>
                   {salon.paquetes.map(p => {
                     const chico = invitados > p.hastaInvitados
@@ -367,7 +378,7 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
                   {enviando ? 'Reservando…' : textoBoton} {!enviando && <ArrowRight size={16} aria-hidden />}
                 </button>
               )}
-              <p className="rv-ayuda" style={{ minHeight: 20, margin: '8px 0 0', textAlign: 'center' }}>{listo[actual] ? '' : falta[actual]}</p>
+              <p className="rv-ayuda alr-falta" style={{ minHeight: 20, margin: '8px 0 0', textAlign: 'center' }}>{listo[actual] ? '' : falta[actual]}</p>
             </div>
           </aside>
         </div>
@@ -418,7 +429,7 @@ function Confirmacion({ negocio, reserva: r, datos }: { negocio: NegocioAlquiler
   const tipo = negocio.tipo
   const codigo = r.id.slice(-6).toUpperCase()
   const unidad = tipo === 'cancha' ? negocio.unidades.find(u => u.id === r.unidadId) : tipo === 'estadia' ? negocio.propiedades.find(p => p.id === r.unidadId) : null
-  const cuando = r.entrada && r.salida ? `${rangoTxt(r.entrada, r.salida)} · ${nochesEntre(r.entrada, r.salida)} noches` : r.fecha && r.inicio !== undefined && r.fin !== undefined ? `${fechaLarga(r.fecha)} · ${hhmm(r.inicio)} a ${hhmm(r.fin)}` : ''
+  const cuando = r.entrada && r.salida ? `${rangoTxt(r.entrada, r.salida)} · ${nochesTxt(nochesEntre(r.entrada, r.salida))}` : r.fecha && r.inicio !== undefined && r.fin !== undefined ? `${fechaLarga(r.fecha)} · ${hhmm(r.inicio)} a ${hhmm(r.fin)}` : ''
   const calendario = () => {
     const titulo = `${unidad?.nombre ?? negocio.nombre} · ${negocio.nombre}`
     const ev = r.entrada && r.salida ? { uid: `${r.id}@orbita`, titulo, fecha: r.entrada, hasta: r.salida, lugar: `${negocio.direccion}, ${negocio.ciudad}` }
@@ -438,7 +449,7 @@ function Confirmacion({ negocio, reserva: r, datos }: { negocio: NegocioAlquiler
           <dl className="alr-ticket" style={{ textAlign: 'left', marginTop: 20 }}>
             <div><dt>{tipo === 'estadia' ? 'Propiedad' : tipo === 'bloque' ? 'Salón' : 'Cancha'}</dt><dd>{unidad?.nombre ?? negocio.nombre}</dd></div>
             <div><dt>Cuándo</dt><dd>{cuando}</dd></div>
-            {r.evento && <div><dt>Evento</dt><dd>{r.evento.agasajado}{r.evento.edad ? ` · ${r.evento.edad} años` : ''} · {r.evento.invitados} invitados</dd></div>}
+            {r.evento && <div><dt>Evento</dt><dd>{r.evento.agasajado}{r.evento.edad ? ` · ${r.evento.edad} años` : ''} · {cuenta(r.evento.invitados, 'invitado', 'invitados')}</dd></div>}
             {r.huespedes && <div><dt>Huéspedes</dt><dd>{r.huespedes}</dd></div>}
             <div><dt>Total</dt><dd className="rv-num">{pesos(r.total)}</dd></div>
             {r.sena > 0 && <div><dt>Pagado ahora</dt><dd className="rv-num">{pesos(r.sena)} · queda {pesos(r.total - r.sena)} en el lugar</dd></div>}
@@ -488,12 +499,16 @@ export const CSS_RESERVA = `
   .alr-bloque:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .alr-ticket { margin: 0; display: flex; flex-direction: column; gap: 8px; }
   .alr-ticket > div { display: flex; justify-content: space-between; gap: 12px; font-size: 13.5px; }
-  .alr-ticket dt { color: var(--color-muted); flex-shrink: 0; }
+  /* El rótulo se puede partir ("1 noche (temporada alta, fin de semana) × $112.700"); el monto, nunca. */
+  .alr-ticket dt { color: var(--color-muted); flex: 0 1 auto; }
   .alr-ticket dd { margin: 0; text-align: right; color: var(--color-text); font-weight: 500; min-width: 0; }
+  .alr-lateral .alr-ticket dd.rv-num { flex-shrink: 0; white-space: nowrap; }
   .alr-ticket i { font-style: normal; color: var(--color-muted); font-weight: 400; }
   /* Las franjas son radios (aria-checked) y el kit pinta solo aria-pressed: sin esto, la hora elegida no se ve. */
   .alr .rv-franja[aria-checked='true'] { background: var(--color-primary); color: var(--color-on-primary); border-color: transparent; }
   .alr .rv-franja[aria-checked='true'] small { color: inherit; opacity: 0.85; }
+  .alr .rv-franja[data-en-rango='true'] { background: var(--color-primary-bg); border-color: var(--color-primary); color: var(--chip-primary-fg); }
+  .alr .rv-franja[data-en-rango='true'] small { color: inherit; }
   .alr-total { display: flex; justify-content: space-between; gap: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--color-border); font-size: 15px; font-weight: 700; color: var(--color-text); }
   .alr-ok { width: 56px; height: 56px; border-radius: 50%; display: inline-grid; place-items: center; background: var(--color-primary); color: var(--color-on-primary); }
   .alr-codigo { display: inline-flex; flex-direction: column; gap: 2px; margin-top: 18px; padding: 10px 18px; border-radius: 12px; background: var(--color-surface); }
@@ -503,8 +518,9 @@ export const CSS_RESERVA = `
     .alr-grilla { grid-template-columns: minmax(0, 1fr); gap: 20px; }
     .alr-lateral { position: static; }
   }
-  /* El botón del resumen se va recién cuando aparece la barra fija del pie (768): entre 769 y 860 no había ninguno. */
-  @media (max-width: 768px) { .alr-lateral .rv-btn { display: none; } .alr-pasos button { min-height: 44px; } }
+  /* El botón del resumen se va recién cuando aparece la barra fija del pie (768): entre 769 y 860 no había ninguno.
+     Con él se va el "Elegí … para seguir" de abajo, que la barra ya dice. */
+  @media (max-width: 768px) { .alr-lateral .rv-btn, .alr-falta { display: none; } .alr-pasos button { min-height: 44px; } }
   @media (max-width: 480px) {
     .alr-op img { width: 76px; height: 60px; }
     .alr-bloques { grid-template-columns: repeat(2, minmax(0, 1fr)); }

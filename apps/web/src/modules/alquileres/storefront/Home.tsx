@@ -9,11 +9,11 @@ import { ArrowRight, BedDouble, Bath, DoorOpen, Users, Check, ChevronLeft, Clock
 import { fechaCorta, hhmm, sumarDias, diaSemana, rangoTxt, type ISO } from '@/lib/reservas/fechas'
 import { franjasDelDia } from '@/lib/reservas/disponibilidad'
 import { pesos } from '@/lib/reservas/precio'
-import { motivoNoReservable, nochesEntre, precioEstadia, salidaMaxima, nochesOcupadas } from '@/lib/reservas/estadia'
-import { AHORA, HOY, TIPOS, aperturaDe, bloquesDe, bloquesLibresEn, ocupadoDelDia, rangosOcupados, type NegocioAlquiler, type Propiedad, type Reserva } from '../datos'
+import { agruparNoches, motivoNoReservable, nochesEntre, precioEstadia, salidaMaxima, nochesOcupadas } from '@/lib/reservas/estadia'
+import { AHORA, HOY, TIPOS, aperturaDe, bloquesDe, bloquesLibresEn, cuenta, nochesTxt, ocupadoDelDia, rangosOcupados, type NegocioAlquiler, type Propiedad, type Reserva } from '../datos'
 import { CalendarioRango, type Rango } from '@/design-system/reservas/Calendario'
 import { Modal } from '@/design-system/reservas/piezas'
-import Sitio, { Horarios, Mapa, ruta } from './Sitio'
+import Sitio, { Horarios, Mapa, lineaNoches, ruta } from './Sitio'
 
 interface P { negocio: NegocioAlquiler; reservas: Reserva[] }
 
@@ -107,14 +107,16 @@ function Canchas({ negocio, reservas }: P) {
             <div className="als-tarjeta-cuerpo">
               <h3>{u.nombre}</h3>
               <span className="als-tarjeta-sub">{u.detalle}</span>
-              <span className="als-precio">{pesos(u.tarifaHora)} <small>la hora</small></span>
-              <div className="als-horas">
+              <div className="als-precio-fila">
+                <span className="als-precio">{pesos(u.tarifaHora)} <small>la hora</small></span>
+                <Link href={ruta('reserva', 'cancha', { unidad: u.id })} className="als-link" aria-label={`Más horarios de ${u.nombre}`}>Más horarios <ArrowRight size={15} aria-hidden /></Link>
+              </div>
+              <div className="als-horas als-horas--3">
                 {proximos(u.id).map(p => (
                   <Link key={`${p.fecha}${p.m}`} href={ruta('reserva', 'cancha', { unidad: u.id, fecha: p.fecha, hora: String(p.m) })} className="als-hora" aria-label={`Reservar ${u.nombre} el ${fechaCorta(p.fecha)} a las ${hhmm(p.m)}`}>
                     {p.fecha === HOY ? 'Hoy' : fechaCorta(p.fecha).split(' ')[0]} {hhmm(p.m)}
                   </Link>
                 ))}
-                <Link href={ruta('reserva', 'cancha', { unidad: u.id })} className="als-hora" aria-label={`Más horarios de ${u.nombre}`}><ArrowRight size={14} aria-hidden /></Link>
               </div>
             </div>
           </div>
@@ -192,7 +194,7 @@ function Propiedades({ negocio }: { negocio: NegocioAlquiler }) {
             <div className="als-tarjeta-cuerpo">
               <span className="rv-rotulo">{p.tipo}</span>
               <h3>{p.nombre}</h3>
-              <span className="als-tarjeta-sub"><Users size={13} aria-hidden style={{ verticalAlign: '-2px' }} /> {p.huespedes} huéspedes · {p.ambientes} amb. · {p.camas} {p.camas === 1 ? 'cama' : 'camas'}</span>
+              <span className="als-tarjeta-sub"><Users size={13} aria-hidden style={{ verticalAlign: '-2px' }} /> {cuenta(p.huespedes, 'huésped', 'huéspedes')} · {p.ambientes} amb. · {p.camas} {p.camas === 1 ? 'cama' : 'camas'}</span>
               <span className="als-precio">{pesos(p.tarifa.precioNoche)} <small>la noche · mínimo {p.tarifa.minNoches} {p.tarifa.minNoches === 1 ? 'noche' : 'noches'}</small></span>
             </div>
           </Link>
@@ -208,7 +210,7 @@ function Galeria({ fotos }: { fotos: string[] }) {
   const cerrar = useCallback(() => setAbierta(null), [])
   return (
     <>
-      <div className="als-galeria">
+      <div className="als-galeria" data-n={Math.min(fotos.length, 5)}>
         {fotos.slice(0, 5).map((f, i) => <button key={`${i}-${f}`} type="button" onClick={() => setAbierta(i)} aria-label={`Ver foto ${i + 1} de ${fotos.length}`}><img src={f} alt="" loading="lazy" /></button>)}
       </div>
       {abierta !== null && (
@@ -233,7 +235,7 @@ function DetallePropiedad({ negocio, reservas, propiedad: p }: P & { propiedad: 
   const motivo = completo ? motivoNoReservable(rango.entrada!, rango.salida!, p.tarifa, ocupadas) : null
   const precio = completo && !motivo ? precioEstadia(rango.entrada!, rango.salida!, p.tarifa) : null
   const hrefReserva = ruta('reserva', 'estadia', { propiedad: p.id, ...(completo && !motivo ? { entrada: rango.entrada!, salida: rango.salida! } : {}) })
-  const resumen = precio ? `${nochesEntre(rango.entrada!, rango.salida!)} noches · ${pesos(precio.total)}` : `Desde ${pesos(p.tarifa.precioNoche)} la noche`
+  const resumen = precio ? `${nochesTxt(nochesEntre(rango.entrada!, rango.salida!))} · ${pesos(precio.total)}` : `Desde ${pesos(p.tarifa.precioNoche)} la noche`
   return (
     <Sitio negocio={negocio} pagina="inicio" cta={{ texto: precio ? 'Reservar' : 'Elegir fechas', sub: `${p.nombre} · ${resumen}`, href: hrefReserva, deshabilitado: !!motivo }}>
       <div className="als-cont">
@@ -247,7 +249,7 @@ function DetallePropiedad({ negocio, reservas, propiedad: p }: P & { propiedad: 
             <h1 className="rv-h1" style={{ fontSize: 30, marginTop: 6 }}>{p.nombre}</h1>
             <p style={{ fontSize: 15.5, lineHeight: 1.6, margin: '12px 0 0' }}>{p.descripcion}</p>
             <div className="rv-fila" style={{ marginTop: 16, gap: 16 }}>
-              <span className="rv-fila" style={{ gap: 6 }}><Users size={16} aria-hidden /> {p.huespedes} huéspedes</span>
+              <span className="rv-fila" style={{ gap: 6 }}><Users size={16} aria-hidden /> {cuenta(p.huespedes, 'huésped', 'huéspedes')}</span>
               <span className="rv-fila" style={{ gap: 6 }}><DoorOpen size={16} aria-hidden /> {p.ambientes} {p.ambientes === 1 ? 'ambiente' : 'ambientes'}</span>
               <span className="rv-fila" style={{ gap: 6 }}><BedDouble size={16} aria-hidden /> {p.camas} {p.camas === 1 ? 'cama' : 'camas'}</span>
               <span className="rv-fila" style={{ gap: 6 }}><Bath size={16} aria-hidden /> {p.banos} {p.banos === 1 ? 'baño' : 'baños'}</span>
@@ -280,7 +282,9 @@ function DetallePropiedad({ negocio, reservas, propiedad: p }: P & { propiedad: 
             {motivo && <p className="rv-error" role="alert" style={{ marginTop: 10 }}>{motivo}</p>}
             {precio && (
               <ul className="als-horarios" style={{ marginTop: 12 }}>
-                <li><span>{nochesEntre(rango.entrada!, rango.salida!)} noches · {rangoTxt(rango.entrada!, rango.salida!)}</span><span className="rv-num">{pesos(precio.subtotal)}</span></li>
+                <li style={{ color: 'var(--color-text)', fontWeight: 600 }}><span>{nochesTxt(nochesEntre(rango.entrada!, rango.salida!))} · {rangoTxt(rango.entrada!, rango.salida!)}</span></li>
+                {/* Una línea por precio: de dónde sale el total cuando hay temporada o fin de semana. */}
+                {agruparNoches(precio.noches).map(lineaNoches).map(([k, v]) => <li key={k}><span>{k}</span><span className="rv-num" style={{ flexShrink: 0 }}>{pesos(v)}</span></li>)}
                 <li><span>Limpieza</span><span className="rv-num">{pesos(precio.limpieza)}</span></li>
                 <li style={{ fontWeight: 700, color: 'var(--color-text)' }}><span>Total</span><span className="rv-num">{pesos(precio.total)}</span></li>
               </ul>

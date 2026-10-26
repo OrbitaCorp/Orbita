@@ -45,6 +45,7 @@ describe('fechas', () => {
     expect(fechaLarga('2026-11-14')).toBe('Sábado 14 de noviembre')
     expect(rangoTxt('2026-11-14', '2026-11-16')).toBe('14 al 16 de noviembre')
     expect(rangoTxt('2026-11-30', '2026-12-02')).toBe('30 de nov al 2 de dic')
+    expect(rangoTxt('2026-11-20', '2026-11-20')).toBe('20 de noviembre')
     expect(fechaRelativa('2026-11-14', '2026-11-14')).toBe('Hoy')
     expect(fechaRelativa('2026-11-15', '2026-11-14')).toBe('Mañana')
   })

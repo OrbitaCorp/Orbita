@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { chocaRango, cumpleMinimo, motivoNoReservable, nocheDeFinDeSemana, nochesDe, nochesEntre, precioEstadia, salidaMaxima, temporadaDe, type TarifaEstadia } from '../estadia'
+import { agruparNoches, chocaRango, cumpleMinimo, motivoNoReservable, nocheDeFinDeSemana, nochesDe, nochesEntre, precioEstadia, salidaMaxima, temporadaDe, type TarifaEstadia } from '../estadia'
 
 const tarifa: TarifaEstadia = {
   precioNoche: 60000,
@@ -53,6 +53,25 @@ describe('estadía', () => {
     const alta = precioEstadia('2026-12-21', '2026-12-23', tarifa) // lunes y martes
     expect(alta.noches.map(n => n.precio)).toEqual([95000, 95000])
     expect(alta.noches[0].temporada).toBe('Temporada alta')
+  })
+
+  it('el recargo de fin de semana redondea bien a los cien (sin coma flotante)', () => {
+    // Viernes 13/11 a $45.000 con +15 %: 51.750 → 51.800 (con × 1,15 daba 51.749,999… → 51.700).
+    const p = precioEstadia('2026-11-13', '2026-11-14', { precioNoche: 45000, temporadas: [], finDeSemanaPct: 15, limpieza: 0, minNoches: 1 })
+    expect(p.noches[0].precio).toBe(51800)
+  })
+
+  it('junta las noches por precio y por qué cuestan eso, en orden', () => {
+    // 17/12 jueves (base), 18 viernes (+20), 19 sábado (+20), 20 domingo (alta), 21 lunes (alta)
+    const p = precioEstadia('2026-12-17', '2026-12-22', tarifa)
+    expect(agruparNoches(p.noches)).toEqual([
+      { noches: 1, precio: 60000, temporada: null, finDeSemana: false },
+      { noches: 2, precio: 72000, temporada: null, finDeSemana: true },
+      { noches: 2, precio: 95000, temporada: 'Temporada alta', finDeSemana: false },
+    ])
+    // Los grupos suman el subtotal.
+    expect(agruparNoches(p.noches).reduce((s, g) => s + g.noches * g.precio, 0)).toBe(p.subtotal)
+    expect(agruparNoches([])).toEqual([])
   })
 
   it('si dos temporadas se pisan, manda la más corta (Carnaval adentro de la alta)', () => {

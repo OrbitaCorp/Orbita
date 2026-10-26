@@ -6,7 +6,7 @@ import { ArrowRight, Search } from 'lucide-react'
 import { fechaCorta, hhmm, rangoTxt } from '@/lib/reservas/fechas'
 import { pesos } from '@/lib/reservas/precio'
 import { nochesEntre } from '@/lib/reservas/estadia'
-import { ESTADO_RESERVA, HOY, TIPOS, fechaDeReserva, unidadPorId, type Cliente, type NegocioAlquiler, type Reserva } from '../datos'
+import { ESTADO_RESERVA, HOY, TIPOS, fechaDeReserva, nochesTxt, unidadPorId, type Cliente, type NegocioAlquiler, type Reserva } from '../datos'
 import { Chip, Encabezado, Modal, Sigla, Vacio } from '@/design-system/reservas/piezas'
 
 interface P { negocio: NegocioAlquiler; reservas: Reserva[]; clientes: Cliente[] }
@@ -31,11 +31,13 @@ export default function Clientes({ negocio, reservas, clientes }: P) {
   const filas = clientes.map(c => {
     const suyas = reservas.filter(r => r.clienteId === c.id && r.estado !== 'cancelada').sort((a, b) => fechaDeReserva(b).localeCompare(fechaDeReserva(a)))
     const gastado = suyas.filter(r => r.estado === 'completada' || r.estado === 'confirmada').reduce((s, r) => s + r.total, 0)
-    return { c, suyas, cuantas: suyas.length, ultima: suyas[0] ? fechaDeReserva(suyas[0]) : null, gastado, proxima: suyas.filter(r => fechaDeReserva(r) >= HOY).sort((a, b) => fechaDeReserva(a).localeCompare(fechaDeReserva(b)))[0] ?? null }
-  }).filter(f => f.cuantas > 0 || esNuevo(f.c)).sort((a, b) => (b.ultima ?? '').localeCompare(a.ultima ?? ''))
+    // "Última" es la última que ya pasó: con la más lejana de todas salía una fecha futura, después de "Próxima".
+    const pasada = suyas.find(r => fechaDeReserva(r) < HOY)
+    return { c, suyas, cuantas: suyas.length, reciente: suyas[0] ? fechaDeReserva(suyas[0]) : null, ultima: pasada ? fechaDeReserva(pasada) : null, gastado, proxima: suyas.filter(r => fechaDeReserva(r) >= HOY).sort((a, b) => fechaDeReserva(a).localeCompare(fechaDeReserva(b)))[0] ?? null }
+  }).filter(f => f.cuantas > 0 || esNuevo(f.c)).sort((a, b) => (b.reciente ?? '').localeCompare(a.reciente ?? ''))
   const visibles = filas.filter(f => !q.trim() || plano(`${f.c.nombre} ${f.c.telefono} ${f.c.email ?? ''}`).includes(plano(q.trim())))
   const fila = abierto ? filas.find(f => f.c.id === abierto) ?? null : null
-  const cuando = (r: Reserva) => r.entrada && r.salida ? `${rangoTxt(r.entrada, r.salida)} · ${nochesEntre(r.entrada, r.salida)} noches` : r.fecha ? `${fechaCorta(r.fecha)} · ${hhmm(r.inicio ?? 0)}` : ''
+  const cuando = (r: Reserva) => r.entrada && r.salida ? `${rangoTxt(r.entrada, r.salida)} · ${nochesTxt(nochesEntre(r.entrada, r.salida))}` : r.fecha ? `${fechaCorta(r.fecha)} · ${hhmm(r.inicio ?? 0)}` : ''
   const plural = t.cliente === 'huésped' ? 'Huéspedes' : 'Clientes'
 
   return (

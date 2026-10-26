@@ -3,7 +3,7 @@
 // entrar el 16. El precio por noche depende de la temporada y, si el dueño lo
 // pide, del fin de semana. Hay una tarifa de limpieza fija por estadía.
 import { diaSemana, diasEntre, esAntes, entre, rango, sumarDias, type ISO } from './fechas'
-import { redondearCien } from './precio'
+import { conAjuste, redondearCien } from './precio'
 
 export interface Temporada {
   id: string
@@ -104,7 +104,7 @@ export function precioNoche(noche: ISO, t: TarifaEstadia): NochePrecio {
   const temp = temporadaDe(noche, t.temporadas)
   const base = temp?.precioNoche ?? t.precioNoche
   const fds = t.finDeSemanaPct > 0 && nocheDeFinDeSemana(noche)
-  return { noche, precio: redondearCien(base * (fds ? 1 + t.finDeSemanaPct / 100 : 1)), temporada: temp?.nombre ?? null, finDeSemana: fds }
+  return { noche, precio: redondearCien(fds ? conAjuste(base, t.finDeSemanaPct) : base), temporada: temp?.nombre ?? null, finDeSemana: fds }
 }
 
 export interface PrecioEstadia {
@@ -121,6 +121,24 @@ export function precioEstadia(entrada: ISO, salida: ISO, t: TarifaEstadia): Prec
   const subtotal = noches.reduce((s, n) => s + n.precio, 0)
   const limpieza = noches.length ? t.limpieza : 0
   return { noches, subtotal, limpieza, total: subtotal + limpieza, promedio: noches.length ? Math.round(subtotal / noches.length) : 0 }
+}
+
+export interface GrupoNoches { noches: number; precio: number; temporada: string | null; finDeSemana: boolean }
+
+/**
+ * Las noches juntadas por lo que cuestan (y por qué: temporada, fin de
+ * semana), en el orden en que aparecen. Es el detalle que explica el total:
+ * "3 noches × $68.000" y "1 noche de temporada alta, fin de semana × $112.700",
+ * en vez de un subtotal que no se sabe de dónde sale.
+ */
+export function agruparNoches(noches: NochePrecio[]): GrupoNoches[] {
+  const out: GrupoNoches[] = []
+  for (const n of noches) {
+    const g = out.find(x => x.precio === n.precio && x.temporada === n.temporada && x.finDeSemana === n.finDeSemana)
+    if (g) g.noches++
+    else out.push({ noches: 1, precio: n.precio, temporada: n.temporada, finDeSemana: n.finDeSemana })
+  }
+  return out
 }
 
 /** Por qué no se puede reservar un rango, en palabras. null = se puede. */

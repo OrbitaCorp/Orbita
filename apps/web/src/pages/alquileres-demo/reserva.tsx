@@ -11,13 +11,14 @@ export const getServerSideProps: GetServerSideProps = async () =>
 
 export default function Page() {
   const router = useRouter()
-  const { tipo, negocio, reservas, reservar } = useNegocio()
+  const { tipo, negocio, reservas, reservar, hidratado } = useNegocio()
   return (
     <>
       <Head><title>{`Reservar · ${negocio.nombre}`}</title></Head>
       <BarraDemo />
-      {/* key: lo que viene por la URL (?unidad=, ?fecha=…) entra como estado inicial del flujo */}
-      <Reserva key={`${tipo}:${router.asPath}`} negocio={negocio} reservas={reservas} onReservar={(r, c) => reservar(tipo, r, c)} />
+      {/* key: lo que viene por la URL (?unidad=, ?fecha=…) entra como estado inicial del flujo, y se vuelve a
+          armar cuando el navegador lee lo guardado (un horario de la URL pudo haberse reservado en esta demo). */}
+      <Reserva key={`${tipo}:${router.asPath}:${hidratado}`} negocio={negocio} reservas={reservas} onReservar={(r, c) => reservar(tipo, r, c)} />
     </>
   )
 }

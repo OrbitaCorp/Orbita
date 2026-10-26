@@ -9,9 +9,9 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import { ArrowRight, Ban, Check, ChevronLeft, ChevronRight, Lock, Plus, Wallet } from 'lucide-react'
 import { MESES, diasDelMes, duracionTxt, fechaCorta, fechaLarga, fechaRelativa, hhmm, mesTxt, moverMes, partes, rangoTxt, sumarDias, diaSemana, diasEntre, type ISO } from '@/lib/reservas/fechas'
 import { consecutivasDesde, franjasDelDia } from '@/lib/reservas/disponibilidad'
-import { pesos, precioBloque, precioPorHora, senaDe } from '@/lib/reservas/precio'
+import { pesos, precioBloque, precioTurnosSeguidos, senaDe } from '@/lib/reservas/precio'
 import { motivoNoReservable, nochesEntre, nochesOcupadas, precioEstadia, salidaMaxima } from '@/lib/reservas/estadia'
-import { AHORA, ESTADO_RESERVA, HOY, TIPOS, aperturaDe, bloqueoEn, bloquesDe, bloquesLibresEn, clientePorId, fechaDeReserva, ocupadoDelDia, rangosOcupados, reservasDelDia, tituloEvento, unidadPorId, type Bloqueo, type Cliente, type NegocioAlquiler, type Reserva } from '../datos'
+import { AHORA, ESTADO_RESERVA, HOY, TIPOS, aperturaDe, bloqueoEn, bloquesDe, bloquesLibresEn, clientePorId, cuenta, fechaDeReserva, nochesTxt, ocupadoDelDia, rangosOcupados, reservasDelDia, tituloEvento, unidadPorId, type Bloqueo, type Cliente, type NegocioAlquiler, type Reserva } from '../datos'
 import { CalendarioDia, CalendarioRango, type Rango } from '@/design-system/reservas/Calendario'
 import { Area, Campo, Chip, Encabezado, Modal, Nota, Selector, Sigla, Vacio } from '@/design-system/reservas/piezas'
 
@@ -49,11 +49,13 @@ const CSS = `
   /* En táctil no hay hover que lo descubra: el + de los huecos libres se ve siempre. */
   @media (hover: none) { .alg-libre:not(:disabled) { color: var(--color-muted); } }
   .alg-libre:disabled { cursor: default; background: repeating-linear-gradient(135deg, transparent 0 6px, var(--color-surface-alt) 6px 8px); }
-  .alg-reserva { position: absolute; left: 3px; right: 3px; top: 3px; z-index: 1; display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; border-radius: 6px; border: none; background: var(--color-primary-bg); color: var(--color-text); font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; overflow: hidden; }
+  /* En una hora (42 px) entran el nombre y el horario: con 6 px de aire y sin flex-shrink, el nombre se achicaba y quedaba cortado por la mitad. */
+  .alg-reserva { position: absolute; left: 3px; right: 3px; top: 3px; z-index: 1; display: flex; flex-direction: column; justify-content: center; gap: 1px; padding: 4px 8px; border-radius: 6px; border: none; background: var(--color-primary-bg); color: var(--color-text); font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; overflow: hidden; }
   .alg-reserva[data-estado='pendiente'] { background: var(--color-warning-bg); }
   .alg-reserva[data-estado='completada'] { background: var(--color-surface-alt); color: var(--color-muted); }
-  .alg-reserva b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .alg-reserva small { font-family: var(--rv-mono); font-size: 11px; opacity: 0.85; }
+  .alg-reserva b, .alg-reserva small { flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .alg-reserva b { font-weight: 600; line-height: 1.25; }
+  .alg-reserva small { font-family: var(--rv-mono); font-size: 11px; line-height: 1.2; opacity: 0.85; }
   .alg-reserva:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
   .alg-lista { display: none; }
   .alg-ocupacion { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
@@ -71,9 +73,13 @@ const CSS = `
   .alg-medidor { height: 8px; border-radius: 999px; background: var(--color-primary-bg); overflow: hidden; margin: 6px 0; }
   .alg-medidor > i { display: block; height: 100%; border-radius: inherit; background: var(--color-primary); }
   .alg-dos { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 20px; align-items: start; }
+  /* En el calendario del salón un día completo se abre igual (para ver sus eventos): va tintado, no tachado ni apagado. Tachado queda solo lo cerrado. */
+  .alg-cal-salon .rv-cal-celda[data-ocupado='true'] { text-decoration: none; }
+  .alg-cal-salon .rv-cal-celda[data-ocupado='true']:not([aria-pressed='true']) { color: var(--color-text); }
   .alg-extras { display: flex; flex-wrap: wrap; gap: 8px; }
   /* Las franjas son radios (aria-checked) y el kit pinta solo aria-pressed. */
   .alg-nueva .rv-franja[aria-checked='true'] { background: var(--color-primary); color: var(--color-on-primary); border-color: transparent; }
+  .alg-nueva .rv-franja[data-en-rango='true'] { background: var(--color-primary-bg); border-color: var(--color-primary); color: var(--chip-primary-fg); }
   @media (max-width: 900px) { .alg-dos { grid-template-columns: minmax(0, 1fr); } }
   @media (max-width: 768px) {
     .alg-grilla { display: none; }
@@ -96,7 +102,7 @@ export default function Reservas(p: P) {
       <Encabezado rotulo={fechaLarga(HOY)} titulo={titulo}
         bajada={pendientes.length ? `${pendientes.length} ${pendientes.length === 1 ? 'reserva con seña pendiente' : 'reservas con seña pendiente'}: si no se paga, el lugar se libera.` : 'Todo al día: ninguna seña pendiente.'}
         acciones={<>
-          {tipo === 'estadia' && <button type="button" className="rv-btn" onClick={() => setBloquear(true)}><Ban size={15} aria-hidden /> Bloquear fechas</button>}
+          <button type="button" className="rv-btn" onClick={() => setBloquear(true)}><Ban size={15} aria-hidden /> {tipo === 'estadia' ? 'Bloquear fechas' : 'Bloquear un día'}</button>
           <button type="button" className="rv-btn rv-btn--primario" onClick={() => setNueva({})}><Plus size={16} aria-hidden /> {tipo === 'bloque' ? 'Nuevo evento' : 'Nueva reserva'}</button>
         </>} />
       {tipo === 'cancha' && <AgendaCanchas {...p} onAbrir={setAbierta} onNueva={setNueva} />}
@@ -104,7 +110,9 @@ export default function Reservas(p: P) {
       {tipo === 'estadia' && <Ocupacion {...p} onAbrir={setAbierta} onNueva={setNueva} />}
       {reserva && <Detalle negocio={p.negocio} reserva={reserva} cliente={clientePorId(reserva.clienteId, p.clientes)} onCerrar={() => setAbierta(null)} onCambiar={p.onCambiar} />}
       {nueva && <Nueva negocio={p.negocio} reservas={p.reservas} clientes={p.clientes} pre={nueva} onCerrar={() => setNueva(null)} onReservar={(r, c) => { p.onReservar(r, c); setNueva(null) }} />}
-      {bloquear && <Bloquear negocio={p.negocio} reservas={p.reservas} onCerrar={() => setBloquear(false)} onBloqueo={b => { p.onBloqueo(b); setBloquear(false) }} />}
+      {bloquear && (tipo === 'estadia'
+        ? <Bloquear negocio={p.negocio} reservas={p.reservas} onCerrar={() => setBloquear(false)} onBloqueo={b => { p.onBloqueo(b); setBloquear(false) }} />
+        : <BloquearDia negocio={p.negocio} reservas={p.reservas} onCerrar={() => setBloquear(false)} onBloqueos={bs => { bs.forEach(b => p.onBloqueo(b)); setBloquear(false) }} />)}
     </div>
   )
 }
@@ -139,7 +147,7 @@ function TiraDias({ dia, onDia }: { dia: ISO; onDia: (f: ISO) => void }) {
   )
 }
 
-function AgendaCanchas({ negocio, reservas, clientes, onAbrir, onNueva }: Sub) {
+function AgendaCanchas({ negocio, reservas, clientes, onAbrir, onNueva, onQuitarBloqueo }: Sub) {
   const [dia, setDia] = useState<ISO>(HOY)
   const apertura = aperturaDe(negocio, dia)
   const horas = apertura.length ? Array.from({ length: Math.ceil((apertura[0][1] - apertura[0][0]) / negocio.pasoMin) }, (_, i) => apertura[0][0] + i * negocio.pasoMin) : []
@@ -149,9 +157,27 @@ function AgendaCanchas({ negocio, reservas, clientes, onAbrir, onNueva }: Sub) {
   const tapada = (u: string, h: number) => delDia.some(r => r.unidadId === u && r.inicio !== undefined && r.fin !== undefined && r.inicio < h && h < r.fin)
   const pasada = (h: number) => dia < HOY || (dia === HOY && h < AHORA)
   const bloqueo = (u: string) => bloqueoEn(negocio, u, dia)
+  // Las canchas bloqueadas ese día, juntas por motivo: "Todas las canchas" si cerró el complejo entero.
+  const bloqueadas: { nombres: string[]; ids: string[]; motivo: string; dueno: boolean }[] = []
+  for (const u of negocio.unidades) {
+    const b = bloqueo(u.id)
+    if (!b) continue
+    const g = bloqueadas.find(x => x.motivo === b.motivo && x.dueno === (b.origen === 'dueno'))
+    if (g) { g.nombres.push(u.nombre); g.ids.push(b.id) } else bloqueadas.push({ nombres: [u.nombre], ids: [b.id], motivo: b.motivo, dueno: b.origen === 'dueno' })
+  }
   return (
     <>
       <TiraDias dia={dia} onDia={setDia} />
+      {bloqueadas.length > 0 && (
+        <div className="rv-pila" style={{ gap: 8, marginBottom: 12 }}>
+          {bloqueadas.map(g => (
+            <Nota key={g.ids.join()} tono="aviso">
+              <span style={{ flex: 1, minWidth: 0 }}><b>{g.nombres.length === negocio.unidades.length ? 'Todas las canchas' : g.nombres.join(', ')}</b>: no se puede reservar este día ({g.motivo}).{g.dueno ? '' : ' Vino de un calendario externo: se quita en Configuración.'}</span>
+              {g.dueno && <button type="button" className="rv-btn rv-btn--sm" onClick={() => g.ids.forEach(id => onQuitarBloqueo(id))}>Quitar</button>}
+            </Nota>
+          ))}
+        </div>
+      )}
       {!apertura.length ? <Vacio titulo="Cerrado" texto={`${fechaLarga(dia)}: el complejo no abre.`} /> : (
         <>
           <div className="alg-grilla" style={{ ['--n' as string]: negocio.unidades.length } as CSSProperties} role="grid" aria-label={`Agenda del ${fechaLarga(dia)}`}>
@@ -211,7 +237,7 @@ function AgendaCanchas({ negocio, reservas, clientes, onAbrir, onNueva }: Sub) {
 
 // ─── Salón: el mes y los eventos del día ─────────────────────────────────────
 
-function AgendaSalon({ negocio, reservas, clientes, onAbrir, onNueva }: Sub) {
+function AgendaSalon({ negocio, reservas, clientes, onAbrir, onNueva, onQuitarBloqueo }: Sub) {
   const s = negocio.salon
   const [dia, setDia] = useState<ISO>(HOY)
   const [mes, setMes] = useState<ISO>(HOY)
@@ -224,7 +250,7 @@ function AgendaSalon({ negocio, reservas, clientes, onAbrir, onNueva }: Sub) {
   return (
     <div className="alg-dos">
       <div className="rv-card rv-card--pad">
-        <CalendarioDia mes={mes} onMes={setMes} hoy={HOY} elegido={dia} onElegir={setDia}
+        <CalendarioDia className="alg-cal-salon" mes={mes} onMes={setMes} hoy={HOY} elegido={dia} onElegir={setDia}
           estadoDe={f => {
             const n = cuantos(f)
             const b = bloqueoEn(negocio, 'salon', f)
@@ -237,7 +263,14 @@ function AgendaSalon({ negocio, reservas, clientes, onAbrir, onNueva }: Sub) {
           <h2 className="rv-h2">{dia === HOY ? 'Hoy' : fechaLarga(dia)}</h2>
           <span className="rv-ayuda">{delDia.length} de {bloques.length} bloques tomados</span>
         </div>
-        {bloqueoDia && <div style={{ marginBottom: 10 }}><Nota tono="aviso">Día bloqueado: {bloqueoDia.motivo}. Nadie puede reservar el salón ese día.</Nota></div>}
+        {bloqueoDia && (
+          <div style={{ marginBottom: 10 }}>
+            <Nota tono="aviso">
+              <span style={{ flex: 1, minWidth: 0 }}>Día bloqueado: {bloqueoDia.motivo}. Nadie puede reservar el salón ese día.{bloqueoDia.origen === 'ical' ? ' Vino de un calendario externo: se quita en Configuración.' : ''}</span>
+              {bloqueoDia.origen === 'dueno' && <button type="button" className="rv-btn rv-btn--sm" onClick={() => onQuitarBloqueo(bloqueoDia.id)}>Quitar</button>}
+            </Nota>
+          </div>
+        )}
         <div className="rv-pila">
           {bloques.map(b => {
             const r = delDia.find(x => x.bloqueId === b.id)
@@ -250,7 +283,7 @@ function AgendaSalon({ negocio, reservas, clientes, onAbrir, onNueva }: Sub) {
                     <div style={{ minWidth: 0 }}>
                       <span className="rv-rotulo">{b.nombre} · {hhmm(b.inicio)}–{hhmm(b.fin)}</span>
                       <div className="rv-h2" style={{ marginTop: 4 }}>{tituloEvento(r.evento)}</div>
-                      <div className="rv-ayuda">{c?.nombre ?? '—'} · {r.evento?.invitados ?? 0} invitados · {s.paquetes.find(x => x.id === r.paqueteId)?.nombre ?? ''}{r.extras.length ? ` · ${r.extras.length} extras` : ''}</div>
+                      <div className="rv-ayuda">{c?.nombre ?? '—'} · {r.evento?.invitados ?? 0} invitados · {s.paquetes.find(x => x.id === r.paqueteId)?.nombre ?? ''}{r.extras.length ? ` · ${cuenta(r.extras.length, 'extra', 'extras')}` : ''}</div>
                     </div>
                     <Chip tono={ESTADO_RESERVA[r.estado].tono}>{ESTADO_RESERVA[r.estado].label}</Chip>
                   </div>
@@ -334,7 +367,7 @@ function Ocupacion({ negocio, reservas, clientes, onAbrir, onNueva, onQuitarBloq
           <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--color-border)' }}>
             <div className="rv-entre"><span className="rv-rotulo">Ocupación de {MESES[m - 1]}</span><b style={{ fontSize: 15, color: 'var(--color-text)' }}>{pct}%</b></div>
             <div className="alg-medidor" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={`Ocupación de ${prop.nombre} en ${mesTxt(primero)}`}><i style={{ width: `${pct}%` }} /></div>
-            <p className="rv-ayuda" style={{ margin: 0 }}>{reservadas} de {nochesMes.length} noches reservadas{bloqueadas ? ` · ${bloqueadas} bloqueadas` : ''}.</p>
+            <p className="rv-ayuda" style={{ margin: 0 }}>{reservadas} de {nochesMes.length} noches reservadas{bloqueadas ? ` · ${cuenta(bloqueadas, 'bloqueada', 'bloqueadas')}` : ''}.</p>
           </div>
           <button type="button" className="rv-btn rv-btn--sm" style={{ marginTop: 12 }} onClick={() => onNueva({ unidadId: prop.id })}><Plus size={15} aria-hidden /> Agendar a mano</button>
         </div>
@@ -348,7 +381,7 @@ function Ocupacion({ negocio, reservas, clientes, onAbrir, onNueva, onQuitarBloq
                   return (
                     <button key={r.id} type="button" className="rv-item" onClick={() => onAbrir(r.id)}>
                       <Chip tono={llega ? 'ok' : 'gris'}>{llega ? `Llega ${fechaRelativa(r.entrada!, HOY).toLowerCase()}` : `Sale ${fechaRelativa(r.salida!, HOY).toLowerCase()}`}</Chip>
-                      <span className="rv-item-cuerpo"><span className="rv-item-titulo">{clientePorId(r.clienteId, clientes)?.nombre}</span><span className="rv-item-sub">{rangoTxt(r.entrada!, r.salida!)} · {r.huespedes} huéspedes · {hhmm(llega ? prop.checkIn : prop.checkOut)}</span></span>
+                      <span className="rv-item-cuerpo"><span className="rv-item-titulo">{clientePorId(r.clienteId, clientes)?.nombre}</span><span className="rv-item-sub">{rangoTxt(r.entrada!, r.salida!)} · {cuenta(r.huespedes ?? 1, 'huésped', 'huéspedes')} · {hhmm(llega ? prop.checkIn : prop.checkOut)}</span></span>
                       <ArrowRight size={16} aria-hidden style={{ color: 'var(--color-subtle)', flexShrink: 0 }} />
                     </button>
                   )
@@ -361,7 +394,7 @@ function Ocupacion({ negocio, reservas, clientes, onAbrir, onNueva, onQuitarBloq
             <div className="rv-lista">
               {proximas.map(r => (
                 <button key={r.id} type="button" className="rv-item" onClick={() => onAbrir(r.id)}>
-                  <span className="rv-item-cuerpo"><span className="rv-item-titulo">{clientePorId(r.clienteId, clientes)?.nombre}</span><span className="rv-item-sub">{rangoTxt(r.entrada!, r.salida!)} · {nochesEntre(r.entrada!, r.salida!)} noches · {pesos(r.total)}</span></span>
+                  <span className="rv-item-cuerpo"><span className="rv-item-titulo">{clientePorId(r.clienteId, clientes)?.nombre}</span><span className="rv-item-sub">{rangoTxt(r.entrada!, r.salida!)} · {nochesTxt(nochesEntre(r.entrada!, r.salida!))} · {pesos(r.total)}</span></span>
                   <Chip tono={ESTADO_RESERVA[r.estado].tono}>{ESTADO_RESERVA[r.estado].label}</Chip>
                 </button>
               ))}
@@ -395,7 +428,7 @@ const Fila = ({ k, v }: { k: string; v: ReactNode }) => <div className="rv-entre
  */
 export function Detalle({ negocio, reserva: r, cliente, onCerrar, onCambiar }: { negocio: NegocioAlquiler; reserva: Reserva; cliente?: Cliente; onCerrar: () => void; onCambiar: P['onCambiar'] }) {
   const u = unidadPorId(negocio, r.unidadId)
-  const cuando = r.entrada && r.salida ? `${rangoTxt(r.entrada, r.salida)} · ${nochesEntre(r.entrada, r.salida)} noches` : r.fecha ? `${fechaLarga(r.fecha)} · ${hhmm(r.inicio ?? 0)} a ${hhmm(r.fin ?? 0)}` : ''
+  const cuando = r.entrada && r.salida ? `${rangoTxt(r.entrada, r.salida)} · ${nochesTxt(nochesEntre(r.entrada, r.salida))}` : r.fecha ? `${fechaLarga(r.fecha)} · ${hhmm(r.inicio ?? 0)} a ${hhmm(r.fin ?? 0)}` : ''
   const saldo = r.total - r.sena
   const activa = r.estado === 'pendiente' || r.estado === 'confirmada'
   const paquete = negocio.salon?.paquetes.find(p => p.id === r.paqueteId)
@@ -484,7 +517,8 @@ function Nueva({ negocio, reservas, clientes, pre, onCerrar, onReservar }: { neg
   const ocupadas = prop ? rangosOcupados(negocio, reservas, prop.id) : []
   const tomadas = nochesOcupadas(ocupadas)
 
-  const total = tipo === 'cancha' && unidad && hora !== '' ? precioBloque(precioPorHora(unidad.tarifaHora, negocio.duracionMin * seguidas, diaSemana(fecha), hora, negocio.reglasPrecio).final, negocio.extras, extrasElegidos).total
+  // Como en el sitio: cada turno con el ajuste de su franja.
+  const total = tipo === 'cancha' && unidad && hora !== '' ? precioBloque(precioTurnosSeguidos(unidad.tarifaHora, negocio.duracionMin, seguidas, diaSemana(fecha), hora, negocio.reglasPrecio).final, negocio.extras, extrasElegidos).total
     : tipo === 'bloque' && s ? precioBloque(paquete?.precio ?? 0, s.extras, extrasElegidos).total
       : tipo === 'estadia' && prop && rango.entrada && rango.salida ? precioEstadia(rango.entrada, rango.salida, prop.tarifa).total : 0
   const sena = senaDe(total, negocio.senaPct)
@@ -538,7 +572,8 @@ function Nueva({ negocio, reservas, clientes, pre, onCerrar, onReservar }: { neg
               <div className="rv-rotulo" style={{ marginBottom: 8 }}>Horario</div>
               {bloqueoDia ? <p className="rv-ayuda" style={{ margin: 0 }}>{unidad?.nombre} está bloqueada ese día: {bloqueoDia.motivo}.</p> : (
                 <div className="rv-franjas" role="radiogroup" aria-label="Horario">
-                  {franjas.map(f => <button key={f.inicio} type="button" role="radio" aria-checked={hora === f.inicio} className="rv-franja" disabled={!f.libre} onClick={() => setHora(f.inicio)}>{hhmm(f.inicio)}</button>)}
+                  {/* Con dos o tres turnos seguidos se marcan también los que quedan adentro, como en el sitio. */}
+                  {franjas.map(f => <button key={f.inicio} type="button" role="radio" aria-checked={hora === f.inicio} data-en-rango={(hora !== '' && f.inicio > hora && f.inicio < hora + negocio.duracionMin * seguidas) || undefined} className="rv-franja" disabled={!f.libre} onClick={() => setHora(f.inicio)}>{hhmm(f.inicio)}</button>)}
                   {franjas.length === 0 && <p className="rv-ayuda">Ese día está cerrado.</p>}
                 </div>
               )}
@@ -582,11 +617,53 @@ function Nueva({ negocio, reservas, clientes, pre, onCerrar, onReservar }: { neg
             </div>
             <CalendarioRango mes={mes} onMes={setMes} hoy={HOY} rango={rango} onRango={setRango} minMes={HOY}
               estadoDe={f => ({ deshabilitado: f < HOY, ocupado: tomadas.has(f) })} salidaMaxima={e => salidaMaxima(e, ocupadas)} />
-            {rango.entrada && rango.salida && <p className="rv-ayuda" style={{ margin: 0 }}>{rangoTxt(rango.entrada, rango.salida)} · {nochesEntre(rango.entrada, rango.salida)} noches</p>}
+            {rango.entrada && rango.salida && <p className="rv-ayuda" style={{ margin: 0 }}>{rangoTxt(rango.entrada, rango.salida)} · {nochesTxt(nochesEntre(rango.entrada, rango.salida))}</p>}
           </>
         )}
         <Area label={tipo === 'bloque' ? 'Notas del evento (opcional)' : 'Nota (opcional)'} value={notas} onChange={setNotas} maxLength={300} placeholder={tipo === 'bloque' ? 'Temática, alergias, horario de la torta…' : ''} />
         {error && <p className="rv-error" role="alert" style={{ margin: 0 }}>{error}</p>}
+      </div>
+    </Modal>
+  )
+}
+
+// ─── Bloquear un día (canchas y salón) ───────────────────────────────────────
+// Un feriado, un torneo, mantenimiento o un evento propio: desde ahí ese día
+// no se reserva. En canchas, una o todas. Lo que ya estaba reservado sigue en
+// pie (se avisa, y se cancela desde la agenda si no se va a poder usar).
+
+function BloquearDia({ negocio, reservas, onCerrar, onBloqueos }: { negocio: NegocioAlquiler; reservas: Reserva[]; onCerrar: () => void; onBloqueos: (b: Bloqueo[]) => void }) {
+  const canchas = negocio.tipo === 'cancha'
+  const [unidad, setUnidad] = useState(canchas ? 'todas' : 'salon')
+  const [dia, setDia] = useState<ISO | null>(null)
+  const [mes, setMes] = useState<ISO>(HOY)
+  const [motivo, setMotivo] = useState(canchas ? 'Mantenimiento' : 'Cerrado')
+  const ids = unidad === 'todas' ? negocio.unidades.map(u => u.id) : [unidad]
+  const yaBloqueado = (f: ISO) => ids.every(id => bloqueoEn(negocio, id, f))
+  const enPie = dia ? reservas.filter(r => r.estado !== 'cancelada' && r.fecha === dia && ids.includes(r.unidadId)).length : 0
+  const que = canchas ? (unidad === 'todas' ? 'todas las canchas' : negocio.unidades.find(u => u.id === unidad)?.nombre ?? '') : 'el salón'
+  const bloquear = () => {
+    if (!dia) return
+    const base = idNuevo('bl')
+    onBloqueos(ids.filter(id => !bloqueoEn(negocio, id, dia)).map((id, i) => ({ id: `${base}${i}`, unidadId: id, desde: dia, hasta: sumarDias(dia, 1), motivo: motivo.trim() || 'Bloqueado', origen: 'dueno' as const })))
+  }
+  return (
+    <Modal titulo="Bloquear un día" bajada={canchas ? 'Para mantenimiento, un torneo o un feriado: ese día no se puede reservar.' : 'Para un feriado o un evento propio: ese día nadie puede reservar el salón.'} onCerrar={onCerrar}
+      pie={<>
+        <button type="button" className="rv-btn" onClick={onCerrar}>Cancelar</button>
+        <button type="button" className="rv-btn rv-btn--primario" disabled={!dia} onClick={bloquear}><Ban size={15} aria-hidden /> Bloquear</button>
+      </>}>
+      <div className="rv-pila">
+        {canchas && <Selector label="Qué se bloquea" valor={unidad} onChange={v => { setUnidad(v); setDia(null) }} opciones={[{ id: 'todas', label: 'Todas las canchas' }, ...negocio.unidades.map(u => ({ id: u.id, label: u.nombre }))]} />}
+        <Campo label="Motivo" value={motivo} onChange={setMotivo} />
+        <CalendarioDia mes={mes} onMes={setMes} hoy={HOY} elegido={dia} onElegir={setDia} minMes={HOY}
+          estadoDe={f => {
+            const cerrado = f < HOY || !negocio.apertura.dias.includes(diaSemana(f))
+            const ya = !cerrado && yaBloqueado(f)
+            return { deshabilitado: cerrado || ya, ocupado: ya, aria: ya ? 'ya está bloqueado' : cerrado ? 'cerrado' : undefined }
+          }} />
+        {enPie > 0 && <Nota tono="aviso">Ese día ya hay {cuenta(enPie, 'reserva', 'reservas')}: {enPie === 1 ? 'sigue en pie. Si no se va a poder usar, cancelala' : 'siguen en pie. Si no se va a poder usar, cancelalas'} desde la agenda.</Nota>}
+        <p className="rv-ayuda" style={{ margin: 0 }}>{dia ? `Se bloquea ${que} el ${fechaLarga(dia).toLowerCase()}: desde ahora no se puede reservar.` : 'Elegí el día. Los tachados ya están bloqueados.'}</p>
       </div>
     </Modal>
   )

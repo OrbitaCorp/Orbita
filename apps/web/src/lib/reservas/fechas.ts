@@ -118,6 +118,8 @@ export const mesTxt = (f: ISO) => { const p = partes(f); return `${MESES[p.mes -
 /** "14 al 16 de noviembre" o "30 de nov al 2 de dic". */
 export function rangoTxt(desde: ISO, hasta: ISO): string {
   const a = partes(desde), b = partes(hasta)
+  // Un bloqueo o una temporada de un solo día no es "20 al 20 de noviembre".
+  if (desde === hasta) return `${a.dia} de ${MESES[a.mes - 1]}`
   if (a.mes === b.mes) return `${a.dia} al ${b.dia} de ${MESES[a.mes - 1]}`
   return `${a.dia} de ${MESES_CORTOS[a.mes - 1]} al ${b.dia} de ${MESES_CORTOS[b.mes - 1]}`
 }

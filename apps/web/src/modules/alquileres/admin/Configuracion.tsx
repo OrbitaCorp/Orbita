@@ -13,7 +13,7 @@ import { Download, Link2, Plus, Trash2, Upload } from 'lucide-react'
 import { DIAS_CORTOS, duracionTxt, fechaCorta, hhmm, rangoTxt, sumarDias } from '@/lib/reservas/fechas'
 import { armarBloques } from '@/lib/reservas/disponibilidad'
 import { descargarICS, generarICS, leerICS, type EventoICS } from '@/lib/reservas/ics'
-import { HOY, TIPOS, unidadesDe, type Bloqueo, type CalendarioExterno, type NegocioAlquiler, type Paquete, type Propiedad, type Reserva, type Unidad } from '../datos'
+import { HOY, TIPOS, cuenta, unidadesDe, type Bloqueo, type CalendarioExterno, type NegocioAlquiler, type Paquete, type Propiedad, type Reserva, type Unidad } from '../datos'
 import { deCalendario } from '../datos/negocio'
 import { Mapa } from '../storefront/Sitio'
 import { Campo, Area, Encabezado, EtiquetaDemo, Nota, Seccion, Selector } from '@/design-system/reservas/piezas'
@@ -53,12 +53,19 @@ const CSS = `
   .alc-bloqueos li { display: flex; flex-wrap: wrap; gap: 2px 10px; }
   .alc-bloqueos li span:first-child { font-weight: 600; color: var(--color-text); }
   @media (max-width: 768px) {
-    .alc { flex-direction: column; }
+    /* stretch: con flex-start, en columna el cuerpo tomaba el ancho de su contenido
+       (un título que no se corta, la tira de propiedades) y la página corría de costado. */
+    .alc { flex-direction: column; align-items: stretch; }
     /* La tira estándar (ds-tira) pone las píldoras; acá solo el sentido y los 44 px de alto. */
     .alc-nav { position: static; width: 100%; flex-direction: row; padding-bottom: 4px; }
     .alc-nav .ds-tira-chip { min-height: 44px !important; }
+    /* El nombre arriba con el tachito al lado (solo en un renglón quedaba huérfano) y el resto de a dos,
+       en dos mitades enteras: con una tercera columna para el tachito, las fechas no entraban. */
     .alc-fila, .alc-fila--extra, .alc-fila--paquete, .alc-fila--temporada { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding-bottom: 14px; border-bottom: 1px solid var(--color-border); }
-    .alc-fila > :first-child { grid-column: 1 / -1; }
+    .alc-fila > :first-child { grid-column: 1 / -1; grid-row: 1; margin-right: 54px; }
+    .alc-fila > button:last-child { grid-column: 2; grid-row: 1; justify-self: end; }
+    .alc-fila > :nth-child(2n + 2):not(:last-child) { grid-column: 1; }
+    .alc-fila > :nth-child(2n + 3):not(:last-child) { grid-column: 2; }
     .alc-paquete { padding-bottom: 14px; border-bottom: 1px solid var(--color-border); }
     .alc-paquete .alc-fila { padding-bottom: 0; border-bottom: none; }
     .alc-bloqueos { margin-left: 0; }
@@ -232,7 +239,14 @@ function Precios({ negocio, onGuardar }: Form) {
         {reglas.map((r, i) => (
           <div key={i} className="rv-card rv-card--pad" style={{ background: 'var(--color-surface)' }}>
             <div className="alc-dias" role="group" aria-label="Días">
-              {DIAS_CORTOS.map((d, k) => <button key={d} type="button" className="rv-chip rv-chip--borde" aria-pressed={r.dias.length === 0 || r.dias.includes(k)} onClick={() => editar(i, { dias: r.dias.includes(k) ? r.dias.filter(x => x !== k) : [...r.dias, k].sort() })}>{d}</button>)}
+              {DIAS_CORTOS.map((d, k) => {
+                // [] es "todos los días": tocar uno con todos marcados lo saca a él (antes quedaba solo ese), y el último no se
+                // saca (volvería a ser [] = todos). Si se marcan los siete, se guarda [] como en los datos de ejemplo.
+                const dias = r.dias.length === 0 ? [0, 1, 2, 3, 4, 5, 6] : r.dias
+                const on = dias.includes(k)
+                const nuevos = on ? dias.filter(x => x !== k) : [...dias, k].sort()
+                return <button key={d} type="button" className="rv-chip rv-chip--borde" aria-pressed={on} onClick={() => { if (nuevos.length) editar(i, { dias: nuevos.length === 7 ? [] : nuevos }) }}>{d}</button>
+              })}
             </div>
             <div className="alc-horas" style={{ marginTop: 10 }}>
               <Selector label="Desde" valor={r.desde} onChange={x => editar(i, { desde: x, hasta: Math.max(r.hasta, x + 60) })} opciones={HORAS.slice(0, 24)} />
@@ -448,7 +462,9 @@ function Calendarios({ negocio, reservas, onCalendario, onQuitarCalendario }: Om
     descargarICS(generarICS([...eventos, ...propios], { nombre: `${u?.nombre ?? negocio.nombre} · ${negocio.nombre}` }), nombreArchivo(u?.nombre ?? negocio.nombre))
   }
   const importar = () => {
-    if (!/^https?:\/\/\S+\.ics(\?\S*)?$/i.test(url.trim())) { setError('Pegá una URL que termine en .ics, como la que da Airbnb o Booking.'); return }
+    // Airbnb y Google dan una URL que termina en .ics; la de Booking termina en ical.html?t=…: valen las dos.
+    const u = url.trim()
+    if (!/^https?:\/\/\S+$/i.test(u) || !/\.ics\b|ical/i.test(u)) { setError('Pegá la URL del calendario (.ics o iCal) que te dan Airbnb, Booking o Google.'); return }
     setError('')
     const id = idNuevo('ce')
     // Un evento con hora ocupa su día entero: el bloqueo es de días.
@@ -463,7 +479,7 @@ function Calendarios({ negocio, reservas, onCalendario, onQuitarCalendario }: Om
         <div className="rv-lista">
           {unidades.map(u => (
             <div key={u.id} className="rv-item" style={{ flexWrap: 'wrap' }}>
-              <span className="rv-item-cuerpo" style={{ minWidth: 140 }}><span className="rv-item-titulo">{u.nombre}</span><span className="rv-item-sub">{reservas.filter(r => r.unidadId === u.id && r.estado !== 'cancelada').length} reservas</span></span>
+              <span className="rv-item-cuerpo" style={{ minWidth: 140 }}><span className="rv-item-titulo">{u.nombre}</span><span className="rv-item-sub">{cuenta(reservas.filter(r => r.unidadId === u.id && r.estado !== 'cancelada').length, 'reserva', 'reservas')}</span></span>
               <button type="button" className="rv-btn rv-btn--sm" onClick={() => exportar(u.id)}><Download size={15} aria-hidden /> Descargar calendario (.ics)</button>
             </div>
           ))}
@@ -486,7 +502,8 @@ function Calendarios({ negocio, reservas, onCalendario, onQuitarCalendario }: Om
                 <div key={c.id} style={{ padding: '4px 0 10px' }}>
                   <div className="rv-item">
                     <Link2 size={16} aria-hidden style={{ color: 'var(--color-muted)', flexShrink: 0 }} />
-                    <span className="rv-item-cuerpo"><span className="rv-item-titulo">{c.nombre} → {unidades.find(u => u.id === c.unidadId)?.nombre}</span><span className="rv-item-sub">Última sincronización: {fechaCorta(c.ultimaSync)} · {suyos.length} {suyos.length === 1 ? 'bloqueo' : 'bloqueos'}</span></span>
+                    {/* El título se parte en dos renglones si hace falta: cortado con "…" no se leía a qué propiedad va. */}
+                    <span className="rv-item-cuerpo"><span className="rv-item-titulo" style={{ whiteSpace: 'normal' }}>{c.nombre} → {unidades.find(u => u.id === c.unidadId)?.nombre}</span><span className="rv-item-sub">Última sincronización: {fechaCorta(c.ultimaSync)} · {suyos.length} {suyos.length === 1 ? 'bloqueo' : 'bloqueos'}</span></span>
                     <button type="button" className="rv-btn rv-btn--sm" onClick={() => onQuitarCalendario(c.id)}><Trash2 size={15} aria-hidden /> Quitar</button>
                   </div>
                   {suyos.length > 0

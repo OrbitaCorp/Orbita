@@ -75,6 +75,17 @@ const unidadExiste = (n: NegocioAlquiler, id: string) =>
 
 export const clientesDelDemo = (demo: DemoAlquiler): Cliente[] => [...CLIENTES, ...demo.clientes]
 
+const sinCambios = () => () => {}
+
+/**
+ * false en el servidor y en el primer pintado (que ven los valores de fábrica),
+ * true desde que el navegador ya leyó lo guardado. Los editores que arman su
+ * estado una sola vez con lo del almacén (useState(negocio.x)) llevan esto en
+ * la key: sin eso, al recargar la página se quedaban con el negocio de ejemplo
+ * y "Guardar" pisaba lo que el dueño había cargado.
+ */
+export const useHidratado = () => useSyncExternalStore(sinCambios, () => true, () => false)
+
 /** Si un bloqueo vino de ese calendario externo (los guardados antes de `calendarioId` se reconocen por el id). */
 export const deCalendario = (b: Bloqueo, calendarioId: string) => b.calendarioId === calendarioId || b.id.startsWith(`${calendarioId}-`)
 

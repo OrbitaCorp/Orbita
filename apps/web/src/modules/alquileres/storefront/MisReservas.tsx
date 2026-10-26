@@ -5,11 +5,11 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { ArrowRight, CalendarPlus, Check, Clock, MapPin, X } from 'lucide-react'
-import { diasEntre, fechaLarga, hhmm, rangoTxt, sumarDias } from '@/lib/reservas/fechas'
+import { diasEntre, fechaLarga, hhmm, rangoTxt } from '@/lib/reservas/fechas'
 import { pesos } from '@/lib/reservas/precio'
 import { nochesEntre } from '@/lib/reservas/estadia'
 import { descargarICS, generarICS } from '@/lib/reservas/ics'
-import { AHORA, ESTADO_RESERVA, HOY, TIPOS, fechaDeReserva, unidadPorId, type NegocioAlquiler, type Reserva } from '../datos'
+import { AHORA, ESTADO_RESERVA, HOY, TIPOS, cuenta, fechaDeReserva, nochesTxt, unidadPorId, type NegocioAlquiler, type Reserva } from '../datos'
 import { Modal, Chip, useAviso } from '@/design-system/reservas/piezas'
 import Sitio, { ruta } from './Sitio'
 import { CSS_RESERVA } from './Reserva'
@@ -17,18 +17,30 @@ import { CSS_RESERVA } from './Reserva'
 /** El cliente de la demo: el que hizo reservas desde el sitio, más Sofía (k1) como ejemplo. */
 const CLIENTE_DEMO = 'k1'
 
+// El código y el monto van a la derecha; cuando la tarjeta se parte en celular, pasan abajo y se alinean a la izquierda (a la derecha quedaban flotando).
+const CSS_MIS = `
+  .alm-codigo { text-align: right; }
+  .alm-codigo b { font-size: 18px; letter-spacing: 0.1em; color: var(--color-text); }
+  @media (max-width: 560px) { .alm-codigo { text-align: left; width: 100%; padding-top: 10px; border-top: 1px solid var(--color-border); } }
+`
+
 interface P { negocio: NegocioAlquiler; reservas: Reserva[]; onCancelar: (id: string) => void }
 
 export default function MisReservas({ negocio, reservas, onCancelar }: P) {
   const tipo = negocio.tipo
-  const mias = reservas.filter(r => r.clienteId === CLIENTE_DEMO || r.clienteId.startsWith('kn'))
   const esPasada = (r: Reserva) => {
     if (r.entrada && r.salida) return r.salida <= HOY
     if (!r.fecha) return false
     return r.fecha < HOY || (r.fecha === HOY && (r.fin ?? 0) <= AHORA)
   }
-  const proximas = mias.filter(r => !esPasada(r) && r.estado !== 'cancelada').sort((a, b) => fechaDeReserva(a).localeCompare(fechaDeReserva(b)) || (a.inicio ?? 0) - (b.inicio ?? 0))
-  const pasadas = mias.filter(r => esPasada(r) || r.estado === 'cancelada').sort((a, b) => fechaDeReserva(b).localeCompare(fechaDeReserva(a)))
+  const cuandoAsc = (a: Reserva, b: Reserva) => fechaDeReserva(a).localeCompare(fechaDeReserva(b)) || (a.inicio ?? 0) - (b.inicio ?? 0)
+  const enCurso = (r: Reserva) => !esPasada(r) && r.estado !== 'cancelada'
+  // Lo reservado en la demo va entero; de la clienta de ejemplo, un par nomás:
+  // en canchas tiene decenas de turnos y la pantalla era una lista eterna.
+  const delDemo = reservas.filter(r => r.clienteId.startsWith('kn'))
+  const ejemplo = reservas.filter(r => r.clienteId === CLIENTE_DEMO)
+  const proximas = [...delDemo.filter(enCurso), ...ejemplo.filter(enCurso).sort(cuandoAsc).slice(0, 2)].sort(cuandoAsc)
+  const pasadas = [...delDemo.filter(r => !enCurso(r)), ...ejemplo.filter(r => !enCurso(r)).sort((a, b) => cuandoAsc(b, a)).slice(0, 4)].sort((a, b) => cuandoAsc(b, a))
   const [cancelar, setCancelar] = useState<Reserva | null>(null)
   const [avisar, aviso] = useAviso()
 
@@ -41,7 +53,7 @@ export default function MisReservas({ negocio, reservas, onCancelar }: P) {
   const aTiempo = (r: Reserva) => horasHasta(r) >= negocio.cancelaHastaHoras
   const plazo = negocio.cancelaHastaHoras >= 24 ? `${negocio.cancelaHastaHoras / 24} ${negocio.cancelaHastaHoras / 24 === 1 ? 'día' : 'días'}` : `${negocio.cancelaHastaHoras} horas`
 
-  const cuando = (r: Reserva) => r.entrada && r.salida ? `${rangoTxt(r.entrada, r.salida)} · ${nochesEntre(r.entrada, r.salida)} noches`
+  const cuando = (r: Reserva) => r.entrada && r.salida ? `${rangoTxt(r.entrada, r.salida)} · ${nochesTxt(nochesEntre(r.entrada, r.salida))}`
     : r.fecha && r.inicio !== undefined && r.fin !== undefined ? `${fechaLarga(r.fecha)} · ${hhmm(r.inicio)} a ${hhmm(r.fin)}` : ''
   const faltan = (r: Reserva) => {
     const n = diasEntre(HOY, fechaDeReserva(r))
@@ -56,7 +68,8 @@ export default function MisReservas({ negocio, reservas, onCancelar }: P) {
 
   return (
     <Sitio negocio={negocio} pagina="mis-reservas" cta={{ texto: TIPOS[tipo].verbo, href: ruta('reserva', tipo) }}>
-      <style>{CSS_RESERVA}</style>
+      {/* Un solo texto: con dos hijos, el servidor mete un separador adentro del <style> y la hidratación falla. */}
+      <style>{CSS_RESERVA + CSS_MIS}</style>
       <div className="als-cont" style={{ maxWidth: 760, paddingTop: 28 }}>
         <div className="rv-entre" style={{ marginBottom: 18 }}>
           <div>
@@ -79,12 +92,12 @@ export default function MisReservas({ negocio, reservas, onCancelar }: P) {
                       <div className="rv-fila" style={{ gap: 8 }}><Chip tono={ESTADO_RESERVA[r.estado].tono}>{ESTADO_RESERVA[r.estado].label}</Chip><span className="rv-rotulo">{faltan(r)}</span></div>
                       <h2 className="rv-h2" style={{ fontSize: 19, marginTop: 8 }}>{u?.nombre ?? negocio.nombre}</h2>
                       <p style={{ margin: '4px 0 0', fontSize: 14 }}><Clock size={14} aria-hidden style={{ verticalAlign: '-2px' }} /> {cuando(r)}</p>
-                      {r.evento && <p style={{ margin: '4px 0 0', fontSize: 14 }}>{r.evento.agasajado}{r.evento.edad ? ` · ${r.evento.edad} años` : ''} · {r.evento.invitados} invitados</p>}
+                      {r.evento && <p style={{ margin: '4px 0 0', fontSize: 14 }}>{r.evento.agasajado}{r.evento.edad ? ` · ${r.evento.edad} años` : ''} · {cuenta(r.evento.invitados, 'invitado', 'invitados')}</p>}
                       <p style={{ margin: '4px 0 0', fontSize: 14 }}><MapPin size={14} aria-hidden style={{ verticalAlign: '-2px' }} /> {negocio.direccion}, {negocio.ciudad}</p>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
+                    <div className="alm-codigo">
                       <div className="rv-rotulo">Código</div>
-                      <b className="rv-num" style={{ fontSize: 18, letterSpacing: '0.1em', color: 'var(--color-text)' }}>{r.id.slice(-6).toUpperCase()}</b>
+                      <b className="rv-num">{r.id.slice(-6).toUpperCase()}</b>
                       <div style={{ fontSize: 13, marginTop: 6 }}>{pesos(r.total)}{r.sena > 0 ? <> · {r.senaPagada ? `seña ${pesos(r.sena)} pagada` : 'seña pendiente'}</> : null}</div>
                     </div>
                   </div>
@@ -130,7 +143,8 @@ export default function MisReservas({ negocio, reservas, onCancelar }: P) {
               ? `Estás a tiempo: ${cancelar.sena ? `la seña de ${pesos(cancelar.sena)} se devuelve` : 'no tiene costo'}. El lugar queda libre para otra persona.`
               : `Ya pasó el plazo de ${plazo}: ${cancelar.sena ? 'la seña no se devuelve.' : 'el negocio puede cobrarte igual.'}`}
           </p>
-          <p className="rv-ayuda" style={{ marginTop: 8 }}>Hoy es {fechaLarga(HOY).toLowerCase()}, {hhmm(AHORA)}. Mañana sería el {fechaLarga(sumarDias(HOY, 1)).toLowerCase()}.</p>
+          {/* La demo vive en un día fijo: se dice cuál, porque el plazo se cuenta desde ahí. */}
+          <p className="rv-ayuda" style={{ marginTop: 8 }}>En la demo, hoy es siempre el {fechaLarga(HOY).toLowerCase()} a las {hhmm(AHORA)}.</p>
         </Modal>
       )}
       {aviso}

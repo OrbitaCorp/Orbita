@@ -17,6 +17,8 @@ import Link from 'next/link'
 import { ArrowRight, MapPin, Phone } from 'lucide-react'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 import { hhmm, DIAS_CORTOS } from '@/lib/reservas/fechas'
+import { pesos } from '@/lib/reservas/precio'
+import type { GrupoNoches } from '@/lib/reservas/estadia'
 import { TIPOS, type NegocioAlquiler, type TipoAlquiler } from '../datos'
 import { EstiloReservas } from '@/design-system/reservas/estilo'
 
@@ -45,10 +47,12 @@ export const CSS_SITIO = `
   .als[data-tipo='cancha'] { ${TEMAS.cancha} }
   .als[data-tipo='bloque'] { ${TEMAS.bloque} }
   .als[data-tipo='estadia'] { ${TEMAS.estadia} }
-  .als-cont { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  /* Solo los costados: si fuera "padding" entero, el pie (que también es .als-cont) perdía el aire de arriba y abajo en celular. */
+  .als-cont { max-width: 1080px; margin: 0 auto; padding-inline: 24px; }
   .als-header { position: sticky; top: var(--rv-tope, 0px); z-index: 50; background: rgba(255,255,255,0.92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--color-border); }
   .als-header-in { display: flex; align-items: center; gap: 16px; height: 64px; }
-  .als-marca { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--color-text); min-width: 0; }
+  .als-marca { display: flex; align-items: center; gap: 10px; min-height: 44px; text-decoration: none; color: var(--color-text); min-width: 0; }
+  .als-marca:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 10px; }
   .als-marca-sigla { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: var(--color-primary); color: var(--color-on-primary); font-weight: 700; font-size: 13px; flex-shrink: 0; }
   .als-marca b { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .als-nav { display: flex; align-items: center; gap: 4px; margin-left: auto; }
@@ -86,7 +90,11 @@ export const CSS_SITIO = `
   .als-tarjeta-sub { font-size: 13.5px; color: var(--color-muted); }
   .als-precio { font-family: var(--rv-mono); font-size: 15px; font-weight: 600; color: var(--color-text); }
   .als-precio small { font-family: inherit; font-size: 12px; font-weight: 500; color: var(--color-muted); }
+  .als-precio-fila { display: flex; align-items: center; justify-content: space-between; gap: 4px 12px; flex-wrap: wrap; }
   .als-horas { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  /* Los próximos tres horarios de una cancha, en una sola fila: con la flecha de "más" como cuarto chip, la flecha quedaba sola en un renglón. */
+  .als-horas--3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .als-horas--3 .als-hora { justify-content: center; padding: 0 6px; white-space: nowrap; }
   .als-hora { display: inline-flex; align-items: center; min-height: 36px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--color-border); font-family: var(--rv-mono); font-size: 13px; color: var(--color-text); text-decoration: none; }
   .als-hora:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   @media (hover: hover) { .als-hora:hover { border-color: var(--color-primary); color: var(--color-primary); } }
@@ -100,10 +108,16 @@ export const CSS_SITIO = `
   .als-paquete li::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--color-primary); margin-top: 7px; flex-shrink: 0; }
   .als-extras { display: flex; flex-wrap: wrap; gap: 8px; }
 
-  /* Galería y detalle */
+  /* Galería y detalle. La grilla depende de cuántas fotos hay (data-n): con
+     cuatro, tres o menos quedaban celdas vacías (una propiedad nueva trae una sola). */
   .als-galeria { display: grid; grid-template-columns: 2fr 1fr 1fr; grid-template-rows: 220px 220px; gap: 8px; border-radius: 16px; overflow: hidden; }
   .als-galeria > button { padding: 0; border: none; background: var(--color-surface-alt); cursor: pointer; overflow: hidden; }
   .als-galeria > button:first-child { grid-row: span 2; }
+  .als-galeria[data-n='4'] > button:nth-child(4) { grid-column: span 2; }
+  .als-galeria[data-n='3'] { grid-template-columns: 2fr 1fr; }
+  .als-galeria[data-n='2'] { grid-template-columns: 1fr 1fr; grid-template-rows: 340px; }
+  .als-galeria[data-n='1'] { grid-template-columns: minmax(0, 1fr); grid-template-rows: 380px; }
+  .als-galeria[data-n='2'] > button:first-child, .als-galeria[data-n='1'] > button:first-child { grid-row: auto; }
   .als-galeria img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .als-galeria > button:focus-visible { outline: 3px solid var(--color-primary); outline-offset: -3px; }
   .als-detalle { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 32px; align-items: start; padding-top: 24px; }
@@ -126,7 +140,9 @@ export const CSS_SITIO = `
   .als-horarios li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--color-border); font-size: 14px; }
   .als-horarios li:first-child { border-top: none; }
   .als-horarios li[data-cerrado='true'] { color: var(--color-muted); }
-  .als-pie { margin-top: 56px; padding: 24px 0 32px; border-top: 1px solid var(--color-border); font-size: 13px; color: var(--color-muted); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center; }
+  /* El monto de la derecha no se parte ("$98.000 la / noche" en celular): se parte el rótulo. */
+  .als-horarios li > .rv-num:last-child { flex-shrink: 0; text-align: right; }
+  .als-pie { margin-top: 56px; padding-block: 24px 32px; border-top: 1px solid var(--color-border); font-size: 13px; color: var(--color-muted); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center; }
   .als-pie a { color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
 
   /* Botón fijo al pie en celular */
@@ -138,12 +154,14 @@ export const CSS_SITIO = `
     .als-detalle { grid-template-columns: minmax(0, 1fr); }
     .als-lateral { position: static; }
     .als-ubicacion { grid-template-columns: minmax(0, 1fr); }
-    .als-galeria { grid-template-columns: 1fr 1fr; grid-template-rows: 200px 140px; }
-    .als-galeria > button:first-child { grid-column: span 2; grid-row: auto; }
+    .als-galeria, .als-galeria[data-n] { grid-template-columns: 1fr 1fr; grid-template-rows: 200px 140px; }
+    .als-galeria > button:first-child, .als-galeria[data-n] > button:first-child { grid-column: span 2; grid-row: auto; }
     .als-galeria > button:nth-child(n + 4) { display: none; }
+    .als-galeria[data-n='2'] > button:nth-child(2) { grid-column: span 2; }
+    .als-galeria[data-n='1'] { grid-template-rows: 220px; }
   }
   @media (max-width: 768px) {
-    .als-cont { padding: 0 16px; }
+    .als-cont { padding-inline: 16px; }
     .als-nav a:not([data-fijo]) { display: none; }
     .als-nav a { white-space: nowrap; }
     /* Lo que se toca con el dedo, de 44 px. */
@@ -215,6 +233,12 @@ export default function Sitio({ negocio, pagina, cta, children }: Props) {
   )
 }
 
+/** Una línea del detalle de una estadía: "3 noches × $68.000" o "1 noche (temporada alta, fin de semana) × $112.700". */
+export function lineaNoches(g: GrupoNoches): [string, number] {
+  const porque = [g.temporada?.toLowerCase(), g.finDeSemana ? 'fin de semana' : null].filter(Boolean).join(', ')
+  return [`${g.noches} ${g.noches === 1 ? 'noche' : 'noches'}${porque ? ` (${porque})` : ''} × ${pesos(g.precio)}`, g.noches * g.precio]
+}
+
 /** Horarios de atención, para el pie de cada portada. */
 export function Horarios({ negocio }: { negocio: NegocioAlquiler }) {
   const a = negocio.apertura
@@ -228,10 +252,14 @@ export function Horarios({ negocio }: { negocio: NegocioAlquiler }) {
   )
 }
 
-/** Mapa de OpenStreetMap embebido, sin librerías: alcanza para mostrar dónde queda. */
+/**
+ * Mapa de OpenStreetMap embebido, sin librerías: alcanza para mostrar dónde
+ * queda. Fuera del orden del Tab: el foco entraba al iframe (de otro origen) y
+ * no se veía en ningún lado; la dirección ya va escrita al lado.
+ */
 export function Mapa({ latLng, titulo }: { latLng: [number, number]; titulo: string }) {
   const [lat, lng] = latLng
   const d = 0.008
   const src = `https://www.openstreetmap.org/export/embed.html?bbox=${lng - d}%2C${lat - d}%2C${lng + d}%2C${lat + d}&layer=mapnik&marker=${lat}%2C${lng}`
-  return <div className="als-mapa"><iframe title={`Mapa: ${titulo}`} src={src} loading="lazy" referrerPolicy="no-referrer" /></div>
+  return <div className="als-mapa"><iframe title={`Mapa: ${titulo}`} src={src} loading="lazy" referrerPolicy="no-referrer" tabIndex={-1} /></div>
 }

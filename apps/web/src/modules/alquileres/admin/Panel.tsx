@@ -23,8 +23,13 @@ import Configuracion from './Configuracion'
 export default function Panel() {
   const router = useRouter()
   const n = useNegocio()
-  const { tipo, negocio, reservas, clientes } = n
+  const { tipo, negocio, reservas, clientes, hidratado } = n
   const [avisar, aviso] = useAviso()
+  // Cada modo arranca con su propio estado de pantalla, y todo se vuelve a
+  // montar una vez cuando el navegador lee lo guardado: los formularios de
+  // Configuración (y la propiedad elegida en el calendario) siembran su estado
+  // con el negocio, y al recargar se quedaban con el de ejemplo.
+  const k = `${tipo}:${hidratado ? 'guardado' : 'fabrica'}`
 
   const pendientes = reservas.filter(r => r.estado === 'pendiente').length
   const items: ItemNav[] = [
@@ -47,12 +52,11 @@ export default function Panel() {
 
   return (
     <LayoutPanel negocio={negocio.nombre} rubro={`Alquileres · ${TIPOS[tipo].unidades}`} items={items} activo={vista} onIr={ir} sitio={ruta('inicio', tipo)}>
-      {/* key por modo: cada negocio arranca con su propio estado de pantalla */}
-      {vista === 'reservas' && <Reservas key={tipo} negocio={negocio} reservas={reservas} clientes={clientes} onCambiar={cambiar} onReservar={(r, c) => { n.reservar(tipo, r, c); avisar('Reserva agendada', 'Ya figura en la agenda y en Mis reservas.') }} onBloqueo={b => { n.agregarBloqueo(tipo, b); avisar('Fechas bloqueadas', 'No se van a poder reservar.') }} onQuitarBloqueo={id => { n.quitarBloqueo(tipo, id); avisar('Bloqueo quitado') }} />}
-      {vista === 'eventos' && <Eventos key={tipo} negocio={negocio} reservas={reservas} clientes={clientes} onCambiar={cambiar} />}
-      {vista === 'clientes' && <Clientes key={tipo} negocio={negocio} reservas={reservas} clientes={clientes} />}
-      {vista === 'ingresos' && <Ingresos key={tipo} negocio={negocio} reservas={reservas} />}
-      {vista === 'configuracion' && <Configuracion key={tipo} negocio={negocio} reservas={reservas} onGuardar={(cambio, aviso) => { n.configurar(tipo, cambio); avisar(aviso ?? 'Cambios guardados') }} onCalendario={(c, b) => { n.agregarCalendario(tipo, c, b); avisar('Calendario conectado', `${b.length} ${b.length === 1 ? 'fecha bloqueada' : 'fechas bloqueadas'}. Demo: sincronización simulada.`) }} onQuitarCalendario={id => { n.quitarCalendario(tipo, id); avisar('Calendario desconectado') }} />}
+      {vista === 'reservas' && <Reservas key={k} negocio={negocio} reservas={reservas} clientes={clientes} onCambiar={cambiar} onReservar={(r, c) => { n.reservar(tipo, r, c); avisar('Reserva agendada', 'Ya figura en la agenda y en Mis reservas.') }} onBloqueo={b => { n.agregarBloqueo(tipo, b); avisar(tipo === 'estadia' ? 'Fechas bloqueadas' : 'Día bloqueado', tipo === 'estadia' ? 'No se van a poder reservar.' : 'No se va a poder reservar.') }} onQuitarBloqueo={id => { n.quitarBloqueo(tipo, id); avisar('Bloqueo quitado') }} />}
+      {vista === 'eventos' && <Eventos key={k} negocio={negocio} reservas={reservas} clientes={clientes} onCambiar={cambiar} />}
+      {vista === 'clientes' && <Clientes key={k} negocio={negocio} reservas={reservas} clientes={clientes} />}
+      {vista === 'ingresos' && <Ingresos key={k} negocio={negocio} reservas={reservas} />}
+      {vista === 'configuracion' && <Configuracion key={k} negocio={negocio} reservas={reservas} onGuardar={(cambio, aviso) => { n.configurar(tipo, cambio); avisar(aviso ?? 'Cambios guardados') }} onCalendario={(c, b) => { n.agregarCalendario(tipo, c, b); avisar('Calendario conectado', `${b.length} ${b.length === 1 ? 'fecha bloqueada' : 'fechas bloqueadas'}. Demo: sincronización simulada.`) }} onQuitarCalendario={id => { n.quitarCalendario(tipo, id); avisar('Calendario desconectado') }} />}
       {aviso}
     </LayoutPanel>
   )

@@ -18,7 +18,7 @@ import { Trophy, Music, Box, Cake, PartyPopper, Utensils, Presentation, Home, Bu
 import { sumarDias, diaSemana, type ISO } from '@/lib/reservas/fechas'
 import { seSolapan, type Tramo } from '@/lib/reservas/solapamiento'
 import { armarBloques, bloquesLibres, type Bloque } from '@/lib/reservas/disponibilidad'
-import { precioPorHora, senaDe, type Extra, type ReglaFranja } from '@/lib/reservas/precio'
+import { precioTurnosSeguidos, senaDe, type Extra, type ReglaFranja } from '@/lib/reservas/precio'
 import { precioEstadia, type RangoOcupado, type TarifaEstadia } from '@/lib/reservas/estadia'
 
 // ─── El "hoy" de la demo ─────────────────────────────────────────────────────
@@ -360,7 +360,7 @@ export const clientePorId = (id: string, lista: Cliente[] = CLIENTES) => lista.f
 export function unidadesDe(n: NegocioAlquiler): { id: string; nombre: string; detalle: string; foto: string }[] {
   if (n.tipo === 'cancha') return n.unidades.map(u => ({ id: u.id, nombre: u.nombre, detalle: u.detalle, foto: u.foto }))
   if (n.tipo === 'bloque') return [{ id: 'salon', nombre: n.nombre, detalle: `Hasta ${n.salon?.capacidad ?? 0} personas`, foto: n.fotoPortada }]
-  return n.propiedades.map(p => ({ id: p.id, nombre: p.nombre, detalle: `${p.tipo} · ${p.huespedes} huéspedes`, foto: p.fotos[0] }))
+  return n.propiedades.map(p => ({ id: p.id, nombre: p.nombre, detalle: `${p.tipo} · ${cuenta(p.huespedes, 'huésped', 'huéspedes')}`, foto: p.fotos[0] }))
 }
 export const unidadPorId = (n: NegocioAlquiler, id: string) => unidadesDe(n).find(u => u.id === id)
 
@@ -395,7 +395,7 @@ function reservasCancha(n: NegocioAlquiler): Reserva[] {
         // Una cancha no se reserva dos veces a la misma hora: si pisa otra del día, no va.
         if (out.some(r => r.unidadId === u.id && r.fecha === fecha && seSolapan([r.inicio!, r.fin!], [inicio, fin]))) continue
         const extras = rota(k + 3) > 7 ? ['luz'] : []
-        const total = precioPorHora(u.tarifaHora, fin - inicio, dia, inicio, n.reglasPrecio).final + n.extras.filter(e => extras.includes(e.id)).reduce((s, e) => s + e.precio, 0)
+        const total = precioTurnosSeguidos(u.tarifaHora, n.duracionMin, (fin - inicio) / n.duracionMin, dia, inicio, n.reglasPrecio).final + n.extras.filter(e => extras.includes(e.id)).reduce((s, e) => s + e.precio, 0)
         const sena = senaDe(total, n.senaPct)
         const pasada = d < 0 || (d === 0 && fin <= AHORA)
         const estado: EstadoReserva = pasada ? (rota(k) === 0 ? 'cancelada' : 'completada') : rota(k + 1) === 2 ? 'pendiente' : 'confirmada'
@@ -475,6 +475,10 @@ export function reservasDe(n: NegocioAlquiler): Reserva[] {
 }
 
 // ─── Lecturas que usan el sitio y el panel ───────────────────────────────────
+
+/** "1 noche", "3 noches": el número con la palabra que corresponde (el Depto Centro admite una sola noche). */
+export const cuenta = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`
+export const nochesTxt = (n: number) => cuenta(n, 'noche', 'noches')
 
 const activa = (r: Reserva) => r.estado !== 'cancelada'
 
