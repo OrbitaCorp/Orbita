@@ -31,7 +31,7 @@ const FILTROS = [
 ] as const
 type FiltroId = (typeof FILTROS)[number]['id']
 
-// Sin acentos ni mayúsculas: "ceramica" tiene que encontrar "Taller de cerámica".
+// Sin acentos ni mayúsculas: "ecografia" tiene que encontrar "Ecografía".
 const plano = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
 
 function Catalogo({ rubro, t }: { rubro: RubroTurnos; t: TemaNegocio }) {
@@ -52,7 +52,7 @@ function Catalogo({ rubro, t }: { rubro: RubroTurnos; t: TemaNegocio }) {
   const pagos = rubro.servicios.filter(s => s.precio > 0)
   const desde = pagos.length ? Math.min(...pagos.map(s => s.precio)) : 0
   const durMin = Math.min(...rubro.servicios.map(s => s.duracion))
-  const cosa = rubro.modo === 'cupo' ? 'actividades' : 'servicios'
+  const cosa = 'servicios'
   const limpiar = () => { setQ(''); setF('todos') }
 
   return (
@@ -66,11 +66,11 @@ function Catalogo({ rubro, t }: { rubro: RubroTurnos; t: TemaNegocio }) {
           <div>
             <div className="tu-eyebrow tu-eyebrow--raya tu-entra">{t.nombre} · {rubro.label}</div>
             <h1 className="tu-h tu-h1">
-              <span className="tu-linea"><span>{rubro.modo === 'cupo' ? 'Actividades' : 'Servicios'}</span></span>{' '}
+              <span className="tu-linea"><span>Servicios</span></span>{' '}
               <span className="tu-linea"><span style={{ animationDelay: '140ms' }}><em>y precios</em></span></span>
             </h1>
             <p className="tu-entra" style={{ ['--i' as string]: 3 }}>
-              Precios finales{rubro.sena ? <>. Para reservar se pide una seña del <span className="tu-num">{rubro.sena}%</span>, que se descuenta del total</> : ''}. Tocá {rubro.modo === 'cupo' ? 'una actividad' : 'un servicio'} para ver el detalle y reservarlo.
+              Precios finales{rubro.sena ? <>. Para reservar se pide una seña del <span className="tu-num">{rubro.sena}%</span>, que se descuenta del total</> : ''}. Tocá un servicio para ver el detalle y reservarlo.
             </p>
             <dl className="tus-resumen tu-entra" style={{ ['--i' as string]: 4 }}>
               <div><dd className="tu-num">{rubro.servicios.length}</dd><dt className="tu-rotulo">{cosa}</dt></div>
@@ -153,8 +153,7 @@ function Catalogo({ rubro, t }: { rubro: RubroTurnos; t: TemaNegocio }) {
                                     Con {quienes.map(r => r.nombre.split(' ')[0]).join(' o ')}
                                   </span>
                                 )}
-                                {rubro.modo === 'cupo' && <span><Users size={16} aria-hidden /> Clase grupal con cupo</span>}
-                                {(rubro.modo === 'recurso' || rubro.modo === 'cancha') && <span><Users size={16} aria-hidden /> {equipo.map(r => r.nombre).join(', ')}</span>}
+                                {rubro.modo === 'recurso' && <span><Users size={16} aria-hidden /> {equipo.map(r => r.nombre).join(', ')}</span>}
                                 <span><MapPin size={16} aria-hidden /> {t.direccion}</span>
                               </div>
                             </div>
@@ -176,7 +175,7 @@ function Catalogo({ rubro, t }: { rubro: RubroTurnos; t: TemaNegocio }) {
               <div className="tu-h">¿No sabés cuál elegir?</div>
               <p>Escribinos y te orientamos antes de reservar.</p>
             </div>
-            <button type="button" className="tu-btn-sec" onClick={() => contactar({ canal: 'whatsapp', texto: `Hola ${t.nombre}, quiero reservar y no sé qué ${rubro.modo === 'cupo' ? 'actividad' : 'servicio'} elegir.` })}><MessageCircle size={17} aria-hidden /> WhatsApp</button>
+            <button type="button" className="tu-btn-sec" onClick={() => contactar({ canal: 'whatsapp', texto: `Hola ${t.nombre}, quiero reservar y no sé qué servicio elegir.` })}><MessageCircle size={17} aria-hidden /> WhatsApp</button>
             <Link href={ruta('reserva', rubro.key)} className="tu-btn">Ir a reservar <ArrowRight size={16} aria-hidden /></Link>
           </div>
         </Reveal>

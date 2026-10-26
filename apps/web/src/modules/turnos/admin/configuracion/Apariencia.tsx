@@ -4,25 +4,23 @@
 // identidad completa, con miniatura fiel). Abajo, el editor a la izquierda y la vista previa en
 // vivo a la derecha. Elegir una plantilla trae sus valores de fábrica (paleta,
 // par tipográfico, bordes, botón y tipo de portada) y después cada cosa se
-// ajusta por separado. La plantilla puede venir elegida desde Avanzado →
-// Plantillas por ?plantilla=.
+// ajusta por separado.
 //
 // Antes que todo eso va el tipo de página: sitio web completo o página simple
 // (y, si es simple, cuál de sus cinco diseños).
 //
-// Qué se guarda de verdad (demo/negocioDemo.ts) y se ve en el sitio: el tipo de
+// Qué se guarda de verdad (datos/negocio.ts) y se ve en el sitio: el tipo de
 // página, el diseño de la página simple y la plantilla con sus ajustes (acento,
 // letra, bordes y foto). El botón, el logo, las secciones y los textos siguen
 // siendo una demo en memoria.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { useRouter } from 'next/router'
 import {
   Sparkles, Droplets, Type, Square, Image as ImageIcon, LayoutTemplate, PanelsTopLeft, AlignLeft,
-  Check, Upload, GripVertical, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Lock, Eye, X, Trash2, Info, RotateCcw, ArrowUpRight,
+  Check, Upload, GripVertical, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Lock, Eye, X, Trash2, Info, RotateCcw,
   MonitorSmartphone, Smartphone, type LucideIcon,
 } from 'lucide-react'
-import { useNegocioDemo, type DisenoSimple, type FormaSitio } from '@/modules/turnos/demo/negocioDemo'
-import { achicarFoto } from '@/modules/turnos/onboarding/imagen'
+import { useNegocioDemo, type DisenoSimple, type FormaSitio } from '@/modules/turnos/datos/negocio'
+import { achicarFoto } from '@/lib/achicarImagen'
 import { temaDe } from '@/modules/turnos/storefront/tema'
 import {
   cargarFuentesTurnos, plantillaEnUso, plantillasPara, temaConPlantilla, paletaCon,
@@ -33,7 +31,7 @@ import { useBorrador, Encabezado, SecCard, Rotulo, Switch, Campo, Chip, BarraGua
 import VistaPrevia, { armarPisar } from './VistaPrevia'
 import { MiniSitio, TarjetaPlantilla, datosMini } from './MiniSitio'
 
-/** Lo que SÍ se guarda de la apariencia: la plantilla y sus cuatro ajustes (demo/negocioDemo.ts → AparienciaDemo). */
+/** Lo que SÍ se guarda de la apariencia: la plantilla y sus cuatro ajustes (datos/negocio.ts → AparienciaDemo). */
 interface Vestido {
   plantilla: string
   color: string
@@ -76,10 +74,8 @@ const DISENOS: { id: DisenoSimple; titulo: string; texto: string }[] = [
 const deFabrica = (p: PlantillaSitio): Vestido => ({ plantilla: p.id, color: p.c.primary, tipo: p.tipo, radio: p.radio, foto: '' })
 
 export default function Apariencia({ rubro, avisar }: PropsTab) {
-  const router = useRouter()
   const voz = vozDe(rubro)
   const orden = useMemo(() => plantillasPara(rubro), [rubro])
-  const pedida = orden.find(p => p.id === router.query.plantilla)
 
   // Lo que se guarda en el negocio de la demo: el tipo de página, el diseño de la
   // página simple y la plantilla con sus ajustes. null = sin tocar: vale lo guardado
@@ -99,8 +95,7 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
     const g = demo.apariencia?.rubro === rubro.key && demo.apariencia.plantilla === p.id ? demo.apariencia : null
     return g ? { plantilla: p.id, color: esHex(g.color) ? g.color : p.c.primary, tipo: g.tipo || p.tipo, radio: g.radio > 0 ? g.radio : p.radio, foto: g.foto } : deFabrica(p)
   }, [rubro, demo.apariencia])
-  // Si se llegó con una plantilla pedida (desde la galería), el borrador arranca con esa: ya es un cambio sin guardar.
-  const [vestidoBorrador, setVestidoBorrador] = useState<Vestido | null>(() => (pedida ? deFabrica(pedida) : null))
+  const [vestidoBorrador, setVestidoBorrador] = useState<Vestido | null>(null)
   const vestido = vestidoBorrador ?? guardado
   const vestidoDirty = vestidoBorrador !== null && JSON.stringify(vestidoBorrador) !== JSON.stringify(guardado)
   const vestir = (cambio: Partial<Vestido>) => setVestidoBorrador({ ...vestido, ...cambio })
@@ -176,11 +171,6 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
     const quieto = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     riel.current?.scrollBy({ left: d * Math.max(280, riel.current.clientWidth * 0.8), behavior: quieto ? 'auto' : 'smooth' })
   }
-  const irAGaleria = () => {
-    const { tab: _t, plantilla: _p, ...resto } = router.query
-    void _t; void _p
-    void router.replace({ pathname: router.pathname, query: { ...resto, vista: 'avanzado', funcion: 'plantillas' } }, undefined, { shallow: true })
-  }
 
   const preview = (alto: string, celular?: boolean) => (
     // key = forma: la página simple está pensada para el celular, así que al elegirla la vista previa arranca en celular.
@@ -237,7 +227,6 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             {tocada && <button type="button" className="tuc-link" onClick={() => elegir(plantilla)}><RotateCcw size={13} aria-hidden />Volver a los valores de {plantilla.nombre}</button>}
-            <button type="button" className="tuc-link" onClick={irAGaleria}>Ver la galería<ArrowUpRight size={13} aria-hidden /></button>
             <span className="tuc-riel-flechas">
               <button type="button" className="tuo-btn tuo-btn--sm tuo-btn--icono" aria-label="Plantillas anteriores" onClick={() => correr(-1)}><ChevronLeft size={16} aria-hidden /></button>
               <button type="button" className="tuo-btn tuo-btn--sm tuo-btn--icono" aria-label="Plantillas siguientes" onClick={() => correr(1)}><ChevronRight size={16} aria-hidden /></button>
@@ -635,7 +624,7 @@ export const CSS_APARIENCIA = `
   .tuc-foto { position: relative; aspect-ratio: 4 / 3; border-radius: 12px; overflow: hidden; padding: 0; border: none; cursor: pointer; background: var(--color-surface-alt); transition: box-shadow 200ms ease; }
   .tuc-foto > img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 500ms var(--tuo-ease, ease), filter 200ms ease; }
   .tuc-foto[aria-checked='true'] { box-shadow: 0 0 0 2px var(--color-bg), 0 0 0 4.5px var(--color-primary); }
-  .tuc-foto-tilde { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 50%; background: var(--tuo-grad); color: #fff; display: grid; place-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+  .tuc-foto-tilde { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 50%; background: var(--color-primary); color: var(--color-on-primary); display: grid; place-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.35);
     opacity: 0; transform: scale(0.6); transition: opacity 180ms ease, transform 240ms var(--tuo-ease, ease); }
   .tuc-foto[aria-checked='true'] .tuc-foto-tilde { opacity: 1; transform: none; }
 

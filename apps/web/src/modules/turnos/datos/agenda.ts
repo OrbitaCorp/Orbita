@@ -6,14 +6,12 @@
 // La agenda sigue el horario del negocio (mañana y tarde, con el corte del
 // mediodía) y, dentro de ese horario, los días y las horas de cada agenda: nada
 // cae cuando el negocio está cerrado ni cuando esa persona no atiende.
-import { DIAS, horaTxt, tramosDeRecurso, turnosDe, type ClaseCupo, type Recurso, type RubroTurnos, type ServicioTipo, type Turno } from '@/modules/turnos/datos'
+import { DIAS, horaTxt, tramosDeRecurso, turnosDe, type Recurso, type RubroTurnos, type ServicioTipo, type Turno } from '@/modules/turnos/datos'
 import { AHORA_DEMO, type Semana, type Tramo } from '@/modules/turnos/horario'
 
 /** Turno con su día: `dia` son los días contados desde hoy (0 = hoy, -1 = ayer). */
 export type TurnoAgenda = Turno & { dia?: number }
 export type ServicioPanel = ServicioTipo & { id: string; online: boolean }
-/** `lista` son los anotados con nombre; mientras nadie la toca se arma de ejemplo. */
-export type ClasePanel = ClaseCupo & { lista?: string[] }
 
 /** Con qué arranca el formulario de "Nuevo turno" según desde dónde se abre. */
 export interface NuevoTurnoPre { clienteId?: string; recursoId?: string; inicio?: number; dia?: number }
@@ -81,7 +79,7 @@ export function moverMes(dia: number, pasos: number) {
 
 // ─── Turnos de cada día ───────────────────────────────────────────────────────
 
-/** Las agendas del negocio de ejemplo: los turnos de muestra (datos.ts) son de r1, r2 y r3. */
+/** Las agendas del negocio de ejemplo: los turnos de muestra (datos/index.ts) son de r1, r2 y r3. */
 const AGENDAS_EJEMPLO = ['r1', 'r2', 'r3']
 
 /**

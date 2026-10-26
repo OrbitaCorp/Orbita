@@ -1,7 +1,6 @@
-// Membresías y abonos: planes mensuales (N clases por semana o pase libre)
-// con renovación automática. Pensado para rubros con cupo (gimnasio,
-// crossfit, yoga, danza), pero un rubro por turno también puede tener un
-// "abono" de N turnos al mes; por eso la unidad cambia con el modo.
+// Membresías y abonos: planes mensuales (N turnos por semana o pase libre)
+// con renovación automática. Sirve para lo que se repite todas las semanas:
+// sesiones de kinesio, de electroestimulación o de estética.
 import { useState } from 'react'
 import { Plus, Trash2, Users, Wallet, CalendarClock, Check } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
@@ -11,22 +10,22 @@ import type { PropsFuncion } from './tipos'
 
 export default function Membresias(p: PropsFuncion) {
   const { rubro } = p
-  const unidad = rubro.modo === 'cupo' ? 'clases' : 'turnos'
+  const unidad = 'turnos'
   const [planes, setPlanes] = useState<PlanMembresia[]>(() => planesDe(rubro))
   const [siguiente, setSiguiente] = useState(4)
   const [renueva, setRenueva] = useState(true)
   const [diaCobro, setDiaCobro] = useState<string>('1')
   const [pausa, setPausa] = useState(true)
   const [diasPausa, setDiasPausa] = useState(15)
-  const [matricula, setMatricula] = useState<number | ''>(rubro.modo === 'cupo' ? 8000 : '')
+  const [matricula, setMatricula] = useState<number | ''>('')
 
   const editar = (id: string, cambios: Partial<PlanMembresia>) => setPlanes(l => l.map(x => x.id === id ? { ...x, ...cambios } : x))
   const destacar = (id: string) => setPlanes(l => l.map(x => ({ ...x, destacado: x.id === id })))
-  const detalle = (x: PlanMembresia) => x.porSemana === 0 ? `${unidad[0].toUpperCase() + unidad.slice(1)} ilimitad${unidad === 'clases' ? 'as' : 'os'}` : `${x.porSemana} ${unidad} por semana`
+  const detalle = (x: PlanMembresia) => x.porSemana === 0 ? 'Turnos ilimitados' : `${x.porSemana} ${unidad} por semana`
 
-  // Socios de ejemplo repartidos entre los planes para el ingreso recurrente.
-  const socios = [34, 38, 14]
-  const recurrente = planes.reduce((s, x, i) => s + x.precio * (socios[i] ?? 5), 0)
+  // Clientes con plan, de ejemplo, repartidos entre los planes para el ingreso recurrente.
+  const conPlan = [34, 38, 14]
+  const recurrente = planes.reduce((s, x, i) => s + x.precio * (conPlan[i] ?? 5), 0)
 
   return (
     <ShellFuncion
@@ -34,7 +33,7 @@ export default function Membresias(p: PropsFuncion) {
       bajada={`Planes mensuales con ${unidad} por semana o pase libre. Se cobran solos cada mes y quien tiene uno reserva sin pagar cada vez.`}
       textoOn={`Los planes se ven en tu sitio y quien tiene uno activo reserva sus ${unidad} sin pagar en el momento.`}
       kpis={<>
-        <Dato label="Con plan activo" valor={String(socios.reduce((a, b) => a + b, 0))} nota="Datos de ejemplo" Icon={Users} />
+        <Dato label="Con plan activo" valor={String(conPlan.reduce((a, b) => a + b, 0))} nota="Datos de ejemplo" Icon={Users} />
         <Dato label="Ingreso mensual recurrente" valor={ars(recurrente)} nota="Si todos renuevan · ejemplo" Icon={Wallet} acento="var(--color-success)" />
         <Dato label="Vencen esta semana" valor="7" nota="Se les avisa 3 días antes" Icon={CalendarClock} acento="var(--color-warning)" />
       </>}

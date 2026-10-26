@@ -22,7 +22,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, Plus, Coins, MoonStar } from '
 import { ESTADO_TURNO, DIAS, DIAS_CORTOS, horaTxt, type Recurso, type Cliente, type RubroTurnos } from '@/modules/turnos/datos'
 import { AHORA_DEMO, diasAbiertos, extremos, minutosAbiertos, tramosDelDia, tramosFrase, type Semana, type Tramo } from '@/modules/turnos/horario'
 import { Cabecera, Sigla } from '@/modules/turnos/_shared/orbita/piezas'
-import { fechaCorta, fechaDe, fechaLarga, grillaDelMes, indiceDia, lunesDe, mesTxt, mismoMes, moverMes, rangoSemana, type NuevoTurnoPre, type TurnoAgenda } from './agendaDemo'
+import { fechaCorta, fechaDe, fechaLarga, grillaDelMes, indiceDia, lunesDe, mesTxt, mismoMes, moverMes, rangoSemana, type NuevoTurnoPre, type TurnoAgenda } from '../datos/agenda'
 
 const PX_HORA = 92
 type Vista = 'dia' | 'semana' | 'mes'
@@ -122,7 +122,7 @@ export default function Agenda({ rubro, semana, recursos, turnosDelDia, jornada,
   }
 
   const chip = (id: string, activo: boolean, contenido: ReactNode, onClick: () => void) => (
-    <button key={id} type="button" onClick={onClick} aria-pressed={activo} className="ds-hover ds-tira-chip" data-activa={activo} style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 7, height: 36, padding: '0 14px', borderRadius: 999, border: activo ? '1.5px solid var(--color-primary)' : '1px solid var(--color-border)', background: activo ? 'var(--color-primary-bg)' : 'var(--color-bg)', color: activo ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 13, fontWeight: activo ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', transition: 'border-color 160ms ease, background 160ms ease, color 160ms ease' }}>
+    <button key={id} type="button" onClick={onClick} aria-pressed={activo} className="ds-hover ds-tira-chip tu-ag-chip" data-activa={activo} style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 7, height: 36, padding: '0 14px', borderRadius: 999, border: activo ? '1.5px solid var(--color-primary)' : '1px solid var(--color-border)', background: activo ? 'var(--color-primary-bg)' : 'var(--color-bg)', color: activo ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 13, fontWeight: activo ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', transition: 'border-color 160ms ease, background 160ms ease, color 160ms ease' }}>
       {contenido}
     </button>
   )
@@ -134,7 +134,7 @@ export default function Agenda({ rubro, semana, recursos, turnosDelDia, jornada,
         .tu-ag-bloque { transition: box-shadow 180ms ease, transform 200ms cubic-bezier(0.22, 1, 0.36, 1), filter 180ms ease; animation: tuAgEntra 420ms cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: calc(var(--i, 0) * 35ms); }
         @keyframes tuAgEntra { from { opacity: 0; transform: scale(0.96) translateY(6px) } to { opacity: var(--op, 1); transform: none } }
         @media (hover: hover) {
-          .tu-ag-bloque:hover { box-shadow: 0 8px 24px color-mix(in srgb, var(--c) 30%, transparent), 0 0 0 1px color-mix(in srgb, var(--c) 55%, transparent); transform: translateY(-1px) scale(1.012); z-index: 3; filter: saturate(1.15); }
+          .tu-ag-bloque:hover { box-shadow: 0 0 0 1px color-mix(in srgb, var(--c) 55%, transparent); transform: translateY(-1px); z-index: 3; }
           .tu-ag-col[data-libre="true"]:hover { background-color: color-mix(in srgb, var(--color-primary) 3%, transparent); }
         }
         .tu-ag-bloque:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; z-index: 3; }
@@ -145,7 +145,6 @@ export default function Agenda({ rubro, semana, recursos, turnosDelDia, jornada,
         .tu-ag-banda { position: absolute; left: 0; right: 0; display: grid; place-items: center; overflow: hidden; cursor: default; background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--color-border-strong) 42%, transparent) 0 1px, transparent 1px 9px), color-mix(in srgb, var(--color-surface-alt) 50%, var(--color-bg)); }
         .tu-ag-banda > span { max-width: calc(100% - 12px); padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 500; color: var(--color-muted); background: var(--color-bg); border: 1px solid var(--color-border); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .tu-ag-movil { display: none; }
-        .tu-ag-resumen { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
 
         /* Mes: el calendario a la izquierda y, a la derecha, el día elegido con sus turnos. */
         .tu-ag-mes-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 328px; gap: 16px; align-items: start; }
@@ -160,7 +159,7 @@ export default function Agenda({ rubro, semana, recursos, turnosDelDia, jornada,
         .tu-ag-celda[data-pasado='true'] .tu-ag-pill { opacity: 0.6; }
         .tu-ag-celda-cab { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 3px; }
         .tu-ag-celda-num { min-width: 26px; height: 26px; padding: 0 6px; border-radius: 999px; display: grid; place-items: center; font-family: var(--tuo-mono); font-size: 13px; font-weight: 600; color: var(--color-text); font-variant-numeric: tabular-nums; margin-left: auto; order: 2; }
-        .tu-ag-celda[data-hoy='true'] .tu-ag-celda-num { background: var(--tuo-grad); color: #fff; box-shadow: 0 4px 12px rgba(37,99,235,0.35); }
+        .tu-ag-celda[data-hoy='true'] .tu-ag-celda-num { background: var(--color-primary); color: var(--color-on-primary); }
         .tu-ag-celda[data-sel='true'] { box-shadow: inset 0 0 0 2px var(--color-primary); background: color-mix(in srgb, var(--color-primary) 5%, var(--color-bg)); z-index: 1; }
         .tu-ag-celda-total { font-size: 11px; font-weight: 500; color: var(--color-muted); white-space: nowrap; }
         .tu-ag-pill { display: flex; align-items: center; gap: 5px; min-width: 0; height: 21px; padding: 0 6px 0 0; border-radius: 6px; overflow: hidden; font-size: 11.5px; color: var(--color-text); background: color-mix(in srgb, var(--c) 13%, var(--color-bg)); }
@@ -208,6 +207,7 @@ export default function Agenda({ rubro, semana, recursos, turnosDelDia, jornada,
           .tu-ag-grid[data-vista="semana"] { grid-template-columns: 44px repeat(var(--tu-cols), minmax(96px, 1fr)); }
           .tu-ag-leyenda { display: none !important; }
           .tu-ag-nav { height: 44px; min-width: 44px; }
+          .tu-ag-chip { min-height: 44px !important; }
           .tu-ag-seg { display: flex; flex: 1; }
           .tu-ag-seg > button { height: 44px; flex: 1; }
           .tu-ag-nuevo { height: 44px; }
@@ -225,7 +225,7 @@ export default function Agenda({ rubro, semana, recursos, turnosDelDia, jornada,
 
       <Cabecera
         rotulo={vista === 'dia' ? fechaLarga(dia) : vista === 'semana' ? rangoSemana(lunes, diasSemana[diasSemana.length - 1]) : mesTxt(dia)}
-        titulo={rubro.modo === 'cancha' ? 'Reservas' : 'Agenda'}
+        titulo="Agenda"
         acciones={<>
           <div className="tuo-seg tu-ag-seg" role="group" aria-label="Vista de la agenda">
             {VISTAS.map(([v, l]) => <button key={v} type="button" onClick={() => setVista(v)} aria-pressed={vista === v}>{l}</button>)}
@@ -366,7 +366,7 @@ export default function Agenda({ rubro, semana, recursos, turnosDelDia, jornada,
                 const actual = hoyALaVista && hh <= AHORA_DEMO && hh + 60 > AHORA_DEMO
                 return <div key={hh} className="tuo-num" style={{ height: PX_HORA, fontSize: 11, color: actual ? 'var(--color-primary)' : 'var(--color-subtle)', fontWeight: actual ? 600 : 400, textAlign: 'right', padding: '5px 10px 0 0' }}>{horaTxt(hh)}</div>
               })}
-              {hoyALaVista && AHORA_DEMO >= desde && AHORA_DEMO <= hasta && <span className="tuo-num" aria-hidden style={{ position: 'absolute', right: 4, top: y(AHORA_DEMO) - 10, height: 20, padding: '0 6px', borderRadius: 6, display: 'grid', placeItems: 'center', fontSize: 10.5, fontWeight: 600, color: '#fff', background: 'var(--tuo-grad)', boxShadow: '0 4px 12px rgba(37,99,235,0.4)' }}>{horaTxt(AHORA_DEMO)}</span>}
+              {hoyALaVista && AHORA_DEMO >= desde && AHORA_DEMO <= hasta && <span className="tuo-num" aria-hidden style={{ position: 'absolute', right: 4, top: y(AHORA_DEMO) - 10, height: 20, padding: '0 6px', borderRadius: 6, display: 'grid', placeItems: 'center', fontSize: 10.5, fontWeight: 600, color: 'var(--color-on-primary)', background: 'var(--color-primary)' }}>{horaTxt(AHORA_DEMO)}</span>}
             </div>
 
             {/* Columnas */}
@@ -391,8 +391,8 @@ export default function Agenda({ rubro, semana, recursos, turnosDelDia, jornada,
                 {/* Lo que ya pasó del día */}
                 {c.dia <= 0 && <div aria-hidden style={{ position: 'absolute', left: 0, right: 0, top: 0, height: hoy ? Math.max(0, y(AHORA_DEMO)) : '100%', background: 'color-mix(in srgb, var(--color-surface-alt) 38%, transparent)', pointerEvents: 'none' }} />}
                 {hoy && AHORA_DEMO >= desde && AHORA_DEMO <= hasta && (
-                  <div aria-hidden style={{ position: 'absolute', left: 0, right: 0, top: y(AHORA_DEMO) - 1, height: 2, background: 'linear-gradient(90deg, #3B82F6, #818CF8)', boxShadow: '0 0 12px rgba(59,130,246,0.7)', zIndex: 1 }}>
-                    {(ci === 0 || c.esDia) && <span className="tuo-late" style={{ position: 'absolute', left: -5, top: -4, width: 10, height: 10, borderRadius: '50%', background: '#93C5FD', boxShadow: '0 0 0 3px rgba(59,130,246,0.35)' }} />}
+                  <div aria-hidden style={{ position: 'absolute', left: 0, right: 0, top: y(AHORA_DEMO) - 1, height: 2, background: 'var(--color-primary)', zIndex: 1 }}>
+                    {(ci === 0 || c.esDia) && <span className="tuo-late" style={{ position: 'absolute', left: -5, top: -4, width: 10, height: 10, borderRadius: '50%', background: 'var(--color-primary)' }} />}
                   </div>
                 )}
                 {c.lista.map((t, k) => {
@@ -409,9 +409,9 @@ export default function Agenda({ rubro, semana, recursos, turnosDelDia, jornada,
                       display: 'flex', flexDirection: corto ? 'row' : 'column', alignItems: corto ? 'center' : 'flex-start', gap: corto ? 7 : 2, padding: corto ? '0 10px 0 12px' : '6px 10px 6px 12px', textAlign: 'left',
                       borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
                       border: t.estado === 'pendiente' ? `1.5px dashed ${est.dot}` : `1px solid color-mix(in srgb, ${c.color} ${apagado ? 14 : 30}%, transparent)`,
-                      background: `linear-gradient(135deg, color-mix(in srgb, ${c.color} ${apagado ? 7 : 18}%, var(--color-bg)), color-mix(in srgb, ${c.color} ${apagado ? 4 : 9}%, var(--color-bg)))`,
+                      background: `color-mix(in srgb, ${c.color} ${apagado ? 6 : 14}%, var(--color-bg))`,
                       opacity: apagado ? 0.62 : 1,
-                      boxShadow: enCurso ? `0 0 0 1.5px ${c.color}, 0 8px 24px color-mix(in srgb, ${c.color} 35%, transparent)` : undefined,
+                      boxShadow: enCurso ? `0 0 0 1.5px ${c.color}` : undefined,
                     }}>
                       <span aria-hidden style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, background: c.color, opacity: apagado ? 0.5 : 1 }} />
                       <span className="tuo-num" style={{ display: 'flex', alignItems: 'center', gap: 6, width: corto ? 'auto' : '100%', flexShrink: 0, fontSize: 11, color: 'var(--color-muted)' }}>

@@ -11,11 +11,11 @@ import type { RubroTurnos } from '@/modules/turnos/datos'
 import { Llave } from '@/modules/turnos/_shared/orbita/piezas'
 import { Campo, Selector } from './configuracion/ui'
 import { Borrar, ErrorCampo, Modal } from './piezasPanel'
-import { sinAcentos } from './agendaDemo'
+import { sinAcentos } from '../datos/agenda'
 import {
   PERMISOS_MINIMOS, normalizar, permisosDe, resumenRol, rolCambiado, rolDeFabrica, trabaDe,
   type Alcance, type Permiso, type Persona, type Rol, type VerComo,
-} from './equipoDemo'
+} from '../datos/equipo'
 
 export const CSS_ROLES = `
   .tu-rol-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
@@ -92,7 +92,7 @@ export default function RolesPermisos({ rubro, roles, personas, onGuardar, onBor
                     {rol.fijo ? <span className="tuo-chip tuo-chip--primario" style={{ height: 22, fontSize: 11 }}><Lock size={11} /> Puede todo</span>
                       : rol.deFabrica ? <span className="tuo-chip" style={{ height: 22, fontSize: 11 }}>{ajustado ? 'Ajustado por vos' : `De ${rubro.label.toLowerCase()}`}</span>
                         : <span className="tuo-chip tuo-chip--ok" style={{ height: 22, fontSize: 11 }}>Creado por vos</span>}
-                    {rol.atiende && rubro.modo !== 'cancha' && <span className="tuo-chip tuo-chip--borde" style={{ height: 22, fontSize: 11 }}>{rubro.modo === 'cupo' ? 'Da clases' : 'Atiende turnos'}</span>}
+                    {rol.atiende && <span className="tuo-chip tuo-chip--borde" style={{ height: 22, fontSize: 11 }}>Atiende turnos</span>}
                   </div>
                 </div>
               </div>
@@ -189,19 +189,16 @@ function EditorRol({ inicial, rubro, roles, cuantos, onCerrar, onGuardar, onBorr
           opciones={[{ id: '', label: 'De cero: solo ve su agenda' }, ...copiables.map(r => ({ id: r.id, label: `Igual que ${r.nombre}` }))]} />
       )}
 
-      {rubro.modo !== 'cancha' && (
-        <div className="tu-rol-atiende">
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)' }}>{rubro.modo === 'cupo' ? 'Da clases' : 'Atiende turnos'}</div>
-            <div className="tuc-ayuda">
-              {!esNuevo && cuantos > 0 ? `Para cambiarlo, primero pasá a ${cuantos === 1 ? 'la persona que lo tiene' : `las ${cuantos} personas que lo tienen`} a otro rol.`
-                : rubro.modo === 'profesional' ? 'Tiene su columna en la agenda y se le pueden dar turnos.'
-                  : rubro.modo === 'cupo' ? 'Aparece como profe al armar una clase.' : 'Atiende en una de las cabinas.'}
-            </div>
+      <div className="tu-rol-atiende">
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)' }}>Atiende turnos</div>
+          <div className="tuc-ayuda">
+            {!esNuevo && cuantos > 0 ? `Para cambiarlo, primero pasá a ${cuantos === 1 ? 'la persona que lo tiene' : `las ${cuantos} personas que lo tienen`} a otro rol.`
+              : rubro.modo === 'profesional' ? 'Tiene su columna en la agenda y se le pueden dar turnos.' : 'Atiende en una de las cabinas.'}
           </div>
-          <Llave on={rol.atiende} onChange={atiende => setRol(r => ({ ...r, atiende }))} label={rubro.modo === 'cupo' ? 'Da clases' : 'Atiende turnos'} disabled={!esNuevo && cuantos > 0} />
         </div>
-      )}
+        <Llave on={rol.atiende} onChange={atiende => setRol(r => ({ ...r, atiende }))} label="Atiende turnos" disabled={!esNuevo && cuantos > 0} />
+      </div>
 
       {grupos.map(g => (
         <section key={g} className="tu-rol-grupo" aria-label={`Permisos de ${g.toLowerCase()}`}>

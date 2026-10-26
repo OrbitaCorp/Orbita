@@ -7,13 +7,13 @@
 // Al lado de cada día va una franja de 6 a 24 h con lo que está abierto
 // pintado: la semana se lee de un vistazo, sin sumar horas de cabeza.
 //
-// El horario semanal se guarda en el negocio de la demo (demo/negocioDemo.ts):
+// El horario semanal se guarda en el negocio de la demo (datos/negocio.ts):
 // el sitio, la reserva y la agenda lo leen de ahí. Los días especiales y las
 // vacaciones siguen siendo demo en memoria.
 import { useState } from 'react'
 import { Clock, CalendarX, Plane, Plus, Trash2, Copy, TriangleAlert } from 'lucide-react'
 import { DIAS, semanaDe } from '@/modules/turnos/datos'
-import { useNegocioDemo } from '@/modules/turnos/demo/negocioDemo'
+import { useNegocioDemo } from '@/modules/turnos/datos/negocio'
 import { JORNADA_INICIAL, errorJornada, jornadaDe, jornadaTxt, minutosAbiertos, tramosDe, tramosDeJornada, tramosFrase, type Jornada, type Semana, type Tramo } from '@/modules/turnos/horario'
 import { BloquesJornada, DiasSemana } from '@/modules/turnos/admin/piezasPanel'
 import { useBorrador, Encabezado, SecCard, Switch, Segmentado, Campo, Dos, BarraGuardar, BotonBorde, FilaSwitch, Chip, Vacio, type PropsTab } from './ui'

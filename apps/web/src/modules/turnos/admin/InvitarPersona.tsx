@@ -16,7 +16,7 @@ import { Button } from '@/design-system/components/Button'
 import { Lbl, Err, Inp, RolRadios } from '@/modules/ventas/panel/configuracion/components/equipo/FormBits'
 import type { Rol as RolTienda } from '@/modules/ventas/panel/configuracion/types/equipo.types'
 import type { RubroTurnos } from '@/modules/turnos/datos'
-import { COLORES_EQUIPO, pagoTxt, resumenRol, type Pago, type Persona, type Rol } from './equipoDemo'
+import { COLORES_EQUIPO, pagoTxt, resumenRol, type Pago, type Persona, type Rol } from '../datos/equipo'
 
 const LETRAS = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 /** Contraseña temporal de la demo. Se llama solo desde el envío (nunca en render). */

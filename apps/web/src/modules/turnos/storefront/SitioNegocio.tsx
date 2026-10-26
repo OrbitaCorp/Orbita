@@ -22,7 +22,7 @@ import Link from 'next/link'
 import { Menu, X, CalendarCheck, MapPin, Phone, AtSign, ArrowRight, ArrowLeft, ChevronRight, Home } from 'lucide-react'
 import { cargarFuentes } from '@/modules/ventas/panel/avanzado/plantillas/piezas'
 import type { RubroTurnos } from '@/modules/turnos/datos'
-import type { FormaSitio } from '@/modules/turnos/demo/negocioDemo'
+import type { FormaSitio } from '@/modules/turnos/datos/negocio'
 import { CSS_SITIO } from './estilos'
 import { ContactoProvider, DialogoContacto, type Contacto } from './ContactoDemo'
 import { Legales, LEGALES, type Legal } from './Legales'
@@ -92,13 +92,13 @@ export default function SitioNegocio({ rubro, pagina, forma = 'web', sobreFoto, 
 
   const conLocal = t.modalidades.includes('local')
   const nav: { label: string; href: string; actual?: boolean }[] = [
-    { label: rubro.modo === 'cupo' ? 'Actividades' : 'Servicios', href: ruta('servicios', rubro.key), actual: pagina === 'servicios' },
+    { label: 'Servicios', href: ruta('servicios', rubro.key), actual: pagina === 'servicios' },
     ...(rubro.modo === 'profesional' ? [{ label: 'Equipo', href: ruta('inicio', rubro.key, {}, '#equipo') }] : []),
     { label: 'Nosotros', href: ruta('inicio', rubro.key, {}, '#nosotros') },
     { label: conLocal ? 'Cómo llegar' : 'Dónde atendemos', href: ruta('inicio', rubro.key, {}, '#ubicacion') },
   ]
   const transparente = !!sobreFoto && !solido && !menu
-  const reservar = rubro.modo === 'cupo' ? 'Reservar lugar' : rubro.modo === 'cancha' ? 'Reservar cancha' : 'Reservar turno'
+  const reservar = 'Reservar turno'
   const prox = proximoLibre(rubro)
   const fuentes = `https://fonts.googleapis.com/css2?${t.fuentes.map(f => `family=${f}`).join('&')}&display=swap`
   const barraMovil = !simple && ctaMovil && pagina !== 'reserva'

@@ -17,10 +17,9 @@ import type { LucideIcon } from 'lucide-react'
 import { Avatar } from '@/design-system/components/Avatar'
 import { DIAS, horaTxt, duracionTxt, pesos, esSalud, type Cliente, type Recurso, type RubroTurnos, type EstadoTurno } from '@/modules/turnos/datos'
 import { AHORA_DEMO, ChipEstado } from '@/modules/turnos/_shared/components/ChipEstado'
-import { Estrellas } from '@/modules/turnos/_shared/orbita/Cielo'
 import { Modal, TiraDias, HorasLibres } from './piezasPanel'
-import { fechaDe, fechaLarga, indiceDia, type GrupoLibres, type TurnoAgenda } from './agendaDemo'
-import { taparTelefono } from './equipoDemo'
+import { fechaDe, fechaLarga, indiceDia, type GrupoLibres, type TurnoAgenda } from '../datos/agenda'
+import { taparTelefono } from '../datos/equipo'
 
 interface Props {
   turno: TurnoAgenda
@@ -64,7 +63,6 @@ export default function DetalleTurno({ turno, rubro, cliente, recurso, diasMover
 
   const cabecera = (
     <div className="tuo-espacio" style={{ padding: '18px 20px 20px', flexShrink: 0 }}>
-      <Estrellas cantidad={18} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <ChipEstado estado={turno.estado} />
         <span style={{ flex: 1 }} />
@@ -83,7 +81,7 @@ export default function DetalleTurno({ turno, rubro, cliente, recurso, diasMover
     <>
       <span className="tuo-modal-izq" style={{ fontSize: 13.5, color: 'var(--color-text)', fontWeight: 500 }}>¿Cancelar el turno? {cliente ? `Le avisamos a ${nombrePila}.` : ''}</span>
       <button type="button" onClick={() => setConfirmarCancelar(false)} className="tuo-btn">Volver</button>
-      <button type="button" onClick={() => { onEstado(turno.id, 'cancelado'); setConfirmarCancelar(false) }} className="tuo-btn" style={{ background: 'var(--color-error)', borderColor: 'var(--color-error)', color: '#fff' }}>Sí, cancelar</button>
+      <button type="button" onClick={() => { onEstado(turno.id, 'cancelado'); setConfirmarCancelar(false) }} className="tuo-btn" style={{ background: 'var(--color-error)', borderColor: 'var(--color-error)', color: 'var(--color-on-primary)' }}>Sí, cancelar</button>
     </>
   ) : !puedeEditar ? (
     <button type="button" onClick={onCerrar} className="tuo-btn tuo-btn--primario">Listo</button>

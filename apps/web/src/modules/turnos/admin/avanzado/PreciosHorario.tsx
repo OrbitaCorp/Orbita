@@ -17,10 +17,7 @@ const AJUSTES = [-25, -20, -15, -10, 10, 15, 20]
 const aplicaLunes = (f: Franja, hora: string) => f.dias !== 'Sábados' && hora >= f.desde && hora < f.hasta
 
 export default function PreciosHorario(p: PropsFuncion) {
-  const { rubro } = p
-  const [franjas, setFranjas] = useState<Franja[]>(() => rubro.modo === 'cancha'
-    ? [...FRANJAS_INICIALES, { id: 'f3', dias: 'Lun a vie', desde: '19:00', hasta: '22:00', ajuste: 15 }]
-    : FRANJAS_INICIALES)
+  const [franjas, setFranjas] = useState<Franja[]>(FRANJAS_INICIALES)
   const [siguiente, setSiguiente] = useState(5)
   const [tachado, setTachado] = useState(true)
 
@@ -29,7 +26,7 @@ export default function PreciosHorario(p: PropsFuncion) {
   return (
     <ShellFuncion
       {...p}
-      bajada={`Poné un descuento en los horarios que cuesta llenar${rubro.modo === 'cancha' ? ' y, si querés, un recargo en los de más demanda' : ''}. El precio final se ve al elegir horario, así cada uno decide.`}
+      bajada="Poné un descuento en los horarios que cuesta llenar. El precio final se ve al elegir horario, así cada uno decide."
       textoOn="Los horarios con descuento se marcan en la reserva con el porcentaje y el precio final."
       kpis={<>
         <Dato label="Ocupación en franjas con descuento" valor="+18 pts" nota="Antes vs. después · ejemplo" Icon={TrendingDown} acento="var(--color-success)" />

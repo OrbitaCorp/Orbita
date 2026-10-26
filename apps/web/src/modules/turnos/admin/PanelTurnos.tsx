@@ -1,9 +1,14 @@
-// Panel del negocio de Turnos (demo): arma el menú según el rubro y cambia de
+// Panel del negocio de Turnos (demo): arma el menú según quién mira y cambia de
 // pantalla con ?vista=, igual que las sub-vistas del panel de Tienda.
 //
+// El menú es corto a propósito: Resumen, Agenda, Clientes, Configuración y
+// Avanzado. Servicios, equipo, espacios y ganancias se manejan desde
+// Configuración (son cosas que se arman una vez); solo aparecen como secciones
+// sueltas para alguien del equipo cuyo rol no puede configurar.
+//
 // Acá vive todo lo que se puede tocar en la demo (turnos, clientes, servicios,
-// equipo, roles, pagos, clases): son copias en memoria de los datos de ejemplo,
-// así lo que se agrega en una pantalla aparece en las otras. No hay backend: al
+// equipo, roles, pagos): son copias en memoria de los datos de ejemplo, así lo
+// que se agrega en una pantalla aparece en las otras. No hay backend: al
 // recargar, o al cambiar de rubro, vuelve todo a como estaba.
 //
 // El horario es uno solo para todo el panel: el del negocio (semanaDe) y,
@@ -14,14 +19,14 @@
 // equipo: el menú, la agenda, los clientes y las ganancias se recortan a lo que
 // su rol le permite. Es la forma de ver, sin cuentas de verdad, que cada
 // persona tiene su propio panel.
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/router'
-import { LayoutDashboard, CalendarDays, CalendarRange, Users, Contact, Settings, Sparkles, BellRing, UserX, Ban, CalendarClock, HandCoins, LayoutGrid, Eye } from 'lucide-react'
+import { LayoutDashboard, CalendarDays, Users, Contact, Settings, Sparkles, BellRing, UserX, Ban, CalendarClock, HandCoins, LayoutGrid, Eye } from 'lucide-react'
 import { Toast } from '@/design-system/components/Toast'
 import { temaDe } from '@/modules/turnos/storefront/tema'
 import LayoutTurnos, { type ItemNav, type AvisoNav, type ItemBusqueda } from '@/modules/turnos/layout/LayoutTurnos'
 import { useRubroDemo } from '@/modules/turnos/demo/BarraDemo'
-import { ESTADO_TURNO, recursosDe, clientesDe, clasesDe, semanaDe, tramosDeRecurso, esSalud, horaTxt, duracionTxt, pesos, type EstadoTurno, type Turno, type Cliente, type Recurso, type RubroTurnos } from '@/modules/turnos/datos'
+import { ESTADO_TURNO, recursosDe, clientesDe, semanaDe, tramosDeRecurso, esSalud, horaTxt, duracionTxt, pesos, type EstadoTurno, type Turno, type Cliente, type Recurso, type RubroTurnos } from '@/modules/turnos/datos'
 import { AHORA_DEMO, HOY_SEMANA, extremos, tramosDelDia, type Tramo } from '@/modules/turnos/horario'
 import ResumenDia from './KPIs'
 import Agenda from './Agenda'
@@ -33,19 +38,18 @@ import Ganancias, { CSS_GANANCIAS } from './Ganancias'
 import { CSS_ROLES } from './Roles'
 import { CSS_PAGO } from './PagoPersona'
 import Clientes, { pluralCliente } from './Clientes'
-import Clases from './Clases'
 import NuevoTurno from './NuevoTurno'
 import ConfiguracionTurnos from './configuracion/ConfiguracionTurnos'
 import AvanzadoTurnos from './avanzado/AvanzadoTurnos'
 import { CSS_UI_CONFIG } from './configuracion/ui'
 import { subdominioDe } from './configuracion/datos'
 import { CSS_PIEZAS_PANEL, MensajeWhatsApp } from './piezasPanel'
-import { cuandoTxt, fechaLarga, indiceDia, libresPorTramo, tieneTelefono, turnosDelDia, type ClasePanel, type MensajeWA, type NuevoTurnoPre, type ServicioPanel, type TurnoAgenda } from './agendaDemo'
-import { clientesDeLaAgenda, pagadoHastaInicial, personasDe, plata, puedeDe, rolesDe, taparTelefono, type Pago, type Persona, type Rol, type VerComo } from './equipoDemo'
+import { cuandoTxt, fechaLarga, indiceDia, libresPorTramo, tieneTelefono, turnosDelDia, type MensajeWA, type NuevoTurnoPre, type ServicioPanel, type TurnoAgenda } from '../datos/agenda'
+import { clientesDeLaAgenda, pagadoHastaInicial, personasDe, plata, puedeDe, rolesDe, taparTelefono, type Pago, type Persona, type Rol, type VerComo } from '../datos/equipo'
 
 const CSS_PANEL = CSS_UI_CONFIG + CSS_PIEZAS_PANEL + CSS_ESPACIOS + CSS_EQUIPO + CSS_ROLES + CSS_PAGO + CSS_GANANCIAS + `
   .tu-toast { position: fixed; right: 16px; bottom: 16px; left: auto; z-index: 400; max-width: calc(100vw - 32px); animation: tuToastIn 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
-  @keyframes tuToastIn { from { opacity: 0; transform: translateY(14px) scale(0.97); } to { opacity: 1; transform: none; } }
+  @keyframes tuToastIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
   @media (max-width: 768px) { .tu-toast { left: 16px; } }
   /* Con un modal abierto el aviso sube: abajo taparía los botones del modal. */
   .tu-shell:has(.tuo-modal) .tu-toast { top: calc(var(--tuo-tope, 0px) + 14px); bottom: auto; }
@@ -54,11 +58,13 @@ const CSS_PANEL = CSS_UI_CONFIG + CSS_PIEZAS_PANEL + CSS_ESPACIOS + CSS_EQUIPO +
   .tu-como > svg { flex-shrink: 0; }
   .tu-como > span { flex: 1; min-width: 200px; }
   .tu-como b { font-weight: 600; }
-  @media (max-width: 768px) { .tu-como .tuo-btn { height: 40px; } }
+  @media (max-width: 768px) { .tu-como .tuo-btn { height: 44px; } }
   @media (prefers-reduced-motion: reduce) { .tu-toast, .tu-como { animation: none; } }
 `
 
 type Agenda = { atiende: number[]; horario: string; dias: string }
+/** Las pantallas que viven dentro de Configuración, y que un rol sin acceso a Configuración ve como secciones sueltas. */
+type SeccionNegocio = 'servicios' | 'equipo' | 'espacios' | 'ganancias'
 
 export default function PanelTurnos() {
   const [rubro] = useRubroDemo()
@@ -87,7 +93,6 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
     })
   })
   const [clientes, setClientes] = useState<Cliente[]>(() => clientesDe(rubro))
-  const [clases, setClases] = useState<ClasePanel[]>(() => clasesDe(rubro))
   const [servicios, setServicios] = useState<ServicioPanel[]>(() => rubro.servicios.map((s, i) => ({ ...s, id: `s${i + 1}`, online: i !== 3 })))
   const [roles, setRoles] = useState<Rol[]>(() => rolesDe(rubro))
   const [personas, setPersonas] = useState<Persona[]>(() => personasDe(rubro, recursosDe(rubro), `${subdominioDe(temaDe(rubro).nombre)}.com.ar`))
@@ -160,30 +165,43 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
 
   const pendientes = turnos.filter(t => t.estado === 'pendiente').length
   const conEspacios = rubro.modo !== 'profesional'
-  // El menú, según lo que puede quien mira. El dueño lo ve entero.
-  const negocioTxt = !como || puede('config.editar') !== 'no' ? 'Tu negocio' : puede('equipo.editar') !== 'no' || puede('clientes.ver') === 'todo' ? 'El negocio' : 'Lo tuyo'
+  // Quien puede configurar maneja servicios, equipo, espacios y ganancias desde
+  // Configuración. El resto del equipo los ve como secciones sueltas, según su rol.
+  const enConfig = puede('config.editar') !== 'no'
+  const negocioTxt = enConfig ? 'Negocio' : puede('equipo.editar') !== 'no' || puede('clientes.ver') === 'todo' ? 'El negocio' : 'Lo tuyo'
+  const veSeccion = (s: SeccionNegocio) =>
+    s === 'servicios' ? puede('servicios.editar') !== 'no'
+      : s === 'equipo' ? puede('equipo.editar') !== 'no'
+        : s === 'espacios' ? conEspacios && puede('equipo.editar') !== 'no'
+          : puede('ganancias.ver') !== 'no'
+  const sueltas: ItemNav[] = enConfig ? [] : [
+    ...(veSeccion('servicios') ? [{ id: 'servicios', label: 'Servicios', Icon: rubro.Icon, grupo: negocioTxt }] : []),
+    ...(veSeccion('equipo') ? [{ id: 'equipo', label: 'Equipo', Icon: Users, grupo: negocioTxt }] : []),
+    ...(veSeccion('espacios') ? [{ id: 'espacios', label: espaciosTxt(rubro), Icon: LayoutGrid, grupo: negocioTxt }] : []),
+    ...(veSeccion('ganancias') ? [{ id: 'ganancias', label: puede('ganancias.ver') === 'propio' ? 'Mis ganancias' : 'Ganancias', Icon: HandCoins, grupo: negocioTxt }] : []),
+  ]
   const items: ItemNav[] = [
-    { id: 'resumen', label: 'Resumen', Icon: LayoutDashboard, grupo: 'Día a día' },
-    ...(puede('agenda.ver') !== 'no' ? [{ id: 'agenda', label: rubro.modo === 'cancha' ? 'Reservas' : soloMiAgenda ? 'Mi agenda' : 'Agenda', Icon: CalendarDays, badge: pendientes || undefined, grupo: 'Día a día' }] : []),
-    ...(rubro.modo === 'cupo' && puede('agenda.ver') !== 'no' ? [{ id: 'clases', label: 'Clases', Icon: CalendarRange, grupo: 'Día a día' }] : []),
-    ...(puede('servicios.editar') !== 'no' ? [{ id: 'servicios', label: rubro.modo === 'cupo' ? 'Actividades' : 'Servicios', Icon: rubro.Icon, grupo: negocioTxt }] : []),
-    ...(puede('equipo.editar') !== 'no' ? [{ id: 'equipo', label: 'Equipo', Icon: Users, grupo: negocioTxt }] : []),
-    ...(conEspacios && puede('equipo.editar') !== 'no' ? [{ id: 'espacios', label: espaciosTxt(rubro), Icon: LayoutGrid, grupo: negocioTxt }] : []),
+    { id: 'resumen', label: 'Resumen', Icon: LayoutDashboard, grupo: 'Hoy' },
+    ...(puede('agenda.ver') !== 'no' ? [{ id: 'agenda', label: soloMiAgenda ? 'Mi agenda' : 'Agenda', Icon: CalendarDays, badge: pendientes || undefined, grupo: 'Hoy' }] : []),
     ...(puede('clientes.ver') !== 'no' ? [{ id: 'clientes', label: puede('clientes.ver') === 'propio' ? `Mis ${pluralCliente(rubro).toLowerCase()}` : pluralCliente(rubro), Icon: Contact, grupo: negocioTxt }] : []),
-    ...(puede('ganancias.ver') !== 'no' ? [{ id: 'ganancias', label: puede('ganancias.ver') === 'propio' ? 'Mis ganancias' : 'Ganancias', Icon: HandCoins, grupo: negocioTxt }] : []),
-    ...(puede('config.editar') !== 'no' ? [
-      { id: 'configuracion', label: 'Configuración', Icon: Settings, grupo: 'Ajustes' },
-      { id: 'avanzado', label: 'Avanzado', Icon: Sparkles, grupo: 'Ajustes' },
+    ...sueltas,
+    ...(enConfig ? [
+      { id: 'configuracion', label: 'Configuración', Icon: Settings, grupo: negocioTxt },
+      { id: 'avanzado', label: 'Avanzado', Icon: Sparkles, grupo: negocioTxt },
     ] : []),
   ]
-  // Una vista que este rubro o este rol no tiene (?vista=clases en una barbería) cae en el resumen.
+  // Una vista que este rol no tiene (?vista=ganancias para quien no las ve) cae en el resumen.
   const pedida = typeof router.query.vista === 'string' ? router.query.vista : 'resumen'
   const vista = items.some(i => i.id === pedida) ? pedida : 'resumen'
 
-  const ir = (v: string) => {
+  const ir = (v: string, tab?: string) => {
     setClienteSel(null)
-    void router.replace({ pathname: router.pathname, query: { ...router.query, vista: v } }, undefined, { shallow: true })
+    const { tab: _t, ...resto } = router.query
+    void _t
+    void router.replace({ pathname: router.pathname, query: { ...resto, vista: v, ...(tab ? { tab } : {}) } }, undefined, { shallow: true })
   }
+  /** Servicios, equipo, espacios y ganancias: dentro de Configuración para quien configura; sección suelta para el resto. */
+  const irA = (s: SeccionNegocio) => (enConfig ? ir('configuracion', s) : ir(s))
   const nombreDe = (id: string) => clientes.find(c => c.id === id)?.nombre ?? '—'
   const pila = (id: string) => nombreDe(id).split(' ')[0]
   const abrir = (t: TurnoAgenda) => setAbiertoEn({ id: t.id, dia: t.dia ?? 0 })
@@ -265,12 +283,12 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
   const guardarServicio = (s: ServicioPanel, silencio?: boolean) => {
     const era = servicios.some(x => x.id === s.id)
     setServicios(l => guardar(l, s))
-    if (!silencio) avisar(era ? 'Cambios guardados' : rubro.modo === 'cupo' ? 'Actividad creada' : 'Servicio creado', `${s.nombre} · ${duracionTxt(s.duracion)}`)
+    if (!silencio) avisar(era ? 'Cambios guardados' : 'Servicio creado', `${s.nombre} · ${duracionTxt(s.duracion)}`)
   }
   const borrarServicio = (id: string) => {
     const s = servicios.find(x => x.id === id)
     setServicios(l => l.filter(x => x.id !== id))
-    avisar(rubro.modo === 'cupo' ? 'Actividad eliminada' : 'Servicio eliminado', s?.nombre)
+    avisar('Servicio eliminado', s?.nombre)
   }
   const guardarRecurso = (r: Recurso) => {
     const era = recursos.some(x => x.id === r.id)
@@ -283,16 +301,6 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
     // Quien atendía ahí se queda sin espacio fijo.
     setPersonas(l => l.map(p => (p.recursoId === id ? { id: p.id, nombre: p.nombre, rolId: p.rolId, email: p.email, telefono: p.telefono, color: p.color, pago: p.pago, ...(p.pendiente ? { pendiente: true } : {}) } : p)))
     avisar('Eliminado de la agenda', r?.nombre)
-  }
-  const guardarClase = (c: ClasePanel, aviso?: string) => {
-    const era = clases.some(x => x.id === c.id)
-    setClases(l => guardar(l, c))
-    avisar(aviso ?? (era ? 'Cambios guardados' : 'Clase creada'), `${c.nombre} · ${horaTxt(c.inicio)}`)
-  }
-  const borrarClase = (id: string) => {
-    const c = clases.find(x => x.id === id)
-    setClases(l => l.filter(x => x.id !== id))
-    avisar('Clase eliminada', c ? `${c.nombre} · ${horaTxt(c.inicio)}` : undefined)
   }
   const agregarCliente = (c: Cliente) => {
     setClientes(l => [...l, c])
@@ -376,13 +384,12 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
     ...turnos.filter(t => t.estado === 'ausente').map(t => ({ id: `a-${t.id}`, Icon: UserX, tono: 'error' as const, titulo: `${nombreDe(t.clienteId)} no vino a su turno`, detalle: `${horaTxt(t.inicio)} · ${t.servicio}`, cuando: 'Hoy', onAbrir: () => abrir(t) })),
     ...turnos.filter(t => t.estado === 'cancelado').map(t => ({ id: `c-${t.id}`, Icon: Ban, tono: 'primario' as const, titulo: `Se canceló el turno de ${nombreDe(t.clienteId)}`, detalle: `${horaTxt(t.inicio)} · quedó libre`, cuando: 'Hoy', onAbrir: () => abrir(t) })),
   ]
-  const veSeccion = (id: string) => items.some(i => i.id === id)
   const busqueda: ItemBusqueda[] = [
     ...items.map(i => ({ id: `ir-${i.id}`, grupo: 'Ir a', titulo: i.label, detalle: i.grupo, Icon: i.Icon, onElegir: () => ir(i.id) })),
     ...turnos.map(t => ({ id: `t-${t.id}`, grupo: 'Turnos de hoy', titulo: `${horaTxt(t.inicio)} · ${nombreDe(t.clienteId)}`, detalle: `${t.servicio} · ${recursos.find(r => r.id === t.recursoId)?.nombre ?? ''} · ${ESTADO_TURNO[t.estado].label}`, Icon: CalendarDays, onElegir: () => abrir(t) })),
-    ...(veSeccion('clientes') ? clientesVista.map(c => ({ id: `c-${c.id}`, grupo: pluralCliente(rubro), titulo: c.nombre, detalle: `${telefonoDe(c)} · ${c.visitas} visita${c.visitas === 1 ? '' : 's'}`, Icon: Contact, onElegir: () => { ir('clientes'); setClienteSel(c.id) } })) : []),
-    ...(veSeccion('servicios') ? servicios.map(s => ({ id: `s-${s.id}`, grupo: rubro.modo === 'cupo' ? 'Actividades' : 'Servicios', titulo: s.nombre, detalle: duracionTxt(s.duracion), Icon: rubro.Icon, onElegir: () => ir('servicios') })) : []),
-    ...(veSeccion('equipo') ? personas.map(p => ({ id: `e-${p.id}`, grupo: 'Equipo', titulo: p.nombre, detalle: rolDe(p.rolId)?.nombre, Icon: Users, onElegir: () => ir('equipo') })) : []),
+    ...(puede('clientes.ver') !== 'no' ? clientesVista.map(c => ({ id: `c-${c.id}`, grupo: pluralCliente(rubro), titulo: c.nombre, detalle: `${telefonoDe(c)} · ${c.visitas} visita${c.visitas === 1 ? '' : 's'}`, Icon: Contact, onElegir: () => { ir('clientes'); setClienteSel(c.id) } })) : []),
+    ...(veSeccion('servicios') ? servicios.map(s => ({ id: `s-${s.id}`, grupo: 'Servicios', titulo: s.nombre, detalle: duracionTxt(s.duracion), Icon: rubro.Icon, onElegir: () => irA('servicios') })) : []),
+    ...(veSeccion('equipo') ? personas.map(p => ({ id: `e-${p.id}`, grupo: 'Equipo', titulo: p.nombre, detalle: rolDe(p.rolId)?.nombre, Icon: Users, onElegir: () => irA('equipo') })) : []),
   ]
 
   // Mover el turno abierto: los próximos días de su agenda y lo que tiene libre cada uno.
@@ -391,6 +398,28 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
     if (!abierto) return []
     return libresPorTramo(delDia(d), jornada(abierto.recursoId, d), abierto.recursoId, abierto.duracion, d, abierto.id)
       .map(g => ({ ...g, libres: g.libres.filter(m => !(d === (abierto.dia ?? 0) && m === abierto.inicio)) }))
+  }
+
+  // Las pantallas que viven dentro de Configuración (o sueltas, según el rol).
+  const seccion: Record<SeccionNegocio, ReactNode> = {
+    servicios: veSeccion('servicios') && <Servicios rubro={rubro} recursos={recursos} servicios={servicios} onGuardar={guardarServicio} onBorrar={borrarServicio} />,
+    equipo: veSeccion('equipo') && (
+      <Equipo
+        rubro={rubro} semana={semana} personas={personas} roles={roles} recursos={recursos} turnos={delDia(0)} jornada={id => jornada(id, 0)} rango={rangoHoy}
+        onGuardar={guardarPersona} onBorrar={borrarPersona} onGuardarRol={guardarRol} onBorrarRol={borrarRol} onVerComo={verComo}
+      />
+    ),
+    espacios: veSeccion('espacios') && (
+      <Espacios rubro={rubro} semana={semana} recursos={recursos} turnos={delDia(0)} jornada={id => jornada(id, 0)} rango={rangoHoy} personas={personas} onGuardar={guardarRecurso} onBorrar={borrarRecurso} />
+    ),
+    ganancias: veSeccion('ganancias') && (
+      <Ganancias
+        rubro={rubro} personas={puede('ganancias.ver') === 'propio' ? (yo ? [yo] : []) : personas} roles={roles} clientes={clientes} turnosDelDia={delDia}
+        pagadoHasta={Object.fromEntries(personas.map(p => [p.id, pagadoHasta[p.id] ?? pagadoHastaInicial(p)]))}
+        alcance={puede('ganancias.ver') === 'propio' ? 'propio' : 'todo'} puedeLiquidar={puede('ganancias.liquidar') !== 'no'}
+        onPagar={registrarPago} onPago={guardarPago} onAvisar={setMensaje}
+      />
+    ),
   }
 
   return (
@@ -426,22 +455,6 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
         />
       )}
       {vista === 'agenda' && <Agenda rubro={rubro} semana={semana} recursos={recursosVista} turnosDelDia={delDiaVista} jornada={jornada} clientes={clientes} puedeAgendar={puedeAgendar} onAbrir={abrir} onNuevo={agendar} />}
-      {vista === 'clases' && (
-        <Clases
-          rubro={rubro} clases={clases} actividades={servicios.map(s => s.nombre)} salas={recursos.map(r => r.nombre)} alumnos={clientes.map(c => c.nombre)}
-          profes={personas.filter(p => rolDe(p.rolId)?.atiende).map(p => p.nombre.split(' ')[0])} onGuardar={guardarClase} onBorrar={borrarClase}
-        />
-      )}
-      {vista === 'servicios' && <Servicios rubro={rubro} recursos={recursos} servicios={servicios} onGuardar={guardarServicio} onBorrar={borrarServicio} />}
-      {vista === 'equipo' && (
-        <Equipo
-          rubro={rubro} semana={semana} personas={personas} roles={roles} recursos={recursos} turnos={delDia(0)} jornada={id => jornada(id, 0)} rango={rangoHoy}
-          onGuardar={guardarPersona} onBorrar={borrarPersona} onGuardarRol={guardarRol} onBorrarRol={borrarRol} onVerComo={verComo}
-        />
-      )}
-      {vista === 'espacios' && (
-        <Espacios rubro={rubro} semana={semana} recursos={recursos} turnos={delDia(0)} jornada={id => jornada(id, 0)} rango={rangoHoy} personas={personas} onGuardar={guardarRecurso} onBorrar={borrarRecurso} />
-      )}
       {vista === 'clientes' && (
         <Clientes
           rubro={rubro} clientes={clientesVista} servicios={servicios} selId={clienteSel} onSel={setClienteSel}
@@ -450,15 +463,11 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
           verContacto={verContacto} verNumeros={verNumeros} puedeAgendar={puedeAgendar} soloLosSuyos={puede('clientes.ver') === 'propio'}
         />
       )}
-      {vista === 'ganancias' && (
-        <Ganancias
-          rubro={rubro} personas={puede('ganancias.ver') === 'propio' ? (yo ? [yo] : []) : personas} roles={roles} clientes={clientes} clases={clases} turnosDelDia={delDia}
-          pagadoHasta={Object.fromEntries(personas.map(p => [p.id, pagadoHasta[p.id] ?? pagadoHastaInicial(p)]))}
-          alcance={puede('ganancias.ver') === 'propio' ? 'propio' : 'todo'} puedeLiquidar={puede('ganancias.liquidar') !== 'no'}
-          onPagar={registrarPago} onPago={guardarPago} onAvisar={setMensaje}
-        />
-      )}
-      {vista === 'configuracion' && <ConfiguracionTurnos rubro={rubro} equipo={{ roles, personas, onGuardarRol: guardarRol, onBorrarRol: borrarRol, onVerComo: verComo, onIrEquipo: () => ir('equipo') }} />}
+      {vista === 'servicios' && seccion.servicios}
+      {vista === 'equipo' && seccion.equipo}
+      {vista === 'espacios' && seccion.espacios}
+      {vista === 'ganancias' && seccion.ganancias}
+      {vista === 'configuracion' && <ConfiguracionTurnos rubro={rubro} secciones={seccion} />}
       {vista === 'avanzado' && <AvanzadoTurnos rubro={rubro} />}
 
       {/* key: cada turno abre su detalle con el estado interno (mover, cancelar) de cero */}

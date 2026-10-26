@@ -15,8 +15,8 @@ import { duracionTxt, horaTxt, pesos, type Cliente, type Recurso, type RubroTurn
 import type { Tramo } from '@/modules/turnos/horario'
 import { Campo, Dos, Selector } from './configuracion/ui'
 import { Modal, ErrorCampo, DatoFila, TiraDias, HorasLibres } from './piezasPanel'
-import { fechaLarga, libresPorTramo, sinAcentos, tieneTelefono, type NuevoTurnoPre, type ServicioPanel, type TurnoAgenda } from './agendaDemo'
-import { clientesTxt, taparTelefono } from './equipoDemo'
+import { fechaLarga, libresPorTramo, sinAcentos, tieneTelefono, type NuevoTurnoPre, type ServicioPanel, type TurnoAgenda } from '../datos/agenda'
+import { clientesTxt, taparTelefono } from '../datos/equipo'
 
 const DIAS_A_LA_VISTA = 14
 const MAX_RESULTADOS = 6
@@ -70,7 +70,7 @@ export default function NuevoTurno({ rubro, pre, clientes, recursos, servicios, 
   const limpiar = () => setError(null)
 
   const plural = clientesTxt(rubro)
-  const etiquetaRecurso = rubro.modo === 'profesional' ? `Con qué ${rubro.profesional.toLowerCase()}` : rubro.modo === 'cancha' ? 'En qué cancha' : 'Dónde'
+  const etiquetaRecurso = rubro.modo === 'profesional' ? `Con qué ${rubro.profesional.toLowerCase()}` : 'Dónde'
   // Si la agenda elegida ya no está entre las que se pueden usar, la primera.
   const recursoId = recursos.some(r => r.id === recursoElegido) ? recursoElegido : recursos[0]?.id ?? ''
   const recurso = recursos.find(r => r.id === recursoId)
@@ -239,7 +239,7 @@ export default function NuevoTurno({ rubro, pre, clientes, recursos, servicios, 
 
       {/* ── Qué y con quién ── */}
       <Selector
-        label={rubro.modo === 'cupo' ? 'Actividad' : 'Servicio'}
+        label="Servicio"
         valor={servicioId}
         onChange={v => { setServicioId(v); limpiar() }}
         opciones={servicios.map(s => ({ id: s.id, label: `${s.nombre} · ${duracionTxt(s.duracion)}${s.precio ? ` · ${pesos(s.precio)}` : ''}` }))}

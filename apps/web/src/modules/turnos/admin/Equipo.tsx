@@ -24,7 +24,7 @@ import { ResumenAgenda, ocupacionDe } from './Espacios'
 import RolesPermisos from './Roles'
 import { CamposPago } from './PagoPersona'
 import InvitarPersona from './InvitarPersona'
-import { CADA_TXT, COLORES_EQUIPO, lugarAlquiler, pagoInicialDe, plata, type Pago, type Persona, type Rol, type VerComo } from './equipoDemo'
+import { CADA_TXT, COLORES_EQUIPO, lugarAlquiler, pagoInicialDe, plata, type Pago, type Persona, type Rol, type VerComo } from '../datos/equipo'
 
 export const CSS_EQUIPO = `
   .tu-per-pie { display: flex; gap: 8px; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--color-border); }
@@ -49,13 +49,11 @@ type Agenda = { atiende: number[]; horario: string; dias: string }
 
 /** Cuánto se le paga a alguien, para la tarjeta: el tipo, el número grande y el detalle. */
 function pagoTarjeta(p: Pago, r: RubroTurnos): { tipo: string; valor: string; detalle: string } {
-  const turno = r.modo === 'cupo' ? 'clase' : r.modo === 'cancha' ? 'reserva' : 'turno'
   const liquida = `se liquida ${CADA_TXT[p.cada]}`
-  if (p.forma === 'comision') return { tipo: 'Comisión', valor: `${p.comision}%`, detalle: `De cada ${turno} que atiende · ${liquida}` }
+  if (p.forma === 'comision') return { tipo: 'Comisión', valor: `${p.comision}%`, detalle: `De cada turno que atiende · ${liquida}` }
   if (p.forma === 'sueldo') return { tipo: 'Sueldo fijo', valor: plata(p.sueldo), detalle: `Por mes · ${liquida}` }
-  if (p.forma === 'mixto') return { tipo: 'Sueldo + comisión', valor: `${plata(p.sueldo)} + ${p.comision}%`, detalle: `Fijo por mes más su parte de cada ${turno} · ${liquida}` }
-  if (p.forma === 'alquiler') return { tipo: 'Alquila', valor: plata(p.alquiler), detalle: `Te paga por usar ${lugarAlquiler(r)} · ${CADA_TXT[p.cada]}` }
-  return { tipo: 'Por clase', valor: plata(p.porClase), detalle: `Por cada clase que da · ${liquida}` }
+  if (p.forma === 'mixto') return { tipo: 'Sueldo + comisión', valor: `${plata(p.sueldo)} + ${p.comision}%`, detalle: `Fijo por mes más su parte de cada turno · ${liquida}` }
+  return { tipo: 'Alquila', valor: plata(p.alquiler), detalle: `Te paga por usar ${lugarAlquiler(r)} · ${CADA_TXT[p.cada]}` }
 }
 
 interface Props {
@@ -89,7 +87,7 @@ export default function Equipo({ rubro, semana, personas, roles, recursos, turno
   const invitar = ({ nombre, email, rolId }: { nombre: string; email: string; rolId: string }) => {
     const id = `p${Date.now()}`
     const persona: Persona = {
-      id, nombre, email, telefono: '', rolId, pago: pagoInicialDe(rubro), pendiente: true,
+      id, nombre, email, telefono: '', rolId, pago: pagoInicialDe(), pendiente: true,
       color: COLORES_EQUIPO.find(c => !personas.some(p => p.color === c)) ?? COLORES_EQUIPO[personas.length % COLORES_EQUIPO.length],
     }
     // Si su rol atiende, entra con la agenda del negocio: todos los días que abre, en su horario.
@@ -124,7 +122,7 @@ export default function Equipo({ rubro, semana, personas, roles, recursos, turno
             const pct = rec ? ocupacionDe(rec.id, turnos, tramos) : 0
             return (
               <article key={p.id} className="tuo-card tuo-card--pad tu-eq-card tuo-entra" style={{ ['--c' as string]: p.color, ['--i' as string]: idx + 2, display: 'flex', flexDirection: 'column' }}>
-                <span aria-hidden className="tu-eq-filo" style={{ background: `linear-gradient(90deg, ${p.color}, color-mix(in srgb, ${p.color} 20%, transparent))` }} />
+                <span aria-hidden className="tu-eq-filo" style={{ background: p.color }} />
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
                   <Sigla nombre={p.nombre} color={p.color} size={48} />
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -183,7 +181,7 @@ export default function Equipo({ rubro, semana, personas, roles, recursos, turno
 
       {invitando && (
         <InvitarPersona
-          rubro={rubro} roles={roles} personas={personas} pago={pagoInicialDe(rubro)}
+          rubro={rubro} roles={roles} personas={personas} pago={pagoInicialDe()}
           onCerrar={() => setInvitando(false)}
           onInvitar={invitar}
           onConfigurar={() => { setInvitando(false); setEditando(personas.find(p => p.id === invitadaId) ?? null) }}
@@ -223,7 +221,7 @@ function FormPersona({ inicial, rubro, semana, roles, recursos, personas, turnos
   const [rolId, setRolId] = useState(inicial.rolId)
   const [agenda, setAgenda] = useState(() => agendaFormDe(porPersona ? suRecurso : null, semana))
   const [cabina, setCabina] = useState(porPersona ? '' : inicial.recursoId ?? '')
-  const [pago, setPago] = useState(inicial.pago ?? pagoInicialDe(rubro))
+  const [pago, setPago] = useState(inicial.pago ?? pagoInicialDe())
   const [error, setError] = useState<{ en: 'datos' | 'agenda'; texto: string } | null>(null)
 
   const rol = roles.find(r => r.id === rolId)
@@ -231,7 +229,6 @@ function FormPersona({ inicial, rubro, semana, roles, recursos, personas, turnos
   const atiende = !!rol?.atiende
   // Sin nadie que atienda no hay agenda: el último no puede dejar de atender ni irse.
   const esLaUnicaAgenda = porPersona && !!suRecurso && recursos.length <= 1
-  const pila = nombre.trim().split(' ')[0]
 
   const guardar = () => {
     const limpio = nombre.trim().replace(/\s+/g, ' ')
@@ -292,9 +289,6 @@ function FormPersona({ inicial, rubro, semana, roles, recursos, personas, turnos
       {atiende && rubro.modo === 'recurso' && (
         <Selector label="Dónde atiende" ayuda="Lo que factura esa agenda cuenta para su comisión." valor={cabina} onChange={setCabina}
           opciones={[...recursos.map(r => ({ id: r.id, label: r.nombre })), { id: '', label: 'Sin un espacio fijo' }]} />
-      )}
-      {atiende && rubro.modo === 'cupo' && (
-        <div className="tu-nota tu-nota--info"><Check size={15} /><span>Las clases que da {pila || 'esta persona'} se arman en <b>Clases</b>: ahí se elige quién da cada una.</span></div>
       )}
       {error?.en === 'agenda' && <ErrorCampo>{error.texto}</ErrorCampo>}
 

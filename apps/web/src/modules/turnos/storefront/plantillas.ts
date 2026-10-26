@@ -7,7 +7,7 @@
 // nombre propio y pensada para ese rubro.
 //
 // Cómo está armado:
-//  · LOOKS son las identidades visuales (veinticuatro), sin nombre de rubro.
+//  · LOOKS son las identidades visuales (veintitrés), sin nombre de rubro.
 //  · CATALOGO dice, rubro por rubro, cuáles cinco usa, cómo se llaman ahí y para
 //    quién es cada una. La primera es la de fábrica: con esa se ve el sitio de
 //    ejemplo del rubro.
@@ -142,11 +142,6 @@ const LOOKS = {
     caracter: 'Azul noche', oscuro: true, estilo: 'estudio', composicion: 'cine', tarjeta: 'suave', forma: 'redonda', textura: 'ninguna', tipo: 'nitida', radio: 14, boton: 'relleno',
     c: { bg: '#0A0E1F', surface: '#121833', surfaceAlt: '#1B2347', border: '#283262', text: '#F2F4FF', body: '#C5CBE8', muted: '#8F98C2', primary: '#8B9CFF', primaryH: '#A5B2FF', onPrimary: '#0A0E1F', primaryBg: 'rgba(139,156,255,0.16)' },
     acento: '#5EEAD4', acentos: ['#8B9CFF', '#5EEAD4', '#F0ABFC', '#FDBA74', '#7DD3FC', '#FCA5A5'],
-  },
-  cesped: {
-    caracter: 'Verde césped', oscuro: true, estilo: 'box', composicion: 'impacto', tarjeta: 'corte', forma: 'recta', textura: 'trama', tipo: 'potente', radio: 6, boton: 'relleno',
-    c: { bg: '#07140D', surface: '#0E2016', surfaceAlt: '#16301F', border: '#22452E', text: '#F4FBF6', body: '#CFE3D5', muted: '#8FB09A', primary: '#3DDC84', primaryH: '#63E69C', onPrimary: '#04120A', primaryBg: 'rgba(61,220,132,0.14)' },
-    acento: '#FACC15', acentos: ['#3DDC84', '#FACC15', '#FB923C', '#38BDF8', '#F4F4F5', '#F472B6'],
   },
   vino: {
     caracter: 'Bordó y ámbar', oscuro: true, estilo: 'estudio', composicion: 'cine', tarjeta: 'filete', forma: 'arco', textura: 'grano', tipo: 'delicada', radio: 6, boton: 'relleno',
@@ -410,28 +405,7 @@ const CATALOGO: Record<string, [Entrada, Entrada, Entrada, Entrada, Entrada]> = 
     ['lavanda', 'Aura', 'Lila suave, liviana.'],
   ],
 
-  // Deporte y bienestar
-  gym: [
-    ['carbon', 'Hierro', 'Negra y lima: pura energía de gimnasio.'],
-    ['grafito', 'Fuerza', 'Grafito y naranja, industrial.'],
-    ['neon', 'Pulso', 'Violeta eléctrico, para clases y música.'],
-    ['cosmos', 'Fit', 'Blanca y azul: gimnasio de barrio, claro y ordenado.'],
-    ['energia', 'Sudor', 'Clara y naranja, cercana y con empuje.'],
-  ],
-  crossfit: [
-    ['carbon', 'Box', 'Negra y lima, la identidad del box.'],
-    ['grafito', 'WOD', 'Grafito y naranja, cruda y directa.'],
-    ['neon', 'RX', 'Violeta eléctrico, para una comunidad joven.'],
-    ['cesped', 'Rig', 'Verde oscuro y potente.'],
-    ['editorial', 'Tiza', 'Blanco y negro, como el pizarrón del WOD.'],
-  ],
-  funcional: [
-    ['carbon', 'Circuito', 'Negra y lima, intensa.'],
-    ['energia', 'Energía', 'Clara y naranja: grupos reducidos y buena onda.'],
-    ['grafito', 'Kettlebell', 'Grafito y naranja, industrial.'],
-    ['cosmos', 'Activo', 'Blanca y azul, ordenada.'],
-    ['cesped', 'Aire libre', 'Verde: para entrenar en la plaza o el parque.'],
-  ],
+  // Bienestar
   electro: [
     ['carbon', 'Impulso', 'Negra y lima, tecnológica.'],
     ['neon', 'Voltaje', 'Violeta eléctrico, futurista.'],
@@ -439,56 +413,14 @@ const CATALOGO: Record<string, [Entrada, Entrada, Entrada, Entrada, Entrada]> = 
     ['oceano', 'Onda', 'Azul agua, serena.'],
     ['grafito', 'EMS', 'Grafito y naranja, deportiva.'],
   ],
-  canchas: [
-    ['carbon', 'Tribuna', 'Negra y lima: el complejo de noche.'],
-    ['cesped', 'Césped', 'Verde césped, como la cancha.'],
-    ['grafito', 'Nocturno', 'Grafito y naranja, con luz de reflector.'],
-    ['noche', 'Estadio', 'Azul noche, prolija.'],
-    ['energia', 'Potrero', 'Clara y naranja, de club de barrio.'],
-  ],
-  yoga: [
-    ['calma', 'Prana', 'Salvia y arena: calma desde la portada.'],
-    ['arena', 'Shala', 'Tonos tierra, cálida y simple.'],
-    ['bosque', 'Bosque', 'Verde profundo, para clases al atardecer.'],
-    ['lavanda', 'Loto', 'Lila suave y liviana.'],
-    ['oceano', 'Respira', 'Azul agua, clara y abierta.'],
-  ],
-  danza: [
-    ['neon', 'Escenario', 'Violeta eléctrico: luces, música y movimiento.'],
-    ['vino', 'Milonga', 'Bordó y ámbar, para tango y ritmos de salón.'],
-    ['coral', 'Ritmo', 'Coral y alegre: salsa, bachata y urbanos.'],
-    ['grafito', 'Urbano', 'Grafito y naranja, para hip hop y street.'],
-    ['editorial', 'Barra', 'Blanco y negro, para ballet y danza contemporánea.'],
-  ],
-  'artes-marciales': [
-    ['carbon', 'Dojo', 'Negra y potente: disciplina y carácter.'],
-    ['vino', 'Cinturón', 'Bordó y ámbar, tradicional.'],
-    ['grafito', 'Tatami', 'Grafito y naranja, de competencia.'],
-    ['noche', 'Honor', 'Azul noche, sobria.'],
-    ['editorial', 'Kata', 'Blanco y negro, limpia.'],
-  ],
-  natacion: [
-    ['oceano', 'Pileta', 'Azul agua: se respira cloro del bueno.'],
-    ['noche', 'Profundo', 'Azul noche, para un club con historia.'],
-    ['cosmos', 'Andarivel', 'Blanca y azul, ordenada.'],
-    ['menta', 'Laguna', 'Verde agua, fresca.'],
-    ['energia', 'Verano', 'Clara y naranja: colonia y pileta libre.'],
-  ],
 
-  // Clases
+  // Clases particulares
   clases: [
     ['taller', 'Aula', 'Cálida y artesanal: clases con dedicación.'],
     ['cosmos', 'Apunte', 'Blanca y azul, ordenada: apoyo escolar y exámenes.'],
     ['miel', 'Tiza', 'Marfil y miel, cercana.'],
     ['lavanda', 'Idioma', 'Lila y moderna: idiomas y conversación.'],
     ['editorial', 'Cuaderno', 'Blanco y negro, prolija.'],
-  ],
-  talleres: [
-    ['taller', 'Taller', 'Papel y terracota: se nota que se trabaja con las manos.'],
-    ['vintage', 'Oficio', 'Crema y verde botella, con aire de taller antiguo.'],
-    ['coral', 'Manos', 'Coral y alegre, para talleres de fin de semana.'],
-    ['miel', 'Barro', 'Marfil y miel, cálida.'],
-    ['calma', 'Encuentro', 'Salvia y arena, tranquila.'],
   ],
 }
 

@@ -58,7 +58,7 @@ export function Indicador({ label, valor, Icon, color = 'var(--color-primary)', 
   const ok = neutro ? null : (bueno === 'sube') === sube
   const Flecha = sube ? TrendingUp : TrendingDown
   return (
-    <div className="tuo-card tuo-card--pad tuo-card--luz tuo-entra tuo-ind" style={{ ['--i' as string]: i, display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className="tuo-card tuo-card--pad tuo-entra tuo-ind" style={{ ['--i' as string]: i, display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <span style={{ width: 34, height: 34, borderRadius: 10, display: 'grid', placeItems: 'center', flexShrink: 0, color, background: `color-mix(in srgb, ${color} 14%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 22%, transparent)` }}>
           <Icon size={17} strokeWidth={1.8} />

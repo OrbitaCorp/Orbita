@@ -40,7 +40,7 @@ function textos(voz: Voz): Record<string, string> {
 
 export default function Mensajes({ rubro, avisar }: PropsTab) {
   const voz = vozDe(rubro)
-  const lista = metas(voz).filter(m => m.id !== 'espera' || rubro.modo === 'cupo' || rubro.modo === 'cancha' || rubro.modo === 'profesional')
+  const lista = metas(voz).filter(m => m.id !== 'espera' || rubro.modo === 'profesional')
   const t = temaDe(rubro)
   const b = useBorrador(() => {
     const tx = textos(voz)
@@ -56,7 +56,7 @@ export default function Mensajes({ rubro, avisar }: PropsTab) {
   const [abierto, setAbierto] = useState<string | null>('recordatorio')
   const setMsj = (id: string, m: Partial<Mensaje>) => b.set('mensajes', v.mensajes.map(x => x.id === id ? { ...x, ...m } : x))
 
-  const quien = rubro.modo === 'profesional' ? recursosDe(rubro)[0].nombre : rubro.modo === 'cupo' ? 'Caro' : recursosDe(rubro)[0].nombre
+  const quien = recursosDe(rubro)[0].nombre
   const ejemplo: Record<string, string> = {
     nombre: CLIENTES[0].nombre.split(' ')[0], servicio: rubro.servicios[0].nombre.toLowerCase(), fecha: 'sábado 27/09', hora: '15:30',
     profesional: quien, negocio: t.nombre, link: `${subdominioDe(t.nombre)}.orbita.site/t/8KQ2`,

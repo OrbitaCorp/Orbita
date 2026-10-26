@@ -180,15 +180,9 @@ export function modalidadesRubro(r: RubroTurnos): Modalidad[] {
   return ['local', ...(A_DOMICILIO.has(r.key) ? ['domicilio' as const] : [])]
 }
 
-/** Las modalidades del negocio: las del alta si es de este rubro; si no, las típicas del rubro. */
-export function modalidadesDe(r: RubroTurnos, demo: NegocioDemo): Modalidad[] {
-  const propias = demo.identidad?.rubro === r.key ? demo.identidad.modalidades : null
-  return propias?.length ? propias : modalidadesRubro(r)
-}
-
-/** Una cancha o una clase con cupo no se llevan a domicilio. */
-export function modalidadesPosibles(r: RubroTurnos): Modalidad[] {
-  return r.modo === 'cancha' || r.modo === 'cupo' ? ['local'] : ['local', 'domicilio']
+/** Todo negocio de turnos puede atender en su local, a domicilio o de las dos formas. */
+export function modalidadesPosibles(): Modalidad[] {
+  return ['local', 'domicilio']
 }
 
 export const MODALIDAD_TXT: Record<Modalidad, string> = { local: 'En el local', domicilio: 'A domicilio' }
@@ -228,9 +222,9 @@ export interface BeneficioTxt { id: 'bienvenida' | 'sellos' | 'promos'; titulo: 
 /** Lo que gana quien crea su cuenta, tal como lo configuró el dueño. Vacío = no hay cuenta para ofrecer. */
 export function beneficiosTxt(c: BeneficiosCuenta, r: RubroTurnos): BeneficioTxt[] {
   if (!c.activo) return []
-  const turno = r.modo === 'cupo' ? 'clase' : r.modo === 'cancha' ? 'reserva' : 'turno'
+  const turno = r.familia === 'salud' ? 'consulta' : 'turno'
   const out: BeneficioTxt[] = []
-  if (c.bienvenida > 0) out.push({ id: 'bienvenida', titulo: `${c.bienvenida}% de bienvenida`, texto: `En tu ${r.modo === 'cupo' || r.modo === 'cancha' ? 'primera' : 'primer'} ${turno} con cuenta.` })
+  if (c.bienvenida > 0) out.push({ id: 'bienvenida', titulo: `${c.bienvenida}% de bienvenida`, texto: `En tu ${turno === 'consulta' ? 'primera' : 'primer'} ${turno} con cuenta.` })
   if (c.sellos > 0) out.push({ id: 'sellos', titulo: 'Tarjeta de sellos', texto: `Cada ${turno} suma un sello: al completar ${c.sellos}, tenés un premio.` })
   if (c.promos) out.push({ id: 'promos', titulo: 'Promos antes que nadie', texto: 'Te avisamos por WhatsApp cuando hay una promo o se libera un horario.' })
   return out

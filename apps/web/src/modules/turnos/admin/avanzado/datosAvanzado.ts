@@ -1,30 +1,25 @@
 // DEMO INTERNA — catálogo y datos de ejemplo del "Avanzado" de Turnos.
 // Solo visual: ningún número de acá sale de un negocio real ni se guarda. Los
-// montos están en ARS y se derivan de los servicios del rubro (datos.ts) para
+// montos están en ARS y se derivan de los servicios del rubro (datos/) para
 // que cada rubro vea precios coherentes con lo que cobra.
 import type { LucideIcon } from 'lucide-react'
-import {
-  Package, Crown, Gift, Stamp, CalendarSync, HeartHandshake,
-  BadgePercent, LayoutTemplate, CalendarPlus, Repeat2, Wallet, Palette,
-} from 'lucide-react'
+import { Package, Crown, BadgePercent, CalendarPlus, Wallet } from 'lucide-react'
 import { CLIENTES, type RubroTurnos, type ServicioTipo } from '@/modules/turnos/datos'
 
 // ─── Catálogo de funciones ────────────────────────────────────────────────────
+// Tres funciones, las que un negocio de turnos usa de verdad: repartir la
+// demanda con precios por horario y cobrar por adelantado con packs y abonos.
 
-export type FuncionId =
-  | 'paquetes' | 'membresias' | 'gift-cards' | 'fidelidad' | 'turno-fijo'
-  | 'recuperar' | 'precios-horario' | 'plantillas'
+export type FuncionId = 'paquetes' | 'membresias' | 'precios-horario'
 
-export type GrupoId = 'llenar' | 'vuelvan' | 'cobrar' | 'imagen'
+export type GrupoId = 'llenar' | 'cobrar'
 
 // Cada grupo es un objetivo del negocio, con su ícono y su color: en el hub el
 // color del grupo tiñe el ícono de cada función, así se lee de qué familia es
 // sin leer el título.
 export const GRUPOS: { id: GrupoId; label: string; corto: string; desc: string; Icon: LucideIcon; tono: string }[] = [
-  { id: 'llenar', label: 'Llenar la agenda', corto: 'Llenar', desc: 'Que los horarios flojos se ocupen y los clientes de siempre tengan su lugar.', Icon: CalendarPlus, tono: 'var(--color-primary)' },
-  { id: 'vuelvan', label: 'Fidelizar', corto: 'Fidelizar', desc: 'Convertir un turno suelto en un cliente de todos los meses.', Icon: Repeat2, tono: '#DB2777' },
-  { id: 'cobrar', label: 'Cobrar mejor', corto: 'Cobrar', desc: 'Plata por adelantado: packs, abonos y regalos.', Icon: Wallet, tono: 'var(--color-success)' },
-  { id: 'imagen', label: 'Tu imagen', corto: 'Imagen', desc: 'Cómo te ven antes de conocerte: el diseño de tu sitio de reservas.', Icon: Palette, tono: '#8B5CF6' },
+  { id: 'llenar', label: 'Llenar la agenda', corto: 'Llenar', desc: 'Que los horarios flojos se ocupen.', Icon: CalendarPlus, tono: 'var(--color-primary)' },
+  { id: 'cobrar', label: 'Cobrar mejor', corto: 'Cobrar', desc: 'Plata por adelantado: packs y abonos.', Icon: Wallet, tono: 'var(--color-success)' },
 ]
 
 export const grupoPorId = (id: GrupoId) => GRUPOS.find(g => g.id === id) ?? GRUPOS[0]
@@ -36,8 +31,6 @@ export interface Funcion {
   /** Una línea: qué gana el negocio. */
   desc: string
   Icon: LucideIcon
-  /** No tiene interruptor: es una galería (Plantillas), no algo que se prende o se apaga. */
-  externa?: boolean
   recomendada: (r: RubroTurnos) => boolean
 }
 
@@ -45,54 +38,32 @@ const en = (...keys: string[]) => (r: RubroTurnos) => keys.includes(r.key)
 
 export const FUNCIONES: Funcion[] = [
   // Llenar la agenda
-  { id: 'turno-fijo', grupo: 'llenar', label: 'Turno fijo', Icon: CalendarSync,
-    desc: 'Tu cliente reserva el mismo horario cada semana o cada quince días, sin volver a pedirlo.',
-    recomendada: en('psico', 'kinesio', 'fono', 'nutricion', 'clases', 'canchas', 'medicina-alternativa', 'podologia') },
   { id: 'precios-horario', grupo: 'llenar', label: 'Precios por horario', Icon: BadgePercent,
-    desc: 'Descuento en los horarios flojos (o recargo en los picos) para repartir mejor la demanda.',
-    recomendada: en('canchas', 'electro', 'spa', 'depilacion', 'estetica') },
+    desc: 'Descuento en los horarios flojos para repartir mejor la demanda.',
+    recomendada: en('electro', 'spa', 'depilacion', 'estetica') },
 
-  // Que vuelvan
-  { id: 'fidelidad', grupo: 'vuelvan', label: 'Programa de fidelidad', Icon: Stamp,
-    desc: 'Tarjeta de sellos digital: cada tantos turnos, uno gratis o un descuento.',
-    recomendada: en('barberia', 'peluqueria', 'unas', 'pestanas', 'estilista', 'depilacion') },
-  { id: 'recuperar', grupo: 'vuelvan', label: 'Recuperar clientes', Icon: HeartHandshake,
-    desc: 'Campaña "te extrañamos" automática para quienes no vuelven hace un tiempo.',
-    recomendada: r => r.familia === 'belleza' || ['odonto', 'nutricion', 'podologia'].includes(r.key) },
-
-  // Cobrar y cuidar el tiempo
+  // Cobrar por adelantado
   { id: 'paquetes', grupo: 'cobrar', label: 'Paquetes y bonos', Icon: Package,
     desc: 'Vendé packs de sesiones por adelantado (ej. 10 de kinesio) y descontá cada turno solo.',
     recomendada: en('kinesio', 'estetica', 'electro', 'depilacion', 'spa', 'pestanas', 'fono', 'medicina-alternativa', 'clases', 'medicina-estetica') },
   { id: 'membresias', grupo: 'cobrar', label: 'Membresías y abonos', Icon: Crown,
-    desc: 'Planes mensuales con clases por semana o libre, con renovación automática.',
-    recomendada: r => r.modo === 'cupo' },
-  { id: 'gift-cards', grupo: 'cobrar', label: 'Gift cards', Icon: Gift,
-    desc: 'Regalá un turno: tarjetas de regalo por monto o por servicio, listas para mandar.',
-    recomendada: r => r.familia === 'belleza' || r.key === 'talleres' },
-
-  // Tu imagen
-  { id: 'plantillas', grupo: 'imagen', label: 'Plantillas del sitio', Icon: LayoutTemplate, externa: true,
-    desc: 'Cinco identidades completas pensadas para tu rubro: mirá cómo queda tu sitio con cada una y aplicala.',
-    recomendada: () => false },
+    desc: 'Planes mensuales con turnos por semana o libre, con renovación automática.',
+    recomendada: en('estetica', 'spa', 'depilacion', 'electro', 'kinesio') },
 ]
 
 export const funcionPorId = (id: string) => FUNCIONES.find(f => f.id === id)
 
-/** Arranque de la demo: algunas prendidas para que el hub no se vea vacío. */
-export const ACTIVAS_INICIALES: Record<FuncionId, boolean> = {
-  paquetes: false, membresias: false, 'gift-cards': true, fidelidad: false, 'turno-fijo': true,
-  recuperar: false, 'precios-horario': false, plantillas: false,
-}
+/** Arranque de la demo: una prendida para que el hub no se vea vacío. */
+export const ACTIVAS_INICIALES: Record<FuncionId, boolean> = { paquetes: true, membresias: false, 'precios-horario': false }
 
 // ─── Formato ──────────────────────────────────────────────────────────────────
 
-/** Pesos sin el "Incluido" de datos.ts: acá un 0 es un 0. */
+/** Pesos sin el "Incluido" de datos/index.ts: acá un 0 es un 0. */
 export const ars = (n: number) => `$${Math.round(n).toLocaleString('es-AR')}`
 
-/** Servicio "típico" del rubro: el primero con precio (los de cupo tienen precio 0). */
+/** Servicio "típico" del rubro: el primero con precio que no sea un pack (una consulta gratis no sirve de base). */
 export function servicioBase(r: RubroTurnos): ServicioTipo {
-  return r.servicios.find(s => s.precio > 0 && !/pack/i.test(s.nombre)) ?? { nombre: 'Clase suelta', duracion: 60, precio: 10000 }
+  return r.servicios.find(s => s.precio > 0 && !/pack/i.test(s.nombre)) ?? { nombre: 'Sesión', duracion: 60, precio: 10000 }
 }
 
 /** Servicios que tiene sentido vender en pack (no packs ni gratis). */
@@ -143,82 +114,20 @@ export const USOS_PAQUETE = [
 export interface PlanMembresia {
   id: string
   nombre: string
-  /** Clases por semana; 0 = libre. */
+  /** Turnos por semana; 0 = libre. */
   porSemana: number
   precio: number
   destacado?: boolean
 }
 
 export function planesDe(r: RubroTurnos): PlanMembresia[] {
-  // La clase suelta del rubro marca el piso de precio del abono.
-  const suelta = r.servicios.find(s => /suelta|pase/i.test(s.nombre))?.precio ?? servicioBase(r).precio
+  // El turno suelto del servicio típico marca el piso de precio del abono.
+  const suelta = servicioBase(r).precio
   return [
     { id: 'm1', nombre: '2 veces por semana', porSemana: 2, precio: redondear(suelta * 8 * 0.45) },
     { id: 'm2', nombre: '3 veces por semana', porSemana: 3, precio: redondear(suelta * 12 * 0.38), destacado: true },
     { id: 'm3', nombre: 'Pase libre', porSemana: 0, precio: redondear(suelta * 20 * 0.3) },
   ]
-}
-
-// ─── Lista de espera ──────────────────────────────────────────────────────────
-
-export const EN_ESPERA = [
-  { cliente: 'Sofía Ramírez', franja: 'Lun 28/09 · tarde', frecuente: true, desde: 'hace 2 días' },
-  { cliente: 'Nicolás Torres', franja: 'Lun 28/09 · cualquier horario', frecuente: false, desde: 'hace 1 día' },
-  { cliente: 'Valentina Gómez', franja: 'Mar 29/09 · 18 a 20 h', frecuente: true, desde: 'hace 5 h' },
-  { cliente: 'Lautaro Castro', franja: 'Mié 30/09 · mañana', frecuente: false, desde: 'hace 3 h' },
-]
-
-// ─── Recuperar clientes ───────────────────────────────────────────────────────
-
-/** Cuántos clientes (de ejemplo) no vuelven hace N días o más. */
-export const INACTIVOS_POR_DIAS: Record<number, number> = { 30: 48, 45: 37, 60: 29, 90: 18, 120: 11 }
-export const MUESTRA_INACTIVOS = [
-  { nombre: 'Juan Pérez', ultima: 'hace 64 días', visitas: 3 },
-  { nombre: 'Lautaro Castro', ultima: 'hace 71 días', visitas: 2 },
-  { nombre: 'Rocío Medina', ultima: 'hace 88 días', visitas: 6 },
-  { nombre: 'Ezequiel Funes', ultima: 'hace 95 días', visitas: 4 },
-  { nombre: 'Brenda Ojeda', ultima: 'hace 132 días', visitas: 9 },
-]
-/** Supuesto que usamos para estimar, no un dato del negocio. */
-export const TASA_RETORNO_ESTIMADA = 0.15
-
-// ─── Formularios ──────────────────────────────────────────────────────────────
-
-export type TipoPregunta = 'corta' | 'larga' | 'si-no' | 'opciones' | 'fecha'
-export const TIPOS_PREGUNTA: { id: TipoPregunta; label: string }[] = [
-  { id: 'corta', label: 'Texto corto' },
-  { id: 'larga', label: 'Texto largo' },
-  { id: 'si-no', label: 'Sí / No' },
-  { id: 'opciones', label: 'Opción múltiple' },
-  { id: 'fecha', label: 'Fecha' },
-]
-export interface Pregunta { id: string; texto: string; tipo: TipoPregunta; obligatoria: boolean; opciones?: string[] }
-
-/** Preguntas de arranque según el rubro: se editan libremente. */
-export function preguntasDe(r: RubroTurnos): Pregunta[] {
-  if (r.key === 'tatuajes') return [
-    { id: 'q1', texto: '¿Tenés alguna alergia (látex, tintas, antisépticos)?', tipo: 'si-no', obligatoria: true },
-    { id: 'q2', texto: 'Zona del cuerpo y tamaño aproximado', tipo: 'corta', obligatoria: true },
-    { id: 'q3', texto: '¿Tomás anticoagulantes o algún medicamento?', tipo: 'si-no', obligatoria: true },
-    { id: 'q4', texto: 'Fecha de nacimiento', tipo: 'fecha', obligatoria: true },
-  ]
-  if (r.familia === 'salud') return [
-    { id: 'q1', texto: 'Motivo de la consulta', tipo: 'larga', obligatoria: true },
-    { id: 'q2', texto: '¿Tomás alguna medicación?', tipo: 'si-no', obligatoria: true },
-    { id: 'q3', texto: 'Cobertura', tipo: 'opciones', obligatoria: true, opciones: ['Particular', 'OSDE', 'Swiss Medical', 'Otra'] },
-    { id: 'q4', texto: 'Fecha de nacimiento', tipo: 'fecha', obligatoria: false },
-  ]
-  return [
-    { id: 'q1', texto: '¿Tenés alguna alergia o sensibilidad en la piel?', tipo: 'si-no', obligatoria: true },
-    { id: 'q2', texto: '¿Es tu primera vez con este tratamiento?', tipo: 'si-no', obligatoria: false },
-    { id: 'q3', texto: 'Tipo de piel', tipo: 'opciones', obligatoria: false, opciones: ['Seca', 'Mixta', 'Grasa', 'No sé'] },
-    { id: 'q4', texto: 'Algo que quieras contarnos antes', tipo: 'larga', obligatoria: false },
-  ]
-}
-
-export function consentimientoDe(r: RubroTurnos): string {
-  const que = r.key === 'tatuajes' ? 'el tatuaje o piercing' : r.familia === 'salud' ? 'la práctica' : 'el tratamiento'
-  return `Declaro que la información que completé es verdadera. Me explicaron en qué consiste ${que}, sus cuidados posteriores y los posibles efectos. Acepto realizarlo y autorizo el uso de estos datos solo para mi atención.`
 }
 
 // ─── Precios por horario ──────────────────────────────────────────────────────

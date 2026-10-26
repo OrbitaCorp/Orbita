@@ -1,19 +1,18 @@
 // Avanzado del panel de Turnos (DEMO visual): la vidriera del paquete. Un
-// bloque de espacio profundo cuenta qué es y cuánto tiene prendido el negocio;
-// abajo, las funciones agrupadas por el objetivo que resuelven (llenar la
-// agenda, fidelizar, cobrar mejor, tu imagen), con las que le calzan al rubro
-// primero. Al tocar una se abre su pantalla de configuración con vista previa.
+// bloque oscuro cuenta qué es y cuánto tiene prendido el negocio; abajo, las
+// funciones agrupadas por el objetivo que resuelven (llenar la agenda, cobrar
+// mejor), con las que le calzan al rubro primero. Al tocar una se abre su
+// pantalla de configuración con vista previa.
 //
 // La función abierta viaja por ?funcion= (replace + shallow) para que un link
 // abra directo la pantalla y el botón "atrás" del navegador no la duplique;
 // se conservan rubro, vista y el resto de la query.
 import { useState, type ComponentType, type CSSProperties } from 'react'
 import { useRouter } from 'next/router'
-import { ArrowRight, Sparkles, Search, SearchX, Images } from 'lucide-react'
+import { ArrowRight, Sparkles, Search, SearchX } from 'lucide-react'
 import { MODO_LABEL, type RubroTurnos } from '@/modules/turnos/datos'
-import { useNegocioDemo } from '@/modules/turnos/demo/negocioDemo'
+import { useNegocioDemo } from '@/modules/turnos/datos/negocio'
 import { EstiloTurnos } from '@/modules/turnos/_shared/orbita/estilo'
-import { Estrellas, Anillos } from '@/modules/turnos/_shared/orbita/Cielo'
 import { Anillo } from '@/modules/turnos/_shared/orbita/OrbitaDia'
 import { pluralCliente } from '../Clientes'
 import {
@@ -23,16 +22,10 @@ import { CSS_AVANZADO, BadgeEstado, Boton, Vacio } from './ui'
 import type { PropsFuncion } from './tipos'
 import Paquetes from './Paquetes'
 import Membresias from './Membresias'
-import GiftCards from './GiftCards'
-import Fidelidad from './Fidelidad'
-import TurnoFijo from './TurnoFijo'
-import Recuperar from './Recuperar'
 import PreciosHorario from './PreciosHorario'
-import Plantillas from './Plantillas'
 
 const PANTALLAS: Record<FuncionId, ComponentType<PropsFuncion>> = {
-  paquetes: Paquetes, membresias: Membresias, 'gift-cards': GiftCards, fidelidad: Fidelidad,
-  'turno-fijo': TurnoFijo, recuperar: Recuperar, 'precios-horario': PreciosHorario, plantillas: Plantillas,
+  paquetes: Paquetes, membresias: Membresias, 'precios-horario': PreciosHorario,
 }
 
 type Filtro = 'todas' | 'recomendadas' | 'activas'
@@ -49,16 +42,11 @@ const CSS_HUB = `
   .tua-hub > div { display: flex; min-width: 0; }
   .tua-funcion { display: flex; flex-direction: column; width: 100%; min-height: 218px; padding: 20px; overflow: hidden; }
   .tua-funcion-ico { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; flex-shrink: 0; color: var(--tono); background: color-mix(in srgb, var(--tono) 13%, transparent);
-    border: 1px solid color-mix(in srgb, var(--tono) 24%, transparent); transition: transform 320ms var(--tuo-ease, ease), box-shadow 320ms ease; }
-  .tua-funcion[data-on='true'] .tua-funcion-ico { box-shadow: 0 0 0 4px color-mix(in srgb, var(--tono) 10%, transparent); }
-  /* El resplandor del color del grupo asoma desde la esquina recién al pasar el mouse. */
-  .tua-funcion::after { content: ''; position: absolute; right: -60px; top: -60px; width: 180px; height: 180px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--tono) 22%, transparent), transparent);
-    opacity: 0; transition: opacity 320ms ease; pointer-events: none; }
+    border: 1px solid color-mix(in srgb, var(--tono) 24%, transparent); transition: transform 320ms var(--tuo-ease, ease); }
   .tua-funcion-ir { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 600; color: var(--color-primary); white-space: nowrap; }
   .tua-funcion-ir > svg { transition: transform 260ms var(--tuo-ease, ease); }
   .tua-funcion[data-rec='true'] { border-color: color-mix(in srgb, var(--color-primary) 32%, var(--color-border)); }
   @media (hover: hover) {
-    .tua-funcion:hover::after { opacity: 1; }
     .tua-funcion:hover .tua-funcion-ico { transform: scale(1.08) rotate(-4deg); }
     .tua-funcion:hover .tua-funcion-ir > svg { transform: translateX(4px); }
   }
@@ -77,7 +65,7 @@ const CSS_HUB = `
     .tua-funcion { min-height: 0; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .tua-funcion-ico, .tua-funcion-ir > svg, .tua-funcion::after { transition: none; }
+    .tua-funcion-ico, .tua-funcion-ir > svg { transition: none; }
     .tua-funcion:hover .tua-funcion-ico, .tua-funcion:hover .tua-funcion-ir > svg { transform: none; }
   }
 `
@@ -108,12 +96,11 @@ export default function AvanzadoTurnos({ rubro }: { rubro: RubroTurnos }) {
     return <Pantalla key={`${abierta.id}-${rubro.key}`} rubro={rubro} funcion={abierta} activo={activas[abierta.id]} onActivo={setActiva(abierta.id)} onVolver={() => irA()} />
   }
 
-  const conLlave = FUNCIONES.filter(f => !f.externa)
   const recomendadas = FUNCIONES.filter(f => f.recomendada(rubro))
-  const nActivas = conLlave.filter(f => activas[f.id]).length // lo guardado de funciones que ya no existen no cuenta
+  const nActivas = FUNCIONES.filter(f => activas[f.id]).length // lo guardado de funciones que ya no existen no cuenta
   const q = busca.trim().toLowerCase()
   const visibles = (f: Funcion) =>
-    (filtro === 'todas' || (filtro === 'recomendadas' ? f.recomendada(rubro) : !f.externa && activas[f.id]))
+    (filtro === 'todas' || (filtro === 'recomendadas' ? f.recomendada(rubro) : activas[f.id]))
     && (!q || `${f.label} ${f.desc} ${grupoPorId(f.grupo).label}`.toLowerCase().includes(q))
   const hayAlguna = FUNCIONES.some(visibles)
   const clientes = pluralCliente(rubro).toLowerCase()
@@ -126,28 +113,25 @@ export default function AvanzadoTurnos({ rubro }: { rubro: RubroTurnos }) {
       <style>{CSS_AVANZADO + CSS_HUB}</style>
 
       <section className="tuo-espacio tua-vidriera tuo-entra" aria-labelledby="tua-titulo">
-        <Estrellas />
-        <Anillos size={560} />
         <div style={{ minWidth: 0 }}>
           <div className="tuo-eyebrow" style={{ marginBottom: 14 }}>Paquete Avanzado</div>
           <h1 id="tua-titulo" className="tuo-h1">Que tu agenda trabaje con vos</h1>
           <p className="tuo-bajada" style={{ fontSize: 15, color: 'var(--color-body)', marginTop: 12 }}>
-            {FUNCIONES.length} herramientas para llenar huecos, que tus {clientes} vuelvan y cobrar por adelantado.
+            {FUNCIONES.length} herramientas para llenar huecos y cobrar por adelantado a tus {clientes}.
             Las recomendadas son las que mejor le calzan a {rubro.label.toLowerCase()} ({MODO_LABEL[rubro.modo].toLowerCase()}).
           </p>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 20 }}>
             <Boton variant="primary" icon={<Sparkles size={15} aria-hidden />} onClick={() => setFiltro('recomendadas')}>Ver las {recomendadas.length} recomendadas</Boton>
-            <Boton variant="outline" icon={<Images size={15} aria-hidden />} onClick={() => irA('plantillas')}>Las 5 plantillas de tu rubro</Boton>
           </div>
         </div>
         <div className="tua-vidriera-panel">
-          <Anillo valor={nActivas / conLlave.length} size={84} grosor={8} color="#60A5FA" label={`${nActivas} de ${conLlave.length} funciones activas`}>
+          <Anillo valor={nActivas / FUNCIONES.length} size={84} grosor={8} color="#60A5FA" label={`${nActivas} de ${FUNCIONES.length} funciones activas`}>
             <span style={{ fontSize: 20 }}>{nActivas}</span>
           </Anillo>
           <div style={{ minWidth: 0 }}>
             <div className="tuo-rotulo">Activas ahora</div>
             <div style={{ fontFamily: 'var(--tuo-fh)', fontSize: 17, fontWeight: 600, color: 'var(--color-text)', marginTop: 4, letterSpacing: '-0.01em' }}>
-              <span className="tuo-num">{nActivas}</span> de <span className="tuo-num">{conLlave.length}</span> funciones
+              <span className="tuo-num">{nActivas}</span> de <span className="tuo-num">{FUNCIONES.length}</span> funciones
             </div>
             <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 3, lineHeight: 1.45 }}>
               {nActivas === 0 ? 'Todavía no prendiste ninguna.' : 'Se prenden y se apagan cuando quieras.'}
@@ -215,15 +199,13 @@ function TarjetaFuncion({ f, rubro, activa, onAbrir, i }: { f: Funcion; rubro: R
     // mismo elemento, la animación le ganaría al transform del hover.
     <div className="tua-entra" style={{ ['--i' as string]: Math.min(i, 10) } as CSSProperties}>
       <button
-        type="button" onClick={onAbrir} className="tuo-card tuo-card--accion tua-funcion" data-on={!f.externa && activa} data-rec={rec}
-        aria-label={`${f.label}. ${f.externa ? 'Galería' : activa ? 'Activo' : 'Inactivo'}${rec ? `. Recomendado para ${rubro.label}` : ''}`}
+        type="button" onClick={onAbrir} className="tuo-card tuo-card--accion tua-funcion" data-on={activa} data-rec={rec}
+        aria-label={`${f.label}. ${activa ? 'Activo' : 'Inactivo'}${rec ? `. Recomendado para ${rubro.label}` : ''}`}
       >
         <span style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%' }}>
           <span className="tua-funcion-ico" aria-hidden><f.Icon size={22} strokeWidth={1.7} /></span>
           <span style={{ flex: 1 }} />
-          {f.externa
-            ? <span className="tuo-chip tuo-chip--borde" style={{ height: 24, fontSize: 11.5 }}><Images size={11} aria-hidden />5 diseños para tu rubro</span>
-            : <BadgeEstado on={activa} />}
+          <BadgeEstado on={activa} />
         </span>
         <span className="tuo-h2" style={{ display: 'block', marginTop: 16, fontSize: 16.5 }}>{f.label}</span>
         <span style={{ display: 'block', fontSize: 13, color: 'var(--color-muted)', marginTop: 6, lineHeight: 1.55, flex: 1 }}>{f.desc}</span>
@@ -232,7 +214,7 @@ function TarjetaFuncion({ f, rubro, activa, onAbrir, i }: { f: Funcion; rubro: R
             ? <span className="tuo-chip tuo-chip--primario" style={{ height: 24, fontSize: 11.5 }}><Sparkles size={11} aria-hidden />Recomendado para {rubro.label.toLowerCase()}</span>
             : <span className="tuo-rotulo">{grupoPorId(f.grupo).corto}</span>}
           <span style={{ flex: 1 }} />
-          <span className="tua-funcion-ir">{f.externa ? 'Ver galería' : 'Configurar'}<ArrowRight size={15} aria-hidden /></span>
+          <span className="tua-funcion-ir">Configurar<ArrowRight size={15} aria-hidden /></span>
         </span>
       </button>
     </div>

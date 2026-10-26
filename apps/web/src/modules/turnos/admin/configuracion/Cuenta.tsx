@@ -1,17 +1,11 @@
-// Pestañas "livianas" de Configuración de Turnos: Dominio, Suscripción y
-// Equipo y permisos. Mismo look que las de Tienda (Dominios.tsx,
-// Suscripcion.tsx, Equipo.tsx) pero sin la lógica real de cada una: acá
-// alcanza con que se entienda qué hay y cómo se ve.
-//
-// Equipo y permisos no tiene datos propios: muestra las personas y los roles
-// del panel (los mismos de la pantalla Equipo), así lo que se ajusta acá vale
-// en todos lados.
+// Pestañas "livianas" de Configuración de Turnos: Dominio y Suscripción.
+// Mismo look que las de Tienda (Dominios.tsx, Suscripcion.tsx) pero sin la
+// lógica real de cada una: acá alcanza con que se entienda qué hay y cómo se ve.
+// El equipo y los roles viven en la pestaña Equipo (la pantalla Equipo del panel).
 import { useEffect, useRef, useState } from 'react'
-import { Globe, Link2, Copy, Check, Server, Crown, CreditCard, Receipt, ShieldCheck, Users, Eye, CalendarDays, X, CircleCheck } from 'lucide-react'
+import { Globe, Link2, Copy, Check, Server, Crown, CreditCard, Receipt, CalendarDays, X, CircleCheck } from 'lucide-react'
 import { temaDe } from '@/modules/turnos/storefront/tema'
-import { Sigla } from '@/modules/turnos/_shared/orbita/piezas'
-import RolesPermisos from '../Roles'
-import { CADA_TXT, pagoTxt, type EquipoConfig } from '../equipoDemo'
+
 import { useBorrador, Encabezado, SecCard, Campo, Dos, Chip, BotonBorde, BarraGuardar, Boton, Dialogo, type PropsTab } from './ui'
 import { subdominioDe, vozDe, cap } from './datos'
 
@@ -115,7 +109,7 @@ export function Suscripcion({ rubro, avisar }: PropsTab) {
     avisar('Tarjeta actualizada', 'Demo: no se guardó ni se cobró nada.')
   }
   const usos: [string, number, number | null][] = [
-    [rubro.modo === 'profesional' ? `Agendas de ${voz.recurso}` : rubro.modo === 'cancha' ? 'Canchas' : 'Salas y espacios', 3, 5],
+    [rubro.modo === 'profesional' ? `Agendas de ${voz.recurso}` : 'Salas y espacios', 3, 5],
     ['Mensajes de WhatsApp este mes', 412, 1000],
     [`${cap(voz.turnos)} este mes`, 286, null],
   ]
@@ -203,53 +197,6 @@ export function Suscripcion({ rubro, avisar }: PropsTab) {
           </div>
         </Dialogo>
       )}
-    </div>
-  )
-}
-
-// ─── Equipo y permisos ───────────────────────────────────────────────────────
-
-export function EquipoPermisos({ rubro, equipo }: PropsTab & { equipo?: EquipoConfig }) {
-  if (!equipo) return null
-  const { roles, personas } = equipo
-  const rolDe = (id: string) => roles.find(r => r.id === id)
-
-  return (
-    <div className="panel-page">
-      <Encabezado rotulo="Cuenta" titulo="Equipo y permisos"
-        bajada={`Quién entra al panel y qué puede ver cada uno. Los roles vienen armados para ${rubro.label.toLowerCase()}: ajustalos permiso por permiso o creá los tuyos.`}
-        acciones={<Boton variant="primary" icon={<Users size={15} />} onClick={equipo.onIrEquipo}>Gestionar el equipo</Boton>} />
-      <div className="tuc-pila">
-        <SecCard titulo={`Personas (${personas.length})`} Icon={ShieldCheck} bajada="Cada persona entra con su cuenta y ve el panel que le da su rol. Se suman y se editan desde Equipo.">
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {personas.map((p, i) => {
-              const rol = rolDe(p.rolId)
-              return (
-                <div key={p.id} className="tuc-miembro tuc-linea" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 8px', margin: '0 -8px', borderTop: i ? '1px solid var(--color-border)' : 'none', flexWrap: 'wrap' }}>
-                  <Sigla nombre={p.nombre} color={p.color} size={38} />
-                  <div style={{ flex: '1 1 180px', minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{p.nombre}</span>
-                      {p.pendiente && <Chip tono="aviso">Invitación pendiente</Chip>}
-                    </div>
-                    <div style={{ fontSize: 12.5, color: 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.email || pagoTxt(p.pago, rubro)}{p.email && p.pago ? ` · ${pagoTxt(p.pago, rubro)} ${CADA_TXT[p.pago.cada]}` : ''}</div>
-                  </div>
-                  {rol?.fijo ? <Chip tono="primario"><Crown size={11} aria-hidden />{rol.nombre}</Chip> : <Chip>{rol?.nombre ?? 'Sin rol'}</Chip>}
-                  {!rol?.fijo && <BotonBorde Icon={Eye} onClick={() => equipo.onVerComo({ rolId: p.rolId, personaId: p.id })} label={`Ver el panel como ${p.nombre}`}>Ver su panel</BotonBorde>}
-                </div>
-              )
-            })}
-          </div>
-        </SecCard>
-
-        <section aria-label="Roles">
-          <div style={{ margin: '6px 0 14px' }}>
-            <h2 className="tuo-h2">Roles</h2>
-            <p className="tuc-card-bajada">Qué ve y qué puede hacer cada rol. Lo que cambies vale para todos los que lo tengan.</p>
-          </div>
-          <RolesPermisos rubro={rubro} roles={roles} personas={personas} onGuardar={equipo.onGuardarRol} onBorrar={equipo.onBorrarRol} onVerComo={equipo.onVerComo} />
-        </section>
-      </div>
     </div>
   )
 }

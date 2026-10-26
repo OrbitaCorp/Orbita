@@ -18,7 +18,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Monitor, Smartphone, ExternalLink, Lock, RotateCw } from 'lucide-react'
 import type { RubroTurnos } from '@/modules/turnos/datos'
-import type { FormaSitio } from '@/modules/turnos/demo/negocioDemo'
+import type { FormaSitio } from '@/modules/turnos/datos/negocio'
 import { temaDe, variablesTema } from '@/modules/turnos/storefront/tema'
 import type { AjustesPlantilla, Paleta, PlantillaSitio } from './datos'
 
@@ -179,7 +179,7 @@ function hidratado(frame: HTMLIFrameElement | null): boolean {
 
 export const CSS_VISTA_PREVIA = `
   .tuc-vp { display: flex; flex-direction: column; min-height: 0; border-radius: 18px; overflow: hidden; border: 1px solid var(--color-border); background: var(--color-bg);
-    box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 24px 60px -24px rgba(15,23,42,0.35), 0 8px 24px -12px rgba(37,99,235,0.18); }
+    box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 24px 60px -24px rgba(15,23,42,0.35); }
   .tuc-vp-barra { min-height: 48px; flex-shrink: 0; border-bottom: 1px solid var(--color-border); display: flex; align-items: center; gap: 8px; padding: 7px 10px; flex-wrap: wrap; background: var(--color-surface); }
   .tuc-vp-luces { display: inline-flex; gap: 6px; padding: 0 4px 0 2px; flex-shrink: 0; }
   .tuc-vp-luces > span { width: 10px; height: 10px; border-radius: 50%; background: var(--color-border-strong); }
@@ -196,9 +196,9 @@ export const CSS_VISTA_PREVIA = `
     transition: color 150ms ease, border-color 150ms ease, background 150ms ease; }
   .tuc-vp-escena { position: relative; flex: 1; min-height: 0; overflow: clip; background: var(--color-bg); }
   .tuc-vp-escena--movil { display: grid; place-items: center;
-    background: radial-gradient(520px 320px at 50% 0%, color-mix(in srgb, var(--color-primary) 16%, transparent), transparent 70%), var(--color-surface-alt); }
+    background: var(--color-surface-alt); }
   .tuc-vp-tel { position: relative; flex-shrink: 0; box-sizing: content-box; overflow: hidden; background: #0B0F19; border-style: solid; border-color: #0B0F19;
-    box-shadow: 0 0 0 1.5px #2A3350, 0 0 0 3px #0B0F19, 0 30px 60px -18px rgba(3,6,14,0.55), 0 0 60px -10px color-mix(in srgb, var(--color-primary) 35%, transparent); }
+    box-shadow: 0 0 0 1.5px #2A3350, 0 0 0 3px #0B0F19, 0 30px 60px -18px rgba(3,6,14,0.55); }
   .tuc-vp-isla { position: absolute; top: 0; left: 50%; transform: translateX(-50%); background: #0B0F19; z-index: 2; pointer-events: none; }
   .tuc-vp-carga { position: absolute; inset: 0; display: grid; place-items: center; background: var(--color-surface); }
   .tuc-spin { animation: tucSpin 800ms linear infinite; }
@@ -210,7 +210,7 @@ export const CSS_VISTA_PREVIA = `
   @media (max-width: 560px) {
     .tuc-vp-url, .tuc-vp-luces { display: none !important; }
     .tuc-vp-barra { justify-content: space-between; }
-    .tuc-vp-mini > button { height: 40px; min-width: 44px; }
+    .tuc-vp-mini > button { height: 44px; min-width: 44px; }
     .tuc-vp-accion { width: 44px; height: 44px; }
   }
   @media (prefers-reduced-motion: reduce) { .tuc-spin { animation-duration: 2.4s; } }

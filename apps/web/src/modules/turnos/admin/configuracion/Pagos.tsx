@@ -28,7 +28,7 @@ export default function Pagos({ rubro, avisar }: PropsTab) {
           {v.conectado ? (
             <>
               <div className="tuc-renglon" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14, flexWrap: 'wrap', marginBottom: 16 }}>
-                <span aria-hidden style={{ width: 44, height: 44, borderRadius: 12, background: '#009EE3', color: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0, boxShadow: '0 8px 18px rgba(0,158,227,0.35)' }}><Wallet size={20} /></span>
+                <span aria-hidden style={{ width: 44, height: 44, borderRadius: 12, background: '#009EE3', color: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0 }}><Wallet size={20} /></span>
                 <div style={{ flex: '1 1 180px', minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{t.nombre}</div>
                   <div className="tuo-num" style={{ fontSize: 12, color: 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis' }}>hola@{subdominioDe(t.nombre)}.com.ar · conectada el 02/09/2026</div>
@@ -65,7 +65,7 @@ export default function Pagos({ rubro, avisar }: PropsTab) {
             <Dos>
               <Campo label="Alias" value={v.alias} onChange={x => b.set('alias', x)} mono sufijo={
                 <button type="button" aria-label="Copiar alias" onClick={() => { void navigator.clipboard?.writeText(v.alias).catch(() => undefined); setCopiado(true); setTimeout(() => setCopiado(false), 1600) }}
-                  className="tuc-icono" style={{ width: 30, height: 30 }}>
+                  className="tuc-icono">
                   {copiado ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />}
                 </button>
               } />

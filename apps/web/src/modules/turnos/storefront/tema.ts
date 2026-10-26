@@ -24,7 +24,7 @@
 // belleza no-barbería y clases particulares, algunas de public/plantillas que
 // ya estaban en el repo.
 import { semanaDe, type RubroTurnos, type FamiliaId } from '@/modules/turnos/datos'
-import { modalidadesRubro, type AparienciaDemo, type IdentidadDemo, type Modalidad } from '@/modules/turnos/demo/negocioDemo'
+import { modalidadesRubro, type AparienciaDemo, type IdentidadDemo, type Modalidad } from '@/modules/turnos/datos/negocio'
 import { SEMANA_PARTIDA, type Semana } from '@/modules/turnos/horario'
 import { E_CLARO, E_OSCURO, aplicarPlantilla, esHex, lookDeFabrica, plantillasDe, type PlantillaSitio } from './plantillas'
 
@@ -184,8 +184,9 @@ const TEMAS: Record<FamiliaId, TemaNegocio> = {
     },
     logo: null, modalidades: ['local'], zonas: 'Palermo, Villa Crespo, Colegiales y alrededores',
   },
+  // Bienestar: hoy es solo electroestimulación (sesiones cortas por equipo).
   deporte: {
-    nombre: 'Box Sur', tagline: 'Clases con cupo y coaches que te siguen de cerca', oscuro: true, hero: 'sangre', mayus: true,
+    nombre: 'Volt EMS', tagline: 'Sesiones de electroestimulación con tu entrenador al lado', oscuro: true, hero: 'sangre', mayus: true,
     estilo: 'box', composicion: 'impacto', tarjeta: 'corte', boton: 'recto', forma: 'recta', textura: 'trama',
     fh: "'Barlow Condensed', 'Oswald', Impact, sans-serif", fb: "'Barlow', 'Inter', system-ui, sans-serif", fm: MONO, pesoTitulo: 800, radio: 2,
     titular: ['Entrená', 'en serio'],
@@ -195,38 +196,38 @@ const TEMAS: Record<FamiliaId, TemaNegocio> = {
     fuentes: ['Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800', 'Barlow:wght@400;500;600;700'],
     fotoHero: '/turnos/dep-hero.jpg',
     galeria: ['/turnos/dep-barra.jpg', '/turnos/dep-soga.jpg', '/plantillas/dep-pesas.jpg', '/turnos/dep-pesas.jpg', '/turnos/dep-yoga.jpg'],
-    direccion: 'Av. Mitre 1520', barrio: 'Avellaneda', telefono: '11 5555-0177', instagram: 'boxsur', horarios: SEMANA_PARTIDA,
-    sello: 'Tu lugar asegurado antes de llegar',
+    direccion: 'Av. Mitre 1520', barrio: 'Avellaneda', telefono: '11 5555-0177', instagram: 'voltems', horarios: SEMANA_PARTIDA,
+    sello: 'Tu equipo reservado antes de llegar',
     nosotros: {
       titulo: ['Entrená', 'acompañado'], desde: 2017,
       parrafos: [
-        'Somos un espacio para entrenar en serio y pasarla bien. Las clases tienen cupo: cada persona tiene su lugar y su corrección.',
-        'Los profes te conocen por el nombre, adaptan los ejercicios a tu nivel y te siguen de cerca para que avances sin lastimarte.',
+        'Entrenamos con electroestimulación: sesiones cortas e intensas, con un entrenador al lado tuyo de principio a fin.',
+        'Cada equipo se reserva con turno, así no esperás y la sesión arranca a horario. Adaptamos la intensidad a tu nivel para que avances sin lastimarte.',
       ],
-      valores: ['Grupos con cupo', 'Ejercicios adaptados a tu nivel', 'Todos los niveles'],
+      valores: ['Sesiones de 20 minutos', 'Un entrenador en cada sesión', 'Todos los niveles'],
     },
     logo: null, modalidades: ['local'], zonas: 'Avellaneda, Lanús y alrededores',
   },
   clases: {
-    nombre: 'Aula Viva', tagline: 'Talleres con las manos en la masa', oscuro: false, hero: 'partido',
+    nombre: 'Aula Viva', tagline: 'Clases particulares a tu ritmo', oscuro: false, hero: 'partido',
     estilo: 'taller', composicion: 'collage', tarjeta: 'papel', boton: 'pildora', forma: 'arco', textura: 'papel',
     fh: "'Fraunces', 'Libre Baskerville', Georgia, serif", fb: "'Nunito', system-ui, sans-serif", fm: MONO, pesoTitulo: 600, radio: 20,
-    titular: ['Aprendé', 'haciendo'],
+    titular: ['Aprendé', 'a tu ritmo'],
     c: { bg: '#F7F1E7', surface: '#FFFCF6', surfaceAlt: '#EFE4D3', border: '#DFCFB8', text: '#2A1F17', body: '#4A3B2F', muted: '#6B5B4C', primary: '#A8481F', primaryH: '#8E3B18', onPrimary: '#FFFFFF', primaryBg: '#F4DFD0' },
     e: { ...E_CLARO, acento: '#55663A' },
     grad: 'radial-gradient(800px 460px at 90% 0%, rgba(168,72,31,0.14), transparent 62%), radial-gradient(640px 400px at 0% 100%, rgba(85,102,58,0.14), transparent 60%)',
     fuentes: ['Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500;1,9..144,600', 'Nunito:wght@400;600;700;800'],
-    fotoHero: '/turnos/cla-hero.jpg',
-    galeria: ['/turnos/cla-torno.jpg', '/turnos/cla-manos.jpg', '/turnos/cla-vasija.jpg', '/plantillas/casa-ceramica.jpg', '/turnos/cla-hero.jpg'],
+    fotoHero: '/plantillas/libre-lectura.jpg',
+    galeria: ['/plantillas/libre-cuaderno.jpg', '/plantillas/libre-lapices.jpg', '/plantillas/libre-lectura.jpg', '/plantillas/casa-interior.jpg'],
     direccion: 'Honduras 5020', barrio: 'Palermo Soho, CABA', telefono: '11 5555-0123', instagram: 'aulaviva', horarios: SEMANA_PARTIDA,
-    sello: 'Cupos limitados en cada encuentro',
+    sello: 'Elegí el día y el horario de tu clase',
     nosotros: {
-      titulo: ['Aprender', 'con las manos'], desde: 2019,
+      titulo: ['A tu ritmo,', 'paso a paso'], desde: 2019,
       parrafos: [
-        'Somos un taller de grupos chicos, donde se aprende haciendo. Cada encuentro tiene cupo limitado para que nadie se quede mirando.',
-        'Los materiales están incluidos y no hace falta experiencia: venís, hacés y te llevás lo que hiciste.',
+        'Clases uno a uno, al ritmo de cada alumno. Empezamos por ver dónde estás y armamos un plan para llegar a donde querés.',
+        'Apoyo escolar, idiomas y música, con profes que explican las veces que haga falta.',
       ],
-      valores: ['Grupos chicos', 'Materiales incluidos', 'Sin experiencia previa'],
+      valores: ['Clases uno a uno', 'Un plan a tu medida', 'En el estudio o en tu casa'],
     },
     logo: null, modalidades: ['local'], zonas: 'Palermo, Villa Crespo y alrededores',
   },
@@ -240,16 +241,13 @@ const HERO_RUBRO: Record<string, string> = {
   maquillaje: '/plantillas/belleza-labial.jpg', estetica: '/plantillas/belleza-spa.jpg', spa: '/plantillas/belleza-spa.jpg',
   depilacion: '/plantillas/relato-modelo.jpg', unas: '/plantillas/belleza-manos.jpg', pestanas: '/plantillas/belleza-labial.jpg',
   peluqueria: '/turnos/bel-salon.jpg', tatuajes: '/turnos/bel-navaja.jpg', consulta: '/turnos/sal-consulta.jpg',
-  yoga: '/turnos/dep-yoga.jpg', danza: '/turnos/dep-yoga.jpg', funcional: '/turnos/dep-soga.jpg', canchas: '/turnos/can-hero.jpg',
-  clases: '/plantillas/libre-lectura.jpg', odonto: '/turnos/sal-dentista.jpg',
+  odonto: '/turnos/sal-dentista.jpg',
 }
 // Galería propia de los rubros cuyas fotos de plantilla no aplican.
 const GALERIA_RUBRO: Record<string, string[]> = {
   maquillaje: ['/plantillas/belleza-maquillaje.jpg', '/plantillas/belleza-paleta-2.jpg', '/plantillas/belleza-coral.jpg', '/plantillas/belleza-paletas.jpg', '/plantillas/belleza-labial.jpg'],
   pestanas: ['/plantillas/belleza-labial.jpg', '/plantillas/belleza-cosmetica.jpg', '/plantillas/relato-modelo.jpg', '/plantillas/casa-plantas.jpg', '/plantillas/belleza-coral.jpg'],
   odonto: ['/turnos/sal-dentista.jpg', '/turnos/sal-consulta.jpg', '/plantillas/casa-interior.jpg', '/plantillas/casa-plantas.jpg'],
-  clases: ['/plantillas/libre-cuaderno.jpg', '/plantillas/libre-lapices.jpg', '/plantillas/libre-lectura.jpg', '/plantillas/casa-interior.jpg'],
-  canchas: ['/turnos/can-padel.jpg', '/turnos/can-partido.jpg', '/turnos/can-pelota.jpg', '/turnos/can-paletas.jpg', '/turnos/can-arco.jpg'],
 }
 const NOMBRE_RUBRO: Record<string, [string, string]> = {
   peluqueria: ['Estudio Norte', 'Color, corte y peinado'], estilista: ['Sol Rivas Estilista', 'Tu estilista, a tu tiempo'],
@@ -258,16 +256,12 @@ const NOMBRE_RUBRO: Record<string, [string, string]> = {
   spa: ['Casa Calma', 'Masajes y circuitos de relax'], tatuajes: ['Tinta Norte', 'Tatuajes y piercing con turno'],
   odonto: ['Sonrisa Palermo', 'Odontología integral'], kinesio: ['Kine Palermo', 'Rehabilitación y kinesiología'], psico: ['Espacio Palermo', 'Psicología con turnos fijos'],
   nutricion: ['Nutrición Palermo', 'Planes a tu medida'], 'medicina-estetica': ['Clínica Lumen', 'Medicina estética'],
-  yoga: ['Prana Studio', 'Yoga y pilates con cupos'], danza: ['Ritmo Sur', 'Clases de baile para todos'], natacion: ['Club Delta', 'Natación y pileta libre'],
-  canchas: ['Complejo Sur', 'Canchas de fútbol y pádel'], clases: ['Aula Viva', 'Clases particulares a tu ritmo'],
 }
 // Titular del hero cuando el de la plantilla no le habla al rubro.
 const TITULAR_RUBRO: Record<string, [string, string]> = {
   peluqueria: ['Tu pelo,', 'en buenas manos'], tatuajes: ['Tu idea,', 'en la piel'], maquillaje: ['Lista para', 'tu momento'],
   unas: ['Manos que', 'hablan de vos'], pestanas: ['Una mirada', 'que se nota'], depilacion: ['Piel suave,', 'sin vueltas'],
   odonto: ['Tu sonrisa,', 'bien cuidada'], psico: ['Un espacio', 'para vos'], kinesio: ['Volvé a', 'moverte bien'], nutricion: ['Comer mejor,', 'a tu medida'],
-  canchas: ['Armá', 'el partido'], yoga: ['Respirá', 'y soltá'], danza: ['Vení', 'a bailar'], natacion: ['Tirate', 'al agua'],
-  clases: ['Aprendé', 'a tu ritmo'],
 }
 
 // "Nosotros" cuando el texto de la plantilla no le habla al rubro. Lo que no se pisa, queda el de la plantilla.
@@ -304,46 +298,6 @@ const NOSOTROS_RUBRO: Record<string, Partial<Nosotros>> = {
     ],
     valores: ['Confidencialidad', 'Sesiones de 50 minutos', 'Horario fijo semanal'],
   },
-  canchas: {
-    titulo: ['Hecho para', 'jugar'],
-    parrafos: [
-      'Un complejo pensado para que el partido salga redondo: canchas cuidadas, buena luz y vestuarios.',
-      'Reservás online la cancha y el horario, y el día del partido solo hay que llegar y jugar.',
-    ],
-    valores: ['Canchas en buen estado', 'Luz para jugar de noche', 'Vestuarios y estacionamiento'],
-  },
-  natacion: {
-    titulo: ['Todo el año,', 'al agua'],
-    parrafos: [
-      'Una pileta climatizada para aprender, entrenar o nadar por tu cuenta. Hay cupo por andarivel: siempre hay lugar para nadar cómodo.',
-      'Profes para todos los niveles, desde quien recién arranca hasta quien entrena.',
-    ],
-    valores: ['Pileta climatizada', 'Cupo por andarivel', 'Todos los niveles'],
-  },
-  yoga: {
-    titulo: ['Un rato', 'para bajar un cambio'],
-    parrafos: [
-      'Un estudio tranquilo, de grupos reducidos. Las clases tienen cupo: cada persona tiene su espacio y su corrección.',
-      'Te acompañamos desde la primera clase. No hace falta experiencia ni traer nada.',
-    ],
-    valores: ['Grupos reducidos', 'Todos los niveles', 'Mat y elementos en el estudio'],
-  },
-  danza: {
-    titulo: ['Vení', 'a moverte'],
-    parrafos: [
-      'Una escuela para bailar a cualquier edad y con cualquier nivel. Los grupos tienen cupo para que haya lugar para moverse y aprender.',
-      'Elegís el estilo y el horario, reservás tu lugar y venís a pasarla bien.',
-    ],
-    valores: ['Varios estilos y niveles', 'Grupos con cupo', 'No hace falta experiencia'],
-  },
-  clases: {
-    titulo: ['A tu ritmo,', 'paso a paso'],
-    parrafos: [
-      'Clases uno a uno, al ritmo de cada alumno. Empezamos por ver dónde estás y armamos un plan para llegar a donde querés.',
-      'Apoyo escolar, idiomas y música, con profes que explican las veces que haga falta.',
-    ],
-    valores: ['Clases uno a uno', 'Un plan a tu medida', 'En el estudio o en tu casa'],
-  },
 }
 
 /**
@@ -378,8 +332,8 @@ function temaEjemplo(rubro: RubroTurnos): TemaNegocio {
     ...base, nombre, tagline, instagram, galeria, fotoHero: HERO_RUBRO[rubro.key] ?? base.fotoHero, titular: TITULAR_RUBRO[rubro.key] ?? base.titular,
     nosotros: { ...base.nosotros, ...NOSOTROS_RUBRO[rubro.key] }, modalidades: modalidadesRubro(rubro),
   }
-  // Un estudio de yoga no se ve como un box de crossfit aunque los dos sean "deporte": si la
-  // plantilla de fábrica del rubro no es la de su familia, el negocio de ejemplo ya sale con ella.
+  // Si la plantilla de fábrica del rubro (la primera de su catálogo) no es la de su familia,
+  // el negocio de ejemplo ya sale con ella: así el sitio y Apariencia muestran lo mismo.
   const deFamilia = RUBROS_ATELIER.has(rubro.key) ? 'atelier' : LOOK_FAMILIA[rubro.familia]
   return lookDeFabrica(rubro.key) === deFamilia ? t : aplicarPlantilla(t, plantillasDe(rubro, fotosDe(t))[0])
 }
@@ -437,12 +391,10 @@ const ALT: Record<string, string> = {
   'bel-hero': 'El salón, con sus tres sillones', 'bel-navaja': 'Perfilado a máquina', 'bel-herramientas': 'Las herramientas del oficio', 'bel-tijeras': 'Corte a tijera y peine',
   'bel-salon': 'Los puestos de trabajo', 'bel-corte': 'Afeitado a navaja',
   'sal-hero': 'Una consulta en el consultorio', 'sal-consulta': 'Atención en el consultorio', 'sal-presion': 'Control de presión', 'sal-dentista': 'Explicación de un tratamiento',
-  'dep-hero': 'El box, con los racks y los discos', 'dep-barra': 'La zona de barras', 'dep-soga': 'Trabajo con sogas', 'dep-pesas': 'Levantamiento con barra', 'dep-yoga': 'Una clase grupal', 'dep-pista': 'Largada en la pista',
-  'can-hero': 'La cancha de fútbol, desde arriba', 'can-padel': 'Las canchas de pádel', 'can-partido': 'Un partido de fútbol 5', 'can-pelota': 'Césped sintético', 'can-paletas': 'Paletas y pelotas de pádel', 'can-arco': 'La cancha iluminada de noche',
-  'cla-hero': 'El torno y las herramientas', 'cla-torno': 'Modelando una pieza', 'cla-manos': 'Manos en el torno', 'cla-vasija': 'Terminando una vasija',
+  'dep-hero': 'La sala de entrenamiento, con los racks y los discos', 'dep-barra': 'La zona de barras', 'dep-soga': 'Trabajo con sogas', 'dep-pesas': 'Levantamiento con barra', 'dep-yoga': 'Una clase grupal',
   'belleza-spa': 'Tratamiento facial en cabina', 'belleza-manos': 'Cuidado de pies y manos', 'belleza-cosmetica': 'Los productos que usamos', 'belleza-maquillaje': 'Paleta y polvos', 'belleza-labial': 'Maquillaje de ojos y labios',
   'belleza-coral': 'Brochas y labiales', 'belleza-paletas': 'Paletas de sombras', 'belleza-paleta-2': 'Eligiendo los tonos', 'relato-modelo': 'Pelo cuidado', 'casa-plantas': 'La sala de espera', 'casa-interior': 'La recepción',
-  'casa-ceramica': 'Piezas terminadas', 'libre-lectura': 'Material de lectura', 'libre-cuaderno': 'Cuaderno de apuntes', 'libre-lapices': 'Lápices de colores',
+  'libre-lectura': 'Material de lectura', 'libre-cuaderno': 'Cuaderno de apuntes', 'libre-lapices': 'Lápices de colores',
 }
 export const altFoto = (src: string) => {
   const clave = src.split('/').pop()!.replace('.jpg', '')

@@ -18,10 +18,9 @@ import { Avatar } from '@/design-system/components/Avatar'
 import { horaTxt, pesos, type Turno, type Cliente, type Recurso, type RubroTurnos } from '@/modules/turnos/datos'
 import { AHORA_DEMO, FECHA_DEMO, minutosAbiertos, type Tramo } from '@/modules/turnos/horario'
 import { OrbitaDia, Anillo } from '@/modules/turnos/_shared/orbita/OrbitaDia'
-import { Estrellas } from '@/modules/turnos/_shared/orbita/Cielo'
 import { Indicador } from '@/modules/turnos/_shared/orbita/piezas'
 import TurnosLista from './TurnosLista'
-import { SLOT, huecosDe, type MensajeWA, type NuevoTurnoPre } from './agendaDemo'
+import { SLOT, huecosDe, type MensajeWA, type NuevoTurnoPre } from '../datos/agenda'
 
 const saludo = (min: number) => (min < 12 * 60 ? 'Buen día' : min < 20 * 60 ? 'Buenas tardes' : 'Buenas noches')
 const faltan = (min: number) => (min < 60 ? `${min} min` : `${Math.floor(min / 60)} h${min % 60 ? ` ${min % 60} min` : ''}`)
@@ -78,17 +77,17 @@ export default function ResumenDia({ negocio, saludo: aQuien, rubro, turnos, cli
   return (
     <div className="panel-page">
       <style>{`
-        .tu-res-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 400px); gap: 28px; align-items: center; padding: 30px 32px; border-radius: 24px; border: 1px solid rgba(147,197,253,0.16); box-shadow: 0 24px 60px rgba(5,8,15,0.28); margin-bottom: 18px; }
+        .tu-res-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 400px); gap: 28px; align-items: center; padding: 30px 32px; border-radius: 24px; border: 1px solid rgba(147,197,253,0.16); margin-bottom: 18px; }
         .tu-res-ahora { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 24px; }
         .tu-res-mini { padding: 14px; border-radius: 14px; border: 1px solid rgba(147,197,253,0.14); background: rgba(255,255,255,0.035); backdrop-filter: blur(6px); text-align: left; font-family: inherit; color: inherit; cursor: pointer; transition: border-color 180ms ease, background 180ms ease, transform 220ms cubic-bezier(0.22, 1, 0.36, 1); }
         @media (hover: hover) { .tu-res-mini:hover { border-color: rgba(147,197,253,0.42); background: rgba(96,165,250,0.08); transform: translateY(-2px); } }
         .tu-res-mini:focus-visible { outline: 2px solid #93C5FD; outline-offset: 2px; }
         .tu-res-kpis { display: grid; grid-template-columns: repeat(var(--tu-kpis, 4), minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
         .tu-res-cols { display: grid; grid-template-columns: minmax(0, 2fr) minmax(290px, 1fr); gap: 18px; align-items: start; }
-        .tu-res-aviso { transition: border-color 180ms ease, transform 220ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 220ms ease; }
+        .tu-res-aviso { transition: border-color 180ms ease, transform 220ms cubic-bezier(0.22, 1, 0.36, 1); }
         .tu-res-aviso svg:last-child { transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1); }
         @media (hover: hover) {
-          .tu-res-aviso:hover { transform: translateY(-1px); box-shadow: 0 8px 22px color-mix(in srgb, var(--color-warning) 18%, transparent); }
+          .tu-res-aviso:hover { transform: translateY(-1px); }
           .tu-res-aviso:hover svg:last-child { transform: translateX(4px); }
         }
         .tu-res-aviso:focus-visible { outline: 2px solid var(--color-warning); outline-offset: 2px; }
@@ -117,7 +116,6 @@ export default function ResumenDia({ negocio, saludo: aQuien, rubro, turnos, cli
 
       {/* El día en órbita */}
       <section className="tuo-espacio tu-res-hero tuo-entra" aria-label="El día de hoy">
-        <Estrellas cantidad={38} />
         <div style={{ minWidth: 0 }}>
           <div className="tuo-eyebrow">{FECHA_DEMO}</div>
           <h1 className="tuo-h1" style={{ fontSize: 'clamp(25px, 3vw, 34px)', marginTop: 12 }}>{saludo(AHORA_DEMO)}, {aQuien}</h1>
@@ -146,7 +144,7 @@ export default function ResumenDia({ negocio, saludo: aQuien, rubro, turnos, cli
                   </span>
                 </span>
                 <span role="progressbar" aria-label="Avance del turno" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(avance * 100)} style={{ display: 'block', height: 4, borderRadius: 999, background: 'rgba(147,197,253,0.16)', marginTop: 12, overflow: 'hidden' }}>
-                  <span className="tu-res-barra" style={{ display: 'block', width: `${avance * 100}%`, height: '100%', borderRadius: 999, background: 'linear-gradient(90deg, #3B82F6, #93C5FD)' }} />
+                  <span className="tu-res-barra" style={{ display: 'block', width: `${avance * 100}%`, height: '100%', borderRadius: 999, background: 'var(--color-primary)' }} />
                 </span>
               </button>
             )}
@@ -208,7 +206,7 @@ export default function ResumenDia({ negocio, saludo: aQuien, rubro, turnos, cli
         </section>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0 }}>
-          <section className="tuo-card tuo-card--pad tuo-card--luz tuo-entra" style={{ ['--i' as string]: 4 }}>
+          <section className="tuo-card tuo-card--pad tuo-entra" style={{ ['--i' as string]: 4 }}>
             <h2 className="tuo-h2">Ocupación de hoy</h2>
             <p style={{ fontSize: 12.5, color: 'var(--color-muted)', margin: '3px 0 16px' }}>Tiempo tomado sobre el horario de atención de cada uno.</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

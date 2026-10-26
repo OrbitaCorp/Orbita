@@ -1,12 +1,10 @@
 // Armazón del panel de Turnos. Mantiene las medidas del panel de Tienda
 // (sidebar de 240px, header de 64px, `.admin-main` de fondo, drawer en celular)
 // para que los dos productos se sientan el mismo lugar, y suma encima el
-// lenguaje de Turnos: el negocio como planeta del menú, grupos rotulados, el
-// ítem activo con su filo de luz y la tarjeta de la página de reservas.
-// No reusa AdminLayout porque ese exige sesión y arma el menú de Tienda; cuando
-// Turnos sea real, lo correcto es sumar un módulo `turnos` a Sidebar.MODULOS y
-// a AdminSeccionShell en vez de este archivo. Los 40px de --tuo-tope y del alto
-// son la tira de la demo (BarraDemo), que en el producto real no existe.
+// lenguaje de Turnos: el negocio arriba del menú, grupos rotulados, el ítem
+// activo marcado con un filo y la tarjeta de la página de reservas.
+// No reusa AdminLayout porque ese exige sesión y arma el menú de Tienda. Los
+// 40px de --tuo-tope y del alto son la tira de la demo (BarraDemo).
 //
 // El buscador y la campanita abren paneles flotantes. Van position: fixed y
 // fuera del <header> a propósito: el header tiene backdrop-filter (arma su
@@ -192,9 +190,11 @@ export default function LayoutTurnos({ negocio, rubro, fecha, items, activo, onI
   const ir = (id: string) => { onIr(id); setAbierto(false) }
 
   return (
-    <div className="tuo tu-shell" style={{ ['--tuo-tope' as string]: '40px', display: 'flex', height: 'calc(100vh - 40px)', overflow: 'hidden' }}>
+    <div className="tuo tu-shell" style={{ ['--tuo-tope' as string]: '40px', display: 'flex', overflow: 'hidden' }}>
       <EstiloTurnos />
       <style>{`
+        /* dvh: en el celular, 100vh incluye la barra del navegador y el pie del panel quedaba tapado. */
+        .tu-shell { height: calc(100vh - 40px); height: calc(100dvh - 40px); }
         .tu-sidebar { width: 240px; flex-shrink: 0; transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1); }
         .tu-backdrop { display: none; }
         .tu-menu-btn, .tu-cerrar-btn { display: none !important; }
@@ -211,10 +211,10 @@ export default function LayoutTurnos({ negocio, rubro, fecha, items, activo, onI
         .tu-nav-item[aria-current="page"] svg { color: var(--color-primary); }
         .tu-nav-item[aria-current="page"]::before { opacity: 1; transform: none; }
 
-        .tu-reservas { transition: border-color 180ms ease, box-shadow 220ms ease, transform 220ms cubic-bezier(0.22, 1, 0.36, 1); }
+        .tu-reservas { transition: border-color 180ms ease; }
         .tu-reservas .tu-reservas-flecha { transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1); }
         @media (hover: hover) {
-          .tu-reservas:hover { border-color: rgba(147,197,253,0.45) !important; box-shadow: 0 10px 28px rgba(37,99,235,0.28); transform: translateY(-1px); }
+          .tu-reservas:hover { border-color: rgba(147,197,253,0.45) !important; }
           .tu-reservas:hover .tu-reservas-flecha { transform: translate(2px, -2px); }
         }
         .tu-reservas:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
@@ -260,6 +260,9 @@ export default function LayoutTurnos({ negocio, rubro, fecha, items, activo, onI
           .tu-backdrop[data-abierto="true"] { display: block; position: fixed; inset: 0; z-index: 130; background: rgba(3,6,14,0.6); backdrop-filter: blur(3px); animation: tuoVelo 200ms ease; }
           .tu-menu-btn, .tu-cerrar-btn { display: inline-flex !important; }
           .tu-cerrar-btn { width: 44px; min-width: 44px; height: 44px; }
+          /* Todo botón del panel (el menú, la campanita, los de cada pantalla) mide 44px para el dedo. */
+          .tu-shell .tuo-btn, .tu-shell .tuo-seg > button { min-height: 44px; }
+          .tu-shell .tuo-btn--icono { min-width: 44px; }
           .tu-header-ext { display: none !important; }
           .tu-nav-item { height: 44px; font-size: 14.5px; }
         }
@@ -282,10 +285,10 @@ export default function LayoutTurnos({ negocio, rubro, fecha, items, activo, onI
           <button ref={botonCerrar} type="button" onClick={() => setAbierto(false)} aria-label="Cerrar menú" className="tuo-btn tuo-btn--icono tuo-btn--sm tu-cerrar-btn"><X size={16} /></button>
         </div>
 
-        {/* El negocio: el planeta alrededor del que gira el menú. */}
+        {/* El negocio, arriba del menú. */}
         <div style={{ padding: '14px 12px 6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, borderRadius: 12, background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
-            <span aria-hidden style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--tuo-grad)', color: '#fff', fontFamily: 'var(--tuo-fh)', fontSize: 13, fontWeight: 700, boxShadow: '0 4px 12px rgba(37,99,235,0.35)' }}>{iniciales}</span>
+            <span aria-hidden style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--color-primary)', color: 'var(--color-on-primary)', fontFamily: 'var(--tuo-fh)', fontSize: 13, fontWeight: 700 }}>{iniciales}</span>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{negocio}</div>
               {rubro && <div style={{ fontSize: 11.5, color: 'var(--color-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{rubro}</div>}

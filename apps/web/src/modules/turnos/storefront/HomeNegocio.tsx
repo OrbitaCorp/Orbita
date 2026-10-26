@@ -5,27 +5,26 @@
 // La portada es una plantilla con CUATRO composiciones de hero (cine, partido,
 // impacto, collage) y tarjetas que cambian de forma según el tema: el orden de
 // las secciones es el mismo —es lo que convierte—, pero una barbería, un
-// consultorio, un box y un taller no comparten ni la entrada ni el trazo.
+// consultorio y un spa no comparten ni la entrada ni el trazo.
 // El CSS de todas las secciones vive en estilos.ts.
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
-  ArrowRight, Clock, MapPin, Navigation, MessageCircle, CalendarCheck, BellRing, ShieldCheck, Sparkles, Users, Phone, AtSign, MousePointerClick,
+  ArrowRight, Clock, MapPin, Navigation, MessageCircle, CalendarCheck, BellRing, ShieldCheck, Sparkles, Phone, AtSign, MousePointerClick,
   ChevronLeft, ChevronRight, X, Check, Percent, Gift, Home, UserRoundCheck,
 } from 'lucide-react'
-import { Anillo } from '@/modules/turnos/_shared/orbita/OrbitaDia'
-import { duracionTxt, recursosDe, clasesDe, horaTxt, type RubroTurnos, type ClaseCupo } from '@/modules/turnos/datos'
-import { beneficiosTxt, useNegocioDemo, type BeneficioTxt } from '@/modules/turnos/demo/negocioDemo'
+import { duracionTxt, horaTxt, recursosDe, type RubroTurnos } from '@/modules/turnos/datos'
+import { beneficiosTxt, useNegocioDemo, type BeneficioTxt } from '@/modules/turnos/datos/negocio'
 import SitioNegocio from './SitioNegocio'
 import { CSS_PORTADA } from './estilos'
-import { Abierto, AnillosTema, Encabezado, Foto, HOY, AHORA, HorasDia, Marca, OrbitaMini, Precio, ProximoLibre, Reveal, SemanaOrbita, TarjetaSellos, estadoLocal, proximoLibre, ruta, useDialogo } from './piezas'
+import { Abierto, AnillosTema, Encabezado, Foto, HOY, HorasDia, Marca, OrbitaMini, Precio, ProximoLibre, Reveal, SemanaOrbita, TarjetaSellos, estadoLocal, proximoLibre, ruta, useDialogo } from './piezas'
 import { useContacto } from './ContactoDemo'
 import { linkMapa } from './reserva/acciones'
 import { RETRATOS, altFoto, temaDe, type TemaNegocio } from './tema'
 
 interface P { rubro: RubroTurnos; t: TemaNegocio }
 
-const verbo = (r: RubroTurnos) => r.modo === 'cupo' ? 'Reservar mi lugar' : r.modo === 'cancha' ? 'Reservar cancha' : 'Reservar turno'
+const RESERVAR = 'Reservar turno'
 
 export default function HomeNegocio({ rubro }: { rubro: RubroTurnos }) {
   // El header arranca transparente solo en los heros con foto a sangre.
@@ -42,9 +41,7 @@ export default function HomeNegocio({ rubro }: { rubro: RubroTurnos }) {
           {t.estilo === 'box' && <Cinta rubro={rubro} t={t} />}
           <Confianza rubro={rubro} t={t} />
           <Disponibilidad rubro={rubro} />
-          {rubro.modo === 'cupo' && <Clases rubro={rubro} />}
-          {rubro.modo === 'cancha' && <Canchas rubro={rubro} />}
-          {rubro.modo !== 'cupo' && <Servicios rubro={rubro} t={t} />}
+          <Servicios rubro={rubro} t={t} />
           {rubro.modo === 'profesional' && <Equipo rubro={rubro} />}
           <Nosotros rubro={rubro} t={t} />
           <Galeria t={t} />
@@ -79,8 +76,8 @@ function Bajada({ t }: { t: TemaNegocio }) {
 function Botones({ rubro }: { rubro: RubroTurnos }) {
   return (
     <div className="tup-hero-ctas tu-entra" style={{ ['--i' as string]: 4 }}>
-      <Link href={ruta('reserva', rubro.key)} className="tu-btn tu-btn--lg">{verbo(rubro)} <ArrowRight size={18} aria-hidden /></Link>
-      <Link href={ruta('servicios', rubro.key)} className="tu-btn-sec tu-btn--lg">{rubro.modo === 'cupo' ? 'Ver actividades' : 'Servicios y precios'}</Link>
+      <Link href={ruta('reserva', rubro.key)} className="tu-btn tu-btn--lg">{RESERVAR} <ArrowRight size={18} aria-hidden /></Link>
+      <Link href={ruta('servicios', rubro.key)} className="tu-btn-sec tu-btn--lg">Servicios y precios</Link>
     </div>
   )
 }
@@ -155,18 +152,13 @@ function HeroCine({ rubro, t }: P) {
 
 function datosRapidos(rubro: RubroTurnos, t: TemaNegocio): { valor: string; rotulo: string }[] {
   const abre = { valor: String(t.horarios.filter(([, h]) => h).length), rotulo: 'días por semana' }
-  if (rubro.modo === 'cupo') {
-    const semana = clasesDe(rubro)
-    const lugares = semana.filter(c => c.dia === HOY && c.inicio >= AHORA).reduce((a, c) => a + Math.max(0, c.cupo - c.anotados), 0)
-    return [{ valor: String(semana.length), rotulo: 'clases por semana' }, { valor: String(lugares), rotulo: 'lugares libres hoy' }, abre]
-  }
   const recursos = recursosDe(rubro)
   // Si el dueño dejó todo sin precio, no hay "desde" que mostrar.
   const precios = rubro.servicios.filter(s => s.precio > 0).map(s => s.precio)
   return [
-    { valor: String(recursos.length), rotulo: rubro.modo === 'cancha' ? 'canchas' : rubro.modo === 'profesional' ? 'profesionales' : 'espacios' },
+    { valor: String(recursos.length), rotulo: rubro.modo === 'profesional' ? 'profesionales' : 'espacios' },
     precios.length
-      ? { valor: `$${Math.round(Math.min(...precios) / 1000)}k`, rotulo: rubro.modo === 'cancha' ? 'la hora, desde' : 'desde' }
+      ? { valor: `$${Math.round(Math.min(...precios) / 1000)}k`, rotulo: 'desde' }
       : { valor: String(rubro.servicios.length), rotulo: 'servicios' },
     abre,
   ]
@@ -253,7 +245,7 @@ function HeroCollage({ rubro, t }: P) {
   )
 }
 
-/** Cinta infinita con los servicios: ritmo de marca debajo del hero del box. */
+/** Cinta infinita con los servicios: ritmo de marca debajo del hero de las plantillas de estilo "box". */
 function Cinta({ rubro, t }: P) {
   const items = rubro.servicios.map(s => s.nombre)
   const fila = [...items, ...items, ...items]
@@ -346,7 +338,7 @@ function Servicios({ rubro, t }: P) {
   return (
     <section className="tu-cont tu-sec">
       <Reveal>
-        <Encabezado eyebrow="Servicios" titulo={carta ? <>Nuestra <em>carta</em></> : rubro.modo === 'cancha' ? <>Elegí <em>tu deporte</em></> : <>Qué podés <em>reservar</em></>} accion={{ label: 'Ver todos con detalle', href: ruta('servicios', rubro.key) }} />
+        <Encabezado eyebrow="Servicios" titulo={carta ? <>Nuestra <em>carta</em></> : <>Qué podés <em>reservar</em></>} accion={{ label: 'Ver todos con detalle', href: ruta('servicios', rubro.key) }} />
       </Reveal>
       {carta ? (
         <Reveal delay={80}><Carta rubro={rubro} t={t} /></Reveal>
@@ -405,133 +397,6 @@ function Carta({ rubro, t }: P) {
         ))}
       </div>
     </div>
-  )
-}
-
-// ─── Clases con cupo ─────────────────────────────────────────────────────────
-
-const DIA_CLASE = ['Lun 28', 'Mar 29', 'Mié 30', 'Jue 1', 'Vie 2', 'Hoy']
-
-function estadoCupo(c: ClaseCupo) {
-  const libres = c.cupo - c.anotados
-  if (libres <= 0) return { tono: 'lleno', texto: 'Lista de espera', libres: 0 }
-  if (libres <= 3) return { tono: 'aviso', texto: libres === 1 ? 'Último lugar' : `Últimos ${libres} lugares`, libres }
-  return { tono: 'ok', texto: `${libres} lugares libres`, libres }
-}
-
-function Clases({ rubro }: { rubro: RubroTurnos }) {
-  // Lo que queda de hoy y, para completar, las primeras del lunes.
-  const todas = clasesDe(rubro)
-  const clases = [...todas.filter(c => c.dia === HOY && c.inicio >= AHORA), ...todas.filter(c => c.dia === 0)].sort((a, b) => (a.dia === HOY ? -1 : 0) - (b.dia === HOY ? -1 : 0) || a.inicio - b.inicio).slice(0, 6)
-  return (
-    <section className="tu-cont tu-sec">
-      <Reveal><Encabezado eyebrow="Próximas clases" titulo={<>Reservá <em>tu lugar</em></>} bajada="El anillo muestra cuánto se llenó cada clase. Si está completa, te anotás en la lista de espera." accion={{ label: 'Ver la semana', href: ruta('reserva', rubro.key) }} /></Reveal>
-      <div className="tu-grilla tu-grilla--cl">
-        {clases.map((c, i) => {
-          const e = estadoCupo(c)
-          return (
-            <Reveal key={c.id} delay={i * 50}>
-              <Link href={ruta('reserva', rubro.key, { clase: c.id })} className="tu-card tu-card-h tu-spot tup-clase">
-                <span className="tup-clase-cab">
-                  <span>
-                    <span className="tu-rotulo">{DIA_CLASE[c.dia]}</span>
-                    <span className="tu-num tup-clase-hora">{horaTxt(c.inicio)}</span>
-                  </span>
-                  <Anillo valor={c.anotados / c.cupo} size={62} grosor={6} color={`var(--tu-${e.tono})`} label={`${c.anotados} de ${c.cupo} lugares ocupados`}>
-                    <span style={{ fontSize: 13 }}>{c.anotados}/{c.cupo}</span>
-                  </Anillo>
-                </span>
-                <span className="tu-h tup-clase-nombre">{c.nombre}</span>
-                <span className="tup-clase-det"><Users size={14} aria-hidden /> {c.profe} · {c.sala} · <span className="tu-num">{duracionTxt(c.duracion)}</span></span>
-                <span className="tup-clase-pie">
-                  <span className="tu-estado" data-tono={e.tono}>{e.texto}</span>
-                  <span className="tu-ir" aria-hidden><ArrowRight size={17} /></span>
-                </span>
-              </Link>
-            </Reveal>
-          )
-        })}
-      </div>
-    </section>
-  )
-}
-
-// ─── Canchas ─────────────────────────────────────────────────────────────────
-
-/** Cancha vista desde arriba, dibujada con el color del negocio. Cada deporte con sus líneas:
- *  pádel y tenis llevan red y cuadros de saque, no áreas ni círculo central. */
-function DibujoCancha({ deporte }: { deporte: string }) {
-  const d = deporte.toLowerCase()
-  const tenis = d.includes('tenis')
-  if (tenis || d.includes('pádel') || d.includes('padel')) {
-    // Pádel: saque a 3 m del fondo. Tenis: pasillos de dobles y saque más cerca de la red.
-    const [arriba, abajo] = tenis ? [30, 140] : [8, 162]
-    const [saqueIzq, saqueDer] = tenis ? [90, 230] : [54, 266]
-    return (
-      <svg aria-hidden viewBox="0 0 320 170" className="tup-cancha-svg">
-        <rect x="8" y="8" width="304" height="154" rx="4" fill="none" stroke="currentColor" strokeWidth="2" />
-        {tenis && <>
-          <line x1="8" y1={arriba} x2="312" y2={arriba} stroke="currentColor" strokeWidth="2" />
-          <line x1="8" y1={abajo} x2="312" y2={abajo} stroke="currentColor" strokeWidth="2" />
-        </>}
-        <line x1={saqueIzq} y1={arriba} x2={saqueIzq} y2={abajo} stroke="currentColor" strokeWidth="2" />
-        <line x1={saqueDer} y1={arriba} x2={saqueDer} y2={abajo} stroke="currentColor" strokeWidth="2" />
-        <line x1={saqueIzq} y1="85" x2={saqueDer} y2="85" stroke="currentColor" strokeWidth="2" />
-        {/* La red, con sus dos postes. */}
-        <line x1="160" y1="4" x2="160" y2="166" stroke="currentColor" strokeWidth="3" strokeDasharray="2 4" />
-        <circle cx="160" cy="4" r="3" fill="currentColor" />
-        <circle cx="160" cy="166" r="3" fill="currentColor" />
-        {/* La pelota cruza la red dando la vuelta: la órbita, en la cancha. */}
-        <g className="tu-orbita-gira" style={{ transformOrigin: '160px 85px', animationDuration: '9s' }}><circle cx="160" cy="50" r="4" fill="currentColor" /></g>
-      </svg>
-    )
-  }
-  return (
-    <svg aria-hidden viewBox="0 0 320 170" className="tup-cancha-svg">
-      <rect x="8" y="8" width="304" height="154" rx="4" fill="none" stroke="currentColor" strokeWidth="2" />
-      <line x1="160" y1="8" x2="160" y2="162" stroke="currentColor" strokeWidth="2" />
-      <circle cx="160" cy="85" r="30" fill="none" stroke="currentColor" strokeWidth="2" />
-      <circle cx="160" cy="85" r="3" fill="currentColor" />
-      <rect x="8" y="45" width="46" height="80" fill="none" stroke="currentColor" strokeWidth="2" />
-      <rect x="266" y="45" width="46" height="80" fill="none" stroke="currentColor" strokeWidth="2" />
-      <rect x="8" y="65" width="18" height="40" fill="none" stroke="currentColor" strokeWidth="2" />
-      <rect x="294" y="65" width="18" height="40" fill="none" stroke="currentColor" strokeWidth="2" />
-      {/* La pelota da la vuelta al círculo central: la órbita, en la cancha. */}
-      <g className="tu-orbita-gira" style={{ transformOrigin: '160px 85px', animationDuration: '9s' }}><circle cx="160" cy="55" r="5" fill="currentColor" /></g>
-    </svg>
-  )
-}
-
-function Canchas({ rubro }: { rubro: RubroTurnos }) {
-  const canchas = recursosDe(rubro)
-  const horas = [[16 * 60, 19 * 60, 21 * 60], [15 * 60 + 30, 17 * 60, 20 * 60], [18 * 60, 20 * 60, 22 * 60]]
-  return (
-    <section className="tu-cont tu-sec">
-      <Reveal><Encabezado eyebrow="Canchas" titulo={<>Libres <em>hoy</em></>} bajada={rubro.sena ? `Reservás con una seña del ${rubro.sena}% y el resto lo pagás en el lugar.` : undefined} accion={{ label: 'Ver todos los horarios', href: ruta('reserva', rubro.key) }} /></Reveal>
-      <div className="tu-grilla tu-grilla--sv" data-n={canchas.length}>
-        {canchas.map((c, i) => {
-          const s = rubro.servicios[i % rubro.servicios.length]
-          return (
-            <Reveal key={c.id} delay={i * 70}>
-              <div className="tu-card tu-card-h tu-spot tup-cancha">
-                <div className="tup-cancha-dib"><DibujoCancha deporte={s.nombre} /></div>
-                <div className="tup-cancha-cuerpo">
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-                    <span className="tu-h tup-sv-nombre">{c.nombre}</span>
-                    <span className="tu-rotulo">{s.nombre}</span>
-                  </div>
-                  <div className="tup-sv-dur"><Precio valor={s.precio} size={17} /> <span>· <span className="tu-num">{duracionTxt(s.duracion)}</span></span></div>
-                  <div className="tu-horas">
-                    {horas[i % horas.length].map(h => <Link key={h} href={ruta('reserva', rubro.key, { con: c.id })} className="tu-hora" aria-label={`Reservar ${c.nombre} hoy a las ${horaTxt(h)}`}>{horaTxt(h)}</Link>)}
-                    <Link href={ruta('reserva', rubro.key, { con: c.id })} className="tu-hora tu-hora--mas" aria-label={`Ver más horarios de ${c.nombre}`}><ArrowRight size={15} aria-hidden /></Link>
-                  </div>
-                </div>
-              </div>
-            </Reveal>
-          )
-        })}
-      </div>
-    </section>
   )
 }
 
@@ -635,12 +500,10 @@ function Visor({ fotos, inicial, onCerrar }: { fotos: string[]; inicial: number;
 /** Quiénes son y cómo trabajan, en palabras del negocio. El texto lo escribe el dueño en Configuración. */
 function Nosotros({ rubro, t }: P) {
   const n = t.nosotros
-  const recursos = rubro.modo === 'cupo' ? 0 : recursosDe(rubro).length
+  const recursos = recursosDe(rubro).length
   const datos = [
     ...(n.desde ? [{ valor: String(n.desde), rotulo: 'abrimos en' }] : []),
-    rubro.modo === 'cupo'
-      ? { valor: String(clasesDe(rubro).length), rotulo: 'clases por semana' }
-      : { valor: String(recursos), rotulo: rubro.modo === 'cancha' ? 'canchas' : rubro.modo === 'profesional' ? (recursos === 1 ? 'profesional' : 'profesionales') : 'espacios' },
+    { valor: String(recursos), rotulo: rubro.modo === 'profesional' ? (recursos === 1 ? 'profesional' : 'profesionales') : 'espacios' },
     { valor: String(t.horarios.filter(([, h]) => h).length), rotulo: 'días por semana' },
   ]
   return (
@@ -698,7 +561,7 @@ function Beneficios({ rubro, t }: P) {
             <h2 id="tup-ben" className="tu-h tu-h2">Reservá sin registrarte. <em>Con cuenta, sumás.</em></h2>
             <p className="tu-bajada">Para reservar alcanza con tu nombre y tu celular. Si además creás tu cuenta —es gratis y lleva un minuto—, {t.nombre} te lo reconoce cada vez que volvés.</p>
             <div className="tup-ben-ctas">
-              <Link href={ruta('reserva', rubro.key)} className="tu-btn">{verbo(rubro)} <ArrowRight size={17} aria-hidden /></Link>
+              <Link href={ruta('reserva', rubro.key)} className="tu-btn">{RESERVAR} <ArrowRight size={17} aria-hidden /></Link>
               <Link href={ruta('mis-turnos', rubro.key)} className="tu-btn-sec">Crear mi cuenta</Link>
             </div>
           </div>
@@ -726,7 +589,7 @@ function Beneficios({ rubro, t }: P) {
 
 function ComoFunciona({ rubro }: { rubro: RubroTurnos }) {
   const pasos = [
-    { Icon: MousePointerClick, titulo: rubro.modo === 'cupo' ? 'Elegís tu clase' : rubro.modo === 'cancha' ? 'Elegís la cancha' : 'Elegís el servicio', texto: rubro.modo === 'profesional' ? 'Y con quién te querés atender. Ves precio y duración antes de reservar.' : 'Ves precio, duración y lugares disponibles antes de reservar.' },
+    { Icon: MousePointerClick, titulo: 'Elegís el servicio', texto: rubro.modo === 'profesional' ? 'Y con quién te querés atender. Ves precio y duración antes de reservar.' : 'Ves precio, duración y lugares disponibles antes de reservar.' },
     { Icon: CalendarCheck, titulo: 'Reservás el horario', texto: rubro.sena ? `Confirmás con una seña del ${rubro.sena}% que se descuenta del total.` : 'La confirmación es inmediata, sin llamadas ni esperas.' },
     { Icon: BellRing, titulo: 'Te recordamos', texto: 'Un día antes te llega un WhatsApp. Si no podés ir, reprogramás desde el mismo link.' },
   ]
@@ -852,9 +715,9 @@ function Cierre({ rubro, t }: P) {
           <AnillosTema size={620} className="tup-cierre-anillos" />
           <div className="tup-cierre-txt">
             <div className="tup-cierre-rot"><OrbitaMini size={30} color="currentColor" lento /> {t.nombre}</div>
-            <h2 className="tu-h tu-h2">{rubro.modo === 'cupo' ? 'Tu lugar en la próxima clase, a un toque' : rubro.modo === 'cancha' ? 'La cancha de hoy, a un toque' : 'Tu próximo turno, a un toque'}</h2>
-            <p>Elegí día y horario, y listo. {rubro.modo === 'cupo' ? 'Si la clase está llena, te anotamos en la lista de espera.' : 'Te mandamos la confirmación al instante.'}</p>
-            <Link href={ruta('reserva', rubro.key)} className="tu-btn tu-btn--lg tu-btn--inverso">{verbo(rubro)} <ArrowRight size={18} aria-hidden /></Link>
+            <h2 className="tu-h tu-h2">Tu próximo turno, a un toque</h2>
+            <p>Elegí día y horario, y listo. Te mandamos la confirmación al instante.</p>
+            <Link href={ruta('reserva', rubro.key)} className="tu-btn tu-btn--lg tu-btn--inverso">{RESERVAR} <ArrowRight size={18} aria-hidden /></Link>
           </div>
         </div>
       </Reveal>
@@ -877,7 +740,7 @@ function BotonFlotante({ rubro }: { rubro: RubroTurnos }) {
     <div className="tup-flotante" data-ver={ver} aria-hidden={!ver}>
       <div className="tup-flotante-caja">
         <span className="tup-flotante-txt"><span className="tu-vivo" aria-hidden /> Próximo libre: <b className="tu-num">{p.cuando.toLowerCase()} {p.hora}</b></span>
-        <Link href={ruta('reserva', rubro.key)} className="tu-btn" tabIndex={ver ? 0 : -1} style={{ height: 46, fontSize: 14 }}>{verbo(rubro)} <ArrowRight size={16} aria-hidden /></Link>
+        <Link href={ruta('reserva', rubro.key)} className="tu-btn" tabIndex={ver ? 0 : -1} style={{ height: 46, fontSize: 14 }}>{RESERVAR} <ArrowRight size={16} aria-hidden /></Link>
       </div>
     </div>
   )

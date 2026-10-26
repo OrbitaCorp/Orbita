@@ -1,18 +1,17 @@
 // DEMO — el equipo de un negocio de Turnos: los roles con los que se entra al
 // panel, qué puede ver y hacer cada uno, las personas, y cómo cobra cada una
-// (comisión, sueldo, las dos cosas, alquiler del sillón o por clase).
+// (comisión, sueldo, las dos cosas o alquiler del sillón).
 //
 // Cada rubro trae sus roles de fábrica: una barbería tiene Barbero y Aprendiz,
-// un consultorio tiene Secretaría y Administración, un box tiene Coach. El
-// dueño los ajusta permiso por permiso, o crea los suyos. Con eso se arma el
-// panel de cada persona: quien entra con el rol "Barbero" ve su agenda, sus
-// clientes y lo que le corresponde cobrar, y nada más.
+// un consultorio tiene Secretaría y Administración. El dueño los ajusta
+// permiso por permiso, o crea los suyos. Con eso se arma el panel de cada
+// persona: quien entra con el rol "Barbero" ve su agenda, sus clientes y lo
+// que le corresponde cobrar, y nada más.
 //
 // Todo es de ejemplo y vive en el estado de PanelTurnos: no hay cuentas ni
 // invitaciones de verdad.
 import { esSalud, type Recurso, type RubroTurnos } from '@/modules/turnos/datos'
-import { AHORA_DEMO } from '@/modules/turnos/horario'
-import { fechaDe, fechaLarga, indiceDia, type ClasePanel, type TurnoAgenda } from './agendaDemo'
+import { fechaDe, fechaLarga, type TurnoAgenda } from './agenda'
 
 // ─── Permisos ────────────────────────────────────────────────────────────────
 
@@ -39,10 +38,10 @@ export interface Permiso {
 export type Permisos = Record<PermisoId, Alcance>
 
 /** Cómo le dice el rubro a quien reserva, en plural y minúscula. */
-export const clientesTxt = (r: RubroTurnos) => (esSalud(r) ? 'pacientes' : r.modo === 'cupo' ? 'alumnos' : 'clientes')
+export const clientesTxt = (r: RubroTurnos) => (esSalud(r) ? 'pacientes' : 'clientes')
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1)
 
-/** Los permisos del panel, con las palabras del rubro (clientes, pacientes o alumnos). */
+/** Los permisos del panel, con las palabras del rubro (clientes o pacientes). */
 export function permisosDe(r: RubroTurnos): Permiso[] {
   const c = clientesTxt(r)
   const C = cap(c)
@@ -109,7 +108,6 @@ const BASE = {
   aprendiz: armar('propio', 'no', 'propio', 'no', 'no', 'propio', 'no', 'no', 'no', 'no', 'no'),
   /** Ayuda sin atender: necesita saber quién viene, y nada más. */
   asistente: armar('todo', 'no', 'no', 'no', 'no', 'no', 'no', 'no', 'no', 'no', 'no'),
-  caja: armar('todo', 'no', 'no', 'no', 'todo', 'no', 'no', 'no', 'no', 'no', 'no'),
 }
 
 // ─── Roles ───────────────────────────────────────────────────────────────────
@@ -122,7 +120,7 @@ export interface Rol {
   deFabrica: boolean
   /** El del dueño: puede todo, no se cambia ni se borra. */
   fijo?: boolean
-  /** Quien tiene este rol atiende turnos (o da clases): tiene agenda propia. */
+  /** Quien tiene este rol atiende turnos: tiene agenda propia. */
   atiende: boolean
   permisos: Permisos
 }
@@ -149,11 +147,6 @@ const EXTRAS: Record<string, RolExtra[]> = {
   'centro-medico': [['enfermeria', 'Enfermería', 'Asiste en los consultorios. Ve la agenda del centro; no da turnos ni ve la caja.', 'asistente', false]],
   clinica: [['enfermeria', 'Enfermería', 'Asiste en consultorios y estudios. Ve la agenda de la clínica; no da turnos ni ve la caja.', 'asistente', false]],
   odonto: [['asistente', 'Asistente dental', 'Prepara el sillón y asiste en la atención. Ve la agenda; no da turnos ni ve la caja.', 'asistente', false]],
-  gym: [['trainer', 'Personal trainer', 'Da sus clases particulares. Ve su agenda, sus alumnos y lo que le corresponde.', 'atiende', true]],
-  crossfit: [['asistente', 'Coach asistente', 'Acompaña al coach en la clase. Ve la grilla de clases; nada más.', 'asistente', false]],
-  'artes-marciales': [['asistente', 'Instructor/a ayudante', 'Acompaña al sensei en la clase. Ve la grilla de clases; nada más.', 'asistente', false]],
-  natacion: [['guardavidas', 'Guardavidas', 'Cuida la pileta. Ve qué clases hay y cuánta gente; nada más.', 'asistente', false]],
-  talleres: [['coordinacion', 'Coordinación', 'Arma los grupos y cobra las señas. No ve ganancias.', 'recepcion', false]],
 }
 
 /** Los roles con los que arranca un negocio de ese rubro. */
@@ -162,18 +155,6 @@ export function rolesDe(r: RubroTurnos): Rol[] {
   const salud = esSalud(r)
   const dueno: Rol = { id: 'dueno', nombre: 'Dueño/a', descripcion: 'Ve y puede todo. Es la cuenta con la que se creó el negocio.', deFabrica: true, fijo: true, atiende: r.modo === 'profesional', permisos: TODO }
 
-  // Un complejo de canchas no tiene "profesionales": tiene gente que abre, cobra y mantiene.
-  if (r.modo === 'cancha') {
-    return [
-      dueno,
-      { id: 'encargado', nombre: 'Encargado/a de turno', descripcion: 'Abre el complejo, entrega las canchas, toma reservas y cobra. No toca la configuración ni ve ganancias.', deFabrica: true, atiende: false, permisos: BASE.recepcion },
-      { id: 'cantina', nombre: 'Cantina y caja', descripcion: 'Atiende la cantina y cobra. Ve las reservas del día para saber quién llega.', deFabrica: true, atiende: false, permisos: BASE.caja },
-      { id: 'mantenimiento', nombre: 'Mantenimiento', descripcion: 'Cuida las canchas. Ve qué canchas están ocupadas y cuándo; nada más.', deFabrica: true, atiende: false, permisos: BASE.asistente },
-      { id: 'administracion', nombre: 'Administración', descripcion: 'Lleva los números: ve lo que se factura y liquida los sueldos. No toma reservas.', deFabrica: true, atiende: false, permisos: BASE.administracion },
-    ]
-  }
-
-  const queAtiende = r.modo === 'cupo' ? 'da sus clases' : 'atiende'
   const roles: Rol[] = [
     dueno,
     { id: 'encargado', nombre: 'Encargado/a', descripcion: 'Maneja el día a día cuando no estás: agenda, equipo y caja. No toca el sitio ni la suscripción.', deFabrica: true, atiende: false, permisos: BASE.encargado },
@@ -183,7 +164,7 @@ export function rolesDe(r: RubroTurnos): Rol[] {
     },
     {
       id: 'profesional', nombre: r.profesional, deFabrica: true, atiende: true, permisos: salud ? BASE.atiendeSalud : BASE.atiende,
-      descripcion: `Entra a su panel y ${queAtiende}: ve su agenda, sus ${c} y lo que le corresponde cobrar. No ve lo del resto.`,
+      descripcion: `Entra a su panel y atiende: ve su agenda, sus ${c} y lo que le corresponde cobrar. No ve lo del resto.`,
     },
     ...(EXTRAS[r.key] ?? []).map(([id, nombre, descripcion, base, atiende]): Rol => ({ id, nombre, descripcion, deFabrica: true, atiende, permisos: BASE[base] })),
   ]
@@ -217,7 +198,7 @@ export function rolCambiado(rol: Rol, r: RubroTurnos): boolean {
 
 // ─── Cómo cobra cada uno ─────────────────────────────────────────────────────
 
-export type FormaPago = 'comision' | 'sueldo' | 'mixto' | 'alquiler' | 'clase'
+export type FormaPago = 'comision' | 'sueldo' | 'mixto' | 'alquiler'
 export type Cada = 'semana' | 'quincena' | 'mes'
 
 export interface Pago {
@@ -228,13 +209,11 @@ export interface Pago {
   sueldo: number
   /** Lo que la persona le paga al negocio por mes para usar el sillón o el consultorio. */
   alquiler: number
-  /** Monto por cada clase que da. */
-  porClase: number
   /** Cada cuánto se le liquida. */
   cada: Cada
 }
 
-export const PAGO_INICIAL: Pago = { forma: 'comision', comision: 50, sueldo: 0, alquiler: 0, porClase: 0, cada: 'semana' }
+export const PAGO_INICIAL: Pago = { forma: 'comision', comision: 50, sueldo: 0, alquiler: 0, cada: 'semana' }
 export const CADA_TXT: Record<Cada, string> = { semana: 'por semana', quincena: 'por quincena', mes: 'por mes' }
 
 /** Qué alquila quien alquila, según el rubro: "el sillón", "el consultorio". */
@@ -246,23 +225,18 @@ export function lugarAlquiler(r: RubroTurnos) {
   return 'el espacio'
 }
 
-/** Las formas de pago que tienen sentido en el rubro. "Por clase" solo donde hay clases; comisión y alquiler, donde se cobra por turno. */
+/** Las formas de pago de un negocio de turnos: todas se liquidan por lo que se atiende, salvo el sueldo fijo. */
 export function formasDe(r: RubroTurnos): { id: FormaPago; label: string; ayuda: string }[] {
-  const porTurno = r.modo === 'profesional' || r.modo === 'recurso'
   return [
-    ...(porTurno ? [{ id: 'comision' as const, label: 'Comisión', ayuda: 'Un porcentaje de cada turno que atiende. Si no atiende, no cobra.' }] : []),
-    { id: 'sueldo' as const, label: 'Sueldo fijo', ayuda: 'Lo mismo todos los meses, atienda lo que atienda.' },
-    ...(porTurno ? [{ id: 'mixto' as const, label: 'Sueldo + comisión', ayuda: 'Un fijo más chico y, encima, un porcentaje de lo que atiende.' }] : []),
-    ...(porTurno ? [{ id: 'alquiler' as const, label: `Alquila ${lugarAlquiler(r)}`, ayuda: 'Se queda con lo que factura y te paga un fijo por mes.' }] : []),
-    ...(r.modo === 'cupo' ? [{ id: 'clase' as const, label: 'Por clase', ayuda: 'Un monto fijo por cada clase que da.' }] : []),
+    { id: 'comision', label: 'Comisión', ayuda: 'Un porcentaje de cada turno que atiende. Si no atiende, no cobra.' },
+    { id: 'sueldo', label: 'Sueldo fijo', ayuda: 'Lo mismo todos los meses, atienda lo que atienda.' },
+    { id: 'mixto', label: 'Sueldo + comisión', ayuda: 'Un fijo más chico y, encima, un porcentaje de lo que atiende.' },
+    { id: 'alquiler', label: `Alquila ${lugarAlquiler(r)}`, ayuda: 'Se queda con lo que factura y te paga un fijo por mes.' },
   ]
 }
 
-/** La forma de pago con la que arranca alguien nuevo en ese rubro. */
-export const pagoInicialDe = (r: RubroTurnos): Pago =>
-  r.modo === 'cupo' ? { ...PAGO_INICIAL, forma: 'clase', porClase: 9000, cada: 'mes' }
-    : r.modo === 'cancha' ? { ...PAGO_INICIAL, forma: 'sueldo', sueldo: 480000, cada: 'mes' }
-      : PAGO_INICIAL
+/** La forma de pago con la que arranca alguien nuevo. */
+export const pagoInicialDe = (): Pago => PAGO_INICIAL
 
 export const plata = (n: number) => `${n < 0 ? '−' : ''}$${Math.abs(Math.round(n)).toLocaleString('es-AR')}`
 
@@ -272,12 +246,11 @@ export function pagoTxt(p: Pago | null, r: RubroTurnos): string {
   if (p.forma === 'comision') return `Comisión del ${p.comision}%`
   if (p.forma === 'sueldo') return `Sueldo de ${plata(p.sueldo)}`
   if (p.forma === 'mixto') return `Sueldo de ${plata(p.sueldo)} + ${p.comision}%`
-  if (p.forma === 'alquiler') return `Alquila ${lugarAlquiler(r)}: ${plata(p.alquiler)}`
-  return `${plata(p.porClase)} por clase`
+  return `Alquila ${lugarAlquiler(r)}: ${plata(p.alquiler)}`
 }
 /** La forma, en una o dos palabras (para el chip). */
 export const formaCorta = (p: Pago | null): string =>
-  !p ? 'Dueño' : p.forma === 'comision' ? `Comisión ${p.comision}%` : p.forma === 'sueldo' ? 'Sueldo fijo' : p.forma === 'mixto' ? `Sueldo + ${p.comision}%` : p.forma === 'alquiler' ? 'Alquila' : 'Por clase'
+  !p ? 'Dueño' : p.forma === 'comision' ? `Comisión ${p.comision}%` : p.forma === 'sueldo' ? 'Sueldo fijo' : p.forma === 'mixto' ? `Sueldo + ${p.comision}%` : 'Alquila'
 
 // ─── Personas ────────────────────────────────────────────────────────────────
 
@@ -305,7 +278,7 @@ export function personasDe(r: RubroTurnos, recursos: Recurso[], dominio: string)
   const p = (id: string, nombre: string, rolId: string, color: string, pago: Pago | null, recursoId?: string): Persona =>
     ({ id, nombre, rolId, email: mail(nombre, dominio), telefono: '', color, pago, ...(recursoId ? { recursoId } : {}) })
   const pago = (forma: FormaPago, v: Partial<Pago>): Pago => ({ ...PAGO_INICIAL, forma, ...v })
-  const [c0, c1, c2, c3, c4] = COLORES_EQUIPO
+  const [c0, c1, c2, c3] = COLORES_EQUIPO
 
   if (r.modo === 'profesional') {
     const [a, b, c] = recursos
@@ -322,29 +295,12 @@ export function personasDe(r: RubroTurnos, recursos: Recurso[], dominio: string)
       p('p4', 'Caro Gómez', 'recepcion', c3, pago('sueldo', { sueldo: 520000, cada: 'mes' })),
     ]
   }
-  if (r.modo === 'recurso') {
-    return [
-      p('p1', 'Carla Méndez', 'dueno', c0, null),
-      p('p2', 'Lucía Benítez', 'profesional', c1, pago('comision', { comision: 45, cada: 'semana' }), recursos[0]?.id),
-      p('p3', 'Julieta Sosa', 'profesional', c2, pago('mixto', { sueldo: 300000, comision: 25, cada: 'mes' }), recursos[1]?.id),
-      p('p4', 'Paula Ortiz', 'recepcion', c3, pago('sueldo', { sueldo: 520000, cada: 'mes' })),
-    ]
-  }
-  if (r.modo === 'cancha') {
-    return [
-      p('p1', 'Nico Ríos', 'dueno', c0, null),
-      p('p2', 'Caro Gómez', 'encargado', c1, pago('sueldo', { sueldo: 560000, cada: 'mes' })),
-      p('p3', 'Seba López', 'cantina', c2, pago('sueldo', { sueldo: 480000, cada: 'mes' })),
-      p('p4', 'Flor Díaz', 'mantenimiento', c3, pago('sueldo', { sueldo: 450000, cada: 'mes' })),
-    ]
-  }
-  // Clases con cupo: los nombres de pila son los de la grilla de clases (clasesDe).
+  // Por sala o cabina: quien atiende tiene su espacio fijo.
   return [
-    p('p1', 'Nico Ríos', 'dueno', c0, null),
-    p('p2', 'Caro Gómez', 'profesional', c1, pago('clase', { porClase: 9000, cada: 'mes' })),
-    p('p3', 'Flor Díaz', 'profesional', c2, pago('clase', { porClase: 9000, cada: 'quincena' })),
-    p('p4', 'Seba López', 'profesional', c3, pago('sueldo', { sueldo: 540000, cada: 'mes' })),
-    p('p5', 'Mica Torres', 'recepcion', c4, pago('sueldo', { sueldo: 500000, cada: 'mes' })),
+    p('p1', 'Carla Méndez', 'dueno', c0, null),
+    p('p2', 'Lucía Benítez', 'profesional', c1, pago('comision', { comision: 45, cada: 'semana' }), recursos[0]?.id),
+    p('p3', 'Julieta Sosa', 'profesional', c2, pago('mixto', { sueldo: 300000, comision: 25, cada: 'mes' }), recursos[1]?.id),
+    p('p4', 'Paula Ortiz', 'recepcion', c3, pago('sueldo', { sueldo: 520000, cada: 'mes' })),
   ]
 }
 
@@ -380,14 +336,11 @@ export interface Liquidacion {
   hasta: number
   /** Turnos atendidos de su agenda. */
   turnos: number
-  /** Clases que dio (donde hay clases con cupo). */
-  clases: number
   /** Lo que se cobró por los turnos que atendió. */
   facturado: number
   comision: number
   /** La parte del sueldo que corresponde a los días del período. */
   fijo: number
-  porClases: number
   /** Lo que le paga al negocio por el alquiler en el período. */
   alquiler: number
   /** Lo que se lleva la persona. */
@@ -397,21 +350,20 @@ export interface Liquidacion {
   renglones: Renglon[]
 }
 
-const VACIA: Omit<Liquidacion, 'desde' | 'hasta'> = { turnos: 0, clases: 0, facturado: 0, comision: 0, fijo: 0, porClases: 0, alquiler: 0, paraLaPersona: 0, paraElNegocio: 0, renglones: [] }
+const VACIA: Omit<Liquidacion, 'desde' | 'hasta'> = { turnos: 0, facturado: 0, comision: 0, fijo: 0, alquiler: 0, paraLaPersona: 0, paraElNegocio: 0, renglones: [] }
 
 /**
  * Lo que le corresponde a una persona entre dos días (contados desde hoy), según
  * cómo cobra. Cuenta los turnos ATENDIDOS de su agenda (los cancelados y las
- * ausencias no suman) y las clases que dio. El sueldo y el alquiler son
- * mensuales: se llevan la parte de los días que entran en el rango.
+ * ausencias no suman). El sueldo y el alquiler son mensuales: se llevan la
+ * parte de los días que entran en el rango.
  */
-export function liquidarEntre(persona: Persona, desde: number, hasta: number, turnosDelDia: (dia: number) => TurnoAgenda[], clases: ClasePanel[]): Liquidacion {
+export function liquidarEntre(persona: Persona, desde: number, hasta: number, turnosDelDia: (dia: number) => TurnoAgenda[]): Liquidacion {
   if (hasta < desde) return { desde, hasta, ...VACIA }
   const p = persona.pago
   const pct = !p ? 0 : p.forma === 'comision' || p.forma === 'mixto' ? p.comision : p.forma === 'alquiler' ? 100 : 0
-  const pila = persona.nombre.split(' ')[0]
   const renglones: Renglon[] = []
-  let dadas = 0, fijo = 0, alquiler = 0
+  let fijo = 0, alquiler = 0
   for (let d = desde; d <= hasta; d++) {
     if (p && (p.forma === 'sueldo' || p.forma === 'mixto')) fijo += p.sueldo / diasDelMes(d)
     if (p?.forma === 'alquiler') alquiler += p.alquiler / diasDelMes(d)
@@ -421,23 +373,18 @@ export function liquidarEntre(persona: Persona, desde: number, hasta: number, tu
         renglones.push({ dia: d, inicio: t.inicio, clienteId: t.clienteId, servicio: t.servicio, precio: t.precio, parte: Math.round(t.precio * pct / 100) })
       }
     }
-    if (d <= 0) {
-      const semana = indiceDia(d)
-      dadas += clases.filter(c => c.dia === semana && c.profe === pila && (d < 0 || c.inicio + c.duracion <= AHORA_DEMO)).length
-    }
   }
   renglones.sort((a, b) => b.dia - a.dia || b.inicio - a.inicio)
   fijo = Math.round(fijo)
   alquiler = Math.round(alquiler)
   const facturado = renglones.reduce((s, x) => s + x.precio, 0)
   const comision = p && (p.forma === 'comision' || p.forma === 'mixto') ? renglones.reduce((s, x) => s + x.parte, 0) : 0
-  const porClases = p?.forma === 'clase' ? dadas * p.porClase : 0
-  const paraLaPersona = !p ? 0 : p.forma === 'alquiler' ? facturado - alquiler : comision + fijo + porClases
-  return { desde, hasta, turnos: renglones.length, clases: dadas, facturado, comision, fijo, porClases, alquiler, paraLaPersona, paraElNegocio: facturado - paraLaPersona, renglones }
+  const paraLaPersona = !p ? 0 : p.forma === 'alquiler' ? facturado - alquiler : comision + fijo
+  return { desde, hasta, turnos: renglones.length, facturado, comision, fijo, alquiler, paraLaPersona, paraElNegocio: facturado - paraLaPersona, renglones }
 }
 
-export const liquidar = (persona: Persona, periodo: Periodo, turnosDelDia: (dia: number) => TurnoAgenda[], clases: ClasePanel[]) =>
-  liquidarEntre(persona, RANGO[periodo][0], RANGO[periodo][1], turnosDelDia, clases)
+export const liquidar = (persona: Persona, periodo: Periodo, turnosDelDia: (dia: number) => TurnoAgenda[]) =>
+  liquidarEntre(persona, RANGO[periodo][0], RANGO[periodo][1], turnosDelDia)
 
 /**
  * Hasta qué día (contado desde hoy) se le pagó a alguien cuando arranca la demo:
@@ -446,7 +393,7 @@ export const liquidar = (persona: Persona, periodo: Periodo, turnosDelDia: (dia:
  */
 export const pagadoHastaInicial = (p: Persona): number => (p.pago?.cada === 'semana' ? -6 : p.pago?.cada === 'quincena' ? -11 : -26)
 
-/** La plata que se mueve entre el negocio y la persona: el negocio le paga (comisión, sueldo, clases) o ella le paga el alquiler. */
+/** La plata que se mueve entre el negocio y la persona: el negocio le paga (comisión o sueldo) o ella le paga el alquiler. */
 export const aPagar = (persona: Persona, l: Liquidacion) => (!persona.pago || persona.pago.forma === 'alquiler' ? 0 : l.paraLaPersona)
 export const aCobrar = (persona: Persona, l: Liquidacion) => (persona.pago?.forma === 'alquiler' ? l.alquiler : 0)
 
@@ -478,13 +425,3 @@ export function puedeDe(como: VerComo | null, roles: Rol[]): (id: PermisoId) => 
 
 /** El teléfono con los números tapados (quedan los dos últimos): para quien no puede ver cómo contactar. */
 export const taparTelefono = (telefono: string) => telefono.replace(/\d(?=(?:\D*\d){2})/g, '•')
-
-/** Lo que el panel le pasa a Configuración → Equipo y permisos: los mismos roles y personas de la pantalla Equipo. */
-export interface EquipoConfig {
-  roles: Rol[]
-  personas: Persona[]
-  onGuardarRol: (r: Rol) => void
-  onBorrarRol: (id: string) => void
-  onVerComo: (c: VerComo) => void
-  onIrEquipo: () => void
-}

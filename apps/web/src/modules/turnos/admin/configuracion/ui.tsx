@@ -24,7 +24,7 @@ export const CSS_UI_CONFIG = `
   .tuc-card-cuerpo { margin-top: 18px; }
   @media (hover: hover) {
     .tuc-card:hover { border-color: color-mix(in srgb, var(--color-primary) 26%, var(--color-border)); box-shadow: var(--shadow-card-hover); }
-    .tuc-card:hover .tuc-card-ico { transform: rotate(-4deg) scale(1.05); box-shadow: 0 6px 16px color-mix(in srgb, var(--color-primary) 22%, transparent); }
+    .tuc-card:hover .tuc-card-ico { transform: rotate(-4deg) scale(1.05); }
   }
   .tuc-pila { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 
@@ -83,7 +83,7 @@ export const CSS_UI_CONFIG = `
     transition: border-color 160ms ease, background 200ms ease, box-shadow 220ms ease, transform 220ms var(--tuo-ease, ease); }
   .tuc-opcion[aria-checked='true'], .tuc-opcion[aria-pressed='true'] { border-color: var(--color-primary); background: var(--tuo-grad-suave); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 16%, transparent); }
   .tuc-opcion:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-  .tuc-opcion-tilde { position: absolute; top: 10px; right: 10px; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: var(--tuo-grad); opacity: 0; transform: scale(0.6); transition: opacity 180ms ease, transform 240ms var(--tuo-ease, ease); }
+  .tuc-opcion-tilde { position: absolute; top: 10px; right: 10px; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; color: var(--color-on-primary); background: var(--color-primary); opacity: 0; transform: scale(0.6); transition: opacity 180ms ease, transform 240ms var(--tuo-ease, ease); }
   .tuc-opcion[aria-checked='true'] .tuc-opcion-tilde, .tuc-opcion[aria-pressed='true'] .tuc-opcion-tilde { opacity: 1; transform: none; }
   @media (hover: hover) {
     .tuc-opcion:not([aria-checked='true']):not([aria-pressed='true']):hover { border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border)); box-shadow: var(--shadow-card-hover); transform: translateY(-2px); }
@@ -144,6 +144,12 @@ export const CSS_UI_CONFIG = `
   .tuc-dos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .tuc-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
+  /* En el celular el diálogo sube desde abajo, como los modales del panel. */
+  @keyframes tucHoja { from { opacity: 0; transform: translateY(48px); } to { opacity: 1; transform: none; } }
+  @media (max-width: 640px) {
+    .tuc-velo { place-items: end center; padding: 0; }
+    .tuc-dialogo { width: 100%; max-height: calc(100dvh - 40px); overflow-y: auto; border-radius: 22px 22px 0 0; border-bottom: none; padding-bottom: calc(22px + env(safe-area-inset-bottom)); animation-name: tucHoja; }
+  }
   @media (max-width: 768px) {
     .tuc-card { padding: 16px; }
     .tuc-dos { grid-template-columns: minmax(0, 1fr); }
@@ -218,7 +224,7 @@ export function SecCard({ id, titulo, Icon, badge, bajada, children, style }: {
   id?: string; titulo: string; Icon: LucideIcon; badge?: ReactNode; bajada?: ReactNode; children: ReactNode; style?: CSSProperties
 }) {
   return (
-    <section id={id} aria-label={titulo} className="tuo-card tuo-card--luz tuc-card" style={style}>
+    <section id={id} aria-label={titulo} className="tuo-card tuc-card" style={style}>
       <div className="tuc-card-cab">
         <span className="tuc-card-ico" aria-hidden><Icon size={18} strokeWidth={1.7} /></span>
         <div style={{ flex: 1, minWidth: 0 }}>

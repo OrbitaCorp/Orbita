@@ -1,4 +1,4 @@
-// Los espacios donde se atiende: canchas, cabinas, consultorios o salas. Cada
+// Los espacios donde se atiende: cabinas, consultorios o equipos. Cada
 // tarjeta muestra de un vistazo cómo viene el día de ese espacio: el anillo de
 // ocupación, la jornada en línea (con el corte del mediodía a la vista) y los
 // días que se usa.
@@ -15,7 +15,7 @@ import { Anillo } from '@/modules/turnos/_shared/orbita/OrbitaDia'
 import { Cabecera, Sigla } from '@/modules/turnos/_shared/orbita/piezas'
 import { Campo } from './configuracion/ui'
 import { Modal, ErrorCampo, Borrar, CamposAgenda, TiraJornada, agendaDeForm, agendaFormDe, errorAgenda } from './piezasPanel'
-import { COLORES_EQUIPO, type Persona } from './equipoDemo'
+import { COLORES_EQUIPO, type Persona } from '../datos/equipo'
 
 export const CSS_ESPACIOS = `
   .tu-eq-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
@@ -72,7 +72,7 @@ export function ResumenAgenda({ recurso: r, semana, turnos, tramos, rango, verbo
 
 /** Cómo se llaman los espacios del rubro: es el título de la pantalla y el ítem del menú. */
 export const espaciosTxt = (r: RubroTurnos) =>
-  r.modo === 'cancha' ? 'Canchas' : r.modo === 'cupo' ? 'Salas' : r.familia === 'salud' ? 'Consultorios' : r.familia === 'deporte' ? 'Equipos EMS' : 'Cabinas'
+  r.familia === 'salud' ? 'Consultorios' : r.familia === 'deporte' ? 'Equipos EMS' : 'Cabinas'
 
 /** Cuánto de la jornada de hoy está tomado (0 a 1). */
 export const ocupacionDe = (recursoId: string, turnos: Turno[], tramos: Tramo[]) => {
@@ -99,18 +99,18 @@ interface Props {
 
 export default function Espacios({ rubro, semana, recursos, turnos, jornada, rango, personas, onGuardar, onBorrar }: Props) {
   const [editando, setEditando] = useState<Recurso | null>(null)
-  const cancha = rubro.modo === 'cancha'
   const titulo = espaciosTxt(rubro)
-  const uno = cancha ? 'una cancha' : rubro.modo === 'cupo' ? 'una sala' : rubro.familia === 'salud' ? 'un consultorio' : rubro.familia === 'deporte' ? 'un equipo' : 'una cabina'
-  const tipo = cancha ? 'Cancha' : 'Espacio'
-  const nuevo = () => setEditando({ id: '', nombre: '', rol: tipo, color: COLORES_EQUIPO.find(c => !recursos.some(r => r.color === c)) ?? COLORES_EQUIPO[recursos.length % COLORES_EQUIPO.length], horario: '', atiende: [], dias: '' })
+  const uno = rubro.familia === 'salud' ? 'un consultorio' : rubro.familia === 'deporte' ? 'un equipo' : 'una cabina'
+  // El ejemplo del campo Nombre al agregar uno: "Cabina 4", "Consultorio 4".
+  const ejemplo = `${rubro.familia === 'salud' ? 'Consultorio' : rubro.familia === 'deporte' ? 'Equipo' : 'Cabina'} ${recursos.length + 1}`
+  const nuevo = () => setEditando({ id: '', nombre: '', rol: 'Espacio', color: COLORES_EQUIPO.find(c => !recursos.some(r => r.color === c)) ?? COLORES_EQUIPO[recursos.length % COLORES_EQUIPO.length], horario: '', atiende: [], dias: '' })
 
   return (
     <div className="panel-page">
       <Cabecera
         rotulo={`${recursos.length} ${recursos.length === 1 ? 'espacio' : 'espacios'}`}
         titulo={titulo}
-        bajada={cancha ? 'Cada cancha tiene sus días y su horario. Al reservar, tus clientes eligen la que esté libre.' : 'Cada espacio tiene sus días y su horario, siempre dentro del horario del negocio. Los turnos se dan en el que esté libre.'}
+        bajada="Cada espacio tiene sus días y su horario, siempre dentro del horario del negocio. Los turnos se dan en el que esté libre."
         acciones={<button type="button" onClick={nuevo} className="tuo-btn tuo-btn--primario"><Plus size={16} /> Agregar {uno}</button>}
       />
 
@@ -122,7 +122,7 @@ export default function Espacios({ rubro, semana, recursos, turnos, jornada, ran
           // Toda la tarjeta abre la edición; con teclado, el lápiz.
           return (
             <article key={r.id} onClick={() => setEditando(r)} data-toca="true" className="tuo-card tuo-card--pad tu-eq-card tuo-entra" style={{ ['--c' as string]: r.color, ['--i' as string]: idx + 1 }}>
-              <span aria-hidden className="tu-eq-filo" style={{ background: `linear-gradient(90deg, ${r.color}, color-mix(in srgb, ${r.color} 20%, transparent))` }} />
+              <span aria-hidden className="tu-eq-filo" style={{ background: r.color }} />
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
                 <Sigla nombre={r.nombre} color={r.color} size={48} Icon={rubro.Icon} />
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -155,6 +155,7 @@ export default function Espacios({ rubro, semana, recursos, turnos, jornada, ran
           semana={semana}
           titulo={titulo}
           uno={uno}
+          ejemplo={ejemplo}
           turnosHoy={turnos.filter(t => t.recursoId === editando.id && t.estado !== 'cancelado').length}
           unico={recursos.length <= 1}
           onCerrar={() => setEditando(null)}
@@ -167,8 +168,8 @@ export default function Espacios({ rubro, semana, recursos, turnos, jornada, ran
 }
 
 /** Alta y edición de un espacio. Sin `id` es uno nuevo. */
-function FormEspacio({ inicial, semana, titulo, uno, turnosHoy, unico, onCerrar, onGuardar, onBorrar }: {
-  inicial: Recurso; semana: Semana; titulo: string; uno: string; turnosHoy: number; unico: boolean
+function FormEspacio({ inicial, semana, titulo, uno, ejemplo, turnosHoy, unico, onCerrar, onGuardar, onBorrar }: {
+  inicial: Recurso; semana: Semana; titulo: string; uno: string; ejemplo: string; turnosHoy: number; unico: boolean
   onCerrar: () => void; onGuardar: (r: Recurso) => void; onBorrar: (id: string) => void
 }) {
   const esNuevo = !inicial.id
@@ -196,8 +197,8 @@ function FormEspacio({ inicial, semana, titulo, uno, turnosHoy, unico, onCerrar,
         <button type="submit" className="tuo-btn tuo-btn--primario"><Check size={16} /> {esNuevo ? 'Agregar' : 'Guardar cambios'}</button>
       </>}
     >
-      <Campo label="Nombre" value={nombre} onChange={v => { setNombre(v); setError('') }} placeholder="Ej.: Cancha 4" maxLength={40} />
-      <Campo label="Tipo" ayuda="Se muestra debajo del nombre: techada, de pádel, con camilla…" value={rol} onChange={setRol} maxLength={30} />
+      <Campo label="Nombre" value={nombre} onChange={v => { setNombre(v); setError('') }} placeholder={`Ej.: ${ejemplo}`} maxLength={40} />
+      <Campo label="Tipo" ayuda="Se muestra debajo del nombre: con camilla, planta baja, doble…" value={rol} onChange={setRol} maxLength={30} />
       <CamposAgenda id="tu-espacio" valor={agenda} onChange={a => { setAgenda(a); setError('') }} semana={semana} />
       {error && <ErrorCampo>{error}</ErrorCampo>}
 

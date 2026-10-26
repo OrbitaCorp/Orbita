@@ -13,7 +13,7 @@ import { DIAS, DIAS_CORTOS, horaTxt, type Recurso, type Turno } from '@/modules/
 import { AHORA_DEMO, MEDIAS_HORAS, diasAbiertos, diasTxt, errorJornada, hhmm, jornadaDe, jornadaTxt, tramosDe, type Bloque, type Jornada, type Semana, type Tramo } from '@/modules/turnos/horario'
 import { Llave } from '@/modules/turnos/_shared/orbita/piezas'
 import { Segmentado } from './configuracion/ui'
-import { copiar, fechaDe, indiceDia, type Avisar, type GrupoLibres, type MensajeWA } from './agendaDemo'
+import { copiar, fechaDe, indiceDia, type Avisar, type GrupoLibres, type MensajeWA } from '../datos/agenda'
 
 export const CSS_PIEZAS_PANEL = `
   .tu-error { display: flex; align-items: center; gap: 6px; margin: -8px 0 14px; font-size: 12.5px; font-weight: 500; color: var(--color-error); }
@@ -63,7 +63,7 @@ export const CSS_PIEZAS_PANEL = `
   .tu-horas-cab > span { font-weight: 400; color: var(--color-muted); }
   .tu-horas { display: grid; grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); gap: 6px; }
   .tu-hora-btn { height: 40px; border-radius: 10px; border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text); font-family: var(--tuo-mono); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer; transition: border-color 150ms ease, background 150ms ease, color 150ms ease, box-shadow 180ms ease; }
-  .tu-hora-btn[aria-pressed='true'] { border-color: transparent; background: var(--tuo-grad); color: #fff; box-shadow: 0 6px 16px rgba(37,99,235,0.3); }
+  .tu-hora-btn[aria-pressed='true'] { border-color: transparent; background: var(--color-primary); color: var(--color-on-primary); }
   .tu-hora-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   @media (hover: hover) { .tu-hora-btn:not([aria-pressed='true']):hover { border-color: var(--color-primary); background: var(--color-primary-bg); color: var(--chip-primary-fg); } }
   .tu-corte { display: flex; align-items: center; gap: 10px; margin: 12px 0; font-size: 11.5px; color: var(--color-muted); }
@@ -205,7 +205,7 @@ export function Borrar({ etiqueta, pregunta, onBorrar }: { etiqueta: string; pre
       <span style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--color-text)', lineHeight: 1.5 }}>{pregunta}</span>
       <div style={{ display: 'flex', gap: 8 }}>
         <button type="button" onClick={() => setPide(false)} className="tuo-btn" style={{ flex: 1, height: 44 }}>Volver</button>
-        <button type="button" onClick={onBorrar} className="tuo-btn" style={{ flex: 1, height: 44, background: 'var(--color-error)', borderColor: 'var(--color-error)', color: '#fff' }}>Sí, eliminar</button>
+        <button type="button" onClick={onBorrar} className="tuo-btn" style={{ flex: 1, height: 44, background: 'var(--color-error)', borderColor: 'var(--color-error)', color: 'var(--color-on-primary)' }}>Sí, eliminar</button>
       </div>
     </div>
   )

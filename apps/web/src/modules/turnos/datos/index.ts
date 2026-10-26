@@ -1,20 +1,27 @@
-// DEMO INTERNA — datos de ejemplo del vertical Turnos & Agenda (2026-09-26).
-// Solo visual: nada de esto sale de la API ni se guarda en ninguna base. Lo usan
-// las pantallas de /turnos-demo (localhost; en producción dan 404).
+// Capa de datos de ejemplo de Turnos (demo local, 2026-09-26).
 //
-// Cuando exista el backend de turnos, este archivo es la referencia de qué
-// necesita cada rubro (forma de agendar, seña, servicios típicos), no la fuente
-// de datos: el catálogo real de rubros vive en apps/api/src/onboarding.
+// Turnos no tiene backend: todo lo que ven las pantallas de /turnos-demo sale
+// de esta carpeta y vive en memoria o en el navegador. Las pantallas no
+// inventan datos por su cuenta: rubros, servicios, agendas, turnos y clientes
+// se leen siempre de acá.
+//
+//   index.ts    rubros, servicios, agendas, turnos y clientes de ejemplo
+//   agenda.ts   el calendario alrededor del día de la demo y los horarios libres
+//   equipo.ts   roles, permisos, personas y cómo cobra cada una
+//   negocio.ts  lo que el dueño cargó (alta y Configuración), guardado en el navegador
+//
+// Turnos agenda de dos formas: por profesional (barbero, médico) o por sala o
+// cabina. Las clases con cupo son de Gimnasio y las canchas, de Alquileres:
+// cada módulo tiene su propia capa de datos y no se mezclan.
 import type { LucideIcon } from 'lucide-react'
-import type { AparienciaDemo, IdentidadDemo } from './demo/negocioDemo'
+import type { AparienciaDemo, IdentidadDemo } from './negocio'
 import {
-  AHORA_DEMO, HOY_SEMANA, SEMANA_CANCHAS, SEMANA_CLASES, SEMANA_PARTIDA, cruzar, diasAbiertos, diasTxt, tramosDe, tramosDelDia, tramosTxt,
+  AHORA_DEMO, HOY_SEMANA, SEMANA_PARTIDA, cruzar, diasAbiertos, diasTxt, tramosDe, tramosDelDia, tramosTxt,
   type Semana, type Tramo,
-} from './horario'
+} from '../horario'
 import {
-  Scissors, Sparkles, Stethoscope, Hospital, Smile, Brain, Dumbbell, Flame, Zap, Trophy,
-  Flower2, Music, Swords, Waves, BookOpen, Brush, Hand, Eye, Feather, Flower, PenTool,
-  Syringe, Activity, Apple, Footprints, Ear, Leaf, UserRound, Building2, Presentation,
+  Scissors, Sparkles, Stethoscope, Hospital, Smile, Brain, Zap, Flower, BookOpen, Brush, Hand, Eye, Feather, PenTool,
+  Syringe, Activity, Apple, Footprints, Ear, Leaf, UserRound, Building2, HeartPulse,
 } from 'lucide-react'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -25,8 +32,6 @@ export type FamiliaId = 'belleza' | 'salud' | 'deporte' | 'clases'
 export type ModoAgenda =
   | 'profesional' // cada turno es con una persona (barbero, médico, kinesiólogo)
   | 'recurso'     // una sala, cabina o box, sin importar quién atiende
-  | 'cancha'      // alquiler de un espacio por hora (fútbol, pádel)
-  | 'cupo'        // clase grupal con cupo máximo (crossfit, yoga, danza)
 
 export interface ServicioTipo {
   nombre: string
@@ -68,20 +73,18 @@ export interface RubroTurnos {
 export const FAMILIAS: { id: FamiliaId; label: string; descripcion: string; Icon: LucideIcon }[] = [
   { id: 'belleza', label: 'Belleza y cuidado personal', descripcion: 'Agenda por profesional o por cabina', Icon: Sparkles },
   { id: 'salud',   label: 'Salud',                      descripcion: 'Consultorios, pacientes y obras sociales', Icon: Stethoscope },
-  { id: 'deporte', label: 'Deporte y bienestar',        descripcion: 'Clases con cupo, canchas y membresías', Icon: Dumbbell },
-  { id: 'clases',  label: 'Clases',                     descripcion: 'Particulares o grupales', Icon: BookOpen },
+  { id: 'deporte', label: 'Bienestar',                  descripcion: 'Sesiones por equipo o cabina', Icon: HeartPulse },
+  { id: 'clases',  label: 'Clases particulares',        descripcion: 'Apoyo escolar, idiomas y música', Icon: BookOpen },
 ]
 
 export const MODO_LABEL: Record<ModoAgenda, string> = {
   profesional: 'Por profesional',
   recurso:     'Por sala o cabina',
-  cancha:      'Por cancha',
-  cupo:        'Clases con cupo',
 }
 
 // ─── Rubros ───────────────────────────────────────────────────────────────────
-// Las keys que ya existen en el catálogo de la API (barberia, estetica, clinica,
-// odonto, psico, gym, clases) se conservan tal cual.
+// Las keys que ya usa el catálogo de rubros de Órbita (el del alta de Tienda:
+// barberia, estetica, clinica, odonto, psico, clases) se conservan tal cual.
 
 export const RUBROS_TURNOS: RubroTurnos[] = [
   // Belleza y cuidado personal
@@ -221,75 +224,20 @@ export const RUBROS_TURNOS: RubroTurnos[] = [
     { nombre: 'Consulta homeopática', duracion: 60, precio: 30000 },
   ] },
 
-  // Deporte y bienestar
-  { key: 'gym', familia: 'deporte', label: 'Gimnasio', descripcion: 'Clases con cupo, pases y membresías', Icon: Dumbbell, modo: 'cupo', sena: 0, profesional: 'Profe', cliente: 'Socio/a', servicios: [
-    { nombre: 'Musculación (turno libre)', duracion: 60, precio: 0 },
-    { nombre: 'Spinning', duracion: 45, precio: 0 },
-    { nombre: 'Localizada', duracion: 60, precio: 0 },
-    { nombre: 'Pase diario', duracion: 60, precio: 6000 },
-    { nombre: 'Rutina personalizada', duracion: 60, precio: 18000 },
-  ] },
-  { key: 'crossfit', familia: 'deporte', label: 'Crossfit', descripcion: 'WODs con cupo por horario', Icon: Flame, modo: 'cupo', sena: 0, profesional: 'Coach', cliente: 'Atleta', servicios: [
-    { nombre: 'WOD', duracion: 60, precio: 0 },
-    { nombre: 'Open box', duracion: 90, precio: 0 },
-    { nombre: 'Halterofilia', duracion: 60, precio: 0 },
-    { nombre: 'Clase de prueba', duracion: 60, precio: 0 },
-  ] },
-  { key: 'funcional', familia: 'deporte', label: 'Entrenamiento funcional', descripcion: 'Grupos reducidos y personal training', Icon: Activity, modo: 'cupo', sena: 0, profesional: 'Entrenador/a', cliente: 'Alumno/a', servicios: [
-    { nombre: 'Funcional grupal', duracion: 60, precio: 0 },
-    { nombre: 'HIIT', duracion: 45, precio: 0 },
-    { nombre: 'Personal training', duracion: 60, precio: 25000 },
-    { nombre: 'Clase al aire libre', duracion: 60, precio: 0 },
-  ] },
+  // Bienestar
   { key: 'electro', familia: 'deporte', label: 'Electroestimulación', descripcion: 'Sesiones cortas por equipo', Icon: Zap, modo: 'recurso', sena: 0, profesional: 'Entrenador/a', cliente: 'Cliente', servicios: [
     { nombre: 'Sesión EMS', duracion: 20, precio: 18000 },
     { nombre: 'Sesión EMS + masaje', duracion: 40, precio: 28000 },
     { nombre: 'Evaluación corporal', duracion: 30, precio: 12000 },
     { nombre: 'Pack de 8 sesiones', duracion: 20, precio: 128000 },
   ] },
-  { key: 'canchas', familia: 'deporte', label: 'Centro deportivo', descripcion: 'Alquiler de canchas por hora', Icon: Trophy, modo: 'cancha', sena: 50, profesional: 'Encargado', cliente: 'Cliente', servicios: [
-    { nombre: 'Fútbol 5', duracion: 60, precio: 45000 },
-    { nombre: 'Fútbol 7', duracion: 60, precio: 65000 },
-    { nombre: 'Pádel', duracion: 90, precio: 36000 },
-    { nombre: 'Tenis', duracion: 60, precio: 28000 },
-  ] },
-  { key: 'yoga', familia: 'deporte', label: 'Yoga / pilates', descripcion: 'Clases con cupo y reformers', Icon: Flower2, modo: 'cupo', sena: 0, profesional: 'Instructora', cliente: 'Alumno/a', servicios: [
-    { nombre: 'Hatha yoga', duracion: 60, precio: 0 },
-    { nombre: 'Vinyasa', duracion: 60, precio: 0 },
-    { nombre: 'Pilates reformer', duracion: 50, precio: 0 },
-    { nombre: 'Clase suelta', duracion: 60, precio: 12000 },
-  ] },
-  { key: 'danza', familia: 'deporte', label: 'Danza y baile', descripcion: 'Estilos, niveles y cupos', Icon: Music, modo: 'cupo', sena: 0, profesional: 'Profe', cliente: 'Alumno/a', servicios: [
-    { nombre: 'Salsa — inicial', duracion: 60, precio: 0 },
-    { nombre: 'Tango', duracion: 90, precio: 0 },
-    { nombre: 'Ritmos urbanos', duracion: 60, precio: 0 },
-    { nombre: 'Clase suelta', duracion: 60, precio: 10000 },
-  ] },
-  { key: 'artes-marciales', familia: 'deporte', label: 'Artes marciales', descripcion: 'Disciplinas, grupos y graduaciones', Icon: Swords, modo: 'cupo', sena: 0, profesional: 'Sensei', cliente: 'Alumno/a', servicios: [
-    { nombre: 'Jiu-jitsu', duracion: 90, precio: 0 },
-    { nombre: 'Kickboxing', duracion: 60, precio: 0 },
-    { nombre: 'Karate infantil', duracion: 60, precio: 0 },
-    { nombre: 'Clase de prueba', duracion: 60, precio: 0 },
-  ] },
-  { key: 'natacion', familia: 'deporte', label: 'Natación', descripcion: 'Andariveles, clases y pileta libre', Icon: Waves, modo: 'cupo', sena: 0, profesional: 'Profe', cliente: 'Alumno/a', servicios: [
-    { nombre: 'Natación adultos', duracion: 45, precio: 0 },
-    { nombre: 'Matronatación', duracion: 45, precio: 0 },
-    { nombre: 'Pileta libre', duracion: 60, precio: 0 },
-    { nombre: 'Aquagym', duracion: 45, precio: 0 },
-  ] },
 
-  // Clases
+  // Clases particulares
   { key: 'clases', familia: 'clases', label: 'Clases particulares', descripcion: 'Apoyo escolar, idiomas y música', Icon: BookOpen, modo: 'profesional', sena: 0, profesional: 'Profe', cliente: 'Alumno/a', servicios: [
     { nombre: 'Clase individual', duracion: 60, precio: 15000 },
     { nombre: 'Clase a domicilio', duracion: 60, precio: 19000 },
     { nombre: 'Clase de prueba', duracion: 30, precio: 0 },
     { nombre: 'Pack de 4 clases', duracion: 60, precio: 54000 },
-  ] },
-  { key: 'talleres', familia: 'clases', label: 'Clases grupales / talleres', descripcion: 'Talleres con fecha y cupo', Icon: Presentation, modo: 'cupo', sena: 50, profesional: 'Tallerista', cliente: 'Participante', servicios: [
-    { nombre: 'Taller de cerámica', duracion: 120, precio: 25000 },
-    { nombre: 'Taller de cocina', duracion: 150, precio: 32000 },
-    { nombre: 'Curso intensivo (4 encuentros)', duracion: 120, precio: 90000 },
-    { nombre: 'Clase abierta', duracion: 90, precio: 0 },
   ] },
 ]
 
@@ -348,19 +296,17 @@ const NOMBRES_PROF = ['Martín Sosa', 'Lucía Benítez', 'Tomás Ferreyra', 'Car
 const NOMBRES_RECURSO: Record<ModoAgenda, string[]> = {
   profesional: NOMBRES_PROF,
   recurso:     ['Cabina 1', 'Cabina 2', 'Cabina 3'],
-  cancha:      ['Cancha 1', 'Cancha 2', 'Cancha 3 (techada)'],
-  cupo:        ['Salón principal', 'Sala 2'],
 }
 
 /**
  * La semana de atención del negocio: la que guardó en Configuración → Horarios,
- * la que cargó en el alta o, si todavía no tocó nada, la de ejemplo según cómo
- * agenda. Es UNA sola para el sitio, la reserva y el panel.
+ * la que cargó en el alta o, si todavía no tocó nada, la de ejemplo (mañana y
+ * tarde con el corte del mediodía). Es UNA sola para el sitio, la reserva y el panel.
  */
 export const semanaDe = (r: RubroTurnos): Semana =>
   r.horarios?.length === 7 ? r.horarios
     : r.alta?.horarios.length === 7 ? r.alta.horarios
-      : r.modo === 'cupo' ? SEMANA_CLASES : r.modo === 'cancha' ? SEMANA_CANCHAS : SEMANA_PARTIDA
+      : SEMANA_PARTIDA
 
 export function recursosDe(r: RubroTurnos): Recurso[] {
   // Los rubros "por sala" nombran distinto su espacio: consultorio, cabina o equipo.
@@ -375,12 +321,12 @@ export function recursosDe(r: RubroTurnos): Recurso[] {
   return nombres.map((nombre, i) => {
     // Las personas no trabajan todas igual: el segundo no viene el primer día de la semana y el
     // tercero atiende solo a la tarde. Así la agenda muestra gente con días y horarios distintos.
-    // Una cancha o una cabina están siempre que el negocio abre.
+    // Una cabina está siempre que el negocio abre.
     const atiende = persona && i === 1 && abiertos.length > 2 ? abiertos.slice(1) : abiertos
     return {
       id: `r${i + 1}`,
       nombre,
-      rol: persona ? r.profesional : r.modo === 'cancha' ? 'Cancha' : 'Espacio',
+      rol: persona ? r.profesional : 'Espacio',
       color: COLORES[i % COLORES.length],
       horario: persona && i === 2 && tipico.length > 1 ? tramosTxt([tipico[tipico.length - 1]]) : '',
       atiende,
@@ -505,38 +451,6 @@ export function turnosDe(r: RubroTurnos, jornadas?: Tramo[][], ahora: number | n
 }
 
 export const horaTxt = (min: number) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`
-
-// ─── Clases con cupo ──────────────────────────────────────────────────────────
-
-export interface ClaseCupo { id: string; dia: number; inicio: number; duracion: number; nombre: string; profe: string; cupo: number; anotados: number; sala: string }
-
-export function clasesDe(r: RubroTurnos): ClaseCupo[] {
-  const nombres = r.servicios.filter(s => s.precio === 0).map(s => s.nombre)
-  // Con una sola actividad sin cargo (talleres) la grilla entera repetiría el mismo nombre.
-  const lista = nombres.length > 1 ? nombres : r.servicios.map(s => s.nombre)
-  const profes = ['Caro', 'Nico', 'Flor', 'Seba']
-  // A qué altura de la mañana o de la tarde cae cada clase: [es de la tarde, minutos desde que abre
-  // ese turno]. Con el horario de ejemplo (7 a 13 y 17 a 22) dan las 7:00, 8:30, 10:00, 12:00,
-  // 18:00, 19:15 y 20:30; si el dueño cambia el horario, las clases se corren con él.
-  const CUANDO: [boolean, number][] = [[false, 0], [false, 90], [false, 180], [false, 300], [true, 60], [true, 135], [true, 210]]
-  const semana = semanaDe(r)
-  const out: ClaseCupo[] = []
-  let n = 0
-  for (let dia = 0; dia < 6; dia++) {
-    const bloques = bloquesDe(tramosDelDia(semana, dia))
-    for (let k = 0; k < CUANDO.length; k++) {
-      if ((dia + k) % 3 === 2 && k !== 4) continue // huecos para que la grilla respire
-      if (dia === 5 && k > 4) continue           // sábado sin la última franja
-      const [tarde, en] = CUANDO[k]
-      const tramo = tarde ? bloques.tarde : bloques.manana
-      if (!tramo || tramo[0] + en + 60 > tramo[1]) continue // ese día no hay ese turno, o la clase no entra
-      const cupo = [12, 15, 20, 10][(dia + k) % 4]
-      const anotados = Math.min(cupo, Math.round(cupo * [0.4, 1, 0.75, 0.9, 1, 0.55, 0.3][(dia * 2 + k) % 7]))
-      out.push({ id: `k${n++}`, dia, inicio: tramo[0] + en, duracion: 60, nombre: lista[(dia + k) % lista.length], profe: profes[(dia + k) % profes.length], cupo, anotados, sala: (dia + k) % 2 ? 'Sala 2' : 'Salón principal' })
-    }
-  }
-  return out
-}
 
 export const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 export const DIAS_CORTOS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']

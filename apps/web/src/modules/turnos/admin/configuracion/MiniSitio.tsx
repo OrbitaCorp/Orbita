@@ -183,8 +183,8 @@ export const CSS_PLANTILLA = `
   .tuc-plantilla-nombre { font-family: var(--tuo-fh); font-size: 16px; font-weight: 700; letter-spacing: -0.02em; color: var(--color-text); }
   .tuc-plantilla-para { font-size: 12.5px; line-height: 1.45; color: var(--color-muted); margin: 0; }
   .tuc-plantilla-sello { position: absolute; top: 10px; left: 10px; z-index: 3; display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px 0 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700;
-    color: #fff; background: var(--tuo-grad); box-shadow: 0 6px 16px rgba(37,99,235,0.45); opacity: 0; transform: translateY(-4px) scale(0.92); transition: opacity 200ms ease, transform 280ms var(--tuo-ease, ease); }
-  .tuc-plantilla[aria-checked='true'] { border-color: var(--color-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 24%, transparent), 0 22px 44px -22px color-mix(in srgb, var(--color-primary) 60%, transparent); }
+    color: var(--color-on-primary); background: var(--color-primary); opacity: 0; transform: translateY(-4px) scale(0.92); transition: opacity 200ms ease, transform 280ms var(--tuo-ease, ease); }
+  .tuc-plantilla[aria-checked='true'] { border-color: var(--color-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 24%, transparent); }
   .tuc-plantilla[aria-checked='true'] .tuc-plantilla-sello { opacity: 1; transform: none; }
   .tuc-plantilla[aria-checked='true'] .tuc-plantilla-marco { border-color: color-mix(in srgb, var(--color-primary) 40%, var(--color-border)); }
   .tuc-plantilla:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }

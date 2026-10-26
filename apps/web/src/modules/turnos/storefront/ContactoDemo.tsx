@@ -47,7 +47,7 @@ function WhatsApp({ texto, t, rubro, onCerrar }: { texto: string; t: TemaNegocio
     setEnviados(v => [...v, txt])
     setBorrador('')
   }
-  const reservar = rubro.modo === 'cupo' ? 'Reservar lugar' : rubro.modo === 'cancha' ? 'Reservar cancha' : 'Reservar turno'
+  const reservar = 'Reservar turno'
   const hora = horaTxt(AHORA)
   return (
     <Dialogo titulo="WhatsApp" onCerrar={onCerrar}>

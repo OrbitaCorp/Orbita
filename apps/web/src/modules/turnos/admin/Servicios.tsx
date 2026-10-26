@@ -11,7 +11,7 @@ import { pesos, duracionTxt, type RubroTurnos, type Recurso } from '@/modules/tu
 import { Cabecera, Llave } from '@/modules/turnos/_shared/orbita/piezas'
 import { Campo, Selector } from './configuracion/ui'
 import { Modal, ErrorCampo, Borrar } from './piezasPanel'
-import type { ServicioPanel } from './agendaDemo'
+import type { ServicioPanel } from '../datos/agenda'
 
 const DURACIONES = [10, 15, 20, 25, 30, 40, 45, 50, 60, 75, 90, 120, 150, 180, 240]
 
@@ -30,9 +30,8 @@ export default function Servicios({ rubro, recursos, servicios, onGuardar, onBor
   const lista = servicios.filter(s => s.nombre.toLowerCase().includes(q.toLowerCase()))
   const publicados = servicios.filter(s => s.online).length
   const maxDuracion = Math.max(...servicios.map(s => s.duracion), 1)
-  const cupo = rubro.modo === 'cupo'
-  const titulo = cupo ? 'Actividades' : 'Servicios'
-  const uno = cupo ? 'actividad' : 'servicio'
+  const titulo = 'Servicios'
+  const uno = 'servicio'
 
   const nuevo = (nombre = '') => setEditando({ id: '', nombre, duracion: 30, precio: 0, online: true })
 
@@ -60,7 +59,7 @@ export default function Servicios({ rubro, recursos, servicios, onGuardar, onBor
         rotulo={`${publicados} de ${servicios.length} se reservan online`}
         titulo={titulo}
         bajada="Lo que ofrecés, cuánto dura y cuánto sale. Lo que esté prendido aparece en tu página de reservas."
-        acciones={<button onClick={() => nuevo()} className="tuo-btn tuo-btn--primario"><Plus size={16} /> {cupo ? 'Nueva actividad' : 'Nuevo servicio'}</button>}
+        acciones={<button onClick={() => nuevo()} className="tuo-btn tuo-btn--primario"><Plus size={16} /> Nuevo servicio</button>}
       />
 
       <label className="tuo-buscar tuo-entra" style={{ ['--i' as string]: 1, marginBottom: 18 }}>
@@ -71,8 +70,8 @@ export default function Servicios({ rubro, recursos, servicios, onGuardar, onBor
       {lista.length === 0 && (
         <div className="tuo-card tuo-entra" style={{ padding: '44px 20px', textAlign: 'center' }}>
           <Search size={22} color="var(--color-subtle)" />
-          <div style={{ fontSize: 14.5, fontWeight: 600, color: 'var(--color-text)', marginTop: 10 }}>{servicios.length === 0 ? `Todavía no cargaste ${cupo ? 'ninguna actividad' : 'ningún servicio'}` : `Nada coincide con “${q}”`}</div>
-          <div style={{ fontSize: 13, color: 'var(--color-muted)', marginTop: 4 }}>{servicios.length === 0 ? 'Sin eso, tus clientes no tienen qué reservar.' : `Probá con otra palabra o creá ${cupo ? 'la actividad' : 'el servicio'}.`}</div>
+          <div style={{ fontSize: 14.5, fontWeight: 600, color: 'var(--color-text)', marginTop: 10 }}>{servicios.length === 0 ? 'Todavía no cargaste ningún servicio' : `Nada coincide con “${q}”`}</div>
+          <div style={{ fontSize: 13, color: 'var(--color-muted)', marginTop: 4 }}>{servicios.length === 0 ? 'Sin eso, tus clientes no tienen qué reservar.' : 'Probá con otra palabra o creá el servicio.'}</div>
           <button onClick={() => nuevo(q.trim())} className="tuo-btn" style={{ marginTop: 16, height: 44 }}><Plus size={16} /> {q.trim() ? `Crear “${q.trim()}”` : `Crear ${uno}`}</button>
         </div>
       )}
@@ -146,21 +145,20 @@ function FormServicio({ inicial, rubro, onCerrar, onGuardar, onBorrar }: {
   const [online, setOnline] = useState(inicial.online)
   const [error, setError] = useState('')
   const esNuevo = !inicial.id
-  const cupo = rubro.modo === 'cupo'
   const monto = Math.max(0, Math.round(Number(precio.replace(',', '.')) || 0))
   const sena = rubro.sena && monto ? Math.round(monto * rubro.sena / 100) : 0
   const duraciones = (DURACIONES.includes(inicial.duracion) ? DURACIONES : [...DURACIONES, inicial.duracion].sort((a, b) => a - b))
     .map(d => ({ id: d, label: duracionTxt(d) }))
 
   const guardar = () => {
-    if (!nombre.trim()) { setError(`Ponele un nombre ${cupo ? 'a la actividad' : 'al servicio'}.`); return }
+    if (!nombre.trim()) { setError('Ponele un nombre al servicio.'); return }
     onGuardar({ id: inicial.id || `s${Date.now()}`, nombre: nombre.trim(), duracion, precio: monto, online })
   }
 
   return (
     <Modal
-      rotulo={cupo ? 'Actividades' : 'Servicios'}
-      titulo={esNuevo ? (cupo ? 'Nueva actividad' : 'Nuevo servicio') : inicial.nombre}
+      rotulo="Servicios"
+      titulo={esNuevo ? 'Nuevo servicio' : inicial.nombre}
       bajada={esNuevo ? 'Así lo van a ver tus clientes al reservar.' : undefined}
       onCerrar={onCerrar}
       onEnviar={guardar}
@@ -169,7 +167,7 @@ function FormServicio({ inicial, rubro, onCerrar, onGuardar, onBorrar }: {
         <button type="submit" className="tuo-btn tuo-btn--primario"><Check size={16} /> {esNuevo ? 'Crear' : 'Guardar cambios'}</button>
       </>}
     >
-      <Campo label="Nombre" value={nombre} onChange={v => { setNombre(v); setError('') }} placeholder={cupo ? 'Ej.: Stretching' : 'Ej.: Corte y lavado'} maxLength={50} />
+      <Campo label="Nombre" value={nombre} onChange={v => { setNombre(v); setError('') }} placeholder="Ej.: Corte y lavado" maxLength={50} />
       {error && <ErrorCampo>{error}</ErrorCampo>}
       <Selector label="Duración" valor={duracion} onChange={setDuracion} opciones={duraciones} />
       <Campo
@@ -187,7 +185,7 @@ function FormServicio({ inicial, rubro, onCerrar, onGuardar, onBorrar }: {
 
       {!esNuevo && (
         <Borrar
-          etiqueta={cupo ? 'Eliminar actividad' : 'Eliminar servicio'}
+          etiqueta="Eliminar servicio"
           pregunta={<>¿Eliminar <b>{inicial.nombre}</b>? Deja de ofrecerse en tu página. Los turnos que ya están agendados no se tocan.</>}
           onBorrar={() => onBorrar(inicial.id)}
         />

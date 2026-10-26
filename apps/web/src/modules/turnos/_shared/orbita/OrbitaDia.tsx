@@ -157,7 +157,7 @@ export function OrbitaDia({ recursos, turnos, ahora, apertura = 8 * 60, cierre =
 
 const recortar = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
 
-/** Anillo de progreso chico (ocupación, cupo de una clase, avance de un paso). */
+/** Anillo de progreso chico (ocupación, avance de un paso). */
 export function Anillo({ valor, size = 56, grosor = 6, color = 'var(--color-primary)', children, label }: { valor: number; size?: number; grosor?: number; color?: string; children?: React.ReactNode; label?: string }) {
   const r = (size - grosor) / 2
   const largo = 2 * Math.PI * r

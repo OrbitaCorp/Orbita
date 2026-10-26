@@ -1,4 +1,4 @@
-// Clientes (o pacientes, o alumnos) con su historial de turnos.
+// Clientes (o pacientes) con su historial de turnos.
 // Lista con buscador y filtros rápidos + la ficha de cada uno en un modal. La
 // frecuencia de cada cliente se ve como una órbita: más visitas, más cerca del
 // negocio.
@@ -19,10 +19,10 @@ import { Anillo } from '@/modules/turnos/_shared/orbita/OrbitaDia'
 import { Cabecera } from '@/modules/turnos/_shared/orbita/piezas'
 import { Campo } from './configuracion/ui'
 import { Modal, ErrorCampo } from './piezasPanel'
-import { cuandoTxt, sinAcentos, tieneTelefono, type ServicioPanel, type TurnoAgenda } from './agendaDemo'
-import { taparTelefono } from './equipoDemo'
+import { cuandoTxt, sinAcentos, tieneTelefono, type ServicioPanel, type TurnoAgenda } from '../datos/agenda'
+import { taparTelefono } from '../datos/equipo'
 
-export const pluralCliente = (r: RubroTurnos) => esSalud(r) ? 'Pacientes' : r.modo === 'cupo' ? 'Alumnos' : 'Clientes'
+export const pluralCliente = (r: RubroTurnos) => esSalud(r) ? 'Pacientes' : 'Clientes'
 
 const HISTORIAL: { fecha: string; estado: EstadoTurno }[] = [
   { fecha: '19/09', estado: 'completado' }, { fecha: '05/09', estado: 'completado' },

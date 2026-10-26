@@ -7,7 +7,7 @@
 // mañana y su tarde, y en el corte del mediodía no hay turnos. Cuáles están
 // libres y cuáles ocupados sale de una cuenta determinista, no de una agenda real.
 import { AHORA_DEMO, tramosDelDia, type Semana, type Tramo } from '@/modules/turnos/horario'
-import { DIAS, DIAS_CORTOS, type ClaseCupo } from '@/modules/turnos/datos'
+import { DIAS, DIAS_CORTOS } from '@/modules/turnos/datos'
 
 export interface Fecha { mes: number; dia: number }
 export interface Franja { m: number; libre: boolean }
@@ -64,8 +64,6 @@ export function grillaDel(horarios: Semana, f: Fecha, duracion: number): Franja[
   return out
 }
 
-export const libresDel = (horarios: Semana, f: Fecha, duracion: number) => grillaDel(horarios, f, duracion).filter(x => x.libre)
-
 export interface GrupoHoras { nombre: 'Mañana' | 'Tarde' | 'Noche'; desde: number; hasta: number; /** "09:00 a 13:00" si es un turno de atención del negocio. */ rango?: string }
 
 const momento = (m: number): GrupoHoras['nombre'] => (m < 12 * 60 ? 'Mañana' : m < 19 * 60 ? 'Tarde' : 'Noche')
@@ -103,9 +101,3 @@ export function primerLibre(horarios: Semana, duracion: number): { f: Fecha; m: 
   }
   return null
 }
-
-// ─── Clases con cupo ──────────────────────────────────────────────────────────
-// La grilla semanal va de lunes (0) a sábado (5). Hoy es sábado: las clases de
-// hoy son las del 26 y el resto cae en la semana que arranca el lunes 28.
-export const fechaDeClase = (dia: number): Fecha => (dia === 5 ? HOY : sumarDias({ mes: 9, dia: 28 }, dia))
-export const clasePasada = (c: ClaseCupo) => c.dia === 5 && c.inicio <= AHORA_DEMO

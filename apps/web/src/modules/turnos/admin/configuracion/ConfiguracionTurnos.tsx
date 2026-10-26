@@ -4,17 +4,20 @@
 // para que un link abra directo en Reglas de reserva o en Mensajes,
 // conservando el resto de la query (?rubro=, ?vista=).
 //
+// Servicios, espacios, equipo y ganancias también viven acá: las arma el panel
+// con su estado (son las mismas pantallas que ve un rol sin acceso a
+// Configuración como secciones sueltas) y las pasa en `secciones`.
+//
 // Acá se montan, una sola vez, todas las hojas de estilo de Configuración: la
 // del lenguaje de Turnos, la de las piezas compartidas y la de cada pestaña.
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/router'
 import { ArrowUpRight } from 'lucide-react'
 import { Toast } from '@/design-system/components/Toast'
 import type { RubroTurnos } from '@/modules/turnos/datos'
 import { temaDe } from '@/modules/turnos/storefront/tema'
 import { EstiloTurnos } from '@/modules/turnos/_shared/orbita/estilo'
-import type { EquipoConfig } from '../equipoDemo'
-import { GRUPOS_NAV, TABS, subdominioDe, type TabConfig } from './datos'
+import { GRUPOS_NAV, TABS_DEL_PANEL, subdominioDe, type TabConfig, type TabDelPanel } from './datos'
 import { CSS_UI_CONFIG } from './ui'
 import { CSS_MINI, CSS_PLANTILLA } from './MiniSitio'
 import { CSS_VISTA_PREVIA } from './VistaPrevia'
@@ -24,7 +27,7 @@ import Horarios, { CSS_HORARIOS } from './Horarios'
 import Reservas, { CSS_RESERVAS } from './Reservas'
 import Mensajes, { CSS_MENSAJES } from './Mensajes'
 import Pagos from './Pagos'
-import { Dominio, Suscripcion, EquipoPermisos, CSS_CUENTA } from './Cuenta'
+import { Dominio, Suscripcion, CSS_CUENTA } from './Cuenta'
 
 const CSS_CONFIG = `
   .tuc-cfg { display: flex; align-items: flex-start; min-height: 100%; }
@@ -73,20 +76,27 @@ const CSS_CONFIG = `
   }
 ` + CSS_UI_CONFIG + CSS_MINI + CSS_PLANTILLA + CSS_VISTA_PREVIA + CSS_APARIENCIA + CSS_NEGOCIO + CSS_HORARIOS + CSS_RESERVAS + CSS_MENSAJES + CSS_CUENTA
 
-export default function ConfiguracionTurnos({ rubro, equipo }: { rubro: RubroTurnos; /** Los roles y las personas del panel, para Equipo y permisos. */ equipo?: EquipoConfig }) {
+interface Props {
+  rubro: RubroTurnos
+  /** Las pantallas que arma el panel con su estado. Las que vienen vacías (un rol que no las ve) no aparecen en el menú. */
+  secciones?: Partial<Record<TabDelPanel, ReactNode>>
+}
+
+export default function ConfiguracionTurnos({ rubro, secciones }: Props) {
   const router = useRouter()
   const q = typeof router.query.tab === 'string' ? router.query.tab : ''
-  const tab: TabConfig = (TABS as string[]).includes(q) ? q as TabConfig : 'apariencia'
-  const plantillaPedida = typeof router.query.plantilla === 'string' ? router.query.plantilla : ''
+  const esDelPanel = (id: TabConfig): id is TabDelPanel => (TABS_DEL_PANEL as readonly string[]).includes(id)
+  const grupos = GRUPOS_NAV
+    .map(g => ({ ...g, items: g.items.filter(it => !esDelPanel(it.id) || !!secciones?.[it.id]) }))
+    .filter(g => g.items.length > 0)
+  const tabs = grupos.flatMap(g => g.items.map(i => i.id))
+  const tab: TabConfig = (tabs as string[]).includes(q) ? q as TabConfig : 'apariencia'
   const navRef = useRef<HTMLElement>(null)
   const tema = temaDe(rubro)
 
   const ir = (t: TabConfig) => {
     if (t === tab) return
-    // La plantilla pedida desde Avanzado vale para una sola entrada a Apariencia.
-    const { plantilla: _p, ...resto } = router.query
-    void _p
-    void router.replace({ pathname: router.pathname, query: { ...resto, tab: t } }, undefined, { shallow: true, scroll: false })
+    void router.replace({ pathname: router.pathname, query: { ...router.query, tab: t } }, undefined, { shallow: true, scroll: false })
     // El área que scrollea es .admin-main (no la ventana): al cambiar de pestaña se vuelve arriba.
     navRef.current?.closest('main')?.scrollTo({ top: 0 })
   }
@@ -123,7 +133,7 @@ export default function ConfiguracionTurnos({ rubro, equipo }: { rubro: RubroTur
           <div className="tuo-h2" style={{ fontSize: 18 }}>Configuración</div>
           <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tema.nombre} · {rubro.label}</div>
         </div>
-        {GRUPOS_NAV.map((g, gi) => (
+        {grupos.map((g, gi) => (
           <div key={gi} className="tuc-nav-grupo">
             {g.label && <div className="tuc-nav-label tuo-rotulo">{g.label}</div>}
             {g.items.map(it => {
@@ -151,7 +161,7 @@ export default function ConfiguracionTurnos({ rubro, equipo }: { rubro: RubroTur
           key por pestaña: la entrada se anima en cada cambio. */}
       <div className="tuc-cuerpo" key={rubro.key}>
         <div className="tuc-pane" key={tab}>
-          {tab === 'apariencia' && <Apariencia key={plantillaPedida} {...props} />}
+          {tab === 'apariencia' && <Apariencia {...props} />}
           {tab === 'negocio' && <Negocio {...props} />}
           {tab === 'horarios' && <Horarios {...props} />}
           {tab === 'reservas' && <Reservas {...props} />}
@@ -159,7 +169,7 @@ export default function ConfiguracionTurnos({ rubro, equipo }: { rubro: RubroTur
           {tab === 'pagos' && <Pagos {...props} />}
           {tab === 'dominio' && <Dominio {...props} />}
           {tab === 'suscripcion' && <Suscripcion {...props} />}
-          {tab === 'equipo' && <EquipoPermisos {...props} equipo={equipo} />}
+          {esDelPanel(tab) && secciones?.[tab]}
         </div>
       </div>
 

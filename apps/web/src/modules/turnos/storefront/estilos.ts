@@ -106,10 +106,6 @@ export const CSS_SITIO = `
   .tu-spot { position: relative; }
   .tu-spot::before { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity 300ms ease; z-index: 1;
     background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--color-primary) 16%, transparent), transparent 60%); }
-  .tu-borde-luz { position: relative; }
-  .tu-borde-luz::after { content: ''; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; pointer-events: none;
-    background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 70%, transparent), transparent 40%, transparent 60%, color-mix(in srgb, var(--color-primary) 40%, transparent));
-    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
   .tu-ir { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; background: var(--color-primary-bg); color: var(--color-primary); transition: background 200ms ease, color 200ms ease, transform 240ms var(--tu-ease); }
   .tu-sitio[data-tarjeta="corte"] .tu-ir, .tu-sitio[data-tarjeta="filete"] .tu-ir { border-radius: var(--tu-r); }
   @media (hover: hover) {
@@ -134,11 +130,6 @@ export const CSS_SITIO = `
   .tu-hora { display: inline-grid; place-items: center; min-width: 44px; height: 40px; padding: 0 13px; box-sizing: border-box; border-radius: var(--tu-r-btn, 999px); border: 1px solid var(--color-border); background: transparent;
     font: 600 14px var(--tu-fm); font-variant-numeric: tabular-nums; color: var(--color-text); text-decoration: none; cursor: pointer; transition: background 160ms ease, color 160ms ease, border-color 160ms ease, transform 160ms ease; }
   .tu-hora--mas { padding: 0; width: 44px; color: var(--color-primary); }
-  .tu-estado { display: inline-flex; align-items: center; gap: 7px; min-height: 28px; padding: 0 11px; border-radius: 999px; font-size: 13px; font-weight: 700; color: var(--tu-ok); background: color-mix(in srgb, var(--tu-ok) 13%, transparent); }
-  .tu-estado::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
-  .tu-estado[data-tono="aviso"] { color: var(--tu-aviso); background: color-mix(in srgb, var(--tu-aviso) 13%, transparent); }
-  .tu-estado[data-tono="lleno"] { color: var(--tu-lleno); background: color-mix(in srgb, var(--tu-lleno) 13%, transparent); }
-  .tu-estado[data-tono="lleno"]::before { border-radius: 1px; }
   .tu-chip-hoy { display: inline-block; margin-left: 8px; padding: 2px 7px; border-radius: 999px; background: var(--color-primary); color: var(--color-on-primary); font: 600 10px var(--tu-fm); letter-spacing: .08em; text-transform: uppercase; vertical-align: middle; }
   .tu-vivo { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--tu-ok, #22C55E); animation: tuPulso 2s infinite; flex-shrink: 0; }
   .tu-vivo--off { background: var(--color-muted); animation: none; }
@@ -521,7 +512,7 @@ export const CSS_PORTADA = `
   .tup-disp .tu-eyebrow { margin-bottom: 14px; }
 
   /* ── Grillas ────────────────────────────────────────────────────────────── */
-  .tup-grilla, .tu-grilla { display: grid; gap: 20px; }
+  .tu-grilla { display: grid; gap: 20px; }
   /* Servicios: la grilla se arma según cuántos hay, para que nunca quede una tarjeta suelta en la última fila. */
   .tu-grilla--sv { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .tu-grilla--sv[data-n="4"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -537,7 +528,6 @@ export const CSS_PORTADA = `
     .tu-grilla--sv, .tu-grilla--sv[data-n="4"], .tu-grilla--sv[data-n="5"] { grid-template-columns: minmax(0, 1fr); }
     .tu-grilla--sv > :nth-child(n) { grid-column: auto !important; }
   }
-  .tu-grilla--cl { grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr)); }
   .tu-grilla--eq { grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr)); }
   .tu-grilla > .tu-reveal { display: flex; }
   .tu-grilla > .tu-reveal > * { flex: 1; min-width: 0; }
@@ -578,23 +568,6 @@ export const CSS_PORTADA = `
     .tup-carta:hover .tup-carta-nombre { color: var(--color-primary); }
     .tup-carta:hover .tup-carta-cta, .tup-carta:focus-visible .tup-carta-cta { opacity: 1; transform: none; }
   }
-
-  /* ── Clases con cupo ────────────────────────────────────────────────────── */
-  .tup-clase { display: flex; flex-direction: column; padding: 24px; }
-  .tup-clase > * { position: relative; z-index: 2; }
-  .tup-clase-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-  .tup-clase-hora { display: block; font-size: 38px; font-weight: 600; line-height: 1.05; color: var(--color-text); margin-top: 4px; }
-  .tup-clase-nombre { display: block; font-size: 23px; margin: 18px 0 6px; }
-  .tu-sitio[data-mayus="true"] .tup-clase-nombre { font-size: 28px; }
-  .tup-clase-det { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 14px; color: var(--color-muted); }
-  .tup-clase-pie { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; padding-top: 22px; }
-
-  /* ── Canchas ────────────────────────────────────────────────────────────── */
-  .tup-cancha { display: flex; flex-direction: column; overflow: hidden; }
-  .tup-cancha-dib { padding: 22px 22px 0; color: var(--color-primary); }
-  .tup-cancha-svg { display: block; width: 100%; height: auto; border-radius: 4px; background: color-mix(in srgb, var(--color-primary) 7%, transparent); transition: background 240ms ease; }
-  .tup-cancha-cuerpo { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 12px; padding: 20px 22px 24px; }
-  @media (hover: hover) { .tup-cancha:hover .tup-cancha-svg { background: color-mix(in srgb, var(--color-primary) 16%, transparent); } }
 
   /* ── Equipo ─────────────────────────────────────────────────────────────── */
   .tup-pro { overflow: hidden; display: flex; flex-direction: column; }

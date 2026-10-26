@@ -9,8 +9,8 @@
 // muestra: "09:00 – 13:00 · 16:00 – 20:00" ('' = cerrado). Acá está cómo se lee
 // y se escribe ese texto, y la hora en la que "está" la demo.
 //
-// No importa nada de datos.ts a propósito: datos.ts arma la agenda de ejemplo
-// con lo de acá.
+// No importa nada de datos/ a propósito: datos/index.ts arma la agenda de
+// ejemplo con lo de acá.
 
 /** [desde, hasta] en minutos desde las 00:00. */
 export type Tramo = [number, number]
@@ -51,7 +51,6 @@ export const tramosTxt = (tramos: Tramo[]) => tramos.map(([a, b]) => `${hhmm(a)}
 /** Los tramos de un día de la semana (0 = lunes). */
 export const tramosDelDia = (semana: Semana, indice: number): Tramo[] => tramosDe(semana[indice]?.[1])
 
-export const abiertoA = (tramos: Tramo[], m: number) => tramos.some(([a, b]) => m >= a && m < b)
 export const minutosAbiertos = (tramos: Tramo[]) => tramos.reduce((s, [a, b]) => s + (b - a), 0)
 
 /** El corte del mediodía de un día partido, o null si atiende de un tirón. */
@@ -119,10 +118,6 @@ export const semanaCon = (lunesAViernes: string, sabado: string, domingo = ''): 
 
 /** Mañana y tarde, con el corte del mediodía: así atiende el negocio de ejemplo. */
 export const SEMANA_PARTIDA: Semana = semanaCon(HORARIO_PARTIDO, HORARIO_PARTIDO)
-/** Donde hay clases con cupo se abre temprano y se cierra tarde. */
-export const SEMANA_CLASES: Semana = semanaCon('07:00 – 13:00 · 17:00 – 22:00', '07:00 – 13:00 · 17:00 – 20:00')
-/** Las canchas se alquilan sobre todo a la tarde y a la noche. */
-export const SEMANA_CANCHAS: Semana = semanaCon('09:00 – 13:00 · 16:00 – 23:00', '09:00 – 13:00 · 15:00 – 23:00')
 
 export const tramosDeJornada = (j: Jornada): Tramo[] =>
   [j.manana, j.tarde].filter(b => b.on && b.hasta > b.desde).map(b => [b.desde, b.hasta] as Tramo)

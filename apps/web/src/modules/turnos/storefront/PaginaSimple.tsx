@@ -15,7 +15,7 @@ import { useRouter } from 'next/router'
 import { CalendarCheck, ChevronDown, ChevronRight, Clock, Gift, Home, MapPin, MessageCircle } from 'lucide-react'
 import type { RubroTurnos } from '@/modules/turnos/datos'
 import { tramosDelDia, tramosFrase } from '@/modules/turnos/horario'
-import { DISENOS_SIMPLE, beneficiosTxt, useNegocioDemo, type DisenoSimple } from '@/modules/turnos/demo/negocioDemo'
+import { DISENOS_SIMPLE, beneficiosTxt, useNegocioDemo, type DisenoSimple } from '@/modules/turnos/datos/negocio'
 import SitioNegocio from './SitioNegocio'
 import { CSS_SIMPLE } from './estilos'
 import { Abierto, HOY, HorasDia, Marca, proximoLibre, ruta } from './piezas'
@@ -23,7 +23,6 @@ import { useContacto } from './ContactoDemo'
 import { linkMapa } from './reserva/acciones'
 import { altFoto, type TemaNegocio } from './tema'
 
-const verbo = (r: RubroTurnos) => r.modo === 'cupo' ? 'Reservar mi lugar' : r.modo === 'cancha' ? 'Reservar cancha' : 'Reservar turno'
 const SIMPLE = { forma: 'simple' }
 
 export default function PaginaSimple({ rubro }: { rubro: RubroTurnos }) {
@@ -65,7 +64,7 @@ function Contenido({ rubro, t }: { rubro: RubroTurnos; t: TemaNegocio }) {
             <div className="tu-rotulo tusp-lugar">{[rubro.label, t.barrio].filter(Boolean).join(' · ')}</div>
             <p className="tusp-desc">{t.tagline.replace(/\.$/, '')}.</p>
 
-            <Link href={ruta('reserva', rubro.key, SIMPLE)} className="tu-btn tu-btn--lg tusp-cta"><CalendarCheck size={20} aria-hidden /> {verbo(rubro)}</Link>
+            <Link href={ruta('reserva', rubro.key, SIMPLE)} className="tu-btn tu-btn--lg tusp-cta"><CalendarCheck size={20} aria-hidden /> Reservar turno</Link>
             <p className="tusp-nota">
               <span>Sin registrarte</span>
               <span className="tusp-nota-punto" aria-hidden />

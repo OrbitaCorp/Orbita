@@ -1,12 +1,11 @@
 // Datos del negocio: lo que aparece en el sitio, en los mensajes y en el pie
 // de cada recordatorio. El rubro no se edita acá: define cómo funciona la
-// agenda entera (por profesional, por sala, con cupo), cambiarlo es otra cosa.
+// agenda entera (por profesional o por sala), cambiarlo es otra cosa.
 import { useState } from 'react'
 import { Building2, MapPin, Phone, AtSign, Mail, Link2, Copy, QrCode, Check, X, MessageCircle, Download } from 'lucide-react'
 import { temaDe } from '@/modules/turnos/storefront/tema'
 import { FAMILIAS, MODO_LABEL } from '@/modules/turnos/datos'
 import { QR, matrizQR } from '@/modules/turnos/_shared/components/QR'
-import { Estrellas, Anillos } from '@/modules/turnos/_shared/orbita/Cielo'
 import { useBorrador, Encabezado, SecCard, Campo, Dos, Rotulo, BarraGuardar, FilaSwitch, Boton, Dialogo, type PropsTab } from './ui'
 import { subdominioDe, vozDe } from './datos'
 
@@ -63,8 +62,6 @@ export default function Negocio({ rubro, avisar }: PropsTab) {
       <div className="tuc-pila">
         {/* El link es lo que más se usa de esta pantalla: va primero y sobre el espacio de Órbita. */}
         <section aria-label="Tu link de reservas" className="tuo-espacio tuc-link-hero tuo-entra">
-          <Estrellas cantidad={30} />
-          <Anillos size={360} opacidad={0.8} />
           <div style={{ minWidth: 0, flex: '1 1 300px' }}>
             <div className="tuo-eyebrow" style={{ marginBottom: 10 }}><Link2 size={12} aria-hidden style={{ marginLeft: -2 }} />Tu link de reservas</div>
             <div className="tuc-link-url">
@@ -161,7 +158,7 @@ export const CSS_NEGOCIO = `
   .tuc-mapa-pin { position: absolute; left: 50%; top: 52%; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; gap: 6px; transition: transform 300ms var(--tuo-ease, ease); }
   .tuc-mapa-cartel { padding: 5px 11px; border-radius: 9px; background: var(--color-bg); border: 1px solid var(--color-border); font-size: 11.5px; font-weight: 600; color: var(--color-text); white-space: nowrap;
     box-shadow: 0 6px 16px rgba(15,23,42,0.16); max-width: 230px; overflow: hidden; text-overflow: ellipsis; }
-  .tuc-mapa-punto { width: 34px; height: 34px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display: grid; place-items: center; color: #fff; background: var(--tuo-grad); box-shadow: 0 8px 18px rgba(37,99,235,0.45); }
+  .tuc-mapa-punto { width: 34px; height: 34px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display: grid; place-items: center; color: var(--color-on-primary); background: var(--color-primary); }
   .tuc-mapa-punto > svg { transform: rotate(45deg); }
   @media (hover: hover) { .tuc-mapa:hover .tuc-mapa-pin { transform: translate(-50%, -108%); } }
   @media (max-width: 560px) { .tuc-link-hero { padding: 18px; } .tuc-link-url { font-size: 14px; } }
