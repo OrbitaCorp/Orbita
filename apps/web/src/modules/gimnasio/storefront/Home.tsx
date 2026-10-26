@@ -72,12 +72,23 @@ function Hoy({ negocio, inscripciones }: P) {
         <div className="gis-clases">
           {clases.map(c => {
             const cupo = cupoDe(c, HOY, inscripciones)
-            const enCurso = c.inicio <= AHORA
+            const sub = <span className="gis-clase-sub"><Users size={13} aria-hidden style={{ verticalAlign: '-2px' }} /> {c.profe?.nombre} · {c.sala} · {c.actividad?.duracion} min</span>
+            // La que ya empezó se muestra (está pasando), pero no se reserva: no es un link.
+            if (c.inicio <= AHORA) {
+              return (
+                <div key={c.id} className="gis-clase" data-en-curso="true">
+                  <span className="gis-clase-hora">{hhmm(c.inicio)}<span className="rv-chip rv-chip--aviso" style={{ marginLeft: 8, verticalAlign: '4px' }}>En curso</span></span>
+                  <h3>{c.actividad?.nombre}</h3>
+                  {sub}
+                  <span className="rv-ayuda">Ya empezó: se reserva hasta el horario de inicio.</span>
+                </div>
+              )
+            }
             return (
-              <Link key={c.id} href={ruta('reserva', negocio.rubro, { clase: c.id, fecha: HOY })} className="gis-clase" aria-label={`${c.actividad?.nombre} a las ${hhmm(c.inicio)}, ${cupo.libres} lugares libres`}>
-                <span className="gis-clase-hora">{hhmm(c.inicio)}{enCurso && <span className="rv-chip rv-chip--aviso" style={{ marginLeft: 8, verticalAlign: '4px' }}>En curso</span>}</span>
+              <Link key={c.id} href={ruta('reserva', negocio.rubro, { clase: c.id, fecha: HOY })} className="gis-clase" aria-label={`${c.actividad?.nombre} a las ${hhmm(c.inicio)}, ${cupo.lleno ? 'completa: lista de espera' : `${cupo.libres} ${cupo.libres === 1 ? 'lugar libre' : 'lugares libres'}`}`}>
+                <span className="gis-clase-hora">{hhmm(c.inicio)}</span>
                 <h3>{c.actividad?.nombre}</h3>
-                <span className="gis-clase-sub"><Users size={13} aria-hidden style={{ verticalAlign: '-2px' }} /> {c.profe?.nombre} · {c.sala} · {c.actividad?.duracion} min</span>
+                {sub}
                 <BarraCupo anotados={cupo.anotados} cupo={cupo.cupo} />
               </Link>
             )
@@ -110,8 +121,8 @@ function Semana({ negocio, inscripciones }: P) {
               {bloqueo ? <p className="rv-ayuda" style={{ margin: 0 }}>{bloqueo.motivo}</p> : clases.map(c => {
                 const cupo = cupoDe(c, f, inscripciones)
                 return (
-                  <Link key={c.id} href={ruta('reserva', negocio.rubro, { clase: c.id, fecha: f })} className="gis-dia-clase" data-lleno={cupo.lleno} aria-label={`${c.actividad?.nombre} ${hhmm(c.inicio)}, ${cupo.lleno ? 'completa' : `${cupo.libres} lugares`}`}>
-                    <b>{hhmm(c.inicio)}</b><span>{c.actividad?.nombre}</span><span style={{ color: 'var(--color-muted)' }}>{cupo.lleno ? 'Completa' : `${cupo.libres} lugares`}</span>
+                  <Link key={c.id} href={ruta('reserva', negocio.rubro, { clase: c.id, fecha: f })} className="gis-dia-clase" data-lleno={cupo.lleno} aria-label={`${c.actividad?.nombre} ${hhmm(c.inicio)}, ${cupo.lleno ? 'completa: lista de espera' : `${cupo.libres} ${cupo.libres === 1 ? 'lugar' : 'lugares'}`}`}>
+                    <b>{hhmm(c.inicio)}</b><span>{c.actividad?.nombre}</span><span className="gis-dia-cupo">{cupo.lleno ? 'Completa' : `${cupo.libres} ${cupo.libres === 1 ? 'lugar' : 'lugares'}`}</span>
                   </Link>
                 )
               })}
@@ -132,18 +143,27 @@ export function textoPlan(p: Plan): string {
 
 function Planes({ negocio }: { negocio: NegocioGym }) {
   const planes = negocio.planes.filter(p => p.activo)
-  const destacado = planes.find(p => p.tipo === 'membresia' && (p.porSemana ?? 0) === 3) ?? planes.find(p => p.tipo === 'membresia')
+  // La de prueba va en su franja, arriba: es para empezar, no un plan más que comparar.
+  const prueba = planes.find(p => p.tipo === 'prueba')
+  const pagos = planes.filter(p => p.tipo !== 'prueba')
+  const destacado = pagos.find(p => p.tipo === 'membresia' && (p.porSemana ?? 0) === 3) ?? pagos.find(p => p.tipo === 'membresia')
   return (
     <section className="gis-sec" aria-labelledby="gis-planes">
-      <Encabezado id="gis-planes" titulo="Planes y pases" bajada="Probá gratis una vez. Después, una clase suelta, un pack o una membresía mensual." />
+      <Encabezado id="gis-planes" titulo="Planes y pases" bajada={prueba ? 'Probá gratis una vez. Después, una clase suelta, un pack o una membresía mensual.' : 'Una clase suelta, un pack o una membresía mensual.'} />
+      {prueba && (
+        <div className="gis-prueba">
+          <p><b>¿Primera vez?</b> {prueba.nombre}: gratis, una vez por persona y sin compromiso.</p>
+          <Link href={ruta('reserva', negocio.rubro, { plan: 'prueba' })} className="rv-btn">Reservar mi prueba <ArrowRight size={15} aria-hidden /></Link>
+        </div>
+      )}
       <div className="gis-planes">
-        {planes.map(p => (
+        {pagos.map(p => (
           <div key={p.id} className="gis-plan" data-destacado={p.id === destacado?.id}>
-            <span className="rv-rotulo">{p.tipo === 'prueba' ? 'Para empezar' : p.tipo === 'suelta' ? 'Sin compromiso' : p.tipo === 'pack' ? 'Pack' : 'Membresía'}</span>
+            <span className="rv-rotulo">{p.tipo === 'suelta' ? 'Sin compromiso' : p.tipo === 'pack' ? 'Pack' : 'Membresía'}</span>
             <h3 className="rv-h3" style={{ fontSize: 17 }}>{p.nombre}</h3>
-            <div className="gis-precio">{p.precio ? pesos(p.precio) : 'Gratis'} <small>{p.tipo === 'membresia' ? 'por mes' : p.tipo === 'pack' ? 'el pack' : p.tipo === 'suelta' ? 'la clase' : ''}</small></div>
+            <div className="gis-precio">{pesos(p.precio)} <small>{p.tipo === 'membresia' ? 'por mes' : p.tipo === 'pack' ? 'el pack' : 'la clase'}</small></div>
             <p style={{ margin: 0, fontSize: 13.5, color: 'var(--color-muted)', lineHeight: 1.5, flex: 1 }}>{textoPlan(p)}</p>
-            <Link href={ruta('reserva', negocio.rubro, { plan: p.id })} className={`rv-btn${p.id === destacado?.id ? ' rv-btn--primario' : ''}`}>{p.tipo === 'prueba' ? 'Reservar mi prueba' : 'Elegir'}</Link>
+            <Link href={ruta('reserva', negocio.rubro, { plan: p.id })} className={`rv-btn${p.id === destacado?.id ? ' rv-btn--primario' : ''}`} aria-label={`Elegir ${p.nombre}`}>Elegir</Link>
           </div>
         ))}
       </div>

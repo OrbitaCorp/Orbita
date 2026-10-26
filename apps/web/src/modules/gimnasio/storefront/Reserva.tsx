@@ -37,7 +37,11 @@ export default function Reserva({ negocio, inscripciones, socios, onInscribir, q
   const r = rubroPorKey(negocio.rubro)
   const fechaQ = esISO(q1(query.fecha)) && q1(query.fecha) >= HOY ? q1(query.fecha) : HOY
   const [fecha, setFecha] = useState<ISO>(fechaQ)
-  const [claseId, setClaseId] = useState<string | null>(negocio.clases.some(c => c.id === q1(query.clase)) ? q1(query.clase) : null)
+  // La clase que viene por la URL tiene que existir y no haber empezado (la portada muestra la que está en curso, pero no se reserva).
+  const [claseId, setClaseId] = useState<string | null>(() => {
+    const c = negocio.clases.find(x => x.id === q1(query.clase))
+    return c && (fechaQ !== HOY || c.inicio > AHORA) ? c.id : null
+  })
   const planQ = q1(query.plan)
   const [modo, setModo] = useState<'socio' | 'nuevo'>('nuevo')
   const [planId, setPlanId] = useState<string | null>(planQ === 'prueba' ? negocio.planes.find(p => p.tipo === 'prueba')?.id ?? null : negocio.planes.some(p => p.id === planQ) ? planQ : null)
@@ -121,7 +125,7 @@ export default function Reserva({ negocio, inscripciones, socios, onInscribir, q
         id: `sn${id}`, nombre: datos.nombre.trim(), telefono: datos.telefono.trim(), email: datos.email.trim() || undefined,
         planId: planNuevo?.id ?? null, desde: planNuevo ? HOY : null, vence: planNuevo ? sumarDias(HOY, planNuevo.vigenciaDias) : null,
         // El pack entra entero: la clase de hoy la descuenta el almacén al inscribir, como cualquier reserva con pack.
-        clasesRestantes: planNuevo?.tipo === 'pack' ? planNuevo.clases ?? 0 : null, probo: false, nota: datos.notas.trim() || undefined,
+        clasesRestantes: planNuevo?.tipo === 'pack' ? planNuevo.clases ?? 0 : null, probo: false, nota: datos.notas.trim() || undefined, alta: HOY,
       }
       const espera = cupo.lleno
       const ins: Inscripcion = { id, claseId: clase.id, fecha, socioId: socio.id, estado: espera ? 'espera' : 'reservada', creada: HOY, planId: plan?.id ?? null }
@@ -146,7 +150,8 @@ export default function Reserva({ negocio, inscripciones, socios, onInscribir, q
   const textoBoton = ultimo ? (cupo?.lleno ? 'Anotarme en la lista de espera' : precio ? `Pagar ${pesos(precio)} y reservar` : 'Confirmar reserva') : 'Continuar'
 
   return (
-    <Sitio negocio={negocio} pagina="reserva" cta={{ texto: ultimo ? (cupo?.lleno ? 'Anotarme' : 'Confirmar') : 'Continuar', sub: [que, cuando].filter(Boolean).join(' · ') || falta[actual], onClick: siguiente, deshabilitado: !listo[actual] || enviando }}>
+    // En el botón fijo del celular, el último paso con pago dice el monto: es lo que se va a cobrar.
+    <Sitio negocio={negocio} pagina="reserva" cta={{ texto: enviando ? 'Reservando…' : ultimo ? (cupo?.lleno ? 'Anotarme' : precio ? `Pagar ${pesos(precio)}` : 'Confirmar') : 'Continuar', sub: [que, cuando].filter(Boolean).join(' · ') || falta[actual], onClick: siguiente, deshabilitado: !listo[actual] || enviando }}>
       <style>{CSS_RESERVA}</style>
       <div className="gis-cont gir">
         <ol className="gir-pasos" aria-label="Pasos de la reserva">
@@ -272,7 +277,7 @@ export default function Reserva({ negocio, inscripciones, socios, onInscribir, q
               <button type="button" className="rv-btn rv-btn--primario rv-btn--lg rv-btn--ancho" style={{ marginTop: 14 }} onClick={siguiente} disabled={!listo[actual] || enviando} aria-busy={enviando}>
                 {enviando ? 'Reservando…' : textoBoton} {!enviando && (ultimo && precio && !cupo?.lleno ? <Lock size={16} aria-hidden /> : <ArrowRight size={16} aria-hidden />)}
               </button>
-              <p className="rv-ayuda" style={{ minHeight: 20, margin: '8px 0 0', textAlign: 'center' }}>{listo[actual] ? '' : falta[actual]}</p>
+              <p className="rv-ayuda gir-falta" style={{ minHeight: 20, margin: '8px 0 0', textAlign: 'center' }}>{listo[actual] ? '' : falta[actual]}</p>
             </div>
             <p className="rv-ayuda" style={{ margin: '10px 0 0', textAlign: 'center' }}>Cancelás hasta {negocio.cancelaHastaHoras} h antes sin perder la clase. {r.socio === 'Atleta' ? 'Un cupo por atleta.' : ''}</p>
           </aside>
@@ -388,7 +393,7 @@ export const CSS_RESERVA = `
   /* En celular el botón del resumen sobra: el de reservar va fijo al pie (Sitio). Hasta
      768 y no hasta 860: entre 769 y 860 no hay botón fijo y este es el único. */
   @media (max-width: 768px) {
-    .gir-lateral .rv-btn { display: none; }
+    .gir-lateral .rv-btn, .gir-lateral .gir-falta { display: none; }
     .gir-pasos button { min-height: 44px; padding: 0 14px; }
   }
 `

@@ -208,3 +208,16 @@ export function useDemoGym() {
   const demo = useSyncExternalStore(suscribir, leer, () => INICIAL)
   return { demo, ...accionesGym }
 }
+
+const sinCambios = () => () => {}
+
+/**
+ * Si el almacén ya se leyó del navegador. En una carga completa (recargar,
+ * entrar por un link) el primer render es el de la hidratación y usa la foto
+ * del servidor, que es el negocio de ejemplo; recién en el render siguiente
+ * llega lo guardado. Lo que arma su estado una sola vez con lo que recibe (los
+ * formularios de Configuración, la reserva que viene con ?clase=) tiene que
+ * esperar a esto o volver a montarse cuando cambia: si no, se queda con el
+ * ejemplo y al guardar pisa lo del dueño.
+ */
+export const useHidratado = () => useSyncExternalStore(sinCambios, () => true, () => false)

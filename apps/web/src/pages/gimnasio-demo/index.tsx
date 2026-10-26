@@ -46,10 +46,11 @@ export default function GimnasioDemo() {
                     <span className="rv-rotulo" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><r.Icon size={13} aria-hidden /> {r.label}</span>
                     <h3 className="rv-h2" style={{ marginTop: 4 }}>{n.nombre}</h3>
                     <p className="rv-bajada" style={{ fontSize: 13.5, flex: 1 }}>{r.descripcion}. {n.clases.length} clases por semana.</p>
-                    <div className="rv-fila" style={{ marginTop: 14, gap: 8 }}>
-                      <Link href={{ pathname: '/gimnasio-demo/panel', query: { rubro: r.key } }} className="rv-btn rv-btn--primario rv-btn--sm" aria-label={`Panel de ${n.nombre}`}>Panel</Link>
-                      <Link href={{ pathname: '/gimnasio-demo/negocio', query: { rubro: r.key } }} className="rv-btn rv-btn--sm" aria-label={`Sitio de ${n.nombre}`}>Sitio</Link>
-                      <Link href={{ pathname: '/gimnasio-demo/reserva', query: { rubro: r.key } }} className="rv-btn rv-btn--sm" aria-label={`Reservar una clase en ${n.nombre}`}>Reservar</Link>
+                    {/* Los tres en una fila (con el padding de siempre, Reservar caía solo a la segunda). */}
+                    <div className="rv-fila" style={{ marginTop: 14, gap: 6, flexWrap: 'nowrap' }}>
+                      <Link href={{ pathname: '/gimnasio-demo/panel', query: { rubro: r.key } }} className="rv-btn rv-btn--primario rv-btn--sm" style={{ flex: 1, padding: '0 8px' }} aria-label={`Panel de ${n.nombre}`}>Panel</Link>
+                      <Link href={{ pathname: '/gimnasio-demo/negocio', query: { rubro: r.key } }} className="rv-btn rv-btn--sm" style={{ flex: 1, padding: '0 8px' }} aria-label={`Sitio de ${n.nombre}`}>Sitio</Link>
+                      <Link href={{ pathname: '/gimnasio-demo/reserva', query: { rubro: r.key } }} className="rv-btn rv-btn--sm" style={{ flex: 1, padding: '0 8px' }} aria-label={`Reservar una clase en ${n.nombre}`}>Reservar</Link>
                     </div>
                   </div>
                 </div>
@@ -70,7 +71,8 @@ export default function GimnasioDemo() {
           </div>
 
           <h2 className="rv-h2" style={{ marginTop: 36, marginBottom: 8 }}>Qué es real y qué es simulado</h2>
-          <ul className="rv-bajada" style={{ marginTop: 0, paddingLeft: 18, lineHeight: 1.7 }}>
+          {/* list-style explícito: el preflight de Tailwind se lo saca a todas las listas y sin viñetas parecía un párrafo con sangría. */}
+          <ul className="rv-bajada" style={{ marginTop: 0, paddingLeft: 18, lineHeight: 1.7, listStyle: 'disc' }}>
             <li>El calendario .ics de las clases se genera de verdad en el navegador (Configuración › Calendarios, y cada reserva en Mis clases).</li>
             <li>La importación de un calendario externo por URL es simulada: no se descarga nada y lo dice en pantalla («Demo: sincronización simulada»).</li>
             <li>Los cobros (planes, packs, clases sueltas) se registran a mano: no se cobra nada.</li>

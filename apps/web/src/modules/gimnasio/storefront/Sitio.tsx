@@ -18,6 +18,25 @@ export function ruta(p: PaginaSitio, rubro: string, q: Record<string, string> = 
   return `${RUTAS[p]}?${s}${hash}`
 }
 
+/**
+ * La barra de cupo (BarraCupo) la usan el sitio y el panel: su hoja va aparte y
+ * cada uno la monta. Antes vivía solo en la del sitio y en el panel la barra no
+ * se dibujaba (quedaba el texto suelto, grande y en un naranja ilegible). El
+ * texto usa los tonos de chip: el --color-warning del panel (#F59E0B) sobre
+ * blanco da 2,1:1.
+ */
+export const CSS_CUPO = `
+  .gis-cupo { display: flex; align-items: center; gap: 8px; margin-top: 4px; font-size: 12.5px; color: var(--color-muted); }
+  .gis-cupo-barra { flex: 1; height: 6px; border-radius: 3px; background: var(--color-surface-alt); overflow: hidden; }
+  .gis-cupo-barra i { display: block; height: 100%; background: var(--color-primary); border-radius: 3px; }
+  .gis-cupo-barra i[data-tono='aviso'] { background: var(--color-warning); }
+  .gis-cupo-barra i[data-tono='lleno'] { background: var(--color-error); }
+  .gis-cupo > span { flex-shrink: 0; }
+  .gis-cupo > span[data-tono] { font-weight: 600; }
+  .gis-cupo > span[data-tono='aviso'] { color: var(--chip-warning-fg); }
+  .gis-cupo > span[data-tono='lleno'] { color: var(--chip-error-fg); }
+`
+
 export const CSS_SITIO = `
   /* --rv-tope: los 40 px de la tira de la demo, que en el producto real no existe. */
   /* --color-muted un punto más oscuro que el del panel: sobre los fondos verdosos del sitio (#F2F7F6, #CCFBF1) el #64748B quedaba en 4,4:1, debajo de AA. */
@@ -64,11 +83,8 @@ export const CSS_SITIO = `
   .gis-clase-hora { font-family: var(--rv-mono); font-size: 18px; font-weight: 600; color: var(--color-text); }
   .gis-clase h3 { font-size: 16px; font-weight: 700; color: var(--color-text); margin: 0; }
   .gis-clase-sub { font-size: 13px; color: var(--color-muted); }
-  .gis-cupo { display: flex; align-items: center; gap: 8px; margin-top: 4px; font-size: 12.5px; color: var(--color-muted); }
-  .gis-cupo-barra { flex: 1; height: 6px; border-radius: 3px; background: var(--color-surface-alt); overflow: hidden; }
-  .gis-cupo-barra i { display: block; height: 100%; background: var(--color-primary); border-radius: 3px; }
-  .gis-cupo-barra i[data-tono='aviso'] { background: var(--color-warning); }
-  .gis-cupo-barra i[data-tono='lleno'] { background: var(--color-error); }
+  /* La clase que ya empezó no se reserva: va sin link y más quieta. */
+  .gis-clase[data-en-curso='true'] { background: var(--color-surface); }
 
   /* La semana */
   .gis-semana { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
@@ -78,16 +94,25 @@ export const CSS_SITIO = `
   .gis-dia-clase { display: block; width: 100%; text-align: left; padding: 7px 8px; border-radius: 8px; border: none; border-left: 3px solid var(--color-primary); background: var(--color-surface); color: var(--color-text); font: inherit; font-size: 12.5px; line-height: 1.3; text-decoration: none; margin-bottom: 6px; cursor: pointer; }
   .gis-dia-clase b { display: block; font-family: var(--rv-mono); font-weight: 600; }
   .gis-dia-clase span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .gis-dia-clase[data-lleno='true'] { opacity: 0.6; border-left-color: var(--color-subtle); }
+  /* Llena: se sigue leyendo (con opacity: 0.6 el texto quedaba en 2,6:1) y se puede tocar para la lista de espera. */
+  .gis-dia-clase[data-lleno='true'] { background: var(--color-bg); border-left-color: var(--color-border-strong); box-shadow: inset 0 0 0 1px var(--color-border); }
+  .gis-dia-cupo { color: var(--color-muted); }
+  .gis-dia-clase[data-lleno='true'] .gis-dia-cupo { color: var(--chip-error-fg); font-weight: 600; }
   .gis-dia-clase:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
   .gis-tabs-dias { display: none; }
 
-  /* Planes */
-  .gis-planes { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+  /* Planes: la de prueba va aparte, en una franja; los pagos, en una fila que se reparte entera
+     (con minmax(220px) cinco planes quedaban en 4 + 1 suelto). En tablet, de a dos, y si sobra
+     uno, ocupa la fila. */
+  .gis-prueba { display: flex; align-items: center; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; padding: 16px 18px; margin-bottom: 14px; border-radius: 14px; background: var(--color-surface); }
+  .gis-prueba p { margin: 0; font-size: 14px; color: var(--color-body); }
+  .gis-prueba b { color: var(--color-text); }
+  .gis-planes { display: grid; grid-template-columns: repeat(auto-fit, minmax(176px, 1fr)); gap: 14px; }
   .gis-plan { border: 1px solid var(--color-border); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 8px; }
   .gis-plan[data-destacado='true'] { border-color: var(--color-primary); box-shadow: 0 0 0 1px var(--color-primary); }
-  .gis-precio { font-family: var(--rv-mono); font-size: 24px; font-weight: 600; color: var(--color-text); letter-spacing: -0.02em; }
-  .gis-precio small { font-family: inherit; font-size: 12px; font-weight: 500; color: var(--color-muted); }
+  /* La unidad ("la clase", "por mes") no se parte: si no entra al lado del precio, baja entera. */
+  .gis-precio { font-family: var(--rv-mono); font-size: 24px; line-height: 1.2; font-weight: 600; color: var(--color-text); letter-spacing: -0.02em; }
+  .gis-precio small { font-family: inherit; font-size: 12px; font-weight: 500; color: var(--color-muted); white-space: nowrap; display: inline-block; }
 
   .gis-pasos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
   .gis-paso { padding: 18px; border-radius: 14px; background: var(--color-surface); }
@@ -101,6 +126,7 @@ export const CSS_SITIO = `
   .gis-horarios li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--color-border); font-size: 14px; }
   .gis-horarios li:first-child { border-top: none; }
   .gis-horarios li[data-cerrado='true'] { color: var(--color-muted); }
+  /* El pie va adentro de .gis-cont (no es él): con padding: 24px 0 pisaba el padding lateral del contenedor y quedaba 24 px corrido del contenido. */
   .gis-pie { margin-top: 56px; padding: 24px 0 32px; border-top: 1px solid var(--color-border); font-size: 13px; color: var(--color-muted); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center; }
   .gis-pie a { color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
   .gis-cta-movil { display: none; }
@@ -108,15 +134,22 @@ export const CSS_SITIO = `
   /* Lo que se enfoca con el teclado no queda escondido debajo del header fijo (40 de la demo + 64). */
   html:has(.gis) { scroll-padding-top: 112px; }
 
-  @media (max-width: 960px) { .gis-semana { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (max-width: 960px) {
+    .gis-semana { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .gis-planes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .gis-planes > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+  }
   @media (max-width: 860px) {
     .gis-hero { grid-template-columns: minmax(0, 1fr); gap: 20px; padding-top: 20px; }
+    /* A lo ancho, en 4:3 la foto ocupaba toda la primera pantalla de una tablet. */
+    .gis-hero-foto { aspect-ratio: 16 / 10; }
     .gis-ubicacion { grid-template-columns: minmax(0, 1fr); }
   }
   @media (max-width: 768px) {
     .gis-cont { padding: 0 16px; }
     .gis-nav a:not([data-fijo]) { display: none; }
-    .gis-nav a, .gis-link { min-height: 44px; }
+    .gis-nav a, .gis-link, .gis-marca { min-height: 44px; }
+    .gis-hero-datos { max-width: none; }
     /* El botón fijo al pie mide --rv-pie: el pie de página deja ese aire para que
        nada quede tapado al final, los avisos (rv-toast) salen por encima y el
        foco del teclado tampoco se esconde detrás. */
@@ -126,7 +159,6 @@ export const CSS_SITIO = `
     .gis-cta-movil { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: rgba(255,255,255,0.94); backdrop-filter: blur(8px); border-top: 1px solid var(--color-border); gap: 10px; align-items: center; }
     .gis-cta-movil > div { flex: 1; min-width: 0; font-size: 13px; color: var(--color-muted); }
     .gis-cta-movil b { display: block; font-size: 14px; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .gis-pasos { grid-template-columns: minmax(0, 1fr); }
     .gis-sec { padding-top: 32px; }
     .gis-hero-ctas .rv-btn { flex: 1 1 100%; }
     /* La semana en celular: un día por vez, elegido con la tira de días */
@@ -136,6 +168,9 @@ export const CSS_SITIO = `
     .gis-tabs-dias { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 4px; margin: -4px -4px 6px; }
     .gis-tabs-dias::-webkit-scrollbar { display: none; }
   }
+  /* "Cómo funciona" sigue en tres columnas en una tablet; recién en celular va de a uno. */
+  @media (max-width: 600px) { .gis-pasos { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 560px) { .gis-planes { grid-template-columns: minmax(0, 1fr); } .gis-prueba .rv-btn { flex: 1 1 100%; } }
   @media (max-width: 480px) { .gis-hero-datos li { padding: 10px; } .gis-hero-datos b { font-size: 17px; } .gis-clases { grid-template-columns: minmax(0, 1fr); } }
 `
 
@@ -156,7 +191,7 @@ export default function Sitio({ negocio, pagina, cta, children }: Props) {
   return (
     <div className="rv gis" data-cta={!!cta || undefined}>
       <EstiloReservas />
-      <style>{CSS_SITIO}</style>
+      <style>{CSS_SITIO + CSS_CUPO}</style>
       <header className="gis-header">
         <div className="gis-cont gis-header-in">
           <Link href={ruta('inicio', negocio.rubro)} className="gis-marca" aria-label={`${negocio.nombre}: inicio`}>
@@ -169,9 +204,11 @@ export default function Sitio({ negocio, pagina, cta, children }: Props) {
         </div>
       </header>
       <main className="gis-main">{children}</main>
-      <footer className="gis-cont gis-pie">
-        <span><Phone size={13} aria-hidden style={{ verticalAlign: '-2px', marginRight: 5 }} />{negocio.telefono} · <MapPin size={13} aria-hidden style={{ verticalAlign: '-2px', marginRight: 4 }} />{negocio.direccion}, {negocio.ciudad}</span>
-        <span>Reservas con <a href="https://orbita.site" target="_blank" rel="noreferrer"><OrbitaLogo size={14} animated={false} /> Órbita</a></span>
+      <footer className="gis-cont">
+        <div className="gis-pie">
+          <span><Phone size={13} aria-hidden style={{ verticalAlign: '-2px', marginRight: 5 }} />{negocio.telefono} · <MapPin size={13} aria-hidden style={{ verticalAlign: '-2px', marginRight: 4 }} />{negocio.direccion}, {negocio.ciudad}</span>
+          <span>Reservas con <a href="https://orbita.site" target="_blank" rel="noreferrer"><OrbitaLogo size={14} animated={false} /> Órbita</a></span>
+        </div>
       </footer>
       {cta && (
         <div className="gis-cta-movil">
@@ -193,15 +230,17 @@ export function Mapa({ latLng, titulo }: { latLng: [number, number]; titulo: str
   return <div className="gis-mapa"><iframe title={`Mapa: ${titulo}`} src={src} loading="lazy" referrerPolicy="no-referrer" /></div>
 }
 
-/** Barra de cupo: cuánto se llenó una clase. El texto dice lo mismo que el color. */
+/** Barra de cupo: cuánto se llenó una clase. El texto dice lo mismo que el color. Necesita CSS_CUPO montado. */
 export function BarraCupo({ anotados, cupo }: { anotados: number; cupo: number }) {
   const libres = Math.max(0, cupo - anotados)
   const tono = libres === 0 ? 'lleno' : libres <= 3 ? 'aviso' : undefined
   const texto = libres === 0 ? 'Completa · lista de espera' : libres === 1 ? 'Último lugar' : `${libres} lugares libres`
   return (
-    <div className="gis-cupo" aria-label={`${anotados} de ${cupo} lugares ocupados`}>
+    <div className="gis-cupo">
+      {/* Un div no se nombra con aria-label (el lector lo ignora): la cuenta va como texto oculto. */}
+      <span className="rv-sr">{`${anotados} de ${cupo} lugares ocupados. `}</span>
       <div className="gis-cupo-barra" aria-hidden><i data-tono={tono} style={{ width: `${Math.min(100, Math.round((anotados / Math.max(1, cupo)) * 100))}%` }} /></div>
-      <span style={{ flexShrink: 0, color: tono === 'lleno' ? 'var(--color-error)' : tono === 'aviso' ? 'var(--color-warning)' : undefined, fontWeight: tono ? 600 : 400 }}>{texto}</span>
+      <span data-tono={tono}>{texto}</span>
     </div>
   )
 }

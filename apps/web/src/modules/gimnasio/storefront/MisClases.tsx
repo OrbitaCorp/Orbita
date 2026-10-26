@@ -15,6 +15,16 @@ import { CSS_RESERVA } from './Reserva'
 
 interface P { negocio: NegocioGym; inscripciones: Inscripcion[]; socios: Socio[]; onCancelar: (id: string) => void; onCheckIn: (id: string) => void }
 
+// En celular: el botón de reservar de arriba sobra (va el fijo al pie) y la
+// asistencia baja a su propia fila, alineada a la izquierda (a la derecha y
+// angosta quedaba desacomodada debajo del plan).
+const CSS = `
+  @media (max-width: 768px) { .gim-reservar { display: none; } }
+  @media (max-width: 560px) {
+    .gim-asistencia { flex: 1 1 100%; text-align: left !important; display: flex; align-items: baseline; gap: 6px 10px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--color-border); }
+  }
+`
+
 export default function MisClases({ negocio, inscripciones, socios, onCancelar, onCheckIn }: P) {
   const idYo = idSocioDemo(negocio.rubro)
   const mios = socios.filter(s => s.id === idYo || s.id.startsWith('sn'))
@@ -53,14 +63,14 @@ export default function MisClases({ negocio, inscripciones, socios, onCancelar, 
 
   return (
     <Sitio negocio={negocio} pagina="mis-clases" cta={{ texto: 'Reservar clase', href: ruta('reserva', negocio.rubro) }}>
-      <style>{CSS_RESERVA}</style>
+      <style>{CSS_RESERVA + CSS}</style>
       <div className="gis-cont" style={{ maxWidth: 760, paddingTop: 28 }}>
         <div className="rv-entre" style={{ marginBottom: 18 }}>
           <div>
             <h1 className="rv-h1">Mis clases</h1>
             <p className="rv-bajada">Hola, {yo?.nombre.split(' ')[0]}. Cancelás hasta {negocio.cancelaHastaHoras} h antes sin perder la clase.</p>
           </div>
-          <Link href={ruta('reserva', negocio.rubro)} className="rv-btn rv-btn--primario">Reservar clase <ArrowRight size={16} aria-hidden /></Link>
+          <Link href={ruta('reserva', negocio.rubro)} className="rv-btn rv-btn--primario gim-reservar">Reservar clase <ArrowRight size={16} aria-hidden /></Link>
         </div>
 
         {yo && (
@@ -73,9 +83,9 @@ export default function MisClases({ negocio, inscripciones, socios, onCancelar, 
                   {plan && yo.vence ? <>{estado === 'vencido' ? 'Venció' : 'Vence'} el <b>{fechaLarga(yo.vence).toLowerCase()}</b>{yo.clasesRestantes !== null ? <> · te quedan <b>{yo.clasesRestantes}</b> clases</> : semana ? <> · esta semana usaste <b>{semana.usadas} de {semana.porSemana}</b></> : <> · clases libres</>}.</> : 'Elegí un plan al reservar tu próxima clase.'}
                 </p>
               </div>
-              <div style={{ textAlign: 'right' }}>
+              <div className="gim-asistencia" style={{ textAlign: 'right' }}>
                 <div className="rv-rotulo">Asistencia</div>
-                <b className="rv-num" style={{ fontSize: 22, color: 'var(--color-text)' }}>{asistidas}</b>
+                <div><b className="rv-num" style={{ fontSize: 22, color: 'var(--color-text)' }}>{asistidas}</b> <span className="rv-ayuda">{asistidas === 1 ? 'clase' : 'clases'}</span></div>
                 <div className="rv-ayuda">{asistidas + faltas ? `${Math.round((asistidas / (asistidas + faltas)) * 100)}% de las reservadas` : 'todavía sin clases'}</div>
               </div>
             </div>

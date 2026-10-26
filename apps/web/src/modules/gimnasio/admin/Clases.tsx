@@ -7,7 +7,7 @@ import { Check, ChevronLeft, ChevronRight, Hourglass, Plus, Trash2, UserPlus, X 
 import { DIAS_CORTOS, DIAS_SEMANA, diaSemana, fechaLarga, fechaRelativa, hhmm, sumarDias, type ISO } from '@/lib/reservas/fechas'
 import { AHORA, HOY, actividadDe, clasesDelDia, cupoDe, diaBloqueado, profeDe, rubroPorKey, socioPorId, topeSemanal, type ClaseSemanal, type Inscripcion, type NegocioGym, type Socio } from '../datos'
 import { Chip, Encabezado, Modal, Nota, Selector, Sigla, Vacio, Campo } from '@/design-system/reservas/piezas'
-import { BarraCupo } from '../storefront/Sitio'
+import { BarraCupo, CSS_CUPO } from '../storefront/Sitio'
 
 interface P {
   negocio: NegocioGym
@@ -57,14 +57,18 @@ const CSS = `
     /* El padding deja lugar al anillo de foco, que la tira (overflow) recortaba. */
     .gic-tabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 4px; margin: -4px -4px 6px; }
     .gic-tabs::-webkit-scrollbar { display: none; }
-    .gic-clase { grid-template-columns: 64px minmax(0, 1fr); }
-    .gic-clase > :last-child { grid-column: 1 / -1; }
     .gic-persona { flex-wrap: wrap; }
     .gic-persona-acciones { width: 100%; }
     .gic-persona-acciones > .rv-btn { flex: 1; }
     .gic-mas { min-height: 44px; }
   }
-`
+  /* Recién en celular los chips de la clase bajan a su propia fila: en una tablet entran al costado. */
+  @media (max-width: 560px) {
+    .gic-clase { grid-template-columns: 64px minmax(0, 1fr); }
+    .gic-clase > :last-child { grid-column: 1 / -1; }
+    .gic-clase > :last-child:empty { display: none; }
+  }
+` + CSS_CUPO
 
 export default function Clases(p: P) {
   const [vista, setVista] = useState<'dia' | 'grilla'>('dia')
@@ -138,6 +142,8 @@ function DetalleClase({ negocio, clase, fecha, inscripciones, socios, pasada, so
 }) {
   const act = actividadDe(negocio, clase.actividadId)
   const k = cupoDe(clase, fecha, inscripciones)
+  // El check-in se abre el día de la clase, desde checkInMin minutos antes (como en Mis clases); en las pasadas sirve para corregir la asistencia.
+  const checkInAbierto = fecha < HOY || (fecha === HOY && clase.inicio - negocio.checkInMin <= AHORA)
   const suyas = inscripciones.filter(i => i.claseId === clase.id && i.fecha === fecha && i.estado !== 'cancelada')
   const anotados = suyas.filter(i => i.estado !== 'espera').sort((a, b) => (socioPorId(a.socioId, socios)?.nombre ?? '').localeCompare(socioPorId(b.socioId, socios)?.nombre ?? ''))
   const espera = suyas.filter(i => i.estado === 'espera').sort((a, b) => a.creada.localeCompare(b.creada) || a.id.localeCompare(b.id))
@@ -160,6 +166,7 @@ function DetalleClase({ negocio, clase, fecha, inscripciones, socios, pasada, so
       <div className="rv-entre" style={{ margin: '16px 0 6px' }}>
         <h3 className="rv-h3">{pasada ? 'Asistencia' : 'Anotados'} ({anotados.length})</h3>
         {pasada && <span className="rv-ayuda">{anotados.filter(i => i.estado === 'asistio').length} vinieron · {anotados.filter(i => i.estado === 'ausente').length} faltaron</span>}
+        {!checkInAbierto && <span className="rv-ayuda">El check-in se abre {negocio.checkInMin} min antes de la clase.</span>}
       </div>
       <div className="gic-asistencia">
         {anotados.map(i => {
@@ -170,7 +177,7 @@ function DetalleClase({ negocio, clase, fecha, inscripciones, socios, pasada, so
               <span style={{ flex: 1, minWidth: 0 }}><b style={{ display: 'block', fontSize: 14, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s?.nombre ?? '—'}</b><span className="rv-ayuda">{s?.telefono}</span></span>
               <span className="gic-persona-acciones">
                 {i.estado === 'asistio' ? <Chip tono="ok"><Check size={12} aria-hidden /> Vino</Chip> : i.estado === 'ausente' ? <Chip tono="error">Faltó</Chip> : null}
-                {i.estado !== 'asistio' && <button type="button" className="rv-btn rv-btn--sm" onClick={() => onCambiar(i.id, { estado: 'asistio' }, `Check-in de ${s?.nombre.split(' ')[0] ?? ''}`)}><Check size={14} aria-hidden /> Check-in</button>}
+                {checkInAbierto && i.estado !== 'asistio' && <button type="button" className="rv-btn rv-btn--sm" onClick={() => onCambiar(i.id, { estado: 'asistio' }, `Check-in de ${s?.nombre.split(' ')[0] ?? ''}`)}><Check size={14} aria-hidden /> Check-in</button>}
                 {pasada && i.estado !== 'ausente' && <button type="button" className="rv-btn rv-btn--sm rv-btn--fantasma" onClick={() => onCambiar(i.id, { estado: 'ausente' })}>Faltó</button>}
                 {!pasada && i.estado === 'reservada' && <button type="button" className="rv-btn rv-btn--sm rv-btn--fantasma" onClick={() => onCancelar(i.id, `Se liberó el lugar de ${s?.nombre.split(' ')[0] ?? ''}`)} aria-label={`Sacar a ${s?.nombre}`}><X size={14} /></button>}
               </span>

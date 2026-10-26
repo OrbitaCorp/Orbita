@@ -13,7 +13,7 @@
 // con su plan y su asistencia; check-in; y lista de espera que avanza sola.
 import type { LucideIcon } from 'lucide-react'
 import { Dumbbell, Flame, Activity, Flower2, Music, Swords, Waves, Presentation } from 'lucide-react'
-import { diaSemana, sumarDias, type ISO } from '@/lib/reservas/fechas'
+import { diaSemana, diasEntre, sumarDias, type ISO } from '@/lib/reservas/fechas'
 
 // ─── El "hoy" de la demo ─────────────────────────────────────────────────────
 // Sábado 14/11/2026 a las 10:40, fijo.
@@ -172,6 +172,8 @@ export interface Socio {
   /** Ya usó la clase de prueba. */
   probo: boolean
   nota?: string
+  /** Desde cuándo es socio: con eso Ingresos cuenta las renovaciones de antes del plan de ahora. */
+  alta?: ISO | null
 }
 
 export type EstadoInscripcion = 'reservada' | 'asistio' | 'ausente' | 'cancelada' | 'espera'
@@ -229,7 +231,8 @@ export function negocioDe(r: RubroGym): NegocioGym {
   const profes: Profe[] = r.profes.map((p, i) => ({ id: `p${i + 1}`, nombre: p }))
   const apertura: Apertura = { dias: [0, 1, 2, 3, 4, 5], desde: 7 * 60, hasta: 22 * 60 }
   return {
-    rubro: r.key, nombre: r.negocio, descripcion: `${r.tagline} ${r.descripcion}, con cupo por clase y reserva desde el celular.`,
+    // Sin repetir la descripción del rubro ("WODs con cupo por horario, con cupo por clase…").
+    rubro: r.key, nombre: r.negocio, descripcion: `${r.tagline} Reservá tu lugar en cada clase desde el celular.`,
     telefono: '3757 55-0202', direccion: 'Av. Misiones 310', ciudad: 'Puerto Iguazú', latLng: IGUAZU, slug: slugDe(r.negocio), logo: null,
     fotoPortada: r.fotos[0], galeria: r.fotos, apertura, actividades, salas: r.salas, profes,
     clases: grillaDe(r, actividades, profes, apertura),
@@ -242,6 +245,28 @@ export function negocioDe(r: RubroGym): NegocioGym {
 
 const NOMBRES = ['Sofía Ramírez', 'Juan Pérez', 'Valentina Gómez', 'Nicolás Torres', 'Camila López', 'Mateo Díaz', 'Agustina Ruiz', 'Lautaro Castro', 'Brenda Ojeda', 'Ezequiel Funes', 'Rocío Medina', 'Tomás Ferreyra', 'Lucía Benítez', 'Martín Sosa', 'Julieta Sosa', 'Paula Ortiz']
 
+// El resto del plantel. Con los 16 de arriba solos, para llenar unas 25 clases
+// por semana cada uno "venía" a dos o tres clases por día: 65 clases en un mes
+// con un plan de 3 por semana, y gente sin plan con 50 asistencias. Los nombres
+// salen de cruzar estas dos listas (30 × 31: no se repiten hasta 930 socios).
+const PILA = ['Abril', 'Bruno', 'Carla', 'Diego', 'Elena', 'Facundo', 'Gabriela', 'Hernán', 'Inés', 'Joaquín', 'Karen', 'Leandro', 'Milagros', 'Nahuel', 'Olivia', 'Pablo', 'Romina', 'Santiago', 'Tamara', 'Ulises', 'Vanesa', 'Walter', 'Ximena', 'Yamila', 'Zoe', 'Gonzalo', 'Micaela', 'Franco', 'Daiana', 'Emiliano']
+const APELLIDOS = ['Acosta', 'Barrios', 'Cabrera', 'Domínguez', 'Escobar', 'Figueroa', 'Giménez', 'Herrera', 'Ibarra', 'Juárez', 'Ledesma', 'Molina', 'Núñez', 'Olivera', 'Paz', 'Quiroga', 'Ríos', 'Silva', 'Toledo', 'Vera', 'Zalazar', 'Aguirre', 'Bravo', 'Correa', 'Duarte', 'Ferreira', 'Godoy', 'Luna', 'Méndez', 'Pereyra', 'Romero']
+const sinTildes = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+
+/**
+ * Cuántos socios hacen falta para llenar la grilla sin que nadie pase su plan:
+ * los lugares de la semana (con un 10 % de aire: no todos usan todas sus
+ * clases, y si no las últimas clases del día quedaban vacías) sobre las clases
+ * por semana que viene un socio en promedio (tres cuartos con membresía, un
+ * quinto con pack, que viene una vez por semana). En un taller de una vez por
+ * semana hacen falta más que en un box.
+ */
+function cuantosSocios(n: NegocioGym): number {
+  const membresias = n.planes.filter(p => p.tipo === 'membresia').map(p => p.porSemana || 4)
+  const ritmo = 0.75 * (membresias.length ? membresias.reduce((s, x) => s + x, 0) / membresias.length : 2) + 0.2 * 1 + 0.05 * 0.5
+  return Math.max(24, Math.min(200, Math.round((n.clases.reduce((s, c) => s + c.cupo, 0) * 1.1) / ritmo)))
+}
+
 // Los ids de ejemplo llevan el rubro adelante: los cambios de la demo se
 // guardan por id (un check-in, un plan renovado), y con "s1" o "i5" a secas
 // un cambio hecho en el box se veía también en el estudio de yoga.
@@ -249,26 +274,56 @@ const NOMBRES = ['Sofía Ramírez', 'Juan Pérez', 'Valentina Gómez', 'Nicolás
 /** El socio con el que se entra en la demo ("Ya tengo plan", Mis clases): el primero, que tiene membresía. */
 export const idSocioDemo = (rubro: string) => `${rubro}-s1`
 
-/** Los socios de ejemplo de un negocio, con planes en distintos estados: vigentes, por vencer, vencidos, packs a medio usar. */
+/**
+ * Los socios de ejemplo de un negocio. Los 16 primeros cuentan la historia de
+ * la demo, con planes en distintos estados: vigentes (dos vencen esta semana),
+ * packs a medio usar, vencidos, uno que vino a la de prueba, dos que pagan
+ * clase suelta y dos que nunca vinieron. Los demás son el plantel que llena
+ * las clases: casi todos con membresía al día, algunos con pack, pocos
+ * vencidos o con clase suelta.
+ */
 export function sociosDe(n: NegocioGym): Socio[] {
   const planes = n.planes
   const membresias = planes.filter(p => p.tipo === 'membresia')
   const pack = planes.find(p => p.tipo === 'pack')
   const prueba = planes.find(p => p.tipo === 'prueba')
-  return NOMBRES.map((nombre, i) => {
+  const tel = (i: number) => `3757 55-2${String(100 + i).slice(-3)}`
+  const destacados: Socio[] = NOMBRES.map((nombre, i) => {
     const id = `${n.rubro}-s${i + 1}`
-    const tel = `3757 55-2${String(100 + i).slice(-3)}`
-    // 0..5: membresía vigente (una vence dentro de 7 días); 6..8: pack; 9..10: vencidos; 11: prueba usada; resto: nuevos sin plan.
+    // 0..5: membresía vigente (dos vencen dentro de 7 días); 6..8: pack; 9..10: vencidos; 11: prueba usada; 12..13: clase suelta; 14..15: nunca vinieron.
     if (i < 6 && membresias.length) {
       const plan = membresias[i % membresias.length]
       const vence = sumarDias(HOY, i === 2 ? 3 : i === 4 ? 6 : 10 + i * 4)
-      return { id, nombre, telefono: tel, email: i % 2 ? `${nombre.split(' ')[0].toLowerCase()}@ejemplo.com` : undefined, planId: plan.id, desde: sumarDias(vence, -30), vence, clasesRestantes: null, probo: true, nota: i === 0 ? 'Viene a la mañana' : undefined }
+      const desde = sumarDias(vence, -30)
+      return { id, nombre, telefono: tel(i), email: i % 2 ? `${nombre.split(' ')[0].toLowerCase()}@ejemplo.com` : undefined, planId: plan.id, desde, vence, clasesRestantes: null, probo: true, nota: i === 0 ? 'Viene a la mañana' : undefined, alta: sumarDias(desde, -30 * (1 + i)) }
     }
-    if (i < 9 && pack) return { id, nombre, telefono: tel, planId: pack.id, desde: sumarDias(HOY, -20 - i), vence: sumarDias(HOY, 50 - i), clasesRestantes: Math.max(1, (pack.clases ?? 8) - (i - 4)), probo: true }
-    if (i < 11 && membresias.length) return { id, nombre, telefono: tel, planId: membresias[0].id, desde: sumarDias(HOY, -45 - i), vence: sumarDias(HOY, -(i - 8) * 5), clasesRestantes: null, probo: true, nota: i === 9 ? 'Pidió congelar en enero' : undefined }
-    if (i === 11 && prueba) return { id, nombre, telefono: tel, planId: null, desde: null, vence: null, clasesRestantes: null, probo: true, nota: 'Vino a la de prueba, no se anotó' }
-    return { id, nombre, telefono: tel, planId: null, desde: null, vence: null, clasesRestantes: null, probo: false }
+    if (i < 9 && pack) { const desde = sumarDias(HOY, -20 - i); return { id, nombre, telefono: tel(i), planId: pack.id, desde, vence: sumarDias(desde, pack.vigenciaDias), clasesRestantes: Math.max(1, (pack.clases ?? 8) - (i - 4)), probo: true, alta: desde } }
+    if (i < 11 && membresias.length) { const vence = sumarDias(HOY, -(i - 8) * 5); const desde = sumarDias(vence, -30); return { id, nombre, telefono: tel(i), planId: membresias[0].id, desde, vence, clasesRestantes: null, probo: true, nota: i === 9 ? 'Pidió congelar en enero' : undefined, alta: sumarDias(desde, -60) } }
+    if (i === 11 && prueba) return { id, nombre, telefono: tel(i), planId: null, desde: null, vence: null, clasesRestantes: null, probo: true, nota: 'Vino a la de prueba, no se anotó', alta: sumarDias(HOY, -12) }
+    if (i < 14) return { id, nombre, telefono: tel(i), planId: null, desde: null, vence: null, clasesRestantes: null, probo: true, nota: 'Paga la clase suelta cuando viene', alta: sumarDias(HOY, i === 12 ? -40 : -26) }
+    return { id, nombre, telefono: tel(i), planId: null, desde: null, vence: null, clasesRestantes: null, probo: false, alta: null }
   })
+  const resto: Socio[] = Array.from({ length: Math.max(0, cuantosSocios(n) - NOMBRES.length) }, (_, j) => {
+    const i = NOMBRES.length + j
+    const pila = PILA[j % PILA.length]
+    const apellido = APELLIDOS[(j * 7) % APELLIDOS.length]
+    const base = { id: `${n.rubro}-s${i + 1}`, nombre: `${pila} ${apellido}`, telefono: tel(i), email: j % 3 === 0 ? `${sinTildes(pila)}.${sinTildes(apellido)}@ejemplo.com` : undefined, probo: true }
+    const tipo = j % 20
+    // Pack: 4 de cada 20, comprado en los últimos dos meses.
+    if (tipo >= 13 && tipo <= 16 && pack) {
+      const desde = sumarDias(HOY, -((j * 13) % 60))
+      return { ...base, planId: pack.id, desde, vence: sumarDias(desde, pack.vigenciaDias), clasesRestantes: Math.max(1, (pack.clases ?? 8) - 1 - (j % 5)), alta: sumarDias(desde, -pack.vigenciaDias * (j % 3)) }
+    }
+    // Clase suelta: 1 de cada 20.
+    if (tipo === 18 || !membresias.length) return { ...base, planId: null, desde: null, vence: null, clasesRestantes: null, alta: sumarDias(HOY, -(20 + (j % 60))) }
+    // Membresía: al día (vence entre 8 y 30 días) o, 1 de cada 20, vencida hace poco.
+    // (Los vencidos, cada uno con su fecha: con j % 20 caían todos el mismo día.)
+    const plan = membresias[(j + Math.floor(j / 20)) % membresias.length]
+    const vence = tipo === 17 ? sumarDias(HOY, -(2 + 5 * Math.floor(j / 20))) : sumarDias(HOY, 8 + ((j * 11) % 23))
+    const desde = sumarDias(vence, -plan.vigenciaDias)
+    return { ...base, planId: plan.id, desde, vence, clasesRestantes: null, alta: sumarDias(desde, -plan.vigenciaDias * (j % 7)) }
+  })
+  return [...destacados, ...resto]
 }
 
 // ─── Inscripciones de ejemplo ────────────────────────────────────────────────
@@ -276,22 +331,64 @@ export function sociosDe(n: NegocioGym): Socio[] {
 // navegador. Cubren un mes para atrás y dos semanas para adelante. Algunas
 // clases quedan llenas, con lista de espera.
 //
+// Cada socio viene según su plan, en sus días fijos: la membresía de X por
+// semana, X clases (la libre, cuatro); el pack, una por semana (le dura los 90
+// días); quien paga suelta, una cada dos semanas; quien vino a la de prueba,
+// esa sola vez; y nadie más de una clase por día ni fuera de las fechas de su plan.
+//
 // El socio de la demo (Sofía, con membresía de X por semana) no entra en el
-// reparto: con 16 socios para unas 25 clases, el reparto la anotaba en dos o
-// tres clases por día y su tope semanal estaba siempre lleno, así que "Ya
-// tengo plan" no la dejaba reservar nunca. Ella va a la primera clase de sus
-// días fijos (lunes, miércoles, sábado, recortados a su tope); esta semana
-// completa el tope (y hoy está en la clase que se puede hacer check-in); las
-// que vienen tiene una menos reservada, para que se pueda reservar con su plan.
+// reparto: ella va a la primera clase de sus días fijos (lunes, miércoles,
+// sábado, recortados a su tope); esta semana completa el tope (y hoy está en
+// la clase que se puede hacer check-in); las que vienen tiene una menos
+// reservada, para que "Ya tengo plan" la deje reservar con su plan.
 
 const PATRON = [3, 7, 1, 9, 4, 8, 2, 6, 5, 0]
 const rota = (i: number) => PATRON[((i % PATRON.length) + PATRON.length) % PATRON.length]
 const DIAS_DEL_SOCIO_DEMO = [0, 2, 5]
+/** Cuánto se llena cada clase: entre la mitad y todo, y a veces se pasa (lista de espera). */
+const LLENO = [0.5, 1, 0.7, 1.15, 0.85, 0.6, 1]
+
+/** Cómo viene un socio a clase: cuántas por semana, qué días, entre qué fechas y con qué plan queda anotado. */
+interface Ritmo { porSemana: number; dias: number[]; desde: ISO; hasta: ISO; planId: string | null; cadaDosSemanas?: boolean }
+
+/**
+ * Los días de la semana en que suele venir: `cuantos` días repartidos entre
+ * los que abre el negocio, arrancando en uno distinto para cada socio. Sin
+ * días fijos, el reparto gastaba el tope de todos de lunes a jueves y las
+ * clases del sábado quedaban vacías.
+ */
+function diasFijos(n: NegocioGym, i: number, cuantos: number): number[] {
+  const abiertos = [...n.apertura.dias].sort((a, b) => a - b)
+  if (!abiertos.length) return []
+  if (cuantos >= abiertos.length) return abiertos
+  // Un hash del índice (y no i * algo): los socios pares e impares tienen planes distintos y caían todos en los mismos días.
+  // (Los bits altos: el módulo de un número par conserva la paridad de los bajos.)
+  const inicio = (Math.imul(i + 1, 2654435761) >>> 16) % abiertos.length
+  return Array.from({ length: cuantos }, (_, k) => abiertos[(inicio + Math.floor((k * abiertos.length) / cuantos)) % abiertos.length])
+}
+
+function ritmoDe(n: NegocioGym, s: Socio, i: number): Ritmo | null {
+  const plan = planDe(n, s.planId)
+  if (plan && s.vence && (plan.tipo === 'membresia' || plan.tipo === 'pack')) {
+    const porSemana = plan.tipo === 'pack' ? 1 : plan.porSemana || 4
+    return { porSemana, dias: diasFijos(n, i, porSemana), desde: s.alta ?? s.desde ?? s.vence, hasta: s.vence, planId: plan.id }
+  }
+  // Sin plan pero ya vino: si llegó hace menos de dos semanas, solo tomó la de prueba ese día; si no, viene cada tanto y paga la suelta.
+  if (!s.planId && s.probo && s.alta) {
+    if (s.alta >= sumarDias(HOY, -14)) return { porSemana: 1, dias: [diaSemana(s.alta)], desde: s.alta, hasta: s.alta, planId: n.planes.find(p => p.tipo === 'prueba')?.id ?? null }
+    const suelta = n.planes.find(p => p.tipo === 'suelta')
+    return suelta ? { porSemana: 1, dias: diasFijos(n, i, 1), desde: s.alta, hasta: sumarDias(HOY, 14), planId: suelta.id, cadaDosSemanas: true } : null
+  }
+  return null
+}
 
 export function inscripcionesDe(n: NegocioGym, socios: Socio[]): Inscripcion[] {
   const out: Inscripcion[] = []
   let k = 0
   const yo = socios.find(s => s.id === idSocioDemo(n.rubro))
+  const ritmos = new Map(socios.map((s, i) => [s.id, ritmoDe(n, s, i)]))
+  /** Clases que ya tiene cada socio en cada semana: "socio|lunes". */
+  const usadas = new Map<string, number>()
   const planYo = yo ? planDe(n, yo.planId) : null
   const tope = planYo?.tipo === 'membresia' && planYo.porSemana ? planYo.porSemana : 3
   const susDias = DIAS_DEL_SOCIO_DEMO.slice(-Math.min(tope, DIAS_DEL_SOCIO_DEMO.length))
@@ -305,26 +402,41 @@ export function inscripcionesDe(n: NegocioGym, socios: Socio[]): Inscripcion[] {
     // Hoy: la que está abierta para el check-in, así "Mis clases" lo muestra.
     return orden.find(c => c.inicio - n.checkInMin <= AHORA && AHORA < c.inicio + (actividadDe(n, c.actividadId)?.duracion ?? 60)) ?? orden.find(c => c.inicio > AHORA) ?? orden[0]
   }
+  const total = socios.length
   for (let d = -30; d <= 14; d++) {
     const fecha = sumarDias(HOY, d)
     const dia = diaSemana(fecha)
+    const lunes = sumarDias(fecha, -dia)
+    const semanaPar = Math.round(diasEntre(HOY, lunes) / 7) % 2 === 0
     const clasesDelDia = n.clases.filter(c => c.dia === dia)
     const suya = suClase(fecha, clasesDelDia)
+    const vinoHoy = new Set<string>()
     clasesDelDia.forEach((c, ci) => {
-      // Cuánto se llena: entre la mitad y todo, y a veces se pasa (lista de espera).
-      const lleno = [0.5, 1, 0.7, 1.15, 0.85, 0.6, 1][(d * 2 + ci + 100) % 7]
-      const cuantos = Math.round(c.cupo * lleno)
+      const cuantos = Math.round(c.cupo * LLENO[(d * 2 + ci + 100) % 7])
       const pasada = d < 0 || (d === 0 && c.inicio + 60 <= AHORA)
-      // Quiénes vienen, en orden de llegada: el socio de la demo primero (si es su clase) y el resto con el reparto fijo.
+      // Quiénes vienen, en orden de llegada: el socio de la demo primero (si es su clase) y el resto en una
+      // rueda que arranca en otro lugar en cada clase, cada uno hasta su tope de la semana.
       const vienen: Socio[] = yo && suya?.id === c.id ? [yo] : []
-      for (let j = 0; vienen.length < cuantos && j < socios.length; j++) {
-        const socio = socios[(d + j * 3 + ci * 5 + 160) % socios.length]
-        if (socio !== yo && !vienen.includes(socio)) vienen.push(socio)
+      // Quien vino a la clase de prueba ese día entra en la primera clase (si no, la rueda podía no llegar a él).
+      if (ci === 0) for (const s of socios) { const r = ritmos.get(s.id); if (r && r.desde === fecha && r.hasta === fecha && s !== yo) { vienen.push(s); vinoHoy.add(s.id) } }
+      const arranque = (((d * 7 + ci * 13) % total) + total) % total
+      for (let j = 0; j < total && vienen.length < cuantos; j++) {
+        const s = socios[(arranque + j) % total]
+        const r = ritmos.get(s.id)
+        if (s === yo || !r || vinoHoy.has(s.id) || !r.dias.includes(dia) || fecha < r.desde || fecha > r.hasta || (r.cadaDosSemanas && !semanaPar)) continue
+        const clave = `${s.id}|${lunes}`
+        const ya = usadas.get(clave) ?? 0
+        if (ya >= r.porSemana) continue
+        usadas.set(clave, ya + 1)
+        vinoHoy.add(s.id)
+        vienen.push(s)
       }
       vienen.forEach((socio, j) => {
         const enEspera = j >= c.cupo
         const estado: EstadoInscripcion = enEspera ? 'espera' : pasada ? (rota(k) === 0 ? 'ausente' : 'asistio') : 'reservada'
-        out.push({ id: `${n.rubro}-i${k++}`, claseId: c.id, fecha, socioId: socio.id, estado, creada: sumarDias(fecha, -(1 + rota(k) % 4)), planId: socio.planId })
+        // Se reserva unos días antes, pero nunca después de hoy.
+        const creada = sumarDias(fecha, -(1 + rota(k) % 4))
+        out.push({ id: `${n.rubro}-i${k++}`, claseId: c.id, fecha, socioId: socio.id, estado, creada: creada > HOY ? HOY : creada, planId: socio === yo ? socio.planId : ritmos.get(socio.id)?.planId ?? socio.planId })
       })
     })
   }

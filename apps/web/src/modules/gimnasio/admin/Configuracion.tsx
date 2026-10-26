@@ -1,10 +1,10 @@
 // Configuración del gimnasio: datos, horarios, actividades y salas, planes y
 // precios, reglas de reserva, días sin clases y calendarios (.ics). Cada
 // pestaña es un formulario con borrador y botón de guardar.
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/router'
 import { Download, Link2, Plus, Trash2, Upload } from 'lucide-react'
-import { DIAS_CORTOS, diaSemana, hhmm, rangoTxt, sumarDias } from '@/lib/reservas/fechas'
+import { DIAS_CORTOS, MESES, diaSemana, hhmm, rangoTxt, sumarDias } from '@/lib/reservas/fechas'
 import { descargarICS, generarICS, leerICS } from '@/lib/reservas/ics'
 import { HOY, rubroPorKey, type Actividad, type BloqueoGym, type CalendarioExterno, type NegocioGym, type Plan } from '../datos'
 import { Area, Campo, Encabezado, EtiquetaDemo, FilaSwitch, Nota, Seccion, Selector } from '@/design-system/reservas/piezas'
@@ -27,12 +27,18 @@ const CSS = `
   .gic-fila { display: grid; grid-template-columns: minmax(0, 1.4fr) 120px 110px auto; gap: 8px; align-items: end; }
   .gic-cfg-dias { display: flex; flex-wrap: wrap; gap: 6px; }
   @media (max-width: 768px) {
-    .gic-cfg { flex-direction: column; }
+    /* stretch: con flex-start, en columna cada pestaña medía lo que su contenido (Datos del negocio quedaba angosta). */
+    .gic-cfg { flex-direction: column; align-items: stretch; }
     .gic-nav { position: static; width: 100%; flex-direction: row; overflow-x: auto; scrollbar-width: none; padding-bottom: 4px; }
     .gic-nav button { flex-shrink: 0; min-height: 44px; }
+    /* En dos filas por actividad hace falta ver dónde termina una y empieza la otra. */
     .gic-fila { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .gic-fila + .gic-fila { padding-top: 14px; border-top: 1px solid var(--color-border); }
   }
 `
+
+/** "20 de noviembre" para un solo día y "24 al 26 de noviembre" para varios (rangoTxt solo da la segunda forma). */
+const diasTxt = (desde: string, hastaIncluido: string) => (desde === hastaIncluido ? `${Number(desde.slice(8))} de ${MESES[Number(desde.slice(5, 7)) - 1]}` : rangoTxt(desde, hastaIncluido))
 const HORAS = Array.from({ length: 25 }, (_, i) => ({ id: i * 60, label: i === 24 ? '24:00' : hhmm(i * 60) }))
 
 export default function Configuracion({ negocio, onGuardar }: P) {
@@ -40,12 +46,21 @@ export default function Configuracion({ negocio, onGuardar }: P) {
   const q = typeof router.query.tab === 'string' ? router.query.tab : ''
   const tab: Tab = TABS.some(t => t.id === q) ? (q as Tab) : 'negocio'
   const ir = (t: Tab) => router.replace({ pathname: router.pathname, query: { ...router.query, tab: t } }, undefined, { shallow: true, scroll: false })
+  // En celular las pestañas son una tira que scrollea: la elegida (también si se entra por link) queda a la vista.
+  const nav = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const tira = nav.current
+    const activa = tira?.querySelector<HTMLElement>('[aria-current="page"]')
+    if (!tira || !activa || tira.scrollWidth <= tira.clientWidth) return
+    const enLaTira = activa.getBoundingClientRect().left - tira.getBoundingClientRect().left + tira.scrollLeft
+    tira.scrollLeft = Math.max(0, enLaTira - (tira.clientWidth - activa.offsetWidth) / 2)
+  }, [tab])
   return (
     <div className="rv-pagina">
       <style>{CSS}</style>
       <Encabezado rotulo={rubroPorKey(negocio.rubro).label} titulo="Configuración" bajada="Lo que cambiás acá se ve en tu sitio y en las clases al instante." />
       <div className="gic-cfg">
-        <nav className="gic-nav" aria-label="Secciones de configuración">
+        <nav ref={nav} className="gic-nav" aria-label="Secciones de configuración">
           {TABS.map(t => <button key={t.id} type="button" aria-current={t.id === tab ? 'page' : undefined} onClick={() => ir(t.id)}>{t.label}</button>)}
         </nav>
         <div className="gic-cuerpo" key={tab}>
@@ -164,7 +179,7 @@ function Planes({ negocio, onGuardar }: P) {
               {p.tipo === 'membresia' && <Selector label="Por semana" valor={p.porSemana ?? 0} onChange={x => editar(p.id, { porSemana: x })} opciones={[0, 1, 2, 3, 4, 5].map(n => ({ id: n, label: n ? `${n} clases` : 'Libre' }))} />}
               {(p.tipo === 'pack' || p.tipo === 'membresia') && <Selector label="Vigencia" valor={p.vigenciaDias} onChange={x => editar(p.id, { vigenciaDias: x })} opciones={[30, 60, 90, 180].map(d => ({ id: d, label: `${d} días` }))} />}
             </div>
-            <FilaSwitch titulo="Se ofrece en el sitio" ayuda="Apagado, los socios que ya lo tienen lo siguen usando." on={p.activo} onChange={x => editar(p.id, { activo: x })} />
+            <FilaSwitch titulo="Se ofrece en el sitio" ayuda={p.tipo === 'pack' || p.tipo === 'membresia' ? 'Apagado, los socios que ya lo tienen lo siguen usando.' : 'Apagado, no aparece en el sitio ni al reservar.'} on={p.activo} onChange={x => editar(p.id, { activo: x })} />
           </div>
         ))}
       </div>
@@ -201,7 +216,7 @@ function Bloqueos({ negocio, onGuardar }: P) {
       <div className="rv-lista" style={{ marginBottom: 14 }}>
         {negocio.bloqueos.map(b => (
           <div key={b.id} className="rv-item">
-            <span className="rv-item-cuerpo"><span className="rv-item-titulo">{rangoTxt(b.desde, sumarDias(b.hasta, -1))}</span><span className="rv-item-sub">{b.motivo} · {b.origen === 'ical' ? 'calendario externo' : 'lo pusiste vos'}</span></span>
+            <span className="rv-item-cuerpo"><span className="rv-item-titulo">{diasTxt(b.desde, sumarDias(b.hasta, -1))}</span><span className="rv-item-sub">{b.motivo} · {b.origen === 'ical' ? 'calendario externo' : 'lo pusiste vos'}</span></span>
             {b.origen === 'dueno' && <button type="button" className="rv-btn rv-btn--sm" onClick={() => onGuardar({ bloqueos: negocio.bloqueos.filter(x => x.id !== b.id) }, 'Bloqueo quitado')}><Trash2 size={14} aria-hidden /> Quitar</button>}
           </div>
         ))}
@@ -273,7 +288,7 @@ function Calendarios({ negocio, onGuardar }: P) {
             {negocio.calendariosExternos.map(c => (
               <div key={c.id} className="rv-item">
                 <Link2 size={16} aria-hidden style={{ color: 'var(--color-subtle)', flexShrink: 0 }} />
-                <span className="rv-item-cuerpo"><span className="rv-item-titulo">{c.nombre}</span><span className="rv-item-sub">{negocio.bloqueos.filter(b => b.id.startsWith(`${c.id}-`)).map(b => rangoTxt(b.desde, sumarDias(b.hasta, -1))).join(' · ') || 'Sin días'} · última sincronización {c.ultimaSync}</span></span>
+                <span className="rv-item-cuerpo"><span className="rv-item-titulo">{c.nombre}</span><span className="rv-item-sub">{negocio.bloqueos.filter(b => b.id.startsWith(`${c.id}-`)).map(b => diasTxt(b.desde, sumarDias(b.hasta, -1))).join(' · ') || 'Sin días'} · última sincronización {diasTxt(c.ultimaSync, c.ultimaSync)}</span></span>
                 <button type="button" className="rv-btn rv-btn--sm" onClick={() => quitar(c.id)}><Trash2 size={15} aria-hidden /> Quitar</button>
               </div>
             ))}

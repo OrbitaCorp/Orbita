@@ -8,7 +8,7 @@
 import { useRouter } from 'next/router'
 import { CalendarDays, HandCoins, Settings, Users } from 'lucide-react'
 import LayoutPanel, { type ItemNav } from '@/design-system/reservas/LayoutPanel'
-import { useAviso } from '@/design-system/reservas/piezas'
+import { Encabezado, useAviso } from '@/design-system/reservas/piezas'
 import { HOY, clasesDelDia, cupoDe, estadoPlanDe, rubroPorKey } from '../datos'
 import { useNegocio } from '../demo/useNegocio'
 import { ruta } from '../storefront/Sitio'
@@ -40,6 +40,18 @@ export default function Panel() {
     const { tab: _t, ...resto } = router.query
     void _t
     void router.replace({ pathname: router.pathname, query: { ...resto, vista: v } }, undefined, { shallow: true })
+  }
+
+  // En una carga completa el primer render todavía tiene el negocio de ejemplo (ver
+  // useHidratado): las secciones esperan a lo guardado. Si no, los formularios de
+  // Configuración arrancaban con el ejemplo y al guardar pisaban lo del dueño.
+  // Mientras tanto, el armazón sin datos del negocio (ni nombre ni contadores): nada que después cambie.
+  if (!n.hidratado) {
+    return (
+      <LayoutPanel negocio="" rubro={r.label} items={items.map(i => ({ ...i, badge: undefined }))} activo={vista} onIr={ir} sitio={ruta('inicio', rubro.key)}>
+        <div className="rv-pagina" aria-busy="true"><Encabezado rotulo="Cargando" titulo={items.find(i => i.id === vista)?.label ?? ''} /></div>
+      </LayoutPanel>
+    )
   }
 
   return (

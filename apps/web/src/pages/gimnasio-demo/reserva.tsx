@@ -11,14 +11,16 @@ export const getServerSideProps: GetServerSideProps = async () =>
 
 export default function Page() {
   const router = useRouter()
-  const { rubro, negocio, inscripciones, socios, inscribir } = useNegocio()
+  const { rubro, negocio, inscripciones, socios, inscribir, hidratado } = useNegocio()
   return (
     <>
       <Head><title>{`Reservar clase · ${negocio.nombre}`}</title></Head>
       <BarraDemo />
-      {/* key: lo que viene por la URL (?clase=, ?fecha=, ?plan=) entra como estado inicial del flujo.
+      {/* key: lo que viene por la URL (?clase=, ?fecha=, ?plan=) entra como estado inicial del flujo, y
+          se valida contra la grilla y los planes guardados: por eso también cambia al hidratarse (una
+          clase o un plan que agregó el dueño no existe en el negocio de ejemplo del primer render).
           El socio nuevo (sn…) se guarda junto con la inscripción; el pack lo descuenta el almacén al inscribir. */}
-      <Reserva key={`${rubro.key}:${router.asPath}`} negocio={negocio} inscripciones={inscripciones} socios={socios} query={router.query}
+      <Reserva key={`${rubro.key}:${router.asPath}:${hidratado}`} negocio={negocio} inscripciones={inscripciones} socios={socios} query={router.query}
         onInscribir={(i, s) => inscribir(rubro.key, i, s.id.startsWith('sn') ? s : undefined)} />
     </>
   )

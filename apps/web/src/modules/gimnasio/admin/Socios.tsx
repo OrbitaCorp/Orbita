@@ -4,7 +4,7 @@
 // el plan y se ve el historial.
 import { useMemo, useState } from 'react'
 import { ArrowRight, BellRing, Plus, Search, Check } from 'lucide-react'
-import { diasEntre, fechaCorta, fechaLarga, hhmm, sumarDias } from '@/lib/reservas/fechas'
+import { diasEntre, fechaCorta, fechaLarga, hhmm, mesTxt, sumarDias } from '@/lib/reservas/fechas'
 import { pesos } from '@/lib/reservas/precio'
 import { ESTADO_INSCRIPCION, ESTADO_PLAN, HOY, actividadDe, estadoPlanDe, planDe, rubroPorKey, type EstadoPlan, type Inscripcion, type NegocioGym, type Socio } from '../datos'
 import { Campo, Chip, Encabezado, Filtros, Kpi, Modal, Nota, Selector, Sigla, Vacio } from '@/design-system/reservas/piezas'
@@ -16,25 +16,43 @@ type Filtro = 'todos' | 'vigente' | 'por-vencer' | 'vencido' | 'sin-plan'
 const plano = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
 
 // En celular el buscador va a todo el ancho, arriba de los filtros plegados.
+// La fecha de vencimiento va en los tonos de chip: el --color-warning y el
+// --color-error del panel (#F59E0B, #EF4444) sobre blanco no llegan a AA.
 const CSS = `
   .gic-buscar { width: 260px; max-width: 100%; }
-  @media (max-width: 768px) { .gic-buscar { width: 100%; order: -1; } }
+  .gic-vence[data-estado='por-vencer'] { color: var(--chip-warning-fg); font-weight: 600; }
+  .gic-vence[data-estado='vencido'] { color: var(--chip-error-fg); }
+  .gic-mas-socios { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 14px; }
+  @media (max-width: 768px) { .gic-buscar { width: 100%; order: -1; } .gic-mas-socios .rv-btn { width: 100%; } }
 `
+
+/** Cuántas filas se muestran de entrada y cuántas suma "Mostrar más": un gimnasio tiene cientos de socios. */
+const PAGINA = 25
 
 export default function Socios({ negocio, inscripciones, socios, onAgregar, onCambiar }: P) {
   const r = rubroPorKey(negocio.rubro)
-  const [filtro, setFiltro] = useState<Filtro>('todos')
-  const [q, setQ] = useState('')
+  const [filtro, setFiltroEstado] = useState<Filtro>('todos')
+  const [q, setQEstado] = useState('')
+  const [mostrar, setMostrar] = useState(PAGINA)
+  // Con otro filtro u otra búsqueda la lista vuelve a arrancar desde arriba.
+  const setFiltro = (f: Filtro) => { setFiltroEstado(f); setMostrar(PAGINA) }
+  const setQ = (v: string) => { setQEstado(v); setMostrar(PAGINA) }
   const [abierto, setAbierto] = useState<string | null>(null)
   const [nuevo, setNuevo] = useState(false)
+  // Las inscripciones de cada socio, de una pasada (con cientos de socios, filtrar la lista entera por cada uno se notaba).
+  const porSocio = useMemo(() => {
+    const m = new Map<string, Inscripcion[]>()
+    for (const i of inscripciones) { const l = m.get(i.socioId); if (l) l.push(i); else m.set(i.socioId, [i]) }
+    return m
+  }, [inscripciones])
   const filas = useMemo(() => socios.map(s => {
-    const suyas = inscripciones.filter(i => i.socioId === s.id)
+    const suyas = porSocio.get(s.id) ?? []
     const ultimas30 = suyas.filter(i => i.fecha >= sumarDias(HOY, -30) && i.fecha <= HOY)
     const vino = ultimas30.filter(i => i.estado === 'asistio').length
     const falto = ultimas30.filter(i => i.estado === 'ausente').length
     const estado = estadoPlanDe(s)
     return { s, estado, vino, falto, asistencia: vino + falto ? Math.round((vino / (vino + falto)) * 100) : null, suyas }
-  }), [socios, inscripciones])
+  }), [socios, porSocio])
   const orden: Record<EstadoPlan, number> = { 'por-vencer': 0, vencido: 1, agotado: 1, vigente: 2, 'sin-plan': 3 }
   const visibles = filas
     .filter(f => filtro === 'todos' || (filtro === 'vencido' ? f.estado === 'vencido' || f.estado === 'agotado' : f.estado === filtro))
@@ -67,7 +85,7 @@ export default function Socios({ negocio, inscripciones, socios, onAgregar, onCa
         <Kpi i={0} label="Al día" valor={cuenta('vigente') + cuenta('por-vencer')} nota="con plan vigente" />
         <Kpi i={1} label="Vencen en 7 días" valor={cuenta('por-vencer')} nota={cuenta('por-vencer') ? 'para avisarles esta semana' : 'nadie por ahora'} />
         <Kpi i={2} label="Vencidos" valor={cuenta('vencido')} nota="plan vencido o pack agotado" />
-        <Kpi i={3} label="Sin plan" valor={cuenta('sin-plan')} nota="vinieron a probar o nunca se anotaron" />
+        <Kpi i={3} label="Sin plan" valor={cuenta('sin-plan')} nota="de prueba, con clase suelta o sin clases" />
       </div>
       <div className="rv-entre" style={{ marginBottom: 14, alignItems: 'flex-start' }}>
         <Filtros resumen={filtro === 'todos' ? undefined : FILTROS.find(f => f.id === filtro)?.label}>
@@ -85,21 +103,28 @@ export default function Socios({ negocio, inscripciones, socios, onAgregar, onCa
           <table className="rv-tabla">
             <thead><tr><th>{r.socio}</th><th>Plan</th><th>Vence</th><th>Le quedan</th><th>Asistencia 30 d</th><th><span className="rv-sr">Abrir</span></th></tr></thead>
             <tbody>
-              {visibles.map(f => {
+              {visibles.slice(0, mostrar).map(f => {
                 const plan = planDe(negocio, f.s.planId)
                 return (
                   <tr key={f.s.id}>
                     <td data-label="Nombre"><span className="rv-fila" style={{ gap: 10, flexWrap: 'nowrap' }}><Sigla nombre={f.s.nombre} size={32} /><span style={{ minWidth: 0 }}><span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.s.nombre}</span><span className="rv-ayuda" style={{ fontWeight: 400 }}>{f.s.telefono}</span></span></span></td>
                     <td data-label="Plan"><span className="rv-fila" style={{ gap: 6, flexWrap: 'nowrap' }}><Chip tono={ESTADO_PLAN[f.estado].tono}>{ESTADO_PLAN[f.estado].label}</Chip><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{plan?.nombre ?? '—'}</span></span></td>
-                    <td data-label="Vence">{f.s.vence ? <span style={{ color: f.estado === 'por-vencer' ? 'var(--color-warning)' : f.estado === 'vencido' ? 'var(--color-error)' : undefined }}>{fechaCorta(f.s.vence)}{f.estado === 'por-vencer' ? ` · en ${diasEntre(HOY, f.s.vence)} d` : ''}</span> : '—'}</td>
-                    <td data-label="Le quedan" className="rv-num">{f.s.clasesRestantes !== null ? `${f.s.clasesRestantes} clases` : plan?.porSemana ? `${plan.porSemana}/sem` : plan ? 'libre' : '—'}</td>
-                    <td data-label="Asistencia">{f.asistencia !== null ? `${f.asistencia}% · ${f.vino} clases` : <span className="rv-muted">sin clases</span>}</td>
+                    <td data-label="Vence">{f.s.vence ? <span className="gic-vence" data-estado={f.estado === 'agotado' ? 'vencido' : f.estado}>{fechaCorta(f.s.vence)}{f.estado === 'por-vencer' ? ` · en ${diasEntre(HOY, f.s.vence)} d` : ''}</span> : '—'}</td>
+                    {/* El número en mono va en su span: en la tarjeta de celular el rótulo de la celda (::before) quedaba en mono también. */}
+                    <td data-label="Le quedan"><span className="rv-num">{f.s.clasesRestantes !== null ? `${f.s.clasesRestantes} clases` : plan?.porSemana ? `${plan.porSemana}/sem` : plan ? 'libre' : '—'}</span></td>
+                    <td data-label="Asistencia 30 d">{f.asistencia !== null ? `${f.asistencia}% · ${f.vino} ${f.vino === 1 ? 'clase' : 'clases'}` : <span className="rv-muted">sin clases</span>}</td>
                     <td><button type="button" className="rv-btn rv-btn--sm" onClick={() => setAbierto(f.s.id)} aria-label={`Ver a ${f.s.nombre}`}>Ver <ArrowRight size={14} aria-hidden /></button></td>
                   </tr>
                 )
               })}
             </tbody>
           </table>
+        </div>
+      )}
+      {visibles.length > mostrar && (
+        <div className="gic-mas-socios">
+          <button type="button" className="rv-btn" onClick={() => setMostrar(mostrar + PAGINA)}>Mostrar {Math.min(PAGINA, visibles.length - mostrar)} más</button>
+          <span className="rv-ayuda">Ves {mostrar} de {visibles.length}</span>
         </div>
       )}
       {fila && <Ficha negocio={negocio} socio={fila.s} estado={fila.estado} suyas={fila.suyas} vino={fila.vino} falto={fila.falto} onCerrar={() => setAbierto(null)} onCambiar={onCambiar} />}
@@ -121,7 +146,7 @@ function Ficha({ negocio, socio: s, estado, suyas, vino, falto, onCerrar, onCamb
     onCambiar(s.id, { planId: p.id, desde: HOY, vence: sumarDias(HOY, p.vigenciaDias), clasesRestantes: p.tipo === 'pack' ? p.clases ?? null : null, probo: true }, `${p.nombre} asignado a ${s.nombre.split(' ')[0]} hasta el ${fechaCorta(sumarDias(HOY, p.vigenciaDias))}`)
   }
   return (
-    <Modal titulo={s.nombre} bajada={`${s.telefono}${s.email ? ` · ${s.email}` : ''}`} onCerrar={onCerrar} ancho={600} pie={<button type="button" className="rv-btn" onClick={onCerrar}>Cerrar</button>}>
+    <Modal titulo={s.nombre} bajada={`${s.telefono}${s.email ? ` · ${s.email}` : ''}${s.alta ? ` · socio desde ${mesTxt(s.alta)}` : ''}`} onCerrar={onCerrar} ancho={600} pie={<button type="button" className="rv-btn" onClick={onCerrar}>Cerrar</button>}>
       {s.nota && <p className="rv-nota" style={{ marginBottom: 12 }}>{s.nota}</p>}
       <div className="rv-card rv-card--pad" style={{ background: 'var(--color-surface)', marginBottom: 14 }}>
         <div className="rv-entre">
@@ -167,7 +192,7 @@ function NuevoSocio({ negocio, socioTxt, onCerrar, onAgregar }: { negocio: Negoc
     if (nombre.trim().length < 3) { setError('Escribí nombre y apellido.'); return }
     if (telefono.replace(/\D/g, '').length < 8) { setError('Escribí un celular con código de área.'); return }
     const p = planDe(negocio, planId || null)
-    onAgregar({ id: `sn${Date.now().toString(36)}`, nombre: nombre.trim(), telefono: telefono.trim(), email: email.trim() || undefined, planId: p?.id ?? null, desde: p ? HOY : null, vence: p ? sumarDias(HOY, p.vigenciaDias) : null, clasesRestantes: p?.tipo === 'pack' ? p.clases ?? null : null, probo: false })
+    onAgregar({ id: `sn${Date.now().toString(36)}`, nombre: nombre.trim(), telefono: telefono.trim(), email: email.trim() || undefined, planId: p?.id ?? null, desde: p ? HOY : null, vence: p ? sumarDias(HOY, p.vigenciaDias) : null, clasesRestantes: p?.tipo === 'pack' ? p.clases ?? null : null, probo: false, alta: HOY })
   }
   return (
     <Modal titulo={`Sumar ${socioTxt.toLowerCase()}`} bajada="Para quien se anota en el mostrador. Después reserva desde el sitio con su celular." onCerrar={onCerrar}
