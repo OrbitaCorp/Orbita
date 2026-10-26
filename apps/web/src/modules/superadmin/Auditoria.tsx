@@ -56,6 +56,9 @@ const REFRESCO_MS = 20_000
 export function TabAuditoria({ currentAdminId }: { currentAdminId: string }) {
   const [data, setData] = useState<AuditListado | null>(null)
   const [error, setError] = useState('')
+  // Aparte de `error`: la recarga que sigue a un guardado fallido limpia
+  // `error` al salir bien, y el aviso de que no se guardó tiene que quedar.
+  const [errorGuardar, setErrorGuardar] = useState('')
   const [refrescando, setRefrescando] = useState(false)
   const [busqueda, setBusqueda] = useState('')
   const [area, setArea] = useState<AuditArea | 'TODO'>('TODO')
@@ -111,8 +114,9 @@ export function TabAuditoria({ currentAdminId }: { currentAdminId: string }) {
     try {
       const fila = await platformApi.updateAuditItem(id, input)
       setData((d) => d ? { ...d, items: d.items.map((i) => (i.id === id ? fila : i)), resumen: resumirLocal(d.items.map((i) => (i.id === id ? fila : i)).filter((i) => !esDeModulos(i.key))) } : d)
+      setErrorGuardar('')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo guardar.')
+      setErrorGuardar(e instanceof Error ? e.message : 'No se pudo guardar.')
       void cargar(true)
     }
   }, [cargar])
@@ -189,12 +193,27 @@ export function TabAuditoria({ currentAdminId }: { currentAdminId: string }) {
         .au-informe-cuerpo { background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: 12px; padding: 18px 22px; max-width: 860px; }
         .au-informe-vacio { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; border: 1px dashed var(--color-border); border-radius: 12px; padding: 14px 18px; font-size: 13px; color: var(--color-muted); }
         .au-informe-editor { width: 100%; min-height: 380px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; line-height: 1.55; padding: 12px 14px; resize: vertical; tab-size: 2; }
-        .au-informe-flag { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: var(--color-primary); background: var(--color-primary-bg); padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+        .au-informe-flag { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: var(--chip-primary-fg); background: var(--color-primary-bg); padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+        /* Contador de grupo sin terminar: el Chip gris (muted sobre surface-alt)
+           queda en 4,3:1, abajo de AA para 12 px. */
+        .au-etiqueta { display: inline-flex; align-items: center; height: 24px; padding: 0 9px; border-radius: 999px; background: var(--color-surface-alt); color: var(--color-body); font-size: 12px; font-weight: 600; white-space: nowrap; }
+        .au-expandir { width: 28px; height: 28px; }
         @media (max-width: 960px) {
           .au-fila { grid-template-columns: 28px minmax(0, 1fr); row-gap: 8px; }
           .au-fila > .au-col-r { grid-column: 2; }
           .au-detalle { grid-template-columns: 1fr; padding-left: 16px; }
           .au-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        /* Celular y tablet: todo lo que se toca mide 44 px. Los botones traen
+           la altura inline (btnGhost, btnGhostSm, inputStyle), de ahí el !important. */
+        @media (max-width: 768px) {
+          .au-fila { grid-template-columns: 44px minmax(0, 1fr); column-gap: 8px; padding: 12px; }
+          .au-expandir { width: 44px; height: 44px; }
+          .au-btn-estado { height: 44px; padding: 0 14px; }
+          .au-boton, .au-sm, .au-select { height: 44px !important; }
+          .au-check { min-height: 44px; align-items: center; padding: 2px 0; }
+          .au-check input { margin-top: 0; }
+          .au-detalle { padding-right: 12px; padding-left: 12px; }
         }
         @media (prefers-reduced-motion: reduce) { .au-mini .barra > span { transition: none; } }
       `}</style>
@@ -204,7 +223,7 @@ export function TabAuditoria({ currentAdminId }: { currentAdminId: string }) {
         subtitle="Todo lo que hay que revisar de Órbita, quién lo toma y en qué está. Lo que tilda cada uno lo ven todos."
         action={
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button onClick={() => setDecisiones(true)} className="ds-hover" style={btnGhost} title="Recorrer lo que no se destraba con código y elegir qué hacer con cada uno">
+            <button onClick={() => setDecisiones(true)} className="ds-hover au-boton" style={btnGhost} title="Recorrer lo que no se destraba con código y elegir qué hacer con cada uno">
               <Scale size={15} strokeWidth={2} /> Decisiones
               {pendientesDeDecidir > 0 && (
                 <span style={{
@@ -216,21 +235,21 @@ export function TabAuditoria({ currentAdminId }: { currentAdminId: string }) {
                 </span>
               )}
             </button>
-            <button onClick={() => setDocumento(true)} className="ds-hover" style={btnGhost} title="Ver todos los informes juntos y guardarlos como PDF">
+            <button onClick={() => setDocumento(true)} className="ds-hover au-boton" style={btnGhost} title="Ver todos los informes juntos y guardarlos como PDF">
               <BookOpen size={15} strokeWidth={2} /> Documento
             </button>
-            <button onClick={() => void cargar(false)} className="ds-hover" style={btnGhost} aria-label="Actualizar" title="Actualizar ahora (también se actualiza solo cada 20 s)">
+            <button onClick={() => void cargar(false)} className="ds-hover au-boton" style={btnGhost} aria-label="Actualizar" title="Actualizar ahora (también se actualiza solo cada 20 s)">
               <RefreshCw size={15} strokeWidth={2} style={{ animation: refrescando ? 'orbita-spin 0.7s linear infinite' : undefined }} />
               Actualizar
             </button>
-            <button onClick={() => setCreando(true)} className="ds-hover" style={btnPrimary}>
+            <button onClick={() => setCreando(true)} className="ds-hover au-boton" style={btnPrimary}>
               <Plus size={16} strokeWidth={2} /> Agregar ítem
             </button>
           </div>
         }
       />
 
-      {error && <ErrorBox msg={error} />}
+      {(errorGuardar || error) && <ErrorBox msg={errorGuardar || error} />}
 
       <div className="au-kpis">
         <KpiProgreso label="Auditado" valor={`${resumen.hechos} / ${resumen.total}`} pct={pct} hint={`${pct}% del inventario`} />
@@ -264,7 +283,8 @@ export function TabAuditoria({ currentAdminId }: { currentAdminId: string }) {
                   aria-selected={activo}
                   onClick={() => setArea(a.id)}
                   className="ds-hover au-btn-estado"
-                  style={activo ? { background: 'var(--color-primary-bg)', color: 'var(--color-primary)', borderColor: 'transparent' } : undefined}
+                  // chip-primary-fg y no primary: el azul de marca sobre primary-bg queda en 3,4:1.
+                  style={activo ? { background: 'var(--color-primary-bg)', color: 'var(--chip-primary-fg)', borderColor: 'transparent' } : undefined}
                 >
                   {a.label} <span style={{ fontWeight: 500, opacity: 0.8 }}>{h}/{n}</span>
                 </button>
@@ -289,7 +309,7 @@ export function TabAuditoria({ currentAdminId }: { currentAdminId: string }) {
             noPad
             title={g.nombre}
             subtitle={AREA_LABEL[g.area]}
-            action={<Chip text={`${hechos}/${g.items.length}`} tone={hechos === g.items.length ? 'green' : 'gray'} />}
+            action={hechos === g.items.length ? <Chip text={`${hechos}/${g.items.length}`} tone="green" /> : <span className="au-etiqueta">{hechos}/{g.items.length}</span>}
           >
             {g.items.map((it) => (
               <FilaItem
@@ -348,8 +368,8 @@ function FilaItem({ item, admins, abierto, onToggle, onActualizar, onBorrado }: 
           onClick={onToggle}
           aria-expanded={abierto}
           aria-label={abierto ? 'Cerrar detalle' : 'Ver verificaciones'}
-          className="ds-hover"
-          style={{ width: 28, height: 28, borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--color-muted)', display: 'grid', placeItems: 'center', cursor: 'pointer', fontFamily: 'inherit' }}
+          className="ds-hover au-expandir"
+          style={{ borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--color-muted)', display: 'grid', placeItems: 'center', cursor: 'pointer', fontFamily: 'inherit' }}
         >
           {abierto ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         </button>
@@ -358,7 +378,7 @@ function FilaItem({ item, admins, abierto, onToggle, onActualizar, onBorrado }: 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontWeight: 600, color: 'var(--color-text)', fontSize: 13.5 }}>{item.titulo}</span>
             {item.severidad && <Chip text={SEVERIDAD[item.severidad].label} tone={SEVERIDAD[item.severidad].tone} />}
-            {item.ruta && <code style={{ fontSize: 11, color: 'var(--color-muted)', background: 'var(--color-surface-alt)', padding: '1px 6px', borderRadius: 5, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.ruta}</code>}
+            {item.ruta && <code style={{ fontSize: 11, color: 'var(--color-body)', background: 'var(--color-surface-alt)', padding: '1px 6px', borderRadius: 5, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.ruta}</code>}
             {item.esPersonalizado && <Chip text="Agregado a mano" tone="violet" />}
             {item.informe && <span className="au-informe-flag" title="Tiene informe"><FileText size={11} strokeWidth={2.2} /> Informe</span>}
           </div>
@@ -377,7 +397,7 @@ function FilaItem({ item, admins, abierto, onToggle, onActualizar, onBorrado }: 
             value={item.responsable?.id ?? ''}
             onChange={(e) => void onActualizar({ responsableId: e.target.value || null })}
             aria-label="Responsable"
-            className="ds-field"
+            className="ds-field au-select"
             style={{ ...inputStyle, height: 34, fontSize: 12.5, width: '100%', color: item.responsable ? 'var(--color-text)' : 'var(--color-muted)' }}
           >
             <option value="">Sin responsable</option>
@@ -388,7 +408,7 @@ function FilaItem({ item, admins, abierto, onToggle, onActualizar, onBorrado }: 
         <div className="au-col-r" style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
           <SelectorEstado valor={item.estado} onChange={(estado) => void onActualizar({ estado })} />
           {item.informeUrl && (
-            <a href={item.informeUrl} target="_blank" rel="noopener noreferrer" className="ds-hover" style={{ ...btnGhostSm, textDecoration: 'none' }} title={item.informeUrl}>
+            <a href={item.informeUrl} target="_blank" rel="noopener noreferrer" className="ds-hover au-sm" style={{ ...btnGhostSm, textDecoration: 'none' }} title={item.informeUrl}>
               <ExternalLink size={13} /> Link
             </a>
           )}
@@ -451,7 +471,7 @@ function DetalleItem({ item, estadoLabel, todosTildados, onActualizar, onBorrado
   return (
     <div className="au-detalle">
       <div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-subtle)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '10px 0 4px' }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '10px 0 4px' }}>
           Verificaciones
         </div>
         {item.checks.length === 0 && <Empty text="Este ítem no tiene verificaciones todavía." />}
@@ -467,15 +487,15 @@ function DetalleItem({ item, estadoLabel, todosTildados, onActualizar, onBorrado
             onChange={(e) => setNuevoCheck(e.target.value)}
             placeholder="Sumar una verificación…"
             aria-label="Nueva verificación"
-            className="ds-field"
+            className="ds-field au-sm"
             style={{ ...inputStyle, height: 34, fontSize: 12.5, flex: 1 }}
           />
-          <button type="submit" disabled={nuevoCheck.trim().length < 3} className="ds-hover" style={{ ...btnGhostSm, height: 34 }}>Agregar</button>
+          <button type="submit" disabled={nuevoCheck.trim().length < 3} className="ds-hover au-sm" style={{ ...btnGhostSm, height: 34 }}>Agregar</button>
         </form>
         {todosTildados && (
           <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 10, background: 'var(--color-success-bg)', color: 'var(--chip-success-fg)', fontSize: 12.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
             <span>Todas las verificaciones están tildadas.</span>
-            <button onClick={() => void onActualizar({ estado: 'HECHO' })} className="ds-hover" style={{ ...btnGhostSm, height: 30 }}>Marcar como hecho</button>
+            <button onClick={() => void onActualizar({ estado: 'HECHO' })} className="ds-hover au-sm" style={{ ...btnGhostSm, height: 30 }}>Marcar como hecho</button>
           </div>
         )}
       </div>
@@ -488,7 +508,7 @@ function DetalleItem({ item, estadoLabel, todosTildados, onActualizar, onBorrado
             onChange={(e) => setInforme(e.target.value)}
             onBlur={() => void guardarTexto()}
             placeholder="https://…"
-            className="ds-field"
+            className="ds-field au-sm"
             style={{ ...inputStyle, height: 36, fontSize: 12.5 }}
           />
         </Field>
@@ -510,7 +530,7 @@ function DetalleItem({ item, estadoLabel, todosTildados, onActualizar, onBorrado
         </div>
         {item.esPersonalizado && (
           <div>
-            <button onClick={() => setBorrando(true)} className="ds-hover" style={{ ...btnGhostSm, color: 'var(--color-error)', borderColor: 'var(--color-error)' }}>
+            <button onClick={() => setBorrando(true)} className="ds-hover au-sm" style={{ ...btnGhostSm, color: 'var(--color-error)', borderColor: 'var(--color-error)' }}>
               <Trash2 size={13} /> Borrar este ítem
             </button>
           </div>
@@ -572,7 +592,7 @@ function SeccionInforme({ item, onActualizar }: { item: AuditItemRow; onActualiz
     setEditando(false)
   }
   const cambiado = editando && borrador.trim() !== (item.informe ?? '').trim()
-  const rotulo = { fontSize: 11, fontWeight: 700, color: 'var(--color-subtle)', textTransform: 'uppercase', letterSpacing: '0.05em' } as const
+  const rotulo = { fontSize: 11, fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' } as const
 
   if (editando) {
     return (
@@ -580,11 +600,11 @@ function SeccionInforme({ item, onActualizar }: { item: AuditItemRow; onActualiz
         <div className="au-informe-cab">
           <div style={rotulo}>Informe · Markdown</div>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-            <button type="button" onClick={() => setPrevia((v) => !v)} aria-pressed={previa} className="ds-hover" style={{ ...btnGhostSm, background: previa ? 'var(--color-primary-bg)' : undefined, color: previa ? 'var(--color-primary)' : undefined, borderColor: previa ? 'transparent' : undefined }}>
+            <button type="button" onClick={() => setPrevia((v) => !v)} aria-pressed={previa} className="ds-hover au-sm" style={{ ...btnGhostSm, background: previa ? 'var(--color-primary-bg)' : undefined, color: previa ? 'var(--chip-primary-fg)' : undefined, borderColor: previa ? 'transparent' : undefined }}>
               {previa ? 'Volver a editar' : 'Vista previa'}
             </button>
-            <button type="button" onClick={cancelar} disabled={guardando} className="ds-hover" style={btnGhostSm}>Cancelar</button>
-            <button type="button" onClick={() => void guardar()} disabled={guardando || !cambiado} className="ds-hover" style={{ ...btnPrimary, height: 30, padding: '0 14px', fontSize: 12.5, opacity: guardando || !cambiado ? 0.6 : 1 }}>
+            <button type="button" onClick={cancelar} disabled={guardando} className="ds-hover au-sm" style={btnGhostSm}>Cancelar</button>
+            <button type="button" onClick={() => void guardar()} disabled={guardando || !cambiado} className="ds-hover au-sm" style={{ ...btnPrimary, height: 30, padding: '0 14px', fontSize: 12.5, opacity: guardando || !cambiado ? 0.6 : 1 }}>
               {guardando ? 'Guardando…' : 'Guardar informe'}
             </button>
           </div>
@@ -616,7 +636,7 @@ function SeccionInforme({ item, onActualizar }: { item: AuditItemRow; onActualiz
         <>
           <div className="au-informe-cab">
             <div style={rotulo}>Informe</div>
-            <button type="button" onClick={empezar} className="ds-hover" style={btnGhostSm}><PencilLine size={13} /> Editar informe</button>
+            <button type="button" onClick={empezar} className="ds-hover au-sm" style={btnGhostSm}><PencilLine size={13} /> Editar informe</button>
           </div>
           <div className="au-informe-cuerpo">
             <MarkdownInforme texto={item.informe} />
@@ -625,7 +645,7 @@ function SeccionInforme({ item, onActualizar }: { item: AuditItemRow; onActualiz
       ) : (
         <div className="au-informe-vacio">
           <span>Este ítem todavía no tiene informe. Es lo que va al documento PDF: cómo está hecho el módulo, qué se verificó y qué se encontró.</span>
-          <button type="button" onClick={empezar} className="ds-hover" style={btnGhostSm}><PencilLine size={13} /> Escribir informe</button>
+          <button type="button" onClick={empezar} className="ds-hover au-sm" style={btnGhostSm}><PencilLine size={13} /> Escribir informe</button>
         </div>
       )}
     </div>
@@ -636,7 +656,8 @@ function SeccionInforme({ item, onActualizar }: { item: AuditItemRow; onActualiz
 
 function SelectorEstado({ valor, onChange }: { valor: AuditEstado; onChange: (e: AuditEstado) => void }) {
   const actual = ESTADOS.find((e) => e.id === valor) ?? ESTADOS[0]
-  const colores = { gray: { bg: 'var(--color-surface-alt)', fg: 'var(--color-muted)' }, amber: { bg: 'var(--color-warning-bg)', fg: 'var(--chip-warning-fg)' }, green: { bg: 'var(--color-success-bg)', fg: 'var(--chip-success-fg)' } }[actual.tone]
+  // Pendiente en color-body: muted sobre surface-alt no llega a AA.
+  const colores = { gray: { bg: 'var(--color-surface-alt)', fg: 'var(--color-body)' }, amber: { bg: 'var(--color-warning-bg)', fg: 'var(--chip-warning-fg)' }, green: { bg: 'var(--color-success-bg)', fg: 'var(--chip-success-fg)' } }[actual.tone]
   return (
     <select
       value={valor}

@@ -37,8 +37,10 @@ export const CICLO = { inicio: '2026-10-26', fin2m: '2026-12-18', fin1m: '2026-1
 
 // Lo que lee y escribe el front en `notas` del ítem del plan: el selector de
 // horizonte persiste `horizonte` ahí y el resto lo conserva tal cual.
-function notasPlan(semanas: string[]): string {
-  return JSON.stringify({ horizonte: '2m', inicio: CICLO.inicio, fin2m: CICLO.fin2m, fin1m: CICLO.fin1m, semanas });
+// `semanas1m` titula las 4 semanas del ciclo de 1 mes: ahí la 3 y la 4 absorben
+// tareas de las semanas 5 a 8, así que el título de 2 meses ya no las describe.
+function notasPlan(semanas: string[], semanas1m: string[]): string {
+  return JSON.stringify({ horizonte: '2m', inicio: CICLO.inicio, fin2m: CICLO.fin2m, fin1m: CICLO.fin1m, semanas, semanas1m });
 }
 
 const DIA_MS = 86_400_000;
@@ -68,8 +70,9 @@ function documentada(tarea: SeedTarea, auditoria: string): SeedTarea {
   return { ...tarea, auditoria };
 }
 
-// `semanas`: el título de cada semana del ciclo de 2 meses, en orden (1 a 8).
-function plan(slug: string, nombre: string, responsable: SeedQuien, foco: string, semanas: string[], tareas: SeedTarea[]): SeedItem {
+// `semanas`: el título de cada semana del ciclo de 2 meses, en orden (1 a 8);
+// `semanas1m`, el de las 4 del ciclo de 1 mes.
+function plan(slug: string, nombre: string, responsable: SeedQuien, foco: string, semanas: string[], semanas1m: string[], tareas: SeedTarea[]): SeedItem {
   return {
     key: `modulo.${slug}.plan`,
     area: 'FRONTEND',
@@ -81,7 +84,7 @@ function plan(slug: string, nombre: string, responsable: SeedQuien, foco: string
     checks: tareas.map((x) => x.texto),
     tareas,
     responsable,
-    notas: notasPlan(semanas),
+    notas: notasPlan(semanas, semanas1m),
   };
 }
 
@@ -97,6 +100,12 @@ const TURNOS = plan('turnos', 'Turnos', 'Mateo',
     'Pulido de panel y storefront',
     'QA responsive',
     'Correcciones, auditoría y cierre',
+  ],
+  [
+    'Borrar el backend y consolidar shared',
+    'Rubros movidos a Alquileres y Gimnasio',
+    'Panel, storefront y Turnos en el alta única',
+    'Correcciones, pulido, QA y cierre',
   ],
   [
     // Semana 1 · borrar el backend y consolidar shared
@@ -154,6 +163,12 @@ const ALQUILERES = plan('alquileres', 'Alquileres', 'Alan',
     'Panel y calendarios .ics',
     'QA responsive',
     'Correcciones, auditoría y cierre',
+  ],
+  [
+    'Lectura y diseño del alta',
+    'Alta y modo cancha',
+    'Modo bloque',
+    'Checkpoint, panel, QA y cierre',
   ],
   [
     // Semana 1 · lectura y diseño del alta
@@ -214,6 +229,12 @@ const GIMNASIO = plan('gimnasio', 'Gimnasio', 'Ale',
     'Panel e ingresos',
     'QA responsive',
     'Correcciones, auditoría y cierre',
+  ],
+  [
+    'Lib de reservas y esqueleto de Módulos',
+    'Grilla de clases y reserva de lugar',
+    'Pases, planes, socios y alta única',
+    'Check-in, página pública, panel, QA y cierre',
   ],
   [
     // Semana 1 · lib de reservas y esqueleto de Módulos

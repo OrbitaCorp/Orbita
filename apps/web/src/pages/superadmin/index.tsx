@@ -1,3 +1,4 @@
+import Head from 'next/head'
 import { RequireAuth } from '@/lib/auth/RequireAuth'
 import { SuperAdminDashboard } from '@/modules/superadmin/SuperAdminDashboard'
 
@@ -6,8 +7,11 @@ import { SuperAdminDashboard } from '@/modules/superadmin/SuperAdminDashboard'
 // en pages/superadmin/negocios/[id].tsx), sobre los endpoints /platform/*.
 export default function SuperAdminPage() {
   return (
-    <RequireAuth type="platform_admin">
-      <SuperAdminDashboard />
-    </RequireAuth>
+    <>
+      <Head><title>Superadmin · Órbita</title></Head>
+      <RequireAuth type="platform_admin">
+        <SuperAdminDashboard />
+      </RequireAuth>
+    </>
   )
 }

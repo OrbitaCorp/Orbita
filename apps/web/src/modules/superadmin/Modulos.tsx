@@ -135,7 +135,10 @@ const hoyServidor = () => null
 
 // ─── Lectura de los ítems ─────────────────────────────────────────────────────
 
-interface NotasPlan { horizonte: Horizonte; inicio: string; fin2m: string; fin1m: string; semanas: string[] }
+// `semanas1m` (opcional): los títulos del ciclo de 1 mes. Ahí las semanas 3 y
+// 4 absorben otras y la estadía de Alquileres queda afuera, así que el título
+// de 2 meses ("Checkpoint y estadía, parte 1") contaba algo que no pasa.
+interface NotasPlan { horizonte: Horizonte; inicio: string; fin2m: string; fin1m: string; semanas: string[]; semanas1m: string[] }
 
 function crudoDe(notas: string | null): Record<string, unknown> {
   if (!notas) return {}
@@ -150,13 +153,24 @@ function crudoDe(notas: string | null): Record<string, unknown> {
 function leerNotasPlan(notas: string | null): NotasPlan {
   const c = crudoDe(notas)
   const iso = (v: unknown, def: string) => (typeof v === 'string' && RE_ISO.test(v) ? v : def)
+  const titulos = (v: unknown) => (Array.isArray(v) ? v.map((s) => (typeof s === 'string' ? s : '')) : [])
   return {
     horizonte: c.horizonte === '1m' ? '1m' : '2m',
     inicio: iso(c.inicio, CICLO.inicio),
     fin2m: iso(c.fin2m, CICLO.fin2m),
     fin1m: iso(c.fin1m, CICLO.fin1m),
-    semanas: Array.isArray(c.semanas) ? c.semanas.map((s) => (typeof s === 'string' ? s : '')) : [],
+    semanas: titulos(c.semanas),
+    semanas1m: titulos(c.semanas1m),
   }
+}
+
+// El aviso con que nace toda entrada generada en sesión (AVISO_SESION en
+// modulos-entradas.ts; el test los compara). Es texto fijo del informe: una
+// vez confirmada la entrada, "pendiente de confirmación" ya no es cierto.
+export const AVISO_SESION = '> **Generada en sesión, pendiente de confirmación del responsable.**'
+const AVISO_CONFIRMADA = '> **Generada en sesión y confirmada por el responsable.**'
+export function informeVisible(informe: string, confirmada: boolean): string {
+  return confirmada ? informe.replace(AVISO_SESION, AVISO_CONFIRMADA) : informe
 }
 
 const tipoDe = (e: AuditItemRow): TipoEntrada => {
@@ -248,6 +262,7 @@ export function armarModulo(def: DefModulo, items: AuditItemRow[], porKey: Map<s
   const vistas = (plan?.checks ?? []).map((c) => vistaDeTarea(c, notas, porKey, hoy))
   const tareas = vistas.filter((t) => t.semana !== null)
   const cantidad = Math.max(1, Math.ceil((diasEntre(notas.inicio, fin) + 1) / 7))
+  const titulos = notas.horizonte === '1m' && notas.semanas1m.length > 0 ? notas.semanas1m : notas.semanas
   const semanas: Semana[] = []
   for (let n = 1; n <= cantidad; n++) {
     const desde = lunesDe(notas.inicio, n)
@@ -255,7 +270,7 @@ export function armarModulo(def: DefModulo, items: AuditItemRow[], porKey: Map<s
       .filter((t) => t.semana === n)
       .sort((a, b) => (a.dia ?? '').localeCompare(b.dia ?? '') || (a.check.dia ?? '').localeCompare(b.check.dia ?? ''))
     const comprimidas = Array.from(new Set(deLaSemana.map((t) => t.check.semana ?? n).filter((s) => s !== n))).sort((a, b) => a - b)
-    semanas.push({ n, titulo: notas.semanas[n - 1]?.trim() || `Semana ${n}`, desde, hasta: sumarDias(desde, 4), tareas: deLaSemana, comprimidas })
+    semanas.push({ n, titulo: titulos[n - 1]?.trim() || notas.semanas[n - 1]?.trim() || `Semana ${n}`, desde, hasta: sumarDias(desde, 4), tareas: deLaSemana, comprimidas })
   }
   const atrasadas = tareas.filter((t) => t.atraso > 0).sort((a, b) => b.atraso - a.atraso)
   return {
@@ -307,6 +322,7 @@ const CSS = `
   .mo-card-clic:has(.mo-card-abrir:focus-visible) { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   @media (hover: hover) { .mo-card-clic:hover { border-color: var(--color-border-strong); } }
   .mo-rotulo { font-size: 12px; font-weight: 600; color: var(--color-muted); }
+  .mo-datos { display: flex; flex-direction: column; gap: 4px; font-size: 13px; line-height: 1.45; }
   /* Etiqueta neutra: el Chip gris (muted sobre surface-alt) queda en 4,3:1 y
      no llega a AA con texto de 12 px. */
   .mo-etiqueta { display: inline-flex; align-items: center; height: 24px; padding: 0 9px; border-radius: 999px; background: var(--color-surface-alt); color: var(--color-body); font-size: 12px; font-weight: 600; white-space: nowrap; }
@@ -359,7 +375,12 @@ const CSS = `
   .mo-campo { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--color-text); }
   .mo-campo-ayuda { font-size: 12px; font-weight: 400; color: var(--color-muted); line-height: 1.45; }
   .mo-dos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  /* En oscuro los controles nativos traían su paleta clara: la casilla era un
+     cuadro blanco y el ícono del calendario no se veía. */
+  .dark .mo-check input, .dark .mo-hoja input, .dark .mo-hoja select, .dark .mo-hoja textarea { color-scheme: dark; }
   @media (max-width: 960px) { .mo-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  /* Táctil: los campos de la hoja también miden 44 px (inputStyle trae 40 inline). */
+  @media (max-width: 768px) { .mo-hoja input.ds-field, .mo-hoja select.ds-field { height: 44px !important; } }
   @media (max-width: 640px) {
     .mo-dia { grid-template-columns: minmax(0, 1fr); padding: 10px 12px; }
     .mo-dia-nombre { padding-top: 2px; }
@@ -389,6 +410,10 @@ export function TabModulos({ currentAdminId }: { currentAdminId: string }) {
   const hoy = useSyncExternalStore(suscribirHoy, hoyLocal, hoyServidor)
   const [data, setData] = useState<AuditListado | null>(null)
   const [error, setError] = useState('')
+  // Lo último que no se pudo guardar. Aparte de `error` porque la recarga que
+  // sigue a un fallo (y la de cada 20 s) limpia `error` al salir bien: el
+  // aviso desaparecía en el acto y el cambio se deshacía sin explicación.
+  const [errorGuardar, setErrorGuardar] = useState('')
   const [refrescando, setRefrescando] = useState(false)
   const [guardando, setGuardando] = useState<string | null>(null)
   const cargandoRef = useRef(false)
@@ -433,9 +458,19 @@ export function TabModulos({ currentAdminId }: { currentAdminId: string }) {
   const abierto = esConPlan(router.query.modulo) ? router.query.modulo : null
   const vista: Vista = router.query.vista === 'auditoria' || router.query.vista === 'resumen' ? router.query.vista : 'plan'
   const ir = (modulo: ConPlan | null, v: Vista = 'plan') => {
+    if (modulo !== abierto) setErrorGuardar('')
     const q = modulo ? `&modulo=${modulo}${v !== 'plan' ? `&vista=${v}` : ''}` : ''
     void router.push(`/superadmin?seccion=modulos${q}`, undefined, { shallow: true })
   }
+
+  // Al volver a la lista (con "Volver a Módulos" o con Atrás) el foco va a la
+  // tarjeta del módulo de donde se venía: si no, caía en <body> y con teclado
+  // o lector de pantalla había que arrancar de nuevo desde arriba.
+  const anteriorRef = useRef<ConPlan | null>(null)
+  useEffect(() => {
+    if (!abierto && anteriorRef.current) document.getElementById(`mo-abrir-${anteriorRef.current}`)?.focus()
+    anteriorRef.current = abierto
+  }, [abierto])
 
   if (error && !data) return <ErrorBox msg={error} action={<button onClick={() => void cargar(false)} className="ds-hover mo-boton" style={btnGhost}>Reintentar</button>} />
   if (!data) return <Loader />
@@ -447,7 +482,7 @@ export function TabModulos({ currentAdminId }: { currentAdminId: string }) {
 
   const aplicar = (fila: AuditItemRow) => setData((d) => (d ? { ...d, items: d.items.map((i) => (i.id === fila.id ? fila : i)) } : d))
   const fallo = (e: unknown, texto: string) => {
-    setError(e instanceof Error ? `${texto}: ${e.message}` : texto)
+    setErrorGuardar(e instanceof Error ? `${texto}: ${e.message}` : texto)
     void cargar(true)
   }
 
@@ -455,7 +490,7 @@ export function TabModulos({ currentAdminId }: { currentAdminId: string }) {
   // tareas que documenta: la API registra quién y cuándo (hechoPor/hechoAt).
   const confirmarEntrada = async (entrada: AuditItemRow) => {
     setGuardando(entrada.id)
-    setError('')
+    setErrorGuardar('')
     try {
       const c1 = entrada.checks.find((c) => c.texto === CHECKS_ENTRADA[0])
       aplicar(await platformApi.updateAuditItem(entrada.id, { estado: 'HECHO', ...(c1 ? { checks: [{ id: c1.id, hecho: true }] } : {}) }))
@@ -475,7 +510,7 @@ export function TabModulos({ currentAdminId }: { currentAdminId: string }) {
     // por la entrada, que tilda la tarea de paso.
     if (hecho && t.entrada && t.entrada.estado !== 'HECHO') return confirmarEntrada(t.entrada)
     setGuardando(t.check.id)
-    setError('')
+    setErrorGuardar('')
     try {
       const toggle = hecho && t.check.auditoria ? { id: t.check.id, hecho, auditoria: t.check.auditoria } : { id: t.check.id, hecho }
       aplicar(await platformApi.updateAuditItem(plan.id, { checks: [toggle] }))
@@ -490,6 +525,7 @@ export function TabModulos({ currentAdminId }: { currentAdminId: string }) {
     // Se conserva todo lo que haya en notas (ciclo, títulos): solo cambia el horizonte.
     const notas = JSON.stringify({ ...crudoDe(plan.notas), horizonte })
     aplicar({ ...plan, notas })
+    setErrorGuardar('')
     try {
       aplicar(await platformApi.updateAuditItem(plan.id, { notas }))
     } catch (e) {
@@ -501,6 +537,7 @@ export function TabModulos({ currentAdminId }: { currentAdminId: string }) {
   // tarea; si quien la carga es ese responsable, se confirma en el acto. Si
   // vino de una tarea, la tarea queda vinculada (y tildada si se confirmó).
   const guardarEntrada = async ({ tarea, plan, quien, input }: Guardar) => {
+    setErrorGuardar('')
     const admin = adminDe(quien)
     const fila = await platformApi.createAuditItem({ ...input, responsableId: admin?.id ?? null })
     setData((d) => (d ? { ...d, items: [...d.items, fila] } : d))
@@ -528,7 +565,7 @@ export function TabModulos({ currentAdminId }: { currentAdminId: string }) {
           modulo={actual}
           vista={vista}
           hoy={hoy}
-          error={error}
+          error={errorGuardar || error}
           guardando={guardando}
           keysUsadas={new Set(porKey.keys())}
           confirmaAlGuardar={(quien) => adminDe(quien)?.id === currentAdminId}
@@ -572,26 +609,28 @@ function TarjetaModulo({ modulo: m, hoy, onAbrir }: { modulo: Modulo; hoy: strin
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
         <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--color-text)' }}>
           {onAbrir
-            ? <button type="button" onClick={onAbrir} className="mo-card-abrir">{m.def.nombre}</button>
+            ? <button type="button" id={`mo-abrir-${m.def.slug}`} onClick={onAbrir} className="mo-card-abrir">{m.def.nombre}</button>
             : m.def.nombre}
         </h3>
         <Chip text={enProduccion ? 'En producción' : 'En desarrollo'} tone={enProduccion ? 'green' : 'blue'} />
       </div>
       {enProduccion ? (
-        <>
-          <div style={{ fontSize: 13 }}>Sin responsable · en producción</div>
-          <div className="mo-rotulo" style={{ fontWeight: 500 }}>Sin plan en este ciclo: ya está en producción.</div>
-        </>
+        <div className="mo-datos">
+          <div>Sin responsable · en producción</div>
+          <div className="mo-rotulo" style={{ fontWeight: 500 }}>Sin plan en este ciclo.</div>
+        </div>
       ) : (
         <>
-          <div style={{ fontSize: 13 }}>
-            <span className="mo-rotulo">Responsable </span>{nombreResponsable(m.def.persona, m.plan?.responsable ?? null)}
+          {/* Los datos van juntos y aparte del progreso. Fin y horizonte en
+              dos renglones: en la grilla de 4 columnas "Fin estimado … · 2
+              meses" no entraba y cortaba entre el 2 y "meses". */}
+          <div className="mo-datos">
+            <div><span className="mo-rotulo">Responsable </span>{nombreResponsable(m.def.persona, m.plan?.responsable ?? null)}</div>
+            {m.plan && <div><span className="mo-rotulo">Fin estimado </span>{larga(m.fin)}</div>}
+            {m.plan && <div><span className="mo-rotulo">Horizonte </span>{m.notas.horizonte === '1m' ? '1 mes' : '2 meses'}</div>}
           </div>
           {m.plan ? (
             <>
-              <div style={{ fontSize: 13 }}>
-                <span className="mo-rotulo">Fin estimado </span>{larga(m.fin)} · {m.notas.horizonte === '1m' ? '1 mes' : '2 meses'}
-              </div>
               <Medidor hechas={m.hechas} total={m.tareas.length} atraso={m.diasAtraso > 0} etiqueta={`Progreso de ${m.def.nombre}`} />
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                 <Semaforo hoy={hoy} dias={m.diasAtraso} />
@@ -614,17 +653,30 @@ function TarjetaModulo({ modulo: m, hoy, onAbrir }: { modulo: Modulo; hoy: strin
 
 // Hechas sobre planeadas. La barra va en el color de estado (azul al día,
 // ámbar con atraso) y el texto dice lo mismo: el color nunca va solo.
-function Medidor({ hechas, total, atraso, etiqueta }: { hechas: number; total: number; atraso: boolean; etiqueta: string }) {
+// `compacto`: en el KPI del Resumen, que ya dice "Progreso" y el porcentaje
+// arriba, solo la barra y cuántas van.
+function Medidor({ hechas, total, atraso, etiqueta, compacto = false }: { hechas: number; total: number; atraso: boolean; etiqueta: string; compacto?: boolean }) {
   const pct = total ? Math.round((hechas / total) * 100) : 0
+  const barra = (
+    <div className="mo-barra" data-tono={atraso ? 'atraso' : undefined} role="progressbar" aria-label={etiqueta} aria-valuemin={0} aria-valuemax={total} aria-valuenow={hechas} aria-valuetext={`${hechas} de ${total} tareas hechas`}>
+      <span style={{ width: `${pct}%` }} />
+    </div>
+  )
+  if (compacto) {
+    return (
+      <div>
+        {barra}
+        <div className="mo-rotulo" style={{ fontWeight: 500, marginTop: 6 }}>{hechas} de {total} tareas</div>
+      </div>
+    )
+  }
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 6, fontSize: 13 }}>
         <span className="mo-rotulo">Progreso</span>
         <span style={{ fontWeight: 600, color: 'var(--color-text)' }}>{hechas} de {total} · {pct}%</span>
       </div>
-      <div className="mo-barra" data-tono={atraso ? 'atraso' : undefined} role="progressbar" aria-label={etiqueta} aria-valuemin={0} aria-valuemax={total} aria-valuenow={hechas} aria-valuetext={`${hechas} de ${total} tareas hechas`}>
-        <span style={{ width: `${pct}%` }} />
-      </div>
+      {barra}
     </div>
   )
 }
@@ -898,9 +950,12 @@ function FilaTarea({ t, guardando, onTildar, onRegistrar, onVerEntrada }: {
   const { check: c } = t
   // Se tilda con la entrada cargada; destildar siempre se puede.
   const habilitada = !guardando && (t.estado === 'hecha' || t.estado === 'por-confirmar')
+  // Con la entrada ya confirmada no falta confirmar nada: alguien la destildó.
   const est = t.atraso > 0
     ? { label: `Atrasada ${t.atraso} ${t.atraso === 1 ? 'día' : 'días'}`, color: 'var(--chip-warning-fg)', Icono: AlertTriangle }
-    : ESTADO_TAREA[t.estado]
+    : t.estado === 'por-confirmar' && t.entrada?.estado === 'HECHO'
+      ? { ...ESTADO_TAREA['por-confirmar'], label: 'Documentada · falta tildar' }
+      : ESTADO_TAREA[t.estado]
   const idEstado = `mo-est-${c.id}`
   const movida = t.dia && c.dia && t.dia !== c.dia
   return (
@@ -1059,7 +1114,7 @@ function TarjetaEntrada({ entrada: e, tareas, guardando, enfocar, onConfirmar }:
       </div>
       {abierta && (
         <div id={idCuerpo} className="mo-entrada-cuerpo">
-          {e.informe ? <MarkdownInforme texto={e.informe} /> : <Empty text="Esta entrada no tiene informe." />}
+          {e.informe ? <MarkdownInforme texto={informeVisible(e.informe, confirmada)} /> : <Empty text="Esta entrada no tiene informe." />}
         </div>
       )}
     </article>
@@ -1084,7 +1139,7 @@ function PanelResumen({ modulo: m, hoy }: { modulo: Modulo; hoy: string | null }
         <div className="mo-kpi">
           <div className="mo-rotulo">Progreso</div>
           <div className="mo-kpi-valor">{pct}%</div>
-          <div style={{ marginTop: 8 }}><Medidor hechas={m.hechas} total={m.tareas.length} atraso={m.diasAtraso > 0} etiqueta={`Progreso de ${m.def.nombre}`} /></div>
+          <div style={{ marginTop: 8 }}><Medidor hechas={m.hechas} total={m.tareas.length} atraso={m.diasAtraso > 0} etiqueta={`Progreso de ${m.def.nombre}`} compacto /></div>
         </div>
         <div className="mo-kpi">
           <div className="mo-rotulo">Por confirmar</div>

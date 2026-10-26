@@ -1,11 +1,13 @@
+import { createElement, Fragment } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
-import { anchoCaptura, parsearMarkdown, srcSeguro } from './MarkdownInforme'
+import { anchoCaptura, inline, parsearMarkdown, srcSeguro } from './MarkdownInforme'
 import {
-  armarInforme, armarModulo, esDeModulos, estadoSemana, focoDe, proximoHito, slugDe,
+  AVISO_SESION, armarInforme, armarModulo, esDeModulos, estadoSemana, focoDe, informeVisible, proximoHito, slugDe,
 } from './Modulos'
 import { MODULOS_SEED } from '../../../../api/src/platform/audit/modulos-seed'
-import { ENTRADAS_MODULOS } from '../../../../api/src/platform/audit/modulos-entradas'
+import { AVISO_SESION as AVISO_API, ENTRADAS_MODULOS } from '../../../../api/src/platform/audit/modulos-entradas'
 import type { AuditItemRow } from '@/lib/platform/api'
 
 // Filas como las devuelve GET /platform/audit, armadas desde el seed real.
@@ -65,6 +67,26 @@ describe('MarkdownInforme — imágenes', () => {
     const titulos = b.filter((x) => x.tipo === 'h').map((x) => (x as { texto: string }).texto)
     expect(titulos).toEqual(['Qué se hizo', 'Quién', 'Cuándo', 'Archivos'])
     expect(b.some((x) => x.tipo === 'ul')).toBe(true)
+  })
+
+  it('el código corta después de cada barra (<wbr>) y el texto no cambia', () => {
+    const html = renderToStaticMarkup(createElement(Fragment, null, inline('Ver `apps/web/src/x.tsx:30` y `sin-barras`')))
+    expect(html).toBe('Ver <code class="md-code">apps/<wbr/>web/<wbr/>src/<wbr/>x.tsx:30</code> y <code class="md-code">sin-barras</code>')
+  })
+})
+
+describe('Modulos — aviso de las entradas de sesión', () => {
+  it('es el mismo texto que arma la API y al confirmar deja de decir "pendiente"', () => {
+    expect(AVISO_SESION).toBe(AVISO_API)
+    const informe = ENTRADAS_MODULOS[0].informe!
+    expect(informe.startsWith(AVISO_SESION)).toBe(true)
+    expect(informeVisible(informe, false)).toBe(informe)
+    const confirmada = informeVisible(informe, true)
+    expect(confirmada).not.toContain('pendiente de confirmación')
+    expect(confirmada.startsWith('> **Generada en sesión y confirmada por el responsable.**')).toBe(true)
+    // Solo cambia el aviso (el primer renglón); el resto del informe queda igual.
+    expect(confirmada.split('\n').slice(1)).toEqual(informe.split('\n').slice(1))
+    expect(parsearMarkdown(confirmada).map((x) => x.tipo)).toEqual(parsearMarkdown(informe).map((x) => x.tipo))
   })
 })
 
@@ -135,6 +157,22 @@ describe('Modulos — modelo', () => {
       expect(new Date(`${t.dia}T00:00:00Z`).getUTCDay()).toBeGreaterThanOrEqual(1)
       expect(new Date(`${t.dia}T00:00:00Z`).getUTCDay()).toBeLessThanOrEqual(5)
     }
+  })
+
+  it('1 mes: los títulos salen de semanas1m (sin la estadía); sin ellos, los de 2 meses', () => {
+    const seed = (slug: string) => JSON.parse(MODULOS_SEED.find((p) => p.key === `modulo.${slug}.plan`)!.notas!)
+    for (const slug of ['turnos', 'gimnasio', 'alquileres'] as const) {
+      expect(modulo(slug, planes('1m'), '2026-10-26').semanas.map((s) => s.titulo)).toEqual(seed(slug).semanas1m)
+      expect(modulo(slug, planes('2m'), '2026-10-26').semanas.map((s) => s.titulo)).toEqual(seed(slug).semanas)
+    }
+    expect(modulo('alquileres', planes('1m'), '2026-10-26').semanas.some((s) => /estad[ií]a/i.test(s.titulo))).toBe(false)
+    // Un plan cargado antes de que existieran (notas sin semanas1m): los de 2 meses.
+    const viejos = planes('1m').map((p) => {
+      const notas = JSON.parse(p.notas!)
+      delete notas.semanas1m
+      return { ...p, notas: JSON.stringify(notas) }
+    })
+    expect(modulo('alquileres', viejos, '2026-10-26').semanas[3].titulo).toBe(seed('alquileres').semanas[3])
   })
 
   it('notas rotas o sin títulos: valen los defaults', () => {

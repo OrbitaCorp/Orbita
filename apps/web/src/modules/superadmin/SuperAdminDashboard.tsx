@@ -73,7 +73,10 @@ export function SuperAdminDashboard() {
   const orbiApagado = estadoOrbi?.estado.status === 'MAINTENANCE' ? 1 : 0
   const items = NAV.map((n) => (n.id === 'soporte' ? { ...n, badge: abiertas } : n.id === 'orbi' ? { ...n, badge: orbiApagado, badgeLabel: 'apagado' } : n))
 
-  if (!user || user.type !== 'platform_admin') return null
+  // Hasta que el router tiene la query, la sección sería "resumen" por
+  // default: un link directo (?seccion=modulos&modulo=…) montaba un instante
+  // el Resumen y disparaba sus cuatro pedidos antes de ir a donde tenía que ir.
+  if (!user || user.type !== 'platform_admin' || !router.isReady) return null
 
   const cerrarSesion = () => void logout().then(() => (window.location.href = apexUrl('/login')))
 

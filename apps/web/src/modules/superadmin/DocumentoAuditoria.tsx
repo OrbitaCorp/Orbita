@@ -238,7 +238,8 @@ const DOC_CSS = `
   .au-doc-datos dt { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #64748B; }
   .au-doc-datos dd { margin: 2px 0 0; font-size: 16px; font-weight: 600; color: #0F172A; }
   .au-doc-equipo { margin: 28px 0 0; font-size: 13px; color: #475569; }
-  .au-doc-aviso { margin: 10px 0 0; font-size: 12px; color: #94A3B8; }
+  /* #64748B y no #94A3B8 (2,6:1): el aviso y los vacíos también se leen. */
+  .au-doc-aviso { margin: 10px 0 0; font-size: 12px; color: #64748B; }
 
   .au-doc-indice { break-after: page; margin-bottom: 40px; }
   .au-doc-indice h2, .au-doc-area-titulo { font-size: 26px; font-weight: 800; margin-bottom: 18px; }
@@ -273,17 +274,19 @@ const DOC_CSS = `
   .au-doc-checks ul { list-style: none; margin: 0; padding: 0; }
   .au-doc-checks li { display: flex; gap: 8px; align-items: flex-start; padding: 3px 0; font-size: 13px; color: #334155; break-inside: avoid; }
   .au-doc-checks li.ok { color: #0F172A; }
-  .au-doc-tick { width: 16px; flex-shrink: 0; font-weight: 700; color: #94A3B8; text-align: center; }
+  .au-doc-tick { width: 16px; flex-shrink: 0; font-weight: 700; color: #64748B; text-align: center; }
   .au-doc-checks li.ok .au-doc-tick { color: #16A34A; }
   .au-doc-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .au-doc-informe { margin-top: 6px; }
   .au-doc-notas p { margin: 0; white-space: pre-wrap; color: #334155; }
-  .au-doc-vacio { color: #94A3B8; font-style: italic; margin: 8px 0 0; }
+  .au-doc-vacio { color: #64748B; font-style: italic; margin: 8px 0 0; }
 
   @media (max-width: 720px) {
     .au-doc-paper { padding: 36px 22px 48px; }
     .au-doc-portada h1 { font-size: 30px; }
     .au-doc-datos { grid-template-columns: 1fr; }
+    /* Táctil: la barra del documento también con targets de 44 px. */
+    .au-doc-seg button, .au-doc-btn { height: 44px; }
   }
 
   @media print {

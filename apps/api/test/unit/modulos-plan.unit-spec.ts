@@ -44,6 +44,11 @@ describe('Módulos — seed del plan', () => {
       expect(notas).toMatchObject({ horizonte: '2m', inicio: CICLO.inicio, fin2m: CICLO.fin2m, fin1m: CICLO.fin1m });
       expect(notas.semanas).toHaveLength(8);
       for (const s of notas.semanas) expect(typeof s === 'string' && s.trim().length > 3).toBe(true);
+      // El ciclo de 1 mes tiene sus propios títulos: las semanas 1 y 2 son las
+      // mismas y la 3 y la 4 absorben las tareas de la 5 a la 8.
+      expect(notas.semanas1m).toHaveLength(4);
+      for (const s of notas.semanas1m) expect(typeof s === 'string' && s.trim().length > 3).toBe(true);
+      expect(notas.semanas1m.slice(0, 2)).toEqual(notas.semanas.slice(0, 2));
       // El front la vuelve a mandar entera al cambiar el horizonte: tiene que
       // entrar en el tope de `notas` del PUT.
       expect((i.notas ?? '').length).toBeLessThan(4000);

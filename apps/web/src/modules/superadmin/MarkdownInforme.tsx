@@ -167,6 +167,15 @@ function ImagenFija({ alt, src }: Imagen) {
   )
 }
 
+// Las rutas de los informes (apps/web/src/…/Archivo.tsx:30) no tienen
+// espacios: en celular cortaban a mitad del nombre del archivo. Con un <wbr>
+// después de cada barra cortan ahí; el texto (y lo que se copia) no cambia.
+function conCortes(codigo: string): ReactNode {
+  const partes = codigo.split('/')
+  if (partes.length < 2) return codigo
+  return partes.map((s, i) => (i < partes.length - 1 ? <Fragment key={i}>{s}/<wbr /></Fragment> : <Fragment key={i}>{s}</Fragment>))
+}
+
 // Inline: **negrita**, *cursiva*, `código`, [texto](https://…) y la imagen
 // ![alt](https://… o /auditoria/…). Todo lo demás es texto. Los links solo
 // http(s); las imágenes pasan por srcSeguro y van en un <img> con src
@@ -183,7 +192,7 @@ export function inline(texto: string): ReactNode {
       if (m && src) return <ImagenFija key={idx} alt={m[1]} src={src} />
     }
     if (p.startsWith('**') && p.endsWith('**')) return <strong key={idx}>{p.slice(2, -2)}</strong>
-    if (p.startsWith('`') && p.endsWith('`')) return <code key={idx} className="md-code">{p.slice(1, -1)}</code>
+    if (p.startsWith('`') && p.endsWith('`')) return <code key={idx} className="md-code">{conCortes(p.slice(1, -1))}</code>
     if (p.startsWith('[')) {
       const m = /^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/.exec(p)
       if (m) return <a key={idx} href={m[2]} target="_blank" rel="noopener noreferrer">{m[1]}</a>
@@ -252,6 +261,10 @@ export const MD_CSS = `
   .md-informe .md-h3 { font-size: 14px; }
   .md-informe .md-h4 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--md-muted, var(--color-muted)); }
   .md-informe ul, .md-informe ol { margin: 0 0 10px; padding-left: 22px; }
+  /* El preflight de Tailwind deja las listas sin viñeta ni número: sin esto,
+     las listas de los informes se leían como párrafos sueltos. */
+  .md-informe ul { list-style: disc; }
+  .md-informe ol { list-style: decimal; }
   .md-informe li { margin: 3px 0; }
   .md-informe li::marker { color: var(--md-muted, var(--color-muted)); }
   .md-informe blockquote { margin: 0 0 10px; padding: 8px 14px; border-left: 3px solid var(--md-accent, var(--color-primary)); background: var(--md-quote-bg, var(--color-surface-alt)); border-radius: 0 8px 8px 0; color: var(--md-strong, var(--color-text)); }
