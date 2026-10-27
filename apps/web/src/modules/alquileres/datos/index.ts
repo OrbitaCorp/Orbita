@@ -147,6 +147,59 @@ export interface Bloqueo {
 
 export interface CalendarioExterno { id: string; unidadId: string; nombre: string; url: string; ultimaSync: ISO }
 
+// ─── Mensajes automáticos, pagos y equipo ────────────────────────────────────
+// Lo que el panel configura en "Recordatorios y mensajes", "Pagos y señas" y
+// "Equipo". Es demo: no se manda ningún WhatsApp, no se conecta ninguna cuenta
+// de Mercado Pago y no se invita a nadie; pero lo que se guarda acá es lo que
+// la API tendría que guardar el día que exista.
+
+/** Los cuatro momentos en que el negocio escribe solo. Cada uno se prende o se apaga, y su texto se edita. */
+export type MomentoMensaje = 'confirmacion' | 'recordatorio' | 'sena' | 'gracias'
+export interface MensajeAuto { id: MomentoMensaje; on: boolean; texto: string }
+export interface InfoMensaje { id: MomentoMensaje; titulo: string; cuando: string; ayuda: string }
+export const MENSAJES: InfoMensaje[] = [
+  { id: 'confirmacion', titulo: 'Confirmación', cuando: 'Apenas reservan', ayuda: 'Con el día, la hora y cuánto falta pagar.' },
+  { id: 'recordatorio', titulo: 'Recordatorio', cuando: '24 h antes', ayuda: 'El que más olvidos evita.' },
+  { id: 'sena', titulo: 'Seña pendiente', cuando: 'A las 24 h de reservar sin pagar', ayuda: 'Avisa que, si no se paga, el lugar se libera.' },
+  { id: 'gracias', titulo: 'Agradecimiento', cuando: 'Al día siguiente', ayuda: 'Para que vuelvan: va con el link para reservar de nuevo.' },
+]
+/** Lo que se escribe entre llaves en un mensaje y se reemplaza con los datos de la reserva. */
+export const VARIABLES_MENSAJE = ['nombre', 'negocio', 'unidad', 'fecha', 'hora', 'total', 'sena', 'saldo', 'link'] as const
+export type VariableMensaje = (typeof VARIABLES_MENSAJE)[number]
+/** "{nombre}" → "Sofía". Una llave que no existe queda tal cual, para que se vea el error. */
+export const rellenarMensaje = (texto: string, datos: Record<VariableMensaje, string>) =>
+  texto.replace(/\{([a-z]+)\}/g, (m, k: string) => (Object.hasOwn(datos, k) ? datos[k as VariableMensaje] : m))
+
+export type FormaPago = 'efectivo' | 'transferencia' | 'mercadopago'
+export const FORMAS_PAGO: Record<FormaPago, { label: string; ayuda: string }> = {
+  efectivo: { label: 'Efectivo', ayuda: 'En el lugar, al llegar.' },
+  transferencia: { label: 'Transferencia', ayuda: 'Al alias que se muestra al reservar. La seña se registra a mano.' },
+  mercadopago: { label: 'Mercado Pago', ayuda: 'La seña se cobra online al reservar y va directo a tu cuenta.' },
+}
+export interface Pagos {
+  /** Sobre qué se calcula la seña: el total con extras (o limpieza) o solo la cancha, el paquete o las noches. */
+  senaSobre: 'total' | 'base'
+  formas: FormaPago[]
+  /** Datos para transferir: se muestran al reservar si la transferencia está entre las formas. */
+  alias: string
+  titular: string
+  /** Mercado Pago conectado (en la demo se simula: no hay OAuth). */
+  mpConectado: boolean
+  /** Qué pasa con la seña si cancelan a tiempo (antes de `cancelaHastaHoras`) y si cancelan tarde. */
+  cancelaATiempo: 'devolver' | 'credito'
+  cancelaTarde: 'pierde' | 'mitad' | 'credito'
+}
+
+export type RolEquipo = 'dueno' | 'encargado' | 'recepcion'
+export interface Persona { id: string; nombre: string; rol: RolEquipo; telefono: string; email?: string; genero?: 'f' | 'm' }
+/** Qué puede hacer cada rol en el panel. El rótulo va en femenino si la persona lo pide. */
+export const ROLES: Record<RolEquipo, { label: [string, string]; puede: string }> = {
+  dueno: { label: ['Dueño', 'Dueña'], puede: 'Todo: precios, pagos, equipo y la agenda.' },
+  encargado: { label: ['Encargado', 'Encargada'], puede: 'La agenda, los cobros y los bloqueos. No cambia precios ni el equipo.' },
+  recepcion: { label: ['Recepción', 'Recepción'], puede: 'Ve la agenda, agenda a mano y registra señas. Lo demás, solo lectura.' },
+}
+export const rolDe = (p: Persona) => ROLES[p.rol].label[p.genero === 'f' ? 1 : 0]
+
 export interface NegocioAlquiler {
   tipo: TipoAlquiler
   rubro: string
@@ -178,6 +231,10 @@ export interface NegocioAlquiler {
   propiedades: Propiedad[]
   bloqueos: Bloqueo[]
   calendariosExternos: CalendarioExterno[]
+  mensajes: MensajeAuto[]
+  pagos: Pagos
+  /** El primero es quien figura como dueño del panel. */
+  equipo: Persona[]
 }
 
 // ─── Reservas y clientes ─────────────────────────────────────────────────────
@@ -251,6 +308,18 @@ const BASE = {
   telefono: '3757 55-0101', ciudad: 'Puerto Iguazú', latLng: IGUAZU, logo: null, bloqueos: [] as Bloqueo[], calendariosExternos: [] as CalendarioExterno[],
 }
 
+/** Los textos de fábrica de los mensajes, con las palabras de cada modo (reserva, evento, estadía). */
+export function mensajesDeFabrica(tipo: TipoAlquiler): MensajeAuto[] {
+  const que = tipo === 'cancha' ? 'tu reserva' : tipo === 'bloque' ? 'tu evento' : 'tu estadía'
+  const cuando = tipo === 'estadia' ? 'entrada el {fecha} desde las {hora}' : '{fecha} a las {hora}'
+  return [
+    { id: 'confirmacion', on: true, texto: `¡Hola {nombre}! ${que[0].toUpperCase()}${que.slice(1)} en {negocio} quedó agendada: {unidad}, ${cuando}. Seña: {sena}. El resto ({saldo}) se paga en el lugar. Para verla o cancelarla: {link}` },
+    { id: 'recordatorio', on: true, texto: tipo === 'estadia' ? `Hola {nombre}, mañana te esperamos en {unidad}: entrada desde las {hora}. Si llegás más tarde, avisanos por acá. ¡Buen viaje!` : `Hola {nombre}, te recordamos ${que} de mañana {fecha} a las {hora} en {negocio} ({unidad}). ¡Te esperamos!` },
+    { id: 'sena', on: true, texto: `Hola {nombre}, todavía no nos llegó la seña de {sena} de ${que} del {fecha}. Si no entra hoy, el lugar se libera. Podés pagarla acá: {link}` },
+    { id: 'gracias', on: false, texto: `¡Gracias por venir a {negocio}, {nombre}! Cuando quieras volver, reservá acá: {link}` },
+  ]
+}
+
 export const NEGOCIOS_DEMO: Record<TipoAlquiler, NegocioAlquiler> = {
   cancha: {
     ...BASE,
@@ -259,6 +328,19 @@ export const NEGOCIOS_DEMO: Record<TipoAlquiler, NegocioAlquiler> = {
     direccion: 'Av. Tres Fronteras 1450', fotoPortada: FOTOS_CANCHA[0],
     apertura: { dias: [0, 1, 2, 3, 4, 5, 6], desde: 9 * 60, hasta: 24 * 60 },
     senaPct: 50, cancelaHastaHoras: 24,
+    mensajes: mensajesDeFabrica('cancha'),
+    pagos: { senaSobre: 'base', formas: ['efectivo', 'transferencia', 'mercadopago'], alias: 'lacancha.mp', titular: 'Martín Acosta', mpConectado: true, cancelaATiempo: 'devolver', cancelaTarde: 'pierde' },
+    equipo: [
+      { id: 'e1', nombre: 'Martín Acosta', rol: 'dueno', telefono: '3757 55-0101', email: 'martin@lacancha.com.ar' },
+      { id: 'e2', nombre: 'Paula Giménez', rol: 'encargado', genero: 'f', telefono: '3757 55-0102' },
+      { id: 'e3', nombre: 'Tomás Ferreyra', rol: 'recepcion', telefono: '3757 55-0103' },
+    ],
+    // Un día de una cancha, el torneo que cierra el complejo entero y uno que ya pasó (así la lista tiene historial).
+    bloqueos: [
+      { id: 'bl1', unidadId: 'u1', desde: sumarDias(HOY, 3), hasta: sumarDias(HOY, 4), motivo: 'Cambio del césped', origen: 'dueno' },
+      ...['u1', 'u2', 'u3', 'u4'].map((u, i) => ({ id: `bl2${i}`, unidadId: u, desde: sumarDias(HOY, 7), hasta: sumarDias(HOY, 8), motivo: 'Torneo interno', origen: 'dueno' as const })),
+      { id: 'bl3', unidadId: 'u3', desde: sumarDias(HOY, -10), hasta: sumarDias(HOY, -9), motivo: 'Cancha inundada', origen: 'dueno' },
+    ],
     pasoMin: 60, duracionMin: 60, maxFranjas: 3,
     unidades: [
       { id: 'u1', nombre: 'Cancha 1', detalle: 'Fútbol 5 · césped sintético', tarifaHora: 45000, foto: FOTOS_CANCHA[0] },
@@ -284,6 +366,16 @@ export const NEGOCIOS_DEMO: Record<TipoAlquiler, NegocioAlquiler> = {
     direccion: 'Av. Victoria Aguirre 820', fotoPortada: FOTOS_SALON[0],
     apertura: { dias: [2, 3, 4, 5, 6], desde: 14 * 60, hasta: 24 * 60 },
     senaPct: 30, cancelaHastaHoras: 72,
+    mensajes: mensajesDeFabrica('bloque'),
+    pagos: { senaSobre: 'total', formas: ['transferencia', 'mercadopago'], alias: 'burbujas.salon', titular: 'Lucía Benítez', mpConectado: false, cancelaATiempo: 'devolver', cancelaTarde: 'credito' },
+    equipo: [
+      { id: 'e1', nombre: 'Lucía Benítez', rol: 'dueno', genero: 'f', telefono: '3757 55-0101', email: 'lucia@salonburbujas.com.ar' },
+      { id: 'e2', nombre: 'Marcos Ledesma', rol: 'encargado', telefono: '3757 55-0102' },
+    ],
+    bloqueos: [
+      { id: 'bl1', unidadId: 'salon', desde: '2026-11-20', hasta: '2026-11-21', motivo: 'Feriado', origen: 'dueno' },
+      { id: 'bl2', unidadId: 'salon', desde: '2026-11-25', hasta: '2026-11-27', motivo: 'Pintura del salón', origen: 'dueno' },
+    ],
     pasoMin: 60, duracionMin: 240, maxFranjas: 1, unidades: [], extras: [], reglasPrecio: [],
     salon: {
       capacidad: 100, duracionBloque: 4 * 60, limpieza: 90, deposito: 50000, fotos: FOTOS_SALON,
@@ -310,6 +402,13 @@ export const NEGOCIOS_DEMO: Record<TipoAlquiler, NegocioAlquiler> = {
     direccion: 'Ruta 12 km 5', fotoPortada: FOTOS_CASA[0],
     apertura: { dias: [0, 1, 2, 3, 4, 5, 6], desde: 0, hasta: 24 * 60 },
     senaPct: 30, cancelaHastaHoras: 7 * 24,
+    mensajes: mensajesDeFabrica('estadia'),
+    pagos: { senaSobre: 'base', formas: ['transferencia', 'mercadopago'], alias: 'cabanas.bosque', titular: 'Carolina Ríos', mpConectado: true, cancelaATiempo: 'devolver', cancelaTarde: 'mitad' },
+    equipo: [
+      { id: 'e1', nombre: 'Carolina Ríos', rol: 'dueno', genero: 'f', telefono: '3757 55-0101', email: 'carolina@cabanasdelbosque.com.ar' },
+      { id: 'e2', nombre: 'Esteban Vera', rol: 'encargado', telefono: '3757 55-0102' },
+      { id: 'e3', nombre: 'Mariela Soto', rol: 'recepcion', genero: 'f', telefono: '3757 55-0104' },
+    ],
     pasoMin: 60, duracionMin: 60, maxFranjas: 1, unidades: [], extras: [], reglasPrecio: [], salon: null,
     propiedades: [
       {
@@ -386,6 +485,8 @@ function reservasCancha(n: NegocioAlquiler): Reserva[] {
     const dia = diaSemana(fecha)
     if (!n.apertura.dias.includes(dia)) continue
     n.unidades.forEach((u, ui) => {
+      // Un día bloqueado (torneo, mantenimiento) no tiene reservas de ejemplo: lo cerró el dueño.
+      if (bloqueoEn(n, u.id, fecha)) return
       // Entre dos y cuatro reservas por cancha y por día, más a la tarde y a la noche.
       const cuantas = 2 + ((rota(d + ui) + ui) % 3)
       for (let j = 0; j < cuantas; j++) {
@@ -395,8 +496,9 @@ function reservasCancha(n: NegocioAlquiler): Reserva[] {
         // Una cancha no se reserva dos veces a la misma hora: si pisa otra del día, no va.
         if (out.some(r => r.unidadId === u.id && r.fecha === fecha && seSolapan([r.inicio!, r.fin!], [inicio, fin]))) continue
         const extras = rota(k + 3) > 7 ? ['luz'] : []
-        const total = precioTurnosSeguidos(u.tarifaHora, n.duracionMin, (fin - inicio) / n.duracionMin, dia, inicio, n.reglasPrecio).final + n.extras.filter(e => extras.includes(e.id)).reduce((s, e) => s + e.precio, 0)
-        const sena = senaDe(total, n.senaPct)
+        const base = precioTurnosSeguidos(u.tarifaHora, n.duracionMin, (fin - inicio) / n.duracionMin, dia, inicio, n.reglasPrecio).final
+        const total = base + n.extras.filter(e => extras.includes(e.id)).reduce((s, e) => s + e.precio, 0)
+        const sena = senaPara(n, base, total)
         const pasada = d < 0 || (d === 0 && fin <= AHORA)
         const estado: EstadoReserva = pasada ? (rota(k) === 0 ? 'cancelada' : 'completada') : rota(k + 1) === 2 ? 'pendiente' : 'confirmada'
         out.push({
@@ -420,14 +522,14 @@ function reservasBloque(n: NegocioAlquiler): Reserva[] {
   for (let d = -35; d <= 28; d++) {
     const fecha = sumarDias(HOY, d)
     const dia = diaSemana(fecha)
-    if (!n.apertura.dias.includes(dia)) continue
+    if (!n.apertura.dias.includes(dia) || bloqueoEn(n, 'salon', fecha)) continue
     // Los fines de semana se llenan todos los bloques (el último, casi siempre); entre semana, el primero cada tanto.
     const delDia = dia >= 5 ? todos.filter((_, i) => i < todos.length - 1 || rota(d + 3) !== 0) : rota(d) > 5 ? todos.slice(0, 1) : []
     for (const { id: bloqueId, inicio } of delDia) {
       const paquete = s.paquetes[rota(d + k) % s.paquetes.length]
       const extras = s.extras.filter((_, i) => rota(d + i + k) > 6).map(e => e.id)
       const total = paquete.precio + s.extras.filter(e => extras.includes(e.id)).reduce((a, e) => a + e.precio, 0)
-      const sena = senaDe(total, n.senaPct)
+      const sena = senaPara(n, paquete.precio, total)
       const pasada = d < 0
       const estado: EstadoReserva = pasada ? 'completada' : rota(k + 4) === 2 ? 'pendiente' : 'confirmada'
       out.push({
@@ -454,8 +556,9 @@ function reservasEstadia(n: NegocioAlquiler): Reserva[] {
       const salida = sumarDias(entrada, noches)
       const choca = n.bloqueos.some(b => b.unidadId === p.id && entrada < b.hasta && b.desde < salida)
       if (!choca) {
-        const total = precioEstadia(entrada, salida, p.tarifa).total
-        const sena = senaDe(total, n.senaPct)
+        const precio = precioEstadia(entrada, salida, p.tarifa)
+        const total = precio.total
+        const sena = senaPara(n, precio.subtotal, total)
         const pasada = d + noches <= 0
         const estado: EstadoReserva = pasada ? (rota(k) === 0 ? 'cancelada' : 'completada') : rota(k + 2) === 1 ? 'pendiente' : 'confirmada'
         out.push({
@@ -478,6 +581,13 @@ export function reservasDe(n: NegocioAlquiler): Reserva[] {
 
 /** "1 noche", "3 noches": el número con la palabra que corresponde (el Depto Centro admite una sola noche). */
 export const cuenta = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`
+
+/**
+ * La seña de una reserva: el porcentaje del negocio sobre el total, o solo
+ * sobre lo principal (la cancha, el paquete o las noches: sin extras ni
+ * limpieza), según lo que diga Pagos y señas.
+ */
+export const senaPara = (n: NegocioAlquiler, base: number, total: number) => senaDe(n.pagos.senaSobre === 'base' ? base : total, n.senaPct)
 export const nochesTxt = (n: number) => cuenta(n, 'noche', 'noches')
 
 const activa = (r: Reserva) => r.estado !== 'cancelada'

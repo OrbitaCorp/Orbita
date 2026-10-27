@@ -5,6 +5,7 @@
 //
 // En celular la tabla pasa a tarjetas (rv-tabla) y los filtros quedan
 // guardados detrás de un botón (Filtros del kit), con el buscador siempre a mano.
+// La ficha abierta viaja en ?reserva=: la campanita y el buscador la abren desde cualquier parte.
 import { useState } from 'react'
 import { ArrowRight, Search } from 'lucide-react'
 import { fechaCorta, hhmm } from '@/lib/reservas/fechas'
@@ -17,6 +18,9 @@ interface P {
   negocio: NegocioAlquiler
   reservas: Reserva[]
   clientes: Cliente[]
+  /** El evento abierto en la ficha y cómo abrir otro o cerrar (null). */
+  abierta: string | null
+  onAbrir: (id: string | null) => void
   onCambiar: (id: string, cambio: Partial<Reserva>, aviso?: string) => void
 }
 
@@ -41,10 +45,9 @@ const CSS = `
 
 const plano = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 
-export default function Eventos({ negocio, reservas, clientes, onCambiar }: P) {
+export default function Eventos({ negocio, reservas, clientes, abierta, onAbrir, onCambiar }: P) {
   const [filtro, setFiltro] = useState<Filtro>('proximos')
   const [q, setQ] = useState('')
-  const [abierta, setAbierta] = useState<string | null>(null)
   const s = negocio.salon
   const bloques = bloquesDe(negocio)
   const eventos = reservas.filter(r => r.bloqueId && r.fecha)
@@ -95,7 +98,7 @@ export default function Eventos({ negocio, reservas, clientes, onCambiar }: P) {
                     <td data-label="Paquete y extras">{paquete ? paquete.nombre : '—'}{r.extras.length ? ` · ${r.extras.length} ${r.extras.length === 1 ? 'extra' : 'extras'}` : ''}</td>
                     <td data-label="Saldo" className="rv-num">{r.estado === 'cancelada' ? '—' : saldo > 0 && !r.saldoPagado ? pesos(saldo) : 'Pagado'}</td>
                     <td data-label="Estado"><Chip tono={ESTADO_RESERVA[r.estado].tono}>{ESTADO_RESERVA[r.estado].label}</Chip></td>
-                    <td><button type="button" className="rv-btn rv-btn--sm" onClick={() => setAbierta(r.id)} aria-label={`Ver la ficha de ${r.evento?.agasajado ?? 'este evento'}`}>Ficha <ArrowRight size={14} aria-hidden /></button></td>
+                    <td><button type="button" className="rv-btn rv-btn--sm" onClick={() => onAbrir(r.id)} aria-label={`Ver la ficha de ${r.evento?.agasajado ?? 'este evento'}`}>Ficha <ArrowRight size={14} aria-hidden /></button></td>
                   </tr>
                 )
               })}
@@ -103,7 +106,7 @@ export default function Eventos({ negocio, reservas, clientes, onCambiar }: P) {
           </table>
         </div>
       )}
-      {reserva && <Detalle negocio={negocio} reserva={reserva} cliente={clientePorId(reserva.clienteId, clientes)} onCerrar={() => setAbierta(null)} onCambiar={onCambiar} />}
+      {reserva && <Detalle negocio={negocio} reserva={reserva} cliente={clientePorId(reserva.clienteId, clientes)} onCerrar={() => onAbrir(null)} onCambiar={onCambiar} />}
     </div>
   )
 }

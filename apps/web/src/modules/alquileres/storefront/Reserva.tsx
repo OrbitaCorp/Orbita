@@ -15,10 +15,10 @@ import { useRouter } from 'next/router'
 import { ArrowRight, CalendarPlus, Check, ChevronLeft, Lock, MessageCircle, Users } from 'lucide-react'
 import { duracionTxt, esISO, fechaLarga, hhmm, rangoTxt, sumarDias, diaSemana, fechaCorta, type ISO } from '@/lib/reservas/fechas'
 import { consecutivasDesde, franjasDelDia } from '@/lib/reservas/disponibilidad'
-import { pesos, precioBloque, precioPorHora, precioTurnosSeguidos, senaDe } from '@/lib/reservas/precio'
+import { pesos, precioBloque, precioPorHora, precioTurnosSeguidos } from '@/lib/reservas/precio'
 import { agruparNoches, motivoNoReservable, nochesEntre, precioEstadia, salidaMaxima, nochesOcupadas } from '@/lib/reservas/estadia'
 import { descargarICS, generarICS } from '@/lib/reservas/ics'
-import { AHORA, HOY, aperturaDe, bloqueoEn, bloquesDe, bloquesLibresEn, cuenta, nochesTxt, ocupadoDelDia, rangosOcupados, type Cliente, type NegocioAlquiler, type Reserva as ReservaT } from '../datos'
+import { AHORA, HOY, aperturaDe, bloqueoEn, bloquesDe, bloquesLibresEn, cuenta, nochesTxt, ocupadoDelDia, rangosOcupados, senaPara, type Cliente, type NegocioAlquiler, type Reserva as ReservaT } from '../datos'
 import { CalendarioDia, CalendarioRango, type Rango } from '@/design-system/reservas/Calendario'
 import { Campo, Area, Selector } from '@/design-system/reservas/piezas'
 import Sitio, { lineaNoches, ruta } from './Sitio'
@@ -87,25 +87,26 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
   const pasaCapacidad = !!salon && invitados > salon.capacidad
 
   // ── Precio ──
-  function calcularPrecio(): { total: number; detalle: [string, number][] } | null {
+  // `base` es lo principal (la cancha, el paquete o las noches, sin extras ni limpieza): el negocio elige si la seña se calcula sobre eso o sobre el total.
+  function calcularPrecio(): { total: number; base: number; detalle: [string, number][] } | null {
     const elegidos = listaExtras.filter(e => extras.includes(e.id)).map(e => [e.nombre, e.precio] as [string, number])
     if (tipo === 'cancha' && unidad && fecha && hora !== null) {
       // Cada turno con el ajuste de su franja: si cambia en el medio (15 a 17 con el descuento hasta las 16), va una línea por tramo.
       const p = precioTurnosSeguidos(unidad.tarifaHora, negocio.duracionMin, seguidas, diaSemana(fecha), hora, negocio.reglasPrecio)
       const lineas = p.tramos.map(t => [`${unidad.nombre} · ${p.tramos.length > 1 ? `${hhmm(t.inicio)} a ${hhmm(t.fin)}` : duracionTxt(t.fin - t.inicio)}${t.ajuste ? ` (${t.ajuste > 0 ? '+' : ''}${t.ajuste}%)` : ''}`, t.final] as [string, number])
-      return { total: precioBloque(p.final, listaExtras, extras).total, detalle: [...lineas, ...elegidos] }
+      return { total: precioBloque(p.final, listaExtras, extras).total, base: p.final, detalle: [...lineas, ...elegidos] }
     }
-    if (tipo === 'bloque' && paquete) return { total: precioBloque(paquete.precio, listaExtras, extras).total, detalle: [[paquete.nombre, paquete.precio], ...elegidos] }
+    if (tipo === 'bloque' && paquete) return { total: precioBloque(paquete.precio, listaExtras, extras).total, base: paquete.precio, detalle: [[paquete.nombre, paquete.precio], ...elegidos] }
     if (tipo === 'estadia' && propiedad && rangoCompleto && !motivoRango) {
       const p = precioEstadia(rango.entrada!, rango.salida!, propiedad.tarifa)
       // Una línea por precio: con temporada o fin de semana, un subtotal solo no explicaba el total.
-      return { total: p.total, detalle: [...agruparNoches(p.noches).map(lineaNoches), ['Limpieza', p.limpieza]] }
+      return { total: p.total, base: p.subtotal, detalle: [...agruparNoches(p.noches).map(lineaNoches), ['Limpieza', p.limpieza]] }
     }
     return null
   }
   const precio = calcularPrecio()
   const total = precio?.total ?? 0
-  const sena = senaDe(total, negocio.senaPct)
+  const sena = senaPara(negocio, precio?.base ?? 0, total)
 
   // ── Pasos ──
   // La Seña figura desde el principio si el negocio la cobra: antes aparecía recién al tener un total y la barra de pasos crecía en el medio.

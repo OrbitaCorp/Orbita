@@ -4,21 +4,29 @@
 //   estadía:  la ocupación de cada propiedad en el mes, con llegadas y salidas
 // Desde cualquiera se abre el detalle (registrar seña, saldo o depósito,
 // cancelar, marcar realizada) y se agenda a mano. Los bloqueos (del dueño o
-// de un calendario externo) cierran la cancha, el salón o la propiedad ese día.
+// de un calendario externo) cierran la cancha, el salón o la propiedad ese
+// día; los modales para bloquear están en Bloquear.tsx (los usa también la
+// sección Días bloqueados). La reserva abierta en el detalle viaja en
+// ?reserva=: así la campanita, el buscador e Ingresos la abren desde
+// cualquier parte del panel.
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { ArrowRight, Ban, Check, ChevronLeft, ChevronRight, Lock, Plus, Wallet } from 'lucide-react'
 import { MESES, diasDelMes, duracionTxt, fechaCorta, fechaLarga, fechaRelativa, hhmm, mesTxt, moverMes, partes, rangoTxt, sumarDias, diaSemana, diasEntre, type ISO } from '@/lib/reservas/fechas'
 import { consecutivasDesde, franjasDelDia } from '@/lib/reservas/disponibilidad'
-import { pesos, precioBloque, precioTurnosSeguidos, senaDe } from '@/lib/reservas/precio'
+import { pesos, precioBloque, precioTurnosSeguidos } from '@/lib/reservas/precio'
 import { motivoNoReservable, nochesEntre, nochesOcupadas, precioEstadia, salidaMaxima } from '@/lib/reservas/estadia'
-import { AHORA, ESTADO_RESERVA, HOY, TIPOS, aperturaDe, bloqueoEn, bloquesDe, bloquesLibresEn, clientePorId, cuenta, fechaDeReserva, nochesTxt, ocupadoDelDia, rangosOcupados, reservasDelDia, tituloEvento, unidadPorId, type Bloqueo, type Cliente, type NegocioAlquiler, type Reserva } from '../datos'
+import { AHORA, ESTADO_RESERVA, HOY, TIPOS, aperturaDe, bloqueoEn, bloquesDe, bloquesLibresEn, clientePorId, cuenta, fechaDeReserva, nochesTxt, ocupadoDelDia, rangosOcupados, reservasDelDia, senaPara, tituloEvento, unidadPorId, type Bloqueo, type Cliente, type NegocioAlquiler, type Reserva } from '../datos'
 import { CalendarioDia, CalendarioRango, type Rango } from '@/design-system/reservas/Calendario'
 import { Area, Campo, Chip, Encabezado, Modal, Nota, Selector, Sigla, Vacio } from '@/design-system/reservas/piezas'
+import { BloquearDia, BloquearFechas } from './Bloquear'
 
 interface P {
   negocio: NegocioAlquiler
   reservas: Reserva[]
   clientes: Cliente[]
+  /** La reserva abierta en el detalle (viaja en ?reserva=) y cómo abrir otra o cerrar (null). */
+  reservaAbierta: string | null
+  onAbrirReserva: (id: string | null) => void
   onCambiar: (id: string, cambio: Partial<Reserva>, aviso?: string) => void
   onReservar: (r: Reserva, c: Cliente) => void
   onBloqueo: (b: Bloqueo) => void
@@ -35,7 +43,8 @@ const CSS = `
   .alg-dia { flex: 0 0 auto; min-width: 64px; min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border-radius: 10px; border: 1px solid var(--color-border); background: var(--color-bg); font: inherit; color: var(--color-body); cursor: pointer; }
   .alg-dia b { font-family: var(--rv-mono); font-size: 16px; color: var(--color-text); }
   .alg-dia small { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
-  .alg-dia[aria-pressed='true'] { background: var(--color-primary); border-color: transparent; color: var(--color-on-primary); }
+  /* El día elegido va tintado, no lleno: "HOY" a 11 px y el número a 16 px en blanco sobre el acento no llegaban a AA. */
+  .alg-dia[aria-pressed='true'] { background: var(--color-primary-bg); border-color: var(--color-primary); color: var(--chip-primary-fg); }
   .alg-dia[aria-pressed='true'] b { color: inherit; }
   .alg-dia:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .alg-grilla { display: grid; grid-template-columns: 56px repeat(var(--n), minmax(120px, 1fr)); border: 1px solid var(--color-border); border-radius: var(--rv-r); overflow: auto; background: var(--color-bg); }
@@ -89,10 +98,9 @@ const CSS = `
 `
 
 export default function Reservas(p: P) {
-  const [abierta, setAbierta] = useState<string | null>(null)
   const [nueva, setNueva] = useState<Partial<Reserva> | null>(null)
   const [bloquear, setBloquear] = useState(false)
-  const reserva = abierta ? p.reservas.find(r => r.id === abierta) ?? null : null
+  const reserva = p.reservaAbierta ? p.reservas.find(r => r.id === p.reservaAbierta) ?? null : null
   const tipo = p.negocio.tipo
   const titulo = tipo === 'cancha' ? 'Reservas' : 'Calendario'
   const pendientes = p.reservas.filter(r => r.estado === 'pendiente' && fechaDeReserva(r) >= HOY)
@@ -105,13 +113,13 @@ export default function Reservas(p: P) {
           <button type="button" className="rv-btn" onClick={() => setBloquear(true)}><Ban size={15} aria-hidden /> {tipo === 'estadia' ? 'Bloquear fechas' : 'Bloquear un día'}</button>
           <button type="button" className="rv-btn rv-btn--primario" onClick={() => setNueva({})}><Plus size={16} aria-hidden /> {tipo === 'bloque' ? 'Nuevo evento' : 'Nueva reserva'}</button>
         </>} />
-      {tipo === 'cancha' && <AgendaCanchas {...p} onAbrir={setAbierta} onNueva={setNueva} />}
-      {tipo === 'bloque' && <AgendaSalon {...p} onAbrir={setAbierta} onNueva={setNueva} />}
-      {tipo === 'estadia' && <Ocupacion {...p} onAbrir={setAbierta} onNueva={setNueva} />}
-      {reserva && <Detalle negocio={p.negocio} reserva={reserva} cliente={clientePorId(reserva.clienteId, p.clientes)} onCerrar={() => setAbierta(null)} onCambiar={p.onCambiar} />}
+      {tipo === 'cancha' && <AgendaCanchas {...p} onAbrir={p.onAbrirReserva} onNueva={setNueva} />}
+      {tipo === 'bloque' && <AgendaSalon {...p} onAbrir={p.onAbrirReserva} onNueva={setNueva} />}
+      {tipo === 'estadia' && <Ocupacion {...p} onAbrir={p.onAbrirReserva} onNueva={setNueva} />}
+      {reserva && <Detalle negocio={p.negocio} reserva={reserva} cliente={clientePorId(reserva.clienteId, p.clientes)} onCerrar={() => p.onAbrirReserva(null)} onCambiar={p.onCambiar} />}
       {nueva && <Nueva negocio={p.negocio} reservas={p.reservas} clientes={p.clientes} pre={nueva} onCerrar={() => setNueva(null)} onReservar={(r, c) => { p.onReservar(r, c); setNueva(null) }} />}
       {bloquear && (tipo === 'estadia'
-        ? <Bloquear negocio={p.negocio} reservas={p.reservas} onCerrar={() => setBloquear(false)} onBloqueo={b => { p.onBloqueo(b); setBloquear(false) }} />
+        ? <BloquearFechas negocio={p.negocio} reservas={p.reservas} onCerrar={() => setBloquear(false)} onBloqueo={b => { p.onBloqueo(b); setBloquear(false) }} />
         : <BloquearDia negocio={p.negocio} reservas={p.reservas} onCerrar={() => setBloquear(false)} onBloqueos={bs => { bs.forEach(b => p.onBloqueo(b)); setBloquear(false) }} />)}
     </div>
   )
@@ -519,11 +527,15 @@ function Nueva({ negocio, reservas, clientes, pre, onCerrar, onReservar }: { neg
   const ocupadas = prop ? rangosOcupados(negocio, reservas, prop.id) : []
   const tomadas = nochesOcupadas(ocupadas)
 
-  // Como en el sitio: cada turno con el ajuste de su franja.
-  const total = tipo === 'cancha' && unidad && hora !== '' ? precioBloque(precioTurnosSeguidos(unidad.tarifaHora, negocio.duracionMin, seguidas, diaSemana(fecha), hora, negocio.reglasPrecio).final, negocio.extras, extrasElegidos).total
+  // Como en el sitio: cada turno con el ajuste de su franja. La base (la cancha, el paquete o las
+  // noches, sin extras ni limpieza) es sobre lo que puede calcularse la seña, según Pagos y señas.
+  const precioCancha = tipo === 'cancha' && unidad && hora !== '' ? precioTurnosSeguidos(unidad.tarifaHora, negocio.duracionMin, seguidas, diaSemana(fecha), hora, negocio.reglasPrecio).final : 0
+  const precioNoches = tipo === 'estadia' && prop && rango.entrada && rango.salida ? precioEstadia(rango.entrada, rango.salida, prop.tarifa) : null
+  const base = tipo === 'cancha' ? precioCancha : tipo === 'bloque' ? paquete?.precio ?? 0 : precioNoches?.subtotal ?? 0
+  const total = tipo === 'cancha' ? (precioCancha ? precioBloque(precioCancha, negocio.extras, extrasElegidos).total : 0)
     : tipo === 'bloque' && s ? precioBloque(paquete?.precio ?? 0, s.extras, extrasElegidos).total
-      : tipo === 'estadia' && prop && rango.entrada && rango.salida ? precioEstadia(rango.entrada, rango.salida, prop.tarifa).total : 0
-  const sena = senaDe(total, negocio.senaPct)
+      : precioNoches?.total ?? 0
+  const sena = senaPara(negocio, base, total)
   const listaExtras = tipo === 'cancha' ? negocio.extras : tipo === 'bloque' ? s?.extras ?? [] : []
 
   const guardar = () => {
@@ -631,73 +643,6 @@ function Nueva({ negocio, reservas, clientes, pre, onCerrar, onReservar }: { neg
         )}
         <Area label={tipo === 'bloque' ? 'Notas del evento (opcional)' : 'Nota (opcional)'} value={notas} onChange={setNotas} maxLength={300} placeholder={tipo === 'bloque' ? 'Temática, alergias, horario de la torta…' : ''} />
         {error && <p className="rv-error" role="alert" style={{ margin: 0 }}>{error}</p>}
-      </div>
-    </Modal>
-  )
-}
-
-// ─── Bloquear un día (canchas y salón) ───────────────────────────────────────
-// Un feriado, un torneo, mantenimiento o un evento propio: desde ahí ese día
-// no se reserva. En canchas, una o todas. Lo que ya estaba reservado sigue en
-// pie (se avisa, y se cancela desde la agenda si no se va a poder usar).
-
-function BloquearDia({ negocio, reservas, onCerrar, onBloqueos }: { negocio: NegocioAlquiler; reservas: Reserva[]; onCerrar: () => void; onBloqueos: (b: Bloqueo[]) => void }) {
-  const canchas = negocio.tipo === 'cancha'
-  const [unidad, setUnidad] = useState(canchas ? 'todas' : 'salon')
-  const [dia, setDia] = useState<ISO | null>(null)
-  const [mes, setMes] = useState<ISO>(HOY)
-  const [motivo, setMotivo] = useState(canchas ? 'Mantenimiento' : 'Cerrado')
-  const ids = unidad === 'todas' ? negocio.unidades.map(u => u.id) : [unidad]
-  const yaBloqueado = (f: ISO) => ids.every(id => bloqueoEn(negocio, id, f))
-  const enPie = dia ? reservas.filter(r => r.estado !== 'cancelada' && r.fecha === dia && ids.includes(r.unidadId)).length : 0
-  const que = canchas ? (unidad === 'todas' ? 'todas las canchas' : negocio.unidades.find(u => u.id === unidad)?.nombre ?? '') : 'el salón'
-  const bloquear = () => {
-    if (!dia) return
-    const base = idNuevo('bl')
-    onBloqueos(ids.filter(id => !bloqueoEn(negocio, id, dia)).map((id, i) => ({ id: `${base}${i}`, unidadId: id, desde: dia, hasta: sumarDias(dia, 1), motivo: motivo.trim() || 'Bloqueado', origen: 'dueno' as const })))
-  }
-  return (
-    <Modal titulo="Bloquear un día" bajada={canchas ? 'Para mantenimiento, un torneo o un feriado: ese día no se puede reservar.' : 'Para un feriado o un evento propio: ese día nadie puede reservar el salón.'} onCerrar={onCerrar}
-      pie={<>
-        <button type="button" className="rv-btn" onClick={onCerrar}>Cancelar</button>
-        <button type="button" className="rv-btn rv-btn--primario" disabled={!dia} onClick={bloquear}><Ban size={15} aria-hidden /> Bloquear</button>
-      </>}>
-      <div className="rv-pila">
-        {canchas && <Selector label="Qué se bloquea" valor={unidad} onChange={v => { setUnidad(v); setDia(null) }} opciones={[{ id: 'todas', label: 'Todas las canchas' }, ...negocio.unidades.map(u => ({ id: u.id, label: u.nombre }))]} />}
-        <Campo label="Motivo" value={motivo} onChange={setMotivo} />
-        <CalendarioDia mes={mes} onMes={setMes} hoy={HOY} elegido={dia} onElegir={setDia} minMes={HOY}
-          estadoDe={f => {
-            const cerrado = f < HOY || !negocio.apertura.dias.includes(diaSemana(f))
-            const ya = !cerrado && yaBloqueado(f)
-            return { deshabilitado: cerrado || ya, ocupado: ya, aria: ya ? 'ya está bloqueado' : cerrado ? 'cerrado' : undefined }
-          }} />
-        {enPie > 0 && <Nota tono="aviso">Ese día ya hay {cuenta(enPie, 'reserva', 'reservas')}: {enPie === 1 ? 'sigue en pie. Si no se va a poder usar, cancelala' : 'siguen en pie. Si no se va a poder usar, cancelalas'} desde la agenda.</Nota>}
-        <p className="rv-ayuda" style={{ margin: 0 }}>{dia ? `Se bloquea ${que} el ${fechaLarga(dia).toLowerCase()}: desde ahora no se puede reservar.` : 'Elegí el día. Los tachados ya están bloqueados.'}</p>
-      </div>
-    </Modal>
-  )
-}
-
-// ─── Bloquear fechas (estadía) ───────────────────────────────────────────────
-
-function Bloquear({ negocio, reservas, onCerrar, onBloqueo }: { negocio: NegocioAlquiler; reservas: Reserva[]; onCerrar: () => void; onBloqueo: (b: Bloqueo) => void }) {
-  const [propId, setPropId] = useState(negocio.propiedades[0]?.id ?? '')
-  const [rango, setRango] = useState<Rango>({ entrada: null, salida: null })
-  const [mes, setMes] = useState<ISO>(HOY)
-  const [motivo, setMotivo] = useState('Mantenimiento')
-  const ocupadas = rangosOcupados(negocio, reservas, propId)
-  const tomadas = nochesOcupadas(ocupadas)
-  return (
-    <Modal titulo="Bloquear fechas" bajada="Para mantenimiento, uso propio o cuando se alquiló por otro lado." onCerrar={onCerrar}
-      pie={<>
-        <button type="button" className="rv-btn" onClick={onCerrar}>Cancelar</button>
-        <button type="button" className="rv-btn rv-btn--primario" disabled={!rango.entrada || !rango.salida} onClick={() => rango.entrada && rango.salida && onBloqueo({ id: idNuevo('bl'), unidadId: propId, desde: rango.entrada, hasta: rango.salida, motivo: motivo.trim() || 'Bloqueado', origen: 'dueno' })}><Ban size={15} aria-hidden /> Bloquear</button>
-      </>}>
-      <div className="rv-pila">
-        <Selector label="Propiedad" valor={propId} onChange={v => { setPropId(v); setRango({ entrada: null, salida: null }) }} opciones={negocio.propiedades.map(p => ({ id: p.id, label: p.nombre }))} />
-        <Campo label="Motivo" value={motivo} onChange={setMotivo} />
-        <CalendarioRango mes={mes} onMes={setMes} hoy={HOY} rango={rango} onRango={setRango} minMes={HOY} estadoDe={f => ({ deshabilitado: f < HOY, ocupado: tomadas.has(f) })} salidaMaxima={e => salidaMaxima(e, ocupadas)} />
-        {rango.entrada && rango.salida && <p className="rv-ayuda" style={{ margin: 0 }}>Se bloquean las noches del {rangoTxt(rango.entrada, rango.salida)}.</p>}
       </div>
     </Modal>
   )
