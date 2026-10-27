@@ -5,7 +5,8 @@
 // cosa (negocio, actividad, clase, plan, socio, inscripción) es la que tendría
 // la API: el día que exista, cambia el adaptador y no las pantallas.
 //
-//   index.ts    tipos, los ocho rubros con sus actividades, profes y planes, y el negocio de ejemplo de cada uno
+//   index.ts    tipos, los ocho rubros con sus actividades, equipo y planes, y el negocio de ejemplo de cada uno
+//               (con sus mensajes automáticos y sus formas de pago)
 //   negocio.ts  lo que cambió el dueño y lo que reservaron los socios, en el navegador
 //
 // Todos los rubros comparten el mismo motor: una grilla semanal de clases con
@@ -34,6 +35,8 @@ export interface RubroGym {
   profe: string
   socio: string
   socios: string
+  /** Quien administra el negocio de ejemplo: con su cuenta se mira el panel. */
+  dueno: { nombre: string; rol: 'Dueño' | 'Dueña' }
   actividades: ActividadTipo[]
   salas: string[]
   profes: string[]
@@ -69,30 +72,31 @@ const PLANES_CLASES: PlanTipo[] = [
 ]
 
 export const RUBROS_GYM: RubroGym[] = [
-  { key: 'gym', label: 'Gimnasio', descripcion: 'Musculación, clases y membresías', Icon: Dumbbell, profe: 'Profe', socio: 'Socio', socios: 'Socios', negocio: 'Gimnasio Vital', tagline: 'Entrená a tu ritmo, con tu plan.',
+  { key: 'gym', label: 'Gimnasio', descripcion: 'Musculación, clases y membresías', Icon: Dumbbell, profe: 'Profe', socio: 'Socio', socios: 'Socios', negocio: 'Gimnasio Vital', tagline: 'Entrená a tu ritmo, con tu plan.', dueno: { nombre: 'Marcela Ríos', rol: 'Dueña' },
     actividades: [{ nombre: 'Musculación', duracion: 60, cupo: 25 }, { nombre: 'Spinning', duracion: 45, cupo: 14 }, { nombre: 'Localizada', duracion: 60, cupo: 20 }, { nombre: 'Zumba', duracion: 60, cupo: 20 }],
     salas: ['Salón principal', 'Sala de spinning'], profes: ['Caro', 'Nico', 'Flor', 'Seba'], fotos: FOTOS_GYM,
     planes: [{ tipo: 'prueba', nombre: 'Pase de prueba', precio: 0 }, { tipo: 'suelta', nombre: 'Pase diario', precio: 6000 }, { tipo: 'pack', nombre: 'Pack de 10 pases', precio: 45000, clases: 10 }, { tipo: 'membresia', nombre: '3 veces por semana', precio: 42000, porSemana: 3 }, { tipo: 'membresia', nombre: 'Pase libre', precio: 55000, porSemana: 0 }] },
-  { key: 'crossfit', label: 'Crossfit', descripcion: 'WODs con cupo por horario', Icon: Flame, profe: 'Coach', socio: 'Atleta', socios: 'Atletas', negocio: 'Box Norte', tagline: 'Un WOD por día, un cupo por persona.',
+  // Quien viene al box es "alumno" (Ale, 26/10): "atleta" sonaba a competencia, no a clase.
+  { key: 'crossfit', label: 'Crossfit', descripcion: 'WODs con cupo por horario', Icon: Flame, profe: 'Coach', socio: 'Alumno/a', socios: 'Alumnos', negocio: 'Box Norte', tagline: 'Un WOD por día, un cupo por persona.', dueno: { nombre: 'Martín Acuña', rol: 'Dueño' },
     actividades: [{ nombre: 'WOD', duracion: 60, cupo: 12 }, { nombre: 'Open box', duracion: 90, cupo: 10 }, { nombre: 'Halterofilia', duracion: 60, cupo: 8 }, { nombre: 'Gymnastics', duracion: 60, cupo: 10 }],
     salas: ['Box'], profes: ['Nico', 'Seba', 'Caro'], fotos: FOTOS_BOX,
     planes: [{ tipo: 'prueba', nombre: 'WOD de prueba', precio: 0 }, { tipo: 'suelta', nombre: 'Clase suelta', precio: 10000 }, { tipo: 'pack', nombre: 'Pack de 8 WODs', precio: 64000, clases: 8 }, { tipo: 'membresia', nombre: '3 veces por semana', precio: 68000, porSemana: 3 }, { tipo: 'membresia', nombre: 'Ilimitado', precio: 85000, porSemana: 0 }] },
-  { key: 'funcional', label: 'Entrenamiento funcional', descripcion: 'Grupos reducidos', Icon: Activity, profe: 'Entrenador/a', socio: 'Alumno/a', socios: 'Alumnos', negocio: 'Funcional Costanera', tagline: 'Grupos chicos, seguimiento de verdad.',
+  { key: 'funcional', label: 'Entrenamiento funcional', descripcion: 'Grupos reducidos', Icon: Activity, profe: 'Entrenador/a', socio: 'Alumno/a', socios: 'Alumnos', negocio: 'Funcional Costanera', tagline: 'Grupos chicos, seguimiento de verdad.', dueno: { nombre: 'Lucas Ferreyra', rol: 'Dueño' },
     actividades: [{ nombre: 'Funcional', duracion: 60, cupo: 10 }, { nombre: 'HIIT', duracion: 45, cupo: 10 }, { nombre: 'Core y movilidad', duracion: 45, cupo: 12 }],
     salas: ['Sala 1', 'Parque'], profes: ['Flor', 'Seba', 'Nico'], fotos: FOTOS_FUNCIONAL, planes: PLANES_CLASES },
-  { key: 'yoga', label: 'Yoga y pilates', descripcion: 'Clases con cupo y reformers', Icon: Flower2, profe: 'Instructora', socio: 'Alumno/a', socios: 'Alumnos', negocio: 'Espacio Sattva', tagline: 'Respirá, movete, volvé.',
+  { key: 'yoga', label: 'Yoga y pilates', descripcion: 'Clases con cupo y reformers', Icon: Flower2, profe: 'Instructora', socio: 'Alumno/a', socios: 'Alumnos', negocio: 'Espacio Sattva', tagline: 'Respirá, movete, volvé.', dueno: { nombre: 'Carolina Vega', rol: 'Dueña' },
     actividades: [{ nombre: 'Hatha yoga', duracion: 60, cupo: 14 }, { nombre: 'Vinyasa', duracion: 60, cupo: 14 }, { nombre: 'Pilates reformer', duracion: 50, cupo: 6 }, { nombre: 'Yin yoga', duracion: 75, cupo: 12 }],
     salas: ['Sala principal', 'Sala reformer'], profes: ['Caro', 'Flor', 'Mica'], fotos: FOTOS_YOGA, planes: PLANES_CLASES.map(p => (p.tipo === 'suelta' ? { ...p, precio: 12000 } : p)) },
-  { key: 'danza', label: 'Danza y baile', descripcion: 'Estilos, niveles y cupos', Icon: Music, profe: 'Profe', socio: 'Alumno/a', socios: 'Alumnos', negocio: 'Estudio Compás', tagline: 'Un estilo para cada cuerpo.',
+  { key: 'danza', label: 'Danza y baile', descripcion: 'Estilos, niveles y cupos', Icon: Music, profe: 'Profe', socio: 'Alumno/a', socios: 'Alumnos', negocio: 'Estudio Compás', tagline: 'Un estilo para cada cuerpo.', dueno: { nombre: 'Julián Moreno', rol: 'Dueño' },
     actividades: [{ nombre: 'Salsa inicial', duracion: 60, cupo: 16 }, { nombre: 'Tango', duracion: 90, cupo: 14 }, { nombre: 'Ritmos urbanos', duracion: 60, cupo: 18 }, { nombre: 'Contemporáneo', duracion: 75, cupo: 12 }],
     salas: ['Salón A', 'Salón B'], profes: ['Mica', 'Nico', 'Flor'], fotos: FOTOS_DANZA, planes: PLANES_CLASES.map(p => (p.tipo === 'suelta' ? { ...p, precio: 10000 } : p)) },
-  { key: 'artes-marciales', label: 'Artes marciales', descripcion: 'Disciplinas, grupos y graduaciones', Icon: Swords, profe: 'Sensei', socio: 'Alumno/a', socios: 'Alumnos', negocio: 'Dojo Kaizen', tagline: 'Disciplina, respeto, constancia.',
+  { key: 'artes-marciales', label: 'Artes marciales', descripcion: 'Disciplinas, grupos y graduaciones', Icon: Swords, profe: 'Sensei', socio: 'Alumno/a', socios: 'Alumnos', negocio: 'Dojo Kaizen', tagline: 'Disciplina, respeto, constancia.', dueno: { nombre: 'Sergio Ibarra', rol: 'Dueño' },
     actividades: [{ nombre: 'Jiu-jitsu', duracion: 90, cupo: 16 }, { nombre: 'Kickboxing', duracion: 60, cupo: 16 }, { nombre: 'Karate infantil', duracion: 60, cupo: 20 }, { nombre: 'Muay thai', duracion: 60, cupo: 14 }],
     salas: ['Tatami', 'Ring'], profes: ['Seba', 'Nico', 'Caro'], fotos: FOTOS_MARCIALES, planes: PLANES_CLASES },
-  { key: 'natacion', label: 'Natación', descripcion: 'Andariveles, clases y pileta libre', Icon: Waves, profe: 'Profe', socio: 'Alumno/a', socios: 'Alumnos', negocio: 'Natatorio Delfín', tagline: 'Del primer chapuzón a la competencia.',
+  { key: 'natacion', label: 'Natación', descripcion: 'Andariveles, clases y pileta libre', Icon: Waves, profe: 'Profe', socio: 'Alumno/a', socios: 'Alumnos', negocio: 'Natatorio Delfín', tagline: 'Del primer chapuzón a la competencia.', dueno: { nombre: 'Andrea Luna', rol: 'Dueña' },
     actividades: [{ nombre: 'Natación adultos', duracion: 45, cupo: 10 }, { nombre: 'Matronatación', duracion: 45, cupo: 8 }, { nombre: 'Pileta libre', duracion: 60, cupo: 16 }, { nombre: 'Aquagym', duracion: 45, cupo: 14 }],
     salas: ['Pileta 25 m', 'Pileta chica'], profes: ['Flor', 'Caro', 'Seba'], fotos: FOTOS_NATACION, planes: PLANES_CLASES },
-  { key: 'talleres', label: 'Clases grupales y talleres', descripcion: 'Talleres con fecha y cupo', Icon: Presentation, profe: 'Tallerista', socio: 'Participante', socios: 'Participantes', negocio: 'Taller Raíz', tagline: 'Aprender con las manos, en grupo.',
+  { key: 'talleres', label: 'Clases grupales y talleres', descripcion: 'Talleres con fecha y cupo', Icon: Presentation, profe: 'Tallerista', socio: 'Participante', socios: 'Participantes', negocio: 'Taller Raíz', tagline: 'Aprender con las manos, en grupo.', dueno: { nombre: 'Mariana Soto', rol: 'Dueña' },
     actividades: [{ nombre: 'Cerámica', duracion: 120, cupo: 8 }, { nombre: 'Cocina', duracion: 150, cupo: 10 }, { nombre: 'Acuarela', duracion: 90, cupo: 10 }, { nombre: 'Huerta urbana', duracion: 90, cupo: 12 }],
     salas: ['Taller', 'Cocina'], profes: ['Mica', 'Caro', 'Flor'], fotos: ['/turnos/cla-hero.jpg', '/turnos/cla-torno.jpg', '/turnos/cla-manos.jpg', '/turnos/cla-vasija.jpg'],
     planes: [{ tipo: 'prueba', nombre: 'Clase abierta', precio: 0 }, { tipo: 'suelta', nombre: 'Clase suelta', precio: 25000 }, { tipo: 'pack', nombre: 'Curso de 4 encuentros', precio: 90000, clases: 4 }, { tipo: 'membresia', nombre: 'Un taller por semana', precio: 80000, porSemana: 1 }] },
@@ -104,7 +108,8 @@ export const rubroPorKey = (key: string) => RUBROS_GYM.find(r => r.key === key) 
 
 export interface Apertura { dias: number[]; desde: number; hasta: number }
 export interface Actividad { id: string; nombre: string; duracion: number; cupo: number; color: string }
-export interface Profe { id: string; nombre: string }
+/** Alguien del equipo que da clases. Su color lo distingue en la grilla; `actividades` son las que dicta (ids). */
+export interface Profe { id: string; nombre: string; color: string; actividades: string[]; email?: string }
 /** Una clase de la grilla semanal: se repite todas las semanas el mismo día y a la misma hora. */
 export interface ClaseSemanal { id: string; actividadId: string; dia: number; inicio: number; profeId: string; sala: string; cupo: number }
 
@@ -151,6 +156,10 @@ export interface NegocioGym {
   /** Días en que no hay clases (feriado, cierre, o lo que trajo un calendario externo). */
   bloqueos: BloqueoGym[]
   calendariosExternos: CalendarioExterno[]
+  /** Quien administra el negocio: su cuenta en el panel. */
+  dueno: { nombre: string; rol: string }
+  mensajes: MensajesGym
+  pagos: PagosGym
 }
 
 export interface BloqueoGym {
@@ -165,6 +174,85 @@ export interface CalendarioExterno { id: string; nombre: string; url: string; ul
 
 /** Un día sin clases: cae dentro de un bloqueo. */
 export const diaBloqueado = (n: NegocioGym, fecha: ISO) => n.bloqueos.find(b => b.desde <= fecha && fecha < b.hasta) ?? null
+
+// ─── El equipo ───────────────────────────────────────────────────────────────
+
+/**
+ * Los colores del equipo (y de las siglas de los socios): tonos 700 de la paleta,
+ * que con texto blanco encima llegan a AA (4,5:1). Los de las actividades son
+ * más claros y van solo de borde. El orden no coincide con el de las
+ * actividades, así el primer profe y la primera actividad no comparten color.
+ */
+export const COLORES_EQUIPO = ['#1D4ED8', '#BE185D', '#047857', '#B45309', '#6D28D9', '#0E7490']
+
+/** Un color fijo por nombre: la sigla de cada persona se ve siempre igual en todas las pantallas. */
+export const colorDe = (nombre: string) => COLORES_EQUIPO[[...nombre].reduce((s, ch) => s + ch.charCodeAt(0), 0) % COLORES_EQUIPO.length]
+
+/** Las clases de la grilla que quedaron sin profe (se dio de baja a quien las daba). */
+export const clasesSinProfe = (n: NegocioGym) => n.clases.filter(c => !n.profes.some(p => p.id === c.profeId))
+
+// ─── Recordatorios y mensajes ────────────────────────────────────────────────
+// Lo que les llega a los socios por WhatsApp, en cuatro momentos. Cada plantilla
+// se prende o se apaga y se edita con variables entre llaves; el envío es
+// simulado (no hay backend), pero el texto y la vista previa son los del
+// producto.
+
+export type Momento = 'confirmada' | 'recordatorio' | 'lugar' | 'vence'
+export interface Plantilla {
+  on: boolean
+  texto: string
+  /** Recordatorio: horas antes de la clase. Vence: días antes del vencimiento. Los demás no lo usan. */
+  cuando: number
+}
+export interface MensajesGym {
+  /** El número de WhatsApp desde el que salen. */
+  numero: string
+  /** Cada mensaje termina con "— Nombre del negocio". */
+  firma: boolean
+  plantillas: Record<Momento, Plantilla>
+}
+export const MOMENTOS: Momento[] = ['confirmada', 'recordatorio', 'lugar', 'vence']
+export const VARIABLES_MENSAJE = ['nombre', 'clase', 'fecha', 'hora', 'profe', 'sala', 'negocio', 'plan', 'vence', 'link'] as const
+
+export function mensajesDe(telefono: string): MensajesGym {
+  return {
+    numero: telefono, firma: true,
+    plantillas: {
+      confirmada: { on: true, cuando: 0, texto: '¡Hola {nombre}! Tu lugar en {clase} quedó reservado para el {fecha} a las {hora}, con {profe} en {sala}. Si no podés venir, cancelá a tiempo desde {link} y no perdés la clase.' },
+      recordatorio: { on: true, cuando: 24, texto: 'Hola {nombre}, te esperamos el {fecha} a las {hora} para {clase} en {negocio}. ¿Venís? Si no llegás, liberá el lugar desde {link}.' },
+      lugar: { on: true, cuando: 0, texto: '¡{nombre}, se liberó un lugar en {clase} del {fecha} a las {hora} y ya es tuyo! Te esperamos. Si no venís, avisá desde {link}.' },
+      vence: { on: true, cuando: 3, texto: 'Hola {nombre}, tu plan {plan} vence el {vence}. Renovalo desde {link} o en el mostrador y seguí reservando sin cortes.' },
+    },
+  }
+}
+
+// ─── Pagos ───────────────────────────────────────────────────────────────────
+// Cómo cobra el negocio: en el mostrador (efectivo, transferencia) y, con
+// Mercado Pago conectado, online desde el sitio. Conectar es simulado.
+
+export interface PagosGym {
+  efectivo: boolean
+  transferencia: boolean
+  alias: string
+  titular: string
+  cbu: string
+  mercadoPago: { conectado: boolean; email: string; desde: ISO | null }
+  /** Con Mercado Pago: planes y clases sueltas se cobran al reservar desde el sitio. */
+  cobroOnline: boolean
+  /** Membresías: el cobro lo registra el dueño ('manual') o Mercado Pago cobra solo al vencer ('automatica'). */
+  renovacion: 'manual' | 'automatica'
+  /** Días después del vencimiento en que todavía se puede reservar. */
+  graciaDias: number
+  /** Las reservas que ya tenía quien venció: se mantienen o se liberan para la lista de espera. */
+  alVencer: 'mantener' | 'liberar'
+}
+
+export function pagosDe(nombre: string, slug: string): PagosGym {
+  return {
+    efectivo: true, transferencia: true, alias: `${slug.slice(0, 14)}.mp`, titular: nombre, cbu: '0000003100012345678901',
+    mercadoPago: { conectado: false, email: '', desde: null }, cobroOnline: false, renovacion: 'manual', graciaDias: 3, alVencer: 'mantener',
+  }
+}
 
 // ─── Socios e inscripciones ──────────────────────────────────────────────────
 
@@ -209,7 +297,9 @@ export interface Inscripcion {
 
 // ─── Negocio de ejemplo de cada rubro ────────────────────────────────────────
 
-const COLORES = ['#2563EB', '#7C3AED', '#059669', '#D97706', '#DB2777', '#0891B2']
+/** Los colores de las actividades: van de borde en la grilla (nunca debajo de un texto). */
+export const COLORES_ACTIVIDAD = ['#2563EB', '#7C3AED', '#059669', '#D97706', '#DB2777', '#0891B2']
+const COLORES = COLORES_ACTIVIDAD
 const IGUAZU: [number, number] = [-25.5972, -54.5786]
 const slugDe = (n: string) => n.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, '')
 
@@ -238,18 +328,23 @@ function grillaDe(r: RubroGym, actividades: Actividad[], profes: Profe[], apertu
 
 export function negocioDe(r: RubroGym): NegocioGym {
   const actividades: Actividad[] = r.actividades.map((a, i) => ({ id: `a${i + 1}`, nombre: a.nombre, duracion: a.duracion, cupo: a.cupo, color: COLORES[i % COLORES.length] }))
-  const profes: Profe[] = r.profes.map((p, i) => ({ id: `p${i + 1}`, nombre: p }))
+  const base: Profe[] = r.profes.map((p, i) => ({ id: `p${i + 1}`, nombre: p, color: COLORES_EQUIPO[i % COLORES_EQUIPO.length], actividades: [] }))
   const apertura: Apertura = { dias: [0, 1, 2, 3, 4, 5], desde: 7 * 60, hasta: 22 * 60 }
+  const clases = grillaDe(r, actividades, base, apertura)
+  // Cada profe da las actividades que tiene en la grilla de ejemplo: así el equipo y la grilla cuentan lo mismo.
+  const profes = base.map(p => ({ ...p, actividades: actividades.filter(a => clases.some(c => c.profeId === p.id && c.actividadId === a.id)).map(a => a.id) }))
+  const telefono = '3757 55-0202'
+  const slug = slugDe(r.negocio)
   return {
     // Sin repetir la descripción del rubro ("WODs con cupo por horario, con cupo por clase…").
     rubro: r.key, nombre: r.negocio, descripcion: `${r.tagline} Reservá tu lugar en cada clase desde el celular.`,
-    telefono: '3757 55-0202', direccion: 'Av. Misiones 310', ciudad: 'Puerto Iguazú', latLng: IGUAZU, slug: slugDe(r.negocio), logo: null,
-    fotoPortada: r.fotos[0], galeria: r.fotos, apertura, actividades, salas: r.salas, profes,
-    clases: grillaDe(r, actividades, profes, apertura),
+    telefono, direccion: 'Av. Misiones 310', ciudad: 'Puerto Iguazú', latLng: IGUAZU, slug, logo: null,
+    fotoPortada: r.fotos[0], galeria: r.fotos, apertura, actividades, salas: r.salas, profes, clases,
     planes: r.planes.map((p, i) => ({ id: `pl${i + 1}`, ...p, vigenciaDias: p.tipo === 'membresia' ? 30 : p.tipo === 'pack' ? 90 : p.tipo === 'suelta' ? 1 : 30, activo: true })),
     anticipacionDias: 14, cancelaHastaHoras: 2, checkInMin: 30,
     bloqueos: [{ id: 'bg1', desde: '2026-11-20', hasta: '2026-11-21', motivo: 'Feriado: Día de la Soberanía', origen: 'dueno' }],
     calendariosExternos: [],
+    dueno: r.dueno, mensajes: mensajesDe(telefono), pagos: pagosDe(r.negocio, slug),
   }
 }
 

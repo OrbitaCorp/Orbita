@@ -72,7 +72,8 @@ function Hoy({ negocio, inscripciones }: P) {
         <div className="gis-clases">
           {clases.map(c => {
             const cupo = cupoDe(c, HOY, inscripciones)
-            const sub = <span className="gis-clase-sub"><Users size={13} aria-hidden style={{ verticalAlign: '-2px' }} /> {c.profe?.nombre} · {c.sala} · {c.actividad?.duracion} min</span>
+            {/* Sin profe (se fue del equipo y el dueño todavía no asignó a nadie): se dice, no queda un hueco. */}
+            const sub = <span className="gis-clase-sub"><Users size={13} aria-hidden style={{ verticalAlign: '-2px' }} /> {c.profe?.nombre ?? 'Profe a confirmar'} · {c.sala} · {c.actividad?.duracion} min</span>
             // La que ya empezó se muestra (está pasando), pero no se reserva: no es un link.
             if (c.inicio <= AHORA) {
               return (

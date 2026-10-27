@@ -108,7 +108,7 @@ export default function MisClases({ negocio, inscripciones, socios, onCancelar, 
                     <div style={{ minWidth: 0 }}>
                       <div className="rv-fila" style={{ gap: 8 }}><Chip tono={ESTADO_INSCRIPCION[i.estado].tono}>{espera ? <><Hourglass size={12} aria-hidden /> En lista de espera</> : 'Reservada'}</Chip><span className="rv-rotulo">{fechaRelativa(i.fecha, HOY)}</span></div>
                       <h3 className="rv-h2" style={{ fontSize: 19, marginTop: 8 }}>{act?.nombre}</h3>
-                      <p style={{ margin: '4px 0 0', fontSize: 14 }}>{fechaLarga(i.fecha)} · <span className="rv-num">{hhmm(c?.inicio ?? 0)}</span> · {c ? profeDe(negocio, c.profeId)?.nombre : ''} · {c?.sala}</p>
+                      <p style={{ margin: '4px 0 0', fontSize: 14 }}>{fechaLarga(i.fecha)} · <span className="rv-num">{hhmm(c?.inicio ?? 0)}</span> · {c ? profeDe(negocio, c.profeId)?.nombre ?? 'Profe a confirmar' : ''} · {c?.sala}</p>
                     </div>
                     {puedeCheckIn(i) && <button type="button" className="rv-btn rv-btn--primario" onClick={() => { onCheckIn(i.id); avisar('Check-in hecho', `¡Buena clase, ${yo?.nombre.split(' ')[0]}!`) }}><QrCode size={16} aria-hidden /> Check-in</button>}
                   </div>

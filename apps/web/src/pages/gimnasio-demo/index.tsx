@@ -16,7 +16,7 @@ export const getServerSideProps: GetServerSideProps = async () =>
 
 const PANTALLAS = [
   { href: '/gimnasio-demo/onboarding', label: 'Alta', Icon: Rocket, texto: 'El alta única de Órbita con Gimnasio elegido: rubro, actividades con su cupo y planes con precio.' },
-  { href: '/gimnasio-demo/panel', label: 'Panel', Icon: LayoutDashboard, texto: 'Clases del día con check-in y lista de espera, grilla semanal, socios con vencimientos, ingresos y configuración.' },
+  { href: '/gimnasio-demo/panel', label: 'Panel', Icon: LayoutDashboard, texto: 'Clases del día con check-in y lista de espera, grilla semanal, alumnos con vencimientos, ingresos, equipo, planes, reglas, mensajes y pagos.' },
   { href: '/gimnasio-demo/negocio', label: 'Sitio', Icon: Store, texto: 'Lo que ven los socios: las clases de hoy, la semana, los planes con precio y dónde queda.' },
   { href: '/gimnasio-demo/reserva', label: 'Reservar clase', Icon: CalendarCheck, texto: 'Reserva de lugar sin registrarse: con plan, pack, clase suelta o la de prueba gratis (una vez por persona).' },
   { href: '/gimnasio-demo/mis-clases', label: 'Mis clases', Icon: Users, texto: 'El plan del socio, sus próximas clases con check-in y cancelación, y su asistencia.' },

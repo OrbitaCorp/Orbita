@@ -11,7 +11,7 @@
 //   una; si se cancela a tiempo (antes del plazo del negocio), vuelve. Quien
 //   pasa de la lista de espera a reservado también la descuenta.
 import { useSyncExternalStore } from 'react'
-import { AHORA, HOY, cupoDe, inscripcionesDe, negocioDe, planDe, rubroPorKey, sociosDe, type ClaseSemanal, type Inscripcion, type NegocioGym, type Socio } from './index'
+import { AHORA, COLORES_EQUIPO, HOY, cupoDe, inscripcionesDe, negocioDe, planDe, rubroPorKey, sociosDe, type ClaseSemanal, type Inscripcion, type NegocioGym, type Profe, type Socio } from './index'
 import { diaSemana, diasEntre, sumarDias } from '@/lib/reservas/fechas'
 
 export interface DemoGym {
@@ -57,7 +57,12 @@ function suscribir(f: () => void) {
   return () => { oyentes.delete(f); window.removeEventListener('storage', alCambiar) }
 }
 
-export const negocioDelDemo = (demo: DemoGym, rubro: string): NegocioGym => ({ ...negocioDe(rubroPorKey(rubro)), ...demo.negocios[rubro] })
+export function negocioDelDemo(demo: DemoGym, rubro: string): NegocioGym {
+  const n = { ...negocioDe(rubroPorKey(rubro)), ...demo.negocios[rubro] }
+  // Un equipo guardado antes de que los profes tuvieran color y actividades ({ id, nombre }) se completa al leer.
+  const guardados = n.profes as (Partial<Profe> & Pick<Profe, 'id' | 'nombre'>)[]
+  return { ...n, profes: guardados.map((p, i) => ({ color: COLORES_EQUIPO[i % COLORES_EQUIPO.length], actividades: [], ...p })) }
+}
 
 export function sociosDelDemo(demo: DemoGym, rubro: string): Socio[] {
   const base = sociosDe(negocioDe(rubroPorKey(rubro)))

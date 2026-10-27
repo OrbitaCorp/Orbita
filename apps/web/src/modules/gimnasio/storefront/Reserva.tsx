@@ -86,6 +86,23 @@ export default function Reserva({ negocio, inscripciones, socios, onInscribir, q
     window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
   }, [actual])
 
+  // El día elegido queda entero a la vista en la tira. Al moverse con las flechas del
+  // teclado, el scroll que hace solo el navegador al enfocar el radio ("nearest") lo
+  // dejaba cortado por el borde de la tira (el padding que deja lugar al anillo de foco
+  // y el margen negativo que lo compensa quedan fuera de lo que considera visible). Solo
+  // se scrollea si está cortado: un toque sobre un día visible no mueve nada.
+  const tira = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const t = tira.current
+    const el = t?.querySelector<HTMLElement>("[data-elegido='true']")
+    if (!t || !el || t.scrollWidth <= t.clientWidth) return
+    const rt = t.getBoundingClientRect()
+    const re = el.getBoundingClientRect()
+    const margen = 8
+    if (re.left >= rt.left + margen && re.right <= rt.right - margen) return
+    t.scrollTo({ left: t.scrollLeft + (re.left - rt.left) - (rt.width - re.width) / 2, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+  }, [fecha])
+
   const errores: Record<string, string> = {}
   if (modo === 'nuevo') {
     if (datos.nombre.trim().length < 3) errores.nombre = 'Escribí tu nombre y apellido.'
@@ -169,7 +186,7 @@ export default function Reserva({ negocio, inscripciones, socios, onInscribir, q
                     parada de Tab por grupo, las flechas mueven y eligen, Espacio elige. Con botones
                     role=radio cada opción era una parada y las flechas no hacían nada. Una clase llena se
                     sigue pudiendo elegir: es para anotarse en la lista de espera. */}
-                <div className="gir-dias" role="radiogroup" aria-label="Día">
+                <div ref={tira} className="gir-dias" role="radiogroup" aria-label="Día">
                   {dias.map(f => (
                     <div key={f} className="gir-dia rv-card--radio" data-elegido={f === fecha}>
                       <input type="radio" name={`${prefijo}-dia`} value={f} checked={f === fecha} onChange={() => { setFecha(f); setClaseId(null) }} aria-label={f === HOY ? `Hoy, ${fechaLarga(f).toLowerCase()}` : fechaLarga(f)} />
@@ -190,7 +207,7 @@ export default function Reserva({ negocio, inscripciones, socios, onInscribir, q
                           <span id={`${op}-h`} className="gis-clase-hora">{hhmm(c.inicio)}</span>
                           <span style={{ flex: 1, minWidth: 0 }}>
                             <b id={op} style={{ display: 'block', fontSize: 16, color: 'var(--color-text)' }}>{c.actividad?.nombre}</b>
-                            <span id={`${op}-d`} className="gis-clase-sub"><Users size={13} aria-hidden style={{ verticalAlign: '-2px' }} /> {c.profe?.nombre} · {c.sala} · {c.actividad?.duracion} min</span>
+                            <span id={`${op}-d`} className="gis-clase-sub"><Users size={13} aria-hidden style={{ verticalAlign: '-2px' }} /> {c.profe?.nombre ?? 'Profe a confirmar'} · {c.sala} · {c.actividad?.duracion} min</span>
                             <BarraCupo id={`${op}-c`} anotados={k.anotados} cupo={k.cupo} />
                           </span>
                           {sel && <Check size={18} aria-hidden style={{ color: 'var(--color-primary)', flexShrink: 0 }} />}
@@ -296,7 +313,7 @@ export default function Reserva({ negocio, inscripciones, socios, onInscribir, q
               </button>
               <p className="rv-ayuda gir-falta" style={{ minHeight: 20, margin: '8px 0 0', textAlign: 'center' }}>{listo[actual] ? '' : falta[actual]}</p>
             </div>
-            <p className="rv-ayuda" style={{ margin: '10px 0 0', textAlign: 'center' }}>Cancelás hasta {negocio.cancelaHastaHoras} h antes sin perder la clase. {r.socio === 'Atleta' ? 'Un cupo por atleta.' : ''}</p>
+            <p className="rv-ayuda" style={{ margin: '10px 0 0', textAlign: 'center' }}>Cancelás hasta {negocio.cancelaHastaHoras} h antes sin perder la clase. {r.key === 'crossfit' ? 'Un cupo por alumno.' : ''}</p>
           </aside>
         </div>
       </div>
