@@ -50,17 +50,12 @@ const CSS = `
   .rvp { --rv-tope: 40px; position: relative; display: flex; height: calc(100vh - var(--rv-tope)); height: calc(100dvh - var(--rv-tope)); overflow: hidden; background: var(--color-surface); color: var(--color-body); }
 
   /* El cielo: la misma escena espacial que el panel de Tienda (estrellas y cometas, sin
-     planeta) detrás del contenido. En oscuro es el cielo de Tienda, sobre su negro azulado.
-     En claro Tienda no lo tiene; acá va el toque de galaxia que pidió Ale: estrellas tenues y
-     dos resplandores (azul arriba a la derecha, violeta abajo a la izquierda) sobre el surface
-     plano, sin ensuciar la lectura. La barra lateral y el header tapan el cielo con su fondo. */
-  .rvp-cielo { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; background:
-    radial-gradient(1100px 480px at 88% -12%, rgba(59,130,246,0.14), transparent 60%),
-    radial-gradient(900px 420px at -8% 112%, rgba(139,92,246,0.11), transparent 60%),
-    var(--color-surface); }
-  .rvp-cielo > * { position: absolute !important; opacity: 0.7; }
-  .dark .rvp-cielo { background: #05080F; }
-  .dark .rvp-cielo > * { opacity: 1; }
+     planeta) detrás del contenido, solo en oscuro, sobre su negro azulado. En claro el panel
+     sigue plano como Tienda (se probó un toque de galaxia en claro y Ale lo descartó el 27/10).
+     La barra lateral y el header tapan el cielo con su fondo. */
+  .rvp-cielo { display: none; position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; background: #05080F; }
+  .rvp-cielo > * { position: absolute !important; }
+  .dark .rvp-cielo { display: block; }
   .rvp-lateral, .rvp-cuerpo { position: relative; }
   .rvp-cuerpo { z-index: 1; }
   .rvp .rvp-main, .dark .rvp .rvp-main { background: transparent; }
@@ -385,7 +380,7 @@ export default function LayoutPanel({ producto = '', negocio, rubro, fecha, item
     <div className="rv rvp">
       <EstiloReservas />
       <style>{CSS}</style>
-      <div className="rvp-cielo" aria-hidden><EscenaEspacial planeta={false} oscuro={isDark} /></div>
+      {isDark && <div className="rvp-cielo" aria-hidden><EscenaEspacial planeta={false} oscuro /></div>}
 
       <aside ref={lateral} id={idLateral} className="rvp-lateral admin-sidebar" data-abierto={abierto} aria-label="Menú del panel">
         <div className="rvp-logo">
