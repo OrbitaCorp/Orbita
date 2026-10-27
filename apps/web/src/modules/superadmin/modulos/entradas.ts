@@ -142,10 +142,13 @@ export function entrada(d: DatosEntrada): Entrada {
 }
 
 // ─── Entradas ─────────────────────────────────────────────────────────────────
-// Todas del 26/10/2026, la sesión que armó los módulos nuevos. La primera es
-// la de la sección Módulos (los tests del front la usan de ejemplo).
+// Las primeras son del 26/10/2026, la sesión que armó los módulos nuevos (la
+// primera de todas es la de la sección Módulos: los tests del front la usan de
+// ejemplo). Después vienen las del rediseño de los paneles al estándar de
+// Órbita (26 y 27/10): Alquileres, Gimnasio y lo transversal del kit.
 
 const F = '2026-10-26'
+const F27 = '2026-10-27'
 
 export const ENTRADAS: Entrada[] = [
   // ─── Transversal · la sección Módulos ───────────────────────────────────────
@@ -166,10 +169,10 @@ La primera versión guardaba todo en el tablero de auditoría de la API (commit 
 
 ${comoQuedo('gimnasio', ['Plan de Gimnasio · 1280', 'superadmin-modulos-plan-1280.webp'], ['Plan de Gimnasio · 390', 'superadmin-modulos-plan-390.webp'])}`,
     archivos: [
-      'apps/web/src/modules/superadmin/Modulos.tsx:357',
+      'apps/web/src/modules/superadmin/Modulos.tsx:360',
       'apps/web/src/modules/superadmin/Modulos.tsx:199',
-      'apps/web/src/modules/superadmin/Modulos.tsx:1098',
-      'apps/web/src/modules/superadmin/Modulos.tsx:438',
+      'apps/web/src/modules/superadmin/Modulos.tsx:1102',
+      'apps/web/src/modules/superadmin/Modulos.tsx:441',
       'apps/web/src/modules/superadmin/modulos/plan.ts:1',
       'apps/web/src/modules/superadmin/modulos/entradas.ts:1',
       'apps/web/src/modules/superadmin/modulos/decisiones.ts:1',
@@ -228,8 +231,8 @@ Las pantallas leen siempre de ahí. Lo que carga el dueño queda en el navegador
       'apps/web/src/modules/turnos/datos/agenda.ts:1-4',
       'apps/web/src/modules/turnos/datos/equipo.ts:1-3',
       'apps/web/src/modules/turnos/datos/negocio.ts:1-12',
-      'apps/web/src/modules/turnos/datos/negocio.ts:165',
-      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:9-12',
+      'apps/web/src/modules/turnos/datos/negocio.ts:172',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:17-20',
     ],
   }),
 
@@ -300,7 +303,7 @@ storefront/reserva/   10
 **Diferencias con el plan:** la tarea del 29/10 pedía una carpeta \`shared/\` con un index; quedó la que tenía código, \`_shared/\`, sin index: cada import apunta a su archivo. La del 6/11 pedía "dos capturas del árbol": va como texto, arriba.`,
     archivos: [
       'apps/web/src/lib/achicarImagen.ts:1-4',
-      'apps/web/src/modules/turnos/admin/avanzado/AvanzadoTurnos.tsx:27-29',
+      'apps/web/src/modules/turnos/admin/avanzado/AvanzadoTurnos.tsx:25-27',
       'apps/web/src/modules/turnos/_shared/components/ChipEstado.tsx:1',
       'apps/web/src/modules/turnos/_shared/orbita/estilo.tsx:1-8',
     ],
@@ -323,9 +326,9 @@ En las capturas, el Resumen antes (estrellas, halo en "Nuevo turno", indicadores
     despues: { 1280: 'panel-resumen-despues-1280.webp', 390: 'panel-resumen-despues-390.webp' },
     archivos: [
       'apps/web/src/modules/turnos/_shared/orbita/estilo.tsx:1-8',
-      'apps/web/src/modules/turnos/_shared/orbita/estilo.tsx:24-26',
-      'apps/web/src/modules/turnos/_shared/orbita/piezas.tsx:27-29',
-      'apps/web/src/modules/turnos/_shared/orbita/piezas.tsx:51',
+      'apps/web/src/modules/turnos/_shared/orbita/estilo.tsx:21-23',
+      'apps/web/src/modules/turnos/admin/piezasPanel.tsx:45',
+      'apps/web/src/modules/turnos/admin/piezasPanel.tsx:271',
     ],
   }),
 
@@ -343,10 +346,10 @@ En celular el menú va en el cajón (botón de menú) y Configuración muestra s
     antes: { 1280: 'panel-configuracion-antes-1280.webp', 390: 'panel-configuracion-antes-390.webp' },
     despues: { 1280: 'panel-configuracion-despues-1280.webp', 390: 'panel-configuracion-despues-390.webp' },
     archivos: [
-      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:4-7',
-      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:183-192',
-      'apps/web/src/modules/turnos/admin/configuracion/datos.ts:28-49',
-      'apps/web/src/modules/turnos/admin/configuracion/ConfiguracionTurnos.tsx:7-9',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:6-11',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:191-200',
+      'apps/web/src/modules/turnos/admin/configuracion/datos.ts:20-31',
+      'apps/web/src/modules/turnos/admin/configuracion/datos.ts:29',
     ],
   }),
 
@@ -365,7 +368,7 @@ El bloque de arriba quedó plano, sin el planeta ni las estrellas, y dice cuánt
       'apps/web/src/modules/turnos/admin/avanzado/AvanzadoTurnos.tsx:1-5',
       'apps/web/src/modules/turnos/admin/avanzado/datosAvanzado.ts:10-13',
       'apps/web/src/modules/turnos/admin/avanzado/datosAvanzado.ts:39',
-      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:199-201',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:218-222',
     ],
   }),
 
@@ -378,8 +381,8 @@ El bloque de arriba quedó plano, sin el planeta ni las estrellas, y dice cuánt
     porque: 'Es la decisión 5 del pedido de Ale ("Secciones de Avanzado que sobreviven en Turnos: Membresías, Paquetes y PreciosHorario"). Son las que un negocio de turnos usa de verdad: repartir la demanda y cobrar por adelantado. El pedido decía sacarlas de la navegación; se borró también el código porque eran pantallas visuales sin backend (Turnos no tiene API) y sin entrada en el menú eran código muerto. Si alguna vuelve, está en la historia de git: las borra el commit a0f8d.',
     archivos: [
       'apps/web/src/modules/turnos/admin/avanzado/datosAvanzado.ts:10-13',
-      'apps/web/src/modules/turnos/admin/avanzado/AvanzadoTurnos.tsx:27-29',
-      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:190',
+      'apps/web/src/modules/turnos/admin/avanzado/AvanzadoTurnos.tsx:25-27',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:204',
     ],
   }),
 
@@ -393,7 +396,7 @@ El bloque de arriba quedó plano, sin el planeta ni las estrellas, y dice cuánt
     archivos: [
       'apps/web/src/modules/turnos/datos/index.ts:32-34',
       'apps/web/src/modules/alquileres/datos/index.ts:11-15',
-      'apps/web/src/modules/gimnasio/datos/index.ts:11-13',
+      'apps/web/src/modules/gimnasio/datos/index.ts:12-14',
       'apps/web/src/modules/onboarding/alta/PasoModulo.tsx:28',
       'apps/web/src/modules/onboarding/alta/PasoModulo.tsx:33',
     ],
@@ -416,13 +419,13 @@ En la consola solo queda el 401 de \`POST /api/auth/refresh\`, que es del entorn
 
 ${comoQuedo('turnos', ['Agenda · 390', 'panel-agenda-despues-390.webp'])}`,
     archivos: [
-      'apps/web/src/modules/turnos/admin/Ganancias.tsx:26-30',
-      'apps/web/src/modules/turnos/admin/KPIs.tsx:63-79',
-      'apps/web/src/modules/turnos/admin/KPIs.tsx:84-88',
-      'apps/web/src/modules/turnos/layout/LayoutTurnos.tsx:77-81',
+      'apps/web/src/modules/turnos/admin/Ganancias.tsx:27',
+      'apps/web/src/modules/turnos/admin/KPIs.tsx:94',
+      'apps/web/src/modules/turnos/admin/KPIs.tsx:109-113',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:15-18',
       'apps/web/src/modules/turnos/storefront/MisTurnos.tsx:411',
       'apps/web/src/modules/turnos/storefront/reserva/acciones.ts:11-24',
-      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:199-201',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:218-222',
     ],
   }),
 
@@ -464,9 +467,9 @@ El sitio muestra las canchas y los próximos horarios libres. La reserva va canc
 
 ${comoQuedo('alquileres', ['Sitio · 1280', 'sitio-cancha-1280.webp'], ['Reserva · 390', 'reserva-cancha-390.webp'])}`,
     archivos: [
-      'apps/web/src/modules/alquileres/datos/index.ts:257-278',
+      'apps/web/src/modules/alquileres/datos/index.ts:326-347',
       'apps/web/src/modules/alquileres/storefront/Reserva.tsx:1-4',
-      'apps/web/src/modules/alquileres/storefront/Reserva.tsx:92-96',
+      'apps/web/src/modules/alquileres/storefront/Reserva.tsx:93-97',
       'apps/web/src/modules/alquileres/storefront/Home.tsx:1-4',
       'apps/web/src/lib/reservas/disponibilidad.ts:30',
       'apps/web/src/lib/reservas/disponibilidad.ts:55',
@@ -491,12 +494,12 @@ La reserva va día y bloque → paquete e invitados → extras → datos del eve
 ${comoQuedo('alquileres', ['Sitio · 1280', 'sitio-salon-1280.webp'], ['Reserva · 390', 'reserva-salon-390.webp'])}`,
     archivos: [
       'apps/web/src/modules/alquileres/datos/index.ts:103-113',
-      'apps/web/src/modules/alquileres/datos/index.ts:282-304',
-      'apps/web/src/modules/alquileres/datos/index.ts:368-369',
+      'apps/web/src/modules/alquileres/datos/index.ts:364-386',
+      'apps/web/src/modules/alquileres/datos/index.ts:467-468',
       'apps/web/src/lib/reservas/disponibilidad.ts:84',
-      'apps/web/src/modules/alquileres/admin/Reservas.tsx:424-428',
+      'apps/web/src/modules/alquileres/admin/Reservas.tsx:432-436',
       'apps/web/src/modules/alquileres/admin/Eventos.tsx:1-4',
-      'apps/web/src/modules/alquileres/storefront/Reserva.tsx:323-324',
+      'apps/web/src/modules/alquileres/storefront/Reserva.tsx:324-325',
     ],
   }),
 
@@ -521,8 +524,8 @@ ${comoQuedo('alquileres', ['Sitio · 1280', 'sitio-estadia-1280.webp'], ['Reserv
       'apps/web/src/lib/reservas/estadia.ts:145',
       'apps/web/src/design-system/reservas/Calendario.tsx:146',
       'apps/web/src/modules/alquileres/datos/index.ts:115-133',
-      'apps/web/src/modules/alquileres/datos/index.ts:308-341',
-      'apps/web/src/modules/alquileres/admin/Reservas.tsx:306-308',
+      'apps/web/src/modules/alquileres/datos/index.ts:400-433',
+      'apps/web/src/modules/alquileres/admin/Reservas.tsx:314-316',
       'apps/web/src/modules/alquileres/storefront/MisReservas.tsx:47-54',
     ],
   }),
@@ -542,11 +545,11 @@ Todo vive en el almacén de la demo, en el navegador: una reserva hecha en el si
 ${comoQuedo('alquileres', ['Reservas de canchas · 1280', 'panel-cancha-1280.webp'], ['Calendario de la estadía · 390', 'panel-estadia-390.webp'])}`,
     archivos: [
       'apps/web/src/modules/alquileres/admin/Panel.tsx:1-9',
-      'apps/web/src/modules/alquileres/admin/Panel.tsx:35-42',
+      'apps/web/src/modules/alquileres/admin/Panel.tsx:102',
       'apps/web/src/modules/alquileres/admin/Reservas.tsx:1-7',
-      'apps/web/src/modules/alquileres/admin/Reservas.tsx:424-428',
+      'apps/web/src/modules/alquileres/admin/Reservas.tsx:432-436',
       'apps/web/src/modules/alquileres/admin/Ingresos.tsx:1-4',
-      'apps/web/src/modules/alquileres/admin/Configuracion.tsx:1-5',
+      'apps/web/src/modules/alquileres/admin/configuracion/comun.tsx:91',
       'apps/web/src/modules/alquileres/datos/negocio.ts:1-5',
     ],
   }),
@@ -563,13 +566,13 @@ Generar y leer el .ics es de \`lib/reservas/ics\`, con tests. Falta probar el ar
 
 ${comoQuedo('alquileres', ['Exportar · 1280', 'configuracion-calendarios-1280.webp'], ['Importar · 390', 'configuracion-calendarios-390.webp'])}`,
     archivos: [
-      'apps/web/src/modules/alquileres/admin/Configuracion.tsx:431-436',
-      'apps/web/src/modules/alquileres/admin/Configuracion.tsx:454-462',
-      'apps/web/src/modules/alquileres/admin/Configuracion.tsx:464-472',
+      'apps/web/src/modules/alquileres/admin/configuracion/Calendarios.tsx:1-3',
+      'apps/web/src/modules/alquileres/admin/configuracion/Calendarios.tsx:39',
+      'apps/web/src/modules/alquileres/admin/configuracion/Calendarios.tsx:49',
       'apps/web/src/lib/reservas/ics.ts:1-7',
       'apps/web/src/lib/reservas/ics.ts:70',
       'apps/web/src/lib/reservas/ics.ts:125',
-      'apps/web/src/design-system/reservas/piezas.tsx:279',
+      'apps/web/src/design-system/reservas/piezas.tsx:288',
     ],
   }),
 
@@ -581,9 +584,9 @@ ${comoQuedo('alquileres', ['Exportar · 1280', 'configuracion-calendarios-1280.w
     decision: 'Calendarios externos solo por iCal (.ics): exportar real e importar por URL. Sin APIs de Airbnb, Booking ni Google.',
     porque: 'Es la decisión 7 del pedido de Ale. Sincronizar con Airbnb, Booking o Google necesita las APIs de partner de cada uno y un servidor que consulte y guarde, y estos módulos no tienen backend; el .ics lo aceptan los tres sin acuerdos. La consecuencia es que no hay un link de suscripción que se actualice solo (lo pide la tarea del 3/12 del plan, que por eso no se vinculó): servir un .ics vivo necesita un servidor.',
     archivos: [
-      'apps/web/src/modules/alquileres/admin/Configuracion.tsx:431-436',
-      'apps/web/src/modules/alquileres/admin/Configuracion.tsx:477',
-      'apps/web/src/modules/gimnasio/admin/Configuracion.tsx:235-239',
+      'apps/web/src/modules/alquileres/admin/configuracion/Calendarios.tsx:1-3',
+      'apps/web/src/modules/alquileres/admin/configuracion/Calendarios.tsx:74',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Calendarios.tsx:21',
       'apps/web/src/lib/reservas/ics.ts:1-7',
     ],
   }),
@@ -596,11 +599,11 @@ ${comoQuedo('alquileres', ['Exportar · 1280', 'configuracion-calendarios-1280.w
     decision: 'Seña, saldo y depósito se registran a mano desde el panel. No se integran cobros nuevos.',
     porque: 'Es la decisión 6 del pedido de Ale. Los módulos son demos sin backend, y cobrar de verdad (con Mercado Pago u otro medio) necesita uno: la cuenta de cobro del negocio, los avisos de pago y las devoluciones. Registrar a mano alcanza para mostrar el circuito completo (seña, saldo, depósito) sin prometer un cobro que no existe.',
     archivos: [
-      'apps/web/src/modules/alquileres/admin/Reservas.tsx:424-428',
-      'apps/web/src/modules/alquileres/admin/Reservas.tsx:442-444',
+      'apps/web/src/modules/alquileres/admin/Reservas.tsx:432-436',
+      'apps/web/src/modules/alquileres/admin/Reservas.tsx:450-452',
       'apps/web/src/modules/alquileres/datos/index.ts:110-111',
       'apps/web/src/modules/alquileres/storefront/Reserva.tsx:8-9',
-      'apps/web/src/modules/gimnasio/admin/Ingresos.tsx:91',
+      'apps/web/src/modules/gimnasio/admin/Ingresos.tsx:148',
     ],
   }),
 
@@ -612,8 +615,8 @@ ${comoQuedo('alquileres', ['Exportar · 1280', 'configuracion-calendarios-1280.w
     decision: 'Canchas y salón también tienen "Bloquear un día" (feriado, torneo, mantenimiento o un evento propio), además del "Bloquear fechas" de la estadía.',
     porque: 'La agregó la QA de Alquileres (commit ce12d) sin que el pedido lo exigiera: el pedido solo hablaba de bloqueos del dueño en la estadía, pero una cancha en mantenimiento o un salón cerrado por feriado tienen el mismo problema, y en esos dos modos no había cómo cerrar un día puntual desde el panel. Queda a confirmar por Alan: si no va, se saca el botón de la agenda de canchas y del salón (BloquearDia en Reservas.tsx).',
     archivos: [
-      'apps/web/src/modules/alquileres/admin/Reservas.tsx:639-644',
-      'apps/web/src/modules/alquileres/admin/Reservas.tsx:683',
+      'apps/web/src/modules/alquileres/admin/Bloquear.tsx:1-5',
+      'apps/web/src/modules/alquileres/admin/Bloquear.tsx:18',
       'apps/web/src/modules/alquileres/datos/index.ts:135-146',
     ],
   }),
@@ -642,9 +645,9 @@ ${comoQuedo('alquileres', ['Exportar · 1280', 'configuracion-calendarios-1280.w
       'apps/web/src/lib/reservas/precio.ts:53-61',
       'apps/web/src/lib/reservas/fechas.ts:119',
       'apps/web/src/modules/alquileres/datos/negocio.ts:87',
-      'apps/web/src/modules/alquileres/admin/Panel.tsx:28-32',
-      'apps/web/src/modules/alquileres/admin/Clientes.tsx:34',
-      'apps/web/src/modules/alquileres/storefront/Reserva.tsx:111',
+      'apps/web/src/modules/alquileres/admin/Panel.tsx:67-71',
+      'apps/web/src/modules/alquileres/admin/Clientes.tsx:43',
+      'apps/web/src/modules/alquileres/storefront/Reserva.tsx:112',
       'apps/web/src/modules/alquileres/storefront/Sitio.tsx:269',
       'apps/web/src/modules/alquileres/storefront/MisReservas.tsx:42-43',
     ],
@@ -664,10 +667,10 @@ La reserva aparece en Mis clases y en el panel: el cupo y las reglas son las mis
 
 ${comoQuedo('gimnasio', ['Sitio · 1280', 'sitio-1280.webp'], ['Reserva · 390', 'reserva-390.webp'])}`,
     archivos: [
-      'apps/web/src/modules/gimnasio/datos/index.ts:108-109',
-      'apps/web/src/modules/gimnasio/datos/index.ts:472',
+      'apps/web/src/modules/gimnasio/datos/index.ts:113-114',
+      'apps/web/src/modules/gimnasio/datos/index.ts:567',
       'apps/web/src/modules/gimnasio/datos/negocio.ts:6-12',
-      'apps/web/src/modules/gimnasio/datos/negocio.ts:172-174',
+      'apps/web/src/modules/gimnasio/datos/negocio.ts:177-179',
       'apps/web/src/modules/gimnasio/storefront/Home.tsx:1-3',
       'apps/web/src/modules/gimnasio/storefront/Reserva.tsx:1-4',
       'apps/web/src/modules/gimnasio/admin/Clases.tsx:1-4',
@@ -688,10 +691,10 @@ Las reglas valen igual desde el sitio y desde el panel y tienen 14 tests (\`dato
 
 ${comoQuedo('gimnasio', ['Mis clases · 390', 'mis-clases-390.webp'])}`,
     archivos: [
-      'apps/web/src/modules/gimnasio/datos/index.ts:62-69',
-      'apps/web/src/modules/gimnasio/datos/index.ts:111-125',
-      'apps/web/src/modules/gimnasio/datos/index.ts:504',
-      'apps/web/src/modules/gimnasio/datos/index.ts:511-528',
+      'apps/web/src/modules/gimnasio/datos/index.ts:65-72',
+      'apps/web/src/modules/gimnasio/datos/index.ts:116-130',
+      'apps/web/src/modules/gimnasio/datos/index.ts:599',
+      'apps/web/src/modules/gimnasio/datos/index.ts:606-623',
       'apps/web/src/modules/gimnasio/storefront/Reserva.tsx:6-10',
       'apps/web/src/modules/gimnasio/datos/__tests__/reglas.test.ts:1-5',
     ],
@@ -711,9 +714,9 @@ ${comoQuedo('gimnasio', ['Mis clases · 390', 'mis-clases-390.webp'])}`,
 ${comoQuedo('gimnasio', ['Socios · 1280', 'panel-socios-1280.webp'], ['Socios · 390', 'panel-socios-390.webp'])}`,
     archivos: [
       'apps/web/src/modules/gimnasio/admin/Socios.tsx:1-4',
-      'apps/web/src/modules/gimnasio/admin/Socios.tsx:63-64',
-      'apps/web/src/modules/gimnasio/admin/Socios.tsx:143-159',
-      'apps/web/src/modules/gimnasio/datos/index.ts:481',
+      'apps/web/src/modules/gimnasio/admin/Socios.tsx:98-99',
+      'apps/web/src/modules/gimnasio/admin/Socios.tsx:181-197',
+      'apps/web/src/modules/gimnasio/datos/index.ts:576',
     ],
   }),
 
@@ -732,12 +735,12 @@ ${comoQuedo('gimnasio', ['Socios · 1280', 'panel-socios-1280.webp'], ['Socios �
 
 ${comoQuedo('gimnasio', ['Clases del día · 1280', 'panel-clases-1280.webp'], ['Mis clases · 390', 'mis-clases-390.webp'])}`,
     archivos: [
-      'apps/web/src/modules/gimnasio/admin/Clases.tsx:145-146',
-      'apps/web/src/modules/gimnasio/admin/Clases.tsx:180',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:220-221',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:255',
       'apps/web/src/modules/gimnasio/storefront/MisClases.tsx:1-5',
       'apps/web/src/modules/gimnasio/storefront/MisClases.tsx:48',
       'apps/web/src/modules/gimnasio/storefront/Sitio.tsx:1-4',
-      'apps/web/src/modules/gimnasio/storefront/Home.tsx:146',
+      'apps/web/src/modules/gimnasio/storefront/Home.tsx:147',
       'apps/web/src/modules/gimnasio/storefront/Sitio.tsx:153',
     ],
   }),
@@ -759,10 +762,10 @@ ${comoQuedo('gimnasio', ['Ingresos · 1280', 'panel-ingresos-1280.webp'], ['Ingr
       'apps/web/src/modules/gimnasio/admin/Panel.tsx:1-7',
       'apps/web/src/modules/gimnasio/admin/Clases.tsx:1-4',
       'apps/web/src/modules/gimnasio/admin/Ingresos.tsx:1-5',
-      'apps/web/src/modules/gimnasio/admin/Ingresos.tsx:13',
-      'apps/web/src/modules/gimnasio/admin/Configuracion.tsx:1-3',
-      'apps/web/src/modules/gimnasio/admin/Configuracion.tsx:153',
-      'apps/web/src/modules/gimnasio/admin/Configuracion.tsx:235-239',
+      'apps/web/src/modules/gimnasio/admin/Ingresos.tsx:20',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Negocio.tsx:6',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Actividades.tsx:25',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Calendarios.tsx:21',
     ],
   }),
 
@@ -774,9 +777,9 @@ ${comoQuedo('gimnasio', ['Ingresos · 1280', 'panel-ingresos-1280.webp'], ['Ingr
     decision: 'Un solo motor de clases con cupo para los ocho rubros de Gimnasio, con datos y nombres por rubro.',
     porque: 'Lo pide la Fase 3 del pedido de Ale ("Todos son clases con cupo y comparten el mismo motor"). Un motor por rubro serían ocho copias de las mismas reglas (cupo, lista de espera, tope semanal, pack, prueba una vez por persona) que se desalinean con el primer arreglo; con uno solo, los 14 tests de reglas valen para los ocho.',
     archivos: [
-      'apps/web/src/modules/gimnasio/datos/index.ts:11-13',
-      'apps/web/src/modules/gimnasio/datos/index.ts:28',
-      'apps/web/src/modules/gimnasio/datos/index.ts:71-99',
+      'apps/web/src/modules/gimnasio/datos/index.ts:12-14',
+      'apps/web/src/modules/gimnasio/datos/index.ts:29',
+      'apps/web/src/modules/gimnasio/datos/index.ts:74-102',
       'apps/web/src/modules/gimnasio/datos/__tests__/reglas.test.ts:1-5',
     ],
   }),
@@ -793,13 +796,13 @@ ${comoQuedo('gimnasio', ['Ingresos · 1280', 'panel-ingresos-1280.webp'], ['Ingr
 - **Sitio:** planes con la prueba aparte, pie alineado, marca de 44 px. **Reserva:** el botón fijo dice "Pagar $X". **Mis clases:** la asistencia en su fila.
 - **Configuración:** la pestaña activa visible en la tira; los bloqueos de un día bien escritos. **Ingresos:** "Últimos 3 meses" son tres, sin semanas futuras en cero, y "Por plan" en filas ordenadas.`,
     archivos: [
-      'apps/web/src/modules/gimnasio/datos/negocio.ts:223',
-      'apps/web/src/modules/gimnasio/admin/Panel.tsx:45-49',
-      'apps/web/src/modules/gimnasio/datos/index.ts:267-274',
-      'apps/web/src/modules/gimnasio/admin/Clases.tsx:145-146',
-      'apps/web/src/modules/gimnasio/storefront/Reserva.tsx:152',
-      'apps/web/src/modules/gimnasio/admin/Ingresos.tsx:18',
-      'apps/web/src/modules/gimnasio/admin/Ingresos.tsx:36',
+      'apps/web/src/modules/gimnasio/datos/negocio.ts:228',
+      'apps/web/src/modules/gimnasio/admin/Panel.tsx:146-150',
+      'apps/web/src/modules/gimnasio/datos/index.ts:362-369',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:220-221',
+      'apps/web/src/modules/gimnasio/storefront/Reserva.tsx:169',
+      'apps/web/src/modules/gimnasio/admin/Ingresos.tsx:165',
+      'apps/web/src/modules/gimnasio/admin/Ingresos.tsx:98',
     ],
   }),
 
@@ -847,9 +850,9 @@ La QA (commit 8ebb7) lo ajustó en celular: el cajón llega hasta abajo, el moda
       'apps/web/src/design-system/reservas/Calendario.tsx:1-12',
       'apps/web/src/design-system/reservas/Calendario.tsx:146',
       'apps/web/src/design-system/reservas/piezas.tsx:1-3',
-      'apps/web/src/design-system/reservas/piezas.tsx:137',
-      'apps/web/src/design-system/reservas/piezas.tsx:156',
-      'apps/web/src/design-system/reservas/piezas.tsx:167',
+      'apps/web/src/design-system/reservas/piezas.tsx:144',
+      'apps/web/src/design-system/reservas/piezas.tsx:163',
+      'apps/web/src/design-system/reservas/piezas.tsx:174',
       'apps/web/src/design-system/reservas/LayoutPanel.tsx:1-10',
     ],
   }),
@@ -920,9 +923,9 @@ Queda sin arreglar el azul primario con texto blanco (3,68:1, no llega a AA): es
 ${comoQuedo('gimnasio', ['Resumen de un módulo · 1280', 'superadmin-modulos-resumen-1280.webp'], ['Resumen de un módulo · 390', 'superadmin-modulos-resumen-390.webp'])}`,
     archivos: [
       'apps/web/src/modules/superadmin/modulos/plan.ts:63',
-      'apps/web/src/modules/superadmin/Modulos.tsx:376',
+      'apps/web/src/modules/superadmin/Modulos.tsx:379',
       'apps/web/src/modules/superadmin/Modulos.tsx:112',
-      'apps/web/src/modules/superadmin/Modulos.tsx:501',
+      'apps/web/src/modules/superadmin/Modulos.tsx:504',
       'apps/web/src/modules/superadmin/MarkdownInforme.tsx:170-173',
       'apps/web/src/modules/superadmin/MarkdownInforme.tsx:264-267',
       'apps/web/src/modules/superadmin/SuperAdminDashboard.tsx:79',
@@ -943,7 +946,7 @@ ${comoQuedo('gimnasio', ['Resumen de un módulo · 1280', 'superadmin-modulos-re
     archivos: [
       'apps/web/src/modules/alquileres/storefront/Sitio.tsx:1-6',
       'apps/web/src/modules/gimnasio/storefront/Sitio.tsx:1-4',
-      'apps/web/src/design-system/reservas/estilo.tsx:112',
+      'apps/web/src/design-system/reservas/estilo.tsx:126',
     ],
   }),
 
@@ -1034,6 +1037,949 @@ En las capturas, el paso en la demo de Turnos: antes con dos tarjetas y después
       'apps/web/src/modules/onboarding/alta/estilo.ts:89',
       'apps/web/src/modules/onboarding/alta/estilo.ts:560',
       'apps/web/src/modules/onboarding/alta/modelo.ts:67-68',
+    ],
+  }),
+
+  // ═══ Rediseño de los paneles al estándar de Órbita (26 y 27/10/2026) ═══════
+  // Ale lo pidió textual el 26/10: "hacer el estándar de Órbita, o sea todo
+  // porque no me gusta", "todo en el sidebar", "minimalista pero el estándar
+  // visual de Órbita". Alquileres (Alan) y Gimnasio (Ale) el 26/10, con sus
+  // decisiones tomadas sin preguntar; el kit tomó los pedidos de los módulos el
+  // 27/10 (transversal, en Gimnasio). Turnos (Mateo) se carga cuando termine.
+
+  // ─── Alquileres · Alan · rediseño ───────────────────────────────────────────
+  entrada({
+    modulo: 'alquileres', fecha: F, slug: 'todo-en-el-sidebar', tipo: 'diseño', quien: 'Alan',
+    titulo: 'Alquileres al estándar de Órbita: todas las secciones en el sidebar',
+    foco: 'El panel pasó de cuatro ítems y una columna de pestañas en Configuración a la barra lateral del panel de Tienda: 13 o 14 secciones por modo, en grupos (Hoy, Canchas/Salón/Propiedades, Reservas) y Configuración con sub-secciones; la URL es el único estado.',
+    que: `Ale pidió el 26/10 que los tres paneles fueran "el estándar de Órbita, o sea todo", "todo en el sidebar" y "minimalista pero el estándar visual de Órbita". El panel de Alquileres tenía cuatro ítems (Reservas, Clientes, Ingresos y Configuración) y, adentro de Configuración, una columna propia de seis pestañas. Ahora usa el armazón \`LayoutPanel\` v2 del kit (el de Tienda: ver la entrada transversal "LayoutPanel v2") y cada modo tiene su barra lateral completa:
+- **Canchas:** Hoy (Reservas, con un badge con las señas pendientes; Clientes; Ingresos), Canchas (Canchas, Extras, Precios por horario), Reservas (Reglas de reserva, Días bloqueados, Recordatorios y mensajes, Pagos y señas), Calendarios (.ics) y Configuración › Datos del negocio, Horarios y Equipo.
+- **Salón:** Hoy (Calendario, Eventos, Ingresos), Salón (Salón, Paquetes, Extras), las mismas Reservas, Calendarios y Configuración.
+- **Estadía:** Hoy (Calendario, Huéspedes, Ingresos), Propiedades (Propiedades, Temporadas y precios, Bloqueos), Reservas sin Días bloqueados, Calendarios y Configuración sin Horarios (se entra y se sale a la hora de cada propiedad).
+
+La navegación salió a un módulo puro, \`admin/navegacion.ts\`: \`seccionesDe(tipo)\` arma las secciones de cada modo con su grupo y sus sub-secciones, y \`resolverRuta\` lee \`?tipo=&vista=&tab=\`. Antes \`Panel.tsx\` armaba los cuatro ítems a mano y \`Configuracion.tsx\` tenía su propia columna de pestañas; ahora la URL es el único estado y \`Panel.tsx\` solo pone los íconos. Los links viejos siguen andando: \`?vista=configuracion&tab=reglas\` (o \`unidades\`, \`precios\`, \`salon\`, \`propiedades\`, \`calendarios\`) abre la sección nueva y la URL se reescribe; \`tab=negocio\` y \`tab=horarios\` siguen adentro de Configuración, y una sección de otro modo o inventada cae en la agenda. Son nueve casos probados en \`navegacion.test.ts\`.
+
+En las capturas, Configuración a 1280 antes (cuatro ítems y la columna de pestañas) y después (la barra completa, con Datos del negocio como sub-sección). A 390 el después es el cajón del menú abierto, que es donde se ve la barra en celular.`,
+    antes: { 1280: 'panel-sidebar-antes-1280.webp', 390: 'panel-sidebar-antes-390.webp' },
+    despues: { 1280: 'panel-sidebar-despues-1280.webp', 390: 'panel-sidebar-despues-390.webp' },
+    archivos: [
+      'apps/web/src/modules/alquileres/admin/navegacion.ts:1-14',
+      'apps/web/src/modules/alquileres/admin/navegacion.ts:26',
+      'apps/web/src/modules/alquileres/admin/navegacion.ts:72',
+      'apps/web/src/modules/alquileres/admin/navegacion.test.ts:29',
+      'apps/web/src/modules/alquileres/admin/Panel.tsx:71-72',
+      'apps/web/src/modules/alquileres/admin/Panel.tsx:159-160',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:1-13',
+    ],
+  }),
+
+  entrada({
+    modulo: 'alquileres', fecha: F, slug: 'header-del-panel', tipo: 'tarea', quien: 'Alan',
+    titulo: 'Alquileres: header del estándar con buscador, avisos y cuenta',
+    foco: 'El header de Tienda en el panel: miga, fecha de la demo, buscador (Ctrl K) que encuentra secciones, clientes, reservas y unidades, campanita con avisos y la cuenta del dueño; lo que se abre en un modal viaja en la URL.',
+    que: `Con \`LayoutPanel\` v2 el panel tiene el header completo de Tienda (\`Panel.tsx\`): \`producto="Alquileres"\`, la miga (Alquileres › sección › sub-sección), la fecha de la demo ("Sáb 14 nov · 10:40", el \`HOY\` de los datos de ejemplo), el tema claro u oscuro, y:
+- **Buscador** (\`busqueda\`): sin escribir ofrece "Ir a" cada sección y sub-sección; escribiendo encuentra clientes o huéspedes con reserva (por nombre o teléfono), lo de hoy (reservas de hoy en canchas, "en casa hoy" en la estadía, próximos eventos en el salón) y las canchas, el salón o las propiedades.
+- **Campanita** (\`avisos\`): las reservas hechas en la demo (desde el sitio o a mano) entran sin leer, porque son la única novedad de verdad; después las señas pendientes, lo que queda de hoy, las llegadas y salidas de la estadía y los calendarios externos sincronizados. Cada aviso abre lo suyo.
+- **Cuenta** (\`usuario\`): el dueño o la dueña de \`negocio.equipo\`, con su rol.
+
+Los modales viajan en la URL: \`?reserva=\` abre el detalle de una reserva en Reservas o Eventos y \`?cliente=\` la ficha en Clientes o Huéspedes, así la campanita, el buscador e Ingresos los abren desde cualquier parte y un link se puede compartir. El badge de Reservas cuenta solo las señas pendientes futuras.
+
+${comoQuedo('alquileres', ['Campanita · 1280', 'header-avisos-1280.webp'], ['Ficha de un cliente abierta por la URL · 390', 'header-cliente-390.webp'])}`,
+    archivos: [
+      'apps/web/src/modules/alquileres/admin/Panel.tsx:4-6',
+      'apps/web/src/modules/alquileres/admin/Panel.tsx:52',
+      'apps/web/src/modules/alquileres/admin/Panel.tsx:74-75',
+      'apps/web/src/modules/alquileres/admin/Panel.tsx:106-108',
+      'apps/web/src/modules/alquileres/admin/Panel.tsx:132',
+      'apps/web/src/modules/alquileres/admin/Panel.tsx:150',
+      'apps/web/src/modules/alquileres/admin/Eventos.tsx:8',
+      'apps/web/src/modules/alquileres/admin/Clientes.tsx:4',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:27-36',
+    ],
+  }),
+
+  entrada({
+    modulo: 'alquileres', fecha: F, slug: 'configuracion-en-paginas', tipo: 'tarea', quien: 'Alan',
+    titulo: 'Alquileres: Configuración partida en páginas',
+    foco: 'Configuracion.tsx (499 líneas, con su propia columna de pestañas) se borró; cada sección es una página de admin/configuracion/, de 37 a 155 líneas, con borrador y Guardar; los modales de bloqueo salieron de la agenda a Bloquear.tsx.',
+    que: `\`admin/Configuracion.tsx\` (499 líneas) tenía adentro seis pestañas y su propia columna para elegirlas. Se borró (\`git rm\`) y cada sección quedó como una página en \`admin/configuracion/\`: Negocio, Horarios, Reglas, Canchas, Extras, Precios, Salon, Paquetes, Propiedades, Temporadas, Calendarios, Bloqueos, Mensajes, Pagos y Equipo, de 37 a 155 líneas cada una. Lo común está en \`comun.tsx\`: \`PaginaForm\` (el encabezado y el ancho de formulario), \`CSS_CONFIG\`, \`num\`, \`idNuevo\`, \`HORAS\`, \`igual\` y el tipo \`Form\`.
+- Todas conservan el borrador y el botón Guardar (\`Guardar\` en \`admin/piezas.tsx\`, ahora con Descartar) y la \`key\` del panel que las vuelve a montar cuando el almacén ya leyó lo guardado (\`useHidratado\`), para que el primer render no pise lo del dueño.
+- Los modales "Bloquear un día" y "Bloquear fechas" salieron de \`Reservas.tsx\` a \`admin/Bloquear.tsx\`: los usan la agenda y las páginas Días bloqueados y Bloqueos.
+
+Lo que se hizo en cada página nueva está en "Secciones nuevas con contenido real"; dónde quedó cada dato, en la decisión "Dónde vive cada dato de la configuración".`,
+    archivos: [
+      'apps/web/src/modules/alquileres/admin/configuracion/comun.tsx:18',
+      'apps/web/src/modules/alquileres/admin/configuracion/comun.tsx:31',
+      'apps/web/src/modules/alquileres/admin/configuracion/comun.tsx:91',
+      'apps/web/src/modules/alquileres/admin/piezas.tsx:107',
+      'apps/web/src/modules/alquileres/admin/Bloquear.tsx:1-5',
+      'apps/web/src/modules/alquileres/admin/Bloquear.tsx:18',
+      'apps/web/src/modules/alquileres/admin/Bloquear.tsx:56',
+      'apps/web/src/modules/alquileres/admin/Panel.tsx:166-167',
+      'apps/web/src/modules/alquileres/datos/negocio.ts:87',
+    ],
+  }),
+
+  entrada({
+    modulo: 'alquileres', fecha: F, slug: 'secciones-nuevas', tipo: 'tarea', quien: 'Alan',
+    titulo: 'Alquileres: secciones nuevas con contenido real',
+    foco: 'Extras, Días bloqueados, Recordatorios y mensajes (plantillas de WhatsApp con llaves y vista previa), Pagos y señas (seña, formas de pago, depósito, reembolsos), Equipo con roles, y Temporadas y precios con el calendario de qué temporada rige cada día.',
+    que: `Con todo en el sidebar aparecieron secciones que antes no existían o vivían escondidas en una pestaña. Todas con datos de ejemplo en \`datos/index.ts\`:
+- **Extras:** alta, baja y edición con precio, separado de Canchas (en el salón edita \`salon.extras\`). Cada extra dice cuántas veces lo pidieron y cuánto sumó, y una nota cuenta lo que sumaron los extras en el mes.
+- **Días bloqueados / Bloqueos:** próximos y pasados, agrupados (el torneo que cierra las cuatro canchas es una sola fila, "Todas las canchas"), con motivo, quitar los propios y el chip "Calendario externo" en los que vinieron por .ics (esos se quitan desconectando el calendario). Agrega con los mismos modales de la agenda. Datos nuevos: bloqueos de ejemplo en canchas (cambio del césped, torneo interno, uno pasado) y en el salón (feriado del 20/11, pintura del 25 al 27/11); las reservas de ejemplo saltean los días bloqueados.
+- **Recordatorios y mensajes:** cuatro plantillas de WhatsApp por momento (confirmación, recordatorio 24 h, seña pendiente, agradecimiento), llave para prender cada una, texto editable con llaves (nombre, negocio, unidad, fecha, hora, total, seña, saldo y link, que se insertan donde está el cursor), vista previa con la próxima reserva confirmada de la agenda y "Mandar una prueba" simulado ("Demo: no se mandó ningún WhatsApp"). Textos de fábrica por modo (\`mensajesDeFabrica\`).
+- **Pagos y señas:** la seña (porcentaje y sobre qué se calcula: el total con extras o solo la cancha, el paquete o las noches, \`senaSobre\`) con un ejemplo hecho con los precios del negocio; formas de pago (efectivo, transferencia con alias y titular, Mercado Pago con "Conectar" simulado que avisa "Demo: no se conectó ninguna cuenta real"); el depósito de garantía del salón y la política de reembolso (a tiempo y tarde) con la frase que lee el cliente.
+- **Equipo:** personas con rol (dueño, encargado o recepción, con rótulo femenino cuando corresponde), alta en un modal, baja (no del dueño), qué puede cada rol y "Demo: no se mandó ninguna invitación". Tres equipos de ejemplo.
+- **Temporadas y precios:** por propiedad, el precio base, el recargo de fin de semana, la limpieza y las temporadas, y un calendario de qué temporada rige cada día con el precio de esa noche debajo, en una escala de un solo tono (más fuerte cuanto más cara que la base; gris si es más barata) y su leyenda.
+- **Salón, Paquetes y Extras** como páginas separadas (Paquetes dice cuántos eventos eligió cada uno).
+
+\`senaSobre\` es real: cambia la seña en el sitio público, en Nueva reserva y en las reservas de ejemplo (\`senaPara\`).
+
+${comoQuedo('alquileres', ['Recordatorios y mensajes · 1280', 'secciones-mensajes-1280.webp'], ['Temporadas y precios · 1280', 'secciones-temporadas-1280.webp'], ['Pagos y señas · 390', 'secciones-pagos-390.webp'])}`,
+    archivos: [
+      'apps/web/src/modules/alquileres/admin/configuracion/Extras.tsx:14',
+      'apps/web/src/modules/alquileres/admin/configuracion/Bloqueos.tsx:39',
+      'apps/web/src/modules/alquileres/admin/configuracion/Mensajes.tsx:31',
+      'apps/web/src/modules/alquileres/admin/configuracion/Pagos.tsx:20',
+      'apps/web/src/modules/alquileres/admin/configuracion/Equipo.tsx:17',
+      'apps/web/src/modules/alquileres/admin/configuracion/Temporadas.tsx:30',
+      'apps/web/src/modules/alquileres/admin/configuracion/Temporadas.tsx:79',
+      'apps/web/src/modules/alquileres/admin/configuracion/Paquetes.tsx:11',
+      'apps/web/src/modules/alquileres/datos/index.ts:160',
+      'apps/web/src/modules/alquileres/datos/index.ts:179-181',
+      'apps/web/src/modules/alquileres/datos/index.ts:196',
+      'apps/web/src/modules/alquileres/datos/index.ts:312',
+      'apps/web/src/modules/alquileres/datos/index.ts:339-342',
+      'apps/web/src/modules/alquileres/datos/index.ts:590',
+    ],
+  }),
+
+  entrada({
+    modulo: 'alquileres', fecha: F, slug: 'ingresos-tablero', tipo: 'diseño', quien: 'Alan',
+    titulo: 'Alquileres: Ingresos como tablero del estándar',
+    foco: 'Cuatro indicadores con ícono y variación contra el período anterior del mismo largo, las series por semana y por unidad en un solo acento, una tercera según el modo y la lista "Por cobrar" que abre cada reserva para registrar el pago.',
+    que: `Ingresos tenía cuatro números sueltos (facturado, ocupación, seña pendiente, saldo por cobrar) y dos gráficos. Ahora es el tablero del panel de Tienda:
+- **Indicadores** con ícono en un chip y la variación contra el período anterior del mismo largo (\`periodoAnterior\`): Facturado, Reservas o Eventos, Ocupación (en puntos) y Por cobrar. Sin datos previos no se inventa un porcentaje: el chip no aparece.
+- **Series** en un solo acento: por semana y por cancha, bloque o propiedad; y una tercera por modo: horas reservadas por franja de tres horas en canchas (sirve para afinar Precios por horario), eventos por paquete en el salón, llegadas y salidas de la semana en la estadía.
+- **Por cobrar:** las señas que no entraron y los saldos de reservas ya realizadas; cada fila abre la reserva (por \`?reserva=\`) para registrar el pago.
+
+Reglas de la skill \`dataviz\` aplicadas: una serie es un color, columnas finas de 24 px con el extremo redondeado, el valor solo en la columna más alta y al foco o al pasar, un eje, sin dos ejes ni leyenda para una sola serie. El \`Kpi\` con ícono y variación es una pieza local del módulo (\`admin/piezas.tsx\`), igual que en Gimnasio: el del kit no la tiene (decisión abierta "Pedidos del kit que quedaron sin tomar").`,
+    antes: { 1280: 'ingresos-antes-1280.webp', 390: 'ingresos-antes-390.webp' },
+    despues: { 1280: 'ingresos-despues-1280.webp', 390: 'ingresos-despues-390.webp' },
+    archivos: [
+      'apps/web/src/modules/alquileres/admin/Ingresos.tsx:1-5',
+      'apps/web/src/modules/alquileres/admin/Ingresos.tsx:34',
+      'apps/web/src/modules/alquileres/admin/Ingresos.tsx:41',
+      'apps/web/src/modules/alquileres/admin/Ingresos.tsx:49',
+      'apps/web/src/modules/alquileres/admin/Ingresos.tsx:63',
+      'apps/web/src/modules/alquileres/admin/Ingresos.tsx:78-79',
+      'apps/web/src/modules/alquileres/admin/Ingresos.tsx:104-107',
+      'apps/web/src/modules/alquileres/admin/Ingresos.tsx:124',
+      'apps/web/src/modules/alquileres/admin/piezas.tsx:72',
+    ],
+  }),
+
+  entrada({
+    modulo: 'alquileres', fecha: F, slug: 'clientes-con-indicadores', tipo: 'diseño', quien: 'Alan',
+    titulo: 'Alquileres: Clientes y Huéspedes con indicadores',
+    foco: 'Arriba de la tabla, tres indicadores con la misma pieza Kpi (total, nuevos este mes, con reserva próxima); la ficha se abre por ?cliente=; la tabla rv-tabla sigue pasando a tarjetas en celular.',
+    que: `Clientes (Huéspedes en la estadía) tenía solo la tabla. Ahora arranca con tres indicadores con la misma pieza \`Kpi\` de Ingresos: cuántos clientes con al menos una reserva, cuántos hicieron su primera reserva este mes y cuántos ya tienen fecha. La ficha de cada persona (reservas, gasto, historial) se abre por \`?cliente=\`, así el buscador del header la abre desde cualquier parte. La tabla \`rv-tabla\` del kit sigue como estaba: en celular pasa a tarjetas. En el salón esta sección es Eventos (cada evento con su ficha), como desde el 26/10.`,
+    antes: { 1280: 'clientes-antes-1280.webp', 390: 'clientes-antes-390.webp' },
+    despues: { 1280: 'clientes-despues-1280.webp', 390: 'clientes-despues-390.webp' },
+    archivos: [
+      'apps/web/src/modules/alquileres/admin/Clientes.tsx:4',
+      'apps/web/src/modules/alquileres/admin/Clientes.tsx:37',
+      'apps/web/src/modules/alquileres/admin/Clientes.tsx:60-62',
+      'apps/web/src/modules/alquileres/admin/piezas.tsx:53',
+    ],
+  }),
+
+  entrada({
+    modulo: 'alquileres', fecha: F, slug: 'agenda-tintada-y-piezas', tipo: 'diseño', quien: 'Alan',
+    titulo: 'Alquileres: la agenda con el día tintado y las piezas locales del panel',
+    foco: 'En la tira de días de Reservas el día elegido va tintado (fondo claro del acento, borde y tinta oscura) y no lleno: el blanco sobre el acento a 11 y 16 px daba 3,68:1. Lo que el kit no tiene (Kpi con variación, Guardar) quedó como piezas locales en admin/piezas.tsx.',
+    que: `- **El día elegido va tintado, no lleno.** En la tira de días de la agenda, "HOY" a 11 px y el número a 16 px en blanco sobre el acento daban 3,68:1 (la norma pide 4,5:1). Ahora el elegido lleva el fondo claro del acento, el borde en el acento y la tinta oscura (\`--color-primary-bg\`, \`--color-primary\` y \`--chip-primary-fg\`). Gimnasio hizo lo mismo en su tira de Clases. En el calendario del salón, un día completo se abre igual (para ver sus eventos): va tintado, no tachado ni apagado; tachado queda solo lo cerrado.
+- **Piezas locales:** lo que el kit no tiene quedó en \`admin/piezas.tsx\`, sin romper el estándar: \`Kpi\` con ícono en chip y chip de variación (▲/▼, en porcentaje o en unidades con sufijo, y "sin datos previos" cuando no hay período anterior), \`Guardar\` (el estado "Tenés cambios sin guardar" / "Todo guardado", Descartar y Guardar cambios) y \`CSS_PANEL\` con \`.ala-kpis\`, \`.ala-guardar\`, \`.ala-cab-lista\` y \`.ala-pie-nota\`. Lo que le faltaba al kit se pidió en \`pedidos-kit-alquileres.md\`, y el 27/10 el kit tomó los contrastes del armazón, la Sigla, el chip apretado, el segmentado, el botón de peligro, \`Switch\`, \`Nota\` y \`Area\` (entrada transversal "El kit toma lo que pidieron los módulos"); el pisado local de \`.rv-btn--peligro\` que había en este archivo se borró ese día. Kpi y Guardar siguen locales (decisión abierta "Pedidos del kit que quedaron sin tomar").
+
+En las capturas, Reservas de canchas antes y después: la tira con el día lleno y con el día tintado, y el header nuevo.`,
+    antes: { 1280: 'agenda-antes-1280.webp', 390: 'agenda-antes-390.webp' },
+    despues: { 1280: 'agenda-despues-1280.webp', 390: 'agenda-despues-390.webp' },
+    archivos: [
+      'apps/web/src/modules/alquileres/admin/Reservas.tsx:46-48',
+      'apps/web/src/modules/alquileres/admin/Reservas.tsx:85-87',
+      'apps/web/src/modules/alquileres/admin/Reservas.tsx:132',
+      'apps/web/src/modules/alquileres/admin/piezas.tsx:11',
+      'apps/web/src/modules/alquileres/admin/piezas.tsx:72',
+      'apps/web/src/modules/alquileres/admin/piezas.tsx:107',
+    ],
+  }),
+
+  entrada({
+    modulo: 'alquileres', fecha: F, slug: 'donde-vive-cada-dato', tipo: 'decisión', quien: 'Alan',
+    titulo: 'Alquileres: dónde vive cada dato de la configuración',
+    foco: 'La seña (porcentaje y sobre qué se calcula) vive en Pagos y señas y no en Reglas; el depósito de garantía se edita solo en Pagos; el precio por noche, el fin de semana, la limpieza y las temporadas salieron de Propiedades a Temporadas y precios. Lo decidió Alan sin preguntar, al partir Configuración.',
+    que: `Al partir Configuración en páginas hubo que decidir en cuál queda cada dato, y el pedido nombraba algunos en dos lugares. Quedó así:
+1. La **seña** (porcentaje y sobre qué se calcula) vive en Pagos y señas. Reglas de reserva conserva la cancelación, el turno (en canchas: duración, cada cuánto arranca uno y cuántos seguidos) y, en la estadía, las noches mínimas y las horas de entrada y salida por propiedad, que salieron de Propiedades.
+2. El **depósito de garantía** del salón se edita solo en Pagos y señas; Salón lo muestra con un botón que lleva ahí.
+3. El **precio por noche, el fin de semana, la limpieza y las temporadas** salieron de Propiedades a Temporadas y precios; Propiedades queda con datos, comodidades, fotos y ubicación, y enlaza.
+4. \`senaSobre\` (la seña sobre el total con extras o solo sobre la base) es **real**: cambia la seña en el sitio público, en Nueva reserva y en las reservas de ejemplo (las canchas y la estadía de ejemplo la calculan sobre la base; el salón, sobre el total).`,
+    decision: 'Cada dato de la configuración vive en una sola página: la seña y el depósito en Pagos y señas, las reglas del turno y la cancelación en Reglas de reserva, los precios de la estadía en Temporadas y precios; las otras páginas enlazan en vez de repetirlo. Y la base de la seña es un dato real que usan el sitio y el panel.',
+    porque: 'Un mismo dato en dos pantallas termina con dos valores: el pedido nombraba el depósito en Salón y en Pagos, y la seña en Reglas y en Pagos. Con una sola fuente y un link desde la otra pantalla no hay forma de que se desalineen. La seña es plata y la cancelación es una regla: separarlas sigue el criterio de Tienda (lo que se cobra va en Pagos). Y si `senaSobre` fuera solo un texto de la pantalla, el ejemplo de Pagos y señas mostraría un número que la reserva no cobra. Queda a confirmar por Alan: si Ale prefiere la seña en Reglas, es mover un bloque de Pagos.tsx a Reglas.tsx.',
+    archivos: [
+      'apps/web/src/modules/alquileres/admin/configuracion/Pagos.tsx:20',
+      'apps/web/src/modules/alquileres/admin/configuracion/Reglas.tsx:20',
+      'apps/web/src/modules/alquileres/admin/configuracion/Salon.tsx:17',
+      'apps/web/src/modules/alquileres/admin/configuracion/Temporadas.tsx:30',
+      'apps/web/src/modules/alquileres/admin/configuracion/Propiedades.tsx:17',
+      'apps/web/src/modules/alquileres/datos/index.ts:179-181',
+      'apps/web/src/modules/alquileres/datos/index.ts:590',
+      'apps/web/src/modules/alquileres/storefront/Reserva.tsx:109',
+      'apps/web/src/modules/alquileres/admin/Reservas.tsx:538',
+    ],
+  }),
+
+  entrada({
+    modulo: 'alquileres', fecha: F, slug: 'vista-previa-chat-neutro', tipo: 'decisión', quien: 'Alan',
+    titulo: 'Alquileres: la vista previa de los mensajes es un chat neutro, no WhatsApp',
+    foco: 'La vista previa de Recordatorios y mensajes es una pantalla de chat con los colores del panel (un solo acento), no el verde de WhatsApp que usa Gimnasio. Alan lo decidió sin preguntar; unificar o no es una decisión abierta de Ale.',
+    que: `En Recordatorios y mensajes, cada plantilla se ve en una pantalla de chat (\`.alc-chat\` en \`comun.tsx\`, \`Vista\` en \`Mensajes.tsx\`): la cabecera con el negocio, la burbuja con el texto y las llaves rellenas en negrita, y la hora con las tildes. Los colores son los del panel: la burbuja sobre \`--color-primary-bg\`, la tinta en \`--color-text\`, sin el verde de WhatsApp. Gimnasio eligió lo contrario (una pantalla de WhatsApp, verde, en claro y en oscuro); Turnos tenía el verde y el 27/10 pasó al mismo chat neutro que Alquileres (commit 6d526).`,
+    decision: 'La vista previa del mensaje en Alquileres es un chat neutro con los colores del panel y un solo acento.',
+    porque: 'El pedido de Ale para el rediseño fue un acento y sin adornos: un verde ajeno al sistema en medio de un panel que no usa ese color rompe la regla, y la vista previa muestra el texto, no la aplicación. Gimnasio prefirió parecerse a lo que llega al teléfono. Las dos son defendibles y hoy conviven: si se unifican, Alan propone que sea la neutra, y lo decide Ale (decisión abierta "Pedidos del kit que quedaron sin tomar").',
+    archivos: [
+      'apps/web/src/modules/alquileres/admin/configuracion/comun.tsx:58-65',
+      'apps/web/src/modules/alquileres/admin/configuracion/Mensajes.tsx:134',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Mensajes.tsx:37',
+    ],
+  }),
+
+  entrada({
+    modulo: 'alquileres', fecha: F, slug: 'acciones-al-instante-y-campanita', tipo: 'decisión', quien: 'Alan',
+    titulo: 'Alquileres: qué se guarda al instante, qué cuenta la campanita y qué busca el buscador',
+    foco: 'Equipo y Conectar/Desconectar Mercado Pago se guardan al instante (son acciones, no un borrador); los bloqueos de un calendario externo solo se quitan desconectándolo; el badge de Reservas cuenta solo señas pendientes futuras; las reservas hechas en la demo entran sin leer; en el salón el buscador busca eventos.',
+    que: `Decisiones chicas del comportamiento del panel, tomadas al armarlo:
+1. **Equipo** y **Conectar / Desconectar Mercado Pago** se guardan al instante: son acciones, no un borrador. El resto de Pagos y señas sigue con borrador + Guardar.
+2. Los **bloqueos de un calendario externo** no se quitan desde Días bloqueados o Bloqueos: se desconecta el calendario en Calendarios (.ics), como ya era, y se van con él.
+3. El **badge de Reservas** cuenta solo las señas pendientes futuras (antes contaba también las pasadas).
+4. Las **reservas hechas en la demo** (desde el sitio o a mano) entran en la campanita sin leer: son la única novedad de verdad; el resto de los avisos nace leído.
+5. En el salón el **buscador** no busca clientes (esa sección es Eventos) sino los próximos eventos, con el cliente en el detalle.`,
+    decision: 'Las acciones (sumar o sacar a alguien del equipo, conectar o desconectar Mercado Pago) se guardan al toque; lo que se configura, con borrador y Guardar. La campanita y el badge cuentan solo lo que todavía se puede atender, y el buscador encuentra lo que cada modo llama "la gente" (clientes, huéspedes o eventos).',
+    porque: 'Un "Conectado" que todavía no se guardó confunde (y lo mismo una persona que figura en el equipo y desaparece al descartar): una acción se cumple o no, no queda en borrador. Un badge que cuenta señas de reservas que ya pasaron no se puede bajar nunca. Y los bloqueos importados tienen un dueño, el calendario externo: si se pudieran borrar sueltos, la próxima sincronización los traería de vuelta.',
+    archivos: [
+      'apps/web/src/modules/alquileres/admin/configuracion/Pagos.tsx:28-29',
+      'apps/web/src/modules/alquileres/admin/configuracion/Equipo.tsx:2-3',
+      'apps/web/src/modules/alquileres/admin/configuracion/Bloqueos.tsx:39',
+      'apps/web/src/modules/alquileres/datos/index.ts:144',
+      'apps/web/src/modules/alquileres/admin/Panel.tsx:101-102',
+      'apps/web/src/modules/alquileres/admin/Panel.tsx:106-108',
+      'apps/web/src/modules/alquileres/admin/Panel.tsx:140-144',
+    ],
+  }),
+
+  entrada({
+    modulo: 'alquileres', fecha: F, slug: 'textos-y-links-viejos', tipo: 'decisión', quien: 'Alan',
+    titulo: 'Alquileres: precios abreviados en el calendario, rótulos femeninos y links viejos que siguen andando',
+    foco: 'En el calendario de temporadas el precio va abreviado ("98k") con el precio entero en el aria-label; los roles del equipo tienen rótulo femenino opcional (Dueña, Encargada); los links viejos a Configuración se traducen a la sección nueva y una sección de otro modo cae en la agenda.',
+    que: `1. En el calendario de Temporadas y precios el precio de cada noche va **abreviado** ("98k"): "$98.000" no entra en una celda de 46 px. El precio entero queda en el \`aria-label\` de cada día, con la temporada y si es fin de semana.
+2. Los **roles** tienen rótulo femenino opcional (\`Persona.genero\`): Lucía Benítez es "Dueña" y Paula Giménez "Encargada"; "Recepción" es neutro.
+3. Nada de \`?vista=\` nuevo rompe lo viejo: \`resolverRuta\` traduce \`?vista=configuracion&tab=…\` a la sección nueva y reescribe la URL, y una sección de otro modo o inventada cae en la agenda.`,
+    decision: 'Precio abreviado en la celda y entero para el lector de pantalla; rótulos de rol con género cuando la persona lo tiene; y los links viejos del panel siguen abriendo lo que abrían.',
+    porque: 'Una celda de 46 px no puede mostrar "$98.000" sin romper la grilla ni achicar la letra por debajo de lo legible; el `aria-label` guarda el dato completo. "Dueño" para Lucía es un error que cualquier dueña nota al abrir su panel. Y la demo de Alquileres tiene links guardados desde el 26/10 (en la tira de la demo, en el índice y en las entradas de auditoría): romperlos era regalar 404.',
+    archivos: [
+      'apps/web/src/modules/alquileres/admin/configuracion/Temporadas.tsx:27',
+      'apps/web/src/modules/alquileres/admin/configuracion/Temporadas.tsx:86',
+      'apps/web/src/modules/alquileres/datos/index.ts:194',
+      'apps/web/src/modules/alquileres/datos/index.ts:201',
+      'apps/web/src/modules/alquileres/admin/navegacion.ts:11-14',
+      'apps/web/src/modules/alquileres/admin/navegacion.test.ts:34',
+      'apps/web/src/modules/alquileres/admin/navegacion.test.ts:54',
+    ],
+  }),
+
+  entrada({
+    modulo: 'alquileres', fecha: F, slug: 'qa-rediseno', tipo: 'tarea', quien: 'Alan',
+    titulo: 'Alquileres: QA del rediseño en 1280, 768, 390 y 390 oscuro',
+    foco: 'Recorrida con Playwright de los tres modos (51 pantallas por ancho, 204 en total): sin desborde, sin errores de consola, sin imágenes rotas, el link viejo redirige; lo que quedó en rojo son contrastes del kit (tomados el 27/10), los botones primarios (decisión abierta) y tres toques chicos.',
+    que: `Con el rediseño terminado se recorrieron en el navegador los tres modos (canchas, salón y estadía) a 1280, 768, 390 y 390 en oscuro: 51 pantallas por ancho (cada ítem y sub-sección del sidebar en los tres modos, el detalle de una reserva, nueva reserva y nuevo evento, bloquear, la campanita, el buscador, la ficha de un cliente, sumar al equipo y el link viejo), con un contexto de Playwright por tamaño y un log por ancho (\`qa-1280.log\`, \`qa-768.log\`, \`qa-390.log\` y \`qa-oscuro.log\`, en el scratchpad de la sesión). Antes, \`tsc\` 0 errores en \`modules/alquileres\`, eslint 0 errores (solo avisos de \`no-img-element\`, aceptados) y vitest 9/9 en \`navegacion.test.ts\`.
+
+**Lo que dio bien:** sin scroll horizontal en ninguna pantalla, sin errores de consola, sin imágenes rotas, inputs de 16 px, y el link viejo (\`?vista=configuracion&tab=reglas\`) redirige a la sección nueva.
+
+**Lo que quedó en rojo** (el medidor marcó las 51 pantallas de cada ancho, siempre por lo mismo):
+- **Contrastes del kit** (\`pedidos-kit-alquileres.md\`, punto 3): la sigla del negocio, el ítem y la sub-sección activos, el badge y el contador de la campanita, "Marcar leídas" y la fecha de cada aviso en el armazón (3,38 a 3,76:1, y 2,45:1 la fecha); la \`Sigla\` de personas con tonos 600 (3,19 a 3,88:1); los chips apretados de días, comodidades y filtros y el segmentado (3,68 y 4,34:1). El kit los tomó el 27/10 (commit f1623, entrada transversal "El kit toma lo que pidieron los módulos"); las capturas del después de Alquileres son de antes de eso.
+- **Botones primarios** de 14 y 16 px en blanco sobre el azul (3,68:1): "Nueva reserva", "Agendar", "Importar", "Sumar a alguien". Es la decisión abierta "Azul primario".
+- **Toques chicos a 390:** las llaves \`rv-switch\` (42×24; el kit ya tiene el área de 54×44 con un \`::before\`, el medidor no la cuenta), las flechas de semana de la tira de días (32 px de ancho) y los horarios de Nueva reserva (42 px de alto). Las dos últimas no se arreglaron.
+- En oscuro, el valor sobre la columna más alta de los gráficos (2,17:1) es una falsa alarma: el medidor tomaba la barra como fondo del texto, que está arriba de ella (Gimnasio lo corrigió en su medidor el 27/10).
+
+Las capturas del después (207 archivos en cuatro anchos, en el scratchpad de la sesión) son las que usan las entradas de diseño de Alquileres.
+
+**Diferencias con el plan:** las tareas del 7, 8 y 9/12 piden "lista de fallas registrada en Auditoría" por ancho: está acá, en una sola entrada. La del 10/12 (correcciones) no se vinculó: quedan dos toques chicos sin arreglar. La del 11/12 pide una captura por pantalla en los tres anchos enlazadas en la entrada: están en el scratchpad, no en la web (no se vinculó).`,
+    archivos: [
+      'apps/web/src/modules/alquileres/admin/navegacion.test.ts:5',
+      'apps/web/src/modules/alquileres/admin/Reservas.tsx:144',
+      'apps/web/src/design-system/reservas/estilo.tsx:136',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:59-61',
+    ],
+  }),
+
+  // ─── Gimnasio · Ale · rediseño ──────────────────────────────────────────────
+  entrada({
+    modulo: 'gimnasio', fecha: F, slug: 'todo-en-el-sidebar', tipo: 'diseño', quien: 'Ale',
+    titulo: 'Gimnasio al estándar de Órbita: todas las secciones en el sidebar',
+    foco: 'Un solo panel para los ocho rubros con la barra lateral de Tienda: Hoy (Clases, Alumnos, Ingresos), Negocio (Equipo, Actividades y salas, Planes y precios), Reservas (Reglas, Días sin clases, Mensajes, Pagos), Calendarios y Configuración con Datos del negocio y Horarios; antes eran cuatro ítems y una columna de pestañas.',
+    que: `Mismo pedido de Ale que en los otros módulos ("todo en el sidebar", "minimalista pero el estándar visual de Órbita"). El panel de Gimnasio tenía Clases, Atletas, Ingresos y Configuración, y adentro de Configuración una columna de siete pestañas. Ahora usa \`LayoutPanel\` v2 (el armazón de Tienda, entrada transversal "LayoutPanel v2") y la barra lateral completa, la misma para los ocho rubros (\`RUBROS_GYM\`: cambia el rótulo de la gente, Alumnos, Socios o Participantes, y el del profe, Coach, Instructora, Sensei…, no las secciones):
+- **Hoy:** Clases (badge con las personas en lista de espera hoy; \`?ver=grilla\` abre la grilla semanal, \`?dia=\` otro día y \`?clase=\` el detalle), Alumnos (antes "Atletas"; badge con los planes que vencen en 7 días; \`?socio=\` abre la ficha) e Ingresos.
+- **Negocio:** Equipo, Actividades y salas, Planes y precios.
+- **Reservas:** Reglas de reserva, Días sin clases, Recordatorios y mensajes, Pagos.
+- Sin grupo: Calendarios (.ics) y Configuración › Datos del negocio y Horarios.
+
+Los links viejos siguen andando: \`?vista=configuracion&tab=actividades\` (o \`planes\`, \`reglas\`, \`bloqueos\`, \`calendarios\`) abre la sección nueva y un efecto corrige la barra de direcciones (\`PESTANA_VIEJA\`); \`tab=negocio\` y \`tab=horarios\` siguen adentro de Configuración, y una \`vista\` desconocida cae en Clases. El panel espera a \`useHidratado\` antes de montar los formularios: en una carga completa el primer render traía el negocio de ejemplo y, al guardar, pisaba lo del dueño.
+
+En las capturas, Configuración a 1280 antes (cuatro ítems y la columna de pestañas, con "Atletas") y después (la barra completa con Datos del negocio como sub-sección). A 390 el después es el cajón abierto con Configuración desplegada.`,
+    antes: { 1280: 'panel-sidebar-antes-1280.webp', 390: 'panel-sidebar-antes-390.webp' },
+    despues: { 1280: 'panel-sidebar-despues-1280.webp', 390: 'panel-sidebar-despues-390.webp' },
+    archivos: [
+      'apps/web/src/modules/gimnasio/admin/Panel.tsx:7',
+      'apps/web/src/modules/gimnasio/admin/Panel.tsx:40-42',
+      'apps/web/src/modules/gimnasio/admin/Panel.tsx:62-63',
+      'apps/web/src/modules/gimnasio/admin/Panel.tsx:86-88',
+      'apps/web/src/modules/gimnasio/admin/Panel.tsx:147-152',
+      'apps/web/src/modules/gimnasio/admin/Panel.tsx:163',
+      'apps/web/src/modules/gimnasio/datos/index.ts:74-75',
+      'apps/web/src/modules/gimnasio/datos/negocio.ts:228',
+    ],
+  }),
+
+  entrada({
+    modulo: 'gimnasio', fecha: F, slug: 'header-del-panel', tipo: 'tarea', quien: 'Ale',
+    titulo: 'Gimnasio: header del estándar con buscador, avisos y cuenta',
+    foco: 'Miga, fecha de la demo, buscador que encuentra secciones, clases de hoy, el equipo y los alumnos, campanita con lo que necesita atención (lista de espera, planes por vencer, clases completas o sin profe) y la cuenta del dueño del rubro.',
+    que: `Con \`LayoutPanel\` v2, el panel de Gimnasio tiene el header completo de Tienda (\`Panel.tsx\`): \`producto="Gimnasio"\`, el rubro, la fecha de la demo ("Sáb 14 nov · 10:40", \`FECHA_DEMO\`), el link al sitio ("Lo que ven tus alumnos para reservar") y:
+- **Campanita** (\`avisos\`): las clases de hoy con gente esperando lugar (sin leer), los planes que vencen en 7 días (sin leer si vencen en 3), las clases de hoy completas y, si las hay, las clases de la grilla que quedaron sin profe (en rojo, abre la grilla). Cada aviso lleva a la ficha o a la clase por la URL.
+- **Buscador** (\`busqueda\`): "Ir a" cada sección (con las sub-secciones de Configuración), las clases de hoy (con profe, sala y cupo), el equipo y los alumnos (teléfono, estado del plan y plan).
+- **Cuenta** (\`usuario\`): el dueño o la dueña del rubro (\`RUBROS_GYM[].dueno\`; por ejemplo Martín Acuña, Dueño, en crossfit).
+
+Los badges del menú: Clases cuenta personas esperando lugar hoy; Alumnos, planes que vencen en 7 días.
+
+${comoQuedo('gimnasio', ['Campanita · 1280', 'header-avisos-1280.webp'], ['Cajón del menú · 390', 'header-cajon-390.webp'])}`,
+    archivos: [
+      'apps/web/src/modules/gimnasio/admin/Panel.tsx:45',
+      'apps/web/src/modules/gimnasio/admin/Panel.tsx:58',
+      'apps/web/src/modules/gimnasio/admin/Panel.tsx:90',
+      'apps/web/src/modules/gimnasio/admin/Panel.tsx:117',
+      'apps/web/src/modules/gimnasio/admin/Panel.tsx:142-143',
+      'apps/web/src/modules/gimnasio/admin/Panel.tsx:160',
+      'apps/web/src/modules/gimnasio/datos/index.ts:192',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:27-36',
+    ],
+  }),
+
+  entrada({
+    modulo: 'gimnasio', fecha: F, slug: 'configuracion-en-secciones', tipo: 'tarea', quien: 'Ale',
+    titulo: 'Gimnasio: Configuración partida en secciones del sidebar y piezas comunes del panel',
+    foco: 'Configuracion.tsx (con su columna de pestañas) se borró; cada sección es una página de admin/configuracion/ (39 a 186 líneas) más admin/Equipo.tsx; lo común (useBorrador, BarraGuardar con motivo, Swatches como radios, KpiGym) vive en admin/piezas.tsx.',
+    que: `\`admin/Configuracion.tsx\` tenía adentro las pestañas y su propia columna para elegirlas. Se borró (\`git rm\`) y cada sección es una página en \`admin/configuracion/\`: Negocio (39 líneas), Horarios (41), Reglas (56), Planes (57), Actividades (81), Bloqueos (79), Calendarios (76), Mensajes (186) y Pagos (93), más \`admin/Equipo.tsx\` (143). Todas usan \`rv-pagina rv-pagina--form\` (880 px) salvo Equipo, que es un listado.
+
+Las piezas comunes están en \`admin/piezas.tsx\`:
+- \`useBorrador\`: el borrador que se compara con lo guardado y sabe si cambió.
+- \`BarraGuardar\`: fija abajo, con Descartar y Guardar, y un \`motivo\` cuando todavía no se puede guardar ("Marcá al menos un día", "El CBU tiene que tener 22 números").
+- \`Swatches\`: los colores del equipo como radios de verdad (Tab entra una vez, las flechas eligen).
+- \`Punto\`, \`num\` y \`KpiGym\` (el indicador con ícono y variación, ver Ingresos).
+
+Lo que se hizo en cada sección nueva está en "Secciones nuevas con contenido real"; dónde quedó cada dato, en la decisión "Dónde vive cada cosa y qué se guarda al instante".`,
+    archivos: [
+      'apps/web/src/modules/gimnasio/admin/piezas.tsx:113',
+      'apps/web/src/modules/gimnasio/admin/piezas.tsx:128',
+      'apps/web/src/modules/gimnasio/admin/piezas.tsx:142',
+      'apps/web/src/modules/gimnasio/admin/piezas.tsx:160',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Negocio.tsx:6',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Horarios.tsx:11',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Pagos.tsx:90',
+      'apps/web/src/modules/gimnasio/admin/Panel.tsx:193-194',
+    ],
+  }),
+
+  entrada({
+    modulo: 'gimnasio', fecha: F, slug: 'secciones-nuevas', tipo: 'tarea', quien: 'Ale',
+    titulo: 'Gimnasio: secciones nuevas con contenido real',
+    foco: 'Equipo (profes con color, actividades e invitación; dar de baja deja sus clases sin profe), Actividades y salas, Planes y precios, Reglas de reserva, Días sin clases, Recordatorios y mensajes (WhatsApp con variables y vista previa), Pagos (Mercado Pago, mostrador, renovaciones) y Calendarios (.ics).',
+    que: `Con todo en el sidebar aparecieron secciones nuevas, todas con datos de ejemplo en \`datos/index.ts\`:
+- **Equipo:** una tarjeta por profe con su sigla en su color, las actividades que da, cuántas clases por semana y qué días, Editar y Dar de baja. Sumar pide nombre, email opcional (invitación simulada: "Demo: no se mandó ninguna invitación"), actividades (casillas de 44 px) y color (\`Swatches\`, el primero que nadie usa). Dar de baja deja sus clases **sin profe** (\`profeId: ''\`) y avisa cuántas; la grilla, el día, el sitio ("Profe a confirmar") y la campanita (\`clasesSinProfe\`) lo muestran. Datos: \`Profe\` con \`color\`, \`actividades\` y \`email\`; \`COLORES_EQUIPO\` en tonos 700; \`colorDe\` (un color fijo por nombre para las siglas de alumnos); un equipo guardado antes de tener color se completa al leer.
+- **Actividades y salas:** nombre, duración, cupo por defecto y color de borde en la grilla por actividad (\`COLORES_ACTIVIDAD\`), cuántas clases por semana tiene cada una; las salas aparte (dos clases no se pisan en la misma sala). Al guardar, las clases de una sala quitada pasan a la primera y las de una actividad quitada salen de la grilla (se avisa cuántas); los profes dejan de dar la actividad quitada. Una tarjeta "Los profes están en Equipo" con el salto.
+- **Planes y precios:** prueba (gratis, una vez por persona), clase suelta, packs y membresías, con precio, clases o "por semana", vigencia y la llave "Se ofrece en el sitio"; cada tarjeta dice cuántos alumnos lo tienen hoy (apagar o quitar no les saca nada hasta que venza).
+- **Reglas de reserva:** se reserva hasta N días adelante, cancelación sin cargo hasta N horas antes, check-in desde N minutos antes; debajo, "Lo que pasa solo" (\`SOLAS\`): la lista de espera avanza sola, el pack se descuenta al reservar, la prueba vale una vez por persona, la membresía respeta su tope semanal (reglas del sistema, con tests).
+- **Días sin clases:** lista con fecha ("20 de noviembre" o "24 al 26 de noviembre", \`rangoTxt\`), motivo, origen (lo cargaste vos o calendario externo), cuántas clases de la grilla caen ahí, "ya pasó" y Quitar (solo los propios). Agregar pide desde, hasta incluido y motivo, y dice cuántas clases no se dan. Dato de ejemplo: el feriado del Día de la Soberanía.
+- **Recordatorios y mensajes:** el número de WhatsApp del negocio ("Verificado"), la firma y cuatro mensajes automáticos (\`MOMENTOS\`: reserva confirmada, recordatorio de clase, se liberó un lugar, plan por vencer), cada uno en una tarjeta plegable con llave, texto editable con variables (\`VARIABLES_MENSAJE\`, se insertan donde está el cursor), vista previa como pantalla de WhatsApp con un alumno y una clase reales del negocio (\`ejemploDe\`; una variable inexistente queda marcada), "Enviarme una prueba" (simulado) y "Volver al texto sugerido". Textos de fábrica en \`mensajesDe\`.
+- **Pagos:** Mercado Pago con Conectar / Desconectar simulados ("Demo: no se conectó ninguna cuenta real") y la llave de cobro online al reservar; en el mostrador, efectivo y transferencia (alias, titular, CBU de 22 números validado); membresías y vencimientos: quién registra la renovación (automática solo con Mercado Pago), días de gracia y qué pasa con las reservas de quien venció; una nota con cuántos planes vencen esta semana y el salto a Mensajes. Datos: \`PagosGym\` y \`pagosDe\`.
+- **Calendarios (.ics):** exportar la grilla de las próximas cuatro semanas (real) e importar la URL de un calendario externo (simulado: dos días de ejemplo que quedan como días sin clases); la lista de calendarios conectados con sus días y la última sincronización.
+- **Datos del negocio** y **Horarios** adentro de Configuración: días que abre y horario; si el horario nuevo deja clases afuera se avisa antes de guardar y la grilla las marca.
+
+${comoQuedo('gimnasio', ['Equipo · 1280', 'secciones-equipo-1280.webp'], ['Recordatorios y mensajes · 1280', 'secciones-mensajes-1280.webp'], ['Pagos · 390', 'secciones-pagos-390.webp'])}`,
+    archivos: [
+      'apps/web/src/modules/gimnasio/admin/Equipo.tsx:34',
+      'apps/web/src/modules/gimnasio/admin/Equipo.tsx:48',
+      'apps/web/src/modules/gimnasio/admin/Equipo.tsx:110',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Actividades.tsx:25',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Planes.tsx:11',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Reglas.tsx:20',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Bloqueos.tsx:24',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Bloqueos.tsx:59',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Mensajes.tsx:59',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Mensajes.tsx:74',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Pagos.tsx:21',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Calendarios.tsx:21',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Calendarios.tsx:25',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Calendarios.tsx:37',
+      'apps/web/src/modules/gimnasio/datos/index.ts:112',
+      'apps/web/src/modules/gimnasio/datos/index.ts:186-192',
+      'apps/web/src/modules/gimnasio/datos/index.ts:214-217',
+      'apps/web/src/modules/gimnasio/datos/index.ts:233',
+      'apps/web/src/modules/gimnasio/datos/index.ts:301',
+      'apps/web/src/modules/gimnasio/datos/index.ts:345',
+      'apps/web/src/modules/gimnasio/datos/negocio.ts:62-64',
+      'apps/web/src/modules/gimnasio/storefront/Home.tsx:76',
+    ],
+  }),
+
+  entrada({
+    modulo: 'gimnasio', fecha: F, slug: 'clases-como-listado', tipo: 'diseño', quien: 'Ale',
+    titulo: 'Gimnasio: Clases, el día y la grilla como un listado de Tienda',
+    foco: 'Segmentado Día / Grilla semanal y "Nueva clase" en el encabezado; el día con la tira de siete días, una fila por clase (hora en mono, actividad, profe con su punto de color, barra de cupo y chips) y el detalle en un modal; la grilla con una columna por día y un chip por clase con el borde del color de la actividad.',
+    que: `Clases era una lista de tarjetas con el día y, aparte, la grilla. Ahora es un listado del estándar de Tienda (\`Clases.tsx\`):
+- **Encabezado:** el segmentado Día / Grilla semanal (\`?ver=grilla\`) y "Nueva clase".
+- **El día** (\`Dia\`): la tira de siete días con "Hoy" y un punto en los días con lista de espera, flechas de semana, y una tarjeta con una fila por clase: la hora en mono, la actividad, el profe con su punto de color (o "Sin profe"), la barra de cupo y los chips "En curso", "N en espera" y "N de M vinieron". El día elegido va tintado, no lleno (como en Alquileres: el blanco sobre el primario a 11 px no llega a AA).
+- **El detalle** (\`DetalleClase\`), en un modal que en celular es hoja: la asistencia con check-in (se abre \`checkInMin\` antes de la clase), Faltó, sacar, la lista de espera con "Darle el lugar", y anotar a alguien a mano con aviso si ya gastó su tope semanal o el pack.
+- **La grilla** (\`Grilla\`): una columna por día que abre, cada clase un chip con el borde del color de la actividad, el profe, el cupo y "% lleno" (promedio de cuatro semanas); en celular, un día por vez con una tira de chips. Editar / Nueva clase (\`EditarClase\`): actividad, día, hora de 15 en 15 dentro del horario, profe (incluye "Sin profe por ahora"), sala y cupo; no deja pisar dos clases en la misma sala ni salir del horario.
+
+El 27/10 la QA ajustó la tira en celular: el día elegido queda entero a la vista (un efecto centra el chip apretado solo si quedó cortado, como la tira de Reservar del sitio) y las flechas no se achican (\`flex-shrink: 0\`: medían 27 px a 390).`,
+    antes: { 1280: 'clases-antes-1280.webp', 390: 'clases-antes-390.webp' },
+    despues: { 1280: 'clases-despues-1280.webp', 390: 'clases-despues-390.webp' },
+    archivos: [
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:6',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:30',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:37',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:101',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:146',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:154-159',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:213',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:303',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:351',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:368',
+    ],
+  }),
+
+  entrada({
+    modulo: 'gimnasio', fecha: F, slug: 'alumnos', tipo: 'diseño', quien: 'Ale',
+    titulo: 'Gimnasio: Alumnos (antes Atletas) con indicadores, filtros en tira y paginado',
+    foco: 'La sección pasó a llamarse Alumnos (Socios en el gimnasio tradicional, Participantes en talleres); arriba, el aviso de quiénes vencen en 7 días y cuatro indicadores; filtros con cuenta por estado en una tira, buscador sin tildes, tabla con sigla en color fijo y "Mostrar 25 más".',
+    que: `"Atletas" pasó a **Alumnos** (es el rótulo de crossfit, funcional, yoga, danza, artes marciales y natación; el gimnasio tradicional dice Socios y los talleres, Participantes). La pantalla (\`Socios.tsx\`):
+- Arriba, el aviso con quiénes vencen en 7 días y cuatro \`KpiGym\`: al día, vencen en 7 días, vencidos y sin plan.
+- La tira de filtros con la cuenta por estado (\`.gso-tira\`; píldoras de 44 px en celular) y el buscador por nombre o teléfono sin tildes (\`plano\`).
+- La tabla \`rv-tabla\` (tarjetas en celular) con la sigla en un color fijo por nombre, el estado del plan, "vence en N d", cuántas clases le quedan y la asistencia de 30 días; los que vencen pronto van primero; "Mostrar 25 más" (\`PAGINA\`: hay 104 alumnos de ejemplo).
+- La ficha por \`?socio=\` (\`Ficha\`): plan, vence, renovar o cambiar (asigna desde hoy; el cobro se registra a mano), "Avisar que vence" (simulado, dice si el automático está apagado), vino / faltó / asistencia 30 días y las últimas diez clases. Sumar alumno (\`NuevoSocio\`).
+
+El texto "Un cupo por atleta" del sitio pasó a "Un cupo por alumno".`,
+    antes: { 1280: 'alumnos-antes-1280.webp', 390: 'alumnos-antes-390.webp' },
+    despues: { 1280: 'alumnos-despues-1280.webp', 390: 'alumnos-despues-390.webp' },
+    archivos: [
+      'apps/web/src/modules/gimnasio/admin/Socios.tsx:25',
+      'apps/web/src/modules/gimnasio/admin/Socios.tsx:36-38',
+      'apps/web/src/modules/gimnasio/admin/Socios.tsx:51',
+      'apps/web/src/modules/gimnasio/admin/Socios.tsx:59',
+      'apps/web/src/modules/gimnasio/admin/Socios.tsx:61',
+      'apps/web/src/modules/gimnasio/admin/Socios.tsx:99-100',
+      'apps/web/src/modules/gimnasio/admin/Socios.tsx:120-123',
+      'apps/web/src/modules/gimnasio/admin/Socios.tsx:173',
+      'apps/web/src/modules/gimnasio/admin/Socios.tsx:229',
+      'apps/web/src/modules/gimnasio/datos/index.ts:80',
+      'apps/web/src/modules/gimnasio/storefront/Reserva.tsx:316',
+    ],
+  }),
+
+  entrada({
+    modulo: 'gimnasio', fecha: F27, slug: 'ingresos-comparaciones-honestas', tipo: 'diseño', quien: 'Ale',
+    titulo: 'Gimnasio: Ingresos como tablero del estándar, con comparaciones honestas',
+    foco: 'Cuatro indicadores con ícono y variación, "Por semana" con Barras del kit y tres listas con barra fina (por plan, ocupación por actividad, asistencia por día); el período en curso se compara con el mismo tramo del anterior y sin historial no se inventa un delta.',
+    que: `Ingresos (\`Ingresos.tsx\`) es el tablero del panel de Tienda: el segmentado Este mes / Mes pasado / Últimos 3 meses, cuatro \`KpiGym\` con ícono y variación (Ingresos, Alumnos al día, Vencen en 7 días, Ocupación), "Por semana" con \`Barras\` del kit (una serie, un acento, el valor solo en la columna más alta y al foco) y tres listas con barra fina (\`.gii-filas\`): por plan, ocupación por actividad y asistencia por día de la semana. Las ventas se cuentan por la fecha en que arrancó el plan (y una renovación por vigencia desde el alta), más las clases sueltas (\`ventasEntre\`).
+
+**Lo que se veía mal el 26/10 y se arregló el 27/10:** "▼ 40,1 %" comparaba medio noviembre contra octubre entero, y la ocupación "▲ 35 puntos" contra días anteriores al historial de la demo. Ahora:
+- el período que todavía corre se compara con el mismo tramo del anterior (lo que va de noviembre contra el 1 al 14 de octubre) y la nota lo dice ("vs. 1 al 14 de octubre", \`comparado\`);
+- la ocupación solo cuenta días con historial (\`primerDia\`, \`ocupacionEntre\`) y, sin período anterior con datos, no inventa un delta ("sin historial antes del jue 15 oct");
+- sin ventas previas tampoco hay variación (\`variacion\` solo con \`antes > 0\`).
+
+Con los datos de ejemplo da "▲ 11,3 % · 57 ventas · vs. 1 al 14 de octubre" (se ve en la captura del después). El valor sobre la columna del gráfico en oscuro ("$2.106.000", 2,17:1 según la QA del 26/10) no era una falla real: el rótulo está arriba de la barra, sobre la tarjeta; el medidor tomaba el fondo de la barra como fondo del texto, y se corrigió el medidor.
+
+**Diferencias con el plan:** la tarea del 1/12 pide la comparación "contra el mes anterior": es contra el mismo tramo del período anterior, que es lo honesto a mitad de mes; por eso ahora sí se vinculó.`,
+    antes: { 1280: 'ingresos-antes-1280.webp', 390: 'ingresos-antes-390.webp' },
+    despues: { 1280: 'ingresos-despues-1280.webp', 390: 'ingresos-despues-390.webp' },
+    archivos: [
+      'apps/web/src/modules/gimnasio/admin/Ingresos.tsx:3',
+      'apps/web/src/modules/gimnasio/admin/Ingresos.tsx:28',
+      'apps/web/src/modules/gimnasio/admin/Ingresos.tsx:42',
+      'apps/web/src/modules/gimnasio/admin/Ingresos.tsx:68',
+      'apps/web/src/modules/gimnasio/admin/Ingresos.tsx:84',
+      'apps/web/src/modules/gimnasio/admin/Ingresos.tsx:86',
+      'apps/web/src/modules/gimnasio/admin/Ingresos.tsx:89-92',
+      'apps/web/src/modules/gimnasio/admin/Ingresos.tsx:104',
+      'apps/web/src/modules/gimnasio/admin/Ingresos.tsx:115',
+      'apps/web/src/modules/gimnasio/admin/Ingresos.tsx:151-156',
+      'apps/web/src/modules/gimnasio/admin/piezas.tsx:81',
+    ],
+  }),
+
+  entrada({
+    modulo: 'gimnasio', fecha: F27, slug: 'qa-rediseno', tipo: 'tarea', quien: 'Ale',
+    titulo: 'Gimnasio: QA del rediseño en 1280, 768, 390 y 390 oscuro, y los arreglos del 27/10',
+    foco: '459 verificaciones con Playwright y 0 fallas en cuatro anchos; las 13 fallas del 26/10 eran tres cosas (flechas de 27 px, llaves que el medidor no contaba y un contraste medido contra el fondo equivocado); se borraron los parches locales que el kit tomó.',
+    que: `Antes: \`tsc\` 0 errores en \`modules/gimnasio\` y \`pages/gimnasio-demo\`, eslint 0 errores (solo \`no-img-element\`, aceptados), vitest 14/14 (\`datos/__tests__/reglas.test.ts\`).
+
+**La recorrida** (\`pw/rediseno/gimnasio.cjs\` en el scratchpad de la sesión, un contexto por vista; log en \`gimnasio.log\`): a 1280, 768, 390 y 390 en oscuro, las 14 secciones y sub-secciones del sidebar, el detalle de una clase, nueva clase, la ficha de un alumno, sumar alumno, sumar coach, agregar días sin clases, la campanita, el buscador (1280), el cajón y Configuración desplegada (390), el link viejo, la baja de un profe (1280), la tira de días de Clases a 390 (hoy entero a la vista al entrar, con "Semana siguiente" y al tocar un día; flechas de 44), la llave \`rv-switch\` a 390 (un toque 8 px arriba y abajo o 4 px a los costados cae en la llave y la cambia) y la tira de Reservar con el teclado. En cada pantalla: sin scroll horizontal, sin imágenes rotas, inputs de 16 px, toques de 44 px (contando el \`::before\` de la llave), contraste AA contra el fondo real y sin errores de consola. Resultado: **459 OK · 0 fallas** (1280: 114 · 768: 109 · 390: 119 · 390 oscuro: 117), 94 capturas.
+
+**Las 13 fallas del 26/10 eran tres cosas:**
+- las flechas de semana de la tira de Clases medían 27 px a 390: \`flex-shrink: 0\`;
+- doce llaves de 42×24: el kit ya tenía el área de toque de 54×44 con un \`::before\`, el medidor no la contaba (ahora sí);
+- el valor sobre la barra del gráfico en oscuro (2,17:1): el medidor tomaba la barra como fondo; corregido en \`medir.fondo\` (solo cuentan los ancestros que están debajo del texto, y un ancestro que scrollea cuenta aunque el texto haya quedado fuera de su caja: eso sacó también una falsa alarma en la ficha del alumno a 1280). El mismo arreglo le sirve al medidor común de \`pw/superadmin/visual.cjs\`.
+
+**Parches locales borrados** porque el kit los tomó el 27/10: \`.rvp .rv-seg\`, \`.rvp .rv-chip--gris\`, \`.rvp .rv-btn--peligro\` y \`.rvp .rv-chip[aria-pressed]\` de \`CSS_PANEL\`, y el efecto \`scrollTo\` de \`Panel.tsx\` (lo hace \`LayoutPanel\`). Mensajes usa el \`Switch\` exportado del kit en vez de un botón crudo, y \`diasTxt\` de Bloqueos se fue: \`rangoTxt\` ya cubre un solo día. También el día elegido de la tira de Clases queda entero a la vista en celular.
+
+Lo que queda fuera del módulo: nada en rojo. Los botones primarios (blanco 14 px 600 sobre #3B82F6, 3,7:1) el medidor los excluye a propósito: es la decisión abierta "Azul primario".
+
+**Diferencias con el plan:** las tareas del 7, 8 y 9/12 piden "lista de fallas registrada en Auditoría" por ancho: está acá, en una sola entrada; la del 11/12 (correcciones) se cumple con las tres de arriba.
+
+${comoQuedo('gimnasio', ['Tira de Clases con "Semana siguiente" · 390', 'qa-clases-tira-390.webp'], ['Ingresos en oscuro · 390', 'qa-ingresos-oscuro-390.webp'])}`,
+    archivos: [
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:30',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:154-159',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Mensajes.tsx:136',
+      'apps/web/src/modules/gimnasio/admin/piezas.tsx:18',
+      'apps/web/src/design-system/reservas/estilo.tsx:136',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:355',
+      'apps/web/src/modules/gimnasio/datos/__tests__/reglas.test.ts:1-5',
+    ],
+  }),
+
+  entrada({
+    modulo: 'gimnasio', fecha: F, slug: 'alumnos-y-equipo', tipo: 'decisión', quien: 'Ale',
+    titulo: 'Gimnasio: Atletas pasa a Alumnos y los profes van a Equipo',
+    foco: '"Atletas" pasó a Alumnos solo en crossfit, funcional, yoga, danza, artes marciales y natación (el gimnasio tradicional sigue con Socios y los talleres con Participantes); los profes salieron de Actividades y salas a una sección Equipo, y dar de baja no borra sus clases: quedan sin profe.',
+    que: `1. **Alumnos:** \`socio: 'Alumno/a'\` y \`socios: 'Alumnos'\` en seis rubros (\`RUBROS_GYM\`); el gimnasio tradicional sigue con **Socios** y los talleres con **Participantes**. El texto "Un cupo por atleta" del sitio pasó a "Un cupo por alumno".
+2. **Equipo:** los profes salieron de Actividades y salas a una sección propia, con color, email e invitación. Dar de baja no borra sus clases: quedan "sin profe" (\`profeId: ''\`), se avisa cuántas, y la grilla, el día, el sitio ("Profe a confirmar") y la campanita lo muestran hasta que se asigne a otra persona.`,
+    decision: 'La gente se llama Alumnos (o Socios, o Participantes) según el rubro, nunca Atletas. Los profes son una sección, Equipo, y una baja deja las clases sin profe en vez de borrarlas.',
+    porque: 'Ale pidió "Atletas → Alumnos" el 26/10. "Atletas" era un rótulo de crossfit que colgaba de los otros rubros; "Alumnos" sirve para seis, y al gimnasio tradicional y a los talleres se les dejó el que ya usaban, porque "alumno" en un gimnasio de musculación suena a escuela. Equipo como sección es lo que hace Tienda (y Turnos): los profes son personas con acceso al panel, no un atributo de una actividad. Y borrar las clases de un profe que se fue borraría reservas de alumnos: la clase sigue, se le pone otro profe.',
+    archivos: [
+      'apps/web/src/modules/gimnasio/datos/index.ts:75',
+      'apps/web/src/modules/gimnasio/datos/index.ts:80',
+      'apps/web/src/modules/gimnasio/datos/index.ts:99',
+      'apps/web/src/modules/gimnasio/storefront/Reserva.tsx:316',
+      'apps/web/src/modules/gimnasio/admin/Equipo.tsx:3-4',
+      'apps/web/src/modules/gimnasio/admin/Equipo.tsx:48',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:386-387',
+    ],
+  }),
+
+  entrada({
+    modulo: 'gimnasio', fecha: F, slug: 'donde-vive-cada-cosa', tipo: 'decisión', quien: 'Ale',
+    titulo: 'Gimnasio: dónde vive cada cosa y qué se guarda al instante',
+    foco: 'Reglas de reserva tiene solo lo configurable (lo que el sistema hace solo se explica, no se configura); la seña, el cobro online y las renovaciones viven en Pagos y el aviso de vencimiento en Mensajes; Mercado Pago y el equipo se guardan al instante; los bloqueos de un calendario externo se quitan desconectándolo.',
+    que: `1. **Reglas de reserva** tiene solo lo configurable: reservar hasta N días adelante, cancelar hasta N horas antes, check-in desde N minutos antes. Lo que el sistema hace solo (la lista de espera avanza, el pack se descuenta, la prueba vale una vez, la membresía respeta su tope) se explica ahí, en "Lo que pasa solo", pero no se configura.
+2. La **seña / cobro online** y las **renovaciones** (quién la registra, días de gracia, qué pasa con las reservas de quien venció) viven en Pagos; el aviso de vencimiento, en Recordatorios y mensajes (Pagos solo enlaza).
+3. **Conectar / Desconectar Mercado Pago** y el **equipo** se guardan al instante: son acciones, no un borrador. El resto, borrador + Guardar.
+4. Los **bloqueos de un calendario externo** no se quitan desde Días sin clases: se desconecta el calendario.`,
+    decision: 'Lo que es regla del sistema se explica y no se configura; lo que es plata vive en Pagos y lo que es un mensaje, en Mensajes; las acciones se guardan al toque y lo importado por .ics se saca desconectando el calendario.',
+    porque: 'Una llave para "que la lista de espera avance sola" es una promesa de algo que, apagado, rompería la reserva: las reglas probadas en `reglas.test.ts` no son opciones. Pagos y Mensajes siguen el criterio de Tienda y el mismo que Alquileres tomó el mismo día, así los dos paneles se parecen. Un "Conectado" sin guardar confundía en la QA. Y un bloqueo importado tiene dueño: si se borra suelto, la próxima sincronización lo trae de vuelta.',
+    archivos: [
+      'apps/web/src/modules/gimnasio/admin/configuracion/Reglas.tsx:20',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Reglas.tsx:27',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Pagos.tsx:4',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Pagos.tsx:26',
+      'apps/web/src/modules/gimnasio/admin/Equipo.tsx:43',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Bloqueos.tsx:47',
+      'apps/web/src/modules/gimnasio/datos/__tests__/reglas.test.ts:1-5',
+    ],
+  }),
+
+  entrada({
+    modulo: 'gimnasio', fecha: F, slug: 'vista-previa-whatsapp', tipo: 'decisión', quien: 'Ale',
+    titulo: 'Gimnasio: la vista previa de los mensajes es una pantalla de WhatsApp',
+    foco: 'La vista previa de Recordatorios y mensajes usa los colores de WhatsApp (verde, en claro y en oscuro) porque tiene que parecerse a lo que llega al teléfono; el resto del panel no usa ese verde. Alquileres y Turnos eligieron un chat neutro: unificar o no queda abierto.',
+    que: `En Recordatorios y mensajes, cada plantilla se ve en una pantalla de WhatsApp (\`VistaWhatsApp\`, \`.gms-wa\`): la cabecera gris con la sigla del negocio, el fondo beige, la burbuja verde con el texto y las variables rellenas con un alumno y una clase reales (\`ejemploDe\`), y la firma. Tiene su versión en oscuro. Ese verde no aparece en ningún otro lugar del panel.`,
+    decision: 'La vista previa del mensaje en Gimnasio se ve como WhatsApp, con sus colores, aunque el panel use un solo acento.',
+    porque: 'La vista previa existe para que el dueño sepa cómo le va a llegar el mensaje al alumno, y lo que le llega es un WhatsApp: con los colores del panel se vería como un aviso más del sistema. Es una diferencia consciente con Alquileres y Turnos (chat neutro) y la unificación la decide Ale (decisión abierta "Pedidos del kit que quedaron sin tomar").',
+    archivos: [
+      'apps/web/src/modules/gimnasio/admin/configuracion/Mensajes.tsx:37-45',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Mensajes.tsx:59',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Mensajes.tsx:163',
+      'apps/web/src/modules/alquileres/admin/configuracion/comun.tsx:58',
+    ],
+  }),
+
+  entrada({
+    modulo: 'gimnasio', fecha: F27, slug: 'ingresos-compara-periodos-iguales', tipo: 'decisión', quien: 'Ale',
+    titulo: 'Gimnasio: Ingresos compara períodos del mismo largo y no inventa un delta sin historial',
+    foco: 'El período en curso se compara con el mismo tramo del anterior (lo que va de noviembre contra el 1 al 14 de octubre), la ocupación solo cuenta días con historial y, sin datos previos, no hay chip de variación.',
+    que: `El 26/10 Ingresos comparaba "este mes" (medio noviembre) contra octubre entero y daba "▼ 40,1 %", y la ocupación contra días anteriores al historial de la demo daba "▲ 35 puntos". Desde el 27/10 el período que corre se compara con el mismo tramo del anterior, la ocupación arranca en \`primerDia\` (el primer día con historial) y, sin período anterior con datos, el indicador sale sin chip y la nota lo dice.`,
+    decision: 'Las variaciones de Ingresos comparan tramos del mismo largo y solo aparecen cuando hay con qué comparar.',
+    porque: 'A mitad de mes, "este mes contra el mes pasado entero" daba una caída del 40 % que no existía, y la ocupación contra días sin historial un salto de 35 puntos: un tablero que miente en la demo va a mentir con datos reales. Mejor un indicador sin chip que uno con un número inventado. Alquileres hace lo mismo (`periodoAnterior`, del mismo largo).',
+    archivos: [
+      'apps/web/src/modules/gimnasio/admin/Ingresos.tsx:89-92',
+      'apps/web/src/modules/gimnasio/admin/Ingresos.tsx:62-66',
+      'apps/web/src/modules/gimnasio/admin/Ingresos.tsx:84',
+      'apps/web/src/modules/gimnasio/admin/Ingresos.tsx:151',
+      'apps/web/src/modules/gimnasio/admin/Ingresos.tsx:154-156',
+      'apps/web/src/modules/alquileres/admin/Ingresos.tsx:34',
+    ],
+  }),
+
+  entrada({
+    modulo: 'gimnasio', fecha: F, slug: 'colores-badges-y-dia-tintado', tipo: 'decisión', quien: 'Ale',
+    titulo: 'Gimnasio: colores de borde, siglas en tonos 700, qué cuentan los badges y el día tintado',
+    foco: 'Los colores de actividad van de borde en la grilla, nunca debajo de un texto; los del equipo son tonos 700 que llegan a AA con la sigla blanca; el badge de Clases cuenta personas esperando lugar hoy y el de Alumnos, planes que vencen en 7 días; el día elegido de la tira va tintado, no lleno.',
+    que: `1. Los **colores de actividad** (\`COLORES_ACTIVIDAD\`) van de borde en los chips de la grilla, nunca debajo de un texto.
+2. Los **colores del equipo** (\`COLORES_EQUIPO\`) son tonos 700: con la sigla blanca encima dan 4,5:1 o más (el kit adoptó la misma paleta para \`Sigla\` el 27/10).
+3. El **badge de Clases** cuenta personas esperando lugar hoy; el de **Alumnos**, planes que vencen en 7 días.
+4. El **día elegido** de la tira de Clases va tintado (fondo claro del acento, borde y tinta oscura), no lleno: el blanco sobre el primario a 11 px no llega a AA. Igual que en Alquileres.`,
+    decision: 'El color nunca va debajo de un texto chico salvo en tonos que llegan a AA; los badges cuentan lo que hay que atender hoy; el día elegido se marca con tinte, borde y tinta oscura.',
+    porque: 'Son las tres formas de no romper AA con color: un borde no tiene texto encima; un tono 700 con la sigla blanca da 4,5:1 o más (los 600 daban 3,0 a 3,9:1); y el blanco sobre el primario a 11 px da 3,68:1. Un badge que cuenta todo (todas las clases, todos los alumnos) no dice nada: cuenta lo que se puede atender ahora.',
+    archivos: [
+      'apps/web/src/modules/gimnasio/datos/index.ts:186',
+      'apps/web/src/modules/gimnasio/datos/index.ts:300-301',
+      'apps/web/src/modules/gimnasio/admin/Panel.tsx:58',
+      'apps/web/src/modules/gimnasio/admin/Panel.tsx:62-63',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:37',
+      'apps/web/src/design-system/reservas/piezas.tsx:124',
+    ],
+  }),
+
+  // ─── Transversal · el kit y el armazón (en Gimnasio, el módulo de Ale) ─────
+  entrada({
+    modulo: 'gimnasio', fecha: F, slug: 'layoutpanel-v2', tipo: 'tarea', quien: 'Ale', transversal: true,
+    titulo: 'Transversal: LayoutPanel v2, el armazón del panel de Tienda para los módulos',
+    foco: 'El armazón del kit pasó de una barra con ítems sueltos y un header mínimo al estándar de Tienda: grupos rotulados, sub-secciones plegables, header de 64 px con miga, buscador (Ctrl K), fecha, tema, campanita y cuenta, el contenido scrolleando adentro de main y el cajón en celular.',
+    que: `Para que los tres paneles fueran "el estándar de Órbita" sin importar nada de Tienda (regla "Módulos independientes"), el armazón \`LayoutPanel\` del kit \`design-system/reservas\` se reescribió con las medidas y el lenguaje de \`layouts/AdminLayout\`, \`Sidebar\` y \`Header\` de Tienda, sin su sesión ni su API:
+- **Barra lateral de 240 px** con el logo arriba (64 px), la tarjeta del negocio con su sigla, los grupos rotulados (\`grupo\` en cada \`ItemNav\`) y, en los ítems que las tienen, las sub-secciones plegables (\`subs\`, viajan en \`?tab=\`) unidas por la línea que se enciende hasta la activa, como Configuración en Tienda. Badges por ítem y por sub-sección.
+- **Header de 64 px** con la miga (producto › sección › sub-sección), el buscador (\`busqueda\`, con Ctrl K: los del grupo "Ir a" se ofrecen sin escribir), la fecha, el tema claro u oscuro, la campanita (\`avisos\`, con el contador de los no leídos y "Marcar leídas") y la cuenta (\`usuario\`; con \`cuentas\` se puede mirar el panel como alguien del equipo).
+- El contenido scrollea adentro de \`<main>\` (\`.admin-main\`, el fondo del panel), no la ventana, y vuelve arriba al cambiar de sección.
+- En celular (hasta 768 px) la barra es un cajón: el foco entra, no se escapa (lo de atrás queda inert), Escape, el velo, la X o elegir una sección lo cierran y el foco vuelve al botón de menú. Los paneles flotantes (buscador, avisos, cuenta) se cierran al tocar afuera o con Escape. Nada de hover por JS: \`ds-hover\` y \`ds-field\`.
+
+Antes el armazón era una barra con ítems sueltos y un header con el nombre del negocio y el link al sitio, "sin buscador ni campanita: el panel es corto y se recorre de un vistazo". Con todo en el sidebar dejó de ser corto. Lo usan Alquileres y Gimnasio (las entradas "al estándar de Órbita" de cada uno, con sus capturas) y Turnos en su rediseño. Quedó en el commit f1623 del 27/10, junto con los contrastes.`,
+    archivos: [
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:1-18',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:27-36',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:217',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:266',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:285-286',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:322',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:355',
+      'apps/web/src/modules/alquileres/admin/Panel.tsx:159-160',
+      'apps/web/src/modules/gimnasio/admin/Panel.tsx:163',
+    ],
+  }),
+
+  entrada({
+    modulo: 'gimnasio', fecha: F27, slug: 'kit-toma-los-pedidos', tipo: 'diseño', quien: 'Ale', transversal: true,
+    titulo: 'Transversal: el kit toma lo que pidieron los módulos',
+    foco: 'Contrastes AA del armazón LayoutPanel (ítem y sub-sección activos, badge, sigla, contador y links en tinta del acento sobre su fondo claro), Sigla con paleta 700, chip apretado tintado, segmentado y chip gris en color-body, botón de peligro con el rojo de los chips, scroll arriba al cambiar de sección, Switch suelto, Nota que envuelve, Area con ref, Campo disabled.',
+    que: `Alquileres y Gimnasio anotaron lo que necesitaron del kit \`design-system/reservas\` y lo resolvieron mientras tanto con parches locales (\`pedidos-kit-alquileres.md\` y \`pedidos-kit-gimnasio.md\`, en el scratchpad de la sesión). El 27/10 el kit tomó lo que era suyo (commit f1623) y los módulos borraron sus parches:
+- **Contrastes AA del armazón** (\`LayoutPanel\`): el ítem y la sub-sección activos (3,38:1), el badge del ítem activo y la sigla del negocio (3,68:1), el contador de la campanita (3,76:1), "Marcar leídas" (3,52:1) y la fecha de cada aviso (2,45:1) van ahora en tinta oscura del acento sobre su fondo claro (\`--chip-primary-fg\` sobre \`--color-primary-bg\`) o en \`--color-muted\`: el blanco sobre el primario a 10–14 px daba 3,4–3,7:1.
+- **\`Sigla\` con paleta 700** por defecto: todas dan 4,5:1 o más con la sigla blanca (las 600 daban 3,0–3,9:1).
+- **Chip apretado tintado** (\`button.rv-chip[aria-pressed='true']\`: fondo claro del acento, tinta oscura y borde), el **segmentado** apagado y el **chip gris** en \`--color-body\` (eran \`--color-muted\`, 4,34:1 a 13 px), y el **botón de peligro** con el rojo de los chips (\`--chip-error-fg\`; \`--color-error\` sobre blanco daba 3,76:1).
+- **Vuelve arriba** solo al cambiar de sección o de sub-sección (\`activo\` o \`tab\`): antes cada módulo tenía su \`scrollTo\`.
+- **\`Switch\` suelto** exportado (Gimnasio y Alquileres tenían un \`<button role="switch">\` crudo en Mensajes), **\`Nota\` envuelve su texto** (era flex con gap: un \`<b>\` adentro partía la fila en ítems), **\`Area\` acepta \`ref\` y \`disabled\`** (para insertar una llave donde está el cursor) y **\`Campo\` acepta \`disabled\` y \`readOnly\`**.
+
+- **Y lo que pidió Turnos** (\`pedidos-kit-turnos.md\`, commit da07e de la madrugada): el avatar del menú de cuentas lleva el color de la persona como tinte y anillo con las iniciales en tinta de texto (blancas daban 2,2–4,2:1), los rótulos de grupo de los paneles flotantes van en \`--color-muted\` a 11 px, el botón de cerrar notificaciones mide 44 px en celular, hay una clase \`.rv-link\` para texto suelto en el acento (\`--chip-primary-fg\`, 44 px en celular) y en \`estilo.tsx\` queda escrito qué tokens sirven para texto y cuáles no.
+
+Lo que no se tomó (el \`Kpi\` con ícono y variación, la barra de guardar, el toque de 44 de la llave en el medidor, la tira de chips de 38 px, la vista previa de mensajes, la cabecera del \`Modal\` que estira su primer \`div\`, el gris sobre \`--color-primary-bg\` y el celular de vista previa) está en la decisión abierta "Pedidos del kit que quedaron sin tomar".
+
+En las capturas, el armazón de Alquileres: el antes es la captura del 26/10 (antes del commit del kit), con la sigla y el badge en blanco sobre el azul; el después, el mismo panel el 27/10. A 390, el cajón del menú.`,
+    antes: { 1280: 'kit-armazon-antes-1280.webp', 390: 'kit-armazon-antes-390.webp' },
+    despues: { 1280: 'kit-armazon-despues-1280.webp', 390: 'kit-armazon-despues-390.webp' },
+    archivos: [
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:59-61',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:69',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:73-74',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:85',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:117',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:144',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:151',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:355',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:123',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:139',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:175',
+      'apps/web/src/design-system/reservas/estilo.tsx:115',
+      'apps/web/src/design-system/reservas/estilo.tsx:79',
+      'apps/web/src/design-system/reservas/estilo.tsx:91',
+      'apps/web/src/design-system/reservas/estilo.tsx:96',
+      'apps/web/src/design-system/reservas/estilo.tsx:106',
+      'apps/web/src/design-system/reservas/estilo.tsx:128',
+      'apps/web/src/design-system/reservas/estilo.tsx:279',
+      'apps/web/src/design-system/reservas/piezas.tsx:55-57',
+      'apps/web/src/design-system/reservas/piezas.tsx:72',
+      'apps/web/src/design-system/reservas/piezas.tsx:105',
+      'apps/web/src/design-system/reservas/piezas.tsx:122-124',
+      'apps/web/src/design-system/reservas/piezas.tsx:266',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Mensajes.tsx:136',
+    ],
+  }),
+
+  // ─── Turnos · Mateo · rediseño ──────────────────────────────────────────────
+  entrada({
+    modulo: 'turnos', fecha: F, slug: 'todo-en-el-sidebar', tipo: 'diseño', quien: 'Mateo',
+    titulo: 'Turnos al estándar de Órbita: todas las secciones en el sidebar',
+    foco: 'El panel usa LayoutPanel v2 con Hoy (Resumen, Agenda), Negocio (Clientes, Servicios, Equipo, Espacios, Ganancias), Reservas (Reglas, Recordatorios y mensajes, Pagos) y Configuración con Datos, Horarios, Apariencia, Dominio y Suscripción; el armazón propio, la columna de pestañas y las piezas tuo- del panel se borraron.',
+    que: `Turnos ya tenía un armazón propio (\`layout/LayoutTurnos.tsx\`) con buscador y campanita, pero Servicios, Equipo, Espacios, Ganancias, Reglas, Mensajes y Pagos vivían adentro de Configuración, con su propia columna de pestañas ("Navegación del panel de Turnos: Hoy y Negocio", del 26/10). Ale pidió explícito Reglas de reserva, Recordatorios y mensajes, Ganancias y Pagos en el sidebar. Ahora el panel usa \`LayoutPanel\` v2 del kit (entrada transversal "LayoutPanel v2") y la barra completa (\`items\` con \`grupo\` y \`subs\` en \`PanelTurnos.tsx\`):
+- **Hoy:** Resumen y Agenda (badge con los turnos de hoy sin confirmar; "Mi agenda" para un rol que ve solo la suya).
+- **Negocio** (rotulado "El negocio" o "Lo tuyo" según el rol): Clientes o Pacientes, Servicios, Equipo, Cabinas / Consultorios / Equipos EMS (solo en los rubros por espacio) y Ganancias ("Mis ganancias" para quien ve solo lo suyo).
+- **Reservas** (solo quien puede configurar): Reglas de reserva, Recordatorios y mensajes y Pagos (badge con las señas por cobrar).
+- Sin grupo: Configuración › Datos del negocio, Horarios, Apariencia, Dominio y Suscripción (con separador); y Avanzado (\`&funcion=\` abre cada función).
+
+Cada sección es una página con su \`rv-pagina\` y su \`Encabezado\`, no un envoltorio de la pestaña vieja. Se borraron (\`git rm\`) \`layout/LayoutTurnos.tsx\`, \`admin/configuracion/ConfiguracionTurnos.tsx\` (la columna de pestañas) y \`_shared/orbita/piezas.tsx\`; sus piezas viven en \`admin/piezasPanel.tsx\`, y \`_shared/orbita/estilo.tsx\` (\`tuo-\`) queda solo para el índice de la demo, la landing y el paso de la reserva pública: ninguna pantalla del panel lo monta. La URL es el único estado (\`navegar\` / \`ir\`); los links viejos \`?vista=configuracion&tab=servicios|equipo|espacios|ganancias|reservas|mensajes|pagos\` abren la sección nueva y la URL se reescribe (\`TABS_VIEJAS\`), probado en los cuatro anchos. El header: \`producto="Turnos"\`, fecha de la demo, buscador (Ctrl K: secciones, turnos de hoy, clientes, servicios, equipo), campanita (sin confirmar, nuevos, ausentes, cancelados) y la cuenta con "Ver el panel como" (\`cuentas\`, \`viendoComo\`, \`onCuenta\`) y su franja \`tu-como\`. Servicios suma pausar y reanudar.
+
+La primera sesión del rediseño (26/10, cortada por el límite de uso) puso el armazón y las pantallas principales; la segunda (27/10) terminó Avanzado, arregló Apariencia y sumó sustancia a Pagos, Recordatorios y la ficha de cliente (sus entradas). Todo en el commit 6d526.
+
+En las capturas, Configuración a 1280 antes (la columna de pestañas Tu sitio / Tu negocio / Equipo / Cuenta, con Apariencia como pestaña de entrada) y después (Datos del negocio como sub-sección). A 390 el después es el cajón del menú.`,
+    antes: { 1280: 'panel-sidebar-antes-1280.webp', 390: 'panel-sidebar-antes-390.webp' },
+    despues: { 1280: 'panel-sidebar-despues-1280.webp', 390: 'panel-sidebar-despues-390.webp' },
+    archivos: [
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:191-202',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:212',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:221-226',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:437-442',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:456-457',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:470-471',
+      'apps/web/src/modules/turnos/admin/configuracion/datos.ts:20',
+      'apps/web/src/modules/turnos/admin/configuracion/datos.ts:29',
+      'apps/web/src/modules/turnos/admin/configuracion/Reservas.tsx:63',
+      'apps/web/src/modules/turnos/admin/Ganancias.tsx:97',
+      'apps/web/src/modules/turnos/admin/Servicios.tsx:6',
+      'apps/web/src/modules/turnos/admin/piezasPanel.tsx:20',
+      'apps/web/src/modules/turnos/_shared/orbita/estilo.tsx:1-8',
+    ],
+  }),
+
+  entrada({
+    modulo: 'turnos', fecha: F27, slug: 'avanzado-al-estandar', tipo: 'diseño', quien: 'Mateo',
+    titulo: 'Turnos: Avanzado al estándar, el hub y las tres funciones con el kit',
+    foco: 'El hub dejó de ser una vidriera oscura con degradado y anillo: página plana con encabezado, "N de 3 activas", buscador y segmentado, un bloque por objetivo y tarjetas del kit; cada función con Volver, interruptor maestro plano, indicadores y la vista previa en un celular plano con el tema del sitio.',
+    que: `Antes el hub de Avanzado era una "vidriera" oscura con degradado y un anillo (\`tuo-espacio\`), tarjetas con un tono por grupo y animaciones al pasar (escala y giro), un celular 3D inclinado con sombras y una órbita que giraba, un interruptor maestro con degradado, inputs con una clase que ya no existía (\`tuc-field\`: se veían sin borde) e imports de \`modules/ventas\` (\`Volver\`, \`cargarFuentes\`), que la regla de módulos independientes prohíbe.
+- **El hub** (\`AvanzadoTurnos.tsx\`): \`rv-pagina\` con \`Encabezado\` y el chip "N de 3 activas", \`Buscador\` y \`Segmentado\` en una tira, un bloque por objetivo (Llenar la agenda, Cobrar mejor) con \`rv-h2\`, y tarjetas \`rv-card rv-card--accion\`. Los grupos ya no tienen tono (\`datosAvanzado.ts\`): un solo acento.
+- **El armazón de cada función** (\`ShellFuncion\` en \`avanzado/ui.tsx\`): \`Volver\` propio, \`Encabezado\`, el interruptor maestro en una tarjeta plana, los indicadores en \`rv-kpis\`, dos columnas con la vista previa pegajosa y un Guardar que avisa con el toast del panel (\`avisar\`, que \`PanelTurnos.tsx\` le pasa).
+- **La vista previa** (\`VistaCliente\`): un celular plano (tarjeta con borde y radio 30, sin inclinación ni sombras) con una pantalla pintada con las variables del tema del sitio, que es lo que ve el cliente.
+- **Las tres funciones** (Paquetes y bonos, Membresías y abonos, Precios por horario) reescritas con los controles de Configuración (\`SecCard\`, \`FilaSwitch\`, \`Segmentado\`) y del kit (\`rv-input\`, \`rv-select\`, \`rv-chip\`, \`Barra\`). El mapa de ocupación de Precios por horario (\`tua-mapa\`) usa una escala de un solo tono que no pasa del 55 % del acento y texto siempre en tinta de texto.
+
+Qué funciones quedan sigue siendo la decisión del 26/10 ("Avanzado se queda con Membresías, Paquetes y Precios por horario"); esto es cómo se ven.`,
+    antes: { 1280: 'avanzado-antes-1280.webp', 390: 'avanzado-antes-390.webp' },
+    despues: { 1280: 'avanzado-despues-1280.webp', 390: 'avanzado-despues-390.webp' },
+    archivos: [
+      'apps/web/src/modules/turnos/admin/avanzado/AvanzadoTurnos.tsx:31',
+      'apps/web/src/modules/turnos/admin/avanzado/AvanzadoTurnos.tsx:73',
+      'apps/web/src/modules/turnos/admin/avanzado/AvanzadoTurnos.tsx:84',
+      'apps/web/src/modules/turnos/admin/avanzado/AvanzadoTurnos.tsx:89',
+      'apps/web/src/modules/turnos/admin/avanzado/ui.tsx:26',
+      'apps/web/src/modules/turnos/admin/avanzado/ui.tsx:68-73',
+      'apps/web/src/modules/turnos/admin/avanzado/ui.tsx:80-81',
+      'apps/web/src/modules/turnos/admin/avanzado/ui.tsx:165',
+      'apps/web/src/modules/turnos/admin/avanzado/Paquetes.tsx:14',
+      'apps/web/src/modules/turnos/admin/avanzado/Paquetes.tsx:139',
+      'apps/web/src/modules/turnos/admin/avanzado/Membresias.tsx:10',
+      'apps/web/src/modules/turnos/admin/avanzado/datosAvanzado.ts:20',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:525',
+    ],
+  }),
+
+  entrada({
+    modulo: 'turnos', fecha: F27, slug: 'apariencia-con-su-hoja', tipo: 'diseño', quien: 'Mateo',
+    titulo: 'Turnos: Apariencia volvía a verse rota y pasó al lenguaje del kit',
+    foco: 'Su CSS se montaba en el ConfiguracionTurnos borrado en la sesión 1 y la pantalla salía sin estilos; ahora lo monta sola, usa rv-pagina con el ancho de editor (1760 px), las clases rv- en vez de tuo-/tuc-, y tarjetas de plantilla, vista previa, paletas y fotos planas, sin sombra ni zoom.',
+    que: `Al borrar \`ConfiguracionTurnos.tsx\` en la sesión 1 se fue con él el \`<style>\` que montaba \`CSS_APARIENCIA\`, \`CSS_MINI\`, \`CSS_PLANTILLA\` y \`CSS_VISTA_PREVIA\`: Apariencia salía sin estilos (el iframe de la vista previa aparecía sobre el header, las tarjetas-radio sin forma, el riel sin riel). Ahora la pantalla monta su hoja sola.
+- \`panel-page panel-page--editor\` (clase de Tienda) pasó a \`rv-pagina tuc-pagina--editor\`: 1760 px, como el editor de Tienda, la única pantalla ancha de Configuración (editor y vista previa lado a lado; el resto queda en 880).
+- \`tuo-h2\`, \`tuo-btn\`, \`tuo-rotulo\`, \`tuo-num\`, \`tuc-pastilla\` y \`tuc-sr\` pasaron a \`rv-h2\`, \`rv-btn\`, \`rv-rotulo\`, \`rv-num\`, \`rv-chip rv-chip--borde\` y \`rv-sr\`; sin el punto que latía.
+- Tarjetas de plantilla planas (\`MiniSitio.tsx\`): radio 12, borde fino, la elegida con un anillo de 1 px del acento, "En uso" en tinta del acento sobre fondo; sin sombra, sin elevarse ni escalar la miniatura al pasar. La vista previa sin sombras (\`VistaPrevia.tsx\`); paletas, fotos y tildes sin sombra ni zoom.
+
+En las capturas, el antes es la Configuración vieja, que abría en Apariencia (con el \`tuo-\` del panel de antes); el después, Apariencia con el kit.`,
+    antes: { 1280: 'panel-sidebar-antes-1280.webp', 390: 'panel-sidebar-antes-390.webp' },
+    despues: { 1280: 'apariencia-despues-1280.webp', 390: 'apariencia-despues-390.webp' },
+    archivos: [
+      'apps/web/src/modules/turnos/admin/configuracion/Apariencia.tsx:76',
+      'apps/web/src/modules/turnos/admin/configuracion/Apariencia.tsx:188-191',
+      'apps/web/src/modules/turnos/admin/configuracion/Apariencia.tsx:578-579',
+      'apps/web/src/modules/turnos/admin/configuracion/MiniSitio.tsx:171',
+      'apps/web/src/modules/turnos/admin/configuracion/MiniSitio.tsx:180',
+      'apps/web/src/modules/turnos/admin/configuracion/MiniSitio.tsx:196',
+      'apps/web/src/modules/turnos/admin/configuracion/VistaPrevia.tsx:190-192',
+    ],
+  }),
+
+  entrada({
+    modulo: 'turnos', fecha: F27, slug: 'pagos-senas-por-cobrar', tipo: 'tarea', quien: 'Mateo',
+    titulo: 'Turnos: Pagos lista las señas por cobrar desde la agenda',
+    foco: 'Arriba de la configuración de Pagos, "Señas por cobrar": los turnos de las próximas dos semanas que no pagaron la seña, con el total en el badge del menú; cada fila abre el turno y "Registrar" la cobra con el mismo registrarSena del detalle; si el negocio no pide seña, lo dice y lleva a Reglas.',
+    que: `Es sustancia para el "hay que mejorar 1000 veces más" de Ale: Pagos era solo configuración. Ahora arranca con **Señas por cobrar** (\`configuracion/Pagos.tsx\`): los turnos de las próximas dos semanas que todavía no pagaron la seña, que salen de la agenda (\`senasPendientes\` en \`PanelTurnos.tsx\`), con el total en el chip y en el badge del ítem Pagos del menú. Cada fila abre el turno (la fecha es un \`tuc-link\`) y "Registrar" cobra la seña con el mismo \`registrarSena\` del detalle del turno. Es una tabla \`rv-tabla\`, que en celular pasa a tarjetas, con la celda "Cuándo" a la izquierda. Si el negocio no pide seña, la tarjeta lo dice y lleva a Reglas de reserva.
+
+${comoQuedo('turnos', ['Pagos con seña del 20 %, peluquería · 1280', 'pagos-senas-1280.webp'], ['Pagos · 390', 'pagos-senas-390.webp'])}`,
+    archivos: [
+      'apps/web/src/modules/turnos/admin/configuracion/Pagos.tsx:38',
+      'apps/web/src/modules/turnos/admin/configuracion/Pagos.tsx:49',
+      'apps/web/src/modules/turnos/admin/configuracion/Pagos.tsx:56',
+      'apps/web/src/modules/turnos/admin/configuracion/Pagos.tsx:61',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:179',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:202',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:519',
+    ],
+  }),
+
+  entrada({
+    modulo: 'turnos', fecha: F27, slug: 'recordatorios-hoy-y-ficha-con-historial', tipo: 'tarea', quien: 'Mateo',
+    titulo: 'Turnos: Recordatorios muestra la confirmación de hoy y la ficha del cliente tiene historial real',
+    foco: 'La tarjeta "Hoy" de Recordatorios dice cuántos turnos del día confirmaron y cuántos faltan, con el primero sin confirmar y "Ver el turno"; la ficha del cliente lista los turnos atendidos o ausentes de los últimos dos meses, sacados de la agenda, en vez de una lista fija igual para todos.',
+    que: `- **Recordatorios y mensajes** (\`configuracion/Mensajes.tsx\`): una tarjeta "Hoy" con los turnos del día, cuántos confirmaron y cuántos faltan, el primero sin confirmar con nombre y hora, y "Ver el turno", que lo abre (desde ahí se le manda el recordatorio: el bloque no manda nada por su cuenta). El chip dice si el recordatorio automático está prendido. Props nuevas \`turnosHoy\`, \`nombreDe\` y \`onAbrir\`, que \`PanelTurnos.tsx\` le pasa.
+- **La ficha del cliente** (\`admin/Clientes.tsx\`): antes mostraba una lista fija (\`HISTORIAL\`, las mismas cuatro fechas para todos). Ahora \`historialDe\` (\`PanelTurnos.tsx\`) saca de la agenda los turnos atendidos o ausentes de esa persona en los últimos dos meses; la ficha los lista con fecha, servicio, hora, precio (si el rol ve números) y estado, cada uno abre su turno, y "Ver los N turnos" despliega el resto. Las ausencias del indicador salen de ahí. \`Clientes\` ya no recibe \`servicios\` (solo servía para inventar nombres).
+- **Un error de React Compiler** en la redirección de los links viejos: \`useEffect\` → \`ir()\` → \`setClienteSel(null)\` era un \`setState\` sincrónico dentro de un efecto (el único error de eslint del módulo). Ahora \`navegar\` solo toca la URL, \`ir\` (lo que usa el menú) cierra la ficha y navega, y la redirección usa \`navegar\`.
+
+**Diferencias con el plan:** la tarea del 1/12 ("clientes y horarios de trabajo") pide editar el horario semanal y los feriados sin salir del panel: Horarios ya era una sección de Configuración; lo nuevo es la ficha con historial.
+
+${comoQuedo('turnos', ['Recordatorios con la tarjeta Hoy · 1280', 'mensajes-hoy-1280.webp'], ['Ficha de un cliente · 390', 'cliente-ficha-390.webp'])}`,
+    archivos: [
+      'apps/web/src/modules/turnos/admin/configuracion/Mensajes.tsx:74',
+      'apps/web/src/modules/turnos/admin/configuracion/Mensajes.tsx:105-106',
+      'apps/web/src/modules/turnos/admin/configuracion/Mensajes.tsx:116',
+      'apps/web/src/modules/turnos/admin/configuracion/Mensajes.tsx:127',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:308',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:518',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:221-230',
+      'apps/web/src/modules/turnos/admin/Clientes.tsx:5',
+      'apps/web/src/modules/turnos/admin/Clientes.tsx:86-87',
+      'apps/web/src/modules/turnos/admin/Clientes.tsx:212-213',
+      'apps/web/src/modules/turnos/admin/Clientes.tsx:264',
+    ],
+  }),
+
+  entrada({
+    modulo: 'turnos', fecha: F27, slug: 'contraste-aa-y-chat-neutro', tipo: 'diseño', quien: 'Mateo',
+    titulo: 'Turnos: contraste AA en lo que es del módulo y la vista previa del chat con los colores del panel',
+    foco: 'Texto en el acento con --chip-primary-fg (links, "Ver agenda", la columna de hoy y la etiqueta de "ahora" de la agenda), --color-subtle fuera del texto, --color-body sobre primary-bg, hoy tintado con anillo, estados Atendido y Cancelado legibles, el mapa de ocupación sin blanco sobre celdas claras; y la burbuja del chat sin los verdes de WhatsApp.',
+    que: `Lo que el medidor de la QA marcaba por debajo de 4,5:1 y era del módulo (lo del kit se pidió aparte: "El kit toma lo que pidieron los módulos"):
+- **Texto en el acento → \`--chip-primary-fg\`:** \`.tuc-link\`, \`.tua-funcion-ir\`, "En curso" y "Ver agenda" del Resumen, "Ver los N turnos" en Clientes y Ganancias, el plan elegido en Cuenta, la opción elegida en Apariencia, y en la agenda la columna de hoy, "+N más" y la etiqueta de "ahora" (tinta del acento sobre fondo con borde: el blanco sobre el acento daba 3,68:1).
+- **\`--color-subtle\` dejó de usarse para texto** (2,56:1): escalas de horas, contadores de caracteres, días apagados y rótulos de la agenda pasaron a \`--color-muted\`.
+- **Sobre \`--color-primary-bg\`** el gris \`--color-muted\` queda en 4,37:1: pasa a \`--color-body\` en la opción elegida de una tarjeta-radio, el ítem elegido de Avanzado, la opción marcada del buscador de Nuevo turno y la burbuja del chat.
+- **Hoy en el mes** va tintado con anillo, no lleno; los estados Atendido y Cancelado del chip usan \`--color-body\` (4,3:1 con muted). El mapa de ocupación de Precios por horario no pone texto blanco sobre celdas claras.
+- **La vista previa del chat** (\`BurbujaWA\` en Mensajes y \`MensajeWhatsApp\` en \`piezasPanel.tsx\`): la forma de un chat (burbuja, hora, tildes) pero con \`--color-surface\`, \`--color-primary-bg\` y \`--chip-primary-fg\`; antes llevaba los verdes de WhatsApp en claro y en oscuro. Misma decisión que Alquileres.
+- **Dos arreglos en modales:** el \`Avatar\` del design system es un \`div\` y la cabecera del modal del kit estira su primer \`div\`, así que en la ficha de cliente salía una elipse (el ícono va envuelto en \`piezasPanel.tsx\`); y \`.tu-cli-prox-ico\` se estiraba por una regla \`> span { flex: 1 }\`.
+
+En las capturas, la Agenda antes y después: la columna de hoy, los chips de estado y la tira de agendas tintada. Después de esto, nada del módulo queda debajo de AA en claro ni en oscuro.
+
+**Diferencias con el plan:** la tarea del 13/11 pide la pasada de oscuro del panel y del storefront; el storefront la tuvo en la QA del 26/10 ("QA responsive de Turnos"). La del 30/11 pide además que los vacíos expliquen qué hacer: los de Avanzado lo hacen ("Todavía no prendiste ninguna función"); el resto no se revisó a propósito.
+
+${comoQuedo('turnos', ['Vista previa del chat, neutra · 1280', 'chat-neutro-1280.webp'])}`,
+    antes: { 1280: 'agenda-antes-1280.webp', 390: 'agenda-antes-390.webp' },
+    despues: { 1280: 'agenda-despues-1280.webp', 390: 'agenda-despues-390.webp' },
+    archivos: [
+      'apps/web/src/modules/turnos/admin/configuracion/ui.tsx:63',
+      'apps/web/src/modules/turnos/admin/configuracion/ui.tsx:33',
+      'apps/web/src/modules/turnos/admin/avanzado/ui.tsx:39',
+      'apps/web/src/modules/turnos/admin/avanzado/ui.tsx:56-57',
+      'apps/web/src/modules/turnos/admin/KPIs.tsx:165',
+      'apps/web/src/modules/turnos/admin/Ganancias.tsx:384',
+      'apps/web/src/modules/turnos/admin/configuracion/Cuenta.tsx:168',
+      'apps/web/src/modules/turnos/admin/Agenda.tsx:46-47',
+      'apps/web/src/modules/turnos/admin/Agenda.tsx:52-55',
+      'apps/web/src/modules/turnos/admin/Agenda.tsx:95',
+      'apps/web/src/modules/turnos/admin/configuracion/Horarios.tsx:54',
+      'apps/web/src/modules/turnos/admin/Espacios.tsx:31',
+      'apps/web/src/modules/turnos/admin/NuevoTurno.tsx:46-47',
+      'apps/web/src/modules/turnos/datos/index.ts:263-266',
+      'apps/web/src/modules/turnos/admin/configuracion/Mensajes.tsx:53',
+      'apps/web/src/modules/turnos/admin/configuracion/Mensajes.tsx:244',
+      'apps/web/src/modules/turnos/admin/piezasPanel.tsx:197',
+      'apps/web/src/modules/turnos/admin/piezasPanel.tsx:501',
+      'apps/web/src/modules/turnos/admin/Clientes.tsx:51-52',
+    ],
+  }),
+
+  entrada({
+    modulo: 'turnos', fecha: F27, slug: 'qa-rediseno', tipo: 'tarea', quien: 'Mateo',
+    titulo: 'Turnos: QA del rediseño en 1280, 768, 390 y 390 oscuro',
+    foco: '38 pantallas por corrida con Playwright: ninguna desborda, sin imágenes rotas, inputs de 16 px, sin errores de consola, el link viejo redirige y "ver el panel como" aparece; lo que quedó en falla es del kit o del armazón (anotado en pedidos-kit-turnos.md, parte tomada el 27/10) o la decisión abierta de los botones primarios.',
+    que: `Antes: \`tsc --noEmit\` 0 errores en \`modules/turnos\` (quedan los 2 preexistentes de \`modules/orbi/piezas/Mensaje.tsx\`, de mayúsculas en Windows); eslint 0 errores en \`modules/turnos\` y \`pages/turnos-demo\` (14 avisos \`no-img-element\`, aceptados); el módulo no tiene tests.
+
+**La recorrida** (\`pw/rediseno/turnos.cjs\` en el scratchpad de la sesión, un contexto por corrida): 38 pantallas en cada ancho: cada ítem y sub-sección del sidebar, la Agenda en día, semana y mes, Cabinas (rubro estética), Pagos con seña (peluquería), las tres funciones de Avanzado, los modales (ficha y alta de cliente, nuevo servicio, invitar, editar persona, liquidación, nuevo turno, detalle de turno, WhatsApp), la campanita, el buscador (solo 1280), el menú de cuentas, "ver el panel como", el link viejo y el cajón (solo 390).
+
+**Resultado:** en los cuatro anchos ninguna pantalla desborda (ni la ventana ni \`main\`), no hay imágenes rotas, ningún input baja de 16 px, no hay errores de consola, el link viejo redirige y la franja de "ver el panel como" aparece. Los contadores (\`qa-1280.log\` 232 OK · 29 fallas, \`qa-768.log\` 226 · 28, \`qa-390.log\` 217 · 44, \`qa-oscuro.log\` 239 · 22) incluyen solo fallas del kit o del armazón, anotadas en \`pedidos-kit-turnos.md\` y no parchadas en el módulo:
+- contraste: \`rv-btn--primario\` a 14 px (3,68:1, la decisión abierta "Azul primario"), la \`Sigla\` con las iniciales blancas sobre el color de cada persona (2,15–4,23:1) y, en el menú de cuentas, \`.rvp-avatar\` y \`.rvp-flota-grupo\`;
+- toques a 390: las llaves \`rv-switch\` de 42×24 (el kit les suma 54×44 de área con un \`::before\` que el medidor no ve), "Cerrar notificaciones" (32 px) y la X del \`Toast\` del design system (24 px) que monta \`useAviso\`.
+
+El kit tomó el avatar y los rótulos del menú de cuentas y el cierre de notificaciones de 44 px el mismo 27/10 (commit da07e; ver "El kit toma lo que pidieron los módulos"). Lo que se arregló en el módulo a partir de la medida: la tira de agendas de 44 px con la activa tintada, los siete días de Horarios a 390 (\`.tu-dias\`), el "Volver" de 44 px (\`.tu-volver\`), las opciones cortas del segmentado con 44 px de ancho y el botón "Conectar" a la altura del campo, y el link "Sugerido" de Paquetes. Los últimos arreglos de Agenda y de Pagos están en las corridas filtradas \`qa-{390,768,oscuro}-agenda.log\` y \`qa-390-pagos.log\`, con sus capturas regrabadas.
+
+**Diferencias con el plan:** las tareas del 7, 8 y 9/12 piden "lista de fallas registrada en Auditoría" por ancho: está acá, en una sola entrada. La del 10/12 (correcciones) se cumple: lo que queda es del kit (tomado en parte) o una decisión abierta. La del 11/12 (una captura por pantalla en los tres anchos, enlazadas) no se vinculó: las 155 capturas están en el scratchpad, no en la web.
+
+${comoQuedo('turnos', ['Horarios con los siete días · 390', 'qa-horarios-390.webp'], ['Agenda, vista semana · 390', 'qa-agenda-semana-390.webp'])}`,
+    archivos: [
+      'apps/web/src/modules/turnos/admin/Agenda.tsx:37',
+      'apps/web/src/modules/turnos/admin/Agenda.tsx:260',
+      'apps/web/src/modules/turnos/admin/piezasPanel.tsx:36',
+      'apps/web/src/modules/turnos/admin/piezasPanel.tsx:79-80',
+      'apps/web/src/modules/turnos/admin/configuracion/ui.tsx:50',
+      'apps/web/src/modules/turnos/admin/configuracion/ui.tsx:90-93',
+      'apps/web/src/modules/turnos/admin/avanzado/Paquetes.tsx:91',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:123',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:175',
+    ],
+  }),
+
+  entrada({
+    modulo: 'turnos', fecha: F27, slug: 'avanzado-un-acento-y-celular-plano', tipo: 'decisión', quien: 'Mateo',
+    titulo: 'Turnos: Avanzado sin tonos por grupo, celular plano, Guardar con el toast y la escala del mapa al 55 %',
+    foco: '"Llenar la agenda" y "Cobrar mejor" se distinguen por el bloque y su título, no por un color propio; el celular de la vista previa es una tarjeta plana con el tema del sitio adentro; "Guardar cambios" avisa con el toast del panel; la escala del mapa de ocupación se corta en el 55 % del acento. Lo decidió Mateo sin preguntar.',
+    que: `1. **Avanzado sin tonos por grupo:** "Llenar la agenda" y "Cobrar mejor" se distinguen por el bloque y su título, no por un color (verde) propio.
+2. **El celular de la vista previa es plano:** tarjeta con borde y radio, sin inclinación 3D, sin sombras ni órbita; adentro sigue el tema del sitio (es lo que ve el cliente).
+3. **"Guardar cambios" en Avanzado** avisa con el toast del panel ("Es una demo: quedan solo en esta pantalla") en vez de un estado "Guardado" propio.
+4. **La escala del mapa de ocupación** de Precios por horario se corta en el 55 % del acento.`,
+    decision: 'Avanzado usa un solo acento (sin tono por grupo), el celular de la vista previa es plano, se guarda con el toast de todo el panel y el mapa de ocupación nunca pasa del 55 % del acento.',
+    porque: 'El brief del rediseño pide un acento y nada decorativo: el verde de un grupo, el celular 3D con órbita y el "Guardado" propio eran tres formas de salirse del sistema. Una sola forma de confirmar en todo el panel es lo que hace Tienda. Y con la escala cortada en el 55 % el número de la celda más llena sigue en tinta de texto y legible; al 100 % del acento había que pasarlo a blanco y no llegaba a AA.',
+    archivos: [
+      'apps/web/src/modules/turnos/admin/avanzado/datosAvanzado.ts:20',
+      'apps/web/src/modules/turnos/admin/avanzado/ui.tsx:68-73',
+      'apps/web/src/modules/turnos/admin/avanzado/ui.tsx:80-81',
+      'apps/web/src/modules/turnos/admin/avanzado/ui.tsx:165',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:525',
+    ],
+  }),
+
+  entrada({
+    modulo: 'turnos', fecha: F27, slug: 'pagos-recordatorios-e-historial', tipo: 'decisión', quien: 'Mateo',
+    titulo: 'Turnos: Pagos arranca por las señas por cobrar, Recordatorios no manda nada y el historial es el de la agenda',
+    foco: 'Pagos abre con lo operativo (señas por cobrar, dos semanas) y después la configuración, y su badge cuenta señas; el bloque "Hoy" de Recordatorios lleva al turno en vez de mandar mensajes; el historial de la ficha sale de la agenda (dos meses) y no de una lista inventada.',
+    que: `1. **Pagos arranca por lo operativo** (las señas por cobrar) y después la configuración; el badge del menú cuenta señas, no pagos.
+2. **Señas por cobrar mira dos semanas:** lo que vence antes es lo que importa cobrar; el detalle del turno sigue mostrando la seña de cualquier fecha.
+3. **El bloque "Hoy" de Recordatorios no manda nada:** lleva al turno, donde ya está "Mandar recordatorio".
+4. **El historial de la ficha es el de la agenda** (dos meses): no hay más lista inventada; en un negocio recién creado la ficha dice que el historial arranca con el primer turno.`,
+    decision: 'En Pagos primero lo que hay que cobrar y después cómo se cobra; el badge cuenta señas pendientes de dos semanas; una sola forma de escribirle a alguien (desde el turno); y la ficha muestra turnos reales de la agenda.',
+    porque: 'Ale pidió "mejorar 1000 veces más": una pantalla de Pagos que solo configura no le sirve al dueño a las 10 de la mañana; lo que le sirve es saber a quién cobrarle hoy. Dos semanas es el horizonte en el que una seña todavía se puede reclamar antes del turno. Dos botones para mandar el mismo mensaje son dos lugares donde se desalinean. Y una lista fija de cuatro fechas iguales para todos los clientes era un dato falso en la demo: con la agenda real, la ficha dice la verdad aunque sea "todavía no vino".',
+    archivos: [
+      'apps/web/src/modules/turnos/admin/configuracion/Pagos.tsx:61',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:179',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:202',
+      'apps/web/src/modules/turnos/admin/configuracion/Mensajes.tsx:116',
+      'apps/web/src/modules/turnos/admin/configuracion/Mensajes.tsx:127',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:308',
+      'apps/web/src/modules/turnos/admin/Clientes.tsx:86-87',
+    ],
+  }),
+
+  entrada({
+    modulo: 'turnos', fecha: F27, slug: 'chat-neutro-tinta-del-acento-y-editor-ancho', tipo: 'decisión', quien: 'Mateo',
+    titulo: 'Turnos: chat neutro como Alquileres, texto en el acento con chip-primary-fg y Apariencia con ancho de editor',
+    foco: 'La vista previa del chat usa los colores del panel y no los de WhatsApp (misma decisión que Alquileres); todo texto en el acento va en --chip-primary-fg y el acento puro queda para fondos, bordes y botones primarios; Apariencia conserva los 1760 px del editor de Tienda y el resto de Configuración queda en 880.',
+    que: `1. **La vista previa del chat es neutra:** la forma de un WhatsApp (burbuja, hora, tildes) con \`--color-surface\`, \`--color-primary-bg\` y \`--chip-primary-fg\`; los verdes se fueron. Igual que Alquileres; Gimnasio eligió el verde (decisión abierta "Pedidos del kit que quedaron sin tomar").
+2. **Texto en el acento = \`--chip-primary-fg\`** en todo el módulo (links, "Configurar", chips de estado de la agenda): el acento puro (\`--color-primary\`, 3,68:1 sobre blanco) queda para fondos, bordes y botones primarios.
+3. **Apariencia conserva el ancho de editor (1760 px):** es la única pantalla de Configuración con editor y vista previa lado a lado; el resto queda en 880.`,
+    decision: 'Chat neutro con un solo acento, tinta oscura del acento para todo texto chico en el acento, y el ancho de editor solo donde hay editor.',
+    porque: 'El brief pide un acento y sin adornos: el verde de WhatsApp en medio del panel era un segundo acento, y ya lo había resuelto así Alquileres. El acento puro no llega a AA como texto a 13 o 14 px (3,68:1) y `--chip-primary-fg` sí (es el mismo criterio que el kit adoptó para el armazón el 27/10). Y 1760 px en una pantalla de solo formulario deja líneas de 150 caracteres: el ancho de editor se justifica solo con la vista previa al lado, como en Tienda.',
+    archivos: [
+      'apps/web/src/modules/turnos/admin/configuracion/Mensajes.tsx:53',
+      'apps/web/src/modules/turnos/admin/piezasPanel.tsx:501',
+      'apps/web/src/modules/turnos/admin/configuracion/ui.tsx:63',
+      'apps/web/src/modules/turnos/admin/Agenda.tsx:46-47',
+      'apps/web/src/modules/turnos/admin/configuracion/Apariencia.tsx:188-189',
+      'apps/web/src/modules/turnos/admin/configuracion/Apariencia.tsx:579',
+      'apps/web/src/modules/alquileres/admin/configuracion/comun.tsx:58',
     ],
   }),
 ]

@@ -102,6 +102,9 @@ function plan(modulo: ConPlan, nombre: string, responsable: Persona, foco: strin
 const TUR = (slug: string) => `auditoria.turnos.2026-10-26-${slug}`
 const ALQ = (slug: string) => `auditoria.alquileres.2026-10-26-${slug}`
 const GIM = (slug: string) => `auditoria.gimnasio.2026-10-26-${slug}`
+// Las del rediseño de los paneles que se terminó el 27/10 (Turnos-2, Gimnasio-2 y el kit).
+const TUR27 = (slug: string) => `auditoria.turnos.2026-10-27-${slug}`
+const GIM27 = (slug: string) => `auditoria.gimnasio.2026-10-27-${slug}`
 
 // ─── Turnos · Mateo ───────────────────────────────────────────────────────────
 const TURNOS = plan('turnos', 'Turnos', 'Mateo',
@@ -140,7 +143,7 @@ const TURNOS = plan('turnos', 'Turnos', 'Mateo',
     t('2026-11-10', 'Mateo', 'Panel de Turnos: alta rápida de un turno desde la agenda', 'Un turno se carga en menos de cinco toques desde la agenda, con cliente y servicio'),
     documentada(t('2026-11-11', 'Mateo', 'Storefront de Turnos: elegir servicio, profesional y horario a 390 px', 'Flujo completo en celular sin scroll horizontal y con botones de 44 px'), TUR('qa-responsive-turnos')),
     documentada(t('2026-11-12', 'Mateo', 'Storefront de Turnos: confirmación y Mis turnos responsive', 'Confirmación y lista de turnos legibles a 390, 768 y 1280'), TUR('qa-responsive-turnos')),
-    t('2026-11-13', 'Mateo', 'Pasada de modo oscuro del panel y del storefront de Turnos', 'Ningún color fijo: todo con tokens --color-* y contraste AA en oscuro'),
+    documentada(t('2026-11-13', 'Mateo', 'Pasada de modo oscuro del panel y del storefront de Turnos', 'Ningún color fijo: todo con tokens --color-* y contraste AA en oscuro'), TUR27('contraste-aa-y-chat-neutro')),
     // Semana 4 · correcciones y revisión cruzada
     documentada(t('2026-11-17', 'Mateo', 'Corregir lo que dejó la pasada responsive de Turnos', 'Sin pendientes abiertos en la entrada de auditoría del 13/11'), TUR('qa-responsive-turnos')),
     t('2026-11-19', 'Mateo', 'Revisión cruzada: reservar una cancha en Alquileres como cliente y anotar fallas', 'Fallas registradas como entrada de auditoría en Alquileres, con pasos para reproducir'),
@@ -148,16 +151,16 @@ const TURNOS = plan('turnos', 'Turnos', 'Mateo',
     t('2026-11-24', 'Mateo', 'Turnos en el alta única: paso de rubro y plantilla', 'El alta única crea un negocio de Turnos con su plantilla y horarios', 3),
     t('2026-11-26', 'Mateo', 'Datos de demo prolijos para Turnos (servicios, profesionales, horarios)', 'Un negocio de demo con tres servicios y dos profesionales, sin textos de relleno'),
     // Semana 6 · pulido
-    t('2026-11-30', 'Mateo', 'Pulido del panel de Turnos: agenda, estados y pantallas vacías', 'Cada estado de un turno tiene color y texto propios; los vacíos explican qué hacer'),
-    t('2026-12-01', 'Mateo', 'Pulido del panel de Turnos: clientes y horarios de trabajo', 'Se edita el horario semanal y los feriados sin salir del panel'),
+    documentada(t('2026-11-30', 'Mateo', 'Pulido del panel de Turnos: agenda, estados y pantallas vacías', 'Cada estado de un turno tiene color y texto propios; los vacíos explican qué hacer'), TUR27('contraste-aa-y-chat-neutro')),
+    documentada(t('2026-12-01', 'Mateo', 'Pulido del panel de Turnos: clientes y horarios de trabajo', 'Se edita el horario semanal y los feriados sin salir del panel'), TUR27('recordatorios-hoy-y-ficha-con-historial')),
     t('2026-12-02', 'Mateo', 'Pulido del storefront de Turnos: textos, errores y estados de carga', 'Ningún error crudo de la API llega a la pantalla; carga con esqueletos'),
     t('2026-12-03', 'Mateo', 'Pulido del storefront de Turnos: oscuro y tablet', 'Pasada a 768 px y en oscuro sin colores fijos ni cortes'),
-    t('2026-12-04', 'Mateo', 'Entrada de auditoría del pulido de Turnos con antes y después', 'Entrada tipo diseño con las capturas de antes y después del panel y la tienda'),
+    documentada(t('2026-12-04', 'Mateo', 'Entrada de auditoría del pulido de Turnos con antes y después', 'Entrada tipo diseño con las capturas de antes y después del panel y la tienda'), TUR('todo-en-el-sidebar')),
     // Semana 7 · QA responsive
-    t('2026-12-07', 'Mateo', 'QA de Turnos a 390 px (panel y storefront)', 'Lista de fallas a 390 px registrada en Auditoría; sin scroll horizontal'),
-    t('2026-12-08', 'Mateo', 'QA de Turnos a 768 px', 'Lista de fallas a 768 px registrada en Auditoría'),
-    t('2026-12-09', 'Mateo', 'QA de Turnos a 1280 px', 'Lista de fallas a 1280 px registrada en Auditoría'),
-    t('2026-12-10', 'Mateo', 'Correcciones de la QA de Turnos', 'Todas las fallas de las tres pasadas cerradas o registradas como decisión'),
+    documentada(t('2026-12-07', 'Mateo', 'QA de Turnos a 390 px (panel y storefront)', 'Lista de fallas a 390 px registrada en Auditoría; sin scroll horizontal'), TUR27('qa-rediseno')),
+    documentada(t('2026-12-08', 'Mateo', 'QA de Turnos a 768 px', 'Lista de fallas a 768 px registrada en Auditoría'), TUR27('qa-rediseno')),
+    documentada(t('2026-12-09', 'Mateo', 'QA de Turnos a 1280 px', 'Lista de fallas a 1280 px registrada en Auditoría'), TUR27('qa-rediseno')),
+    documentada(t('2026-12-10', 'Mateo', 'Correcciones de la QA de Turnos', 'Todas las fallas de las tres pasadas cerradas o registradas como decisión'), TUR27('qa-rediseno')),
     t('2026-12-11', 'Mateo', 'Capturas de la QA de Turnos para el documento', 'Una captura por pantalla en los tres anchos, subidas y enlazadas en la entrada'),
     // Semana 8 · cierre
     t('2026-12-14', 'Mateo', 'Correcciones finales de Turnos', 'Sin fallas abiertas en las entradas de auditoría de Turnos'),
@@ -214,15 +217,15 @@ const ALQUILERES = plan('alquileres', 'Alquileres', 'Alan',
     documentada(t('2026-11-26', 'Alan', 'Estadía parte 2: Mis reservas con rango y cancelación', 'La reserva muestra el rango y se cancela según la política', null), ALQ('modo-estadia')),
     documentada(t('2026-11-27', 'Alan', 'Estadía parte 2: pasada responsive y entrada de auditoría', 'Selector y confirmación legibles a 390, 768 y 1280; entrada con capturas', null), ALQ('qa-responsive-alquileres')),
     // Semana 6 · panel y calendarios .ics
-    documentada(t('2026-11-30', 'Alan', 'Panel de Alquileres: reservas del día y de la semana', 'Al entrar se ven las reservas de hoy y de la semana por recurso'), ALQ('panel-alquileres')),
-    documentada(t('2026-12-01', 'Alan', 'Panel de Alquileres: clientes e ingresos', 'Lista de clientes con sus reservas e ingresos por mes y por recurso'), ALQ('panel-alquileres')),
-    documentada(t('2026-12-02', 'Alan', 'Panel de Alquileres: configuración de recursos y precios', 'Se editan recursos, precios y políticas sin salir del panel'), ALQ('panel-alquileres')),
+    documentada(t('2026-11-30', 'Alan', 'Panel de Alquileres: reservas del día y de la semana', 'Al entrar se ven las reservas de hoy y de la semana por recurso'), ALQ('todo-en-el-sidebar')),
+    documentada(t('2026-12-01', 'Alan', 'Panel de Alquileres: clientes e ingresos', 'Lista de clientes con sus reservas e ingresos por mes y por recurso'), ALQ('ingresos-tablero')),
+    documentada(t('2026-12-02', 'Alan', 'Panel de Alquileres: configuración de recursos y precios', 'Se editan recursos, precios y políticas sin salir del panel'), ALQ('secciones-nuevas')),
     t('2026-12-03', 'Alan', 'Calendarios .ics: suscripción por recurso desde el panel', 'Cada recurso tiene un link .ics que Google Calendar acepta y actualiza'),
     t('2026-12-04', 'Alan', 'Calendarios .ics probados en Google y Apple; entrada de auditoría', 'Las reservas se ven en los dos calendarios; entrada con capturas'),
     // Semana 7 · QA responsive
-    t('2026-12-07', 'Alan', 'QA de Alquileres a 390 px (panel y tienda)', 'Lista de fallas a 390 px registrada en Auditoría; sin scroll horizontal'),
-    t('2026-12-08', 'Alan', 'QA de Alquileres a 768 px', 'Lista de fallas a 768 px registrada en Auditoría'),
-    t('2026-12-09', 'Alan', 'QA de Alquileres a 1280 px', 'Lista de fallas a 1280 px registrada en Auditoría'),
+    documentada(t('2026-12-07', 'Alan', 'QA de Alquileres a 390 px (panel y tienda)', 'Lista de fallas a 390 px registrada en Auditoría; sin scroll horizontal'), ALQ('qa-rediseno')),
+    documentada(t('2026-12-08', 'Alan', 'QA de Alquileres a 768 px', 'Lista de fallas a 768 px registrada en Auditoría'), ALQ('qa-rediseno')),
+    documentada(t('2026-12-09', 'Alan', 'QA de Alquileres a 1280 px', 'Lista de fallas a 1280 px registrada en Auditoría'), ALQ('qa-rediseno')),
     t('2026-12-10', 'Alan', 'Correcciones de la QA de Alquileres', 'Todas las fallas de las tres pasadas cerradas o registradas como decisión'),
     t('2026-12-11', 'Alan', 'Capturas de la QA de Alquileres para el documento', 'Una captura por pantalla en los tres anchos, enlazadas en la entrada'),
     // Semana 8 · cierre
@@ -283,17 +286,17 @@ const GIMNASIO = plan('gimnasio', 'Gimnasio', 'Ale',
     documentada(t('2026-11-26', 'Ale', 'Transversal: alta única a 390 px y en oscuro', 'Sin scroll horizontal ni colores fijos en los cuatro caminos', 3), GIM('alta-unica')),
     documentada(t('2026-11-27', 'Ale', 'Transversal: entrada de auditoría del alta única con antes y después', 'Entrada tipo diseño con capturas del alta vieja y la nueva', 3), GIM('alta-paso-modulo')),
     // Semana 6 · panel e ingresos
-    documentada(t('2026-11-30', 'Ale', 'Gimnasio: panel con las clases de hoy y su ocupación', 'Al entrar se ven las clases de hoy con cupo usado y lista de espera'), GIM('panel-e-ingresos')),
-    t('2026-12-01', 'Ale', 'Gimnasio: ingresos por plan y por mes', 'Ingresos del mes por tipo de plan, con comparación contra el mes anterior'),
-    documentada(t('2026-12-02', 'Ale', 'Gimnasio: socios vencidos y por vencer en el panel', 'Lista de socios por vencer en siete días y vencidos, con acción de renovar'), GIM('socios-vencimientos')),
-    documentada(t('2026-12-03', 'Ale', 'Gimnasio: configuración (horarios, disciplinas y profesionales)', 'Se editan horarios, disciplinas y profes sin salir del panel'), GIM('panel-e-ingresos')),
-    documentada(t('2026-12-04', 'Ale', 'Gimnasio: pasada responsive del panel; entrada de auditoría', 'Panel legible a 390, 768 y 1280; entrada con capturas'), GIM('qa-responsive-gimnasio')),
+    documentada(t('2026-11-30', 'Ale', 'Gimnasio: panel con las clases de hoy y su ocupación', 'Al entrar se ven las clases de hoy con cupo usado y lista de espera'), GIM('clases-como-listado')),
+    documentada(t('2026-12-01', 'Ale', 'Gimnasio: ingresos por plan y por mes', 'Ingresos del mes por tipo de plan, con comparación contra el mes anterior'), GIM27('ingresos-comparaciones-honestas')),
+    documentada(t('2026-12-02', 'Ale', 'Gimnasio: socios vencidos y por vencer en el panel', 'Lista de socios por vencer en siete días y vencidos, con acción de renovar'), GIM('alumnos')),
+    documentada(t('2026-12-03', 'Ale', 'Gimnasio: configuración (horarios, disciplinas y profesionales)', 'Se editan horarios, disciplinas y profes sin salir del panel'), GIM('secciones-nuevas')),
+    documentada(t('2026-12-04', 'Ale', 'Gimnasio: pasada responsive del panel; entrada de auditoría', 'Panel legible a 390, 768 y 1280; entrada con capturas'), GIM27('qa-rediseno')),
     // Semana 7 · QA responsive
-    t('2026-12-07', 'Ale', 'QA de Gimnasio a 390 px (panel y tienda)', 'Lista de fallas a 390 px registrada en Auditoría; sin scroll horizontal'),
-    t('2026-12-08', 'Ale', 'QA de Gimnasio a 768 px', 'Lista de fallas a 768 px registrada en Auditoría'),
-    t('2026-12-09', 'Ale', 'QA de Gimnasio a 1280 px', 'Lista de fallas a 1280 px registrada en Auditoría'),
+    documentada(t('2026-12-07', 'Ale', 'QA de Gimnasio a 390 px (panel y tienda)', 'Lista de fallas a 390 px registrada en Auditoría; sin scroll horizontal'), GIM27('qa-rediseno')),
+    documentada(t('2026-12-08', 'Ale', 'QA de Gimnasio a 768 px', 'Lista de fallas a 768 px registrada en Auditoría'), GIM27('qa-rediseno')),
+    documentada(t('2026-12-09', 'Ale', 'QA de Gimnasio a 1280 px', 'Lista de fallas a 1280 px registrada en Auditoría'), GIM27('qa-rediseno')),
     t('2026-12-10', 'Ale', 'Transversal: QA responsive del superadmin (Módulos y Auditoría) a 390, 768 y 1280', 'Tarjetas en una columna y tablas como listas a 390 px; sin scroll horizontal'),
-    t('2026-12-11', 'Ale', 'Correcciones de la QA de Gimnasio', 'Todas las fallas de las tres pasadas cerradas o registradas como decisión'),
+    documentada(t('2026-12-11', 'Ale', 'Correcciones de la QA de Gimnasio', 'Todas las fallas de las tres pasadas cerradas o registradas como decisión'), GIM27('qa-rediseno')),
     // Semana 8 · cierre
     t('2026-12-14', 'Ale', 'Correcciones finales de Gimnasio', 'Sin fallas abiertas en las entradas de auditoría de Gimnasio'),
     t('2026-12-15', 'Ale', 'Auditoría completa de Gimnasio: entradas al día y archivos tocados', 'Toda tarea hecha tiene su entrada y cada entrada lista sus archivos'),

@@ -19,6 +19,8 @@ interface DatosDecision {
   slug: string
   /** Quién la decide. */
   decide: Persona
+  /** AAAA-MM-DD en que se abrió (va en la key). Las de la sesión del 26/10 no lo dicen. */
+  fecha?: string
   transversal?: boolean
   titulo: string
   /** Qué pasa, en una línea. */
@@ -32,6 +34,7 @@ interface DatosDecision {
 export const avisoAbierta = (quien: Persona) => `> **Decisión abierta: la decide ${quien}.**`
 
 function decisionAbierta(d: DatosDecision): Entrada {
+  const fecha = d.fecha ?? '2026-10-26'
   const informe = [
     avisoAbierta(d.decide),
     '## Propuesta', d.propuesta.trim(),
@@ -40,14 +43,14 @@ function decisionAbierta(d: DatosDecision): Entrada {
     '## Archivos', d.archivos.map((a) => `- \`${a}\``).join('\n'),
   ].join('\n\n')
   return {
-    key: `auditoria.${d.modulo}.2026-10-26-${d.slug}`,
+    key: `auditoria.${d.modulo}.${fecha}-${d.slug}`,
     modulo: d.modulo,
     tipo: 'decisión',
     transversal: d.transversal ?? false,
     titulo: d.titulo,
     foco: d.foco,
     quien: d.decide,
-    fecha: '2026-10-26',
+    fecha,
     informe,
     abierta: true,
     origen: 'codigo',
@@ -59,13 +62,11 @@ export const DECISIONES: Entrada[] = [
   decisionAbierta({
     modulo: 'turnos', slug: 'turnos-depende-de-tienda', decide: 'Mateo',
     titulo: 'Turnos todavía usa piezas de Tienda y de la landing',
-    foco: 'Desde antes de esta sesión, Turnos importa de Tienda el botón Volver, cargarFuentes y los campos del formulario de equipo (con los roles de Tienda), y su sección de rubros usa Reveal y Contacto de la landing. Ale pidió que cada módulo sea independiente.',
-    propuesta: 'Mover Volver, cargarFuentes y los campos genéricos (Lbl, Err, Inp) al design system y que Tienda y Turnos los importen de ahí. Decidir aparte si Turnos usa los mismos roles que Tienda (RolRadios y el tipo Rol) o los suyos. La landing de Turnos puede seguir usando la landing: es marketing, no un módulo. Después, sumar `ventas` a la regla de eslint de Turnos (`apps/web/eslint.config.mjs`).',
-    abierta: 'Mover esas piezas toca el panel de Tienda, que está en producción, y lo de los roles es una decisión de producto.',
-    origen: 'Revisión de imports del 26/10/2026, al escribir la regla de eslint que separa los módulos.',
+    foco: 'Al 26/10 Turnos importaba de Tienda el botón Volver, cargarFuentes y los campos del formulario de equipo (con los roles de Tienda), y su sección de rubros usa Reveal y Contacto de la landing. El rediseño del 27/10 sacó del panel los imports de Tienda (Avanzado e Invitar usan el kit y los roles propios de Turnos); queda cargarFuentes en el sitio público y la landing. Ale pidió que cada módulo sea independiente.',
+    propuesta: 'Lo que queda: mover cargarFuentes (las fuentes de las plantillas) al design system y que Tienda y el sitio de Turnos lo importen de ahí. La landing de Turnos puede seguir usando la landing: es marketing, no un módulo. Después, sumar `ventas` a la regla de eslint de Turnos (`apps/web/eslint.config.mjs`), como ya tienen Alquileres y Gimnasio.',
+    abierta: 'Mover cargarFuentes toca las plantillas de Tienda, que están en producción.',
+    origen: 'Revisión de imports del 26/10/2026, al escribir la regla de eslint que separa los módulos; actualizada el 27/10 con el rediseño del panel de Turnos (commit 6d526), que dejó el panel sin imports de Tienda.',
     archivos: [
-      'apps/web/src/modules/turnos/admin/avanzado/ui.tsx:14-15',
-      'apps/web/src/modules/turnos/admin/InvitarPersona.tsx:16-17',
       'apps/web/src/modules/turnos/storefront/SitioNegocio.tsx:23',
       'apps/web/src/modules/turnos/landing/RubrosTurnos.tsx:18-19',
       'apps/web/eslint.config.mjs:32-46',
@@ -136,6 +137,42 @@ export const DECISIONES: Entrada[] = [
     origen: 'Verificación de cuentas del 26/10/2026, solo lectura en la base de desarrollo.',
     archivos: [
       'apps/api/src/platform/platform.service.ts:825',
+    ],
+  }),
+
+  // ─── Del rediseño de los paneles (27/10/2026) ───────────────────────────────
+  decisionAbierta({
+    modulo: 'gimnasio', slug: 'pedidos-del-kit-sin-tomar', decide: 'Ale', transversal: true, fecha: '2026-10-27',
+    titulo: 'Transversal: pedidos del kit que quedaron sin tomar',
+    foco: 'Lo que Alquileres, Gimnasio y Turnos le pidieron al kit design-system/reservas y el 27/10 no se tomó: el Kpi con ícono y variación (hoy tres copias), la barra de guardar y el borrador (duplicados), el toque de 44 de la llave en el medidor común, la tira de chips de 38 px de globals.css, la vista previa de mensajes (WhatsApp o chat neutro), la cabecera del Modal, el gris sobre primary-bg y el celular de vista previa.',
+    propuesta: `1. **\`Kpi\` con ícono y variación** en el kit (la anatomía de \`KpiCard\` de Tienda: \`Icon?\`, \`tono?\` y \`delta?: { valor, unidades?, invertir? }\`) y borrar las tres copias: \`Kpi\` de Alquileres, \`KpiGym\` de Gimnasio e \`Indicador\` de Turnos.
+2. **Barra de guardar y borrador** en el kit (\`BarraGuardar\` con \`motivo\` y \`useBorrador\`, la versión de Gimnasio) y borrar \`Guardar\` de Alquileres y la barra de Turnos.
+3. **El toque de 44 de la llave \`rv-switch\`:** no tocar el kit (el \`::before\` con \`inset: -10px -6px\` ya da 54×44, verificado el 27/10) y que el medidor común de la QA (\`pw/superadmin/visual.cjs\`, en el scratchpad) cuente el pseudo-elemento, como ya hace el de Gimnasio; si se prefiere una caja real de 44, es un \`min-height: 44px\` con el visual adentro.
+4. **\`.ds-tira-chip\` de 38 px en celular:** es global de Tienda (\`globals.css\`) y no se toca en esta rama; mientras tanto los filtros de Alumnos usan \`.gso-chip\` de 44 px con el mismo aspecto. Entra en la decisión abierta "Tira de chips y botón Volver de 38 y 42 px".
+5. **Vista previa de mensajes:** Gimnasio la muestra como WhatsApp (verde) y Alquileres y Turnos como un chat neutro con los colores del panel. Unificar en una pieza del kit (Alan y Mateo proponen la neutra; Ale decide cuál) o dejar las dos.
+6. **La cabecera del \`Modal\` del kit estira su primer \`div\`** (\`.rv-modal-cab > div { flex: 1 }\`): un ícono o un avatar antes del título queda como una elipse (Turnos lo envuelve en un \`span\` en su propio \`Modal\`). Que estire solo un hijo marcado, por ejemplo \`.rv-modal-cab-txt\`.
+7. **\`--color-muted\` sobre \`--color-primary-bg\` da 4,37:1:** Turnos pasa esos textos a \`--color-body\` y el kit ya dejó escrito en \`estilo.tsx\` qué tokens sirven para texto (da07e). La alternativa es subir un punto \`--color-muted\` en claro (#5B6B82 da 4,6:1 sobre #EFF6FF), pero eso es \`globals.css\`, de Tienda.
+8. **Un celular de vista previa compartido:** el \`VistaCliente\` de Avanzado de Turnos (marco plano, pantalla con las variables \`--color-*\` del tema) no sabe de turnos; Apariencia tiene otro con iframe. Si el kit quiere un "celular", ese es el candidato.`,
+    abierta: 'Los dos primeros tocan el kit y a los tres módulos a la vez; el tercero y el cuarto tocan la herramienta de QA y globals.css de Tienda, que está en producción; el quinto es una decisión de diseño entre dos criterios defendibles; el séptimo cambia un token de toda la app; el sexto y el octavo son API del kit que conviene decidir una vez.',
+    origen: 'pedidos-kit-alquileres.md, pedidos-kit-gimnasio.md y pedidos-kit-turnos.md (26 y 27/10/2026, en el scratchpad de la sesión); el kit tomó el resto el 27/10 (entrada "El kit toma lo que pidieron los módulos", commits f1623 y da07e).',
+    archivos: [
+      'apps/web/src/design-system/reservas/piezas.tsx:228',
+      'apps/web/src/modules/alquileres/admin/piezas.tsx:72',
+      'apps/web/src/modules/alquileres/admin/piezas.tsx:107',
+      'apps/web/src/modules/gimnasio/admin/piezas.tsx:81',
+      'apps/web/src/modules/gimnasio/admin/piezas.tsx:113',
+      'apps/web/src/modules/gimnasio/admin/piezas.tsx:128',
+      'apps/web/src/modules/turnos/admin/piezasPanel.tsx:271',
+      'apps/web/src/design-system/reservas/estilo.tsx:136',
+      'apps/web/src/styles/globals.css:915',
+      'apps/web/src/modules/gimnasio/admin/Socios.tsx:51',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Mensajes.tsx:37',
+      'apps/web/src/modules/alquileres/admin/configuracion/comun.tsx:58',
+      'apps/web/src/modules/turnos/admin/configuracion/Mensajes.tsx:53',
+      'apps/web/src/design-system/reservas/piezas.tsx:174',
+      'apps/web/src/modules/turnos/admin/piezasPanel.tsx:197',
+      'apps/web/src/modules/turnos/admin/avanzado/ui.tsx:56-57',
+      'apps/web/src/modules/turnos/admin/avanzado/ui.tsx:80-81',
     ],
   }),
 ]

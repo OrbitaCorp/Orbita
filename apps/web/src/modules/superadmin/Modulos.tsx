@@ -264,6 +264,9 @@ const CSS = `
   .mo-card-clic { position: relative; }
   .mo-card-abrir { all: unset; cursor: pointer; }
   .mo-card-abrir::after { content: ''; position: absolute; inset: 0; border-radius: 14px; }
+  /* En celular el botón (el nombre) mide lo que su texto, aunque el toque valga en toda la
+     tarjeta: se le da el alto de un toque para que también lo sea a ojo y para el teclado. */
+  @media (max-width: 768px) { .mo-card-abrir { display: inline-flex; align-items: center; min-height: 44px; } }
   .mo-card-clic:has(.mo-card-abrir:focus-visible) { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   @media (hover: hover) { .mo-card-clic:hover { border-color: var(--color-border-strong); } }
   .mo-rotulo { font-size: 12px; font-weight: 600; color: var(--color-muted); }
@@ -797,7 +800,8 @@ function FilaTarea({ t, onTildar, onRegistrar, onVerEntrada }: {
         />
       </label>
       <div className="mo-tarea-texto">
-        <div style={{ fontSize: 13.5, fontWeight: 600, color: t.hecha ? 'var(--color-muted)' : 'var(--color-text)', lineHeight: 1.45, textDecoration: t.hecha ? 'line-through' : undefined, textDecorationColor: 'var(--color-border-strong)' }}>
+        {/* textDecorationLine y no el atajo textDecoration: React avisa si se mezcla el atajo con textDecorationColor en un re-render. */}
+        <div style={{ fontSize: 13.5, fontWeight: 600, color: t.hecha ? 'var(--color-muted)' : 'var(--color-text)', lineHeight: 1.45, textDecorationLine: t.hecha ? 'line-through' : 'none', textDecorationColor: 'var(--color-border-strong)' }}>
           {c.texto}
         </div>
         <div style={{ fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.45, marginTop: 2 }}>Listo cuando: {c.criterio}</div>
