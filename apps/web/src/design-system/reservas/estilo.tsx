@@ -108,6 +108,13 @@ export const CSS_RESERVAS = `
   .rv-textarea { padding: 10px 12px; min-height: 88px; resize: vertical; line-height: 1.5; }
   .rv-select { appearance: none; -webkit-appearance: none; padding-right: 34px; background-image: linear-gradient(45deg, transparent 50%, var(--color-muted) 50%), linear-gradient(135deg, var(--color-muted) 50%, transparent 50%); background-position: calc(100% - 17px) 50%, calc(100% - 12px) 50%; background-size: 5px 5px; background-repeat: no-repeat; }
   .rv-input::placeholder, .rv-textarea::placeholder { color: var(--color-subtle); }
+  /* Texto suelto en el acento ("Ver agenda", "Configurar"): en tinta oscura del acento, porque el primario a
+     13 px sobre blanco da 3,7:1. Reglas para texto: --color-muted solo sobre --color-bg y --color-surface (sobre
+     primary-bg queda en 4,4:1: ahí va --color-body); --color-subtle es para íconos, bordes y placeholders, no
+     para texto. */
+  .rv-link { background: none; border: none; padding: 0; font: inherit; font-size: 13px; font-weight: 600; color: var(--chip-primary-fg); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; text-decoration: none; border-radius: 6px; }
+  .rv-link:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  @media (hover: hover) { .rv-link:hover { text-decoration: underline; } }
   .rv-input:focus, .rv-select:focus, .rv-textarea:focus { border-color: var(--color-primary); box-shadow: 0 0 0 1px var(--color-primary); }
   .rv-input[aria-invalid='true'], .rv-select[aria-invalid='true'] { border-color: var(--color-error); }
   .rv-ayuda { font-size: 12.5px; line-height: 1.45; color: var(--color-muted); }
@@ -302,7 +309,7 @@ export const CSS_RESERVAS = `
     .rv-input, .rv-select { min-height: 46px; }
     .rv-con-prefijo > i { font-size: 16px; }
     .rv-con-prefijo > .rv-input { padding-left: 28px; }
-    .rv-btn, .rv-btn--sm { min-height: 44px; }
+    .rv-btn, .rv-btn--sm, .rv-link { min-height: 44px; }
     .rv-btn--lg { min-height: 48px; }
     .rv-btn--icono { width: 44px; }
     .rv-seg > button { min-height: 44px; }

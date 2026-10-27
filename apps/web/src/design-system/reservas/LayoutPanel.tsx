@@ -118,7 +118,9 @@ const CSS = `
   .rvp-usuario { width: 36px; height: 36px; flex-shrink: 0; padding: 0; border-radius: 50%; border: 2px solid transparent; background: transparent; display: grid; place-items: center; cursor: pointer; transition: border-color 150ms ease; }
   .rvp-usuario[aria-expanded='true'] { border-color: var(--color-primary); }
   .rvp-usuario:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-  .rvp-avatar { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 600; background: var(--c, var(--color-primary)); color: var(--color-on-primary); flex-shrink: 0; }
+  /* El avatar lleva el color de la persona como tinte y anillo, con las iniciales en tinta de texto: las
+     iniciales blancas sobre el color de cada una daban 2,2-4,2:1 según la persona. */
+  .rvp-avatar { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: color-mix(in srgb, var(--c, var(--color-primary)) 16%, var(--color-bg)); color: var(--color-text); box-shadow: inset 0 0 0 2px var(--c, var(--color-primary)); flex-shrink: 0; }
   .rvp-buscar { position: relative; display: flex; align-items: center; }
   .rvp-buscar > svg { position: absolute; left: 12px; pointer-events: none; color: var(--color-subtle); }
   .rvp-buscar > input { height: 36px; width: 220px; padding: 0 12px 0 36px; border-radius: 8px; border: 1px solid var(--color-border-strong); background: var(--color-surface); color: var(--color-text); font: inherit; font-size: 14px; outline: none; transition: width 180ms ease; }
@@ -130,10 +132,11 @@ const CSS = `
   @keyframes rvpFlota { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
   .rvp-flota-cab { display: flex; align-items: center; gap: 10px; padding: 12px 10px 10px 16px; border-bottom: 1px solid var(--color-border); flex-shrink: 0; }
   .rvp-flota-cab > div { flex: 1; min-width: 0; }
+  .rvp-flota-cerrar { width: 32px; height: 32px; border: none; }
   .rvp-flota-titulo { font-size: 13px; font-weight: 600; color: var(--color-text); }
   .rvp-flota-nota { font-size: 12px; color: var(--color-muted); margin-top: 1px; }
   .rvp-flota-lista { overflow-y: auto; overscroll-behavior: contain; padding: 6px; }
-  .rvp-flota-grupo { padding: 8px 10px 4px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--color-subtle); }
+  .rvp-flota-grupo { padding: 8px 10px 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--color-muted); }
   .rvp-flota-item { display: flex; align-items: center; gap: 11px; width: 100%; min-height: 48px; padding: 8px 10px; border: none; border-radius: 8px; background: transparent; text-align: left; font: inherit; color: inherit; cursor: pointer; }
   .rvp-flota-item[aria-selected='true'], .rvp-flota-item[aria-current='true'] { background: var(--color-primary-bg); }
   .rvp-flota-item:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
@@ -169,7 +172,7 @@ const CSS = `
     .rvp-fecha, .rvp-sep { display: none; }
     .rvp-item { height: 44px; font-size: 14.5px; }
     .rvp-sub-btn { min-height: 44px; font-size: 13.5px; }
-    .rvp-ico, .rvp-usuario, .rvp-cerrar { width: 44px; height: 44px; }
+    .rvp-ico, .rvp-usuario, .rvp-cerrar, .rvp-flota-cerrar { width: 44px; height: 44px; }
     .rvp-flota-item { min-height: 56px; }
     .rvp-link { min-height: 44px; }
   }
@@ -559,7 +562,7 @@ export default function LayoutPanel({ producto = '', negocio, rubro, fecha, item
               {sinLeer.length > 0 && (
                 <button type="button" className="ds-hover rvp-link" onClick={() => setLeidos(avisos.map(a => a.id))}><CheckCheck size={14} aria-hidden /> Marcar leídas</button>
               )}
-              <button type="button" className="ds-hover rvp-ico" style={{ width: 32, height: 32, border: 'none' }} onClick={() => setVerAvisos(false)} aria-label="Cerrar notificaciones"><X size={16} /></button>
+              <button type="button" className="ds-hover rvp-ico rvp-flota-cerrar" onClick={() => setVerAvisos(false)} aria-label="Cerrar notificaciones"><X size={16} /></button>
             </div>
             <div className="rvp-flota-lista">
               {avisos.length === 0 && (
