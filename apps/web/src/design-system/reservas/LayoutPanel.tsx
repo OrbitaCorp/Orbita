@@ -21,7 +21,7 @@ import type { LucideIcon } from 'lucide-react'
 import { ArrowLeft, ArrowUpRight, Bell, BellOff, CheckCheck, ChevronDown, Eye, Menu, Moon, Search, SearchX, Sun, Undo2, X } from 'lucide-react'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 import { EscenaEspacial } from '@/design-system/EscenaEspacial'
-import HorizonteOrbita from '@/design-system/fondos/HorizonteOrbita'
+import HorizonteOrbita, { type Caja } from '@/design-system/fondos/HorizonteOrbita'
 import { useDarkMode } from '@/hooks/useDarkMode'
 import { EstiloReservas } from './estilo'
 import { retenerFoco } from './piezas'
@@ -396,6 +396,8 @@ export default function LayoutPanel({ producto = '', negocio, rubro, fecha, item
   // encabezado (ResizeObserver: el texto se parte distinto según el ancho). Sin encabezado,
   // no hay banda: el texto oscuro de una cabecera propia quedaría sobre el cielo.
   const [tope, setTope] = useState<number | null>(null)
+  // La caja del texto del encabezado (sin las acciones): los cometas del horizonte se apagan cerca.
+  const [evitar, setEvitar] = useState<Caja | null>(null)
   useEffect(() => {
     const main = principal.current
     if (isDark || !main) return
@@ -409,6 +411,15 @@ export default function LayoutPanel({ producto = '', negocio, rubro, fecha, item
         for (let a: HTMLElement | null = cab; a && a !== main; a = a.offsetParent as HTMLElement | null) y += a.offsetTop
       }
       setTope(t => (t === y ? t : y))
+      const texto = cab?.firstElementChild as HTMLElement | null | undefined
+      let caja: Caja | null = null
+      if (texto) {
+        // Desde el borde de arriba, así también cubre un "volver" que vaya encima del título.
+        let x = 0, yy = 0
+        for (let a: HTMLElement | null = texto; a && a !== main; a = a.offsetParent as HTMLElement | null) { x += a.offsetLeft; yy += a.offsetTop }
+        caja = { x, y: 0, w: texto.offsetWidth, h: yy + texto.offsetHeight }
+      }
+      setEvitar(c => (c && caja ? c.x === caja.x && c.y === caja.y && c.w === caja.w && c.h === caja.h : c === caja) ? c : caja)
     }
     const ro = new ResizeObserver(medir)
     const mo = new MutationObserver(medir)
@@ -556,7 +567,7 @@ export default function LayoutPanel({ producto = '', negocio, rubro, fecha, item
         <main ref={principal} className="rvp-main admin-main">
           {conBanda && (
             <div className="rvp-banda" style={{ height: tope + 48 }} aria-hidden>
-              <HorizonteOrbita tope={tope} />
+              <HorizonteOrbita tope={tope} evitar={evitar} piso={tope - 38} />
             </div>
           )}
           {/* key: cada sección vuelve a montar el envoltorio y dispara la entrada. */}
