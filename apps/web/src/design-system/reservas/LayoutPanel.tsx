@@ -56,6 +56,29 @@ const CSS = `
   .rvp-cielo { display: none; position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; background: #05080F; }
   .rvp-cielo > * { position: absolute !important; }
   .dark .rvp-cielo { display: block; }
+
+  /* En claro, la aurora: tres velos de color de marca (azul, violeta y un toque de cian) que
+     derivan muy despacio detrás del contenido, más las órbitas de Órbita abajo a la derecha,
+     con un planeta chiquito que las recorre. Todo CSS: nada de canvas ni de JS, y con
+     prefers-reduced-motion queda quieto. Los velos son claros (el texto sigue en AA) y las
+     órbitas son líneas de 1 px al 14 %: ambientan sin competir con lo que se lee. */
+  .rvp-aurora { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; background: var(--color-surface); }
+  .rvp-aurora > i { position: absolute; display: block; border-radius: 50%; filter: blur(56px); will-change: transform; }
+  .rvp-aurora > i:nth-child(1) { width: 58vw; height: 58vw; max-width: 760px; max-height: 760px; right: -12vw; top: -28vw; background: radial-gradient(circle at 50% 50%, rgba(59,130,246,0.42), rgba(59,130,246,0) 70%); animation: rvpAurora1 16s ease-in-out infinite alternate; }
+  .rvp-aurora > i:nth-child(2) { width: 46vw; height: 46vw; max-width: 620px; max-height: 620px; left: 18vw; top: -22vw; background: radial-gradient(circle at 50% 50%, rgba(139,92,246,0.34), rgba(139,92,246,0) 70%); animation: rvpAurora2 19s ease-in-out infinite alternate; }
+  .rvp-aurora > i:nth-child(3) { width: 40vw; height: 40vw; max-width: 540px; max-height: 540px; left: -14vw; bottom: -18vw; background: radial-gradient(circle at 50% 50%, rgba(34,211,238,0.30), rgba(34,211,238,0) 70%); animation: rvpAurora3 22s ease-in-out infinite alternate; }
+  @keyframes rvpAurora1 { from { transform: translate3d(0, 0, 0) scale(1); } to { transform: translate3d(-6vw, 5vw, 0) scale(1.12); } }
+  @keyframes rvpAurora2 { from { transform: translate3d(0, 0, 0) scale(1.08); } to { transform: translate3d(8vw, 3vw, 0) scale(0.96); } }
+  @keyframes rvpAurora3 { from { transform: translate3d(0, 0, 0) scale(1); } to { transform: translate3d(5vw, -4vw, 0) scale(1.1); } }
+  .rvp-orbitas { position: absolute; right: -26vw; bottom: -40vw; width: 80vw; height: 80vw; max-width: 1100px; max-height: 1100px; color: var(--color-primary); }
+  .rvp-orbitas circle { fill: none; stroke: currentColor; stroke-width: 1; vector-effect: non-scaling-stroke; }
+  .rvp-orbitas .rvp-orbita-g { transform-origin: 50% 50%; animation: rvpOrbita 48s linear infinite; }
+  .rvp-orbitas .rvp-orbita-g--lenta { animation-duration: 84s; animation-direction: reverse; }
+  .rvp-orbitas .rvp-planeta { fill: currentColor; stroke: var(--color-surface); stroke-width: 3; }
+  @keyframes rvpOrbita { to { transform: rotate(360deg); } }
+  .dark .rvp-aurora { display: none; }
+  @media (prefers-reduced-motion: reduce) { .rvp-aurora > i, .rvp-orbitas .rvp-orbita-g { animation: none; } }
+  @media (max-width: 768px) { .rvp-aurora > i { filter: blur(44px); } .rvp-aurora > i:nth-child(1) { width: 120vw; height: 120vw; right: -40vw; top: -50vw; } .rvp-aurora > i:nth-child(2) { width: 100vw; height: 100vw; left: -10vw; top: -30vw; } .rvp-aurora > i:nth-child(3) { width: 90vw; height: 90vw; left: -40vw; bottom: -30vw; } .rvp-orbitas { right: -70vw; bottom: -80vw; width: 170vw; height: 170vw; } }
   .rvp-lateral, .rvp-cuerpo { position: relative; }
   .rvp-cuerpo { z-index: 1; }
   .rvp .rvp-main, .dark .rvp .rvp-main { background: transparent; }
@@ -380,7 +403,20 @@ export default function LayoutPanel({ producto = '', negocio, rubro, fecha, item
     <div className="rv rvp">
       <EstiloReservas />
       <style>{CSS}</style>
-      {isDark && <div className="rvp-cielo" aria-hidden><EscenaEspacial planeta={false} oscuro /></div>}
+      {isDark
+        ? <div className="rvp-cielo" aria-hidden><EscenaEspacial planeta={false} oscuro /></div>
+        : (
+          <div className="rvp-aurora" aria-hidden>
+            <i /><i /><i />
+            <svg className="rvp-orbitas" viewBox="0 0 1000 1000">
+              <circle cx="500" cy="500" r="470" opacity="0.22" />
+              <circle cx="500" cy="500" r="360" opacity="0.26" strokeDasharray="6 10" />
+              <circle cx="500" cy="500" r="250" opacity="0.3" />
+              <g className="rvp-orbita-g"><circle className="rvp-planeta" cx="500" cy="30" r="7" opacity="0.9" /></g>
+              <g className="rvp-orbita-g rvp-orbita-g--lenta"><circle className="rvp-planeta" cx="500" cy="250" r="5" opacity="0.7" /></g>
+            </svg>
+          </div>
+        )}
 
       <aside ref={lateral} id={idLateral} className="rvp-lateral admin-sidebar" data-abierto={abierto} aria-label="Menú del panel">
         <div className="rvp-logo">
