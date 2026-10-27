@@ -1,12 +1,11 @@
-// Pestañas "livianas" de Configuración de Turnos: Dominio y Suscripción.
+// Sub-secciones "livianas" de Configuración de Turnos: Dominio y Suscripción.
 // Mismo look que las de Tienda (Dominios.tsx, Suscripcion.tsx) pero sin la
 // lógica real de cada una: acá alcanza con que se entienda qué hay y cómo se ve.
-// El equipo y los roles viven en la pestaña Equipo (la pantalla Equipo del panel).
 import { useEffect, useRef, useState } from 'react'
-import { Globe, Link2, Copy, Check, Server, Crown, CreditCard, Receipt, CalendarDays, X, CircleCheck } from 'lucide-react'
+import { Globe, Link2, Copy, Check, Server, Crown, CreditCard, Receipt, CalendarDays, CircleCheck } from 'lucide-react'
 import { temaDe } from '@/modules/turnos/storefront/tema'
-
-import { useBorrador, Encabezado, SecCard, Campo, Dos, Chip, BotonBorde, BarraGuardar, Boton, Dialogo, type PropsTab } from './ui'
+import { Modal } from '../piezasPanel'
+import { useBorrador, Encabezado, SecCard, Campo, Dos, Chip, BotonBorde, BarraGuardar, Boton, type PropsTab } from './ui'
 import { subdominioDe, vozDe, cap } from './datos'
 
 // ─── Dominio ─────────────────────────────────────────────────────────────────
@@ -36,9 +35,9 @@ export function Dominio({ rubro, avisar }: PropsTab) {
     : []
 
   return (
-    <div className="panel-page panel-page--form">
-      <Encabezado rotulo="Tu sitio" titulo="Dominio" bajada="La dirección de tu sitio de reservas." />
-      <div className="tuc-pila">
+    <div className="rv-pagina rv-pagina--form">
+      <Encabezado titulo="Dominio" bajada="La dirección de tu sitio de reservas." />
+      <div className="rv-pila">
         <SecCard titulo="Dirección de Órbita" Icon={Link2} badge={<Chip tono="ok">Activa</Chip>} bajada="Gratis e incluida en tu plan. Si la cambiás, la vieja deja de funcionar.">
           <Campo label="Tu dirección" value={b.valor.sub} onChange={x => b.set('sub', x.toLowerCase().replace(/[^a-z0-9-]/g, ''))} sufijo=".orbita.site" mono maxLength={30}
             ayuda={subOk ? 'Solo letras, números y guiones.' : <span style={{ color: 'var(--color-error)' }}>Tiene que tener al menos 3 caracteres.</span>} />
@@ -47,7 +46,7 @@ export function Dominio({ rubro, avisar }: PropsTab) {
         <SecCard titulo="Dominio propio" Icon={Globe} bajada="Si ya tenés uno (por ejemplo, en NIC Argentina), apuntalo a tu sitio de reservas.">
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <Campo label="Tu dominio" value={b.valor.propio} onChange={x => b.set('propio', x.toLowerCase().trim())} placeholder={`www.${subdominioDe(t.nombre)}.com.ar`} mono style={{ flex: '1 1 240px', marginBottom: 0 }} />
-            <Boton variant="primary" disabled={!/\.[a-z]{2,}$/.test(b.valor.propio)} onClick={conectar} style={{ height: 42 }}>Conectar</Boton>
+            <Boton variant="primary" className="tuc-alto-campo" disabled={!/\.[a-z]{2,}$/.test(b.valor.propio)} onClick={conectar}>Conectar</Boton>
           </div>
           {conectando && (
             <div className="tuc-fila-hijos" style={{ marginTop: 16 }}>
@@ -56,14 +55,14 @@ export function Dominio({ rubro, avisar }: PropsTab) {
                 <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)', flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{conectando}</span>
                 <span aria-live="polite">{estado === 'activo' ? <Chip tono="ok"><CircleCheck size={12} aria-hidden />Conectado</Chip> : <Chip tono="aviso">{estado === 'verificando' ? 'Verificando…' : 'Esperando DNS'}</Chip>}</span>
               </div>
-              <p style={{ fontSize: 12.5, color: 'var(--color-muted)', margin: '0 0 12px', lineHeight: 1.5 }}>{estado === 'activo'
+              <p className="tuc-ayuda" style={{ margin: '0 0 12px' }}>{estado === 'activo'
                 ? 'Listo: tu sitio de reservas ya se abre desde tu dominio. Dejá estos registros cargados para que siga funcionando.'
                 : 'Cargá estos registros donde compraste el dominio. Puede tardar de minutos a unas horas; te avisamos por mail cuando quede.'}</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {registros.map(([tipo, nombre, valor]) => (
                   <div key={tipo} className="tuc-renglon" style={{ display: 'grid', gridTemplateColumns: '64px minmax(0, 1fr) auto', gap: 10, alignItems: 'center', padding: '8px 10px' }}>
                     <Chip tono="primario">{tipo}</Chip>
-                    <div style={{ minWidth: 0, fontFamily: '"Geist Mono", monospace', fontSize: 12.5 }}>
+                    <div className="rv-num" style={{ minWidth: 0, fontSize: 12.5 }}>
                       <div style={{ color: 'var(--color-muted)' }}>{nombre}</div>
                       <div style={{ color: 'var(--color-text)', overflowWrap: 'anywhere' }}>{valor}</div>
                     </div>
@@ -93,6 +92,16 @@ const PLANES = [
 ]
 const $ = (n: number) => `$${n.toLocaleString('es-AR')}`
 
+const CSS_SUSCRIPCION = `
+  .tuc-planes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .tuc-plan-conviene { position: absolute; top: -10px; right: 10px; }
+  .tuc-uso { display: flex; flex-direction: column; gap: 14px; margin-top: 20px; }
+  .tuc-uso-cab { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; margin-bottom: 6px; }
+  .tuc-cobro { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-top: 1px solid var(--color-border); font-size: 13.5px; }
+  .tuc-cobro:first-child { border-top: none; padding-top: 0; }
+  @media (max-width: 560px) { .tuc-planes { grid-template-columns: minmax(0, 1fr); } }
+`
+
 export function Suscripcion({ rubro, avisar }: PropsTab) {
   const voz = vozDe(rubro)
   const [plan, setPlan] = useState('mensual')
@@ -114,14 +123,15 @@ export function Suscripcion({ rubro, avisar }: PropsTab) {
     [`${cap(voz.turnos)} este mes`, 286, null],
   ]
   return (
-    <div className="panel-page panel-page--form">
-      <Encabezado rotulo="Cuenta" titulo="Suscripción" bajada="Tu plan de Órbita Turnos, lo que usás y tus pagos." />
-      <div className="tuc-pila">
+    <div className="rv-pagina rv-pagina--form">
+      <style>{CSS_SUSCRIPCION}</style>
+      <Encabezado titulo="Suscripción" bajada="Tu plan de Órbita Turnos, lo que usás y tus pagos." />
+      <div className="rv-pila">
         <SecCard titulo="Plan actual" Icon={Crown} badge={<Chip tono="ok">Activo</Chip>}>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap' }}>
             <div style={{ flex: '1 1 220px' }}>
               <div style={{ fontSize: 13, color: 'var(--color-muted)' }}>Plan {actual.nombre}</div>
-              <div className="tuo-num" style={{ fontSize: 34, lineHeight: 1.1, fontWeight: 600, letterSpacing: '-0.03em', color: 'var(--color-text)' }}>{$(actual.precio)}<span style={{ fontSize: 14, color: 'var(--color-muted)', fontWeight: 500 }}>/mes</span></div>
+              <div className="rv-num" style={{ fontSize: 30, lineHeight: 1.1, fontWeight: 700, color: 'var(--color-text)' }}>{$(actual.precio)}<span style={{ fontSize: 14, color: 'var(--color-muted)', fontWeight: 500 }}>/mes</span></div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--color-body)', marginTop: 6 }}><CalendarDays size={13} aria-hidden /> Se renueva el 02/10/2026</div>
             </div>
             <div className="tuc-renglon" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px' }}>
@@ -133,15 +143,15 @@ export function Suscripcion({ rubro, avisar }: PropsTab) {
               <button type="button" className="tuc-link" aria-label="Cambiar la tarjeta" onClick={() => setNueva({ numero: '', vence: '', titular: '' })}>Cambiar</button>
             </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 20 }}>
+          <div className="tuc-uso">
             {usos.map(([l, n, max]) => (
               <div key={l}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13, marginBottom: 6 }}>
+                <div className="tuc-uso-cab">
                   <span style={{ color: 'var(--color-body)' }}>{l}</span>
-                  <span style={{ fontFamily: '"Geist Mono", monospace', color: 'var(--color-text)', fontWeight: 600 }}>{n.toLocaleString('es-AR')}{max ? ` / ${max.toLocaleString('es-AR')}` : ' · sin límite'}</span>
+                  <span className="rv-num" style={{ color: 'var(--color-text)', fontWeight: 600 }}>{n.toLocaleString('es-AR')}{max ? ` / ${max.toLocaleString('es-AR')}` : ' · sin límite'}</span>
                 </div>
-                <div role="progressbar" aria-label={l} aria-valuenow={n} aria-valuemin={0} aria-valuemax={max ?? n} style={{ height: 6, borderRadius: 99, background: 'var(--color-surface-alt)', overflow: 'hidden' }}>
-                  <div className="tuc-barra-uso" style={{ width: `${max ? Math.min(100, n / max * 100) : 100}%`, background: max && n / max > 0.8 ? 'var(--color-warning)' : 'var(--tuo-grad)', opacity: max ? 1 : 0.35 }} />
+                <div role="progressbar" aria-label={l} aria-valuenow={n} aria-valuemin={0} aria-valuemax={max ?? n} className="tu-barra">
+                  <i style={{ width: `${max ? Math.min(100, n / max * 100) : 100}%`, background: max && n / max > 0.8 ? 'var(--color-warning)' : 'var(--color-primary)', opacity: max ? 1 : 0.35 }} />
                 </div>
               </div>
             ))}
@@ -154,10 +164,10 @@ export function Suscripcion({ rubro, avisar }: PropsTab) {
               const a = p.id === plan
               return (
                 <button key={p.id} type="button" role="radio" aria-checked={a} onClick={() => { setPlan(p.id); if (!a) avisar(`Pasás al plan ${p.nombre}`, 'Demo: no se cobra nada.') }} className="tuc-opcion" style={{ overflow: 'visible' }}>
-                  {p.id === 'anual' && <span style={{ position: 'absolute', top: -10, right: 10 }}><Chip tono="ok">Conviene</Chip></span>}
-                  <div style={{ fontSize: 13.5, fontWeight: 600, color: a ? 'var(--color-primary)' : 'var(--color-text)' }}>{p.nombre}</div>
-                  <div className="tuo-num" style={{ fontSize: 21, fontWeight: 600, color: 'var(--color-text)', marginTop: 4 }}>{$(p.precio)}<span style={{ fontSize: 12, color: 'var(--color-muted)', fontWeight: 500 }}>/mes</span></div>
-                  <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 4, lineHeight: 1.4 }}>{p.nota}</div>
+                  {p.id === 'anual' && <span className="tuc-plan-conviene"><Chip tono="ok">Conviene</Chip></span>}
+                  <div style={{ fontSize: 13.5, fontWeight: 600, color: a ? 'var(--chip-primary-fg)' : 'var(--color-text)' }}>{p.nombre}</div>
+                  <div className="rv-num" style={{ fontSize: 21, fontWeight: 600, color: 'var(--color-text)', marginTop: 4 }}>{$(p.precio)}<span style={{ fontSize: 12, color: 'var(--color-body)', fontWeight: 500 }}>/mes</span></div>
+                  <div style={{ fontSize: 12, color: 'var(--color-body)', marginTop: 4, lineHeight: 1.4 }}>{p.nota}</div>
                 </button>
               )
             })}
@@ -166,11 +176,11 @@ export function Suscripcion({ rubro, avisar }: PropsTab) {
 
         <SecCard titulo="Pagos" Icon={CreditCard} bajada="Tus últimos cobros de Órbita.">
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {[['02/09/2026', 16500], ['02/08/2026', 16500], ['02/07/2026', 16500]].map(([f, m], i) => (
-              <div key={String(f)} className="tuc-linea" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 8px', margin: '0 -8px', borderTop: i ? '1px solid var(--color-border)' : 'none', fontSize: 13.5 }}>
-                <span className="tuo-num" style={{ flex: 1, color: 'var(--color-body)' }}>{f}</span>
+            {[['02/09/2026', 16500], ['02/08/2026', 16500], ['02/07/2026', 16500]].map(([f, m]) => (
+              <div key={String(f)} className="tuc-cobro">
+                <span className="rv-num" style={{ flex: 1, color: 'var(--color-body)' }}>{f}</span>
                 <Chip tono="ok">Pagado</Chip>
-                <span style={{ fontFamily: '"Geist Mono", monospace', color: 'var(--color-text)', fontWeight: 600, minWidth: 80, textAlign: 'right' }}>{$(Number(m))}</span>
+                <span className="rv-num" style={{ color: 'var(--color-text)', fontWeight: 600, minWidth: 80, textAlign: 'right' }}>{$(Number(m))}</span>
               </div>
             ))}
           </div>
@@ -178,12 +188,8 @@ export function Suscripcion({ rubro, avisar }: PropsTab) {
       </div>
 
       {nueva && (
-        <Dialogo titulo="Cambiar la tarjeta" onCerrar={() => setNueva(null)}>
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
-            <span className="tuo-h2" style={{ flex: 1 }}>Cambiar la tarjeta</span>
-            <button type="button" aria-label="Cerrar" autoFocus onClick={() => setNueva(null)} className="tuc-icono"><X size={17} aria-hidden /></button>
-          </div>
-          <p style={{ fontSize: 12.5, color: 'var(--color-muted)', margin: '0 0 16px', lineHeight: 1.5 }}>Es una demo: probá con números inventados, no con tu tarjeta.</p>
+        <Modal titulo="Cambiar la tarjeta" rotulo="Suscripción" bajada="Es una demo: probá con números inventados, no con tu tarjeta." ancho={440} onCerrar={() => setNueva(null)} onEnviar={guardarTarjeta}
+          pie={<><Boton variant="ghost" onClick={() => setNueva(null)}>Cancelar</Boton><Boton type="submit" variant="primary" disabled={!nuevaOk}>Guardar tarjeta</Boton></>}>
           <Campo label="Número de la tarjeta" value={nueva.numero} mono placeholder="4509 9535 6623 3704"
             onChange={x => setNueva({ ...nueva, numero: x.replace(/\D/g, '').slice(0, 16).replace(/(\d{4})(?=\d)/g, '$1 ') })} />
           <Dos>
@@ -191,21 +197,8 @@ export function Suscripcion({ rubro, avisar }: PropsTab) {
               onChange={x => { const d = x.replace(/\D/g, '').slice(0, 4); setNueva({ ...nueva, vence: d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d }) }} />
             <Campo label="Titular" value={nueva.titular} onChange={x => setNueva({ ...nueva, titular: x })} placeholder="Como figura en la tarjeta" />
           </Dos>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-            <Boton variant="ghost" onClick={() => setNueva(null)}>Cancelar</Boton>
-            <Boton variant="primary" disabled={!nuevaOk} onClick={guardarTarjeta}>Guardar tarjeta</Boton>
-          </div>
-        </Dialogo>
+        </Modal>
       )}
     </div>
   )
 }
-
-export const CSS_CUENTA = `
-  .tuc-planes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-  .tuc-barra-uso { height: 100%; border-radius: 99px; transition: width 600ms var(--tuo-ease, ease); }
-  @media (prefers-reduced-motion: reduce) { .tuc-barra-uso { transition: none; } }
-  @media (max-width: 560px) {
-    .tuc-planes { grid-template-columns: minmax(0, 1fr) !important; }
-  }
-`

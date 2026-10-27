@@ -57,7 +57,7 @@ export function CamposPago({ pago, onChange, rubro, nombre }: { pago: Pago; onCh
       )}
       {conComision && (
         <div className="tu-pago-rapidos" role="group" aria-label="Porcentajes habituales">
-          {COMISIONES.map(c => <button key={c} type="button" className="tuc-pastilla tuo-num" aria-pressed={pago.comision === c} onClick={() => set({ comision: c })}>{c}%</button>)}
+          {COMISIONES.map(c => <button key={c} type="button" className="rv-chip rv-chip--borde rv-num" aria-pressed={pago.comision === c} onClick={() => set({ comision: c })}>{c}%</button>)}
         </div>
       )}
 
@@ -66,8 +66,8 @@ export function CamposPago({ pago, onChange, rubro, nombre }: { pago: Pago; onCh
         <Segmentado label={pago.forma === 'alquiler' ? 'Cada cuánto paga' : 'Cada cuánto se le liquida'} lleno valor={pago.cada} onChange={cada => set({ cada })} opciones={CADA} />
       </div>
 
-      <div className="tu-nota tu-nota--info" style={{ marginBottom: 0 }}>
-        <Info size={15} />
+      <div className="rv-nota rv-nota--info">
+        <Info size={15} aria-hidden />
         <span>{ejemplo}</span>
       </div>
     </>

@@ -2,12 +2,26 @@
 // de cada recordatorio. El rubro no se edita acá: define cómo funciona la
 // agenda entera (por profesional o por sala), cambiarlo es otra cosa.
 import { useState } from 'react'
-import { Building2, MapPin, Phone, AtSign, Mail, Link2, Copy, QrCode, Check, X, MessageCircle, Download } from 'lucide-react'
+import { Building2, MapPin, Phone, AtSign, Mail, Link2, Copy, QrCode, Check, MessageCircle, Download } from 'lucide-react'
 import { temaDe } from '@/modules/turnos/storefront/tema'
 import { FAMILIAS, MODO_LABEL } from '@/modules/turnos/datos'
 import { QR, matrizQR } from '@/modules/turnos/_shared/components/QR'
-import { useBorrador, Encabezado, SecCard, Campo, Dos, Rotulo, BarraGuardar, FilaSwitch, Boton, Dialogo, type PropsTab } from './ui'
+import { Modal } from '../piezasPanel'
+import { useBorrador, Encabezado, SecCard, Campo, Dos, Rotulo, BarraGuardar, FilaSwitch, Boton, Chip, type PropsTab } from './ui'
 import { subdominioDe, vozDe } from './datos'
+
+const CSS = `
+  .tuc-link-url { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 0 14px; margin-bottom: 14px; border-radius: var(--rv-r-sm); border: 1px solid var(--color-border); background: var(--color-surface); font-family: var(--rv-mono); font-size: 15px; font-weight: 500; color: var(--color-text); }
+  .tuc-link-url > i { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--color-success); }
+  .tuc-link-url > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tuc-qr-marco { display: inline-block; padding: 16px; background: #fff; border-radius: var(--rv-r); border: 1px solid var(--color-border); }
+  .tuc-mapa { position: relative; height: 180px; border-radius: var(--rv-r-sm); overflow: hidden; border: 1px solid var(--color-border); background: var(--color-surface); }
+  .tuc-mapa-pin { position: absolute; left: 50%; top: 52%; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .tuc-mapa-cartel { padding: 5px 11px; border-radius: 8px; background: var(--color-bg); border: 1px solid var(--color-border); font-size: 11.5px; font-weight: 600; color: var(--color-text); white-space: nowrap; max-width: 230px; overflow: hidden; text-overflow: ellipsis; }
+  .tuc-mapa-punto { width: 34px; height: 34px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display: grid; place-items: center; color: var(--color-on-primary); background: var(--color-primary); }
+  .tuc-mapa-punto > svg { transform: rotate(45deg); }
+  @media (max-width: 560px) { .tuc-link-url { font-size: 14px; } }
+`
 
 export default function Negocio({ rubro, avisar }: PropsTab) {
   const voz = vozDe(rubro)
@@ -56,35 +70,29 @@ export default function Negocio({ rubro, avisar }: PropsTab) {
   }
 
   return (
-    <div className="panel-page panel-page--form">
-      <Encabezado rotulo="Tu negocio" titulo="Datos del negocio" bajada={`Cómo te encuentran y te contactan tus ${voz.clientes}. Aparece en tu sitio y en cada recordatorio.`} />
+    <div className="rv-pagina rv-pagina--form">
+      <style>{CSS}</style>
+      <Encabezado titulo="Datos del negocio" bajada={`Cómo te encuentran y te contactan tus ${voz.clientes}. Aparece en tu sitio y en cada recordatorio.`} />
 
-      <div className="tuc-pila">
-        {/* El link es lo que más se usa de esta pantalla: va primero y sobre el espacio de Órbita. */}
-        <section aria-label="Tu link de reservas" className="tuo-espacio tuc-link-hero tuo-entra">
-          <div style={{ minWidth: 0, flex: '1 1 300px' }}>
-            <div className="tuo-eyebrow" style={{ marginBottom: 10 }}><Link2 size={12} aria-hidden style={{ marginLeft: -2 }} />Tu link de reservas</div>
-            <div className="tuc-link-url">
-              <span aria-hidden className="tuo-late" style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--color-success)', flexShrink: 0 }} />
-              <span className="tuo-num" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{link}</span>
-            </div>
-            <p style={{ fontSize: 13, lineHeight: 1.5, margin: '10px 0 0', color: 'var(--color-body)', maxWidth: 460 }}>Compartilo en tu bio de Instagram, en Google y en tu WhatsApp Business: quien lo abre reserva sin escribirte.</p>
-          </div>
+      <div className="rv-pila">
+        {/* El link es lo que más se usa de esta pantalla: va primero. */}
+        <SecCard titulo="Tu link de reservas" Icon={Link2} badge={<Chip tono="ok"><Check size={12} strokeWidth={3} aria-hidden />Publicado</Chip>} bajada="Compartilo en tu bio de Instagram, en Google y en tu WhatsApp Business: quien lo abre reserva sin escribirte.">
+          <div className="tuc-link-url"><i aria-hidden /><span>{link}</span></div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <Boton variant="primary" icon={copiado ? <Check size={15} aria-hidden /> : <Copy size={15} aria-hidden />} onClick={copiar}>{copiado ? 'Copiado' : 'Copiar link'}</Boton>
             <Boton variant="outline" icon={<QrCode size={15} aria-hidden />} onClick={() => setQr(true)}>Ver QR</Boton>
           </div>
-          <div aria-live="polite" className="tuc-sr">{copiado ? 'Link copiado' : ''}</div>
-        </section>
+          <div aria-live="polite" className="rv-sr">{copiado ? 'Link copiado' : ''}</div>
+        </SecCard>
 
         <SecCard titulo="Negocio" Icon={Building2} bajada="El nombre y la descripción con los que te presentás.">
           <Campo label="Nombre del negocio" value={v.nombre} onChange={x => b.set('nombre', x)} maxLength={40} />
           <div style={{ marginBottom: 16 }}>
             <Rotulo ayuda="Define cómo se arma tu agenda. Para cambiarlo, escribinos a soporte.">Rubro</Rotulo>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              <span className="tuo-chip tuo-chip--primario" style={{ height: 32, padding: '0 12px', fontSize: 13 }}><rubro.Icon size={15} strokeWidth={1.8} aria-hidden /> {rubro.label}</span>
-              <span className="tuo-chip" style={{ height: 32, padding: '0 12px', fontSize: 12.5, fontWeight: 500 }}>{familia?.label}</span>
-              <span className="tuo-chip" style={{ height: 32, padding: '0 12px', fontSize: 12.5, fontWeight: 500 }}>Agenda: {MODO_LABEL[rubro.modo].toLowerCase()}</span>
+              <span className="rv-chip rv-chip--primario" style={{ height: 32, padding: '0 12px', fontSize: 13 }}><rubro.Icon size={15} strokeWidth={1.8} aria-hidden /> {rubro.label}</span>
+              <span className="rv-chip" style={{ height: 32, padding: '0 12px', fontSize: 12.5, fontWeight: 500 }}>{familia?.label}</span>
+              <span className="rv-chip" style={{ height: 32, padding: '0 12px', fontSize: 12.5, fontWeight: 500 }}>Agenda: {MODO_LABEL[rubro.modo].toLowerCase()}</span>
             </div>
           </div>
           <Campo label="Descripción" value={v.descripcion} onChange={x => b.set('descripcion', x)} area maxLength={240} ayuda="Aparece debajo del nombre en tu sitio y cuando compartís el link." style={{ marginBottom: 0 }} />
@@ -116,18 +124,14 @@ export default function Negocio({ rubro, avisar }: PropsTab) {
       <BarraGuardar dirty={b.dirty} onDescartar={b.descartar} onGuardar={() => { b.guardar(); avisar('Datos guardados', 'Es una demo: no se guardó nada de verdad.') }} />
 
       {qr && (
-        <Dialogo titulo="Código QR de tu link" onCerrar={() => setQr(false)}>
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
-            <span className="tuo-h2" style={{ flex: 1 }}>QR para tu mostrador</span>
-            <button type="button" aria-label="Cerrar" autoFocus onClick={() => setQr(false)} className="tuc-icono"><X size={17} aria-hidden /></button>
-          </div>
+        <Modal titulo="QR para tu mostrador" rotulo="Tu link de reservas" ancho={420} onCerrar={() => setQr(false)}
+          pie={<><button type="button" className="rv-btn" onClick={() => setQr(false)}>Cerrar</button><Boton variant="primary" icon={<Download size={15} aria-hidden />} onClick={descargarQR}>Descargar PNG</Boton></>}>
           <div style={{ textAlign: 'center' }}>
             <div className="tuc-qr-marco"><QR texto={`https://${link}`} size={184} titulo={`QR de ${link}`} /></div>
-            <div className="tuo-num" style={{ fontSize: 12.5, color: 'var(--color-text)', margin: '14px 0 4px', overflowWrap: 'anywhere' }}>{link}</div>
-            <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginBottom: 18, lineHeight: 1.5 }}>Imprimilo y pegalo en el mostrador: lo escanean y reservan desde el celular.</div>
-            <Boton variant="primary" icon={<Download size={15} aria-hidden />} style={{ width: '100%' }} onClick={descargarQR}>Descargar PNG</Boton>
+            <div className="rv-num" style={{ fontSize: 12.5, color: 'var(--color-text)', margin: '14px 0 4px', overflowWrap: 'anywhere' }}>{link}</div>
+            <p className="rv-ayuda" style={{ margin: 0 }}>Imprimilo y pegalo en el mostrador: lo escanean y reservan desde el celular.</p>
           </div>
-        </Dialogo>
+        </Modal>
       )}
     </div>
   )
@@ -148,19 +152,3 @@ function Mapa({ direccion }: { direccion: string }) {
     </div>
   )
 }
-
-export const CSS_NEGOCIO = `
-  .tuc-link-hero { border-radius: 20px; padding: 24px; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; border: 1px solid var(--color-border); }
-  .tuc-link-url { display: inline-flex; align-items: center; gap: 10px; max-width: 100%; min-height: 46px; padding: 0 16px; border-radius: 12px; font-size: 16px; font-weight: 500; color: var(--color-text);
-    background: rgba(147,197,253,0.08); border: 1px solid var(--color-border-strong); box-sizing: border-box; }
-  .tuc-qr-marco { display: inline-block; padding: 16px; background: #fff; border-radius: 18px; border: 1px solid var(--color-border); box-shadow: 0 0 0 6px var(--color-primary-bg); }
-  .tuc-mapa { position: relative; height: 180px; border-radius: 14px; overflow: hidden; border: 1px solid var(--color-border); background: var(--color-surface); }
-  .tuc-mapa-pin { position: absolute; left: 50%; top: 52%; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; gap: 6px; transition: transform 300ms var(--tuo-ease, ease); }
-  .tuc-mapa-cartel { padding: 5px 11px; border-radius: 9px; background: var(--color-bg); border: 1px solid var(--color-border); font-size: 11.5px; font-weight: 600; color: var(--color-text); white-space: nowrap;
-    box-shadow: 0 6px 16px rgba(15,23,42,0.16); max-width: 230px; overflow: hidden; text-overflow: ellipsis; }
-  .tuc-mapa-punto { width: 34px; height: 34px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display: grid; place-items: center; color: var(--color-on-primary); background: var(--color-primary); }
-  .tuc-mapa-punto > svg { transform: rotate(45deg); }
-  @media (hover: hover) { .tuc-mapa:hover .tuc-mapa-pin { transform: translate(-50%, -108%); } }
-  @media (max-width: 560px) { .tuc-link-hero { padding: 18px; } .tuc-link-url { font-size: 14px; } }
-  @media (prefers-reduced-motion: reduce) { .tuc-mapa-pin { transition: none; } .tuc-mapa:hover .tuc-mapa-pin { transform: translate(-50%, -100%); } }
-`

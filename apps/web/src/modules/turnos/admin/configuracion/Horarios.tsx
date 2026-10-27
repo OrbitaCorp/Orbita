@@ -1,8 +1,9 @@
 // Horario de atención del negocio: el marco dentro del cual cada profesional o
 // sala tiene su propio horario (eso se edita en Equipo). Se carga de dos formas:
 // el mismo horario para todos los días que abre, o día por día (para quien un
-// día atiende distinto). Cada día tiene su mañana y su tarde, con el corte del mediodía en el medio; más abajo, feriados
-// y vacaciones, que son lo que más se olvida y más turnos mal dados genera.
+// día atiende distinto). Cada día tiene su mañana y su tarde, con el corte del
+// mediodía en el medio; más abajo, feriados y vacaciones, que son lo que más se
+// olvida y más turnos mal dados genera.
 //
 // Al lado de cada día va una franja de 6 a 24 h con lo que está abierto
 // pintado: la semana se lee de un vistazo, sin sumar horas de cabeza.
@@ -37,6 +38,29 @@ const diasDe = (semana: Semana): Dia[] => semana.map(([, h]) => {
 })
 const semanaDeDias = (dias: Dia[]): Semana => dias.map((d, i) => [DIAS[i], d.abierto ? jornadaTxt(d.jornada) : ''])
 const tramosDia = (d: Dia): Tramo[] => (d.abierto ? tramosDeJornada(d.jornada) : [])
+
+const CSS = `
+  .tuc-dia { display: flex; align-items: flex-start; gap: 12px; padding: 14px 0; flex-wrap: wrap; border-top: 1px solid var(--color-border); }
+  .tuc-dia:first-child { border-top: none; padding-top: 0; }
+  .tuc-dia-nombre { display: flex; align-items: center; gap: 12px; width: 150px; flex-shrink: 0; min-height: 54px; font-size: 14px; font-weight: 600; color: var(--color-text); }
+  .tuc-dia[data-abierto='false'] .tuc-dia-nombre { color: var(--color-muted); min-height: 40px; }
+  .tuc-igual { display: flex; flex-direction: column; gap: 16px; }
+  .tuc-dia-cuerpo { flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  .tuc-dia-cerrado { display: flex; align-items: center; min-height: 40px; font-size: 13.5px; color: var(--color-muted); }
+  .tuc-dia-pie { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 12.5px; color: var(--color-muted); }
+  .tuc-dia-error { display: flex; align-items: center; gap: 6px; margin: 0; min-height: 32px; font-size: 12.5px; font-weight: 500; color: var(--color-error); }
+  .tuc-franja { position: relative; height: 6px; border-radius: 999px; background: var(--color-surface-alt); overflow: hidden; }
+  .tuc-franja > span { position: absolute; top: 0; bottom: 0; border-radius: 999px; background: var(--color-primary); }
+  .tuc-franja-escala { display: flex; justify-content: space-between; margin: 4px 0 0 162px; font-family: var(--rv-mono); font-size: 11px; color: var(--color-muted); font-variant-numeric: tabular-nums; }
+  .tuc-franja-escala[data-modo='igual'] { margin-left: 0; }
+  .tuc-especial { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 12px; }
+  .tuc-especial > .rv-input { width: auto; }
+  @media (max-width: 768px) {
+    .tuc-dia-nombre, .tuc-dia[data-abierto='false'] .tuc-dia-nombre { width: 100%; min-height: 40px; }
+    .tuc-franja-escala { margin-left: 0; }
+    .tuc-especial > .rv-input { flex: 1 1 140px; }
+  }
+`
 
 export default function Horarios({ rubro, avisar }: PropsTab) {
   const voz = vozDe(rubro)
@@ -99,12 +123,13 @@ export default function Horarios({ rubro, avisar }: PropsTab) {
   const descartar = () => { b.descartar(); setBorrador(null); setModo(null) }
 
   return (
-    <div className="panel-page panel-page--form">
-      <Encabezado rotulo="Tu negocio" titulo="Horarios" bajada={`Cuándo está abierto el negocio, a la mañana y a la tarde. Fuera de este horario no se pueden reservar ${voz.turnos}.`} />
+    <div className="rv-pagina rv-pagina--form">
+      <style>{CSS}</style>
+      <Encabezado titulo="Horarios" bajada={`Cuándo está abierto el negocio, a la mañana y a la tarde. Fuera de este horario no se pueden reservar ${voz.turnos}.`} />
 
-      <div className="tuc-pila">
+      <div className="rv-pila">
         <SecCard titulo="Horario semanal" Icon={Clock}
-          badge={<Chip tono="primario"><span className="tuo-num">{Math.round(horasSemana)} h</span> · {abiertos} {abiertos === 1 ? 'día' : 'días'}</Chip>}
+          badge={<Chip tono="primario"><span className="rv-num">{Math.round(horasSemana)} h</span> · {abiertos} {abiertos === 1 ? 'día' : 'días'}</Chip>}
           bajada={rubro.modo === 'profesional' ? `Cada ${voz.recurso} puede tener un horario propio dentro de este, desde Equipo.` : 'Cada espacio puede tener un horario propio dentro de este.'}>
           <div style={{ marginBottom: 16 }}>
             <Segmentado label="Cómo cargás el horario" lleno valor={modo} onChange={cambiarModo}
@@ -164,18 +189,18 @@ export default function Horarios({ rubro, avisar }: PropsTab) {
           <div aria-hidden className="tuc-franja-escala" data-modo={modo}><span>6</span><span>9</span><span>12</span><span>15</span><span>18</span><span>21</span><span>24</span></div>
         </SecCard>
 
-        <SecCard titulo="Días especiales y feriados" Icon={CalendarX} badge={v.especiales.length > 0 ? <Chip><span className="tuo-num">{v.especiales.length}</span> cargados</Chip> : undefined}
+        <SecCard titulo="Días especiales y feriados" Icon={CalendarX} badge={v.especiales.length > 0 ? <Chip><span className="rv-num">{v.especiales.length}</span> cargados</Chip> : undefined}
           bajada={`Cerrás o cambiás el horario de un día puntual. Los ${voz.turnos} ya reservados para ese día te los avisamos para reprogramar.`}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {v.especiales.map(e => (
               <div key={e.id} className="tuc-renglon tuc-especial">
-                <input type="date" aria-label="Fecha" value={e.fecha} onChange={x => setEsp(e.id, { fecha: x.target.value })} className="tuc-input tuc-mono" style={{ width: 158 }} />
-                <input aria-label="Motivo" placeholder="Motivo (opcional)" value={e.motivo} onChange={x => setEsp(e.id, { motivo: x.target.value })} className="tuc-input" style={{ flex: '1 1 160px', minWidth: 0 }} />
+                <input type="date" aria-label="Fecha" value={e.fecha} onChange={x => setEsp(e.id, { fecha: x.target.value })} className="rv-input rv-num" style={{ width: 158 }} />
+                <input aria-label="Motivo" placeholder="Motivo (opcional)" value={e.motivo} onChange={x => setEsp(e.id, { motivo: x.target.value })} className="rv-input" style={{ flex: '1 1 160px', minWidth: 0 }} />
                 <Segmentado label="Tipo de día" valor={e.tipo} onChange={x => setEsp(e.id, { tipo: x })} opciones={[{ id: 'cerrado', label: 'Cerrado' }, { id: 'especial', label: 'Otro horario' }]} />
                 {e.tipo === 'especial' && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <Hora value={e.rango[0]} onChange={x => setEsp(e.id, { rango: [x, e.rango[1]] })} label="Desde" />
-                    <span aria-hidden style={{ color: 'var(--color-subtle)' }}>–</span>
+                    <span aria-hidden style={{ color: 'var(--color-muted)' }}>–</span>
                     <Hora value={e.rango[1]} onChange={x => setEsp(e.id, { rango: [e.rango[0], x] })} label="Hasta" />
                   </div>
                 )}
@@ -208,7 +233,7 @@ export default function Horarios({ rubro, avisar }: PropsTab) {
 }
 
 function Hora({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
-  return <input type="time" step={900} aria-label={label} value={value} onChange={e => onChange(e.target.value)} className="tuc-input tuc-mono" style={{ width: 118 }} />
+  return <input type="time" step={900} aria-label={label} value={value} onChange={e => onChange(e.target.value)} className="rv-input rv-num" style={{ width: 118 }} />
 }
 
 /** El día de 6 a 24 h con lo abierto pintado. Es un apoyo visual: los horarios exactos están en los campos. */
@@ -220,25 +245,3 @@ function Franja({ tramos }: { tramos: Tramo[] }) {
     </div>
   )
 }
-
-export const CSS_HORARIOS = `
-  .tuc-dia { display: flex; align-items: flex-start; gap: 12px; padding: 14px 0; flex-wrap: wrap; border-top: 1px solid var(--color-border); }
-  .tuc-dia:first-child { border-top: none; padding-top: 0; }
-  .tuc-dia-nombre { display: flex; align-items: center; gap: 12px; width: 150px; flex-shrink: 0; min-height: 54px; font-size: 14px; font-weight: 600; color: var(--color-text); transition: color 200ms ease; }
-  .tuc-dia[data-abierto='false'] .tuc-dia-nombre { color: var(--color-muted); min-height: 40px; }
-  .tuc-igual { display: flex; flex-direction: column; gap: 16px; }
-  .tuc-dia-cuerpo { flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-  .tuc-dia-cerrado { display: flex; align-items: center; min-height: 40px; font-size: 13.5px; color: var(--color-muted); }
-  .tuc-dia-pie { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 12.5px; color: var(--color-muted); }
-  .tuc-dia-error { display: flex; align-items: center; gap: 6px; margin: 0; min-height: 32px; font-size: 12.5px; font-weight: 500; color: var(--color-error); }
-  .tuc-franja { position: relative; height: 6px; border-radius: 999px; background: var(--color-surface-alt); overflow: hidden; }
-  .tuc-franja > span { position: absolute; top: 0; bottom: 0; border-radius: 999px; background: var(--tuo-grad); transition: left 320ms var(--tuo-ease, ease), width 320ms var(--tuo-ease, ease); }
-  .tuc-franja-escala { display: flex; justify-content: space-between; margin: 4px 0 0 162px; font-family: var(--tuo-mono, monospace); font-size: 10.5px; color: var(--color-subtle); font-variant-numeric: tabular-nums; }
-  .tuc-franja-escala[data-modo='igual'] { margin-left: 0; }
-  .tuc-especial { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 12px; }
-  @media (max-width: 768px) {
-    .tuc-dia-nombre, .tuc-dia[data-abierto='false'] .tuc-dia-nombre { width: 100%; min-height: 40px; }
-    .tuc-franja-escala { margin-left: 0; }
-  }
-  @media (prefers-reduced-motion: reduce) { .tuc-franja > span { transition: none; } }
-`

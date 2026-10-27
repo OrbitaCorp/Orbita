@@ -11,7 +11,12 @@ import { AHORA_DEMO, type Semana, type Tramo } from '@/modules/turnos/horario'
 
 /** Turno con su día: `dia` son los días contados desde hoy (0 = hoy, -1 = ayer). */
 export type TurnoAgenda = Turno & { dia?: number }
-export type ServicioPanel = ServicioTipo & { id: string; online: boolean }
+/**
+ * Un servicio tal como lo maneja el panel. `online`: se puede reservar desde el
+ * sitio. `estado`: uno pausado sigue en la lista (con sus turnos ya dados) pero
+ * no se ofrece en el sitio ni al dar un turno nuevo; se reanuda cuando se quiera.
+ */
+export type ServicioPanel = ServicioTipo & { id: string; online: boolean; estado: 'activo' | 'pausado' }
 
 /** Con qué arranca el formulario de "Nuevo turno" según desde dónde se abre. */
 export interface NuevoTurnoPre { clienteId?: string; recursoId?: string; inicio?: number; dia?: number }

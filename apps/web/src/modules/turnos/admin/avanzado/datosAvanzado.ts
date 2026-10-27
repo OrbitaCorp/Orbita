@@ -14,12 +14,12 @@ export type FuncionId = 'paquetes' | 'membresias' | 'precios-horario'
 
 export type GrupoId = 'llenar' | 'cobrar'
 
-// Cada grupo es un objetivo del negocio, con su ícono y su color: en el hub el
-// color del grupo tiñe el ícono de cada función, así se lee de qué familia es
-// sin leer el título.
-export const GRUPOS: { id: GrupoId; label: string; corto: string; desc: string; Icon: LucideIcon; tono: string }[] = [
-  { id: 'llenar', label: 'Llenar la agenda', corto: 'Llenar', desc: 'Que los horarios flojos se ocupen.', Icon: CalendarPlus, tono: 'var(--color-primary)' },
-  { id: 'cobrar', label: 'Cobrar mejor', corto: 'Cobrar', desc: 'Plata por adelantado: packs y abonos.', Icon: Wallet, tono: 'var(--color-success)' },
+// Cada grupo es un objetivo del negocio, con su ícono: en el hub cada grupo es
+// un bloque con su título, así se lee de qué familia es cada función sin leer
+// la descripción. Un solo color de acento para todos (el estándar del panel).
+export const GRUPOS: { id: GrupoId; label: string; corto: string; desc: string; Icon: LucideIcon }[] = [
+  { id: 'llenar', label: 'Llenar la agenda', corto: 'Llenar', desc: 'Que los horarios flojos se ocupen.', Icon: CalendarPlus },
+  { id: 'cobrar', label: 'Cobrar mejor', corto: 'Cobrar', desc: 'Plata por adelantado: packs y abonos.', Icon: Wallet },
 ]
 
 export const grupoPorId = (id: GrupoId) => GRUPOS.find(g => g.id === id) ?? GRUPOS[0]

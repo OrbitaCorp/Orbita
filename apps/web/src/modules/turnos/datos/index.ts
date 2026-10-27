@@ -260,9 +260,10 @@ export const ESTADO_TURNO: Record<EstadoTurno, { label: string; fg: string; bg: 
   confirmado: { label: 'Confirmado', fg: 'var(--chip-success-fg)', bg: 'var(--color-success-bg)', dot: '#10B981' },
   pendiente:  { label: 'Sin confirmar', fg: 'var(--chip-warning-fg)', bg: 'var(--color-warning-bg)', dot: '#F59E0B' },
   'en-curso': { label: 'En curso', fg: 'var(--chip-primary-fg)', bg: 'var(--color-primary-bg)', dot: '#3B82F6' },
-  completado: { label: 'Atendido', fg: 'var(--color-muted)', bg: 'var(--color-surface-alt)', dot: '#94A3B8' },
+  // Los dos apagados van en --color-body: el gris --color-muted sobre surface-alt queda en 4,3:1 (no llega a AA).
+  completado: { label: 'Atendido', fg: 'var(--color-body)', bg: 'var(--color-surface-alt)', dot: '#94A3B8' },
   ausente:    { label: 'Ausente', fg: 'var(--chip-error-fg)', bg: 'var(--color-error-bg)', dot: '#EF4444' },
-  cancelado:  { label: 'Cancelado', fg: 'var(--color-muted)', bg: 'var(--color-surface-alt)', dot: '#94A3B8' },
+  cancelado:  { label: 'Cancelado', fg: 'var(--color-body)', bg: 'var(--color-surface-alt)', dot: '#94A3B8' },
 }
 
 export interface Recurso {

@@ -102,13 +102,19 @@ export interface NegocioDemo {
   politica: PoliticaReserva
   /** Las funciones de Avanzado que el dueño prendió o apagó (id → on). Lo que no está acá vale lo de fábrica. */
   avanzado: Record<string, boolean>
+  /**
+   * Los servicios que el panel pausó (Servicios → Pausar), por nombre, y para
+   * qué rubro: el sitio y la reserva no los ofrecen (useRubroSitio), pero el
+   * panel los sigue mostrando para poder reanudarlos.
+   */
+  pausados: { rubro: string; nombres: string[] } | null
 }
 
 export const BENEFICIOS_INICIALES: BeneficiosCuenta = { activo: true, bienvenida: 10, sellos: 6, promos: true }
 export const POLITICA_INICIAL: PoliticaReserva = { cancelaHasta: 24, senaFueraDePlazo: 'se-pierde', tolerancia: 10 }
 
 const INICIAL: NegocioDemo = {
-  identidad: null, forma: 'web', simple: 'tarjeta', cuentas: BENEFICIOS_INICIALES, horarios: null, apariencia: null, politica: POLITICA_INICIAL, avanzado: {},
+  identidad: null, forma: 'web', simple: 'tarjeta', cuentas: BENEFICIOS_INICIALES, horarios: null, apariencia: null, politica: POLITICA_INICIAL, avanzado: {}, pausados: null,
 }
 const CLAVE = 'orbita_turnos_demo_negocio'
 
@@ -133,6 +139,7 @@ function sanear(g: Partial<NegocioDemo>): NegocioDemo {
     horarios: g.horarios?.dias?.length === 7 ? g.horarios : null,
     apariencia: g.apariencia?.plantilla ? g.apariencia : null,
     avanzado: g.avanzado && typeof g.avanzado === 'object' ? g.avanzado : {},
+    pausados: g.pausados?.rubro && Array.isArray(g.pausados.nombres) ? { rubro: g.pausados.rubro, nombres: g.pausados.nombres.filter(n => typeof n === 'string') } : null,
   }
 }
 

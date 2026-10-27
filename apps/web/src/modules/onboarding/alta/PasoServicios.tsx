@@ -4,7 +4,7 @@
 import { useRef, useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { MODO_LABEL, duracionTxt, type RubroTurnos } from '@/modules/turnos/datos'
-import { Llave } from '@/modules/turnos/_shared/orbita/piezas'
+import { Llave } from '@/modules/turnos/admin/piezasPanel'
 import { MensajeError } from './campos'
 import { DESCRIPCION_MODO, DURACIONES, type Errores, type ServicioAlta } from './modelo'
 

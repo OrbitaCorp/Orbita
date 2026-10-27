@@ -11,7 +11,7 @@
 import { BellRing, Gift, PanelsTopLeft, Percent, Smartphone, UserRoundCheck } from 'lucide-react'
 import type { RubroTurnos } from '@/modules/turnos/datos'
 import type { BeneficiosCuenta } from '@/modules/turnos/datos/negocio'
-import { Llave } from '@/modules/turnos/_shared/orbita/piezas'
+import { Llave } from '@/modules/turnos/admin/piezasPanel'
 import { Opcion, type PropsPaso } from './campos'
 import type { ServicioAlta } from './modelo'
 import { VistaPagina } from './VistaPagina'

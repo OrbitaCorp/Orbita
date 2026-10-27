@@ -1,14 +1,15 @@
 // Recordatorios y mensajes automáticos. Es lo que más valor le da a un
-// negocio de turnos (baja las ausencias), así que cada mensaje se puede
-// prender, elegir por dónde sale y editar, con una vista previa tipo WhatsApp
-// que reemplaza las variables por datos de ejemplo del rubro.
+// negocio de turnos (baja las ausencias), así que arriba se ve cómo vino la
+// confirmación de hoy (sale de la agenda), y después cada mensaje se puede
+// prender, elegir por dónde sale y editar, con una vista previa del chat que
+// reemplaza las variables por datos de ejemplo del rubro.
 import { useRef, useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { MessageCircle, Mail, CalendarCheck, BellRing, Bell, CalendarX2, HeartHandshake, Hourglass, ChevronDown, CheckCheck, RotateCcw } from 'lucide-react'
+import { MessageCircle, Mail, CalendarCheck, BellRing, Bell, CalendarX2, HeartHandshake, Hourglass, ChevronDown, CheckCheck, RotateCcw, ArrowRight, Sun } from 'lucide-react'
 import { temaDe } from '@/modules/turnos/storefront/tema'
-import { recursosDe, CLIENTES } from '@/modules/turnos/datos'
-import { useBorrador, Encabezado, SecCard, Switch, Selector, BarraGuardar, Chip, FilaSwitch, Campo, type PropsTab } from './ui'
-import { vozDe, iniciales, subdominioDe, type Voz } from './datos'
+import { recursosDe, CLIENTES, horaTxt, type Turno } from '@/modules/turnos/datos'
+import { useBorrador, Encabezado, SecCard, Switch, Selector, BarraGuardar, Chip, FilaSwitch, Campo, BotonBorde, type PropsTab } from './ui'
+import { vozDe, iniciales, subdominioDe, cap, type Voz } from './datos'
 
 type Canal = 'wa' | 'email'
 interface Mensaje { id: string; on: boolean; canales: Canal[]; cuando: string; texto: string }
@@ -38,7 +39,44 @@ function textos(voz: Voz): Record<string, string> {
   }
 }
 
-export default function Mensajes({ rubro, avisar }: PropsTab) {
+const CSS = `
+  .tuc-msj { overflow: hidden; }
+  .tuc-msj[data-on='false'] { opacity: 0.8; }
+  .tuc-msj[data-abierto='true'] { border-color: var(--color-border-strong); }
+  .tuc-msj-ico { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; flex-shrink: 0; background: var(--color-surface-alt); color: var(--color-subtle); }
+  .tuc-msj[data-on='true'] .tuc-msj-ico { background: var(--color-primary-bg); color: var(--color-primary); }
+  .tuc-msj-flecha { color: var(--color-muted); flex-shrink: 0; }
+  .tuc-msj[data-abierto='true'] .tuc-msj-flecha { transform: rotate(180deg); }
+  .tuc-msj-cab { flex: 1; min-width: 0; min-height: 44px; text-align: left; background: none; border: none; padding: 0; cursor: pointer; font: inherit; display: flex; align-items: center; gap: 8px; }
+  .tuc-msj-cab:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 4px; border-radius: 6px; }
+  .tuc-msj-cuerpo { border-top: 1px solid var(--color-border); padding: 16px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+  /* La vista previa del chat: con los colores del panel (un solo acento), no los de WhatsApp. */
+  .tuc-wa { border-radius: var(--rv-r); overflow: hidden; border: 1px solid var(--color-border); display: flex; flex-direction: column; min-width: 0; align-self: start; }
+  .tuc-wa-cab { background: var(--color-surface); color: var(--color-text); border-bottom: 1px solid var(--color-border); display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+  .tuc-wa-fondo { background: var(--color-surface-alt); background-image: radial-gradient(var(--color-border) 1px, transparent 1px); background-size: 14px 14px; padding: 16px 12px 18px; min-height: 150px; }
+  .tuc-wa-burbuja { background: var(--color-primary-bg); color: var(--color-text); position: relative; max-width: 92%; margin-left: auto; padding: 7px 9px 18px 10px; border-radius: 10px 0 10px 10px; font-size: 13.5px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+  /* Cómo vino la confirmación de hoy: tres números y el primero que falta confirmar. */
+  .tuc-hoy { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
+  .tuc-hoy-tile { padding: 11px 12px; border-radius: var(--rv-r-sm); background: var(--color-surface); border: 1px solid var(--color-border); min-width: 0; }
+  .tuc-hoy-tile > small { display: block; font-size: 11px; color: var(--color-muted); margin-bottom: 3px; }
+  .tuc-hoy-tile > b { display: block; font-family: var(--rv-mono); font-size: 20px; font-weight: 600; color: var(--color-text); font-variant-numeric: tabular-nums; }
+  .tuc-hoy-tile[data-tono='aviso'] > b { color: var(--chip-warning-fg); }
+  .tuc-hoy-pie { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 13px; line-height: 1.5; color: var(--color-body); }
+  @media (max-width: 760px) { .tuc-msj-cuerpo { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 480px) { .tuc-hoy { grid-template-columns: minmax(0, 1fr); } }
+  /* Los canales van a la par del selector de "Cuándo": 42 px como el campo, 46 en celular (también el campo crece). */
+  .rv-chip.tuc-canal { min-height: 42px; }
+  @media (max-width: 768px) { .rv-chip.tuc-canal { min-height: 46px; } }
+`
+
+interface Props extends PropsTab {
+  /** Los turnos de hoy: de ahí sale cómo vino la confirmación. */
+  turnosHoy: Turno[]
+  nombreDe: (clienteId: string) => string
+  onAbrir: (t: Turno) => void
+}
+
+export default function Mensajes({ rubro, avisar, turnosHoy, nombreDe, onAbrir }: Props) {
   const voz = vozDe(rubro)
   const lista = metas(voz).filter(m => m.id !== 'espera' || rubro.modo === 'profesional')
   const t = temaDe(rubro)
@@ -63,11 +101,33 @@ export default function Mensajes({ rubro, avisar }: PropsTab) {
   }
   const activos = v.mensajes.filter(m => m.on).length
 
-  return (
-    <div className="panel-page panel-page--form">
-      <Encabezado rotulo="Tu negocio" titulo="Recordatorios y mensajes" bajada={`Lo que les llega a tus ${voz.clientes} sin que muevas un dedo. Los recordatorios ayudan a que no se olviden del turno.`} />
+  // Cómo vino hoy: los turnos del día (sin los cancelados), cuántos confirmaron y el primero que falta.
+  const deHoy = turnosHoy.filter(t => t.estado !== 'cancelado')
+  const sinConfirmar = deHoy.filter(t => t.estado === 'pendiente').sort((a, b) => a.inicio - b.inicio)
+  const primero = sinConfirmar[0]
+  const recordatorioOn = v.wa && !!v.mensajes.find(m => m.id === 'recordatorio')?.on
 
-      <div className="tuc-pila">
+  return (
+    <div className="rv-pagina rv-pagina--form">
+      <style>{CSS}</style>
+      <Encabezado rotulo="Reservas" titulo="Recordatorios y mensajes" bajada={`Lo que les llega a tus ${voz.clientes} sin que muevas un dedo. Los recordatorios ayudan a que no se olviden del turno.`} />
+
+      <div className="rv-pila">
+        <SecCard titulo="Hoy" Icon={Sun} badge={recordatorioOn ? <Chip tono="ok"><CheckCheck size={12} aria-hidden />Recordatorio prendido</Chip> : <Chip tono="aviso">Sin recordatorio</Chip>}
+          bajada={`Cómo vino la confirmación de los ${voz.turnos} de hoy. ${recordatorioOn ? 'El recordatorio salió ayer a cada uno.' : 'Sin recordatorio, cada uno tiene que acordarse solo.'}`}>
+          <div className="tuc-hoy">
+            <div className="tuc-hoy-tile"><small>{cap(voz.turnos)} de hoy</small><b>{deHoy.length}</b></div>
+            <div className="tuc-hoy-tile"><small>Confirmaron</small><b>{deHoy.length - sinConfirmar.length}</b></div>
+            <div className="tuc-hoy-tile" data-tono={sinConfirmar.length ? 'aviso' : undefined}><small>Sin confirmar</small><b>{sinConfirmar.length}</b></div>
+          </div>
+          <div className="tuc-hoy-pie">
+            <span>{primero
+              ? <>{nombreDe(primero.clienteId)} todavía no confirmó su {voz.turno} de las <span className="rv-num">{horaTxt(primero.inicio)}</span>{sinConfirmar.length > 1 ? ` y ${sinConfirmar.length - 1} más tampoco` : ''}. Desde el turno le mandás un recordatorio.</>
+              : deHoy.length ? 'Todos confirmaron: no hay a quién escribirle.' : 'Hoy no hay turnos.'}</span>
+            {primero && <BotonBorde Icon={ArrowRight} onClick={() => onAbrir(primero)}>Ver el turno</BotonBorde>}
+          </div>
+        </SecCard>
+
         <SecCard titulo="Canales" Icon={MessageCircle} bajada="Por dónde salen los mensajes. Cada mensaje elige después sus canales.">
           <FilaSwitch Icon={MessageCircle} titulo="WhatsApp" ayuda="Desde el número de tu negocio. Es el que más se lee." on={v.wa} onChange={x => b.set('wa', x)}>
             <Campo label="Número que envía" value={v.numero} onChange={x => b.set('numero', x)} prefijo="+54" mono sufijo={<Chip tono="ok">Verificado</Chip>} style={{ marginBottom: 0, maxWidth: 380 }} />
@@ -76,9 +136,9 @@ export default function Mensajes({ rubro, avisar }: PropsTab) {
           <FilaSwitch titulo={`Firmar con el nombre de ${t.nombre}`} ayuda="Al final de cada mensaje, para que sepan de quién es." on={v.firma} onChange={x => b.set('firma', x)} />
         </SecCard>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '8px 2px 0' }}>
-          <h2 className="tuo-h2" style={{ flex: 1 }}>Mensajes automáticos</h2>
-          <Chip tono="primario"><span className="tuo-num">{activos}/{v.mensajes.length}</span> prendidos</Chip>
+        <div className="rv-entre" style={{ margin: '8px 2px 0' }}>
+          <h2 className="rv-h2">Mensajes automáticos</h2>
+          <Chip tono="primario"><span className="rv-num">{activos}/{v.mensajes.length}</span> prendidos</Chip>
         </div>
 
         {lista.map(m => {
@@ -117,11 +177,10 @@ function TarjetaMensaje({ meta, msj, abierto, onAbrir, onCambio, ejemplo, negoci
   const toggleCanal = (c: Canal) => onCambio({ canales: msj.canales.includes(c) ? msj.canales.filter(x => x !== c) : [...msj.canales, c] })
 
   return (
-    <div role="group" aria-label={meta.titulo} className="tuo-card tuc-msj" data-on={msj.on} data-abierto={abierto}>
+    <div role="group" aria-label={meta.titulo} className="rv-card tuc-msj" data-on={msj.on} data-abierto={abierto}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px' }}>
-        <span aria-hidden className="tuc-msj-ico"><meta.Icon size={17} strokeWidth={1.7} /></span>
-        <button type="button" onClick={onAbrir} aria-expanded={abierto} aria-controls={idPanel} className="tuc-msj-cab"
-          style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span aria-hidden className="tuc-msj-ico"><meta.Icon size={16} strokeWidth={1.7} /></span>
+        <button type="button" onClick={onAbrir} aria-expanded={abierto} aria-controls={idPanel} className="tuc-msj-cab">
           <span style={{ flex: 1, minWidth: 0 }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{meta.titulo}</span>
@@ -137,7 +196,7 @@ function TarjetaMensaje({ meta, msj, abierto, onAbrir, onCambio, ejemplo, negoci
       </div>
 
       {abierto && (
-        <div id={idPanel} className="tuc-msj-cuerpo" style={{ borderTop: '1px solid var(--color-border)', padding: 16, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 18 }}>
+        <div id={idPanel} className="tuc-msj-cuerpo">
           <div style={{ minWidth: 0 }}>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 12 }}>
               {meta.cuando && (
@@ -149,7 +208,7 @@ function TarjetaMensaje({ meta, msj, abierto, onAbrir, onCambio, ejemplo, negoci
                   {([['wa', 'WhatsApp', MessageCircle], ['email', 'Email', Mail]] as [Canal, string, LucideIcon][]).map(([c, l, I]) => {
                     const a = msj.canales.includes(c)
                     return (
-                      <button key={c} type="button" aria-pressed={a} onClick={() => toggleCanal(c)} className="tuc-pastilla tuc-canal">
+                      <button key={c} type="button" aria-pressed={a} onClick={() => toggleCanal(c)} className="rv-chip rv-chip--borde tuc-canal">
                         <I size={14} aria-hidden />{l}
                       </button>
                     )
@@ -157,12 +216,14 @@ function TarjetaMensaje({ meta, msj, abierto, onAbrir, onCambio, ejemplo, negoci
                 </div>
               </div>
             </div>
-            <label htmlFor={`${idPanel}-tx`} className="tuc-rotulo" style={{ marginBottom: 8 }}>Mensaje</label>
-            <textarea id={`${idPanel}-tx`} ref={area} value={msj.texto} onChange={e => onCambio({ texto: e.target.value })} rows={5} maxLength={600} className="tuc-field" />
-            <div style={{ fontSize: 12, color: 'var(--color-muted)', margin: '8px 0 6px' }}>Tocá una variable para sumarla donde está el cursor:</div>
+            <div className="rv-campo">
+              <label htmlFor={`${idPanel}-tx`}>Mensaje</label>
+              <textarea id={`${idPanel}-tx`} ref={area} value={msj.texto} onChange={e => onCambio({ texto: e.target.value })} rows={5} maxLength={600} className="rv-textarea" />
+            </div>
+            <div className="tuc-ayuda" style={{ margin: '8px 0 6px' }}>Tocá una variable para sumarla donde está el cursor:</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {VARIABLES.map(n => (
-                <button key={n} type="button" onClick={() => insertar(n)} aria-label={`Insertar ${n}`} className="tuc-pastilla tuc-pastilla--mono">{`{${n}}`}</button>
+                <button key={n} type="button" onClick={() => insertar(n)} aria-label={`Insertar ${n}`} className="rv-chip rv-chip--borde rv-num">{`{${n}}`}</button>
               ))}
             </div>
             {msj.texto !== original && (
@@ -178,59 +239,31 @@ function TarjetaMensaje({ meta, msj, abierto, onAbrir, onCambio, ejemplo, negoci
   )
 }
 
-// Pantalla de chat estilo WhatsApp. Sus colores son los de WhatsApp (claro y
-// oscuro) y no los del panel: tiene que parecerse a lo que llega al teléfono.
+// Pantalla de chat: la forma de un mensaje de WhatsApp (burbuja, hora, tildes)
+// con los colores del panel, para que el acento siga siendo uno solo.
 function BurbujaWA({ texto, ejemplo, negocio, firma }: { texto: string; ejemplo: Record<string, string>; negocio: string; firma: boolean }) {
   const partes = texto.split(/(\{[a-z]+\})/g)
   return (
-    <div aria-label="Vista previa en WhatsApp" role="img" className="tuc-wa" style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid var(--color-border)', boxShadow: '0 18px 40px -24px rgba(15,23,42,0.45)', display: 'flex', flexDirection: 'column', minWidth: 0, alignSelf: 'start' }}>
-      <div className="tuc-wa-cab" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px' }}>
-        <span style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--color-primary)', color: 'var(--color-on-primary)', display: 'grid', placeItems: 'center', fontSize: 11.5, fontWeight: 700, flexShrink: 0 }}>{iniciales(negocio)}</span>
+    <div aria-label="Vista previa en WhatsApp" role="img" className="tuc-wa">
+      <div className="tuc-wa-cab">
+        <span style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--color-primary-bg)', color: 'var(--chip-primary-fg)', display: 'grid', placeItems: 'center', fontSize: 11.5, fontWeight: 700, flexShrink: 0 }}>{iniciales(negocio)}</span>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{negocio}</div>
           <div style={{ fontSize: 11, opacity: 0.75 }}>Cuenta de empresa</div>
         </div>
       </div>
-      <div className="tuc-wa-fondo" style={{ padding: '16px 12px 18px', minHeight: 150 }}>
-        <div className="tuc-wa-burbuja" style={{ position: 'relative', maxWidth: '92%', marginLeft: 'auto', padding: '7px 9px 18px 10px', borderRadius: '10px 0 10px 10px', fontSize: 13.5, lineHeight: 1.45, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', boxShadow: '0 1px 1px rgba(0,0,0,.12)' }}>
+      <div className="tuc-wa-fondo">
+        <div className="tuc-wa-burbuja">
           {partes.map((p, i) => {
             const m = /^\{([a-z]+)\}$/.exec(p)
             if (!m) return <span key={i}>{p}</span>
             const val = ejemplo[m[1]]
-            return val ? <b key={i} style={{ fontWeight: 600 }}>{val}</b> : <span key={i} style={{ color: '#E11D48' }}>{p}</span>
+            return val ? <b key={i} style={{ fontWeight: 600 }}>{val}</b> : <span key={i} style={{ color: 'var(--color-error)' }}>{p}</span>
           })}
-          {firma && <span style={{ display: 'block', marginTop: 6, opacity: 0.7, fontSize: 12 }}>— {negocio}</span>}
-          <span style={{ position: 'absolute', right: 8, bottom: 3, display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10.5, opacity: 0.65 }}>10:02 <CheckCheck size={13} aria-hidden style={{ color: '#53BDEB', opacity: 1 }} /></span>
+          {firma && <span style={{ display: 'block', marginTop: 6, fontSize: 12, color: 'var(--color-body)' }}>— {negocio}</span>}
+          <span className="rv-num" style={{ position: 'absolute', right: 8, bottom: 3, display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10.5, color: 'var(--color-body)' }}>10:02 <CheckCheck size={13} aria-hidden style={{ color: 'var(--chip-primary-fg)' }} /></span>
         </div>
       </div>
     </div>
   )
 }
-
-export const CSS_MENSAJES = `
-  .tuc-msj { overflow: hidden; transition: border-color 180ms ease, box-shadow 240ms ease, opacity 200ms ease; }
-  .tuc-msj[data-on='false'] { opacity: 0.8; }
-  .tuc-msj[data-abierto='true'] { border-color: color-mix(in srgb, var(--color-primary) 40%, var(--color-border)); box-shadow: var(--shadow-card-hover); }
-  .tuc-msj-ico { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; flex-shrink: 0; background: var(--color-surface-alt); color: var(--color-subtle); transition: background 200ms ease, color 200ms ease; }
-  .tuc-msj[data-on='true'] .tuc-msj-ico { background: var(--tuo-grad-suave); color: var(--color-primary); }
-  .tuc-msj-flecha { color: var(--color-muted); flex-shrink: 0; transition: transform 240ms var(--tuo-ease, ease), color 150ms ease; }
-  .tuc-msj[data-abierto='true'] .tuc-msj-flecha { transform: rotate(180deg); color: var(--color-primary); }
-  .tuc-msj-cab { min-height: 44px; }
-  .tuc-msj-cuerpo { animation: tucAbre 280ms var(--tuo-ease, ease) both; }
-  @media (hover: hover) {
-    .tuc-msj:hover { border-color: color-mix(in srgb, var(--color-primary) 30%, var(--color-border)); }
-    .tuc-msj-cab:hover .tuc-msj-flecha { color: var(--color-text); }
-  }
-  @media (prefers-reduced-motion: reduce) { .tuc-msj-cuerpo { animation: none; } .tuc-msj-flecha { transition: none; } }
-  .tuc-wa-cab { background: #F0F2F5; color: #111B21; }
-  .tuc-wa-fondo { background: #EFEAE2; background-image: radial-gradient(rgba(0,0,0,.045) 1px, transparent 1px); background-size: 14px 14px; }
-  .tuc-wa-burbuja { background: #D9FDD3; color: #111B21; }
-  .dark .tuc-wa-cab { background: #202C33; color: #E9EDEF; }
-  .dark .tuc-wa-fondo { background-color: #0B141A; background-image: radial-gradient(rgba(255,255,255,.04) 1px, transparent 1px); }
-  .dark .tuc-wa-burbuja { background: #005C4B; color: #E9EDEF; }
-  .tuc-msj-cab:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 4px; border-radius: 6px; }
-  @media (max-width: 760px) { .tuc-msj-cuerpo { grid-template-columns: minmax(0, 1fr) !important; } }
-  /* Los canales van a la par del selector de "Cuándo": 42 px como el campo, 46 en celular (también el campo crece). */
-  .tuc-pastilla.tuc-canal { min-height: 42px; }
-  @media (max-width: 768px) { .tuc-pastilla.tuc-canal { min-height: 46px; } }
-`

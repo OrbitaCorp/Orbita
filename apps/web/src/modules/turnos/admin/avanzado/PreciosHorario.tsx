@@ -1,9 +1,9 @@
 // Precios por horario: descuento en las franjas flojas (o recargo en las de
 // pico) para repartir la demanda. El mapa de ocupación de ejemplo ayuda a ver
 // dónde conviene; la vista previa muestra los horarios con su precio final.
-import { useState } from 'react'
-import { Plus, Trash2, TrendingDown, Percent, CalendarCheck } from 'lucide-react'
-import { Boton, ShellFuncion, Seccion, Segmentado, FilaSwitch, Dato, VistaCliente, BotonVista, BotonIcono, inputStyle } from './ui'
+import { useState, type CSSProperties } from 'react'
+import { Plus, Trash2, TrendingDown, Percent, CalendarCheck, Grid3x3, BadgePercent } from 'lucide-react'
+import { Boton, ShellFuncion, SecCard, Segmentado, FilaSwitch, Dato, VistaCliente, BotonVista, BotonIcono } from './ui'
 import { ars, servicioBase, FRANJAS_INICIALES, OCUPACION, FRANJAS_OCUPACION, type Franja } from './datosAvanzado'
 import { DIAS_CORTOS } from '@/modules/turnos/datos'
 import type { PropsFuncion } from './tipos'
@@ -21,6 +21,7 @@ export default function PreciosHorario(p: PropsFuncion) {
   const [tachado, setTachado] = useState(true)
 
   const editar = (id: string, c: Partial<Franja>) => setFranjas(l => l.map(f => f.id === id ? { ...f, ...c } : f))
+  const conDescuento = franjas.filter(f => f.ajuste < 0)
 
   return (
     <ShellFuncion
@@ -29,27 +30,27 @@ export default function PreciosHorario(p: PropsFuncion) {
       textoOn="Los horarios con descuento se marcan en la reserva con el porcentaje y el precio final."
       kpis={<>
         <Dato label="Ocupación en franjas con descuento" valor="+18 pts" nota="Antes vs. después · ejemplo" Icon={TrendingDown} />
-        <Dato label="Descuento promedio" valor={`${Math.round(Math.abs(franjas.filter(f => f.ajuste < 0).reduce((s, f) => s + f.ajuste, 0) / Math.max(1, franjas.filter(f => f.ajuste < 0).length)))}%`} nota="Según tus franjas" Icon={Percent} />
+        <Dato label="Descuento promedio" valor={`${Math.round(Math.abs(conDescuento.reduce((s, f) => s + f.ajuste, 0) / Math.max(1, conDescuento.length)))}%`} nota="Según tus franjas" Icon={Percent} />
         <Dato label="Turnos con precio especial" valor="37" nota="Este mes · ejemplo" Icon={CalendarCheck} />
       </>}
       preview={<PreviewHorarios {...p} franjas={franjas} tachado={tachado} />}
     >
-      <Seccion titulo="Dónde sobra lugar" desc="Ocupación de ejemplo de las últimas 4 semanas. En gris claro, lo que cuesta llenar.">
+      <SecCard titulo="Dónde sobra lugar" Icon={Grid3x3} bajada="Ocupación de ejemplo de las últimas 4 semanas. Cuanto más claro, más cuesta llenar.">
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ borderCollapse: 'separate', borderSpacing: 3, width: '100%', minWidth: 300, fontSize: 11 }}>
-            <caption className="sr-only" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Ocupación por día y franja horaria, en porcentaje</caption>
+          <table className="tua-mapa">
+            <caption className="rv-sr">Ocupación por día y franja horaria, en porcentaje</caption>
             <thead>
               <tr>
                 <th />
-                {FRANJAS_OCUPACION.map(h => <th key={h} scope="col" style={{ fontWeight: 600, color: 'var(--color-muted)', padding: '0 0 4px' }}>{h}</th>)}
+                {FRANJAS_OCUPACION.map(h => <th key={h} scope="col">{h}</th>)}
               </tr>
             </thead>
             <tbody>
               {OCUPACION.map((fila, d) => (
                 <tr key={d}>
-                  <th scope="row" style={{ fontWeight: 600, color: 'var(--color-muted)', textAlign: 'left', paddingRight: 4 }}>{DIAS_CORTOS[d]}</th>
+                  <th scope="row">{DIAS_CORTOS[d]}</th>
                   {fila.map((v, h) => (
-                    <td key={h} style={{ height: 30, borderRadius: 6, textAlign: 'center', fontFamily: '"Geist Mono", monospace', fontWeight: 600, background: v === 0 ? 'transparent' : `color-mix(in srgb, var(--color-primary) ${Math.max(8, v * 0.85)}%, var(--color-surface-alt))`, color: v >= 65 ? 'var(--color-on-primary)' : 'var(--color-body)', border: v === 0 ? '1px dashed var(--color-border)' : 'none' }}>
+                    <td key={h} data-vacio={v === 0} style={{ ['--p' as string]: `${Math.min(55, Math.max(6, v * 0.55))}%` } as CSSProperties}>
                       {v === 0 ? '—' : `${v}%`}
                     </td>
                   ))}
@@ -58,37 +59,39 @@ export default function PreciosHorario(p: PropsFuncion) {
             </tbody>
           </table>
         </div>
-      </Seccion>
+      </SecCard>
 
-      <Seccion titulo="Franjas con precio especial" accion={
-        <Boton variant="outline" size="sm" icon={<Plus size={14} />} onClick={() => { setFranjas(l => [...l, { id: `f${siguiente}`, dias: 'Lun a vie', desde: '12:00', hasta: '14:00', ajuste: -10 }]); setSiguiente(n => n + 1) }}>Agregar</Boton>
+      <SecCard titulo="Franjas con precio especial" Icon={BadgePercent} badge={
+        <Boton variant="outline" size="sm" icon={<Plus size={14} aria-hidden />} onClick={() => { setFranjas(l => [...l, { id: `f${siguiente}`, dias: 'Lun a vie', desde: '12:00', hasta: '14:00', ajuste: -10 }]); setSiguiente(n => n + 1) }}>Agregar</Boton>
       }>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {franjas.map((f, i) => (
-            <div key={f.id} style={{ padding: 12, borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-bg)' }}>
+            <div key={f.id} className="tua-bloque">
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                <select aria-label={`Días de la franja ${i + 1}`} className="tuc-field" value={f.dias} onChange={e => editar(f.id, { dias: e.target.value })} style={{ ...inputStyle, width: 'auto', flex: '1 1 130px' }}>
+                <select aria-label={`Días de la franja ${i + 1}`} className="rv-select" value={f.dias} onChange={e => editar(f.id, { dias: e.target.value })} style={{ width: 'auto', flex: '1 1 130px' }}>
                   {DIAS_OPC.map(d => <option key={d}>{d}</option>)}
                 </select>
-                <select aria-label={`Desde, franja ${i + 1}`} className="tuc-field" value={f.desde} onChange={e => editar(f.id, { desde: e.target.value })} style={{ ...inputStyle, width: 92 }}>
+                <select aria-label={`Desde, franja ${i + 1}`} className="rv-select rv-num" value={f.desde} onChange={e => editar(f.id, { desde: e.target.value })} style={{ width: 104 }}>
                   {HORAS.map(h => <option key={h}>{h}</option>)}
                 </select>
                 <span style={{ fontSize: 12.5, color: 'var(--color-muted)' }}>a</span>
-                <select aria-label={`Hasta, franja ${i + 1}`} className="tuc-field" value={f.hasta} onChange={e => editar(f.id, { hasta: e.target.value })} style={{ ...inputStyle, width: 92 }}>
+                <select aria-label={`Hasta, franja ${i + 1}`} className="rv-select rv-num" value={f.hasta} onChange={e => editar(f.id, { hasta: e.target.value })} style={{ width: 104 }}>
                   {HORAS.map(h => <option key={h}>{h}</option>)}
                 </select>
                 <BotonIcono Icon={Trash2} peligro label={`Borrar franja ${i + 1}`} onClick={() => setFranjas(l => l.filter(x => x.id !== f.id))} style={{ marginLeft: 'auto' }} />
               </div>
-              {f.hasta <= f.desde && <div role="alert" style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 6 }}>El “hasta” tiene que ser más tarde que el “desde”.</div>}
+              {f.hasta <= f.desde && <p role="alert" className="rv-error" style={{ margin: '6px 0 0' }}>El “hasta” tiene que ser más tarde que el “desde”.</p>}
               <div style={{ marginTop: 10 }}>
-                <Segmentado label={`Ajuste de la franja ${i + 1}`} valor={f.ajuste} onChange={v => editar(f.id, { ajuste: v })} opciones={AJUSTES.map(a => ({ valor: a, label: a > 0 ? `+${a}%` : `${a}%` }))} />
+                <Segmentado label={`Ajuste de la franja ${i + 1}`} valor={f.ajuste} onChange={v => editar(f.id, { ajuste: v })} opciones={AJUSTES.map(a => ({ id: a, label: a > 0 ? `+${a}%` : `${a}%` }))} />
               </div>
             </div>
           ))}
-          {franjas.length === 0 && <div style={{ fontSize: 13, color: 'var(--color-muted)' }}>Sin franjas: todos los horarios tienen el precio de lista.</div>}
+          {franjas.length === 0 && <p className="rv-ayuda" style={{ margin: 0 }}>Sin franjas: todos los horarios tienen el precio de lista.</p>}
         </div>
-        <FilaSwitch titulo="Mostrar el precio de lista tachado" desc="Así se nota el descuento al elegir horario." on={tachado} onChange={setTachado} />
-      </Seccion>
+        <div style={{ marginTop: 14 }}>
+          <FilaSwitch titulo="Mostrar el precio de lista tachado" ayuda="Así se nota el descuento al elegir horario." on={tachado} onChange={setTachado} />
+        </div>
+      </SecCard>
     </ShellFuncion>
   )
 }
@@ -104,7 +107,7 @@ function PreviewHorarios({ rubro, franjas, tachado }: PropsFuncion & { franjas: 
   return (
     <VistaCliente rubro={rubro} nota="Horarios de ejemplo de un lunes. Cambiá las franjas y mirá cómo se actualizan.">
       <div>
-        <div style={{ fontFamily: 'var(--tu-fh)', fontSize: 19, fontWeight: 700, color: 'var(--color-text)' }}>Elegí horario</div>
+        <div className="tua-titulo" style={{ fontSize: 19 }}>Elegí horario</div>
         <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>{base.nombre} · lunes 28/09</div>
       </div>
       <div role="radiogroup" aria-label="Horarios del lunes (vista previa)" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -113,7 +116,7 @@ function PreviewHorarios({ rubro, franjas, tachado }: PropsFuncion & { franjas: 
           const desc = f && f.ajuste < 0
           const sel = elegido === h
           return (
-            <button key={h} type="button" role="radio" aria-checked={sel} className="tua-opc" onClick={() => setElegido(h)} style={{ position: 'relative', padding: '10px 10px 9px', borderRadius: 'var(--tu-r)', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', border: `1.5px solid ${sel || desc ? 'var(--color-primary)' : 'var(--color-border)'}`, background: desc ? 'var(--color-primary-bg)' : 'var(--color-surface)', boxShadow: sel ? '0 0 0 2px var(--color-primary)' : 'none' }}>
+            <button key={h} type="button" role="radio" aria-checked={sel} className="tua-opc" onClick={() => setElegido(h)} style={desc ? { background: 'var(--color-primary-bg)' } : undefined}>
               {f && <span style={{ position: 'absolute', top: -8, right: 8, padding: '1px 7px', borderRadius: 999, fontSize: 10.5, fontWeight: 800, background: desc ? 'var(--color-primary)' : 'var(--color-text)', color: desc ? 'var(--color-on-primary)' : 'var(--color-bg)' }}>{f.ajuste > 0 ? `+${f.ajuste}` : f.ajuste}%</span>}
               <span style={{ display: 'block', fontSize: 15, fontWeight: 700, color: 'var(--color-text)' }}>{h}</span>
               <span style={{ display: 'block', fontSize: 12, color: 'var(--color-body)', marginTop: 2 }}>

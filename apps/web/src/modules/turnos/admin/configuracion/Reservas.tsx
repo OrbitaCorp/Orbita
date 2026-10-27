@@ -32,6 +32,27 @@ const LIMITE = [{ id: 0, label: 'Sin límite' }, { id: 1, label: '1 a la vez' },
 const BIENVENIDA = [0, 5, 10, 15, 20].map(p => ({ id: p, label: p ? `${p}% de descuento` : 'No ofrecer' }))
 const SELLOS = [0, 5, 6, 8, 10].map(n => ({ id: n, label: n ? `Premio a los ${n} sellos` : 'No ofrecer' }))
 
+const CSS = `
+  .tuc-politica { padding: 16px 18px; border-radius: var(--rv-r-sm); background: var(--color-surface); border: 1px solid var(--color-border); border-left: 3px solid var(--color-primary); }
+  .tuc-politica h3 { margin: 0; font-size: 13px; font-weight: 600; color: var(--color-text); }
+  .tuc-politica p { margin: 4px 0 0; font-size: 13.5px; line-height: 1.6; color: var(--color-body); text-wrap: pretty; }
+  .tuc-politica p + h3 { margin-top: 14px; }
+  .tuc-sinreg { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; margin-bottom: 4px; border-radius: var(--rv-r-sm); background: var(--color-success-bg); }
+  .tuc-sinreg > svg { flex-shrink: 0; margin-top: 2px; color: var(--chip-success-fg); }
+  .tuc-sinreg strong { display: block; font-size: 13.5px; font-weight: 600; color: var(--chip-success-fg); }
+  .tuc-sinreg span { display: block; margin-top: 2px; font-size: 12.5px; line-height: 1.5; color: var(--color-body); }
+  .tuc-resumen { overflow: hidden; }
+  .tuc-resumen-cab { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--color-border); }
+  .tuc-resumen-linea { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--color-body); line-height: 1.45; padding: 6px 0; }
+  .tuc-resumen-ico { width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; flex-shrink: 0; color: var(--color-primary); background: var(--color-primary-bg); }
+  .tuc-res-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: 20px; align-items: start; }
+  .tuc-res-resumen { position: sticky; top: 16px; }
+  @media (max-width: 1024px) {
+    .tuc-res-split { grid-template-columns: minmax(0, 1fr); }
+    .tuc-res-resumen { position: static; }
+  }
+`
+
 interface Reglas {
   minAnt: number; maxAnt: number; buffer: number; grilla: number; confirmacion: 'auto' | 'manual'; elegirRecurso: boolean; cualquiera: boolean
   sena: boolean; senaTipo: 'pct' | 'fijo'; senaPct: number; senaFijo: string
@@ -86,11 +107,12 @@ export default function Reservas({ rubro, avisar }: PropsTab) {
   const descartar = () => { b.descartar(); setCuentasBorrador(null); setPoliticaBorrador(null) }
 
   return (
-    <div className="panel-page">
-      <Encabezado rotulo="Tu negocio" titulo="Reglas de reserva" bajada={`Cuándo y cómo pueden reservar tus ${voz.clientes}. A la derecha ves cómo les queda.`} />
+    <div className="rv-pagina">
+      <style>{CSS}</style>
+      <Encabezado rotulo="Reservas" titulo="Reglas de reserva" bajada={`Cuándo y cómo pueden reservar tus ${voz.clientes}. A la derecha ves cómo les queda.`} />
 
       <div className="tuc-res-split">
-        <div className="tuc-pila">
+        <div className="rv-pila">
 
           <SecCard titulo="Cuándo se puede reservar" Icon={CalendarClock} bajada="La ventana en la que tu agenda acepta reservas.">
             <Dos>
@@ -105,7 +127,7 @@ export default function Reservas({ rubro, avisar }: PropsTab) {
           </SecCard>
 
           <SecCard titulo="Confirmación" Icon={BadgeCheck} bajada="Qué pasa apenas alguien reserva.">
-            <div role="radiogroup" aria-label="Confirmación" className="tuc-grid-2">
+            <div role="radiogroup" aria-label="Confirmación" className="rv-dos">
               <OpcionTarjeta activa={v.confirmacion === 'auto'} onClick={() => b.set('confirmacion', 'auto')} Icon={CircleCheck} titulo="Automática" ayuda={`El ${voz.turno} queda confirmado al instante. Lo más cómodo para ${voz.clientes === 'pacientes' ? 'el paciente' : 'todos'}.`} />
               <OpcionTarjeta activa={v.confirmacion === 'manual'} onClick={() => b.set('confirmacion', 'manual')} Icon={Eye} titulo="La reviso yo" ayuda="Queda pendiente hasta que lo aceptás desde la agenda." />
             </div>
@@ -147,14 +169,14 @@ export default function Reservas({ rubro, avisar }: PropsTab) {
                 </div>
                 {v.senaTipo === 'pct' ? (
                   <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-                    <Rotulo htmlFor="tuc-sena">Porcentaje del precio: <span className="tuo-num" style={{ color: 'var(--color-primary)', fontWeight: 600 }}>{v.senaPct}%</span></Rotulo>
+                    <Rotulo htmlFor="tuc-sena">Porcentaje del precio: <span className="rv-num" style={{ color: 'var(--color-primary)', fontWeight: 600 }}>{v.senaPct}%</span></Rotulo>
                     <input id="tuc-sena" type="range" min={10} max={100} step={5} value={v.senaPct} onChange={e => b.set('senaPct', Number(e.target.value))} className="tuc-rango" />
                   </div>
                 ) : (
                   <Campo label="Monto" value={v.senaFijo} onChange={x => b.set('senaFijo', x.replace(/\D/g, ''))} prefijo="$" style={{ flex: '1 1 160px', marginBottom: 0 }} />
                 )}
               </div>
-              <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 10 }}>Ejemplo: en “{ejemplo.nombre}” (<span className="tuo-num">{pesos(ejemplo.precio)}</span>) la seña es <b className="tuo-num" style={{ color: 'var(--color-text)' }}>{pesos(senaMonto)}</b>.</div>
+              <div className="tuc-ayuda" style={{ marginTop: 10 }}>Ejemplo: en “{ejemplo.nombre}” (<span className="rv-num">{pesos(ejemplo.precio)}</span>) la seña es <b className="rv-num" style={{ color: 'var(--color-text)' }}>{pesos(senaMonto)}</b>.</div>
             </FilaSwitch>
             <Divisor />
             <FilaSwitch Icon={UserX} titulo="Pedir seña a quien faltó sin avisar" ayuda="Aunque no pidas seña en general, quien tiene una ausencia la paga en su próximo turno." on={v.ausentes} onChange={x => b.set('ausentes', x)} />
@@ -193,7 +215,7 @@ export default function Reservas({ rubro, avisar }: PropsTab) {
             <FilaSwitch Icon={Hourglass} titulo="Lista de espera" ayuda={`Si un horario está lleno, se anotan. Cuando alguien cancela, le ofrecemos el lugar al primero por WhatsApp.`} on={v.espera} onChange={x => b.set('espera', x)}>
               <Rotulo>Tiempo para aceptar el lugar</Rotulo>
               <Segmentado label="Tiempo para aceptar el lugar" valor={v.esperaMin} onChange={x => b.set('esperaMin', x)} opciones={[15, 30, 60].map(m => ({ id: m, label: duracionTxt(m) }))} />
-              <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 8 }}>Si no responde a tiempo, pasa al siguiente de la lista.</div>
+              <div className="tuc-ayuda" style={{ marginTop: 8 }}>Si no responde a tiempo, pasa al siguiente de la lista.</div>
             </FilaSwitch>
           </SecCard>
 
@@ -250,11 +272,11 @@ function Resumen({ v, rubro, senaMonto, cuentas, politica }: { v: Reglas; rubro:
   if (beneficios.length) lineas.push([Gift, <>Si querés, creás tu cuenta y sumás <b>{beneficios.map(x => x.titulo.toLowerCase()).join(', ')}</b>.</>])
 
   return (
-    <div className="tuo-card tuc-resumen">
+    <div className="rv-card tuc-resumen">
       <div className="tuc-resumen-cab">
         <Eye size={14} aria-hidden style={{ color: 'var(--color-primary)' }} />
-        <span className="tuo-rotulo" style={{ flex: 1 }}>Así lo ve tu {voz.cliente}</span>
-        <span className="tuo-chip tuo-chip--ok" style={{ height: 22, fontSize: 11 }}><span aria-hidden className="tuo-late" style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} />En vivo</span>
+        <span className="rv-rotulo" style={{ flex: 1 }}>Así lo ve tu {voz.cliente}</span>
+        <span className="rv-chip rv-chip--ok" style={{ height: 22, fontSize: 11 }}>En vivo</span>
       </div>
       <div style={{ background: t.c.bg, color: t.c.body, padding: 18, fontFamily: t.fb }}>
         <div style={{ fontFamily: t.fh, fontSize: 20, fontWeight: 700, color: t.c.text, textTransform: t.mayus ? 'uppercase' : 'none', lineHeight: 1.1 }}>Elegí día y horario</div>
@@ -268,7 +290,7 @@ function Resumen({ v, rubro, senaMonto, cuentas, politica }: { v: Reglas; rubro:
         <div aria-hidden style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 6, marginTop: 12 }}>
           {slots.map(m => {
             const no = m < primero
-            return <span key={m} style={{ textAlign: 'center', padding: '8px 0', borderRadius: t.radio, fontSize: 12.5, fontWeight: 600, fontFamily: '"Geist Mono", monospace', border: `1px solid ${t.c.border}`, color: no ? t.c.muted : t.c.text, background: no ? 'transparent' : t.c.surface, textDecoration: no ? 'line-through' : 'none', opacity: no ? 0.55 : 1 }}>{horaTxt(m)}</span>
+            return <span key={m} style={{ textAlign: 'center', padding: '8px 0', borderRadius: t.radio, fontSize: 12.5, fontWeight: 600, fontFamily: 'var(--rv-mono)', border: `1px solid ${t.c.border}`, color: no ? t.c.muted : t.c.text, background: no ? 'transparent' : t.c.surface, textDecoration: no ? 'line-through' : 'none', opacity: no ? 0.55 : 1 }}>{horaTxt(m)}</span>
           })}
         </div>
         {(v.buffer > 0 || v.minAnt > 0) && (
@@ -278,7 +300,7 @@ function Resumen({ v, rubro, senaMonto, cuentas, politica }: { v: Reglas; rubro:
           </div>
         )}
       </div>
-      <ul style={{ listStyle: 'none', margin: 0, padding: '14px 16px 16px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <ul style={{ listStyle: 'none', margin: 0, padding: '10px 16px 12px', display: 'flex', flexDirection: 'column' }}>
         {lineas.map(([I, txt], i) => (
           <li key={i} className="tuc-resumen-linea">
             <span aria-hidden className="tuc-resumen-ico"><I size={14} strokeWidth={1.8} /></span>
@@ -294,26 +316,3 @@ function Resumen({ v, rubro, senaMonto, cuentas, politica }: { v: Reglas; rubro:
     </div>
   )
 }
-
-export const CSS_RESERVAS = `
-  .tuc-politica { padding: 16px 18px; border-radius: 12px; background: var(--color-surface); border: 1px solid var(--color-border); border-left: 3px solid var(--color-primary); }
-  .tuc-politica h3 { margin: 0; font-size: 13px; font-weight: 600; color: var(--color-text); }
-  .tuc-politica p { margin: 4px 0 0; font-size: 13.5px; line-height: 1.6; color: var(--color-body); text-wrap: pretty; }
-  .tuc-politica p + h3 { margin-top: 14px; }
-  .tuc-sinreg { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; margin-bottom: 4px; border-radius: 12px; background: var(--color-success-bg); border: 1px solid color-mix(in srgb, var(--color-success) 30%, transparent); }
-  .tuc-sinreg > svg { flex-shrink: 0; margin-top: 2px; color: var(--color-success); }
-  .tuc-sinreg strong { display: block; font-size: 13.5px; font-weight: 600; color: var(--color-text); }
-  .tuc-sinreg span { display: block; margin-top: 2px; font-size: 12.5px; line-height: 1.5; color: var(--color-body); }
-  .tuc-resumen { overflow: hidden; box-shadow: 0 24px 60px -30px rgba(15,23,42,0.4), var(--shadow-card); }
-  .tuc-resumen-cab { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--color-border); }
-  .tuc-resumen-linea { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--color-body); line-height: 1.45; padding: 6px 8px; margin: 0 -8px; border-radius: 10px; transition: background 150ms ease; animation: tucAbre 260ms var(--tuo-ease, ease) both; }
-  .tuc-resumen-ico { width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center; flex-shrink: 0; color: var(--color-primary); background: var(--color-primary-bg); }
-  @media (hover: hover) { .tuc-resumen-linea:hover { background: var(--color-surface); } }
-  @media (prefers-reduced-motion: reduce) { .tuc-resumen-linea { animation: none; } }
-  .tuc-res-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: 24px; align-items: start; max-width: 1180px; }
-  .tuc-res-resumen { position: sticky; top: 16px; }
-  @media (max-width: 1024px) {
-    .tuc-res-split { grid-template-columns: minmax(0, 1fr); }
-    .tuc-res-resumen { position: static; }
-  }
-`

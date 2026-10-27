@@ -1,8 +1,7 @@
-// Invitar a alguien al equipo: el mismo modal que usa Tienda (Configuración →
-// Equipo → "Invitar nuevo miembro"), con sus mismas piezas (Modal y Button del
-// design system; Lbl, Inp, Err y RolRadios de Tienda). Nombre, email y rol;
-// al enviar, la pantalla de "Invitación enviada" con la contraseña temporal
-// para copiar.
+// Invitar a alguien al equipo: el mismo flujo que Tienda (Configuración →
+// Equipo → "Invitar nuevo miembro"), con las piezas del kit de reservas.
+// Nombre, email y rol; al enviar, la pantalla de "Invitación enviada" con la
+// contraseña temporal para copiar.
 //
 // Lo propio de Turnos (su agenda y cómo cobra) no se pide acá: la persona entra
 // con la agenda del negocio y la forma de pago típica del rubro, y desde la
@@ -11,12 +10,10 @@
 // Es una demo: no se manda ningún mail y la contraseña se inventa en el navegador.
 import { useState } from 'react'
 import { Check, Copy } from 'lucide-react'
-import { Modal } from '@/design-system/components/Modal'
-import { Button } from '@/design-system/components/Button'
-import { Lbl, Err, Inp, RolRadios } from '@/modules/ventas/panel/configuracion/components/equipo/FormBits'
-import type { Rol as RolTienda } from '@/modules/ventas/panel/configuracion/types/equipo.types'
 import type { RubroTurnos } from '@/modules/turnos/datos'
-import { COLORES_EQUIPO, pagoTxt, resumenRol, type Pago, type Persona, type Rol } from '../datos/equipo'
+import { Campo, OpcionTarjeta } from './configuracion/ui'
+import { ErrorCampo, Modal } from './piezasPanel'
+import { pagoTxt, resumenRol, type Pago, type Persona, type Rol } from '../datos/equipo'
 
 const LETRAS = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 /** Contraseña temporal de la demo. Se llama solo desde el envío (nunca en render). */
@@ -25,6 +22,16 @@ function claveTemporal(): string {
   crypto.getRandomValues(azar)
   return Array.from(azar, n => LETRAS[n % LETRAS.length]).join('')
 }
+
+const CSS = `
+  .tu-inv-roles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .tu-inv-roles > .tuc-opcion { padding: 12px; }
+  .tu-inv-permisos { margin-top: 10px; padding: 12px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--rv-r-sm); }
+  .tu-inv-permisos > div { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tu-inv-clave { display: flex; gap: 8px; align-items: center; }
+  .tu-inv-clave > code { flex: 1; min-width: 0; padding: 10px 12px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--rv-r-sm); font-size: 14px; font-family: var(--rv-mono); color: var(--color-text); letter-spacing: 0.04em; overflow-wrap: anywhere; }
+  @media (max-width: 560px) { .tu-inv-roles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+`
 
 export default function InvitarPersona({ rubro, roles, personas, pago, onCerrar, onInvitar, onConfigurar }: {
   rubro: RubroTurnos
@@ -48,8 +55,6 @@ export default function InvitarPersona({ rubro, roles, personas, pago, onCerrar,
 
   const rol = elegibles.find(r => r.id === rolId) ?? elegibles[0]
   const permisos = rol ? resumenRol(rol, rubro) : []
-  // RolRadios es de Tienda: recibe sus roles. De los de Turnos usa el nombre, la descripción y un color.
-  const paraRadios: RolTienda[] = elegibles.map((r, i) => ({ id: r.id, nombre: r.nombre, descripcion: r.descripcion, color: COLORES_EQUIPO[i % COLORES_EQUIPO.length], esDefault: false, permisos: [], miembros: 0 }))
 
   const enviar = () => {
     const e: { nombre?: string; email?: string } = {}
@@ -76,62 +81,47 @@ export default function InvitarPersona({ rubro, roles, personas, pago, onCerrar,
 
   if (resultado) {
     return (
-      <Modal isOpen onClose={onCerrar} title="Invitación enviada" maxWidth={480}
-        footer={<><Button variant="ghost" onClick={onConfigurar}>Agenda y pago</Button><Button variant="primary" onClick={onCerrar}>Listo</Button></>}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-          <div style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(16,185,129,0.10)', color: 'var(--color-success)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-            <Check size={18} strokeWidth={2.2} />
-          </div>
-          <div style={{ fontSize: 13.5, color: 'var(--color-body)', lineHeight: 1.5 }}>
-            Le mandamos a <strong style={{ color: 'var(--color-text)' }}>{resultado.email}</strong> un email con el acceso al panel y su contraseña temporal.
-          </div>
+      <Modal rotulo="Equipo" titulo="Invitación enviada" ancho={480} onCerrar={onCerrar}
+        pie={<><button type="button" className="rv-btn" onClick={onConfigurar}>Agenda y pago</button><button type="button" className="rv-btn rv-btn--primario" onClick={onCerrar}>Listo</button></>}>
+        <style>{CSS}</style>
+        <div className="rv-nota tu-nota--ok" style={{ marginBottom: 16 }}>
+          <Check size={16} aria-hidden />
+          <span>Le mandamos a <b>{resultado.email}</b> un email con el acceso al panel y su contraseña temporal.</span>
         </div>
-
-        <Lbl help="Por si el email no le llega, pasásela por otro canal">Contraseña temporal</Lbl>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <code style={{ flex: 1, minWidth: 0, padding: '10px 12px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 14, fontFamily: '"Geist Mono", monospace', color: 'var(--color-text)', letterSpacing: '0.04em' }}>
-            {resultado.clave}
-          </code>
-          <Button variant="outline" icon={copiada ? <Check size={14} /> : <Copy size={14} />} onClick={() => void copiar()}>
-            {copiada ? 'Copiada' : 'Copiar'}
-          </Button>
+        <div className="tuc-rotulo" style={{ marginBottom: 4 }}>Contraseña temporal</div>
+        <div className="tuc-ayuda" style={{ marginBottom: 8 }}>Por si el email no le llega, pasásela por otro canal.</div>
+        <div className="tu-inv-clave">
+          <code>{resultado.clave}</code>
+          <button type="button" className="rv-btn" onClick={() => void copiar()}>{copiada ? <Check size={14} /> : <Copy size={14} />} {copiada ? 'Copiada' : 'Copiar'}</button>
         </div>
-        <div style={{ marginTop: 12, fontSize: 12, color: 'var(--color-muted)', lineHeight: 1.5 }}>
-          Deberá cambiarla en su primer acceso. {resultado.nombre.split(' ')[0]} entra con la agenda del negocio y cobra así: <strong style={{ color: 'var(--color-body)' }}>{pagoTxt(pago, rubro).toLowerCase()}</strong>. Lo cambiás en “Agenda y pago”.
-        </div>
+        <p className="rv-ayuda" style={{ margin: '12px 0 0' }}>
+          Deberá cambiarla en su primer acceso. {resultado.nombre.split(' ')[0]} entra con la agenda del negocio y cobra así: <b style={{ color: 'var(--color-body)' }}>{pagoTxt(pago, rubro).toLowerCase()}</b>. Lo cambiás en “Agenda y pago”.
+        </p>
       </Modal>
     )
   }
 
   return (
-    <Modal isOpen onClose={onCerrar} title="Invitar nuevo miembro" maxWidth={560}
-      footer={<><Button variant="ghost" onClick={onCerrar}>Cancelar</Button><Button variant="primary" onClick={enviar}>Enviar invitación</Button></>}>
-      <Lbl>Nombre completo</Lbl>
-      <Inp value={nombre} onChange={setNombre} placeholder="Julián Acosta" error={!!err.nombre} autoFocus />
-      {err.nombre && <Err>{err.nombre}</Err>}
-      <div style={{ height: 14 }} />
+    <Modal rotulo="Equipo" titulo="Invitar nuevo miembro" bajada="Le llega un mail con el acceso a su panel. Después ajustás su agenda y cómo cobra." ancho={560} onCerrar={onCerrar} onEnviar={enviar}
+      pie={<><button type="button" className="rv-btn" onClick={onCerrar}>Cancelar</button><button type="submit" className="rv-btn rv-btn--primario">Enviar invitación</button></>}>
+      <style>{CSS}</style>
+      <Campo label="Nombre completo" value={nombre} onChange={v => { setNombre(v); setErr(e => ({ ...e, nombre: undefined })) }} placeholder="Julián Acosta" maxLength={40} />
+      {err.nombre && <ErrorCampo>{err.nombre}</ErrorCampo>}
+      <Campo label="Email" type="email" value={email} onChange={v => { setEmail(v); setErr(e => ({ ...e, email: undefined })) }} placeholder="julian@tunegocio.com" />
+      {err.email && <ErrorCampo>{err.email}</ErrorCampo>}
 
-      <Lbl>Email</Lbl>
-      <Inp value={email} onChange={setEmail} placeholder="julian@tunegocio.com" type="email" error={!!err.email} />
-      {err.email && <Err>{err.email}</Err>}
-      <div style={{ height: 18 }} />
-
-      <Lbl>Rol asignado</Lbl>
-      {/* RolRadios viene de Tienda con tres columnas fijas: en celular se acomodan solas para que no se aprieten. */}
-      <style>{`@media (max-width: 560px) { .tu-inv-roles > div { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }`}</style>
-      <div className="tu-inv-roles"><RolRadios roles={paraRadios} value={rol?.id ?? ''} onChange={setRolId} /></div>
+      <div className="tuc-rotulo" style={{ marginBottom: 8 }}>Rol asignado</div>
+      <div role="radiogroup" aria-label="Rol asignado" className="tu-inv-roles">
+        {elegibles.map(r => <OpcionTarjeta key={r.id} activa={r.id === rol?.id} onClick={() => setRolId(r.id)} titulo={r.nombre} ayuda={r.descripcion} />)}
+      </div>
       {permisos.length > 0 && (
-        <div style={{ marginTop: 10, padding: 12, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 8 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-body)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Qué puede hacer</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {permisos.map(p => <span key={p} style={{ fontSize: 11, fontWeight: 600, padding: '4px 9px', borderRadius: 9999, background: 'var(--color-primary-bg)', color: 'var(--chip-primary-fg)', border: '1px solid var(--color-border)' }}>{p}</span>)}
-          </div>
+        <div className="tu-inv-permisos">
+          <div className="rv-rotulo" style={{ marginBottom: 8 }}>Qué puede hacer</div>
+          <div>{permisos.map(p => <span key={p} className="rv-chip rv-chip--primario" style={{ height: 24, fontSize: 11.5 }}>{p}</span>)}</div>
         </div>
       )}
 
-      <div style={{ marginTop: 18, padding: 12, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 12, color: 'var(--color-muted)', lineHeight: 1.5 }}>
-        El miembro recibirá un email con el acceso y una contraseña temporal generada automáticamente, que deberá cambiar en su primer ingreso. Al enviarla, la vas a poder copiar desde acá también.
-      </div>
+      <p className="rv-ayuda" style={{ margin: '16px 0 0' }}>El miembro recibe un email con el acceso y una contraseña temporal generada automáticamente, que deberá cambiar en su primer ingreso. Al enviarla, la vas a poder copiar desde acá también.</p>
     </Modal>
   )
 }

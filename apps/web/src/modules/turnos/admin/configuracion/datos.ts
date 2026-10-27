@@ -3,52 +3,32 @@
 // las pestañas, cómo se nombra cada cosa según el rubro y lo que Apariencia
 // necesita para mostrar y editar las plantillas.
 import type { LucideIcon } from 'lucide-react'
-import {
-  Scissors, Users, Images, Heart, Gift, ListOrdered, MapPin,
-  Palette, Building2, Clock, CalendarCog, Bell, Wallet, Globe, Crown, LayoutGrid, HandCoins,
-} from 'lucide-react'
+import { Scissors, Users, Images, Heart, Gift, ListOrdered, MapPin } from 'lucide-react'
 import { esSalud, type RubroTurnos } from '@/modules/turnos/datos'
 import type { AparienciaDemo } from '@/modules/turnos/datos/negocio'
 import { TIPOGRAFIAS, aplicarPlantilla, type AjustesPlantilla, type EstiloBoton, type PlantillaSitio } from '@/modules/turnos/storefront/plantillas'
 import { plantillasDelRubro, temaDe, type TemaNegocio } from '@/modules/turnos/storefront/tema'
 
-// ─── Pestañas ─────────────────────────────────────────────────────────────────
+// ─── Las sub-secciones de Configuración ──────────────────────────────────────
+// Son las del ítem "Configuración" de la barra lateral (viajan en ?tab=). Lo
+// que antes vivía adentro de Configuración como pestaña (servicios, equipo,
+// espacios, ganancias, reglas, mensajes, pagos) ahora es una sección propia del
+// menú: PanelTurnos redirige los links viejos.
 
-export type TabConfig =
-  | 'apariencia' | 'dominio'
-  | 'negocio' | 'horarios' | 'servicios' | 'espacios' | 'reservas' | 'mensajes' | 'pagos'
-  | 'equipo' | 'ganancias' | 'suscripcion'
+export type TabConfig = 'negocio' | 'horarios' | 'apariencia' | 'dominio' | 'suscripcion'
 
-/** Pestañas que el panel arma con su estado (servicios, equipo, espacios, ganancias): solo se muestran si el panel las pasa. */
-export const TABS_DEL_PANEL = ['servicios', 'equipo', 'espacios', 'ganancias'] as const
-export type TabDelPanel = (typeof TABS_DEL_PANEL)[number]
-
-export interface GrupoNav { label?: string; items: { id: TabConfig; label: string; Icon: LucideIcon }[] }
-
-export const GRUPOS_NAV: GrupoNav[] = [
-  { label: 'Tu sitio', items: [
-    { id: 'apariencia', label: 'Apariencia', Icon: Palette },
-    { id: 'dominio', label: 'Dominio', Icon: Globe },
-  ] },
-  { label: 'Tu negocio', items: [
-    { id: 'negocio', label: 'Datos del negocio', Icon: Building2 },
-    { id: 'horarios', label: 'Horarios', Icon: Clock },
-    { id: 'servicios', label: 'Servicios y precios', Icon: Scissors },
-    { id: 'espacios', label: 'Espacios', Icon: LayoutGrid },
-    { id: 'reservas', label: 'Reglas de reserva', Icon: CalendarCog },
-    { id: 'mensajes', label: 'Recordatorios y mensajes', Icon: Bell },
-    { id: 'pagos', label: 'Pagos', Icon: Wallet },
-  ] },
-  { label: 'Equipo', items: [
-    { id: 'equipo', label: 'Equipo y roles', Icon: Users },
-    { id: 'ganancias', label: 'Ganancias y pagos', Icon: HandCoins },
-  ] },
-  { label: 'Cuenta', items: [
-    { id: 'suscripcion', label: 'Suscripción', Icon: Crown },
-  ] },
+export const SUBS_CONFIG: { id: TabConfig; label: string; separador?: boolean }[] = [
+  { id: 'negocio', label: 'Datos del negocio' },
+  { id: 'horarios', label: 'Horarios' },
+  { id: 'apariencia', label: 'Apariencia' },
+  { id: 'dominio', label: 'Dominio' },
+  { id: 'suscripcion', label: 'Suscripción', separador: true },
 ]
 
-export const TABS: TabConfig[] = GRUPOS_NAV.flatMap(g => g.items.map(i => i.id))
+/** Los links viejos (?vista=configuracion&tab=…) y la sección del menú a la que van ahora. */
+export const TABS_VIEJAS: Record<string, string> = {
+  servicios: 'servicios', equipo: 'equipo', espacios: 'espacios', ganancias: 'ganancias', reservas: 'reglas', mensajes: 'mensajes', pagos: 'pagos',
+}
 
 // ─── Cómo se nombra cada cosa según el rubro ─────────────────────────────────
 // Un consultorio no tiene "clientes" sino "pacientes": el copy de toda la

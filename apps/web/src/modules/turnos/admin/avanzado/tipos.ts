@@ -9,4 +9,6 @@ export interface PropsFuncion {
   activo: boolean
   onActivo: (v: boolean) => void
   onVolver: () => void
+  /** El aviso del panel: "Guardar" lo usa para confirmar (nada se guarda, es la demo). */
+  avisar?: (titulo: string, descripcion?: string) => void
 }

@@ -1,179 +1,210 @@
-// Piezas de los formularios del panel de Turnos (demo): el modal donde se crea,
-// se edita o se mira el detalle de algo, la confirmación antes de borrar, los
-// días y los turnos de atención (mañana y tarde) y el mensaje de WhatsApp.
+// Piezas del panel de Turnos (demo) que no trae el kit de reservas: el modal
+// con formulario (Enter guarda) y apilable, la confirmación antes de borrar, el
+// indicador con variación (el KpiCard de Tienda sobre una .rv-card), la llave,
+// los días y los turnos de atención (mañana y tarde), la tira de días y los
+// horarios libres, la jornada en línea y el mensaje de WhatsApp.
 //
-// Todo lo que se abre es un MODAL centrado, como en el resto de Órbita
-// (design-system/Modal): nada se abre desde el costado. En celular el mismo
-// modal es una hoja que sube desde abajo.
-// Los campos son los de Configuración (tuc-, en configuracion/ui.tsx); PanelTurnos
-// monta esa hoja de estilos una sola vez.
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
-import { X, Copy, Check, CheckCheck, Clock3, Send, Share2, Trash2, PhoneOff, Sun, Sunset, CalendarX } from 'lucide-react'
+// Todo pinta con las clases rv- del kit (design-system/reservas/estilo.tsx) y
+// lo propio va con prefijo tu- en CSS_PIEZAS_PANEL, que PanelTurnos monta una
+// sola vez. Nada de hover por JS: lo que se toca lleva ds-hover o una clase
+// del kit que ya trae su hover y su foco.
+import { useEffect, useEffectEvent, useId, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
+import type { LucideIcon } from 'lucide-react'
+import { ArrowLeft, X, Copy, Check, CheckCheck, Clock3, Search, Send, Share2, Trash2, PhoneOff, Sun, Sunset, CalendarX } from 'lucide-react'
+import { frenarScroll, retenerFoco } from '@/design-system/reservas/piezas'
 import { DIAS, DIAS_CORTOS, horaTxt, type Recurso, type Turno } from '@/modules/turnos/datos'
 import { AHORA_DEMO, MEDIAS_HORAS, diasAbiertos, diasTxt, errorJornada, hhmm, jornadaDe, jornadaTxt, tramosDe, type Bloque, type Jornada, type Semana, type Tramo } from '@/modules/turnos/horario'
-import { Llave } from '@/modules/turnos/_shared/orbita/piezas'
 import { Segmentado } from './configuracion/ui'
 import { copiar, fechaDe, indiceDia, type Avisar, type GrupoLibres, type MensajeWA } from '../datos/agenda'
 
 export const CSS_PIEZAS_PANEL = `
+  /* Un modal apilado sobre otro (cambiar cómo cobra desde la liquidación) va encima del primero. */
+  .rv-velo[data-encima='true'] { z-index: 152; }
+  .tu-modal-form { display: flex; flex-direction: column; flex: 1; min-height: 0; margin: 0; }
   .tu-error { display: flex; align-items: center; gap: 6px; margin: -8px 0 14px; font-size: 12.5px; font-weight: 500; color: var(--color-error); }
   .tu-dato-fila { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; font-size: 13px; border-top: 1px solid var(--color-border); }
   .tu-dato-fila:first-child { border-top: none; }
-  .tu-borrar { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 12px; background: var(--color-error-bg); border: 1px solid color-mix(in srgb, var(--color-error) 28%, transparent); animation: tuoEntra 320ms var(--tuo-ease, ease) both; }
-  .tu-nota { display: flex; gap: 9px; padding: 11px 13px; margin-bottom: 16px; border-radius: 12px; font-size: 13px; line-height: 1.5; }
-  .tu-nota--aviso { background: var(--color-warning-bg); color: var(--chip-warning-fg); border: 1px solid color-mix(in srgb, var(--color-warning) 28%, transparent); }
-  .tu-nota--info { background: var(--color-primary-bg); color: var(--chip-primary-fg); border: 1px solid color-mix(in srgb, var(--color-primary) 24%, transparent); }
-  .tu-nota--ok { background: var(--color-success-bg); color: var(--chip-success-fg); border: 1px solid color-mix(in srgb, var(--color-success) 28%, transparent); animation: tuoEntra 320ms var(--tuo-ease, ease) both; }
-  .tu-nota > svg { flex-shrink: 0; margin-top: 2px; }
+  .tu-borrar { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: var(--rv-r-sm); background: var(--color-error-bg); }
+  .tu-borrar > span { font-size: 13.5px; font-weight: 500; color: var(--color-text); line-height: 1.5; }
+  .tu-borrar-si { background: var(--color-error); border-color: transparent; color: var(--color-on-primary); }
+  .rv-nota.tu-nota--ok { background: var(--color-success-bg); border-color: transparent; color: var(--chip-success-fg); }
+  .rv-nota > svg { flex-shrink: 0; margin-top: 2px; }
   .tu-seccion { margin: 6px 0 12px; padding-top: 16px; border-top: 1px solid var(--color-border); }
-  .tu-seccion > .tuo-rotulo { display: block; margin-bottom: 12px; }
+  .tu-seccion > .rv-rotulo { display: block; margin-bottom: 12px; }
 
-  /* Días de la semana: siete botones que se prenden y se apagan. */
+  /* ── Volver (el de Tienda: arriba del título, dice adónde se vuelve) ── */
+  .tu-volver { display: inline-flex; align-items: center; gap: 6px; background: none; border: none; padding: 4px 6px; margin: -4px 0 10px -6px; font: inherit; font-size: 13px; font-weight: 500; color: var(--color-muted); cursor: pointer; border-radius: 6px; }
+  .tu-volver:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  @media (hover: hover) { .tu-volver:hover { color: var(--color-text); } }
+
+  /* ── Buscador de una lista: el input del kit con la lupa adentro ── */
+  .tu-buscar { position: relative; display: block; width: 100%; max-width: 380px; }
+  .tu-buscar > svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--color-subtle); pointer-events: none; }
+  .tu-buscar > .rv-input { padding-left: 36px; }
+
+  /* ── Indicador: el KpiCard de Tienda (rótulo, ícono en chip, valor mono, variación) sobre una tarjeta del kit ── */
+  .tu-kpi { container-type: inline-size; padding: 14px 16px; min-width: 0; }
+  .tu-kpi-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
+  .tu-kpi-rotulo { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-muted); line-height: 1.3; }
+  .tu-kpi-ico { width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0; display: grid; place-items: center; background: var(--color-primary-bg); color: var(--color-primary); }
+  .tu-kpi-valor { font-family: var(--rv-mono); font-size: 30px; font-size: clamp(20px, 14cqi, 30px); font-weight: 700; letter-spacing: -0.02em; line-height: 1; color: var(--color-text); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 10px; }
+  .tu-kpi-pie { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; min-height: 22px; }
+  .tu-kpi-delta { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: 6px; flex-shrink: 0; font-family: var(--rv-mono); font-size: 12px; font-weight: 600; white-space: nowrap; background: var(--color-surface-alt); color: var(--color-muted); }
+  .tu-kpi-delta[data-tono='ok'] { background: var(--color-success-bg); color: var(--chip-success-fg); }
+  .tu-kpi-delta[data-tono='mal'] { background: var(--color-error-bg); color: var(--chip-error-fg); }
+  .tu-kpi-nota { font-size: 11px; color: var(--color-muted); }
+  @media (max-width: 480px) {
+    .tu-kpi { padding: 12px; }
+    .tu-kpi-cab { margin-bottom: 8px; }
+    .tu-kpi-rotulo { font-size: 10.5px; letter-spacing: 0.02em; }
+    .tu-kpi-ico { width: 26px; height: 26px; border-radius: 7px; }
+    .tu-kpi-ico > svg { width: 14px; height: 14px; }
+    .tu-kpi-valor { font-size: 21px; margin-bottom: 7px; }
+    .tu-kpi-pie { flex-direction: column; align-items: flex-start; gap: 3px; }
+  }
+
+  /* ── Barra fina de avance (ocupación, uso) ── */
+  .tu-barra { display: block; height: 6px; border-radius: 999px; background: var(--color-surface-alt); overflow: hidden; }
+  .tu-barra > i { display: block; height: 100%; border-radius: 999px; background: var(--c, var(--color-primary)); }
+
+  /* ── Filas que se tocan (clientes, liquidaciones): una lista dentro de una tarjeta ── */
+  .tu-filas { display: flex; flex-direction: column; }
+  .tu-fila { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 10px 16px; border: none; border-top: 1px solid var(--color-border); border-radius: 0; background: transparent; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+  .tu-fila:first-child { border-top: none; }
+  .tu-fila:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+  .tu-fila-cab { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--color-border); }
+  .tu-fila-cab > span { font-family: var(--rv-mono); font-size: 10.5px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-muted); }
+
+  /* ── Días de la semana: siete botones que se prenden y se apagan ── */
   .tu-dias { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
-  .tu-dias > button { height: 40px; border-radius: 10px; border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-muted); font-family: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: border-color 150ms ease, background 150ms ease, color 150ms ease; }
+  .tu-dias > button { min-height: 40px; border-radius: var(--rv-r-sm); border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-muted); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
   .tu-dias > button[aria-pressed='true'] { border-color: var(--color-primary); background: var(--color-primary-bg); color: var(--chip-primary-fg); }
   .tu-dias > button:disabled { cursor: not-allowed; opacity: 0.42; border-style: dashed; }
   .tu-dias > button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-  @media (hover: hover) { .tu-dias > button:not(:disabled):not([aria-pressed='true']):hover { border-color: var(--color-border-strong); color: var(--color-text); } }
 
-  /* Turnos de atención: un renglón para la mañana y otro para la tarde. */
+  /* ── Turnos de atención: un renglón para la mañana y otro para la tarde ── */
   .tu-bloques { display: grid; gap: 8px; }
-  .tu-bloque { display: grid; grid-template-columns: 34px 70px minmax(0, 1fr) auto; gap: 10px; align-items: center; min-height: 54px; padding: 6px 12px; border-radius: 12px; border: 1px solid var(--color-border); background: var(--color-surface); transition: border-color 160ms ease, background 160ms ease; }
-  .tu-bloque[data-on='true'] { border-color: color-mix(in srgb, var(--color-primary) 34%, var(--color-border)); background: color-mix(in srgb, var(--color-primary) 5%, var(--color-bg)); }
-  .tu-bloque-ico { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; color: var(--color-subtle); background: var(--color-surface-alt); transition: color 160ms ease, background 160ms ease; }
+  .tu-bloque { display: grid; grid-template-columns: 34px 70px minmax(0, 1fr) auto; gap: 10px; align-items: center; min-height: 54px; padding: 6px 12px; border-radius: var(--rv-r-sm); border: 1px solid var(--color-border); background: var(--color-surface); }
+  .tu-bloque[data-on='true'] { background: var(--color-bg); }
+  .tu-bloque-ico { width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; color: var(--color-subtle); background: var(--color-surface-alt); }
   .tu-bloque[data-on='true'] .tu-bloque-ico { color: var(--color-primary); background: var(--color-primary-bg); }
   .tu-bloque > strong { font-size: 13.5px; font-weight: 600; color: var(--color-text); }
   .tu-bloque-horas { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 13px; color: var(--color-muted); }
-  .tu-bloque-horas select.tuc-field { width: 104px; height: 40px; padding: 0 8px 0 10px; appearance: auto; }
+  .tu-bloque-horas > .rv-select { width: 104px; min-height: 40px; padding-left: 10px; font-family: var(--rv-mono); }
   .tu-bloque-off { font-size: 13px; color: var(--color-muted); }
 
-  /* Tira de días: el día se elige tocándolo, igual que en la reserva del cliente. */
+  /* ── Tira de días: el día se elige tocándolo, igual que en la reserva del cliente ── */
   .tu-tira-dias { display: flex; gap: 6px; overflow-x: auto; padding: 3px 3px 8px; margin: 0 -3px; scrollbar-width: thin; }
-  .tu-dia-btn { flex: 0 0 auto; width: 58px; min-height: 62px; padding: 7px 4px; border-radius: 12px; border: 1px solid var(--color-border); background: var(--color-bg); font-family: inherit; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease; }
+  .tu-dia-btn { flex: 0 0 auto; width: 58px; min-height: 62px; padding: 7px 4px; border-radius: var(--rv-r-sm); border: 1px solid var(--color-border); background: var(--color-bg); font: inherit; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
   .tu-dia-btn > small { font-size: 11px; font-weight: 500; color: var(--color-muted); }
-  .tu-dia-btn > b { font-family: var(--tuo-mono); font-size: 16px; font-weight: 600; color: var(--color-text); font-variant-numeric: tabular-nums; }
-  .tu-dia-btn[aria-pressed='true'] { border-color: var(--color-primary); background: var(--color-primary-bg); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 14%, transparent); }
+  .tu-dia-btn > b { font-family: var(--rv-mono); font-size: 16px; font-weight: 600; color: var(--color-text); font-variant-numeric: tabular-nums; }
+  .tu-dia-btn[aria-pressed='true'] { border-color: var(--color-primary); background: var(--color-primary-bg); }
   .tu-dia-btn[aria-pressed='true'] > small, .tu-dia-btn[aria-pressed='true'] > b { color: var(--chip-primary-fg); }
   .tu-dia-btn:disabled { cursor: not-allowed; opacity: 0.42; border-style: dashed; }
   .tu-dia-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-  @media (hover: hover) { .tu-dia-btn:not(:disabled):not([aria-pressed='true']):hover { border-color: var(--color-border-strong); background: var(--color-surface); } }
 
-  /* Horarios libres, agrupados por la mañana y la tarde. */
+  /* ── Horarios libres, agrupados por la mañana y la tarde ── */
   .tu-horas-cab { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; font-size: 12.5px; font-weight: 600; color: var(--color-text); }
   .tu-horas-cab > span { font-weight: 400; color: var(--color-muted); }
-  .tu-horas { display: grid; grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); gap: 6px; }
-  .tu-hora-btn { height: 40px; border-radius: 10px; border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text); font-family: var(--tuo-mono); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer; transition: border-color 150ms ease, background 150ms ease, color 150ms ease, box-shadow 180ms ease; }
-  .tu-hora-btn[aria-pressed='true'] { border-color: transparent; background: var(--color-primary); color: var(--color-on-primary); }
-  .tu-hora-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-  @media (hover: hover) { .tu-hora-btn:not([aria-pressed='true']):hover { border-color: var(--color-primary); background: var(--color-primary-bg); color: var(--chip-primary-fg); } }
   .tu-corte { display: flex; align-items: center; gap: 10px; margin: 12px 0; font-size: 11.5px; color: var(--color-muted); }
   .tu-corte::before, .tu-corte::after { content: ''; flex: 1; height: 1px; background: var(--color-border); }
 
-  /* La jornada en línea: rayado = cerrado, liso = atiende, color = un turno. */
+  /* ── La jornada en línea: rayado = cerrado, liso = atiende, color = un turno ── */
   .tu-jornada { position: relative; height: 10px; }
   .tu-jornada-pista { position: absolute; inset: 0; border-radius: 999px; overflow: hidden; background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--color-border-strong) 60%, transparent) 0 1.5px, transparent 1.5px 6px), var(--color-surface); }
   .tu-jornada-abre { position: absolute; top: 0; bottom: 0; background: var(--color-surface-alt); }
-  .tu-jornada-turno { position: absolute; top: 0; bottom: 0; min-width: 4px; border-radius: 999px; transition: filter 180ms ease; }
-  @media (hover: hover) { .tu-jornada-turno:hover { filter: brightness(1.2); } }
+  .tu-jornada-turno { position: absolute; top: 0; bottom: 0; min-width: 4px; border-radius: 999px; }
   .tu-jornada-ahora { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; border-radius: 2px; background: var(--color-text); }
-  .tu-jornada-escala { position: relative; height: 16px; margin-top: 5px; font-family: var(--tuo-mono); font-size: 10.5px; color: var(--color-subtle); font-variant-numeric: tabular-nums; }
+  .tu-jornada-escala { position: relative; height: 16px; margin-top: 5px; font-family: var(--rv-mono); font-size: 11px; color: var(--color-muted); font-variant-numeric: tabular-nums; }
   .tu-jornada-escala > span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
   .tu-jornada-escala > span:first-child { transform: none; }
   .tu-jornada-escala > span:last-child { transform: translateX(-100%); }
 
-  /* Chat de WhatsApp: sus colores son los de WhatsApp (claro y oscuro) y no
-     los del panel, igual que en Configuración > Mensajes. */
-  .tu-wa { border-radius: 14px; overflow: hidden; border: 1px solid var(--color-border); margin-bottom: 16px; }
-  .tu-wa-cab { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: #F0F2F5; color: #111B21; }
-  .tu-wa-fondo { padding: 14px 12px 16px; background: #EFEAE2; background-image: radial-gradient(rgba(0,0,0,.045) 1px, transparent 1px); background-size: 14px 14px; }
-  .tu-wa-burbuja { position: relative; max-width: 92%; margin-left: auto; padding: 7px 9px 20px 10px; border-radius: 10px 0 10px 10px; font-size: 13.5px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; background: #D9FDD3; color: #111B21; box-shadow: 0 1px 1px rgba(0,0,0,.12); }
-  .tu-wa-hora { position: absolute; right: 8px; bottom: 3px; display: inline-flex; align-items: center; gap: 3px; font-size: 10.5px; opacity: 0.7; }
-  .dark .tu-wa-cab { background: #202C33; color: #E9EDEF; }
-  .dark .tu-wa-fondo { background-color: #0B141A; background-image: radial-gradient(rgba(255,255,255,.04) 1px, transparent 1px); }
-  .dark .tu-wa-burbuja { background: #005C4B; color: #E9EDEF; }
-  @media (max-width: 640px) {
+  /* ── Chat de WhatsApp: la forma de un chat (burbuja, hora, tildes) con los colores del panel, un solo acento ── */
+  .tu-wa { border-radius: var(--rv-r); overflow: hidden; border: 1px solid var(--color-border); margin-bottom: 16px; }
+  .tu-wa-cab { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: var(--color-surface); color: var(--color-text); border-bottom: 1px solid var(--color-border); }
+  .tu-wa-fondo { padding: 14px 12px 16px; background: var(--color-surface-alt); background-image: radial-gradient(var(--color-border) 1px, transparent 1px); background-size: 14px 14px; }
+  .tu-wa-burbuja { position: relative; max-width: 92%; margin-left: auto; padding: 7px 9px 20px 10px; border-radius: 10px 0 10px 10px; font-size: 13.5px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--color-primary-bg); color: var(--color-text); }
+  .tu-wa-hora { position: absolute; right: 8px; bottom: 3px; display: inline-flex; align-items: center; gap: 3px; font-family: var(--rv-mono); font-size: 10.5px; color: var(--color-body); }
+
+  @media (max-width: 768px) {
+    .tu-volver { min-height: 44px; padding: 0 8px; margin: -12px 0 0 -8px; }
+    .tu-buscar { max-width: none; }
+    .tu-fila { min-height: 56px; padding: 12px 14px; }
     .tu-bloque { grid-template-columns: 34px minmax(0, 1fr) auto; }
-    .tu-bloque > .tuo-switch { grid-column: 3; grid-row: 1; }
+    .tu-bloque > .rv-switch { grid-column: 3; grid-row: 1; }
     .tu-bloque-horas, .tu-bloque-off { grid-column: 1 / -1; grid-row: 2; padding-bottom: 6px; }
-    .tu-bloque-horas select.tuc-field { flex: 1; width: auto; height: 46px; }
-    .tu-dias > button { height: 44px; }
-    .tu-hora-btn { height: 44px; }
+    .tu-bloque-horas > .rv-select { flex: 1; width: auto; min-height: 46px; }
+    .tu-dias > button { min-height: 44px; }
     .tu-dia-btn { width: 60px; min-height: 64px; }
   }
-  @media (prefers-reduced-motion: reduce) { .tu-borrar, .tu-nota--ok { animation: none; } .tu-dias > button, .tu-bloque, .tu-bloque-ico, .tu-dia-btn, .tu-hora-btn, .tu-jornada-turno { transition: none; } }
+  /* A 390 los siete días adentro de una tarjeta quedaban en 42 px de ancho: menos aire entre ellos y 4 px robados a cada lado. */
+  @media (max-width: 420px) { .tu-dias { gap: 3px; margin: 0 -4px; } }
 `
 
 /**
- * Modal del panel: cabecera, cuerpo que scrollea y pie de acciones (a la
- * derecha). Con `onEnviar` el cuerpo y el pie van dentro de un <form> (Enter
- * guarda). `encima` lo apila sobre otro modal que ya está abierto; `icono` va
- * a la izquierda del título (la foto de un cliente, por ejemplo) y `cabecera`
- * reemplaza la cabecera entera (el detalle de un turno arma la suya). `foco` es
- * el campo donde arranca el teclado al abrir (un buscador); sin eso, el modal.
+ * Modal del panel: cabecera (rótulo, título, bajada), cuerpo que scrollea y
+ * pie de acciones a la derecha. Es el modal del kit (rv-velo / rv-modal: hoja
+ * desde abajo en celular) con lo que el panel necesita encima: con `onEnviar` el
+ * cuerpo y el pie van dentro de un <form> (Enter guarda); `encima` lo apila
+ * sobre otro modal abierto; `icono` va a la izquierda del título; `foco` es el
+ * campo donde arranca el teclado al abrir (un buscador); sin eso, el modal.
  */
-export function Modal({ titulo, rotulo, bajada, icono, cabecera, onCerrar, onEnviar, pie, encima, ancho = 520, foco, children }: {
-  titulo: string; rotulo?: string; bajada?: ReactNode; icono?: ReactNode; cabecera?: ReactNode; onCerrar: () => void; onEnviar?: () => void
+export function Modal({ titulo, rotulo, bajada, icono, onCerrar, onEnviar, pie, encima, ancho = 520, foco, children }: {
+  titulo: ReactNode; rotulo?: string; bajada?: ReactNode; icono?: ReactNode; onCerrar: () => void; onEnviar?: () => void
   pie?: ReactNode; encima?: boolean; ancho?: number; foco?: RefObject<HTMLElement | null>; children: ReactNode
 }) {
   const caja = useRef<HTMLDivElement>(null)
+  const id = useId()
+  // Los últimos onCerrar y foco sin volver a montar el efecto: remontarlo
+  // devolvía el foco al disparador y lo traía de nuevo al modal en cada render.
+  const cerrar = useEffectEvent(() => onCerrar())
+  const enfocar = useEffectEvent(() => (foco?.current ?? caja.current)?.focus())
 
-  // Escape cierra solo el modal de más arriba (el último de la página). Se
-  // escucha en captura para ganarle a los que quedan abajo.
-  useEffect(() => {
-    const esc = (e: globalThis.KeyboardEvent) => {
-      if (e.key !== 'Escape') return
-      const abiertos = document.querySelectorAll('.tuo-modal')
-      if (abiertos[abiertos.length - 1] !== caja.current) return
-      // Un desplegable abierto adentro (el buscador de clientes) se cierra primero:
-      // recién el segundo Escape cierra el modal.
-      if (e.target instanceof Element && e.target.closest('[data-esc="propio"]')) return
-      e.stopPropagation()
-      onCerrar()
-    }
-    window.addEventListener('keydown', esc, true)
-    return () => window.removeEventListener('keydown', esc, true)
-  }, [onCerrar])
-
-  // El foco entra al modal al abrir, para que el teclado y el lector arranquen
-  // ahí, y al cerrar vuelve a lo que se había tocado para abrirlo.
+  // El foco entra al abrir y vuelve a lo que se había tocado al cerrar; la
+  // página de atrás no scrollea mientras tanto. Escape cierra solo el modal de
+  // más arriba (el último del documento): se escucha en captura para ganarle a
+  // los que quedan abajo. Un desplegable abierto adentro (el buscador de
+  // clientes, data-esc="propio") se cierra primero: recién el segundo Escape
+  // cierra el modal.
   useEffect(() => {
     const antes = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    ;(foco?.current ?? caja.current)?.focus()
-    return () => { if (antes?.isConnected) antes.focus({ preventScroll: true }) }
-    // Solo al abrir: `foco` es una ref, no cambia entre renders.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    enfocar()
+    const esc = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      const abiertos = document.querySelectorAll('.rv-modal')
+      if (abiertos[abiertos.length - 1] !== caja.current) return
+      if (e.target instanceof Element && e.target.closest('[data-esc="propio"]')) return
+      e.stopPropagation()
+      cerrar()
+    }
+    window.addEventListener('keydown', esc, true)
+    const soltar = frenarScroll()
+    return () => { window.removeEventListener('keydown', esc, true); soltar(); if (antes?.isConnected) antes.focus({ preventScroll: true }) }
   }, [])
 
   // Tab da la vuelta adentro del modal: no se escapa a lo que quedó detrás del velo.
-  const vuelta = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key !== 'Tab' || !caja.current) return
-    const f = Array.from(caja.current.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])')).filter(el => el.offsetParent !== null)
-    if (!f.length) return
-    const foco = document.activeElement
-    if (e.shiftKey && (foco === f[0] || foco === caja.current)) { e.preventDefault(); f[f.length - 1].focus() }
-    else if (!e.shiftKey && foco === f[f.length - 1]) { e.preventDefault(); f[0].focus() }
-  }
+  const vuelta = (e: KeyboardEvent<HTMLDivElement>) => { if (caja.current) retenerFoco(e.nativeEvent, caja.current) }
 
-  const cuerpo = <div className="tuo-modal-cuerpo">{children}</div>
-  const acciones = pie ? <div className="tuo-modal-pie">{pie}</div> : null
+  const cuerpo = <div className="rv-modal-cuerpo">{children}</div>
+  const acciones = pie ? <div className="rv-modal-pie">{pie}</div> : null
 
   return (
     // mousedown y no click: soltar el mouse afuera después de seleccionar un texto no cierra.
-    <div className="tuo-modal-velo" data-encima={!!encima} onMouseDown={e => { if (e.target === e.currentTarget) onCerrar() }}>
-      <div ref={caja} tabIndex={-1} className="tuo tuo-modal" role="dialog" aria-modal="true" aria-label={titulo} style={{ ['--tuo-ancho' as string]: `${ancho}px` }} onKeyDown={vuelta}>
-        {cabecera ?? (
-          <header className="tuo-modal-cab">
-            {icono}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              {rotulo && <div className="tuo-eyebrow" style={{ marginBottom: 8 }}>{rotulo}</div>}
-              <h2 className="tuo-modal-titulo">{titulo}</h2>
-              {bajada && <p className="tuo-modal-bajada">{bajada}</p>}
-            </div>
-            <button type="button" onClick={onCerrar} aria-label="Cerrar" className="tuo-btn tuo-btn--icono tuo-btn--sm tuo-btn--fantasma tuo-modal-cerrar" style={{ flexShrink: 0 }}><X size={17} /></button>
-          </header>
-        )}
+    <div className="rv-velo" data-encima={encima || undefined} onMouseDown={e => { if (e.target === e.currentTarget) onCerrar() }}>
+      <div ref={caja} tabIndex={-1} className="rv-modal" role="dialog" aria-modal="true" aria-labelledby={id} style={{ ['--rv-ancho' as string]: `${ancho}px` }} onKeyDown={vuelta}>
+        <div className="rv-modal-cab">
+          {/* El ícono va envuelto: la cabecera del kit estira su primer <div> (el Avatar es un div) a todo el ancho. */}
+          {icono && <span style={{ flexShrink: 0, display: 'inline-flex' }}>{icono}</span>}
+          <div>
+            {rotulo && <div className="rv-rotulo" style={{ marginBottom: 6 }}>{rotulo}</div>}
+            <h2 id={id} className="rv-h2" style={{ fontSize: 18, overflowWrap: 'anywhere' }}>{titulo}</h2>
+            {bajada && <div className="rv-bajada" style={{ marginTop: 3, fontSize: 13 }}>{bajada}</div>}
+          </div>
+          <button type="button" onClick={onCerrar} aria-label="Cerrar" className="rv-btn rv-btn--icono rv-btn--sm"><X size={16} /></button>
+        </div>
         {onEnviar
-          ? <form className="tuo-modal-form" noValidate onSubmit={e => { e.preventDefault(); onEnviar() }}>{cuerpo}{acciones}</form>
+          ? <form className="tu-modal-form" noValidate onSubmit={e => { e.preventDefault(); onEnviar() }}>{cuerpo}{acciones}</form>
           : <>{cuerpo}{acciones}</>}
       </div>
     </div>
@@ -198,16 +229,84 @@ export function DatoFila({ label, children }: { label: string; children: ReactNo
 export function Borrar({ etiqueta, pregunta, onBorrar }: { etiqueta: string; pregunta: ReactNode; onBorrar: () => void }) {
   const [pide, setPide] = useState(false)
   if (!pide) {
-    return <button type="button" onClick={() => setPide(true)} className="tuo-btn tuo-btn--peligro" style={{ width: '100%', height: 44, marginTop: 8 }}><Trash2 size={15} /> {etiqueta}</button>
+    return <button type="button" onClick={() => setPide(true)} className="rv-btn rv-btn--peligro rv-btn--ancho" style={{ marginTop: 8 }}><Trash2 size={15} /> {etiqueta}</button>
   }
   return (
-    <div className="tu-borrar" style={{ marginTop: 8 }}>
-      <span style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--color-text)', lineHeight: 1.5 }}>{pregunta}</span>
+    <div className="tu-borrar" role="group" aria-label={etiqueta} style={{ marginTop: 8 }}>
+      <span>{pregunta}</span>
       <div style={{ display: 'flex', gap: 8 }}>
-        <button type="button" onClick={() => setPide(false)} className="tuo-btn" style={{ flex: 1, height: 44 }}>Volver</button>
-        <button type="button" onClick={onBorrar} className="tuo-btn" style={{ flex: 1, height: 44, background: 'var(--color-error)', borderColor: 'var(--color-error)', color: 'var(--color-on-primary)' }}>Sí, eliminar</button>
+        <button type="button" onClick={() => setPide(false)} className="rv-btn" style={{ flex: 1 }}>Volver</button>
+        <button type="button" onClick={onBorrar} className="rv-btn tu-borrar-si" style={{ flex: 1 }}>Sí, eliminar</button>
       </div>
     </div>
+  )
+}
+
+/** La llave del kit, con rótulo accesible (sin texto al lado). */
+export function Llave({ on, onChange, label, disabled }: { on: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
+  return <button type="button" role="switch" aria-checked={on} aria-label={label} disabled={disabled} className="rv-switch" onClick={() => onChange(!on)} />
+}
+
+/** Volver, como en Tienda: arriba del título y diciendo adónde se vuelve. */
+export function Volver({ a, onClick }: { a: string; onClick: () => void }) {
+  return <button type="button" className="tu-volver" onClick={onClick}><ArrowLeft size={15} strokeWidth={2} aria-hidden /> {a}</button>
+}
+
+/** Buscador de una lista: el input del kit con la lupa adentro. */
+export function Buscador({ value, onChange, placeholder, label }: { value: string; onChange: (v: string) => void; placeholder: string; label?: string }) {
+  return (
+    <span className="tu-buscar">
+      <Search size={15} aria-hidden />
+      <input type="search" className="rv-input" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} aria-label={label ?? placeholder} />
+    </span>
+  )
+}
+
+/**
+ * Indicador del tablero, con la anatomía del KpiCard de Tienda: rótulo en
+ * mayúsculas, ícono en un chip, el valor en mono y la variación. `cambio` es
+ * el porcentaje contra el período anterior (sin dato, no hay variación);
+ * `bueno` dice hacia dónde es una mejora: en ausencias, bajar es bueno.
+ */
+export function Indicador({ label, valor, Icon, cambio, bueno = 'sube', nota }: { label: string; valor: ReactNode; Icon: LucideIcon; cambio?: number | null; bueno?: 'sube' | 'baja'; nota?: string }) {
+  const hay = typeof cambio === 'number' && Number.isFinite(cambio)
+  const neutro = hay && Math.round(cambio * 10) === 0
+  const sube = hay && cambio > 0
+  const ok = hay && !neutro && (bueno === 'sube') === sube
+  const pct = !hay ? '' : Math.abs(cambio) > 999 ? '>999%' : `${Math.abs(cambio).toLocaleString('es-AR', { maximumFractionDigits: 1 })}%`
+  return (
+    <div className="rv-card tu-kpi">
+      <div className="tu-kpi-cab">
+        <span className="tu-kpi-rotulo">{label}</span>
+        <span className="tu-kpi-ico" aria-hidden><Icon size={16} strokeWidth={1.5} /></span>
+      </div>
+      <div className="tu-kpi-valor">{valor}</div>
+      {(hay || nota) && (
+        <div className="tu-kpi-pie">
+          {hay && <span className="tu-kpi-delta" data-tono={neutro ? 'neutro' : ok ? 'ok' : 'mal'} title={`${sube ? '+' : '-'}${pct} vs período anterior`}>{neutro ? '-' : sube ? '▲' : '▼'} {pct}</span>}
+          {nota && <span className="tu-kpi-nota">{nota}</span>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Barra fina de avance: cuánto de algo está tomado (0 a 1). */
+export function Barra({ valor, color, label }: { valor: number; color?: string; label: string }) {
+  const v = Math.min(1, Math.max(0, valor))
+  return (
+    <span role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(v * 100)} className="tu-barra" style={color ? { ['--c' as string]: color } : undefined}>
+      <i style={{ width: `${Math.round(v * 100)}%` }} />
+    </span>
+  )
+}
+
+/** El ícono de un espacio (cabina, consultorio) sobre su color: lo que la Sigla es para una persona. */
+export function IconoRecurso({ color, Icon, size = 36 }: { color: string; Icon: LucideIcon; size?: number }) {
+  return (
+    <span aria-hidden style={{ width: size, height: size, borderRadius: 8, flexShrink: 0, display: 'grid', placeItems: 'center', color, background: `color-mix(in srgb, ${color} 15%, var(--color-bg))` }}>
+      <Icon size={Math.round(size * 0.46)} strokeWidth={1.8} />
+    </span>
   )
 }
 
@@ -247,13 +346,13 @@ export function BloquesJornada({ jornada, onChange, id }: { jornada: Jornada; on
         <strong>{titulo}</strong>
         {b.on ? (
           <span className="tu-bloque-horas">
-            <label className="tuc-sr" htmlFor={`${id}-${clave}-desde`}>{titulo}: desde</label>
-            <select id={`${id}-${clave}-desde`} className="tuc-field tuc-mono" value={b.desde} onChange={e => set({ desde: Number(e.target.value) })}>
+            <label className="rv-sr" htmlFor={`${id}-${clave}-desde`}>{titulo}: desde</label>
+            <select id={`${id}-${clave}-desde`} className="rv-select" value={b.desde} onChange={e => set({ desde: Number(e.target.value) })}>
               {MEDIAS_HORAS.map(m => <option key={m} value={m}>{hhmm(m)}</option>)}
             </select>
             <span aria-hidden>a</span>
-            <label className="tuc-sr" htmlFor={`${id}-${clave}-hasta`}>{titulo}: hasta</label>
-            <select id={`${id}-${clave}-hasta`} className="tuc-field tuc-mono" value={b.hasta} onChange={e => set({ hasta: Number(e.target.value) })}>
+            <label className="rv-sr" htmlFor={`${id}-${clave}-hasta`}>{titulo}: hasta</label>
+            <select id={`${id}-${clave}-hasta`} className="rv-select" value={b.hasta} onChange={e => set({ hasta: Number(e.target.value) })}>
               {MEDIAS_HORAS.map(m => <option key={m} value={m}>{hhmm(m)}</option>)}
             </select>
           </span>
@@ -290,21 +389,21 @@ export function CamposAgenda({ valor, onChange, semana, id }: { valor: AgendaFor
   return (
     <>
       <div style={{ marginBottom: 16 }}>
-        <div className="tuc-rotulo" style={{ marginBottom: 8 }}>Días</div>
+        <div className="rv-rotulo" style={{ marginBottom: 8 }}>Días</div>
         <DiasSemana dias={valor.atiende} onChange={atiende => onChange({ ...valor, atiende })} abiertos={abiertos} />
-        {abiertos.length < 7 && <p className="tuc-ayuda" style={{ marginTop: 6 }}>Los días apagados son los que el negocio no abre.</p>}
+        {abiertos.length < 7 && <p className="rv-ayuda" style={{ margin: '6px 0 0' }}>Los días apagados son los que el negocio no abre.</p>}
       </div>
       <div style={{ marginBottom: 16 }}>
-        <div className="tuc-rotulo" style={{ marginBottom: 8 }}>Horario</div>
+        <div className="rv-rotulo" style={{ marginBottom: 8 }}>Horario</div>
         <Segmentado label="Horario" lleno valor={valor.propio ? 'propio' : 'negocio'} onChange={v => onChange({ ...valor, propio: v === 'propio' })}
           opciones={[{ id: 'negocio', label: 'El del negocio' }, { id: 'propio', label: 'Uno propio' }]} />
         {valor.propio ? (
           <div style={{ marginTop: 10 }}>
             <BloquesJornada id={id} jornada={valor.jornada} onChange={jornada => onChange({ ...valor, jornada })} />
-            <p className="tuc-ayuda" style={{ marginTop: 8 }}>Siempre dentro del horario del negocio: lo que quede afuera no se ofrece.</p>
+            <p className="rv-ayuda" style={{ margin: '8px 0 0' }}>Siempre dentro del horario del negocio: lo que quede afuera no se ofrece.</p>
           </div>
         ) : (
-          <p className="tuc-ayuda" style={{ marginTop: 8 }}>Sigue el horario del negocio{delNegocio ? <>: <span className="tuo-num">{delNegocio}</span></> : ''}. Si el negocio lo cambia, cambia con él.</p>
+          <p className="rv-ayuda" style={{ margin: '8px 0 0' }}>Sigue el horario del negocio{delNegocio ? <>: <span className="rv-num">{delNegocio}</span></> : ''}. Si el negocio lo cambia, cambia con él.</p>
         )}
       </div>
     </>
@@ -365,10 +464,10 @@ export function TiraDias({ dias, valor, onElegir, etiqueta = 'Día' }: { dias: {
   )
 }
 
-/** Los horarios libres de un día, en botones, separados por la mañana y la tarde (con el corte a la vista). */
+/** Los horarios libres de un día, en las franjas del kit, separados por la mañana y la tarde (con el corte a la vista). */
 export function HorasLibres({ grupos, valor, onElegir, vacio }: { grupos: GrupoLibres[]; valor: number | null; onElegir: (m: number) => void; vacio: ReactNode }) {
   if (!grupos.some(g => g.libres.length > 0)) {
-    return <div role="status" className="tu-nota tu-nota--aviso" style={{ marginBottom: 0 }}><CalendarX size={15} /><span>{vacio}</span></div>
+    return <div role="status" className="rv-nota rv-nota--aviso"><CalendarX size={15} aria-hidden /><span>{vacio}</span></div>
   }
   return (
     <div>
@@ -376,10 +475,10 @@ export function HorasLibres({ grupos, valor, onElegir, vacio }: { grupos: GrupoL
         <div key={`${g.nombre}${g.rango}`}>
           {i > 0 && g.rango && grupos[i - 1].rango && <div className="tu-corte">Cerrado de {grupos[i - 1].rango.split(' a ')[1]} a {g.rango.split(' a ')[0]}</div>}
           {i > 0 && !g.rango && <div style={{ height: 14 }} />}
-          <div className="tu-horas-cab">{g.nombre}{g.rango && <span className="tuo-num">{g.rango}</span>}<span>· {g.libres.length ? `${g.libres.length} libre${g.libres.length === 1 ? '' : 's'}` : 'sin lugar'}</span></div>
+          <div className="tu-horas-cab">{g.nombre}{g.rango && <span className="rv-num">{g.rango}</span>}<span>· {g.libres.length ? `${g.libres.length} libre${g.libres.length === 1 ? '' : 's'}` : 'sin lugar'}</span></div>
           {g.libres.length > 0 && (
-            <div className="tu-horas" role="group" aria-label={`Horarios de la ${g.nombre.toLowerCase()}`}>
-              {g.libres.map(m => <button key={m} type="button" className="tu-hora-btn" aria-pressed={m === valor} onClick={() => onElegir(m)}>{horaTxt(m)}</button>)}
+            <div className="rv-franjas" role="group" aria-label={`Horarios de la ${g.nombre.toLowerCase()}`}>
+              {g.libres.map(m => <button key={m} type="button" className="rv-franja" aria-pressed={m === valor} onClick={() => onElegir(m)}>{horaTxt(m)}</button>)}
             </div>
           )}
         </div>
@@ -404,6 +503,7 @@ export function MensajeWhatsApp({ mensaje, onCerrar, avisar }: { mensaje: Mensaj
   // null: todavía no se copió; false: el navegador no dejó copiar.
   const [copiado, setCopiado] = useState<boolean | null>(null)
   const [enviado, setEnviado] = useState(false)
+  const idTexto = useId()
   const persona = mensaje.para
   const vacio = !texto.trim()
   const sinTelefono = !!persona && !mensaje.telefono
@@ -418,12 +518,12 @@ export function MensajeWhatsApp({ mensaje, onCerrar, avisar }: { mensaje: Mensaj
   }
 
   const pie = enviado
-    ? <button type="button" onClick={onCerrar} className="tuo-btn tuo-btn--primario"><Check size={16} /> Listo</button>
+    ? <button type="button" onClick={onCerrar} className="rv-btn rv-btn--primario"><Check size={16} /> Listo</button>
     : <>
-      <button type="button" onClick={copiarTexto} disabled={vacio} className="tuo-btn">{copiado ? <Check size={16} /> : <Copy size={16} />} {copiado ? 'Copiado' : 'Copiar'}</button>
+      <button type="button" onClick={copiarTexto} disabled={vacio} className="rv-btn">{copiado ? <Check size={16} /> : <Copy size={16} />} {copiado ? 'Copiado' : 'Copiar'}</button>
       {persona
-        ? <button type="button" onClick={() => setEnviado(true)} disabled={vacio || sinTelefono} className="tuo-btn tuo-btn--primario"><Send size={16} /> Enviar</button>
-        : <button type="button" onClick={compartirTexto} disabled={vacio} className="tuo-btn tuo-btn--primario"><Share2 size={16} /> Compartir</button>}
+        ? <button type="button" onClick={() => setEnviado(true)} disabled={vacio || sinTelefono} className="rv-btn rv-btn--primario"><Send size={16} /> Enviar</button>
+        : <button type="button" onClick={compartirTexto} disabled={vacio} className="rv-btn rv-btn--primario"><Share2 size={16} /> Compartir</button>}
     </>
 
   return (
@@ -432,44 +532,46 @@ export function MensajeWhatsApp({ mensaje, onCerrar, avisar }: { mensaje: Mensaj
       ancho={480}
       rotulo="WhatsApp"
       titulo={mensaje.titulo}
-      bajada={mensaje.telefono ? <span className="tuo-num">{mensaje.telefono}</span> : persona ? 'Sin teléfono cargado' : 'Copialo o compartilo donde quieras: tu estado, un grupo o tus redes.'}
+      bajada={mensaje.telefono ? <span className="rv-num">{mensaje.telefono}</span> : persona ? 'Sin teléfono cargado' : 'Copialo o compartilo donde quieras: tu estado, un grupo o tus redes.'}
       onCerrar={onCerrar}
       pie={pie}
     >
       {/* Así le llega: la burbuja sigue lo que se escribe abajo */}
       <div className="tu-wa" role="img" aria-label={`Vista previa del mensaje${persona ? ` para ${persona}` : ''}`}>
         <div className="tu-wa-cab">
-          <span aria-hidden style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, display: 'grid', placeItems: 'center', background: '#128C7E', color: '#fff', fontSize: 11.5, fontWeight: 700 }}>{persona ? iniciales(persona) : <Share2 size={14} />}</span>
+          <span aria-hidden style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--color-primary-bg)', color: 'var(--chip-primary-fg)', fontSize: 11.5, fontWeight: 700 }}>{persona ? iniciales(persona) : <Share2 size={14} />}</span>
           <span style={{ minWidth: 0 }}>
             <span style={{ display: 'block', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{persona ?? 'Vista previa'}</span>
-            <span style={{ display: 'block', fontSize: 11, opacity: 0.75 }}>{enviado ? 'Entregado' : 'WhatsApp'}</span>
+            <span style={{ display: 'block', fontSize: 11, color: 'var(--color-muted)' }}>{enviado ? 'Entregado' : 'WhatsApp'}</span>
           </span>
         </div>
         <div className="tu-wa-fondo">
           <div className="tu-wa-burbuja">
             {texto.trim() || '…'}
-            <span className="tu-wa-hora">{horaTxt(AHORA_DEMO)} {enviado ? <CheckCheck size={13} style={{ color: '#53BDEB', opacity: 1 }} /> : <Clock3 size={11} />}</span>
+            <span className="tu-wa-hora">{horaTxt(AHORA_DEMO)} {enviado ? <CheckCheck size={13} style={{ color: 'var(--color-primary)' }} /> : <Clock3 size={11} />}</span>
           </div>
         </div>
       </div>
 
       {enviado ? (
-        <div role="status" className="tu-nota tu-nota--ok" style={{ marginBottom: 0 }}>
-          <CheckCheck size={16} />
+        <div role="status" className="rv-nota tu-nota--ok">
+          <CheckCheck size={16} aria-hidden />
           <span><b>Enviado a {persona}.</b> Es una demo: no salió ningún mensaje real.</span>
         </div>
       ) : (
         <>
           {sinTelefono && (
-            <div role="status" className="tu-nota tu-nota--aviso">
-              <PhoneOff size={15} />
+            <div role="status" className="rv-nota rv-nota--aviso" style={{ marginBottom: 14 }}>
+              <PhoneOff size={15} aria-hidden />
               <span>{persona} no tiene un teléfono cargado. Copiá el mensaje y mandáselo por otro lado.</span>
             </div>
           )}
-          <label htmlFor="tu-wa-texto" className="tuc-rotulo" style={{ marginBottom: 8 }}>Mensaje{persona ? ` para ${persona.split(' ')[0]}` : ''}</label>
-          <textarea id="tu-wa-texto" className="tuc-field" rows={6} value={texto} onChange={e => { setTexto(e.target.value); setCopiado(null) }} style={{ minHeight: 140 }} />
-          <p className="tuc-ayuda" style={{ marginTop: 8 }}>{persona ? 'Podés cambiar el texto antes de mandarlo. En la demo el envío es de mentira: no le llega a nadie.' : 'Podés cambiar el texto antes de compartirlo.'}</p>
-          {copiado === true && <p role="status" className="tuc-ayuda" style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '10px 0 0', color: 'var(--chip-success-fg)', fontWeight: 500 }}><Check size={13} /> Copiado: pegalo en el chat que quieras.</p>}
+          <div className="rv-campo">
+            <label htmlFor={idTexto}>Mensaje{persona ? ` para ${persona.split(' ')[0]}` : ''}</label>
+            <textarea id={idTexto} className="rv-textarea" rows={6} value={texto} onChange={e => { setTexto(e.target.value); setCopiado(null) }} style={{ minHeight: 140 }} />
+            <span className="rv-ayuda">{persona ? 'Podés cambiar el texto antes de mandarlo. En la demo el envío es de mentira: no le llega a nadie.' : 'Podés cambiar el texto antes de compartirlo.'}</span>
+          </div>
+          {copiado === true && <p role="status" className="rv-ayuda" style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '10px 0 0', color: 'var(--chip-success-fg)', fontWeight: 500 }}><Check size={13} /> Copiado: pegalo en el chat que quieras.</p>}
           {copiado === false && <div style={{ marginTop: 18 }}><ErrorCampo>No se pudo copiar. Seleccioná el texto y copialo a mano.</ErrorCampo></div>}
         </>
       )}

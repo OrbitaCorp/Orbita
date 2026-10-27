@@ -7,41 +7,38 @@
 // atiende tiene su propia columna en la agenda: sus días y su horario se editan
 // acá mismo. "Ver su panel" muestra el panel tal como lo ve esa persona.
 //
-// Invitar abre el mismo modal que Tienda (InvitarPersona); editar abre la ficha
-// con su agenda y su pago. Todo vive en PanelTurnos, así quien se suma acá
-// aparece en la agenda, al dar un turno y en Ganancias.
+// Invitar abre el mismo modal de Tienda, hecho con las piezas del kit
+// (InvitarPersona); editar abre la ficha con su agenda y su pago. Todo vive en
+// PanelTurnos, así quien se suma acá aparece en la agenda, al dar un turno y
+// en Ganancias.
 //
 // En cada tarjeta se ve cuánto se le paga: comisión, sueldo fijo o lo que sea.
 import { useState } from 'react'
 import { Check, Eye, Mail, MapPin, Pencil, Plus, UserPlus } from 'lucide-react'
+import { Encabezado, Sigla } from '@/design-system/reservas/piezas'
 import { type Recurso, type RubroTurnos, type Turno } from '@/modules/turnos/datos'
 import type { Semana, Tramo } from '@/modules/turnos/horario'
-import { Anillo } from '@/modules/turnos/_shared/orbita/OrbitaDia'
-import { Cabecera, Sigla } from '@/modules/turnos/_shared/orbita/piezas'
 import { Campo, Dos, Selector } from './configuracion/ui'
 import { Modal, ErrorCampo, Borrar, CamposAgenda, agendaDeForm, agendaFormDe, errorAgenda } from './piezasPanel'
-import { ResumenAgenda, ocupacionDe } from './Espacios'
+import { Ocupacion, ResumenAgenda, ocupacionDe } from './Espacios'
 import RolesPermisos from './Roles'
 import { CamposPago } from './PagoPersona'
 import InvitarPersona from './InvitarPersona'
 import { CADA_TXT, COLORES_EQUIPO, lugarAlquiler, pagoInicialDe, plata, type Pago, type Persona, type Rol, type VerComo } from '../datos/equipo'
 
-export const CSS_EQUIPO = `
-  .tu-per-pie { display: flex; gap: 8px; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--color-border); }
-  .tu-per-pie > .tuo-btn { flex: 1; }
+const CSS = `
+  .tu-per-tabs { margin-bottom: 16px; }
   .tu-per-nota { font-size: 13px; line-height: 1.5; color: var(--color-muted); margin: 0 0 12px; }
-  .tu-per-pago { display: flex; align-items: center; gap: 12px; width: 100%; margin-bottom: 14px; padding: 11px 12px; border-radius: 12px; border: 1px solid var(--color-border); background: var(--color-surface); font-family: inherit; color: inherit; text-align: left; cursor: pointer; transition: border-color 160ms ease, background 160ms ease; }
+  .tu-per-pago { display: flex; align-items: center; gap: 12px; width: 100%; margin: 12px 0 14px; padding: 11px 12px; border-radius: var(--rv-r-sm); border: 1px solid var(--color-border); background: var(--color-surface); font: inherit; color: inherit; text-align: left; cursor: pointer; }
+  .tu-per-pago[data-fijo='true'] { cursor: default; }
   .tu-per-pago-txt { flex: 1; min-width: 0; }
   .tu-per-pago-tipo { display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-muted); }
   .tu-per-pago-det { display: block; margin-top: 2px; font-size: 12.5px; line-height: 1.4; color: var(--color-body); }
-  .tu-per-pago-valor { flex-shrink: 0; font-family: var(--tuo-mono); font-size: 18px; font-weight: 600; letter-spacing: -0.02em; color: var(--color-text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tu-per-pago-valor { flex-shrink: 0; font-family: var(--rv-mono); font-size: 18px; font-weight: 600; letter-spacing: -0.02em; color: var(--color-text); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .tu-per-pago:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-  @media (hover: hover) { .tu-per-pago:hover { border-color: color-mix(in srgb, var(--color-primary) 40%, var(--color-border)); background: var(--color-primary-bg); } }
-  .tu-per-tabs { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
   @media (max-width: 768px) {
-    .tu-per-pie > .tuo-btn { height: 44px; }
-    .tu-per-tabs .tuo-seg { display: flex; width: 100%; }
-    .tu-per-tabs .tuo-seg > button { flex: 1; height: 44px; }
+    .tu-per-tabs > .rv-seg { display: flex; width: 100%; }
+    .tu-per-tabs > .rv-seg > button { flex: 1; }
   }
 `
 
@@ -96,16 +93,17 @@ export default function Equipo({ rubro, semana, personas, roles, recursos, turno
   }
 
   return (
-    <div className="panel-page">
-      <Cabecera
+    <div className="rv-pagina">
+      <style>{CSS}</style>
+      <Encabezado
         rotulo={`${personas.length} ${personas.length === 1 ? 'persona' : 'personas'} · ${roles.length} roles`}
         titulo="Equipo"
         bajada="Quién trabaja en el negocio, con qué rol entra al panel y cómo cobra. Cada uno ve solo lo que su rol le permite."
-        acciones={<button type="button" onClick={() => setInvitando(true)} className="tuo-btn tuo-btn--primario"><UserPlus size={16} /> Invitar miembro</button>}
+        acciones={<button type="button" onClick={() => setInvitando(true)} className="rv-btn rv-btn--primario"><UserPlus size={16} /> Invitar miembro</button>}
       />
 
-      <div className="tu-per-tabs tuo-entra" style={{ ['--i' as string]: 1 }}>
-        <div className="tuo-seg" role="group" aria-label="Qué ver del equipo">
+      <div className="tu-per-tabs">
+        <div className="rv-seg" role="group" aria-label="Qué ver del equipo">
           <button type="button" aria-pressed={tab === 'personas'} onClick={() => setTab('personas')}>Personas</button>
           <button type="button" aria-pressed={tab === 'roles'} onClick={() => setTab('roles')}>Roles y permisos</button>
         </div>
@@ -115,48 +113,42 @@ export default function Equipo({ rubro, semana, personas, roles, recursos, turno
         <RolesPermisos rubro={rubro} roles={roles} personas={personas} onGuardar={onGuardarRol} onBorrar={onBorrarRol} onVerComo={onVerComo} />
       ) : (
         <div className="tu-eq-grid">
-          {personas.map((p, idx) => {
+          {personas.map(p => {
             const rol = rolDe(p.rolId)
             const rec = p.recursoId ? recursos.find(r => r.id === p.recursoId) : undefined
             const tramos = rec ? jornada(rec.id) : []
             const pct = rec ? ocupacionDe(rec.id, turnos, tramos) : 0
+            const pg = p.pago ? pagoTarjeta(p.pago, rubro) : null
             return (
-              <article key={p.id} className="tuo-card tuo-card--pad tu-eq-card tuo-entra" style={{ ['--c' as string]: p.color, ['--i' as string]: idx + 2, display: 'flex', flexDirection: 'column' }}>
-                <span aria-hidden className="tu-eq-filo" style={{ background: p.color }} />
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-                  <Sigla nombre={p.nombre} color={p.color} size={48} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontFamily: 'var(--tuo-fh)', fontSize: 16, fontWeight: 600, letterSpacing: '-0.015em', color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.nombre}</div>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 5 }}>
-                      <span className={`tuo-chip${rol?.fijo ? ' tuo-chip--primario' : ''}`} style={{ height: 22, fontSize: 11.5 }}>{rol?.nombre ?? 'Sin rol'}</span>
-                      {p.pendiente && <span className="tuo-chip tuo-chip--aviso" style={{ height: 22, fontSize: 11.5 }}>Invitación pendiente</span>}
-                    </div>
+              <article key={p.id} className="rv-card rv-card--pad tu-eq-card">
+                <div className="tu-eq-cab">
+                  <Sigla nombre={p.nombre} color={p.color} size={44} />
+                  <div>
+                    <b>{p.nombre}</b>
+                    <small>{rol?.nombre ?? 'Sin rol'}{p.pendiente ? ' · invitación pendiente' : ''}</small>
                   </div>
-                  {porPersona && rec && <Anillo valor={pct} color={p.color} size={46} grosor={4.5} label={`Ocupación de hoy: ${Math.round(pct * 100)}%`} />}
+                  {porPersona && rec && <Ocupacion valor={pct} />}
                 </div>
 
                 {porPersona && rec
                   ? <ResumenAgenda recurso={rec} semana={semana} turnos={turnos} tramos={tramos} rango={rango} verbo="atiende" />
                   : <p className="tu-per-nota">{rol?.descripcion}</p>}
 
-                <div className="tu-eq-datos" style={{ marginTop: porPersona && rec ? 7 : 0, marginBottom: 14 }}>
+                <div className="tu-eq-datos" style={{ marginTop: porPersona && rec ? 7 : 0 }}>
                   {!porPersona && rec && <span><MapPin size={14} /> Atiende en {rec.nombre}</span>}
                   {p.email && <span><Mail size={14} /> <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.email}</span></span>}
                 </div>
 
-                {p.pago ? (() => {
-                  const pg = pagoTarjeta(p.pago, rubro)
-                  return (
-                    <button type="button" className="tu-per-pago" onClick={() => setEditando(p)} aria-label={`Cómo cobra ${p.nombre}: ${pg.tipo}, ${pg.valor}. ${pg.detalle}. Cambiar`}>
-                      <span className="tu-per-pago-txt">
-                        <span className="tu-per-pago-tipo">{pg.tipo}</span>
-                        <span className="tu-per-pago-det">{pg.detalle}</span>
-                      </span>
-                      <span className="tu-per-pago-valor">{pg.valor}</span>
-                    </button>
-                  )
-                })() : (
-                  <div className="tu-per-pago" style={{ cursor: 'default' }}>
+                {pg ? (
+                  <button type="button" className="ds-hover tu-per-pago" onClick={() => setEditando(p)} aria-label={`Cómo cobra ${p.nombre}: ${pg.tipo}, ${pg.valor}. ${pg.detalle}. Cambiar`}>
+                    <span className="tu-per-pago-txt">
+                      <span className="tu-per-pago-tipo">{pg.tipo}</span>
+                      <span className="tu-per-pago-det">{pg.detalle}</span>
+                    </span>
+                    <span className="tu-per-pago-valor">{pg.valor}</span>
+                  </button>
+                ) : (
+                  <div className="tu-per-pago" data-fijo="true">
                     <span className="tu-per-pago-txt">
                       <span className="tu-per-pago-tipo">Dueño</span>
                       <span className="tu-per-pago-det">No se liquida: lo que factura queda para el negocio.</span>
@@ -164,15 +156,15 @@ export default function Equipo({ rubro, semana, personas, roles, recursos, turno
                   </div>
                 )}
 
-                <div className="tu-per-pie">
-                  {!rol?.fijo && <button type="button" className="tuo-btn tuo-btn--sm" onClick={() => onVerComo({ rolId: p.rolId, personaId: p.id })} aria-label={`Ver el panel como ${p.nombre}`}><Eye size={14} /> Ver su panel</button>}
-                  <button type="button" className="tuo-btn tuo-btn--sm" onClick={() => setEditando(p)} aria-label={`Editar a ${p.nombre}`}><Pencil size={14} /> Editar</button>
+                <div className="tu-eq-pie">
+                  {!rol?.fijo && <button type="button" className="rv-btn rv-btn--sm" onClick={() => onVerComo({ rolId: p.rolId, personaId: p.id })} aria-label={`Ver el panel como ${p.nombre}`}><Eye size={14} /> Ver su panel</button>}
+                  <button type="button" className="rv-btn rv-btn--sm" onClick={() => setEditando(p)} aria-label={`Editar a ${p.nombre}`}><Pencil size={14} /> Editar</button>
                 </div>
               </article>
             )
           })}
 
-          <button type="button" onClick={() => setInvitando(true)} className="tu-eq-nuevo tuo-entra" style={{ ['--i' as string]: personas.length + 2 }}>
+          <button type="button" onClick={() => setInvitando(true)} className="tu-eq-nuevo">
             <Plus size={22} strokeWidth={1.6} />
             Invitar miembro
           </button>
@@ -256,12 +248,12 @@ function FormPersona({ inicial, rubro, semana, roles, recursos, personas, turnos
       rotulo="Equipo"
       titulo={esNueva ? 'Sumar al equipo' : inicial.nombre}
       bajada={esNueva ? 'Elegí su rol: de eso depende qué ve cuando entra al panel.' : undefined}
-      icono={esNueva ? undefined : <Sigla nombre={inicial.nombre} color={inicial.color} size={44} />}
+      icono={esNueva ? undefined : <Sigla nombre={inicial.nombre} color={inicial.color} size={40} />}
       onCerrar={onCerrar}
       onEnviar={guardar}
       pie={<>
-        <button type="button" onClick={onCerrar} className="tuo-btn">Cancelar</button>
-        <button type="submit" className="tuo-btn tuo-btn--primario"><Check size={16} /> {esNueva ? 'Sumar al equipo' : 'Guardar cambios'}</button>
+        <button type="button" onClick={onCerrar} className="rv-btn">Cancelar</button>
+        <button type="submit" className="rv-btn rv-btn--primario"><Check size={16} /> {esNueva ? 'Sumar al equipo' : 'Guardar cambios'}</button>
       </>}
     >
       <Campo label="Nombre y apellido" value={nombre} onChange={v => { setNombre(v); setError(null) }} placeholder="Ej.: Julián Acosta" maxLength={40} />
@@ -272,8 +264,8 @@ function FormPersona({ inicial, rubro, semana, roles, recursos, personas, turnos
       {error?.en === 'datos' && <ErrorCampo>{error.texto}</ErrorCampo>}
 
       {esDueno ? (
-        <div className="tu-nota tu-nota--info">
-          <Check size={15} />
+        <div className="rv-nota rv-nota--info" style={{ marginBottom: 16 }}>
+          <Check size={15} aria-hidden />
           <span><b>{rol?.nombre}.</b> Ve y puede todo: su rol no se cambia.</span>
         </div>
       ) : (
@@ -282,7 +274,7 @@ function FormPersona({ inicial, rubro, semana, roles, recursos, personas, turnos
 
       {atiende && porPersona && (
         <div className="tu-seccion">
-          <span className="tuo-rotulo">Su agenda</span>
+          <span className="rv-rotulo">Su agenda</span>
           <CamposAgenda id="tu-persona" valor={agenda} onChange={a => { setAgenda(a); setError(null) }} semana={semana} />
         </div>
       )}
@@ -294,7 +286,7 @@ function FormPersona({ inicial, rubro, semana, roles, recursos, personas, turnos
 
       {!esDueno && (
         <div className="tu-seccion">
-          <span className="tuo-rotulo">Cómo cobra</span>
+          <span className="rv-rotulo">Cómo cobra</span>
           <CamposPago pago={pago} onChange={setPago} rubro={rubro} nombre={nombre} />
         </div>
       )}
@@ -302,7 +294,7 @@ function FormPersona({ inicial, rubro, semana, roles, recursos, personas, turnos
       {!esNueva && !esDueno && (
         <div style={{ marginTop: 16 }}>
           {esLaUnicaAgenda ? (
-            <p style={{ fontSize: 12.5, color: 'var(--color-muted)', margin: 0, lineHeight: 1.5 }}>No se puede sacar del equipo: es la única persona que atiende turnos.</p>
+            <p className="rv-ayuda" style={{ margin: 0 }}>No se puede sacar del equipo: es la única persona que atiende turnos.</p>
           ) : (
             <Borrar
               etiqueta="Sacar del equipo"

@@ -60,6 +60,25 @@ export function useRubroDemo(): [RubroTurnos, (key: string) => void] {
   return [rubro, set]
 }
 
+/**
+ * El rubro como lo ve el sitio público (la portada, Servicios y precios, la
+ * reserva, Mis turnos): el de useRubroDemo sin los servicios que el panel pausó
+ * en Servicios → Pausar. El panel los sigue viendo para poder reanudarlos; el
+ * cliente no tiene que poder reservarlos.
+ */
+export function useRubroSitio(): RubroTurnos {
+  const [rubro] = useRubroDemo()
+  const { demo } = useNegocioDemo()
+  // La lista viaja como texto: así el rubro no cambia de identidad en cada render.
+  const pausados = demo.pausados?.rubro === rubro.key ? demo.pausados.nombres.join('\u0000') : ''
+  return useMemo(() => {
+    if (!pausados) return rubro
+    const fuera = new Set(pausados.split('\u0000'))
+    const servicios = rubro.servicios.filter(s => !fuera.has(s.nombre))
+    return servicios.length === rubro.servicios.length ? rubro : { ...rubro, servicios }
+  }, [rubro, pausados])
+}
+
 // El selector sigue siendo un <select> nativo a propósito: los rubros en cuatro
 // grupos se eligen mejor con la rueda del celular que con un menú armado a
 // mano, y el teclado y el lector de pantalla salen gratis. Lo que se dibuja es
