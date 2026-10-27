@@ -31,7 +31,8 @@ const VISTAS: [Vista, string][] = [['dia', 'Día'], ['semana', 'Semana'], ['mes'
 const CSS = `
   .tu-ag-barra { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
   .tu-ag-nav { display: flex; gap: 6px; }
-  .tu-ag-leyenda { margin-left: auto; display: flex; gap: 14px; flex-wrap: wrap; }
+  /* En una pastilla con fondo: la barra de la agenda queda sobre la banda del panel. */
+  .tu-ag-leyenda { margin-left: auto; display: flex; gap: 14px; flex-wrap: wrap; padding: 6px 12px; border-radius: 999px; background: var(--color-bg); border: 1px solid var(--color-border); }
   .tu-ag-leyenda > span { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-muted); }
   .tu-ag-leyenda i { width: 8px; height: 8px; border-radius: 50%; }
   .tu-ag-tira { display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto; scrollbar-width: none; }

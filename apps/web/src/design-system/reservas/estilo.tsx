@@ -89,7 +89,8 @@ export const CSS_RESERVAS = `
   .rv-chip--aviso { background: var(--color-warning-bg); color: var(--chip-warning-fg); }
   .rv-chip--error { background: var(--color-error-bg); color: var(--chip-error-fg); }
   .rv-chip--gris { background: var(--color-surface-alt); color: var(--color-body); }
-  .rv-chip--borde { background: transparent; border-color: var(--color-border); }
+  /* Con fondo propio: los chips con borde también van sobre la banda de los paneles. */
+  .rv-chip--borde { background: var(--color-bg); border-color: var(--color-border); }
   button.rv-chip { cursor: pointer; font: inherit; font-size: 12px; font-weight: 600; min-height: 32px; }
   button.rv-chip:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   /* Apretado: tintado y no relleno (blanco a 12 px sobre el primario da 3,7:1). */

@@ -33,7 +33,7 @@ export const CSS_PIEZAS_PANEL = `
   .tu-seccion > .rv-rotulo { display: block; margin-bottom: 12px; }
 
   /* ── Volver (el de Tienda: arriba del título, dice adónde se vuelve) ── */
-  .tu-volver { display: inline-flex; align-items: center; gap: 6px; background: none; border: none; padding: 4px 6px; margin: -4px 0 10px -6px; font: inherit; font-size: 13px; font-weight: 500; color: var(--color-muted); cursor: pointer; border-radius: 6px; }
+  .tu-volver { display: inline-flex; align-items: center; gap: 6px; background: none; border: none; padding: 4px 6px; margin: -4px 0 10px -6px; font: inherit; font-size: 13px; font-weight: 500; color: var(--rv-tinta-fondo, var(--color-muted)); cursor: pointer; border-radius: 6px; }
   .tu-volver:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   @media (hover: hover) { .tu-volver:hover { color: var(--color-text); } }
 

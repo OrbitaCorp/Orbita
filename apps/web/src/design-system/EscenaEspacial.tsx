@@ -23,7 +23,7 @@ import { useEffect, useRef, useState } from 'react';
 // negro sobre fondo blanco quedaba como un agujero. Se convierte en un amanecer
 // — cielo celeste pálido, planeta gris muy claro y el mismo halo azul, ahora
 // oscureciendo hacia el horizonte en vez de iluminando.
-interface Paleta {
+export interface Paleta {
     cieloOpacidad: number;
     estrella: string;
     planeta: string;
@@ -34,7 +34,7 @@ interface Paleta {
     cometa: [string, string];
 }
 
-const PALETAS: Record<'oscuro' | 'claro', Paleta> = {
+export const PALETAS: Record<'oscuro' | 'claro', Paleta> = {
     // Resplandor en un solo azul (#3b82f6, el mismo celeste que ya usa el home
     // actual de orbita.site) en vez del degradé que pasaba por índigo/violeta
     // (#4f46e5, #6366f1, #818cf8). Pedido puntual: probar cómo se ve la escena
@@ -78,8 +78,8 @@ const PALETAS: Record<'oscuro' | 'claro', Paleta> = {
 // pantalla angosta, esos mismos factores hacían que los anillos treparan muy
 // por encima del horizonte y se comieran la zona del texto del hero — así que
 // en ≤768px se usan factores más ajustados, más pegados a la línea del planeta.
-const RING_SCALE: Record<number, number> = { 1: 1.30, 2: 1.16, 3: 1.05 };
-const RING_SCALE_MOVIL: Record<number, number> = { 1: 1.11, 2: 1.06, 3: 1.028 };
+export const RING_SCALE: Record<number, number> = { 1: 1.30, 2: 1.16, 3: 1.05 };
+export const RING_SCALE_MOVIL: Record<number, number> = { 1: 1.11, 2: 1.06, 3: 1.028 };
 
 /** Desde qué punto del scroll total el planeta empieza a volver a subir. */
 const REGRESO_DESDE = 0.80;
@@ -93,9 +93,9 @@ const REGRESO_DESDE = 0.80;
 // barato, pero completamente inmóvil y con la grilla a la vista si mirabas fijo.
 // La de antes de esa eran ~160 box-shadow sobre un elemento fijo, y con eso el
 // navegador dejaba de repintar bien la página al scrollear.
-interface Estrella { x: number; y: number; r: number; base: number; vel: number; fase: number }
+export interface Estrella { x: number; y: number; r: number; base: number; vel: number; fase: number }
 
-function generarEstrellas(W: number, H: number): Estrella[] {
+export function generarEstrellas(W: number, H: number): Estrella[] {
     // Cantidad atada al área, para que en una pantalla ancha no quede vacío ni
     // en uno angosto se sature.
     const cantidad = Math.round(clamp((W * H) / 5200, 90, 340));
@@ -130,7 +130,7 @@ function generarEstrellas(W: number, H: number): Estrella[] {
  * cientos de px encima) de la que se ve apenas una franja. Con la polilínea la
  * caja de dibujo es exactamente la pantalla.
  */
-function arco(cx: number, cy: number, r: number, W: number, pasos = 44): string {
+export function arco(cx: number, cy: number, r: number, W: number, pasos = 44): string {
     const puntos: string[] = [];
     for (let i = 0; i <= pasos; i++) {
         const x = (W * i) / pasos;

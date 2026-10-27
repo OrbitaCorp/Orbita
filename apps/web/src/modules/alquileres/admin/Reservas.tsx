@@ -82,6 +82,9 @@ const CSS = `
   .alg-medidor { height: 8px; border-radius: 999px; background: var(--color-primary-bg); overflow: hidden; margin: 6px 0; }
   .alg-medidor > i { display: block; height: 100%; border-radius: inherit; background: var(--color-primary); }
   .alg-dos { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 20px; align-items: start; }
+  /* La cabecera de la columna de la derecha queda suelta sobre el fondo de la página (en claro,
+     donde baja la curva del horizonte del panel): tinta de fondo del kit. */
+  .alg-dos > div > .rv-entre .rv-ayuda { color: var(--rv-tinta-fondo, var(--color-muted)); }
   /* En el calendario del salón un día completo se abre igual (para ver sus eventos): va tintado, no tachado ni apagado. Tachado queda solo lo cerrado. */
   .alg-cal-salon .rv-cal-celda[data-ocupado='true'] { text-decoration: none; }
   .alg-cal-salon .rv-cal-celda[data-ocupado='true']:not([aria-pressed='true']) { color: var(--color-text); }

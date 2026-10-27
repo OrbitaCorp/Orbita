@@ -21,7 +21,7 @@ import type { LucideIcon } from 'lucide-react'
 import { ArrowLeft, ArrowUpRight, Bell, BellOff, CheckCheck, ChevronDown, Eye, Menu, Moon, Search, SearchX, Sun, Undo2, X } from 'lucide-react'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 import { EscenaEspacial } from '@/design-system/EscenaEspacial'
-import SoftAurora from '@/design-system/fondos/SoftAurora'
+import HorizonteOrbita from '@/design-system/fondos/HorizonteOrbita'
 import { useDarkMode } from '@/hooks/useDarkMode'
 import { EstiloReservas } from './estilo'
 import { retenerFoco } from './piezas'
@@ -51,29 +51,32 @@ const CSS = `
   .rvp { --rv-tope: 40px; position: relative; display: flex; height: calc(100vh - var(--rv-tope)); height: calc(100dvh - var(--rv-tope)); overflow: hidden; background: var(--color-surface); color: var(--color-body); }
 
   /* El cielo: la misma escena espacial que el panel de Tienda (estrellas y cometas, sin
-     planeta) detrás del contenido, solo en oscuro, sobre su negro azulado. En claro el panel
-     sigue plano como Tienda (se probó un toque de galaxia en claro y Ale lo descartó el 27/10).
-     La barra lateral y el header tapan el cielo con su fondo. */
+     planeta) detrás del contenido, solo en oscuro, sobre su negro azulado. En claro va la banda
+     iridiscente de más abajo. La barra lateral y el header tapan el cielo con su fondo. */
   .rvp-cielo { display: none; position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; background: #05080F; }
   .rvp-cielo > * { position: absolute !important; }
   .dark .rvp-cielo { display: block; }
 
-  /* En claro, la aurora: el shader SoftAurora de React Bits (design-system/fondos) en modo claro,
-     con los dos colores de marca (azul y violeta), que fluye despacio y se mueve apenas con el
-     cursor; encima, las órbitas de Órbita abajo a la derecha con dos planetas chiquitos que las
-     recorren (SVG + CSS). Con prefers-reduced-motion todo queda quieto. La aurora pinta tinta
-     clara sobre el surface, así que el texto sigue en AA; las órbitas son líneas de 1 px. */
-  .rvp-aurora { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; background: var(--color-surface); }
-  .rvp-aurora-shader { position: absolute; inset: 0; }
-  .rvp-orbitas { position: absolute; right: -26vw; bottom: -40vw; width: 80vw; height: 80vw; max-width: 1100px; max-height: 1100px; color: var(--color-primary); }
-  .rvp-orbitas circle { fill: none; stroke: currentColor; stroke-width: 1; vector-effect: non-scaling-stroke; }
-  .rvp-orbitas .rvp-orbita-g { transform-origin: 50% 50%; animation: rvpOrbita 48s linear infinite; }
-  .rvp-orbitas .rvp-orbita-g--lenta { animation-duration: 84s; animation-direction: reverse; }
-  .rvp-orbitas .rvp-planeta { fill: currentColor; stroke: var(--color-surface); stroke-width: 3; }
-  @keyframes rvpOrbita { to { transform: rotate(360deg); } }
-  .dark .rvp-aurora { display: none; }
-  @media (prefers-reduced-motion: reduce) { .rvp-orbitas .rvp-orbita-g { animation: none; } }
-  @media (max-width: 768px) { .rvp-orbitas { right: -70vw; bottom: -80vw; width: 170vw; height: 170vw; } }
+  /* En claro, el horizonte de Órbita (design-system/fondos/HorizonteOrbita) en su versión clara: la
+     escena de la landing en una banda arriba del contenido. Cielo celeste muy suave con estrellas y
+     anillos finos detrás del encabezado de la página, la línea de luz azul del planeta justo debajo, y
+     el contenido apoyado sobre el planeta (el surface de siempre). La banda vive adentro de <main> (que es el que scrollea) y el armazón la
+     ajusta a cada página: mide dónde termina el encabezado y pone ahí el horizonte. Ale probó y
+     descartó en claro: estrellas tenues, velos CSS, shaders de colores ("no tan fantástico sino
+     minimalista, lo que es Órbita el diseño") y el cielo de noche ("necesito algo para colores
+     claros"); los otros candidatos siguen en /fondos-demo.
+     Regla de la banda: sobre el cielo solo va el encabezado (el rótulo y la bajada en el gris del
+     cuerpo: el apagado no llega a AA sobre el celeste); todo lo demás va sobre el planeta o en su
+     superficie. Un texto suelto que un módulo deje sobre el fondo, debajo
+     del encabezado, usa color: var(--rv-tinta-fondo, var(--color-muted)). */
+  .rvp-main { position: relative; }
+  .rvp-banda { position: absolute; left: 0; right: 0; top: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+  .rvp-vista { position: relative; z-index: 1; }
+  .rvp-con-banda .rvp-main { --rv-tinta-fondo: var(--color-text); }
+  .rvp-con-banda .rvp-vista .rv-pagina > .rv-cab { margin-bottom: 60px; }
+  .rvp-con-banda .rvp-vista .rv-pagina > .rv-cab :is(.rv-rotulo, .rv-bajada) { color: var(--color-body); }
+  .rvp-con-banda .rvp-vista .rv-pagina > .rv-cab .rv-rotulo { font-weight: 600; }
+  @media (max-width: 768px) { .rvp-con-banda .rvp-vista .rv-pagina > .rv-cab { margin-bottom: 52px; } }
   .rvp-lateral, .rvp-cuerpo { position: relative; }
   .rvp-cuerpo { z-index: 1; }
   .rvp .rvp-main, .dark .rvp .rvp-main { background: transparent; }
@@ -386,6 +389,34 @@ export default function LayoutPanel({ producto = '', negocio, rubro, fecha, item
   const principal = useRef<HTMLElement>(null)
   const subActivaId = subActual?.id ?? ''
   useEffect(() => { principal.current?.scrollTo({ top: 0 }) }, [activo, subActivaId])
+
+  // Dónde termina el encabezado de la página (el primer .rv-cab de .rv-pagina), medido con
+  // offsetTop para que no cuente la animación de entrada: el horizonte de la banda va 44 px
+  // más abajo (así el anillo de adentro, que va 30 px por encima, no toca el texto). Se vuelve a medir si cambia la página (MutationObserver) o el alto del
+  // encabezado (ResizeObserver: el texto se parte distinto según el ancho). Sin encabezado,
+  // no hay banda: el texto oscuro de una cabecera propia quedaría sobre el cielo.
+  const [tope, setTope] = useState<number | null>(null)
+  useEffect(() => {
+    const main = principal.current
+    if (isDark || !main) return
+    let cab: HTMLElement | null = null
+    const medir = () => {
+      const actual = main.querySelector<HTMLElement>('.rvp-vista .rv-pagina > .rv-cab')
+      if (actual !== cab) { if (cab) ro.unobserve(cab); cab = actual; if (cab) ro.observe(cab) }
+      let y: number | null = null
+      if (cab) {
+        y = cab.offsetHeight + 44
+        for (let a: HTMLElement | null = cab; a && a !== main; a = a.offsetParent as HTMLElement | null) y += a.offsetTop
+      }
+      setTope(t => (t === y ? t : y))
+    }
+    const ro = new ResizeObserver(medir)
+    const mo = new MutationObserver(medir)
+    mo.observe(main, { childList: true, subtree: true })
+    const primero = requestAnimationFrame(medir)
+    return () => { cancelAnimationFrame(primero); ro.disconnect(); mo.disconnect() }
+  }, [isDark])
+  const conBanda = !isDark && tope !== null
   const grupos = items.reduce<{ nombre: string; items: ItemNav[] }[]>((acc, it) => {
     const nombre = it.grupo ?? ''
     const g = acc.find(x => x.nombre === nombre)
@@ -395,23 +426,10 @@ export default function LayoutPanel({ producto = '', negocio, rubro, fecha, item
   const sigla = siglas(negocio)
 
   return (
-    <div className="rv rvp">
+    <div className={`rv rvp${conBanda ? ' rvp-con-banda' : ''}`}>
       <EstiloReservas />
       <style>{CSS}</style>
-      {isDark
-        ? <div className="rvp-cielo" aria-hidden><EscenaEspacial planeta={false} oscuro /></div>
-        : (
-          <div className="rvp-aurora" aria-hidden>
-            <SoftAurora className="rvp-aurora-shader" lightMode color1="#3B82F6" color2="#8B5CF6" speed={0.3} scale={1.4} brightness={0.95} opacity={0.5} bandHeight={0.96} bandSpread={0.9} tilt={0.22} spectrum={0.35} mouseInfluence={0.18} clickPulse={false} />
-            <svg className="rvp-orbitas" viewBox="0 0 1000 1000">
-              <circle cx="500" cy="500" r="470" opacity="0.22" />
-              <circle cx="500" cy="500" r="360" opacity="0.26" strokeDasharray="6 10" />
-              <circle cx="500" cy="500" r="250" opacity="0.3" />
-              <g className="rvp-orbita-g"><circle className="rvp-planeta" cx="500" cy="30" r="7" opacity="0.9" /></g>
-              <g className="rvp-orbita-g rvp-orbita-g--lenta"><circle className="rvp-planeta" cx="500" cy="250" r="5" opacity="0.7" /></g>
-            </svg>
-          </div>
-        )}
+      {isDark && <div className="rvp-cielo" aria-hidden><EscenaEspacial planeta={false} oscuro /></div>}
 
       <aside ref={lateral} id={idLateral} className="rvp-lateral admin-sidebar" data-abierto={abierto} aria-label="Menú del panel">
         <div className="rvp-logo">
@@ -536,6 +554,11 @@ export default function LayoutPanel({ producto = '', negocio, rubro, fecha, item
         </header>
         {franja}
         <main ref={principal} className="rvp-main admin-main">
+          {conBanda && (
+            <div className="rvp-banda" style={{ height: tope + 48 }} aria-hidden>
+              <HorizonteOrbita tope={tope} />
+            </div>
+          )}
           {/* key: cada sección vuelve a montar el envoltorio y dispara la entrada. */}
           <div key={`${activo}:${subActual?.id ?? ''}`} className="rvp-vista">{children}</div>
         </main>

@@ -30,6 +30,8 @@ export const CSS_AVANZADO = `
   .tua-grupo { margin-bottom: 26px; }
   .tua-grupo-cab { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
   .tua-grupo-cab > div { flex: 1; min-width: 0; }
+  /* El título del grupo queda suelto sobre el fondo de la página (la banda en claro). */
+  .tua-grupo-cab .tuc-card-bajada { color: var(--rv-tinta-fondo, var(--color-muted)); }
   .tua-hub { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap: 12px; }
   .tua-funcion { display: flex; flex-direction: column; align-items: stretch; min-height: 180px; padding: 18px; }
   .tua-funcion-cab { display: flex; align-items: center; gap: 10px; }

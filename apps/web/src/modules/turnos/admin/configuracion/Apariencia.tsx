@@ -578,6 +578,9 @@ function Logo({ ap, tipoFh, color, sobre, onLogo, onMonograma }: { ap: Ap; tipoF
 export const CSS_APARIENCIA = `
   .tuc-pagina--editor { --rv-ancho: 1760px; }
   .tuc-forma-zona { margin: 0 0 26px; min-width: 0; }
+  /* El subtítulo de cada zona queda suelto sobre el fondo de la página (en claro, donde baja la
+     curva del horizonte del panel): tinta de fondo del kit. */
+  .tuc-forma-zona > .tuc-card-bajada { color: var(--rv-tinta-fondo, var(--color-muted)); }
   .tuc-formas { margin-top: 12px; max-width: 900px; }
   .tuc-forma { display: flex; align-items: flex-start; gap: 12px; text-align: left; padding: 14px 46px 14px 14px; }
   .tuc-forma-ico { width: 40px; height: 40px; border-radius: 11px; flex-shrink: 0; display: grid; place-items: center; color: var(--color-primary); background: var(--color-primary-bg); }
