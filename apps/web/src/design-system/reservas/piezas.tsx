@@ -1,7 +1,7 @@
 // Piezas chicas de reservas (design system): encabezado de pantalla, campos, modal, aviso,
 // indicadores y el gráfico de barras. Todas pintan con las clases rv- de
 // estilo.tsx. Nada de acá sabe de canchas ni de propiedades.
-import { useEffect, useEffectEvent, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useEffectEvent, useId, useRef, useState, type CSSProperties, type ReactNode, type Ref } from 'react'
 import { SlidersHorizontal, X } from 'lucide-react'
 import { Toast } from '@/design-system/components/Toast'
 
@@ -54,11 +54,11 @@ function NotaCampo({ id, error, ayuda }: { id: string; error?: string; ayuda?: s
 
 export function Campo({ label, ayuda, error, prefijo, ...resto }: {
   label: string; ayuda?: string; error?: string; prefijo?: string; value: string; onChange: (v: string) => void
-  type?: string; placeholder?: string; maxLength?: number; inputMode?: 'text' | 'numeric' | 'tel' | 'email' | 'decimal'; autoComplete?: string; children?: never
+  type?: string; placeholder?: string; maxLength?: number; inputMode?: 'text' | 'numeric' | 'tel' | 'email' | 'decimal'; autoComplete?: string; disabled?: boolean; readOnly?: boolean; children?: never
 }) {
   const id = useId()
-  const { value, onChange, type = 'text', placeholder, maxLength, inputMode, autoComplete } = resto
-  const input = <input id={id} className="rv-input" type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} maxLength={maxLength} inputMode={inputMode} autoComplete={autoComplete} aria-invalid={error ? true : undefined} aria-describedby={idNota(id, error, ayuda)} />
+  const { value, onChange, type = 'text', placeholder, maxLength, inputMode, autoComplete, disabled, readOnly } = resto
+  const input = <input id={id} className="rv-input" type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} maxLength={maxLength} inputMode={inputMode} autoComplete={autoComplete} disabled={disabled} readOnly={readOnly} aria-invalid={error ? true : undefined} aria-describedby={idNota(id, error, ayuda)} />
   return (
     <div className="rv-campo">
       <label htmlFor={id}>{label}</label>
@@ -68,12 +68,13 @@ export function Campo({ label, ayuda, error, prefijo, ...resto }: {
   )
 }
 
-export function Area({ label, ayuda, value, onChange, placeholder, maxLength }: { label: string; ayuda?: string; value: string; onChange: (v: string) => void; placeholder?: string; maxLength?: number }) {
+// `ref` (React 19 lo pasa como prop) para insertar texto donde está el cursor, p. ej. una llave en un mensaje.
+export function Area({ label, ayuda, value, onChange, placeholder, maxLength, disabled, ref }: { label: string; ayuda?: string; value: string; onChange: (v: string) => void; placeholder?: string; maxLength?: number; disabled?: boolean; ref?: Ref<HTMLTextAreaElement> }) {
   const id = useId()
   return (
     <div className="rv-campo">
       <label htmlFor={id}>{label}</label>
-      <textarea id={id} className="rv-textarea" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} maxLength={maxLength} aria-describedby={idNota(id, undefined, ayuda)} />
+      <textarea ref={ref} id={id} className="rv-textarea" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} maxLength={maxLength} disabled={disabled} aria-describedby={idNota(id, undefined, ayuda)} />
       <NotaCampo id={id} ayuda={ayuda} />
     </div>
   )
@@ -100,12 +101,17 @@ export function Segmentado<T extends string | number>({ label, valor, onChange, 
   )
 }
 
+// La llave sola, para cabeceras o tablas donde el rótulo ya está en otro lado (`label` o `labelledBy`).
+export function Switch({ on, onChange, label, labelledBy, disabled }: { on: boolean; onChange: (v: boolean) => void; label?: string; labelledBy?: string; disabled?: boolean }) {
+  return <button type="button" role="switch" aria-checked={on} aria-label={label} aria-labelledby={labelledBy} disabled={disabled} className="rv-switch" onClick={() => onChange(!on)} />
+}
+
 export function FilaSwitch({ titulo, ayuda, on, onChange }: { titulo: string; ayuda?: string; on: boolean; onChange: (v: boolean) => void }) {
   const id = useId()
   return (
     <div className="rv-fila-switch">
       <div><b id={id}>{titulo}</b>{ayuda && <small>{ayuda}</small>}</div>
-      <button type="button" role="switch" aria-checked={on} aria-labelledby={id} className="rv-switch" onClick={() => onChange(!on)} />
+      <Switch on={on} onChange={onChange} labelledBy={id} />
     </div>
   )
 }
@@ -115,7 +121,8 @@ export const Chip = ({ tono, children, style }: { tono?: 'primario' | 'ok' | 'av
 
 export function Sigla({ nombre, color, size = 36 }: { nombre: string; color?: string; size?: number }) {
   const s = nombre.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase() || '?'
-  const COLORES = ['#2563EB', '#7C3AED', '#059669', '#D97706', '#DB2777', '#0891B2']
+  // Tonos 700: todos dan 4,5:1 o más con la sigla blanca encima (los 600 daban 3,0-3,9:1).
+  const COLORES = ['#1D4ED8', '#BE185D', '#047857', '#B45309', '#6D28D9', '#0E7490']
   const c = color ?? COLORES[(nombre.length + s.charCodeAt(0)) % COLORES.length]
   return <span className="rv-sigla" style={{ width: size, height: size, background: c, fontSize: Math.round(size / 3) }} aria-hidden>{s}</span>
 }
@@ -254,8 +261,10 @@ export function Barras({ datos, formato, label }: { datos: { rotulo: string; val
   )
 }
 
+// El texto va en un span: la nota es flex (para un ícono o una acción al lado) y un texto con
+// un <b> adentro se partía en ítems separados por el gap.
 export function Nota({ tono, children }: { tono?: 'aviso' | 'info'; children: ReactNode }) {
-  return <div className={`rv-nota${tono ? ` rv-nota--${tono}` : ''}`}>{children}</div>
+  return <div className={`rv-nota${tono ? ` rv-nota--${tono}` : ''}`}><span className="rv-nota-txt">{children}</span></div>
 }
 
 /**

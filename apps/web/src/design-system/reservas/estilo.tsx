@@ -34,7 +34,11 @@ export const CSS_RESERVAS = `
   .rv-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
   /* ── Disposición ── */
-  .rv-pagina { max-width: 1120px; margin: 0 auto; padding: 24px 24px 56px; }
+  /* Los anchos y el aire del panel de Tienda (.panel-page en globals.css): 1280 para listados y
+     tableros, 880 (--form) para formularios y configuración. El padding sale de las mismas
+     variables --panel-pad-*, que en celular bajan solas. */
+  .rv-pagina { width: 100%; max-width: var(--rv-ancho, 1280px); margin: 0 auto; padding: var(--panel-pad-top, 24px) var(--panel-pad-x, 32px) var(--panel-pad-bottom, 64px); }
+  .rv-pagina--form { --rv-ancho: 880px; }
   .rv-cab { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; margin-bottom: 20px; }
   .rv-cab-acciones { display: flex; gap: 8px; flex-wrap: wrap; }
   .rv-pila { display: flex; flex-direction: column; gap: 14px; }
@@ -72,7 +76,7 @@ export const CSS_RESERVAS = `
   .rv-btn--primario { background: var(--color-primary); border-color: transparent; color: var(--color-on-primary); }
   @media (hover: hover) { .rv-btn--primario:not(:disabled):hover { background: var(--color-primary-h); border-color: transparent; } }
   .rv-btn--fantasma { background: transparent; border-color: transparent; color: var(--color-body); }
-  .rv-btn--peligro { color: var(--color-error); }
+  .rv-btn--peligro { color: var(--chip-error-fg); }
   .rv-btn--sm { min-height: 34px; padding: 0 12px; font-size: 13px; }
   .rv-btn--lg { min-height: 48px; padding: 0 22px; font-size: 15px; border-radius: 10px; }
   .rv-btn--icono { width: 40px; padding: 0; color: var(--color-body); }
@@ -84,11 +88,12 @@ export const CSS_RESERVAS = `
   .rv-chip--ok { background: var(--color-success-bg); color: var(--chip-success-fg); }
   .rv-chip--aviso { background: var(--color-warning-bg); color: var(--chip-warning-fg); }
   .rv-chip--error { background: var(--color-error-bg); color: var(--chip-error-fg); }
-  .rv-chip--gris { background: var(--color-surface-alt); color: var(--color-muted); }
+  .rv-chip--gris { background: var(--color-surface-alt); color: var(--color-body); }
   .rv-chip--borde { background: transparent; border-color: var(--color-border); }
   button.rv-chip { cursor: pointer; font: inherit; font-size: 12px; font-weight: 600; min-height: 32px; }
   button.rv-chip:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-  button.rv-chip[aria-pressed='true'], button.rv-chip[aria-selected='true'] { background: var(--color-primary); color: var(--color-on-primary); border-color: transparent; }
+  /* Apretado: tintado y no relleno (blanco a 12 px sobre el primario da 3,7:1). */
+  button.rv-chip[aria-pressed='true'], button.rv-chip[aria-selected='true'] { background: var(--color-primary-bg); color: var(--chip-primary-fg); border-color: var(--color-primary); }
 
   /* ── Campos ── */
   .rv-campo { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
@@ -98,6 +103,8 @@ export const CSS_RESERVAS = `
      salían como un segundo rótulo en negrita (el error en negro, no en rojo). */
   .rv-campo > label, .rv-campo > span:not([class]) { font-size: 13px; font-weight: 600; color: var(--color-text); }
   .rv-input, .rv-select, .rv-textarea { width: 100%; min-height: 42px; padding: 0 12px; border-radius: var(--rv-r-sm); border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text); font: inherit; font-size: 14px; outline: none; transition: border-color 150ms ease; }
+  .rv-input:disabled, .rv-select:disabled, .rv-textarea:disabled, .rv-input:read-only { background: var(--color-surface); color: var(--color-body); cursor: not-allowed; }
+  .rv-switch:disabled { opacity: 0.5; cursor: not-allowed; }
   .rv-textarea { padding: 10px 12px; min-height: 88px; resize: vertical; line-height: 1.5; }
   .rv-select { appearance: none; -webkit-appearance: none; padding-right: 34px; background-image: linear-gradient(45deg, transparent 50%, var(--color-muted) 50%), linear-gradient(135deg, var(--color-muted) 50%, transparent 50%); background-position: calc(100% - 17px) 50%, calc(100% - 12px) 50%; background-size: 5px 5px; background-repeat: no-repeat; }
   .rv-input::placeholder, .rv-textarea::placeholder { color: var(--color-subtle); }
@@ -118,7 +125,7 @@ export const CSS_RESERVAS = `
   /* Si las opciones no entran a lo ancho, scrollea adentro: nunca empuja la página. */
   .rv-seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 10px; background: var(--color-surface-alt); border: 1px solid var(--color-border); max-width: 100%; overflow-x: auto; scrollbar-width: none; }
   .rv-seg::-webkit-scrollbar { display: none; }
-  .rv-seg > button { min-height: 32px; padding: 0 14px; border-radius: 7px; border: none; background: transparent; color: var(--color-muted); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; transition: background 160ms ease, color 160ms ease; }
+  .rv-seg > button { min-height: 32px; padding: 0 14px; border-radius: 7px; border: none; background: transparent; color: var(--color-body); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; transition: background 160ms ease, color 160ms ease; }
   .rv-seg > button[aria-pressed='true'], .rv-seg > button[aria-checked='true'] { background: var(--color-bg); color: var(--color-text); font-weight: 600; box-shadow: 0 0 0 1px var(--color-border); }
   .rv-seg > button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
   .rv-seg--lleno { display: flex; }
@@ -269,6 +276,7 @@ export const CSS_RESERVAS = `
   .rv-toast { position: fixed; right: 16px; bottom: calc(16px + var(--rv-pie, 0px)); z-index: 400; max-width: calc(100vw - 32px); animation: rvModal 240ms var(--rv-ease) both; }
   .rv-vacio { display: grid; place-items: center; gap: 8px; padding: 40px 20px; text-align: center; border: 1px dashed var(--color-border-strong); border-radius: var(--rv-r); color: var(--color-muted); }
   .rv-nota { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: var(--rv-r-sm); background: var(--color-surface); border: 1px solid var(--color-border); font-size: 13px; line-height: 1.5; color: var(--color-body); }
+  .rv-nota > .rv-nota-txt { flex: 1; min-width: 0; }
   .rv-nota--aviso { background: var(--color-warning-bg); border-color: transparent; color: var(--chip-warning-fg); }
   .rv-nota--info { background: var(--color-primary-bg); border-color: transparent; color: var(--chip-primary-fg); }
   /* Se lee tal cual está escrito ("Demo: sincronización simulada"), sin pasarlo a mayúsculas. */
@@ -288,7 +296,6 @@ export const CSS_RESERVAS = `
   /* Celular y tablet chica: todo lo que se toca mide 44 px y los campos usan
      16 px (con menos, iOS hace zoom al enfocar y desarma la página). */
   @media (max-width: 768px) {
-    .rv-pagina { padding: 18px 16px 48px; }
     .rv-grid--3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .rv-cab { margin-bottom: 16px; }
     .rv-input, .rv-select, .rv-textarea { font-size: 16px; }
