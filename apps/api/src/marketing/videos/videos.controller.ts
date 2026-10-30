@@ -50,10 +50,15 @@ export class VideosController {
     return this.videos.aprobar(req.user.adminId, id);
   }
 
-  // Rechazar borra el archivo y el registro.
+  // Rechazar (un pendiente) y desaprobar (un aprobado) no borran nada: el video pasa a «Rechazados» con su archivo y sus comentarios.
   @Post(':id/rechazar')
   rechazar(@Req() req: RequestWithAdmin, @Param('id', ParseUUIDPipe) id: string) {
     return this.videos.rechazar(req.user.adminId, id);
+  }
+
+  @Post(':id/desaprobar')
+  desaprobar(@Req() req: RequestWithAdmin, @Param('id', ParseUUIDPipe) id: string) {
+    return this.videos.desaprobar(req.user.adminId, id);
   }
 
   @Get(':id/descarga')

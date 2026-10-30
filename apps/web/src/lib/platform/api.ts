@@ -220,7 +220,7 @@ export type ProspeccionConsulta = {
 }
 export type McpSolicitud = { cliente: string; retorno: string; permisos: string[]; dominios: string[]; usuario: string }
 
-export type VideoEstado = 'PENDIENTE' | 'APROBADO' | 'PUBLICADO'
+export type VideoEstado = 'PENDIENTE' | 'APROBADO' | 'PUBLICADO' | 'RECHAZADO'
 export type VideoTipo = 'MARKETING' | 'TUTORIAL'
 export type VideoControl = { nombre: string; ok: boolean; detalle: string }
 export type VideoDeCola = {
@@ -233,7 +233,7 @@ export type VideoDeCola = {
   aprobadoAt: string | null; publicaciones: { destino: 'tiktok' | 'instagram'; id: string; fecha: string }[]
   expiraAt: string | null; createdAt: string
   /** Qué puede hacer QUIEN MIRA con este video (el servidor nunca dice quién aprobó ni qué falta). */
-  puedeAprobar?: boolean; puedeRechazar?: boolean; yaAprobaste?: boolean; esTuyo?: boolean
+  puedeAprobar?: boolean; puedeRechazar?: boolean; puedeDesaprobar?: boolean; yaAprobaste?: boolean; esTuyo?: boolean
 }
 export type VideoComentario = { id: string; autor: string; texto: string; fecha: string; esTuyo: boolean }
 export type TutorialEstado = 'FALTA' | 'EN_PROCESO' | 'EN_REVISION' | 'HECHO'
@@ -1214,7 +1214,8 @@ export const platformApi = {
   // Cola de videos que genera el equipo con su Claude (apps/api/src/marketing/videos).
   videosCola: (tipo?: VideoTipo) => getJSONConMensaje<VideoDeCola[]>(`/platform/marketing/videos${tipo ? `?tipo=${tipo}` : ''}`),
   videoAprobar: (id: string) => sendJSON<VideoDeCola>(`/platform/marketing/videos/${id}/aprobar`, 'POST'),
-  videoRechazar: (id: string) => sendJSON<{ ok: true }>(`/platform/marketing/videos/${id}/rechazar`, 'POST'),
+  videoRechazar: (id: string) => sendJSON<VideoDeCola>(`/platform/marketing/videos/${id}/rechazar`, 'POST'),
+  videoDesaprobar: (id: string) => sendJSON<VideoDeCola>(`/platform/marketing/videos/${id}/desaprobar`, 'POST'),
   videoDescarga: (id: string) => getJSONConMensaje<{ url: string; nombre: string }>(`/platform/marketing/videos/${id}/descarga`),
   videoATiktok: (id: string) => sendJSON<{ video: VideoDeCola }>(`/platform/marketing/videos/${id}/tiktok-borrador`, 'POST'),
   videoAInstagram: (id: string) => sendJSON<{ video: VideoDeCola }>(`/platform/marketing/videos/${id}/instagram-borrador`, 'POST', {}),

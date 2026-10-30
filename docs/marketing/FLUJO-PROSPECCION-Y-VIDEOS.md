@@ -81,8 +81,10 @@ Cualquiera puede cortar sus propias conexiones desde Marketing → Prospección 
      Sirve también para videos ya aprobados.
 7. **Aprobar:** cada video lo aprueba quien lo subió, para verificar lo que hizo su Claude (los socios no aprueban el video de otro
    socio). Lo que sube Milagros, de marketing, lo aprueba la dirección. El panel solo muestra «Aprobar» a quien corresponde.
-   - **Rechazar** borra el archivo, el registro y sus comentarios. Un pendiente que **nadie aprueba se borra solo** (7 días los de
-     marketing, 30 los tutoriales).
+   - **Rechazar** (un pendiente) o **desaprobar** (uno aprobado o ya pasado a borrador) no borra nada: el video pasa a la pestaña
+     **Rechazados** con su archivo y sus comentarios. Desaprobar no toca lo que ya está en TikTok o Instagram. Si el video cubría un
+     tutorial de la lista, el tutorial vuelve a «falta». Un pendiente que **nadie aprueba se borra solo** (7 días los de marketing,
+     30 los tutoriales).
    - Un video de marketing **aprobado** queda como **registro** (con su archivo) y habilita **descargarlo** o **pasarlo como borrador**
      a TikTok (a los borradores de la cuenta) o a Instagram (como borrador en Publicaciones, donde se programa o se publica).
    - Los **tutoriales** son internos: no se pasan a redes.
@@ -123,7 +125,7 @@ El principio: **se aprovecha lo que ya se paga**. No hay clave de API de Anthrop
 
 **Ejemplo de escala (hipotético, para dimensionar):** 10 videos por día, todos aprobados y conservados = 400 MB por día ≈
 12 GB al mes ≈ **menos de US$ 0,20 al mes** de almacenamiento, más ~US$ 0,20–0,50 por día de voz con Gemini TTS. El
-almacenamiento crece solo con los **aprobados** (los rechazados y vencidos se borran).
+almacenamiento crece con los **aprobados y los rechazados** (se conservan); solo los pendientes vencidos se borran.
 
 ## Cómo se puede explotar (hacia dónde crece)
 

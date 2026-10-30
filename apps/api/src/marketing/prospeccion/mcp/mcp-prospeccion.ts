@@ -128,10 +128,10 @@ export const HERRAMIENTAS: Herramienta[] = [
   },
   {
     name: 'videos_listar',
-    description: 'Lista los videos de la cola (pendientes de aprobar, aprobados y pasados a borrador) con tipo, título, formato, estado y fecha. Sirve para no repetir temas. Filtra por tipo y estado.',
+    description: 'Lista los videos de la cola (pendientes de aprobar, aprobados, pasados a borrador y rechazados) con tipo, título, formato, estado y fecha. Sirve para no repetir temas. Filtra por tipo y estado.',
     inputSchema: {
       type: 'object',
-      properties: { tipo: { type: 'string', enum: ['MARKETING', 'TUTORIAL'] }, estado: { type: 'string', enum: ['PENDIENTE', 'APROBADO', 'PUBLICADO'] } },
+      properties: { tipo: { type: 'string', enum: ['MARKETING', 'TUTORIAL'] }, estado: { type: 'string', enum: ['PENDIENTE', 'APROBADO', 'PUBLICADO', 'RECHAZADO'] } },
       additionalProperties: false,
     },
     annotations: { title: 'Cola de videos', readOnlyHint: true, openWorldHint: false },

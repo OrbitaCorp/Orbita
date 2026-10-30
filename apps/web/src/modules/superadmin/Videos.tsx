@@ -10,23 +10,32 @@ import { ListaDeTutoriales } from './ListaDeTutoriales'
 //
 // Cualquiera del equipo puede COMENTAR cualquier video en todas sus fases y pedir que se MEJORE: «Mejorar con Claude» abre Claude
 // con ese video (si la persona tiene el conector; si no, le explica cómo conectarlo) y Claude lee el video y sus comentarios por
-// el conector. Aprobar o rechazar lo ofrece el servidor solo a quien corresponde (puedeAprobar / puedeRechazar): la pantalla no
-// sabe ni muestra quién aprobó. Una vez aprobado un video de marketing se descarga o se pasa como BORRADOR a TikTok o Instagram.
+// el conector. Aprobar, rechazar y desaprobar lo ofrece el servidor solo a quien corresponde (puedeAprobar / puedeRechazar /
+// puedeDesaprobar): la pantalla no sabe ni muestra quién aprobó. Rechazar (un pendiente) y desaprobar (un aprobado) no borran:
+// el video queda en «Rechazados». Una vez aprobado un video de marketing se descarga o se pasa como BORRADOR a TikTok o Instagram.
 // Nada se publica solo. Qué hace cada llamada: apps/api/src/marketing/videos/.
 
 type Aviso = { variant: ToastVariant; title: string; description?: string }
-type Filtro = 'PENDIENTE' | 'APROBADO' | 'TODOS'
+type Filtro = 'PENDIENTE' | 'APROBADO' | 'RECHAZADO' | 'TODOS'
 
 const FILTROS: { id: Filtro; texto: string }[] = [
   { id: 'PENDIENTE', texto: 'Para aprobar' },
   { id: 'APROBADO', texto: 'Aprobados' },
+  { id: 'RECHAZADO', texto: 'Rechazados' },
   { id: 'TODOS', texto: 'Todos' },
 ]
-const ESTADO: Record<VideoEstado, { texto: string; tono: 'amber' | 'green' | 'gray' }> = {
+const ESTADO: Record<VideoEstado, { texto: string; tono: 'amber' | 'green' | 'gray' | 'red' }> = {
   PENDIENTE: { texto: 'Para aprobar', tono: 'amber' },
   APROBADO: { texto: 'Aprobado', tono: 'green' },
   PUBLICADO: { texto: 'Pasado a borrador', tono: 'gray' },
+  RECHAZADO: { texto: 'Rechazado', tono: 'red' },
 }
+/** En qué pestaña de estado cae cada video: lo pasado a borrador sigue estando aprobado. */
+const FILTRO_DE: Record<VideoEstado, Filtro> = { PENDIENTE: 'PENDIENTE', APROBADO: 'APROBADO', PUBLICADO: 'APROBADO', RECHAZADO: 'RECHAZADO' }
+const QUITAR = {
+  rechazar: { titulo: 'Rechazar el video', cuerpo: 'pasa a «Rechazados», con su archivo y sus comentarios.', boton: 'Rechazar', listo: 'Video rechazado' },
+  desaprobar: { titulo: 'Desaprobar el video', cuerpo: 'deja de estar aprobado y pasa a «Rechazados», con su archivo y sus comentarios. Lo que ya se pasó a TikTok o Instagram no se toca.', boton: 'Desaprobar', listo: 'Video desaprobado' },
+} as const
 const FORMATO = { REEL_9_16: 'Vertical 9:16', CUADRADO: 'Cuadrado', HORIZONTAL_16_9: 'Horizontal 16:9' } as const
 const DESTINO = { tiktok: 'TikTok', instagram: 'Instagram' } as const
 
@@ -49,7 +58,7 @@ export function PanelVideos({ puedeEditar, setAviso }: { puedeEditar: boolean; s
   const [tick, setTick] = useState(0)
   const { data, loading, error } = useFetch(() => platformApi.videosCola(), [tick])
   const [filtro, setFiltro] = useState<Filtro>('PENDIENTE')
-  const [rechazando, setRechazando] = useState<VideoDeCola | null>(null)
+  const [quitando, setQuitando] = useState<{ v: VideoDeCola; accion: keyof typeof QUITAR } | null>(null)
   const [sinClaude, setSinClaude] = useState<VideoDeCola | null>(null)
   const [ocupado, setOcupado] = useState<string | null>(null)
 
@@ -69,7 +78,7 @@ export function PanelVideos({ puedeEditar, setAviso }: { puedeEditar: boolean; s
   }
 
   const delTipo = (data ?? []).filter((v) => v.tipo === tipo)
-  const visibles = delTipo.filter((v) => (filtro === 'TODOS' ? true : filtro === 'APROBADO' ? v.estado !== 'PENDIENTE' : v.estado === 'PENDIENTE'))
+  const visibles = delTipo.filter((v) => filtro === 'TODOS' || FILTRO_DE[v.estado] === filtro)
   const pendientes = delTipo.filter((v) => v.estado === 'PENDIENTE').length
   const pendientesDelOtro = (data ?? []).filter((v) => v.tipo !== tipo && v.estado === 'PENDIENTE').length
   const tituloDe = (id: string | null) => (id ? (data ?? []).find((v) => v.id === id)?.titulo ?? null : null)
@@ -137,14 +146,15 @@ export function PanelVideos({ puedeEditar, setAviso }: { puedeEditar: boolean; s
         ) : visibles.length === 0 ? (
           <Empty text={filtro === 'PENDIENTE'
             ? `No hay ${tipo === 'MARKETING' ? 'videos' : 'tutoriales'} para aprobar. Pedile a tu Claude, con el conector de Órbita, algo como «${tipo === 'MARKETING' ? 'generame 3 videos' : 'hacé el tutorial de Atender un pedido'}» y aparecen acá.${pendientesDelOtro > 0 ? ` Hay ${pendientesDelOtro} en la otra pestaña.` : ''}`
-            : 'Todavía no hay videos en esta lista.'} />
+            : filtro === 'RECHAZADO' ? 'No hay videos rechazados.' : 'Todavía no hay videos en esta lista.'} />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
             {visibles.map((v) => (
               <TarjetaDeVideo
                 key={v.id} v={v} puedeEditar={puedeEditar} ocupado={ocupado} tituloOriginal={tituloDe(v.mejoraDeId)} setAviso={setAviso} onCambio={recargar}
                 onAprobar={() => accion(`a-${v.id}`, () => platformApi.videoAprobar(v.id), (r) => ((r as VideoDeCola).estado === 'PENDIENTE' ? { variant: 'success', title: 'Tu aprobación quedó registrada' } : { variant: 'success', title: 'Video aprobado' }))}
-                onRechazar={() => setRechazando(v)}
+                onRechazar={() => setQuitando({ v, accion: 'rechazar' })}
+                onDesaprobar={() => setQuitando({ v, accion: 'desaprobar' })}
                 onDescargar={() => descargar(v)}
                 onMejorar={() => mejorar(v)}
                 onTiktok={() => accion(`t-${v.id}`, () => platformApi.videoATiktok(v.id), { variant: 'success', title: 'Enviado a los borradores de TikTok', description: 'Abrí TikTok para terminarlo y publicarlo.' })}
@@ -155,16 +165,16 @@ export function PanelVideos({ puedeEditar, setAviso }: { puedeEditar: boolean; s
         )}
       </Card>
 
-      {rechazando && (
+      {quitando && (
         <ConfirmModal
-          title="Rechazar el video"
-          body={`«${rechazando.titulo}» se borra del almacenamiento y de la cola, con sus comentarios. No se puede deshacer.`}
-          confirmLabel="Rechazar y borrar"
-          onCancel={() => setRechazando(null)}
+          title={QUITAR[quitando.accion].titulo}
+          body={`«${quitando.v.titulo}» ${QUITAR[quitando.accion].cuerpo}`}
+          confirmLabel={QUITAR[quitando.accion].boton}
+          onCancel={() => setQuitando(null)}
           onConfirm={async () => {
-            await platformApi.videoRechazar(rechazando.id)
-            setRechazando(null)
-            setAviso({ variant: 'success', title: 'Video rechazado y borrado' })
+            await (quitando.accion === 'rechazar' ? platformApi.videoRechazar(quitando.v.id) : platformApi.videoDesaprobar(quitando.v.id))
+            setAviso({ variant: 'success', title: QUITAR[quitando.accion].listo, description: 'Lo encontrás en «Rechazados».' })
+            setQuitando(null)
             recargar()
           }}
         />
@@ -212,9 +222,9 @@ function ConectarParaMejorar({ v, setAviso, onCerrar }: { v: VideoDeCola; setAvi
   )
 }
 
-function TarjetaDeVideo({ v, puedeEditar, ocupado, tituloOriginal, setAviso, onCambio, onAprobar, onRechazar, onDescargar, onMejorar, onTiktok, onInstagram }: {
+function TarjetaDeVideo({ v, puedeEditar, ocupado, tituloOriginal, setAviso, onCambio, onAprobar, onRechazar, onDesaprobar, onDescargar, onMejorar, onTiktok, onInstagram }: {
   v: VideoDeCola; puedeEditar: boolean; ocupado: string | null; tituloOriginal: string | null; setAviso: (a: Aviso) => void; onCambio: () => void
-  onAprobar: () => void; onRechazar: () => void; onDescargar: () => void; onMejorar: () => void; onTiktok: () => void; onInstagram: () => void
+  onAprobar: () => void; onRechazar: () => void; onDesaprobar: () => void; onDescargar: () => void; onMejorar: () => void; onTiktok: () => void; onInstagram: () => void
 }) {
   // Un video propio que está pendiente y que esta persona NO puede aprobar es de alguien que no es socio (por ejemplo, marketing):
   // lo tiene que aprobar la dirección. (Los socios sí pueden aprobar el suyo.) No se dice quién ni cuántos: solo que lo aprueba la dirección.
@@ -222,7 +232,7 @@ function TarjetaDeVideo({ v, puedeEditar, ocupado, tituloOriginal, setAviso, onC
   const e = esperaDireccion ? { texto: 'Esperando a la dirección', tono: 'amber' as const } : ESTADO[v.estado]
   const vence = v.estado === 'PENDIENTE' ? diasPara(v.expiraAt) : null
   const fallas = v.controles.filter((c) => !c.ok)
-  const aprobado = v.estado !== 'PENDIENTE'
+  const aprobado = v.estado === 'APROBADO' || v.estado === 'PUBLICADO'
   const vertical = v.formato === 'REEL_9_16'
   const boton = (clave: string, texto: string, ocupadoTexto: string, onClick: () => void, primario = false) => (
     <button
@@ -289,7 +299,7 @@ function TarjetaDeVideo({ v, puedeEditar, ocupado, tituloOriginal, setAviso, onC
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4, alignItems: 'center' }}>
           {v.puedeAprobar && boton(`a-${v.id}`, 'Aprobar', 'Aprobando…', onAprobar, true)}
           {v.yaAprobaste && <span style={{ fontSize: 12.5, color: 'var(--color-muted)' }}>Tu aprobación quedó registrada</span>}
-          {v.puedeRechazar && boton(`r-${v.id}`, v.esTuyo ? 'Descartar mi video' : 'Rechazar y borrar', 'Borrando…', onRechazar)}
+          {v.puedeRechazar && boton(`r-${v.id}`, v.esTuyo ? 'Descartar mi video' : 'Rechazar', 'Rechazando…', onRechazar)}
           {boton(`m-${v.id}`, 'Mejorar con Claude', 'Abriendo…', onMejorar)}
           {boton(`d-${v.id}`, 'Descargar', 'Preparando…', onDescargar)}
           {aprobado && v.tipo === 'MARKETING' && (
@@ -298,6 +308,7 @@ function TarjetaDeVideo({ v, puedeEditar, ocupado, tituloOriginal, setAviso, onC
               {boton(`i-${v.id}`, 'Pasar a borrador de Instagram', 'Guardando…', onInstagram)}
             </>
           )}
+          {v.puedeDesaprobar && boton(`q-${v.id}`, 'Desaprobar', 'Desaprobando…', onDesaprobar)}
         </div>
 
         <Comentarios v={v} setAviso={setAviso} onCambio={onCambio} />
