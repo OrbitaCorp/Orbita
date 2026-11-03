@@ -105,14 +105,16 @@ const GIM = (slug: string) => `auditoria.gimnasio.2026-10-26-${slug}`
 // Las del rediseño de los paneles que se terminó el 27/10 (Turnos-2, Gimnasio-2 y el kit).
 const TUR27 = (slug: string) => `auditoria.turnos.2026-10-27-${slug}`
 const GIM27 = (slug: string) => `auditoria.gimnasio.2026-10-27-${slug}`
+// Las del backend compartido de reservas (03/11).
+const GIM3 = (slug: string) => `auditoria.gimnasio.2026-11-03-${slug}`
 
 // ─── Turnos · Mateo ───────────────────────────────────────────────────────────
 const TURNOS = plan('turnos', 'Turnos', 'Mateo',
-  'Plan diario de Turnos del ciclo 26/10 al 18/12: borrar el backend viejo, mover canchas y clases a sus módulos, panel minimalista y storefront responsive. Cada tarea se marca hecha con su entrada de auditoría.',
+  'Plan diario de Turnos del ciclo 26/10 al 18/12: borrar el backend viejo, mover canchas y clases a sus módulos, panel minimalista y storefront responsive, y desde el 03/11 conectar el panel y el sitio al backend compartido de reservas (apps/api/src/reservas). Cada tarea se marca hecha con su entrada de auditoría.',
   [
     'Borrar el backend y consolidar shared',
     'Rubros movidos a Alquileres y Gimnasio',
-    'Panel minimalista y storefront responsive',
+    'Panel y storefront sobre el backend compartido',
     'Correcciones y revisión cruzada',
     'Turnos en el alta única',
     'Pulido de panel y storefront',
@@ -122,7 +124,7 @@ const TURNOS = plan('turnos', 'Turnos', 'Mateo',
   [
     'Borrar el backend y consolidar shared',
     'Rubros movidos a Alquileres y Gimnasio',
-    'Panel, storefront y Turnos en el alta única',
+    'Panel y storefront sobre el backend compartido, y Turnos en el alta única',
     'Correcciones, pulido, QA y cierre',
   ],
   [
@@ -167,16 +169,21 @@ const TURNOS = plan('turnos', 'Turnos', 'Mateo',
     t('2026-12-15', 'Mateo', 'Auditoría completa de Turnos: entradas al día y archivos tocados', 'Toda tarea hecha tiene su entrada y cada entrada lista sus archivos'),
     t('2026-12-16', 'Mateo', 'Capturas finales de Turnos para el documento del sistema', 'Capturas finales del panel y del storefront enlazadas en la última entrada'),
     t('2026-12-17', 'Mateo', 'Cierre de Turnos: resumen del ciclo y entrega a Ale', 'Entrada de cierre con lo hecho, lo que quedó afuera y lo que sigue'),
+    // Sumadas el 03/11: Turnos sobre el backend compartido de reservas (apps/api/src/reservas, cliente en lib/reservasApi).
+    t('2026-11-10', 'Mateo', 'Turnos sobre el backend compartido: Servicios, Equipo y Espacios leen y escriben /reservas (recursos PROFESIONAL y ESPACIO, servicios)', 'Un servicio y un profesional creados desde el panel aparecen en GET /reservas/servicios y /reservas/recursos; la config del módulo existe (PUT /reservas/config)'),
+    t('2026-11-11', 'Mateo', 'Turnos sobre el backend compartido: la agenda y Nuevo turno usan /reservas (crear, mover, cancelar, cobrar) y la disponibilidad del panel', 'Dos turnos pisados desde dos pestañas: el segundo muestra el 409 de la API tal cual y la agenda lo ve ocupado al recargar'),
+    t('2026-11-12', 'Mateo', 'Turnos sobre el backend compartido: el sitio reserva con retener + confirmar, con la cuenta regresiva de la retención', 'Un turno elegido y abandonado se libera solo al vencer la retención; uno confirmado llega por email con su enlace'),
+    t('2026-11-13', 'Mateo', 'Turnos: la página /mi-turno/<token> del sitio (ver, cancelar y reprogramar según la política del negocio)', 'El enlace del email abre la reserva; cancelar fuera del plazo muestra el motivo que manda la API y no un error crudo'),
   ])
 
 // ─── Alquileres · Alan ────────────────────────────────────────────────────────
 const ALQUILERES = plan('alquileres', 'Alquileres', 'Alan',
-  'Plan diario de Alquileres del ciclo 26/10 al 18/12: alta con paso de tipo, modo cancha, modo bloque, estadía (si entra en el ciclo), panel y calendarios .ics. Cada tarea se marca hecha con su entrada de auditoría.',
+  'Plan diario de Alquileres del ciclo 26/10 al 18/12: alta con paso de tipo, modo cancha, modo bloque, estadía (si entra en el ciclo), panel y calendarios .ics, y desde el 03/11 canchas, salones y estadías sobre el backend compartido de reservas. Cada tarea se marca hecha con su entrada de auditoría.',
   [
     'Lectura y diseño del alta',
     'Alta y modo cancha',
     'Modo bloque',
-    'Checkpoint y estadía, parte 1',
+    'Checkpoint, backend compartido y estadía, parte 1',
     'Estadía, parte 2',
     'Panel y calendarios .ics',
     'QA responsive',
@@ -233,16 +240,21 @@ const ALQUILERES = plan('alquileres', 'Alquileres', 'Alan',
     t('2026-12-15', 'Alan', 'Auditoría completa de Alquileres: entradas al día y archivos tocados', 'Toda tarea hecha tiene su entrada y cada entrada lista sus archivos'),
     t('2026-12-16', 'Alan', 'Capturas finales de Alquileres para el documento del sistema', 'Capturas finales del panel y de la tienda enlazadas en la última entrada'),
     t('2026-12-17', 'Alan', 'Cierre de Alquileres: resumen del ciclo y entrega a Ale', 'Entrada de cierre con lo hecho, lo que quedó afuera (la estadía, si no entró) y lo que sigue'),
+    // Sumadas el 03/11: Alquileres sobre el backend compartido de reservas.
+    t('2026-11-17', 'Alan', 'Alquileres sobre el backend compartido: canchas y salones leen /reservas (franjas seguidas, bloques con margen de limpieza)', 'La grilla de una cancha sale de GET disponibilidad y ofrece hasta maximoSeguidos franjas; un salón ofrece sus bloques desde el horario del recurso'),
+    t('2026-11-18', 'Alan', 'Alquileres sobre el backend compartido: estadías con disponibilidad/noches, fechaHasta y las noches mínimas del recurso', 'Un rango que pisa una reserva no se puede elegir y el total por noches coincide con el precio que devuelve la API'),
+    t('2026-11-19', 'Alan', 'Alquileres: la página /mi-reserva/<token> del sitio y Mis reservas sobre /mi/:token', 'Desde el enlace del email se ve, se cancela y se reprograma según la política del negocio, con sus mensajes'),
+    t('2026-11-20', 'Alan', 'Alquileres: Bloquear, Reservas e Ingresos del panel sobre /reservas (bloqueos, agenda, pago y /resumen)', 'Un bloqueo avisa cuántas reservas quedaron adentro; Ingresos muestra lo cobrado del mes según /resumen'),
   ])
 
 // ─── Gimnasio · Ale (más lo transversal) ──────────────────────────────────────
 const GIMNASIO = plan('gimnasio', 'Gimnasio', 'Ale',
-  'Plan diario de Gimnasio del ciclo 26/10 al 18/12: grilla de clases con cupo, planes y socios, check-in, página pública, panel e ingresos. Lleva además lo transversal de Ale: lib de reservas, sección Módulos, alta única y cierre del ciclo.',
+  'Plan diario de Gimnasio del ciclo 26/10 al 18/12: grilla de clases con cupo, planes y socios, check-in, página pública, panel e ingresos, y desde el 03/11 las clases sobre el backend compartido. Lleva además lo transversal de Ale: lib de reservas, sección Módulos, alta única, el backend compartido de reservas y cierre del ciclo.',
   [
     'Lib de reservas y esqueleto de Módulos',
-    'Grilla de clases y reserva de lugar',
+    'Backend compartido, grilla de clases y reserva de lugar',
     'Pases, planes y socios',
-    'Check-in y página pública',
+    'Backend compartido en Gimnasio, check-in y página pública',
     'Alta única con los cuatro módulos',
     'Panel e ingresos',
     'QA responsive',
@@ -250,7 +262,7 @@ const GIMNASIO = plan('gimnasio', 'Gimnasio', 'Ale',
   ],
   [
     'Lib de reservas y esqueleto de Módulos',
-    'Grilla de clases y reserva de lugar',
+    'Backend compartido, grilla de clases y reserva de lugar',
     'Pases, planes, socios y alta única',
     'Check-in, página pública, panel, QA y cierre',
   ],
@@ -303,6 +315,18 @@ const GIMNASIO = plan('gimnasio', 'Gimnasio', 'Ale',
     t('2026-12-16', 'Ale', 'Capturas finales de Gimnasio para el documento del sistema', 'Capturas finales del panel y de la tienda enlazadas en la última entrada'),
     t('2026-12-17', 'Ale', 'Transversal: cierre del ciclo en Módulos (resumen por módulo y decisiones)', 'Los tres módulos con su entrada de cierre y el resumen sin atrasos sin explicar'),
     t('2026-12-18', 'Ale', 'Transversal: retro del ciclo y plan del siguiente', 'Retro registrada en Auditoría y plan del próximo ciclo cargado en modules/superadmin/modulos/plan.ts'),
+    // Sumadas el 03/11: el backend compartido de reservas (hecho en sesión) y Gimnasio sobre él.
+    documentada(t('2026-11-02', 'Ale', 'Transversal: merge de origin/main en la rama de los módulos (139 commits) y typecheck de la web en Windows', 'La rama contiene origin/main, typecheck de web y api en verde, tests de la web en verde'), GIM3('merge-con-main')),
+    documentada(t('2026-11-02', 'Ale', 'Transversal: backend compartido de reservas, modelo y migración (tablas reservas_*, restricción de exclusión, RLS y permisos)', 'Migración aplicada en dev, prisma validate en verde, las siete tablas con RLS y los tres permisos repartidos'), GIM3('backend-compartido-de-reservas')),
+    documentada(t('2026-11-03', 'Ale', 'Transversal: backend compartido de reservas, el motor (candado por recurso, retenciones que vencen, cancelación con lista de espera, reprogramación) y sus tests', 'Unitarios y e2e en verde contra dev: seis pedidos simultáneos entran uno; ocho personas por tres lugares entran tres'), GIM3('backend-compartido-de-reservas')),
+    documentada(t('2026-11-03', 'Ale', 'Transversal: rutas del panel y del sitio de reservas, cliente tipado en lib/reservasApi y contrato en el README del módulo', 'Las rutas de /reservas y /storefront/:slug/reservas responden; lib/reservasApi compila y sus tests pasan; el README dice cómo las usa cada módulo'), GIM3('backend-compartido-de-reservas')),
+    t('2026-11-04', 'Ale', 'Transversal: desplegar el backend compartido de reservas (migración en producción y deploy.sh), cuando Ale lo decida', 'Migración 20261103120000_reservas aplicada en producción con prisma-prod.sh y Cloud Run sirviendo la revisión que responde /reservas'),
+    t('2026-11-16', 'Ale', 'Gimnasio sobre el backend compartido: las clases con cupo como recursos CLASE con sus sesiones en el horario', 'Las clases del panel se crean con POST/PUT de /reservas/recursos y la grilla del sitio sale de GET disponibilidad con cupo y libres'),
+    t('2026-11-17', 'Ale', 'Gimnasio sobre el backend compartido: reservar un lugar con cantidad y la lista de espera con /espera', 'Con la clase llena el sitio ofrece la lista de espera; al cancelar uno, el primero toma el lugar y recibe su email'),
+    t('2026-11-18', 'Ale', 'Gimnasio: la página /mi-clase/<token> del sitio y Mis clases sobre /mi/:token', 'Desde el enlace del email se ve y se cancela el lugar según la política del negocio'),
+    t('2026-11-19', 'Ale', 'Gimnasio: Clases e Ingresos del panel sobre /reservas y /resumen', 'Las clases de hoy con su ocupación y la lista de espera salen de la API; Ingresos muestra lo cobrado según /resumen'),
+    t('2026-12-01', 'Ale', 'Transversal: cobro online de la seña con Mercado Pago sobre /reservas (si Ale lo decide)', 'Una reserva con seña se paga con MP y el webhook la deja CONFIRMADA; sin MP conectado se registra a mano como hoy'),
+    t('2026-12-02', 'Ale', 'Transversal: recordatorios del día anterior colgados del cron de las 22 h y avisos de reservas en la campanita del panel', 'El recordatorio sale una sola vez por reserva (idempotente por email_logs) y una reserva nueva aparece en la campanita'),
   ])
 
 export const PLANES: PlanModulo[] = [TURNOS, ALQUILERES, GIMNASIO]

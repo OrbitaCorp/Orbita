@@ -175,4 +175,26 @@ export const DECISIONES: Entrada[] = [
       'apps/web/src/modules/turnos/admin/avanzado/ui.tsx:80-81',
     ],
   }),
+
+  // ─── Del backend compartido de reservas (03/11/2026) ─────────────────────────
+  decisionAbierta({
+    modulo: 'gimnasio', slug: 'backend-compartido-pendientes', decide: 'Ale', transversal: true, fecha: '2026-11-03',
+    titulo: 'Transversal: lo que el backend compartido de reservas deja para decidir',
+    foco: 'El motor de reservas está hecho y probado, pero seis cosas tocan plata, producción o el alta real y las decide Ale: cobrar la seña online, devolverla sola, avisar por WhatsApp, cuándo mandar el recordatorio, habilitar los módulos en el alta real y desplegar.',
+    propuesta: `1. **Cobro online de la seña con Mercado Pago.** Hoy el panel registra pagos a mano (\`POST /reservas/:id/pago\`). Propuesta: al confirmar desde el sitio, si el negocio tiene MP conectado y \`senaPorcentaje > 0\`, crear una preferencia por la seña y dejar la reserva PENDIENTE hasta el webhook, como hace el checkout de Tienda; sin MP conectado, como hoy.
+2. **Devolución automática al cancelar a tiempo.** Hoy "DEVUELTA" es un aviso al negocio (lo devuelve a mano). Propuesta: reembolso por la API de MP como hace Cancelaciones de Tienda, solo para lo cobrado por MP.
+3. **WhatsApp.** Solo email. Propuesta: cuando los negocios de reservas tengan WhatsApp conectado (el de Orbi), mandar confirmación y cancelación por ahí con plantillas; mientras tanto, el panel arma el texto y abre wa.me.
+4. **El recordatorio del día anterior.** Propuesta: colgarlo del cron de las 22 h (sale entre 2 y 26 horas antes). La opción "a las X horas exactas" necesita un job más de Cloud Scheduler (US$0,10/mes).
+5. **Habilitar Turnos, Alquileres y Gimnasio en el alta real.** Siguen como "Próximamente" (\`MODULOS_PROXIMAMENTE\`). Hace falta que el alta cree la config del módulo (\`PUT /reservas/config\`) y sus recursos, y que cada módulo esté conectado al backend. Propuesta: después de que los tres planes cierren sus tareas de conexión.
+6. **Desplegar.** La migración \`20261103120000_reservas\` está aplicada en dev; en producción no. Propuesta: cuando Ale diga, \`prisma-prod.sh migrate deploy\` y \`deploy.sh\` desde \`main\` con CI verde (o \`staging.sh\` antes para probarlo en caudaliguazu.com.ar). Las rutas nuevas no afectan a Tienda: son tablas y endpoints que nadie llama hasta que un módulo se conecte.`,
+    abierta: 'Las dos primeras mueven plata de los clientes; la tercera y la cuarta cuestan (WhatsApp, un job de Cloud Scheduler); la quinta abre un cobro nuevo en el alta real; la sexta es un deploy a producción. Ninguna se destraba escribiendo código.',
+    origen: 'Sesión del 03/11/2026, al terminar el backend compartido (entrada "Transversal: el backend compartido de reservas").',
+    archivos: [
+      'apps/api/src/reservas/README.md:129',
+      'apps/api/src/reservas/reservas.service.ts:465',
+      'apps/api/src/reservas/reservas-avisos.service.ts:18',
+      'apps/web/src/modules/onboarding/alta/modelo.ts:67',
+      'apps/api/prisma/migrations/20261103120000_reservas/migration.sql:1',
+    ],
+  }),
 ]

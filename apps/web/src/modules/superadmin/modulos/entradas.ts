@@ -149,6 +149,8 @@ export function entrada(d: DatosEntrada): Entrada {
 
 const F = '2026-10-26'
 const F27 = '2026-10-27'
+// El backend compartido de reservas (sesión del 03/11/2026).
+const F3 = '2026-11-03'
 
 export const ENTRADAS: Entrada[] = [
   // ─── Transversal · la sección Módulos ───────────────────────────────────────
@@ -1980,6 +1982,119 @@ ${comoQuedo('turnos', ['Horarios con los siete días · 390', 'qa-horarios-390.w
       'apps/web/src/modules/turnos/admin/configuracion/Apariencia.tsx:188-189',
       'apps/web/src/modules/turnos/admin/configuracion/Apariencia.tsx:579',
       'apps/web/src/modules/alquileres/admin/configuracion/comun.tsx:58',
+    ],
+  }),
+
+  // ─── 03/11/2026 · el backend compartido de reservas ─────────────────────────
+  entrada({
+    modulo: 'gimnasio', fecha: F3, slug: 'un-motor-para-los-tres', tipo: 'decisión', quien: 'Ale', transversal: true,
+    titulo: 'Transversal: un solo backend de reservas para Turnos, Alquileres y Gimnasio',
+    foco: 'Se deja de pensar un backend por módulo (el de Turnos, appointments, se había borrado el 26/10): los tres comparten un motor de reservas en apps/api/src/reservas, y cada módulo sigue siendo dueño de su panel y su sitio.',
+    que: `Hasta el 26/10 la idea era que cada módulo tuviera su backend cuando lo necesitara, y Turnos había tenido uno propio (\`appointments\`, cinco ramas que se borraron sin llegar a \`main\`). El 03/11 Ale pidió otra cosa: *"eliminar lo del backend de turnos, dejar uno profesional de lo que es los 3 y que compartan, cubriendo toda la integridad de turnos: si dos tocan el botón al mismo tiempo, si se cancela, si no completa"*.
+
+Lo que cambia:
+- **Un módulo de la API, \`reservas\`,** con un modelo único: qué se reserva (un recurso con cupo), cuándo (un rango), en qué estado está y las reglas del negocio. Turnos reserva profesionales y cabinas con servicios; Alquileres canchas, salones y alojamientos; Gimnasio clases con cupo. El tipo del recurso dice de qué módulo es.
+- **Cada módulo sigue siendo independiente en la web:** ningún módulo importa de otro; los tres usan el mismo cliente tipado (\`apps/web/src/lib/reservasApi\`) con su \`modulo\`. El sitio y el panel de cada uno los sigue haciendo su responsable.
+- **Lo que no se comparte** sigue en cada módulo: planes, pases y socios de Gimnasio, paquetes y temporadas de Alquileres, membresías y fidelidad de Turnos.
+
+Lo que no cambia: la sección Módulos del superadmin sigue siendo solo visual, y los módulos siguen siendo demos hasta que cada uno se conecte (tareas nuevas en el plan de cada módulo).`,
+    decision: 'Un solo backend de reservas para los tres módulos, en apps/api/src/reservas, con un contrato escrito (su README) y un cliente tipado en la web. Ningún módulo tiene backend propio.',
+    porque: 'Las cuentas que no pueden dar tres resultados distintos (si dos personas toman el mismo lugar, qué pasa al cancelar, cuánto dura un lugar retenido) tienen que vivir en un solo lugar y probarse una sola vez contra Postgres. Con tres backends cada módulo iba a resolver la concurrencia a su manera y el primero en fallar iba a ser el que menos tests tuviera. Y el equipo es de tres personas: un motor compartido es lo único que se puede mantener.',
+    archivos: [
+      'apps/api/src/reservas/README.md:1',
+      'apps/api/prisma/schema.prisma:3770',
+      'apps/web/src/lib/reservasApi/cliente.ts:69',
+      'apps/web/src/lib/reservas/README.md:53',
+    ],
+  }),
+
+  entrada({
+    modulo: 'gimnasio', fecha: F3, slug: 'backend-compartido-de-reservas', tipo: 'tarea', quien: 'Ale', transversal: true,
+    titulo: 'Transversal: el backend compartido de reservas, con su integridad probada contra Postgres',
+    foco: 'Módulo apps/api/src/reservas: modelo, migración, motor con candado por recurso, retenciones que vencen solas, cancelación con lista de espera, reprogramación, rutas del panel y del sitio, cliente tipado en la web y tests (26 de dominio, 25 unitarios, 15 e2e).',
+    que: `## El modelo
+
+Siete tablas \`reservas_*\` (bloque "Reservas" de \`schema.prisma\`, migración \`20261103120000_reservas\`):
+- \`reservas_config\`: las reglas de un negocio para un módulo (existe = usa ese módulo): confirmación automática o manual, minutos de retención, anticipación mínima y máxima, hasta cuántas horas antes se cancela o reprograma, seña, tope de reservas activas por persona, lista de espera, margen y el horario semanal por defecto.
+- \`reservas_recursos\`: lo que se reserva, con \`tipo\` (PROFESIONAL y ESPACIO de Turnos; CANCHA, SALON y ALOJAMIENTO de Alquileres; CLASE de Gimnasio), \`cupo\` (1 = exclusivo), duración y paso de la franja, franjas seguidas, precio, horario propio y \`datos\` por módulo (check-in/check-out, extras, profesor…).
+- \`reservas_servicios\`: lo que se elige antes en Turnos, con duración y precio.
+- \`reservas\`: un recurso, un rango \`[inicio, fin)\`, lugares, estado, la foto del cliente y del servicio, precio, seña, pagado, el código visible, el token del enlace personal, la clave de idempotencia y la \`version\`.
+- \`reservas_historial\` (cada cambio de estado, solo se agrega), \`reservas_espera\` (lista de espera por sesión) y \`reservas_bloqueos\` (feriados, mantenimiento).
+
+Estados: RETENIDA → CONFIRMADA (o PENDIENTE si el negocio confirma a mano) → COMPLETADA o AUSENTE; cualquiera de los que ocupan lugar → CANCELADA; una retenida que nadie confirma → VENCIDA. La tabla de transiciones vive en \`dominio/estados.ts\`.
+
+## La integridad, caso por caso
+
+| Si… | Lo cubre |
+|---|---|
+| Dos tocan el botón a la vez | Crear y reprogramar toman primero el candado de la fila del recurso (\`SELECT … FOR UPDATE\`) y cuentan adentro de la transacción: el segundo recibe 409 "Ese horario se acaba de ocupar". Debajo, la base tiene la restricción de exclusión \`reservas_sin_solapamiento\` (btree_gist sobre \`recurso_id\` y \`[inicio, fin)\`) para los recursos exclusivos: aunque algún camino se saltee el service, el INSERT falla. |
+| Doble clic o reintento | La clave de idempotencia (un uuid por intento): repetir devuelve la misma reserva. |
+| No completa | Nace RETENIDA con \`retenidaHasta\`; vencida, deja de ocupar lugar en el acto (la disponibilidad la filtra y el motor la vence por recurso antes de contar). El cron de cada 5 minutos la marca VENCIDA. |
+| Se cancela | Compare-and-set sobre el estado y la \`version\`: la segunda de dos acciones simultáneas recibe 409 con el estado real. Desde el sitio vale la política; el negocio cancela siempre. La seña queda DEVUELTA, PERDIDA o SIN_SENA. Con lista de espera, el primero toma el lugar en la misma transacción. |
+| Fuera de horario, en un bloqueo, demasiado pronto o lejos, sesión inexistente | 400 con el motivo en castellano. |
+| Precio y seña | Siempre en el servidor; lo que mande el cliente se ignora. |
+| Otro negocio | Todo filtra por el \`businessId\` del token (lo vigila \`aislamiento-consultas.unit-spec.ts\`); el sitio solo encuentra una reserva por el token de su enlace. |
+
+## Rutas
+
+Sitio (\`/api/v1/storefront/:slug/reservas\`, sin login): \`config\`, \`recursos\`, \`servicios\`, \`disponibilidad\` (día, rango y noches), \`retener\` → \`mi/:token/confirmar\` (o \`reservar\` en un paso), \`mi/:token\` con su política, \`cancelar\`, \`reprogramar\`, y la lista de espera (\`espera\`). Panel (\`/api/v1/reservas\`): config, recursos, servicios, bloqueos, disponibilidad, agenda, detalle con historial, resumen, crear, confirmar, completar, ausente, cancelar, reprogramar, pago, nota, lista de espera. Tres permisos nuevos: \`reservas.view\`, \`reservas.manage\` (owner, admin y empleado) y \`reservas.config\` (owner y admin), repartidos a los negocios existentes por la migración.
+
+## Tests
+
+- \`src/reservas/dominio/*.spec.ts\` (26): tiempo de Argentina, horario semanal, máquina de estados, precio y franjas.
+- \`test/unit/reservas.service.unit-spec.ts\` (25): lo que el motor decide antes del candado y cómo reacciona cuando el compare-and-set no encuentra la fila.
+- \`test/reservas.e2e-spec.ts\` (15, contra la base de dev): seis pedidos simultáneos entran uno; una clase de cupo 3 con ocho personas a la vez entra tres; la retenida vencida libera; al cancelar el primero de la lista de espera toma el lugar; la restricción de la base rechaza dos reservas pisadas aunque se saltee el service; política de cancelación; permisos del empleado.
+
+## Lo que queda
+
+El cobro online de la seña (Mercado Pago), la devolución automática, WhatsApp, los recordatorios del día anterior y la campanita del panel no están: solo email. Y conectar cada módulo es tarea de su responsable (ver el plan): hoy los tres siguen siendo demos con datos en el navegador. El cliente tipado para hacerlo está en \`apps/web/src/lib/reservasApi\` (\`panel\` y \`sitio(slug)\`).`,
+    archivos: [
+      'apps/api/src/reservas/README.md:62',
+      'apps/api/prisma/schema.prisma:3852',
+      'apps/api/prisma/schema.prisma:3963',
+      'apps/api/prisma/migrations/20261103120000_reservas/migration.sql:286-302',
+      'apps/api/prisma/migrations/20261103120000_reservas/migration.sql:320',
+      'apps/api/src/reservas/reservas.service.ts:178',
+      'apps/api/src/reservas/reservas.service.ts:258',
+      'apps/api/src/reservas/reservas.service.ts:298',
+      'apps/api/src/reservas/reservas.service.ts:352',
+      'apps/api/src/reservas/reservas.service.ts:437',
+      'apps/api/src/reservas/reservas.service.ts:631-650',
+      'apps/api/src/reservas/reservas.service.ts:671',
+      'apps/api/src/reservas/disponibilidad.service.ts:99',
+      'apps/api/src/reservas/disponibilidad.service.ts:122',
+      'apps/api/src/reservas/reservas-catalogo.service.ts:67',
+      'apps/api/src/reservas/reservas-catalogo.service.ts:259',
+      'apps/api/src/reservas/reservas-panel.controller.ts:22',
+      'apps/api/src/reservas/reservas-publico.controller.ts:29',
+      'apps/api/src/reservas/reservas-avisos.service.ts:18',
+      'apps/api/src/reservas/reservas-mantenimiento.service.ts:20',
+      'apps/api/src/internal-cron/internal-cron.controller.ts:219',
+      'apps/api/src/reservas/dominio/estados.ts:13',
+      'apps/api/src/reservas/dominio/disponibilidad.ts:41',
+      'apps/api/src/common/permisos/catalogo.ts:44',
+      'apps/api/src/onboarding/onboarding.service.ts:135',
+      'apps/api/test/reservas.e2e-spec.ts:109',
+      'apps/api/test/reservas.e2e-spec.ts:232',
+      'apps/api/test/unit/reservas.service.unit-spec.ts:193',
+      'apps/web/src/lib/reservasApi/cliente.ts:69',
+      'apps/web/src/lib/reservasApi/cliente.ts:112',
+      'apps/web/src/lib/reservasApi/tipos.ts:94',
+    ],
+  }),
+
+  entrada({
+    modulo: 'gimnasio', fecha: F3, slug: 'merge-con-main', tipo: 'tarea', quien: 'Ale', transversal: true,
+    titulo: 'Transversal: la rama de los módulos al día con main (139 commits) y el typecheck de la web en Windows',
+    foco: 'feat/turnos-visual estaba 139 commits atrás de origin/main (staging, Marketing, WhatsApp con Orbi, Difusión); se mergeó con dos conflictos en el superadmin y se arregló un nombre de archivo que rompía el typecheck en Windows y macOS.',
+    que: `- **Merge de \`origin/main\`** (commit 56c40): solo dos archivos en conflicto, los dos del superadmin, porque \`main\` sumó Marketing e Instagram al menú y la rama había sumado Módulos: quedaron las tres secciones. \`pages/superadmin/index.tsx\` conserva el título de la pestaña de la rama y el retorno a "Conectar Claude" de \`main\`.
+- **\`pnpm typecheck\` de la web fallaba en Windows** (y falla en macOS): \`modules/orbi/markdown/\` tenía \`Markdown.tsx\` y \`markdown.ts\`, que solo difieren en mayúsculas; en un disco que no distingue mayúsculas TypeScript resolvía uno por el otro. El parser pasó a llamarse \`parser.ts\` (commit 4877d). CI corre en Linux y nunca lo vio.
+- **Tests unitarios de la API en esta máquina:** siete suites de WhatsApp, Instagram y el adaptador de Workers AI fallan con \`jest.spyOn(global, 'fetch')\` en Node 26 ("Property fetch does not exist"); pasan en CI (Node 22). No se tocaron: son de \`main\`, no de la rama.
+- Las dependencias se reinstalaron en \`apps/api\` y \`apps/web\` (los lockfiles cambiaron con \`main\`).`,
+    archivos: [
+      'apps/web/src/pages/superadmin/index.tsx:15',
+      'apps/web/src/modules/superadmin/SuperAdminDashboard.tsx:138',
+      'apps/web/src/modules/orbi/markdown/parser.ts:62',
     ],
   }),
 ]
