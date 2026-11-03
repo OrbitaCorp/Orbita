@@ -186,7 +186,7 @@ export default function ResumenDia({ negocio, saludo: aQuien, rubro, turnos, tur
         <section style={{ minWidth: 0 }}>
           <div className="rv-entre" style={{ marginBottom: 10 }}>
             <h2 className="rv-h2">Próximos turnos</h2>
-            <button type="button" onClick={() => onIr('agenda')} className="rv-btn rv-btn--sm rv-btn--fantasma" style={{ color: 'var(--chip-primary-fg)' }}>Ver agenda <ArrowRight size={14} /></button>
+            <button type="button" onClick={() => onIr('agenda')} className="rv-btn rv-btn--sm rv-btn--fantasma" style={{ color: 'var(--rv-tinta-link, var(--chip-primary-fg))' }}>Ver agenda <ArrowRight size={14} /></button>
           </div>
           <TurnosLista turnos={proximos} clientes={clientes} recursos={recursos} onAbrir={onAbrir} etiquetaRecurso={etiquetaRecurso} />
         </section>

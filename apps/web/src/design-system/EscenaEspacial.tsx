@@ -17,7 +17,7 @@
 // cometa lejano), y vuelve a asomar sobre el final para cerrar detrás del footer
 // donde empezó.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
 
 // Paleta de la escena por tema. En claro NO se invierte sin más: un planeta
 // negro sobre fondo blanco quedaba como un agujero. Se convierte en un amanecer
@@ -32,9 +32,15 @@ export interface Paleta {
     glow: string[];
     neblina: string;
     cometa: [string, string];
+    /** El punto del satélite (prop `satelite`). */
+    satelite: string;
+    /** Cometas marcados: cola con un brillo ancho y suave debajo de la línea y cabeza con
+     *  halo, en vez de los finos y lejanos de la landing (sobre un cielo claro la línea
+     *  fina sola se perdía). */
+    cometasMarcados?: boolean;
 }
 
-export const PALETAS: Record<'oscuro' | 'claro', Paleta> = {
+export const PALETAS: Record<'oscuro' | 'claro' | 'panelClaro', Paleta> = {
     // Resplandor en un solo azul (#3b82f6, el mismo celeste que ya usa el home
     // actual de orbita.site) en vez del degradé que pasaba por índigo/violeta
     // (#4f46e5, #6366f1, #818cf8). Pedido puntual: probar cómo se ve la escena
@@ -52,6 +58,7 @@ export const PALETAS: Record<'oscuro' | 'claro', Paleta> = {
         ],
         neblina: 'radial-gradient(ellipse at 50% 100%, rgba(59,130,246,.36) 0%, rgba(59,130,246,.20) 24%, rgba(59,130,246,.09) 48%, rgba(0,0,0,0) 72%)',
         cometa: ['rgba(226,240,255,', 'rgba(96,165,250,'],
+        satelite: '#FFFFFF',
     },
     claro: {
         cieloOpacidad: 0.16,
@@ -65,8 +72,39 @@ export const PALETAS: Record<'oscuro' | 'claro', Paleta> = {
         ],
         neblina: 'radial-gradient(ellipse at 50% 100%, rgba(147,197,253,.42) 0%, rgba(129,140,248,.22) 24%, rgba(191,219,254,.12) 48%, rgba(255,255,255,0) 74%)',
         cometa: ['rgba(37,99,235,', 'rgba(99,102,241,'],
+        satelite: '#3B82F6',
+    },
+    // El cielo claro de los paneles de reservas (reservas/LayoutPanel): la composición de la
+    // landing, pero sobre un celeste muy suave y solo en azules de marca (el resplandor de
+    // `claro` pasa por índigo y sobre el celeste quedaba lavanda). Estrellas blancas (las grises
+    // de `claro` parecían polvo), el planeta es el surface del panel (el contenido se apoya
+    // encima), la línea del horizonte más suave que en la landing y los anillos un poco más
+    // marcados: el texto del cuerpo (#334155) que los cruza al scrollear tiene que seguir en AA.
+    // Con la línea a .42 el píxel más oscuro de todo el fondo da 4,8:1 con ese gris.
+    panelClaro: {
+        cieloOpacidad: 0.16,
+        estrella: 'rgba(255,255,255,',
+        planeta: 'var(--color-surface)',
+        linea: 'rgba(37,99,235,.42)',
+        anillo: r => `rgba(37,99,235,${r === 1 ? 0.18 : 0.26})`,
+        glow: [
+            'rgba(59,130,246,.05)', 'rgba(59,130,246,.06)', 'rgba(96,165,250,.10)',
+            'rgba(147,197,253,.20)', 'rgba(191,219,254,.45)', 'rgba(219,234,254,.85)',
+        ],
+        neblina: 'radial-gradient(ellipse at 50% 100%, rgba(147,197,253,.30) 0%, rgba(191,219,254,.16) 24%, rgba(219,234,254,.08) 48%, rgba(255,255,255,0) 74%)',
+        cometa: ['rgba(37,99,235,', 'rgba(96,165,250,'],
+        satelite: '#3B82F6',
+        cometasMarcados: true,
     },
 };
+
+const MOVIMIENTO_REDUCIDO = '(prefers-reduced-motion: reduce)';
+const suscribirMovimiento = (aviso: () => void) => {
+    const mq = window.matchMedia(MOVIMIENTO_REDUCIDO);
+    mq.addEventListener('change', aviso);
+    return () => mq.removeEventListener('change', aviso);
+};
+const movimientoReducido = () => window.matchMedia(MOVIMIENTO_REDUCIDO).matches;
 
 // Acá antes vivían los satélites (Stock, Ventas, Pedidos, Clientes): íconos que
 // recorrían el arco de los anillos. Se sacaron a pedido explícito — se quería
@@ -149,24 +187,29 @@ const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(ma
 // meteoritos que le robe la atención al texto.
 interface Cometa { x: number; y: number; vx: number; vy: number; largo: number; vida: number; total: number; brillo: number }
 
-function nuevoCometa(W: number, H: number): Cometa {
+function nuevoCometa(W: number, H: number, marcado = false): Cometa {
     // Entran desde el borde superior o desde los laterales de arriba, siempre
     // bajando en diagonal, como se ven de verdad.
     const desdeArriba = Math.random() < 0.6;
-    const x = desdeArriba ? Math.random() * W : (Math.random() < 0.5 ? -60 : W + 60);
-    const y = desdeArriba ? -60 : Math.random() * H * 0.5;
+    // Los marcados (paleta con cometasMarcados: los paneles en claro) entran más cerca del
+    // borde, bajan menos inclinados y un poco más rápido, y son más largos y más brillantes:
+    // tienen que lucirse sobre un cielo claro antes de fundirse, no leerse lejanos.
+    const margen = marcado ? 30 : 60;
+    const x = desdeArriba ? Math.random() * W : (Math.random() < 0.5 ? -margen : W + margen);
+    const y = desdeArriba ? -margen : Math.random() * H * (marcado ? 0.35 : 0.5);
     const haciaLaDerecha = x < W / 2;
-    const ang = (haciaLaDerecha ? 0.42 : Math.PI - 0.42) + (Math.random() - 0.5) * 0.22;
+    const inclinacion = marcado ? 0.3 : 0.42;
+    const ang = (haciaLaDerecha ? inclinacion : Math.PI - inclinacion) + (Math.random() - 0.5) * 0.22;
     // Lento: la lejanía se lee sobre todo en la velocidad y el tamaño.
-    const vel = 0.9 + Math.random() * 0.7;
-    const total = 3200 + Math.random() * 2200;
+    const vel = (marcado ? 1.1 : 0.9) + Math.random() * (marcado ? 0.8 : 0.7);
+    const total = (marcado ? 3600 : 3200) + Math.random() * 2200;
     return {
         x, y,
         vx: Math.cos(ang) * vel,
         vy: Math.sin(ang) * vel,
-        largo: 90 + Math.random() * 120,
+        largo: (marcado ? 110 : 90) + Math.random() * 120,
         vida: 0, total,
-        brillo: 0.35 + Math.random() * 0.35,
+        brillo: marcado ? 0.6 + Math.random() * 0.35 : 0.35 + Math.random() * 0.35,
     };
 }
 
@@ -180,16 +223,42 @@ function nuevoCometa(W: number, H: number): Cometa {
  * problema (son puntos chicos sobre negro), así que quedan: la página sigue
  * perteneciendo al mismo mundo visual que el home.
  */
-export function EscenaEspacial({ planeta = true, oscuro = true }: { planeta?: boolean; oscuro?: boolean }) {
+/**
+ * `paleta` elige una paleta distinta a la del tema (`panelClaro` para los paneles de
+ * reservas en claro). `contenedor` pone la escena en una capa absoluta que mide a su propio
+ * contenedor en vez de a la ventana: es para los paneles, donde el cielo vive detrás de un
+ * <main> que scrollea adentro de un armazón y la ventana no se mueve (así que el viaje del
+ * planeta con el scroll no aplica y queda fijo). `satelite` suma el satélite del logo
+ * recorriendo el anillo de adentro, en su propia capa; la landing no lo usa.
+ */
+export function EscenaEspacial({ planeta = true, oscuro = true, paleta: nombrePaleta, contenedor = false, satelite = false }: { planeta?: boolean; oscuro?: boolean; paleta?: keyof typeof PALETAS; contenedor?: boolean; satelite?: boolean }) {
     // Sin indicación la escena va en oscuro, que es su diseño.
     const isDark = oscuro;
-    const paleta = PALETAS[isDark ? 'oscuro' : 'claro'];
+    const paleta = PALETAS[nombrePaleta ?? (isDark ? 'oscuro' : 'claro')];
     const [medidas, setMedidas] = useState({ W: 0, H: 0 });
+    const raizRef = useRef<HTMLDivElement>(null);
     const escenaRef = useRef<HTMLDivElement>(null);
     const brilloRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    // El satélite se anima con SMIL: con prefers-reduced-motion directamente no se dibuja.
+    const sinMovimiento = useSyncExternalStore(suscribirMovimiento, movimientoReducido, () => false);
+    const idReact = useId();
+    const idHalo = `ee-halo-${idReact.replace(/\W/g, '')}`;
 
     useEffect(() => {
+        // En un contenedor (los paneles) se mide el propio elemento, y cualquier cambio de
+        // tamaño vuelve a armar la escena: ahí la ventana no scrollea, así que no existe el
+        // rebote que explica el filtro de abajo.
+        if (contenedor) {
+            const el = raizRef.current;
+            if (!el) return;
+            const ro = new ResizeObserver(([e]) => {
+                const W = Math.round(e.contentRect.width), H = Math.round(e.contentRect.height);
+                setMedidas(m => (m.W === W && m.H === H ? m : { W, H }));
+            });
+            ro.observe(el);
+            return () => ro.disconnect();
+        }
         // En mobile, la barra de direcciones se esconde/aparece AL SCROLLEAR
         // (no solo al rotar o redimensionar) y eso cambia `window.innerHeight`
         // — dispara un `resize` en cada gesto de scroll, no solo en un resize
@@ -214,7 +283,7 @@ export function EscenaEspacial({ planeta = true, oscuro = true }: { planeta?: bo
         const inicial = requestAnimationFrame(() => setMedidas(anterior));
         window.addEventListener('resize', medir);
         return () => { cancelAnimationFrame(inicial); window.removeEventListener('resize', medir); };
-    }, []);
+    }, [contenedor]);
 
     useEffect(() => {
         if (medidas.W === 0) return;
@@ -228,7 +297,7 @@ export function EscenaEspacial({ planeta = true, oscuro = true }: { planeta?: bo
 
         const iniciar = () => {
         if (cancelado) return;
-        const quieto = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const quieto = window.matchMedia(MOVIMIENTO_REDUCIDO).matches;
 
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
         const ctx = canvas?.getContext('2d') ?? null;
@@ -316,7 +385,7 @@ export function EscenaEspacial({ planeta = true, oscuro = true }: { planeta?: bo
 
                 proximoCometa -= dt;
                 if (proximoCometa <= 0) {
-                    if (zonaCometas > 0.2 && cometas.length < 4) cometas.push(nuevoCometa(W, H));
+                    if (zonaCometas > 0.2 && cometas.length < 4) cometas.push(nuevoCometa(W, H, paleta.cometasMarcados));
                     proximoCometa = 1300 + Math.random() * 2400;
                 }
 
@@ -340,26 +409,33 @@ export function EscenaEspacial({ planeta = true, oscuro = true }: { planeta?: bo
                     const tx = c.x - (c.vx / norma) * c.largo;
                     const ty = c.y - (c.vy / norma) * c.largo;
 
-                    const grad = ctx.createLinearGradient(c.x, c.y, tx, ty);
-                    grad.addColorStop(0, `${paleta.cometa[0]}${alpha})`);
-                    grad.addColorStop(0.35, `${paleta.cometa[1]}${alpha * 0.42})`);
-                    grad.addColorStop(1, `${paleta.cometa[1]}0)`);
-
-                    ctx.strokeStyle = grad;
-                    ctx.lineWidth = 1.3;
+                    // La cola: la línea fina de siempre; los marcados suman antes un brillo ancho
+                    // y suave por debajo (sobre un cielo claro la línea sola se perdía).
+                    const trazos: [number, number][] = paleta.cometasMarcados ? [[5, 0.22], [1.8, 1]] : [[1.3, 1]];
                     ctx.lineCap = 'round';
-                    ctx.beginPath();
-                    ctx.moveTo(c.x, c.y);
-                    ctx.lineTo(tx, ty);
-                    ctx.stroke();
+                    for (const [ancho, k] of trazos) {
+                        const grad = ctx.createLinearGradient(c.x, c.y, tx, ty);
+                        grad.addColorStop(0, `${paleta.cometa[0]}${(alpha * k).toFixed(3)})`);
+                        grad.addColorStop(0.35, `${paleta.cometa[1]}${(alpha * k * 0.42).toFixed(3)})`);
+                        grad.addColorStop(1, `${paleta.cometa[1]}0)`);
+                        ctx.strokeStyle = grad;
+                        ctx.lineWidth = ancho;
+                        ctx.beginPath();
+                        ctx.moveTo(c.x, c.y);
+                        ctx.lineTo(tx, ty);
+                        ctx.stroke();
+                    }
 
-                    // Cabeza: apenas un punto con halo, para que se lea lejano.
-                    const halo = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, 5);
-                    halo.addColorStop(0, `${paleta.cometa[0]}${alpha})`);
+                    // Cabeza: apenas un punto con halo, para que se lea lejano. En los marcados, un
+                    // poco más grande y con el centro lleno: se lee como meteorito y no como una raya.
+                    const rCabeza = paleta.cometasMarcados ? 6 : 5;
+                    const halo = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, rCabeza);
+                    halo.addColorStop(0, `${paleta.cometa[0]}${alpha.toFixed(3)})`);
+                    if (paleta.cometasMarcados) halo.addColorStop(0.4, `${paleta.cometa[0]}${(alpha * 0.5).toFixed(3)})`);
                     halo.addColorStop(1, `${paleta.cometa[0]}0)`);
                     ctx.fillStyle = halo;
                     ctx.beginPath();
-                    ctx.arc(c.x, c.y, 5, 0, Math.PI * 2);
+                    ctx.arc(c.x, c.y, rCabeza, 0, Math.PI * 2);
                     ctx.fill();
                 }
             }
@@ -391,7 +467,7 @@ export function EscenaEspacial({ planeta = true, oscuro = true }: { planeta?: bo
     const escalaAnillo = esMovil ? RING_SCALE_MOVIL : RING_SCALE;
 
     return (
-        <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden="true">
+        <div ref={raizRef} className="pointer-events-none inset-0 z-0 overflow-hidden" style={{ position: contenedor ? 'absolute' : 'fixed' }} aria-hidden="true">
             {/* Estrellas y cometas: van juntos en el canvas, porque las estrellas
                 ahora titilan y hay que repintarlas frame a frame igual que a los
                 cometas. */}
@@ -442,10 +518,30 @@ export function EscenaEspacial({ planeta = true, oscuro = true }: { planeta?: bo
                                 de abajo. Va DESPUÉS del resplandor para tapar la mitad
                                 que cae del lado de adentro — el planeta queda negro y la
                                 luz se ve solo por encima del horizonte. */}
-                            <path d={`${horizonte} L${W} ${H} L0 ${H} Z`} fill={paleta.planeta} />
+                            <path d={`${horizonte} L${W} ${H} L0 ${H} Z`} style={{ fill: paleta.planeta }} />
 
                             {/* La "línea del amanecer", nítida, al final de todo. */}
                             <path d={horizonte} fill="none" stroke={paleta.linea} strokeWidth={1.6} />
+                        </svg>
+                    )}
+
+                    {/* El satélite del logo sobre el anillo de adentro: entra por un costado y sale
+                        por el otro (la opacidad lo funde en las puntas). En su propia capa, para no
+                        tocar el dibujo del planeta. */}
+                    {planeta && satelite && W > 0 && !sinMovimiento && (
+                        <svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`} className="absolute inset-0" focusable="false">
+                            <defs>
+                                <radialGradient id={idHalo}>
+                                    <stop offset="0" stopColor={paleta.satelite} stopOpacity={isDark ? 0.9 : 0.45} />
+                                    <stop offset="1" stopColor="#3B82F6" stopOpacity="0" />
+                                </radialGradient>
+                            </defs>
+                            <g>
+                                <animateMotion path={arco(W / 2, cy, escalaAnillo[3] * R, W)} dur="38s" repeatCount="indefinite" />
+                                <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.08;0.92;1" dur="38s" repeatCount="indefinite" />
+                                <circle r={9} fill={`url(#${idHalo})`} />
+                                <circle r={2.6} fill={paleta.satelite} />
+                            </g>
                         </svg>
                     )}
                 </div>

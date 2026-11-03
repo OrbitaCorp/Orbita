@@ -33,7 +33,8 @@ export const CSS_ESPACIOS = `
   .tu-eq-datos { display: flex; flex-direction: column; gap: 7px; font-size: 13px; color: var(--color-body); }
   .tu-eq-datos > span { display: flex; align-items: center; gap: 8px; min-width: 0; }
   .tu-eq-datos > span > svg { flex-shrink: 0; color: var(--color-muted); }
-  .tu-eq-nuevo { min-height: 180px; border-radius: var(--rv-r); border: 1px dashed var(--color-border-strong); background: transparent; color: var(--color-muted); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+  /* La tarjeta punteada de "agregar" va suelta sobre el fondo del panel: en claro, sobre el cielo, el apagado no llega a AA. */
+  .tu-eq-nuevo { min-height: 180px; border-radius: var(--rv-r); border: 1px dashed var(--color-border-strong); background: transparent; color: var(--rv-tinta-fondo, var(--color-muted)); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; }
   @media (hover: hover) { .tu-eq-nuevo:hover { border-color: var(--color-primary); color: var(--color-primary); } }
   .tu-eq-nuevo:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .tu-eq-pie { display: flex; gap: 8px; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--color-border); }

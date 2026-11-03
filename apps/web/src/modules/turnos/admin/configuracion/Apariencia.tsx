@@ -529,7 +529,7 @@ function BocetoSimple({ diseno, c, radio }: { diseno: DisenoSimple; c: Paleta; r
 
 function NotaAproximada() {
   return (
-    <p style={{ display: 'flex', gap: 7, alignItems: 'flex-start', fontSize: 12, color: 'var(--color-muted)', margin: '12px 2px 0', lineHeight: 1.5 }}>
+    <p style={{ display: 'flex', gap: 7, alignItems: 'flex-start', fontSize: 12, color: 'var(--rv-tinta-fondo, var(--color-muted))', margin: '12px 2px 0', lineHeight: 1.5 }}>
       <Info size={13} aria-hidden style={{ flexShrink: 0, marginTop: 2 }} />
       <span>La vista previa muestra tu sitio con la plantilla, el acento, la letra, los bordes y la foto que elegiste: es lo que se guarda. El diseño de la portada, el estilo del botón, los textos, el logo y el orden de las secciones se ven en las miniaturas.</span>
     </p>
@@ -581,7 +581,7 @@ export const CSS_APARIENCIA = `
   .tuc-forma-zona { margin: 0 0 26px; min-width: 0; }
   /* El subtítulo de cada zona queda suelto sobre el fondo de la página (en claro, donde baja la
      curva del horizonte del panel): tinta de fondo del kit. */
-  .tuc-forma-zona > .tuc-card-bajada { color: var(--rv-tinta-fondo, var(--color-muted)); }
+  .tuc-forma-zona > .tuc-card-bajada, .tuc-riel-cab .tuc-card-bajada { color: var(--rv-tinta-fondo, var(--color-muted)); }
   .tuc-formas { margin-top: 12px; max-width: 900px; }
   .tuc-forma { display: flex; align-items: flex-start; gap: 12px; text-align: left; padding: 14px 46px 14px 14px; }
   .tuc-forma-ico { width: 40px; height: 40px; border-radius: 11px; flex-shrink: 0; display: grid; place-items: center; color: var(--color-primary); background: var(--color-primary-bg); }
