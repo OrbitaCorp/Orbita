@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { esRutaInterna, inline, parsear, sinMarcaAbierta } from './markdown'
+import { esRutaInterna, inline, parsear, sinMarcaAbierta } from './parser'
 
 describe('inline', () => {
   it('negrita, cursiva y código', () => {
