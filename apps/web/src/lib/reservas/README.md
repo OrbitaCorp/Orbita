@@ -6,8 +6,9 @@ Turnos, Alquileres y Gimnasio son módulos separados (decisión de Ale, 26/10/20
 importa código de otro. Cada uno tiene sus datos, su sitio público, su panel y sus pasos del alta,
 y se puede cambiar, borrar o pasar a otra persona sin tocar a los demás.
 
-Hoy los tres son demos **sin backend**: corren solo en el navegador, con datos de ejemplo, y lo que
-la persona cambia queda guardado en ese navegador (localStorage).
+Hoy los tres son demos que corren en el navegador, con datos de ejemplo, y lo que la persona cambia
+queda guardado en ese navegador (localStorage); el backend compartido ya existe (ver más abajo) y
+cada módulo se conecta cuando su responsable lo hace.
 
 ## Entonces, ¿por qué se comparte esto?
 
@@ -50,9 +51,15 @@ Un cambio acá le llega a todos los que lo usan: corré `pnpm exec vitest run sr
   (Tienda, Turnos, Alquileres y Gimnasio), en un solo sentido: el alta los importa a ellos, ninguno
   importa el alta. El código de Alquileres y Gimnasio se carga recién cuando alguien elige uno de
   esos módulos, así el alta real de producción no lo baja.
-- **Backend:** los módulos no tienen, y la sección **Módulos** del superadmin tampoco: es solo
-  visual. El plan de trabajo y la auditoría de los tres viven en `src/modules/superadmin/modulos/`
-  y lo que se marca queda en el navegador. Ahí están juntos porque es la gestión del equipo, quién
-  hace qué y para cuándo, no una parte de los módulos: ningún módulo lo lee ni lo necesita para andar.
+- **Backend:** desde el 03/11/2026 los tres comparten UN motor de reservas en la API
+  (`apps/api/src/reservas`, contrato en su README): qué se reserva, cuándo, con qué cupo, en qué
+  estado está y las reglas que lo mantienen íntegro aunque dos personas toquen el botón a la vez.
+  En la web lo usan por el cliente tipado `src/lib/reservasApi/` (`panel` y `sitio(slug)`), cada uno
+  con su `modulo`: sigue sin haber imports entre módulos. Las demos todavía corren con datos del
+  navegador hasta que cada responsable conecte su módulo (tareas del plan en Módulos).
+- La sección **Módulos** del superadmin sigue sin API: es solo visual. El plan de trabajo y la
+  auditoría de los tres viven en `src/modules/superadmin/modulos/` y lo que se marca queda en el
+  navegador. Ahí están juntos porque es la gestión del equipo, quién hace qué y para cuándo, no una
+  parte de los módulos: ningún módulo lo lee ni lo necesita para andar.
 - **eslint** (`apps/web/eslint.config.mjs`) marca como error un import de un módulo a otro, para que
   nadie los mezcle sin darse cuenta.

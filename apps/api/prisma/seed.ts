@@ -54,6 +54,9 @@ const PERMISSIONS: Array<{ group: string; code: string; label: string }> = [
   { group: 'Mensajes', code: 'messages.view', label: 'Ver mensajes' },
   { group: 'Mensajes', code: 'messages.manage', label: 'Responder mensajes' },
   { group: 'Avanzado', code: 'advanced.manage', label: 'Gestionar Avanzado' },
+  { group: 'Reservas', code: 'reservas.view', label: 'Ver reservas' },
+  { group: 'Reservas', code: 'reservas.manage', label: 'Gestionar reservas' },
+  { group: 'Reservas', code: 'reservas.config', label: 'Configurar reservas' },
 ];
 
 // Permisos por rol default. empleado suma *.view de catálogo/equipo (y ahora
@@ -65,7 +68,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   admin: PERMISSIONS.map((p) => p.code), // todo (los casos owner-only usan @Roles('owner') directo)
   empleado: [
     'orders.view', 'customers.view', 'inventory.view', 'catalog.view', 'config.team.view',
-    'messages.view', 'messages.manage',
+    'messages.view', 'messages.manage', 'reservas.view', 'reservas.manage',
   ],
 };
 

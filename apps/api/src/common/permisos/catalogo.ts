@@ -38,6 +38,12 @@ export const PERMISSIONS: Array<{ group: string; code: string; label: string }> 
   { group: 'Mensajes', code: 'messages.view', label: 'Ver mensajes' },
   { group: 'Mensajes', code: 'messages.manage', label: 'Responder mensajes' },
   { group: 'Avanzado', code: 'advanced.manage', label: 'Gestionar Avanzado' },
+  // Reservas (Turnos, Alquileres y Gimnasio, 03/11/2026): ver la agenda, darlas/moverlas/cancelarlas/cobrarlas,
+  // y configurar recursos, servicios, reglas y bloqueos. Los negocios existentes los reciben por la migración
+  // 20261103120000_reservas (view y manage a owner/admin/empleado; config a owner/admin).
+  { group: 'Reservas', code: 'reservas.view', label: 'Ver reservas' },
+  { group: 'Reservas', code: 'reservas.manage', label: 'Gestionar reservas' },
+  { group: 'Reservas', code: 'reservas.config', label: 'Configurar reservas' },
 ];
 
 // Los códigos solos: lo que recibe el dueño, que pasa por todo (ver PermissionsGuard).

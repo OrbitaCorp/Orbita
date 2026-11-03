@@ -41,24 +41,24 @@ model Business {
   // entran al panel con un miembro `readOnly` y lo que "crean" vive solo en
   // su localStorage; el servidor rechaza cualquier escritura pública sobre
   // este negocio (ver DemoGuard). Se marca a mano, nunca desde la app.
-  isDemo Boolean @default(false) @map("is_demo")
+  isDemo                 Boolean   @default(false) @map("is_demo")
   // Moderación (06/10/2026): el equipo de Órbita saca la tienda de Google y del
   // directorio (orbita.site/tiendas) SIN suspenderla, así que la tienda sigue
   // vendiendo. Es la palanca para un caso dudoso o una denuncia que se está
   // investigando: suspender corta las ventas, esto solo corta la visibilidad.
   // Lo prende y apaga solo el superadmin (con registro en PlatformAdminLog);
   // el dueño no lo ve ni lo toca.
-  hiddenFromSearch       Boolean @default(false) @map("hidden_from_search")
-  hiddenFromSearchReason String? @map("hidden_from_search_reason")
+  hiddenFromSearch       Boolean   @default(false) @map("hidden_from_search")
+  hiddenFromSearchReason String?   @map("hidden_from_search_reason")
   // Search Console (ver search-console/): la última vez que se le envió a Google el
   // sitemap del SUBDOMINIO de la tienda (slug.orbita.site, bajo la propiedad de
   // dominio orbita.site). Se reenvía cada tanto; null = todavía nunca.
-  gscSitemapAt DateTime? @map("gsc_sitemap_at")
+  gscSitemapAt           DateTime? @map("gsc_sitemap_at")
   // Hasta qué instante están "al día" las fechas de los datos de la demo. Los
   // pedidos, pagos, visitas, etc. se sembraron relativos a un momento; cada
   // tanto se corren hacia adelante lo que pasó desde acá (DemoFechasService),
   // así los reportes de la demo nunca quedan vacíos. null = no es la demo.
-  demoFechasAl DateTime? @map("demo_fechas_al")
+  demoFechasAl           DateTime? @map("demo_fechas_al")
 
   // Datos del wizard de onboarding (RBT-293) — se completan progresivamente
   // mientras isActive: false, vía PUT /onboarding/business.
@@ -100,7 +100,12 @@ model Business {
   payments             Payment[]
   mpCredentials        MpCredentials?
   whatsappConnection   WhatsappConnection?
+  whatsappBotConfig    WhatsappBotConfig?
+  whatsappBotTurns     WhatsappBotTurn[]
   instagramConnection  InstagramConnection?
+  instagramEarlyAccess InstagramEarlyAccess?
+  instagramPosts       InstagramPost[]
+  instagramSettings    InstagramSettings?
   discounts            Discount[]
   discountRedemptions  DiscountRedemption[]
   returns              Return[]
@@ -133,6 +138,14 @@ model Business {
   orbiTurns            OrbiTurn[]
   orbiCupoAjustes      OrbiCupoAjuste[]
   orbiCupoMiembros     OrbiCupoMiembro[]
+  // Reservas (Turnos, Alquileres y Gimnasio): el motor compartido, ver el bloque al final.
+  reservasConfig       ReservaConfig[]
+  reservasRecursos     ReservaRecurso[]
+  reservasServicios    ReservaServicio[]
+  reservas             Reserva[]
+  reservasHistorial    ReservaHistorial[]
+  reservasEspera       ReservaEspera[]
+  reservasBloqueos     ReservaBloqueo[]
 
   @@map("businesses")
 }
@@ -200,6 +213,11 @@ model BusinessConfig {
   // Los dos opcionales: un negocio puede seguir operando solo con alias.
   transferCbu    String? @map("transfer_cbu")
   transferHolder String? @map("transfer_holder")
+  // Entidad (banco o billetera) de la cuenta del alias. Junto con alias y
+  // titular se muestra en el checkout de "Coordinar por WhatsApp" para que el
+  // cliente que quiera adelantar el pago no tenga que pedirlos por chat. Los
+  // tres son opcionales.
+  transferBank   String? @map("transfer_bank") @db.VarChar(80)
 
   // Medios que se aceptan puntualmente AL RETIRAR en el local — puede ser
   // distinto de los medios de pago online (ej: acepta tarjeta al retirar
@@ -355,42 +373,42 @@ model StorefrontConfig {
   headerLinks Json? @map("header_links") // [{ id, label, on }]
 
   // Toggles de storefront
-  showRating            Boolean @default(true) @map("show_rating")
-  showNewBadge          Boolean @default(true) @map("show_new_badge")
-  showWhatsapp          Boolean @default(true) @map("show_whatsapp")
-  showLowStock          Boolean @default(false) @map("show_low_stock")
-  showOfferBadge        Boolean @default(true) @map("show_offer_badge")
-  showSearch            Boolean @default(true) @map("show_search")
-  showCategoriesSection Boolean @default(true) @map("show_categories_section")
-  showFooter            Boolean @default(true) @map("show_footer")
-  showSocialFooter      Boolean @default(true) @map("show_social_footer")
-  showAnnouncementBar   Boolean @default(true) @map("show_announcement_bar") // banner debajo del header (usa shippingText)
+  showRating             Boolean @default(true) @map("show_rating")
+  showNewBadge           Boolean @default(true) @map("show_new_badge")
+  showWhatsapp           Boolean @default(true) @map("show_whatsapp")
+  showLowStock           Boolean @default(false) @map("show_low_stock")
+  showOfferBadge         Boolean @default(true) @map("show_offer_badge")
+  showSearch             Boolean @default(true) @map("show_search")
+  showCategoriesSection  Boolean @default(true) @map("show_categories_section")
+  showFooter             Boolean @default(true) @map("show_footer")
+  showSocialFooter       Boolean @default(true) @map("show_social_footer")
+  showAnnouncementBar    Boolean @default(true) @map("show_announcement_bar") // banner debajo del header (usa shippingText)
   // Pedido explícito del dueño: que el mensaje del banner se pueda mostrar
   // como cartelera (se desliza de derecha a izquierda) en vez de quedarse
   // fijo centrado — mismo criterio de "3X1 + ENVÍO GRATIS" corriendo en
   // loop que mandó de referencia. false = comportamiento de siempre
   // (centrado, quieto), no rompe ninguna tienda existente.
-  announcementScroll    Boolean @default(false) @map("announcement_scroll")
-  showStatsBar          Boolean @default(true) @map("show_stats_bar") // barra debajo del slider del hero
+  announcementScroll     Boolean @default(false) @map("announcement_scroll")
+  showStatsBar           Boolean @default(true) @map("show_stats_bar") // barra debajo del slider del hero
   // Banner de imagen a pantalla completa en medio del home, con efecto
   // parallax (fondo fijo mientras el resto de la página se desplaza) —
   // pedido explícito del dueño, con una tienda de referencia. false por
   // default: es una sección nueva, no tiene que aparecer sola en ninguna
   // tienda existente hasta que el dueño suba su propia imagen y la prenda.
-  showParallaxBanner    Boolean @default(false) @map("show_parallax_banner")
+  showParallaxBanner     Boolean @default(false) @map("show_parallax_banner")
   // Tira de marcas con las que trabaja el negocio, en carrusel: los logos
   // van en gris y toman color al pasar el mouse — pedido explícito del
   // dueño, con una tienda de referencia (una relojería con EUROTIME/CASIO/
   // G-SHOCK). false por default, igual que el parallax: es una sección
   // nueva, no tiene que aparecer sola en ninguna tienda existente hasta que
   // el dueño cargue sus marcas y la prenda.
-  showBrands            Boolean @default(false) @map("show_brands")
+  showBrands             Boolean @default(false) @map("show_brands")
   // Sección de video en el home — YouTube, Vimeo, o el archivo directo.
   // Autocontenida, mismo criterio que el parallax y las marcas (on/off
   // propio, false por default: no aparece sola en ninguna tienda existente
   // hasta que el dueño pegue un link y la prenda). Va después del parallax
   // y antes del pie — pedido explícito del dueño.
-  showVideo             Boolean @default(false) @map("show_video")
+  showVideo              Boolean @default(false) @map("show_video")
   // Los cuatro estantes de productos del home clásico, cada uno con su
   // interruptor (Ale, 19/09). true por default: son los que ya se veían.
   // Cada uno muestra lo que dice su nombre (ver Inicio.tsx): destacados =
@@ -570,20 +588,20 @@ enum ThemePreference {
 }
 
 model Role {
-  id          String   @id @default(uuid())
-  businessId  String   @map("business_id")
-  name        String
-  description String?
-  color       String?
-  isDefault   Boolean  @default(false) @map("is_default") // roles del sistema, no editables
+  id                 String   @id @default(uuid())
+  businessId         String   @map("business_id")
+  name               String
+  description        String?
+  color              String?
+  isDefault          Boolean  @default(false) @map("is_default") // roles del sistema, no editables
   // Qué avisos por EMAIL reciben los miembros con este rol (lista de claves de
   // evento, ver notification-events.ts). null = todos: es lo que pasaba antes de
   // que existiera esta columna, así que los roles que ya estaban no cambian. El
   // rol de propietario recibe todo siempre, sin mirar esto. La campanita del
   // panel es del negocio entero, no depende del rol.
-  notificationEvents Json?   @map("notification_events")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  notificationEvents Json?    @map("notification_events")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
 
   business        Business         @relation(fields: [businessId], references: [id])
   members         Member[]
@@ -628,6 +646,9 @@ model Customer {
   avatarUrl           String?   @map("avatar_url")
   whatsappId          String?   @map("whatsapp_id") // wa_id de Meta (dígitos, con código de país): identifica al cliente en el canal WhatsApp
   instagramId         String?   @map("instagram_id") // IGSID: id de la persona en Instagram, propio de cada cuenta de negocio (no es un teléfono)
+  // true = el Customer lo creó solo un chat de WhatsApp/Instagram (es el "dueño" técnico de la charla, no un cliente del
+  // negocio): no se lista en Clientes ni cuenta en los números mientras no tenga pedidos. Ver `soloClientesReales`.
+  isChatContact       Boolean   @default(false) @map("is_chat_contact")
   passwordHash        String?   @map("password_hash")
   googleId            String?   @map("google_id") // sub del id_token de Google — vincula, no reemplaza el password
   emailVerified       Boolean   @default(false) @map("email_verified")
@@ -645,6 +666,7 @@ model Customer {
   emailLogs         EmailLog[]
   personalDiscounts Discount[]
   gameSessions      GameSession[]
+  reservas          Reserva[]
 
   @@unique([businessId, email])
   @@unique([businessId, googleId])
@@ -836,6 +858,10 @@ model Product {
   // Estrella en la grilla del panel (no en el wizard de creación) — alimenta la
   // sección "Destacados" del storefront público. No confundir con `status`.
   isFeatured    Boolean       @default(false) @map("is_featured")
+  // "Se hace por pedido": no lleva stock. Se muestra en la tienda aunque no haya unidades, pero con la ficha de vidriera:
+  // sin carrito ni compra, solo "Consultar por WhatsApp". Al guardarlo, todas sus variantes quedan con showStock=false
+  // (así las alertas, el inventario y los reportes de stock lo ignoran) y nunca se descuenta ni se repone stock.
+  byOrder       Boolean       @default(false) @map("by_order")
   inventoryType String        @default("standard") @map("inventory_type") // standard | serialized | fractional | batch | simple
   // "Fondo con IA" (modo premium, ver ImageStudioService): qué motor generativo
   // usar. flat (plano — indumentaria, la mayoría del catálogo) va a Gemini;
@@ -944,6 +970,10 @@ model ProductVariant {
   // eso es quantity:0 con isActive:true (temporal); esto es una decisión del
   // dueño de no ofrecer esa combinación (puede revertirse sin perder nada).
   isActive     Boolean  @default(true) @map("is_active")
+  // Solo cuenta en una VIDRIERA (business.mode = SHOWCASE): false = el negocio no cargó stock de esta variante, así que
+  // la tienda no muestra unidades, ni "Sin stock", ni "Últimas unidades", y no deshabilita la combinación. En una
+  // tienda con checkout el stock es obligatorio y este campo se ignora (siempre se muestra).
+  showStock    Boolean  @default(true) @map("show_stock")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
@@ -970,12 +1000,12 @@ model VariantOptionValue {
 }
 
 model ProductImage {
-  id              String   @id @default(uuid())
-  productId       String   @map("product_id")
-  optionValueId   String?  @map("option_value_id") // FK → product_option_values (ej: valor "Negro")
-  url             String // Supabase Storage
-  position        Int      @default(0)
-  isPrimary       Boolean  @default(false) @map("is_primary")
+  id                String   @id @default(uuid())
+  productId         String   @map("product_id")
+  optionValueId     String?  @map("option_value_id") // FK → product_option_values (ej: valor "Negro")
+  url               String // Supabase Storage
+  position          Int      @default(0)
+  isPrimary         Boolean  @default(false) @map("is_primary")
   // Compuesta por ImageStudioService ("Fondo con IA"), no una foto tal cual
   // la subió el vendedor — el storefront usa esto para mostrarla con
   // object-fit:cover (llena el recuadro, sin franjas) en vez de contain: acá
@@ -983,14 +1013,14 @@ model ProductImage {
   // tocar nunca el producto, algo que NO se puede asumir de una foto
   // cualquiera del vendedor (ver comentario de ProductCard.tsx/Thumb.tsx
   // sobre por qué esas usan contain).
-  hasAiBackground Boolean  @default(false) @map("has_ai_background")
+  hasAiBackground   Boolean  @default(false) @map("has_ai_background")
   // El sistema le quitó el fondo ("Quitar fondo", modelo local): `url` es el
   // PNG/webp transparente y `originalUrl` la foto tal cual la subió el
   // vendedor — el panel las usa para mostrar el botón "Sin fondo" al editar y
   // poder volver atrás. `originalUrl` es null si nunca se le quitó el fondo.
   backgroundRemoved Boolean  @default(false) @map("background_removed")
   originalUrl       String?  @map("original_url")
-  createdAt       DateTime @default(now()) @map("created_at")
+  createdAt         DateTime @default(now()) @map("created_at")
 
   product     Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
   optionValue ProductOptionValue? @relation(fields: [optionValueId], references: [id])
@@ -1577,6 +1607,17 @@ model Conversation {
   customerId String   @map("customer_id") // FK real (antes era string nombre)
   isUnread   Boolean  @default(true) @map("is_unread")
   isArchived Boolean  @default(false) @map("is_archived")
+  // Orbi atendiendo este chat de WhatsApp: DEFAULT sigue el modo general del negocio, ON/OFF lo decide el dueño para
+  // este chat, PAUSADO es que entró una persona y Orbi se calló, DERIVADO que Orbi pidió que lo atienda una persona.
+  // PAUSADO y DERIVADO solo los levanta el dueño (a mano).
+  botEstado     WhatsappBotChatEstado @default(DEFAULT) @map("bot_estado")
+  botMotivo     String?               @map("bot_motivo") // por qué está PAUSADO o DERIVADO, para mostrarlo en el chat
+  botCambiadoAt DateTime?             @map("bot_cambiado_at")
+  // El pedido que Orbi está armando con el cliente (items validados con su precio), a la espera de que confirme: se vence a
+  // los 30 minutos. null = no hay ninguno.
+  botBorrador   Json?                 @map("bot_borrador")
+  // Cuándo se le avisó por última vez al dueño que este chat necesita atención: evita mandar un correo por cada mensaje.
+  botAvisoAt    DateTime?             @map("bot_aviso_at")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
@@ -1590,15 +1631,17 @@ model Conversation {
 }
 
 model Message {
-  id             String        @id @default(uuid())
-  conversationId String        @map("conversation_id")
+  id             String         @id @default(uuid())
+  conversationId String         @map("conversation_id")
   sender         MessageSender // enum unificado (antes 'cli'/'me' vs 'cliente'/'tienda')
   text           String
-  orderId        String?       @map("order_id") // mención opcional a un pedido
+  orderId        String?        @map("order_id") // mención opcional a un pedido
   channel        MessageChannel @default(STOREFRONT) // por dónde entró/salió: el chat de la tienda o WhatsApp
-  externalId     String?       @unique @map("external_id") // id del mensaje en Meta (wamid): idempotencia del webhook y cruce con los estados
-  deliveryStatus String?       @map("delivery_status") // solo WhatsApp saliente: sent | delivered | read | failed
-  createdAt      DateTime      @default(now()) @map("created_at") // timestamp real (antes string display)
+  externalId     String?        @unique @map("external_id") // id del mensaje en Meta (wamid): idempotencia del webhook y cruce con los estados
+  deliveryStatus String?        @map("delivery_status") // solo WhatsApp saliente: sent | delivered | read | failed
+  viaOrbi        Boolean        @default(false) @map("via_orbi") // lo contestó Orbi (el bot de atención de WhatsApp), no una persona
+  attachments    Json? // Instagram: [{ tipo: image|video|audio|file, url }] — archivos que llegaron o se mandaron con el mensaje
+  createdAt      DateTime       @default(now()) @map("created_at") // timestamp real (antes string display)
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
@@ -1629,6 +1672,7 @@ model InstagramConnection {
   username       String?                   @map("username") // @usuario, solo para mostrar en el panel
   accessToken    String                    @map("access_token") // CIFRADO (pgp_sym_encrypt)
   tokenExpiresAt DateTime                  @map("token_expires_at")
+  scopes         String?                   @map("scopes") // permisos concedidos, separados por coma (instagram_business_content_publish habilita Publicaciones); null = conexión vieja, solo mensajes
   status         InstagramConnectionStatus @default(ACTIVE)
   createdAt      DateTime                  @default(now()) @map("created_at")
   updatedAt      DateTime                  @updatedAt @map("updated_at")
@@ -1638,9 +1682,105 @@ model InstagramConnection {
   @@map("instagram_connections")
 }
 
+// Publicación hecha en Instagram desde Difusión → Publicaciones: queda el historial (con el enlace a
+// la publicación) de lo que Órbita subió en nombre del negocio. Puede ser una foto, un carrusel de
+// varias fotos y videos, o un video; de un producto o de archivos subidos desde la computadora.
+//
+// Instagram procesa los videos en su tiempo, más de lo que aguanta una llamada HTTP, así que la
+// publicación nace en PROCESSING con los contenedores ya creados en Instagram y el panel la sigue
+// llamando (continuar) hasta que pasa a PUBLISHED o FAILED. PUBLISHING es el instante de publicar: evita
+// que dos llamadas seguidas la publiquen dos veces. No lleva FK al producto (se puede borrar después):
+// el nombre queda de copia.
+model InstagramPost {
+  id                String              @id @default(uuid())
+  businessId        String              @map("business_id")
+  productId         String?             @map("product_id")
+  productName       String?             @map("product_name")
+  memberId          String?             @map("member_id") // quién la publicó
+  caption           String
+  status            InstagramPostStatus @default(PUBLISHED)
+  kind              String              @default("IMAGE") // IMAGE | CAROUSEL | VIDEO
+  media             Json                @default("[]") // [{ tipo: 'image' | 'video', url }] lo que se mandó, en orden
+  imageUrl          String?             @map("image_url") // miniatura para el historial: la primera foto
+  childContainerIds Json                @default("[]") @map("child_container_ids") // contenedores de cada elemento del carrusel
+  containerId       String?             @map("container_id") // el contenedor que se publica
+  tempPaths         Json                @default("[]") @map("temp_paths") // archivos temporales del almacenamiento a borrar al terminar
+  error             String?
+  igMediaId         String?             @unique @map("ig_media_id")
+  permalink         String?
+  scheduledAt       DateTime?           @map("scheduled_at") // SCHEDULED: cuándo se publica
+  plan              Json? // SCHEDULED y DRAFT: lo necesario para armarla después { formato, items: [{ origen, ref, tipo }] }
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @default(now()) @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@index([businessId, createdAt])
+  @@index([businessId, status])
+  @@index([status, scheduledAt])
+  @@map("instagram_posts")
+}
+
+enum InstagramPostStatus {
+  DRAFT // borrador: se guardó a medias, no sale sola
+  SCHEDULED // programada: sale sola a la hora de scheduledAt
+  PROCESSING
+  PUBLISHING
+  PUBLISHED
+  FAILED
+}
+
+// Ajustes de Instagram de un negocio (Difusión): respuestas automáticas de los mensajes y moderación de
+// comentarios. Una fila por negocio.
+model InstagramSettings {
+  id                String   @id @default(uuid())
+  businessId        String   @unique @map("business_id")
+  welcomeEnabled    Boolean  @default(false) @map("welcome_enabled")
+  welcomeText       String   @default("") @map("welcome_text")
+  awayEnabled       Boolean  @default(false) @map("away_enabled")
+  awayText          String   @default("") @map("away_text")
+  // Horario de atención en hora de Argentina ("09:00"–"18:00") y días en que se atiende (0 = domingo … 6 = sábado).
+  // Fuera de ese horario (o en un día que no se atiende) sale el mensaje de ausencia.
+  openFrom          String   @default("09:00") @map("open_from")
+  openTo            String   @default("18:00") @map("open_to")
+  openDays          Json     @default("[1,2,3,4,5]") @map("open_days")
+  moderationEnabled Boolean  @default(false) @map("moderation_enabled")
+  moderationWords   Json     @default("[]") @map("moderation_words") // palabras o frases: el comentario que las tenga se oculta
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@map("instagram_settings")
+}
+
 enum InstagramConnectionStatus {
   ACTIVE
   DISCONNECTED
+}
+
+// Pedido de acceso anticipado a Instagram. Mientras la app de Meta no tenga
+// acceso avanzado, solo las cuentas agregadas como evaluadoras pueden conectar:
+// el dueño deja su @usuario, el equipo lo suma como evaluador en Meta y marca el
+// pedido ENABLED, que abre la compuerta de ese negocio (ver
+// InstagramService.estaHabilitado). Un pedido por negocio.
+model InstagramEarlyAccess {
+  id           String                     @id @default(uuid())
+  businessId   String                     @unique @map("business_id")
+  username     String // @usuario de Instagram, sin la @
+  contactEmail String?                    @map("contact_email") // a quién avisar cuando se habilita; null = el propietario
+  status       InstagramEarlyAccessStatus @default(PENDING)
+  requestedAt  DateTime                   @default(now()) @map("requested_at")
+  enabledAt    DateTime?                  @map("enabled_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@map("instagram_early_access")
+}
+
+enum InstagramEarlyAccessStatus {
+  PENDING
+  ENABLED
 }
 
 // Conexión de un negocio con WhatsApp Business (Cloud API de Meta). Una por
@@ -1660,6 +1800,83 @@ model WhatsappConnection {
   business Business @relation(fields: [businessId], references: [id])
 
   @@map("whatsapp_connections")
+}
+
+enum WhatsappBotModo {
+  SELECCIONADOS // Orbi atiende solo los chats donde el dueño lo activa
+  TODOS // Orbi atiende todos los chats, salvo donde el dueño lo apaga o entra una persona
+}
+
+// Cómo atiende Orbi (lo elige el dueño): CONVERSACIONAL contesta todo con IA; MENU_Y_CONVERSACION saluda con un menú de
+// opciones y después conversa con IA; SOLO_MENU responde solo con el menú y respuestas fijas, sin gastar IA.
+enum WhatsappBotModalidad {
+  CONVERSACIONAL
+  MENU_Y_CONVERSACION
+  SOLO_MENU
+}
+
+// El menú como lista desplegable (hasta 10 opciones) o como botones (hasta 3).
+enum WhatsappMenuEstilo {
+  LISTA
+  BOTONES
+}
+
+enum WhatsappBotChatEstado {
+  DEFAULT
+  ON
+  OFF
+  PAUSADO
+  DERIVADO
+}
+
+// Orbi como atención al público por WhatsApp (función del paquete Avanzado): el interruptor general del negocio, cómo
+// elige los chats y lo que el dueño quiere que Orbi sepa. Una fila por negocio.
+model WhatsappBotConfig {
+  id            String          @id @default(uuid())
+  businessId    String          @unique @map("business_id")
+  enabled       Boolean         @default(false)
+  modo          WhatsappBotModo @default(SELECCIONADOS)
+  instrucciones String? // indicaciones del dueño para Orbi (tono, promociones, políticas), hasta 1000 caracteres
+  modalidad     WhatsappBotModalidad @default(CONVERSACIONAL)
+  menuEstilo    WhatsappMenuEstilo   @default(LISTA) @map("menu_estilo")
+  bienvenida    String? // saludo antes del menú; null = el de siempre
+  menuOpciones  Json?   @map("menu_opciones") // [{ id, titulo, descripcion?, activa, respuesta? }] en orden; null = el menú por defecto
+  // Orbi puede tomar pedidos (quedan pendientes, "coordinar por WhatsApp"): apagado por defecto, con topes por pedido.
+  tomaPedidos   Boolean @default(false) @map("toma_pedidos")
+  maxUnidades   Int     @default(10) @map("max_unidades")
+  maxMonto      Int     @default(200000) @map("max_monto") // en pesos
+  topeCreditos  Int?            @map("tope_creditos") // tope mensual propio del dueño, por debajo del cupo del plan
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@map("whatsapp_bot_configs")
+}
+
+// Una fila por respuesta de Orbi en WhatsApp: de acá sale lo que se gastó del cupo del mes. Sin texto a propósito (los
+// mensajes ya están en la conversación).
+model WhatsappBotTurn {
+  id               String   @id @default(uuid())
+  businessId       String   @map("business_id")
+  conversationId   String?  @map("conversation_id")
+  status           String // ok | error | quota | derivado | limite
+  rounds           Int      @default(0)
+  toolsUsed        String[] @default([]) @map("tools_used")
+  model            String?
+  provider         String?
+  promptTokens     Int?     @map("prompt_tokens")
+  completionTokens Int?     @map("completion_tokens")
+  costUsd          Decimal? @map("cost_usd") @db.Decimal(12, 6)
+  credits          Int      @default(0)
+  latencyMs        Int      @default(0) @map("latency_ms")
+  errorCategory    String?  @map("error_category")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@index([businessId, createdAt])
+  @@map("whatsapp_bot_turns")
 }
 
 enum WhatsappConnectionStatus {
@@ -2356,6 +2573,9 @@ model PlatformAdmin {
   // Cargo con el que firma las respuestas de Soporte ("CEO", "CTO"...). Es
   // texto libre y opcional: sin cargo, el negocio ve "Soporte de Órbita".
   jobTitle              String?           @map("job_title")
+  // Correo personal (Gmail, etc.): a donde viaja la contraseña temporal que genera el superadmin y,
+  // además del correo de la cuenta, el código del segundo factor. Opcional.
+  personalEmail         String?           @map("personal_email")
   isActive              Boolean           @default(true) @map("is_active")
   // Credenciales propias (auth password + Google). A diferencia de member/customer,
   // el email es ÚNICO GLOBAL: un super admin no está scopeado a ningún negocio.
@@ -2430,6 +2650,9 @@ model PlatformOutboundMail {
 enum PlatformAdminRole {
   SUPERADMIN // acceso total (fundadores)
   OPERATOR // soporte / operaciones (acceso acotado)
+  // Marketing (por ejemplo, Milagros): solo ve y usa lo que se le habilita a propósito (Marketing, Correo, Resumen y el
+  // conector de Claude). Cualquier otra parte del super panel le queda cerrada, aunque sea de lectura: ver PlatformAdminGuard.
+  MARKETING
 }
 
 // Segundo factor del login de platform admin (RBT-647): código de 6 dígitos
@@ -3050,12 +3273,12 @@ model CostLimit {
 }
 
 model CostAlert {
-  id              String    @id @default(cuid())
-  limitId         String    @map("limit_id")
-  percentReached  Int       @map("percent_reached")
-  currentValue    Decimal   @map("current_value") @db.Decimal(12, 4)
-  notifiedAt      DateTime  @default(now()) @map("notified_at")
-  acknowledgedAt  DateTime? @map("acknowledged_at")
+  id             String    @id @default(cuid())
+  limitId        String    @map("limit_id")
+  percentReached Int       @map("percent_reached")
+  currentValue   Decimal   @map("current_value") @db.Decimal(12, 4)
+  notifiedAt     DateTime  @default(now()) @map("notified_at")
+  acknowledgedAt DateTime? @map("acknowledged_at")
 
   limit CostLimit @relation(fields: [limitId], references: [id], onDelete: Cascade)
 
@@ -3080,7 +3303,6 @@ model StoreVisit {
   @@index([businessId, isCustom])
   @@map("store_visits")
 }
-
 
 // Pruebas de IA de la demo pública (demo.orbita.site): cuántas veces usó cada
 // función un mismo visitante en la semana. El visitante es anónimo y todos
@@ -3315,4 +3537,564 @@ model OrbiConversationAccess {
   @@index([conversationId])
   @@index([adminId, createdAt])
   @@map("orbi_conversation_access")
+}
+
+// ─── Marketing de Órbita: TikTok ─────────────────────────────────────────────
+// La cuenta de TikTok de la EMPRESA (no de un negocio) con la que se publican los
+// videos de marketing de Órbita (Content Posting API). Hay una sola, y la conecta
+// un superadmin desde Superadmin → Marketing → TikTok. Los tokens van CIFRADOS con
+// pgp_sym_encrypt, igual que WhatsappConnection e InstagramConnection: Node nunca
+// los cifra ni los descifra, lo hace Postgres. El de acceso dura 24 h y el de
+// renovación 365 días (se renuevan cada noche, ver TiktokService#renovarTokens).
+model MarketingTiktokAccount {
+  id               String   @id @default(uuid())
+  openId           String   @unique @map("open_id") // id de la cuenta en TikTok para esta app
+  displayName      String?  @map("display_name")
+  avatarUrl        String?  @map("avatar_url")
+  accessToken      String   @map("access_token") // CIFRADO (pgp_sym_encrypt)
+  refreshToken     String   @map("refresh_token") // CIFRADO (pgp_sym_encrypt)
+  accessExpiresAt  DateTime @map("access_expires_at")
+  refreshExpiresAt DateTime @map("refresh_expires_at")
+  scopes           String // los permisos que TikTok concedió, separados por coma
+  connectedBy      String?  @map("connected_by") // adminId del superadmin que la conectó
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  posts MarketingTiktokPost[]
+
+  @@map("marketing_tiktok_accounts")
+}
+
+// Cada video que se mandó a TikTok desde Órbita, con el estado que informa TikTok.
+model MarketingTiktokPost {
+  id           String   @id @default(uuid())
+  accountId    String   @map("account_id")
+  publishId    String   @unique @map("publish_id") // el que devuelve TikTok al iniciar la subida
+  title        String
+  privacyLevel String   @map("privacy_level") // PUBLIC_TO_EVERYONE, SELF_ONLY, etc.
+  videoUrl     String   @map("video_url") // de dónde se descargó el video
+  // PROCESSING_UPLOAD | PROCESSING_DOWNLOAD | SEND_TO_USER_INBOX | PUBLISH_COMPLETE | FAILED
+  status       String
+  failReason   String?  @map("fail_reason")
+  postId       String?  @map("post_id") // id público del video, cuando TikTok lo publica
+  createdBy    String?  @map("created_by") // adminId
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  account MarketingTiktokAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, createdAt])
+  @@map("marketing_tiktok_posts")
+}
+
+// ─── Marketing de Órbita: Prospección ────────────────────────────────────────
+// Negocios de Instagram a los que vale la pena escribirles, con el criterio de cliente ideal
+// (marketing/prospeccion/prospeccion.criterio.ts). Es solo lectura de datos PÚBLICOS de cuentas
+// profesionales, por la API oficial de Meta (Business Discovery): nada se envía ni se toca.
+//
+// Un prospecto es único por usuario de Instagram: si una cuenta se consulta de nuevo, se actualizan
+// sus datos y su puntaje, pero su estado, responsable y notas se conservan (así dos personas no le
+// escriben al mismo negocio). Un lote es una tanda de consultas; el análisis (el que hace Claude)
+// se guarda en el prospecto.
+model MarketingProspecto {
+  id               String    @id @default(uuid())
+  usuario          String    @unique // usuario de Instagram en minúsculas, sin @
+  datos            Json // lo público que devolvió Meta, resumido: bio, enlace, métricas, últimas publicaciones
+  evaluacion       Json // puntaje por palabras clave: { puntaje, nivel, accion, motivo, subrubro, partes }
+  analisis         Json? // lo que cargó Claude: subrubro, señales, nivel final, ángulo y mensaje sugerido
+  analizadoPor     String?   @map("analizado_por") // adminId
+  analizadoAt      DateTime? @map("analizado_at")
+  // NUEVO | CONTACTADO | RESPONDIO | DEMO | CLIENTE | DESCARTADO | NO_CONTACTAR
+  estado           String    @default("NUEVO")
+  responsableId    String?   @map("responsable_id") // adminId
+  notas            String?
+  ultimaConsultaAt DateTime  @default(now()) @map("ultima_consulta_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@index([estado])
+  @@index([ultimaConsultaAt])
+  @@map("marketing_prospectos")
+}
+
+model MarketingProspeccionLote {
+  id              String   @id @default(uuid())
+  creadoPor       String?  @map("creado_por") // adminId
+  usuarios        String[] // las cuentas que devolvieron datos
+  sinDatos        Json     @default("[]") @map("sin_datos") // [{ usuario, motivo }]: personales, privadas o inexistentes
+  versionCriterio String   @map("version_criterio")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("marketing_prospeccion_lotes")
+}
+
+// ─── Marketing de Órbita: conector MCP de la Prospección ─────────────────────
+// Claude (el de cada superadmin) se conecta a la Prospección por un conector MCP remoto. Para eso la API actúa de
+// servidor OAuth 2.1 (código + PKCE) con una sola regla: el que autoriza es un superadmin de Órbita, con correo del
+// dominio de la organización, y aprueba desde el panel (que ya tiene login con Google y segundo factor).
+// Los clientes se registran solos (registro dinámico) pero NO se guardan: el client_id va firmado y lleva adentro
+// sus direcciones de retorno. Acá solo se guarda lo que tiene que ser de un solo uso. Nada de esto se guarda en
+// claro: los códigos y los tokens de renovación van como hash SHA-256.
+model MarketingMcpCodigo {
+  id            String    @id @default(uuid())
+  codigoHash    String    @unique @map("codigo_hash")
+  adminId       String    @map("admin_id")
+  clientId      String    @map("client_id")
+  redirectUri   String    @map("redirect_uri")
+  codeChallenge String    @map("code_challenge")
+  expiraAt      DateTime  @map("expira_at")
+  usadoAt       DateTime? @map("usado_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([expiraAt])
+  @@map("marketing_mcp_codigos")
+}
+
+model MarketingMcpRefresh {
+  id         String    @id @default(uuid())
+  tokenHash  String    @unique @map("token_hash")
+  // Todos los tokens que salen de la misma autorización comparten familia: si alguien reusa uno ya rotado, se
+  // revoca la familia entera.
+  familiaId  String    @map("familia_id")
+  adminId    String    @map("admin_id")
+  clientId   String    @map("client_id")
+  expiraAt   DateTime  @map("expira_at")
+  revocadoAt DateTime? @map("revocado_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([adminId])
+  @@index([familiaId])
+  @@map("marketing_mcp_refresh")
+}
+
+// ─── Marketing de Órbita: cola de videos para aprobar ──────────────────────────
+// Los videos los genera cada persona del equipo en su propia computadora, con su Claude y el conector MCP
+// (ver src/marketing/videos/): sube el mp4 a R2 y lo registra acá. En el super panel se mira la cola; un video se
+// aprueba (queda como registro, con su archivo, y se puede descargar o publicar en TikTok / Instagram) o se
+// rechaza (se borra el archivo y el registro). Un pendiente que nadie revisa vence a los 7 días y se borra solo.
+// `estado`: SUBIENDO | PENDIENTE | APROBADO | PUBLICADO (lo rechazado no queda).
+model MarketingVideo {
+  id            String                     @id @default(uuid())
+  /**
+   * El superadmin cuyo Claude lo generó.
+   */
+  creadoPor     String?                    @map("creado_por")
+  titulo        String
+  /**
+   * REEL_9_16 | CUADRADO | HORIZONTAL_16_9
+   */
+  formato       String
+  guion         String                     @default("")
+  /**
+   * Texto sugerido para acompañar la publicación (con hashtags).
+   */
+  caption       String                     @default("")
+  duracionSeg   Int?                       @map("duracion_seg")
+  bytes         Int                        @default(0)
+  /**
+   * Clave del archivo en R2.
+   */
+  ruta          String                     @unique
+  estado        String                     @default("SUBIENDO")
+  /**
+   * Resultado de los controles de calidad automáticos: [{ nombre, ok, detalle }]
+   */
+  controles     Json                       @default("[]")
+  /// MARKETING (necesita la aprobación de la dirección) | TUTORIAL (interno: solo lo aprueba quien lo creó).
+  tipo          String                     @default("MARKETING")
+  /// Quiénes aprobaron: [{ adminId, fecha }]. La política (marketing/videos/politica-aprobacion.ts) decide cuándo alcanza.
+  /// Es interno: ni el panel ni el conector muestran quién aprobó.
+  aprobaciones  Json                       @default("[]")
+  /// El tutorial de la lista (marketing_tutoriales) que cubre este video, si es un tutorial.
+  tutorialId    String?                    @map("tutorial_id")
+  /// Si este video es una mejora de otro de la cola (se pide con «Mejorar con Claude»), el video que mejora.
+  mejoraDeId    String?                    @map("mejora_de_id")
+  comentarios   MarketingVideoComentario[]
+  aprobadoPor   String?                    @map("aprobado_por")
+  aprobadoAt    DateTime?                  @map("aprobado_at")
+  /**
+   * Dónde se publicó: [{ destino: 'tiktok' | 'instagram', id, fecha }]
+   */
+  publicaciones Json                       @default("[]")
+  /**
+   * Hasta cuándo vive sin que nadie lo apruebe (null una vez aprobado).
+   */
+  expiraAt      DateTime?                  @map("expira_at")
+  createdAt     DateTime                   @default(now()) @map("created_at")
+  updatedAt     DateTime                   @updatedAt @map("updated_at")
+
+  @@index([estado, createdAt])
+  @@index([expiraAt])
+  @@map("marketing_videos")
+}
+
+// ─── Marketing de Órbita: lista de tutoriales (qué hay y qué falta) ───────────────
+// La lista de tutoriales del panel y de la tienda que el equipo va a ir produciendo. La actualiza el Claude de cada
+// persona por el conector (tutoriales_listar / tutoriales_actualizar) y también se puede corregir desde el panel.
+// `estado`: FALTA | EN_PROCESO | EN_REVISION (hay un video en la cola esperando) | HECHO.
+model MarketingTutorial {
+  id             String   @id @default(uuid())
+  grupo          String
+  grupoOrden     Int      @map("grupo_orden")
+  orden          Int
+  titulo         String   @unique
+  estado         String   @default("FALTA")
+  asignadoA      String?  @map("asignado_a")
+  /// Los de «Para mostrarle a tu cliente»: sirven también como promo.
+  opcional       Boolean  @default(false)
+  prioridadAlta  Boolean  @default(false) @map("prioridad_alta")
+  notas          String?
+  actualizadoPor String?  @map("actualizado_por")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([grupoOrden, orden])
+  @@map("marketing_tutoriales")
+}
+
+// Comentarios sobre un video de la cola: cualquiera del equipo puede opinar, en todas sus fases (para aprobar, aprobado,
+// pasado a borrador). Se borran junto con el video. Sirven también para que Claude sepa qué mejorar (videos_obtener).
+model MarketingVideoComentario {
+  id        String         @id @default(uuid())
+  videoId   String         @map("video_id")
+  video     MarketingVideo @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  adminId   String         @map("admin_id")
+  texto     String
+  createdAt DateTime       @default(now()) @map("created_at")
+
+  @@index([videoId, createdAt])
+  @@map("marketing_video_comentarios")
+}
+
+// ─── Reservas: el backend compartido de Turnos, Alquileres y Gimnasio ────────
+//
+// Un solo motor de reservas para los tres módulos (pedido de Ale, 03/11/2026:
+// "uno profesional de lo que es los 3 y que compartan"). Cada módulo tiene su
+// panel y su sitio; acá vive lo que los tres resuelven igual y donde NO puede
+// haber tres versiones: qué se reserva (un recurso), cuándo (un rango), con
+// qué cupo, en qué estado está, y las reglas que lo mantienen íntegro aunque
+// dos personas toquen el botón a la vez, alguien cancele o nunca termine.
+//
+// Integridad (ver src/reservas/README.md):
+// - Dos reservas de un recurso exclusivo (cupo 1) no se pueden pisar: lo
+//   garantiza la base con una restricción de exclusión (btree_gist) sobre
+//   (recurso_id, [inicio, fin)) para las filas que ocupan lugar, en la
+//   migración 20261103120000_reservas. No depende del código.
+// - Con cupo > 1 (clases) el service toma el candado de la fila del recurso
+//   (SELECT … FOR UPDATE) y cuenta adentro de la misma transacción: dos
+//   pedidos simultáneos para el último lugar salen de a uno.
+// - "Si no completa": la reserva nace RETENIDA con `retenidaHasta`; vencida,
+//   deja de ocupar lugar aunque nadie la haya barrido todavía (el service la
+//   vence antes de contar) y el cron la marca VENCIDA.
+// - "Doble clic": `claveIdempotencia` única por negocio; repetir el pedido
+//   devuelve la misma reserva.
+// - Toda transición de estado es compare-and-set sobre (id, businessId,
+//   estado actual, version): la segunda de dos acciones simultáneas recibe 409.
+
+enum ReservaModulo {
+  TURNOS
+  ALQUILERES
+  GIMNASIO
+}
+
+// Qué tipo de cosa se reserva. PROFESIONAL y ESPACIO son de Turnos (la agenda
+// de una persona o de una cabina); CANCHA, SALON y ALOJAMIENTO de Alquileres;
+// CLASE de Gimnasio (con cupo).
+enum ReservaRecursoTipo {
+  PROFESIONAL
+  ESPACIO
+  CANCHA
+  SALON
+  ALOJAMIENTO
+  CLASE
+}
+
+// RETENIDA: el lugar está tomado mientras la persona termina de reservar
+// (vence sola). PENDIENTE: a confirmar por el negocio (confirmación manual).
+// CONFIRMADA: reserva firme. COMPLETADA / AUSENTE: lo que pasó después del
+// turno. CANCELADA y VENCIDA: ya no ocupan lugar.
+enum ReservaEstado {
+  RETENIDA
+  PENDIENTE
+  CONFIRMADA
+  COMPLETADA
+  CANCELADA
+  VENCIDA
+  AUSENTE
+}
+
+enum ReservaOrigen {
+  TIENDA
+  PANEL
+}
+
+enum ReservaActor {
+  CLIENTE
+  NEGOCIO
+  SISTEMA
+}
+
+enum ReservaConfirmacion {
+  AUTOMATICA
+  MANUAL
+}
+
+enum ReservaEsperaEstado {
+  ESPERANDO
+  TOMADA
+  CANCELADA
+}
+
+// Reglas de reserva de un negocio para un módulo. Existe = el negocio usa ese
+// módulo. Lo crea el panel (PUT /reservas/config) y lo leen el sitio público y
+// el motor.
+model ReservaConfig {
+  id         String        @id @default(uuid())
+  businessId String        @map("business_id")
+  modulo     ReservaModulo
+  activo     Boolean       @default(true)
+
+  confirmacion ReservaConfirmacion @default(AUTOMATICA)
+  /// Cuántos minutos queda tomado el lugar mientras la persona termina (RETENIDA).
+  retencionMinutos Int @default(10) @map("retencion_minutos")
+  /// Con cuánta anticipación mínima se puede reservar desde el sitio (minutos) y hasta cuántos días adelante.
+  anticipacionMinimaMinutos Int @default(60) @map("anticipacion_minima_minutos")
+  anticipacionMaximaDias    Int @default(60) @map("anticipacion_maxima_dias")
+  /// Hasta cuántas horas antes del inicio el cliente puede cancelar o reprogramar por su cuenta.
+  cancelacionHastaHoras    Int @default(24) @map("cancelacion_hasta_horas")
+  reprogramacionHastaHoras Int @default(24) @map("reprogramacion_hasta_horas")
+  reprogramacionesMaximas  Int @default(2) @map("reprogramaciones_maximas")
+  /// Seña: porcentaje del precio (0 = sin seña) y si se devuelve cuando se cancela a tiempo.
+  senaPorcentaje   Int     @default(0) @map("sena_porcentaje")
+  senaReembolsable Boolean @default(true) @map("sena_reembolsable")
+  /// Reservas activas (futuras) que una misma persona puede tener a la vez desde el sitio. 0 = sin tope.
+  maximoActivasPorCliente Int @default(3) @map("maximo_activas_por_cliente")
+  /// Si al cancelar una reserva de un recurso lleno, el primero de la lista de espera toma el lugar.
+  listaDeEspera Boolean @default(true) @map("lista_de_espera")
+  /// Minutos libres entre una reserva y la siguiente (limpieza, descanso).
+  margenMinutos Int @default(0) @map("margen_minutos")
+  /// Horario semanal por defecto de los recursos sin horario propio:
+  /// { "1": [[540, 780], [900, 1200]], … } con 0 = domingo y minutos desde las 00:00 de Argentina.
+  horario Json
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@unique([businessId, modulo])
+  @@map("reservas_config")
+}
+
+// Lo que se reserva: la agenda de un profesional, una cabina, una cancha, un
+// salón, un alojamiento o una clase con cupo. El precio y la duración de
+// fábrica viven acá; Turnos los toma del servicio elegido.
+model ReservaRecurso {
+  id          String             @id @default(uuid())
+  businessId  String             @map("business_id")
+  modulo      ReservaModulo
+  tipo        ReservaRecursoTipo
+  nombre      String             @db.VarChar(120)
+  descripcion String?            @db.VarChar(500)
+  /// Cuántas reservas entran a la vez en el mismo rango. 1 = exclusivo (lo protege la base).
+  cupo        Int                @default(1)
+  /// Minutos de lo que se reserva (un turno de cancha, una noche no: para ALOJAMIENTO se ignora, una sesión de clase).
+  /// null = lo define el servicio (Turnos).
+  duracionMinutos Int?           @map("duracion_minutos")
+  /// Cada cuántos minutos arranca una franja; null = cada `duracionMinutos`.
+  pasoMinutos     Int?           @map("paso_minutos")
+  /// Minutos libres entre reservas; null = el de la config.
+  margenMinutos   Int?           @map("margen_minutos")
+  /// Canchas: cuántas franjas seguidas se pueden tomar en una sola reserva.
+  maximoSeguidos  Int            @default(1) @map("maximo_seguidos")
+  /// Por franja, por noche o por lugar. Turnos usa el precio del servicio.
+  precio          Decimal        @default(0) @db.Decimal(12, 2)
+  /// Horario semanal propio (mismo formato que ReservaConfig.horario); null = el de la config.
+  /// En una CLASE cada tramo es una sesión completa (no se parte en franjas).
+  horario         Json?
+  /// Lo que cada módulo necesita además: { checkIn, checkOut, nochesMinimas, extras: [{ id, nombre, precio }], profesor, disciplina, superficie… }.
+  datos           Json?
+  /// PROFESIONAL: el miembro del equipo cuya agenda es.
+  memberId        String?        @map("member_id")
+  orden           Int            @default(0)
+  activo          Boolean        @default(true)
+  eliminadoEn     DateTime?      @map("eliminado_en")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  business Business         @relation(fields: [businessId], references: [id])
+  reservas Reserva[]
+  esperas  ReservaEspera[]
+  bloqueos ReservaBloqueo[]
+
+  @@index([businessId, modulo])
+  @@map("reservas_recursos")
+}
+
+// Lo que se elige antes del recurso en Turnos (corte, consulta, sesión): trae
+// la duración y el precio. Alquileres y Gimnasio pueden no tener ninguno.
+model ReservaServicio {
+  id               String        @id @default(uuid())
+  businessId       String        @map("business_id")
+  modulo           ReservaModulo
+  nombre           String        @db.VarChar(120)
+  descripcion      String?       @db.VarChar(500)
+  duracionMinutos  Int           @map("duracion_minutos")
+  precio           Decimal       @default(0) @db.Decimal(12, 2)
+  reservableOnline Boolean       @default(true) @map("reservable_online")
+  /// Recursos que lo hacen; vacío = cualquiera del módulo.
+  recursoIds       String[]      @default([]) @map("recurso_ids")
+  orden            Int           @default(0)
+  activo           Boolean       @default(true)
+  eliminadoEn      DateTime?     @map("eliminado_en")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@index([businessId, modulo])
+  @@map("reservas_servicios")
+}
+
+// Una reserva: un recurso, un rango [inicio, fin) y un estado. Guarda la foto
+// del cliente y del servicio al momento de reservar: lo que se borre o cambie
+// después no la toca.
+model Reserva {
+  id         String        @id @default(uuid())
+  businessId String        @map("business_id")
+  modulo     ReservaModulo
+  recursoId  String        @map("recurso_id")
+  servicioId String?       @map("servicio_id")
+  /// Referencia visible ("decile al negocio tu código 4F7K2Q"). Única por negocio. No autentica nada.
+  codigo     String        @db.VarChar(8)
+  /// Secreto del enlace personal del cliente (/mi-reserva/<token>). Se devuelve al crear y nunca en el panel.
+  tokenAcceso String       @unique @map("token_acceso")
+  estado     ReservaEstado @default(RETENIDA)
+  origen     ReservaOrigen @default(TIENDA)
+
+  inicio   DateTime
+  fin      DateTime
+  /// Día de Argentina del inicio, AAAA-MM-DD, para listar la agenda por día.
+  fecha    String   @db.VarChar(10)
+  /// Lugares que ocupa del cupo del recurso (una clase con dos amigos = 2).
+  cantidad Int      @default(1)
+  /// Copia de "el recurso tiene cupo 1": la restricción de exclusión de la base mira esta columna.
+  exclusivo Boolean @default(true)
+  /// RETENIDA: hasta cuándo ocupa lugar sin confirmar.
+  retenidaHasta DateTime? @map("retenida_hasta")
+
+  clienteId       String?  @map("cliente_id")
+  clienteNombre   String   @db.VarChar(120) @map("cliente_nombre")
+  clienteTelefono String?  @db.VarChar(30) @map("cliente_telefono")
+  clienteEmail    String?  @db.VarChar(200) @map("cliente_email")
+  notas           String?  @db.VarChar(500)
+  notaInterna     String?  @db.VarChar(500) @map("nota_interna")
+  /// Foto del servicio elegido: { id, nombre, duracionMinutos, precio }.
+  servicio        Json?
+  /// Extras elegidos del recurso: [{ id, nombre, precio }].
+  extras          Json?
+
+  precio     Decimal @default(0) @db.Decimal(12, 2)
+  sena       Decimal @default(0) @db.Decimal(12, 2)
+  pagado     Decimal @default(0) @db.Decimal(12, 2)
+  pagoMetodo String? @db.VarChar(30) @map("pago_metodo")
+
+  confirmadaEn      DateTime?     @map("confirmada_en")
+  completadaEn      DateTime?     @map("completada_en")
+  canceladaEn       DateTime?     @map("cancelada_en")
+  canceladaPor      ReservaActor? @map("cancelada_por")
+  motivoCancelacion String?       @db.VarChar(300) @map("motivo_cancelacion")
+  reprogramaciones  Int           @default(0)
+
+  /// La manda quien reserva (un uuid por intento): repetir el pedido devuelve la misma reserva.
+  claveIdempotencia String? @db.VarChar(80) @map("clave_idempotencia")
+  /// Sube en cada cambio de estado: quien actúa sobre una versión vieja recibe 409.
+  version           Int     @default(1)
+  creadaPorMemberId String? @map("creada_por_member_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  business  Business           @relation(fields: [businessId], references: [id])
+  recurso   ReservaRecurso     @relation(fields: [recursoId], references: [id])
+  cliente   Customer?          @relation(fields: [clienteId], references: [id])
+  historial ReservaHistorial[]
+
+  @@unique([businessId, codigo])
+  @@unique([businessId, claveIdempotencia])
+  @@index([businessId, recursoId, inicio])
+  @@index([businessId, fecha])
+  @@index([businessId, estado, inicio])
+  @@index([estado, retenidaHasta])
+  @@index([clienteId])
+  @@map("reservas")
+}
+
+// Cada cambio de estado de una reserva, con quién lo hizo y por qué. Solo se agrega.
+model ReservaHistorial {
+  id         String         @id @default(uuid())
+  businessId String         @map("business_id")
+  reservaId  String         @map("reserva_id")
+  de         ReservaEstado?
+  a          ReservaEstado
+  quien      ReservaActor
+  memberId   String?        @map("member_id")
+  motivo     String?        @db.VarChar(300)
+  /// Lo que acompaña al cambio: horario viejo y nuevo al reprogramar, qué pasó con la seña al cancelar.
+  datos      Json?
+  createdAt  DateTime       @default(now()) @map("created_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+  reserva  Reserva  @relation(fields: [reservaId], references: [id], onDelete: Cascade)
+
+  @@index([reservaId, createdAt])
+  @@index([businessId])
+  @@map("reservas_historial")
+}
+
+// Lista de espera de una sesión llena (una clase, un horario). Al liberarse un
+// lugar, el primero que espera lo toma y queda TOMADA, con su reserva.
+model ReservaEspera {
+  id              String              @id @default(uuid())
+  businessId      String              @map("business_id")
+  modulo          ReservaModulo
+  recursoId       String              @map("recurso_id")
+  inicio          DateTime
+  fin             DateTime
+  clienteId       String?             @map("cliente_id")
+  clienteNombre   String              @db.VarChar(120) @map("cliente_nombre")
+  clienteTelefono String?             @db.VarChar(30) @map("cliente_telefono")
+  clienteEmail    String?             @db.VarChar(200) @map("cliente_email")
+  tokenAcceso     String              @unique @map("token_acceso")
+  estado          ReservaEsperaEstado @default(ESPERANDO)
+  reservaId       String?             @map("reserva_id")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  business Business       @relation(fields: [businessId], references: [id])
+  recurso  ReservaRecurso @relation(fields: [recursoId], references: [id])
+
+  @@index([businessId, recursoId, inicio, estado])
+  @@map("reservas_espera")
+}
+
+// Un rango en que no se reserva: feriado, mantenimiento, vacaciones. Con
+// recursoId null tapa a todos los recursos del módulo. No cancela lo ya
+// reservado: el panel avisa cuántas reservas quedaron adentro.
+model ReservaBloqueo {
+  id                String        @id @default(uuid())
+  businessId        String        @map("business_id")
+  modulo            ReservaModulo
+  recursoId         String?       @map("recurso_id")
+  inicio            DateTime
+  fin               DateTime
+  motivo            String?       @db.VarChar(200)
+  creadoPorMemberId String?       @map("creado_por_member_id")
+  createdAt         DateTime      @default(now()) @map("created_at")
+
+  business Business        @relation(fields: [businessId], references: [id])
+  recurso  ReservaRecurso? @relation(fields: [recursoId], references: [id])
+
+  @@index([businessId, modulo, inicio])
+  @@map("reservas_bloqueos")
 }

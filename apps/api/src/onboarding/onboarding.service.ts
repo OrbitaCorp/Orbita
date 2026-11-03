@@ -131,6 +131,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   empleado: [
     'orders.view', 'customers.view', 'inventory.view', 'catalog.view', 'config.team.view',
     'messages.view', 'messages.manage',
+    // Reservas: el empleado (recepción) da, mueve y cancela turnos; configurar queda para el dueño.
+    'reservas.view', 'reservas.manage',
   ],
 };
 
