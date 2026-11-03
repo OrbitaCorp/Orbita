@@ -12,6 +12,7 @@
 //     llaman a setTema() con el valor guardado en member-profile.
 
 import { useState, useEffect } from 'react'
+import { flushSync } from 'react-dom'
 
 export type TemaPreferencia = 'light' | 'dark' | 'system'
 
@@ -55,4 +56,24 @@ export function useDarkMode() {
   }
 
   return { isDark, tema, toggle, setTema }
+}
+
+/**
+ * Cambia el tema con un fundido en vez de un corte. Usa View Transitions: el navegador
+ * fotografía la pantalla como está, corre `cambiar` y funde la foto con lo nuevo según las
+ * reglas de globals.css ("Cambio de tema con fundido"): cuando anochece la noche baja desde
+ * arriba, cuando amanece la luz sube desde el horizonte. Mientras dura, <html> lleva
+ * data-tema-fundido con la dirección. Donde la API no existe (Safari anterior al 18, Firefox
+ * anterior al 144) el cambio es instantáneo, como siempre. `cambiar` va adentro de flushSync
+ * para que React confirme el render ahí mismo: la transición necesita el DOM ya en el tema
+ * nuevo cuando termina el callback.
+ */
+export function conFundidoDeTema(aOscuro: boolean, cambiar: () => void) {
+  if (typeof document.startViewTransition !== 'function') { cambiar(); return }
+  const html = document.documentElement
+  const direccion = aOscuro ? 'anochece' : 'amanece'
+  html.dataset.temaFundido = direccion
+  // Si el atributo ya es de otro cambio (dos toques seguidos), ese lo limpia.
+  const limpiar = () => { if (html.dataset.temaFundido === direccion) delete html.dataset.temaFundido }
+  document.startViewTransition(() => { flushSync(cambiar) }).finished.then(limpiar, limpiar)
 }

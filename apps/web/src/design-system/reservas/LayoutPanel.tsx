@@ -21,7 +21,7 @@ import type { LucideIcon } from 'lucide-react'
 import { ArrowLeft, ArrowUpRight, Bell, BellOff, CheckCheck, ChevronDown, Eye, Menu, Moon, Search, SearchX, Sun, Undo2, X } from 'lucide-react'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 import { EscenaEspacial } from '@/design-system/EscenaEspacial'
-import { useDarkMode } from '@/hooks/useDarkMode'
+import { conFundidoDeTema, useDarkMode } from '@/hooks/useDarkMode'
 import { EstiloReservas } from './estilo'
 import { retenerFoco } from './piezas'
 
@@ -140,6 +140,12 @@ const CSS = `
   .rvp-ico { position: relative; width: 36px; height: 36px; flex-shrink: 0; border-radius: 8px; border: 1px solid var(--color-border); background: transparent; color: var(--color-body); display: inline-grid; place-items: center; cursor: pointer; }
   .rvp-ico[aria-expanded='true'] { background: var(--color-surface-alt); border-color: var(--color-border-strong); }
   .rvp-ico:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  /* El tema cambia con un fundido (conFundidoDeTema): el botón va en su propia capa de la
+     transición, así responde al toque en el acto (el sol y la luna se cruzan ahí mismo)
+     mientras el resto de la pantalla anochece o amanece; el ícono nuevo entra girando. */
+  .rvp-tema { view-transition-name: rvp-tema; }
+  @keyframes rvpTemaIco { from { opacity: 0; transform: rotate(-45deg) scale(0.6); } }
+  .rvp-tema > svg { animation: rvpTemaIco 360ms cubic-bezier(0.22, 1, 0.36, 1) both; }
   /* El botón de menú y la X del cajón existen solo en celular (van después de .rvp-ico para ganarle). */
   .rvp-menu, .rvp-cerrar { display: none; }
   .rvp-sep { width: 1px; height: 20px; background: var(--color-border); flex-shrink: 0; margin: 0 2px; }
@@ -209,7 +215,7 @@ const CSS = `
   @media (max-width: 360px) { .rvp-tema { display: none; } }
   @media (prefers-reduced-motion: reduce) {
     .rvp-lateral, .rvp-lateral[data-abierto='true'], .rvp-subs, .rvp-chevron, .rvp-tramo, .rvp-ramal, .rvp-usuario, .rvp-buscar > input { transition: none; }
-    .rvp-vista, .rvp-flota { animation: none; }
+    .rvp-vista, .rvp-flota, .rvp-tema > svg { animation: none; }
   }
 `
 
@@ -501,7 +507,7 @@ export default function LayoutPanel({ producto = '', negocio, rubro, fecha, item
             )}
             {fecha && <span className="rvp-fecha">{fecha}</span>}
             {(busqueda.length > 0 || fecha) && <span className="rvp-sep" aria-hidden />}
-            <button type="button" className="ds-hover rvp-ico rvp-tema" onClick={() => setTema(isDark ? 'light' : 'dark')} aria-label={isDark ? 'Pasar a modo claro' : 'Pasar a modo oscuro'}>
+            <button type="button" className="ds-hover rvp-ico rvp-tema" onClick={() => conFundidoDeTema(!isDark, () => setTema(isDark ? 'light' : 'dark'))} aria-label={isDark ? 'Pasar a modo claro' : 'Pasar a modo oscuro'}>
               {isDark ? <Sun size={17} strokeWidth={1.5} /> : <Moon size={17} strokeWidth={1.5} />}
             </button>
             <button
