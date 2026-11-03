@@ -3,8 +3,8 @@
 // solas, pero la grilla las marca.
 import { DIAS_CORTOS, hhmm } from '@/lib/reservas/fechas'
 import { actividadDe } from '../../datos'
-import { Encabezado, Nota, Seccion, Selector } from '@/design-system/reservas/piezas'
-import { BarraGuardar, useBorrador, type PropsConfig } from '../piezas'
+import { BarraGuardar, Encabezado, Nota, Seccion, Selector, useBorrador } from '@/design-system/reservas/piezas'
+import { type PropsConfig } from '../piezas'
 
 const HORAS = Array.from({ length: 25 }, (_, i) => ({ id: i * 60, label: i === 24 ? '24:00' : hhmm(i * 60) }))
 

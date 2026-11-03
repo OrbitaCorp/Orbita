@@ -5,10 +5,9 @@
 import { useState } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { duracionTxt } from '@/lib/reservas/fechas'
-import { Nota, Seccion, Selector } from '@/design-system/reservas/piezas'
+import { BarraGuardar, Nota, Seccion, Selector } from '@/design-system/reservas/piezas'
 import { TIPOS, type NegocioAlquiler, type Propiedad } from '../../datos'
 import type { Vista } from '../navegacion'
-import { Guardar } from '../piezas'
 import { HORAS, PaginaForm, igual, type Form } from './comun'
 
 /** "24 horas antes", "3 días antes": las opciones del plazo de cancelación. */
@@ -66,7 +65,7 @@ export default function Reglas({ negocio, onGuardar, onIr }: Form & { onIr: (vis
         )}
         <Nota><span style={{ flex: 1, minWidth: 0 }}>La seña ({negocio.senaPct ? `${negocio.senaPct}%` : 'sin seña'}), las formas de pago y qué pasa con la seña al cancelar están en Pagos y señas.</span><button type="button" className="rv-btn rv-btn--sm" onClick={() => onIr('pagos')}>Ir a Pagos y señas <ArrowRight size={14} aria-hidden /></button></Nota>
       </div>
-      <Guardar cambiado={cambiado} onDescartar={() => setV(de(negocio))} onGuardar={guardar} />
+      <BarraGuardar cambiado={cambiado} onDescartar={() => setV(de(negocio))} onGuardar={guardar} />
     </PaginaForm>
   )
 }

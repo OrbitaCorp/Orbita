@@ -9,11 +9,11 @@
 // que se suma acá aparece en la agenda y al dar un turno.
 import { useState } from 'react'
 import { Plus, Clock, CalendarDays, Pencil, Check, UserRound, MoonStar } from 'lucide-react'
-import { Encabezado } from '@/design-system/reservas/piezas'
+import { Encabezado, Modal } from '@/design-system/reservas/piezas'
 import { DIAS_CORTOS, horaTxt, horarioDeRecurso, type Recurso, type RubroTurnos, type Turno } from '@/modules/turnos/datos'
 import { AHORA_DEMO, minutosAbiertos, tramosTxt, type Semana, type Tramo } from '@/modules/turnos/horario'
 import { Campo } from './configuracion/ui'
-import { Modal, ErrorCampo, Borrar, CamposAgenda, TiraJornada, IconoRecurso, agendaDeForm, agendaFormDe, errorAgenda } from './piezasPanel'
+import { ErrorCampo, Borrar, CamposAgenda, TiraJornada, IconoRecurso, agendaDeForm, agendaFormDe, errorAgenda } from './piezasPanel'
 import { COLORES_EQUIPO, type Persona } from '../datos/equipo'
 
 // Las tarjetas de una agenda (una persona en Equipo, un espacio acá): la misma grilla y las mismas piezas.

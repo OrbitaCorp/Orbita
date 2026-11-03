@@ -4,8 +4,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Globe, Link2, Copy, Check, Server, Crown, CreditCard, Receipt, CalendarDays, CircleCheck } from 'lucide-react'
 import { temaDe } from '@/modules/turnos/storefront/tema'
-import { Modal } from '../piezasPanel'
-import { useBorrador, Encabezado, SecCard, Campo, Dos, Chip, BotonBorde, BarraGuardar, Boton, type PropsTab } from './ui'
+import { Encabezado, SecCard, Campo, Dos, Chip, BotonBorde, Boton, type PropsTab } from './ui'
+import { BarraGuardar, Modal, useBorrador } from '@/design-system/reservas/piezas'
 import { subdominioDe, vozDe, cap } from './datos'
 
 // ─── Dominio ─────────────────────────────────────────────────────────────────
@@ -18,7 +18,7 @@ export function Dominio({ rubro, avisar }: PropsTab) {
   const [estado, setEstado] = useState<'espera' | 'verificando' | 'activo'>('espera')
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
-  const conectar = () => { setConectando(b.valor.propio); setEstado('espera') }
+  const conectar = () => { setConectando(b.v.propio); setEstado('espera') }
   const soltar = () => { if (timer.current) clearTimeout(timer.current); setConectando(null); setEstado('espera') }
   const verificar = () => {
     setEstado('verificando')
@@ -28,7 +28,7 @@ export function Dominio({ rubro, avisar }: PropsTab) {
     }, 1600)
   }
   const [copiado, setCopiado] = useState('')
-  const subOk = /^[a-z0-9-]{3,30}$/.test(b.valor.sub)
+  const subOk = /^[a-z0-9-]{3,30}$/.test(b.v.sub)
   const copiar = (s: string) => { void navigator.clipboard?.writeText(s).catch(() => undefined); setCopiado(s); setTimeout(() => setCopiado(''), 1500) }
   const registros: [string, string, string][] = conectando
     ? [['CNAME', conectando.startsWith('www.') ? 'www' : '@', 'turnos.orbita.site'], ['TXT', '_orbita', `verif-${subdominioDe(t.nombre).slice(0, 8)}-7f3a`]]
@@ -39,14 +39,14 @@ export function Dominio({ rubro, avisar }: PropsTab) {
       <Encabezado titulo="Dominio" bajada="La dirección de tu sitio de reservas." />
       <div className="rv-pila">
         <SecCard titulo="Dirección de Órbita" Icon={Link2} badge={<Chip tono="ok">Activa</Chip>} bajada="Gratis e incluida en tu plan. Si la cambiás, la vieja deja de funcionar.">
-          <Campo label="Tu dirección" value={b.valor.sub} onChange={x => b.set('sub', x.toLowerCase().replace(/[^a-z0-9-]/g, ''))} sufijo=".orbita.site" mono maxLength={30}
+          <Campo label="Tu dirección" value={b.v.sub} onChange={x => b.set('sub', x.toLowerCase().replace(/[^a-z0-9-]/g, ''))} sufijo=".orbita.site" mono maxLength={30}
             ayuda={subOk ? 'Solo letras, números y guiones.' : <span style={{ color: 'var(--color-error)' }}>Tiene que tener al menos 3 caracteres.</span>} />
         </SecCard>
 
         <SecCard titulo="Dominio propio" Icon={Globe} bajada="Si ya tenés uno (por ejemplo, en NIC Argentina), apuntalo a tu sitio de reservas.">
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-            <Campo label="Tu dominio" value={b.valor.propio} onChange={x => b.set('propio', x.toLowerCase().trim())} placeholder={`www.${subdominioDe(t.nombre)}.com.ar`} mono style={{ flex: '1 1 240px', marginBottom: 0 }} />
-            <Boton variant="primary" className="tuc-alto-campo" disabled={!/\.[a-z]{2,}$/.test(b.valor.propio)} onClick={conectar}>Conectar</Boton>
+            <Campo label="Tu dominio" value={b.v.propio} onChange={x => b.set('propio', x.toLowerCase().trim())} placeholder={`www.${subdominioDe(t.nombre)}.com.ar`} mono style={{ flex: '1 1 240px', marginBottom: 0 }} />
+            <Boton variant="primary" className="tuc-alto-campo" disabled={!/\.[a-z]{2,}$/.test(b.v.propio)} onClick={conectar}>Conectar</Boton>
           </div>
           {conectando && (
             <div className="tuc-fila-hijos" style={{ marginTop: 16 }}>
@@ -72,13 +72,13 @@ export function Dominio({ rubro, avisar }: PropsTab) {
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
                 {estado !== 'activo' && <Boton variant="secondary" size="sm" disabled={estado === 'verificando'} onClick={verificar}>{estado === 'verificando' ? 'Verificando…' : 'Verificar ahora'}</Boton>}
-                <Boton variant="ghost" size="sm" onClick={() => { const era = estado === 'activo'; soltar(); if (era) avisar('Dominio desconectado', `Tu sitio sigue en ${b.valor.sub}.orbita.site.`) }}>{estado === 'activo' ? 'Desconectar' : 'Cancelar'}</Boton>
+                <Boton variant="ghost" size="sm" onClick={() => { const era = estado === 'activo'; soltar(); if (era) avisar('Dominio desconectado', `Tu sitio sigue en ${b.v.sub}.orbita.site.`) }}>{estado === 'activo' ? 'Desconectar' : 'Cancelar'}</Boton>
               </div>
             </div>
           )}
         </SecCard>
       </div>
-      <BarraGuardar dirty={b.dirty && subOk} onDescartar={b.descartar} onGuardar={() => { b.guardar(); avisar('Dirección actualizada', `Demo: ${b.valor.sub}.orbita.site no existe de verdad.`) }} />
+      <BarraGuardar cambiado={b.cambiado && subOk} onDescartar={b.descartar} onGuardar={() => { b.guardar(); avisar('Dirección actualizada', `Demo: ${b.v.sub}.orbita.site no existe de verdad.`) }} />
     </div>
   )
 }

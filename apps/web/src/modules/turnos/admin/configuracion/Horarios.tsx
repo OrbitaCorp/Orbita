@@ -17,7 +17,8 @@ import { DIAS, semanaDe } from '@/modules/turnos/datos'
 import { useNegocioDemo } from '@/modules/turnos/datos/negocio'
 import { JORNADA_INICIAL, errorJornada, jornadaDe, jornadaTxt, minutosAbiertos, tramosDe, tramosDeJornada, tramosFrase, type Jornada, type Semana, type Tramo } from '@/modules/turnos/horario'
 import { BloquesJornada, DiasSemana } from '@/modules/turnos/admin/piezasPanel'
-import { useBorrador, Encabezado, SecCard, Switch, Segmentado, Campo, Dos, BarraGuardar, BotonBorde, FilaSwitch, Chip, Vacio, type PropsTab } from './ui'
+import { Encabezado, SecCard, Switch, Segmentado, Campo, Dos, BotonBorde, FilaSwitch, Chip, Vacio, type PropsTab } from './ui'
+import { BarraGuardar, useBorrador } from '@/design-system/reservas/piezas'
 import { vozDe } from './datos'
 
 type Rango = [string, string]
@@ -98,7 +99,7 @@ export default function Horarios({ rubro, avisar }: PropsTab) {
     ]
     return { especiales, vacaciones: false, vacDesde: '2027-01-15', vacHasta: '2027-01-31', vacMensaje: 'Nos tomamos unos días. Volvemos el 1 de febrero con todo: ya podés reservar para esa semana.' }
   })
-  const v = b.valor
+  const v = b.v
 
   const setDia = (i: number, d: Partial<Dia>) => setBorrador(dias.map((x, k) => (k === i ? { ...x, ...d } : x)))
   // Copia el horario de un día a todos los demás días que abren.
@@ -227,7 +228,7 @@ export default function Horarios({ rubro, avisar }: PropsTab) {
         </SecCard>
       </div>
 
-      <BarraGuardar dirty={b.dirty || semanaDirty} onDescartar={descartar} onGuardar={guardar} />
+      <BarraGuardar cambiado={b.cambiado || semanaDirty} onDescartar={descartar} onGuardar={guardar} />
     </div>
   )
 }

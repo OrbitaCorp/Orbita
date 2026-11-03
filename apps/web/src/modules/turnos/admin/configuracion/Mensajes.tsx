@@ -8,7 +8,8 @@ import type { LucideIcon } from 'lucide-react'
 import { MessageCircle, Mail, CalendarCheck, BellRing, Bell, CalendarX2, HeartHandshake, Hourglass, ChevronDown, CheckCheck, RotateCcw, ArrowRight, Sun } from 'lucide-react'
 import { temaDe } from '@/modules/turnos/storefront/tema'
 import { recursosDe, CLIENTES, horaTxt, type Turno } from '@/modules/turnos/datos'
-import { useBorrador, Encabezado, SecCard, Switch, Selector, BarraGuardar, Chip, FilaSwitch, Campo, BotonBorde, type PropsTab } from './ui'
+import { Encabezado, SecCard, Switch, Selector, Chip, FilaSwitch, Campo, BotonBorde, type PropsTab } from './ui'
+import { BarraGuardar, useBorrador } from '@/design-system/reservas/piezas'
 import { vozDe, iniciales, subdominioDe, cap, type Voz } from './datos'
 
 type Canal = 'wa' | 'email'
@@ -90,7 +91,7 @@ export default function Mensajes({ rubro, avisar, turnosHoy, nombreDe, onAbrir }
       })),
     }
   })
-  const v = b.valor
+  const v = b.v
   const [abierto, setAbierto] = useState<string | null>('recordatorio')
   const setMsj = (id: string, m: Partial<Mensaje>) => b.set('mensajes', v.mensajes.map(x => x.id === id ? { ...x, ...m } : x))
 
@@ -152,7 +153,7 @@ export default function Mensajes({ rubro, avisar, turnosHoy, nombreDe, onAbrir }
         })}
       </div>
 
-      <BarraGuardar dirty={b.dirty} onDescartar={b.descartar} onGuardar={() => { b.guardar(); avisar('Mensajes guardados', 'Es una demo: no se envía nada.') }} />
+      <BarraGuardar cambiado={b.cambiado} onDescartar={b.descartar} onGuardar={() => { b.guardar(); avisar('Mensajes guardados', 'Es una demo: no se envía nada.') }} />
     </div>
   )
 }

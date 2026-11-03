@@ -16,10 +16,10 @@
 import { useState } from 'react'
 import { CalendarCheck, Clock3, UserX, Wallet, ArrowRight, Plus, Send, BellRing, CalendarDays } from 'lucide-react'
 import { Avatar } from '@/design-system/components/Avatar'
-import { Encabezado } from '@/design-system/reservas/piezas'
+import { Encabezado, Kpi } from '@/design-system/reservas/piezas'
 import { DIAS, horaTxt, type Turno, type Cliente, type Recurso, type RubroTurnos } from '@/modules/turnos/datos'
 import { AHORA_DEMO, FECHA_DEMO, HOY_SEMANA, minutosAbiertos, type Tramo } from '@/modules/turnos/horario'
-import { Barra, Indicador } from './piezasPanel'
+import { Barra } from './piezasPanel'
 import TurnosLista from './TurnosLista'
 import { SLOT, horariosLibres, huecosDe, type MensajeWA, type NuevoTurnoPre } from '../datos/agenda'
 import { plata } from '../datos/equipo'
@@ -49,7 +49,6 @@ const CSS = `
   .tu-res-huecos { display: flex; flex-wrap: wrap; gap: 6px; }
   .tu-res-agenda { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--color-body); margin: 14px 0 7px; }
   .tu-res-agenda > i { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  @media (min-width: 1025px) { .rv-kpis.tu-res-kpis[data-n='3'] { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   @media (max-width: 1024px) { .tu-res-cols { grid-template-columns: minmax(0, 1fr); } }
   @media (max-width: 768px) {
     /* En celular cada hueco es un botón de 44 px en una grilla pareja. */
@@ -101,7 +100,8 @@ export default function ResumenDia({ negocio, saludo: aQuien, rubro, turnos, tur
   const pasado = delDia(turnosDelDia(-7))
   const contraDia = `vs. ${DIAS[HOY_SEMANA].toLowerCase()} pasado`
   /** Porcentaje contra el mismo día de la semana pasada; si ese día no hubo nada, no hay variación. */
-  const variacion = (hoy: number, antes: number) => (antes > 0 ? Math.round(((hoy - antes) / antes) * 1000) / 10 : undefined)
+  // La variación contra el mismo día de la semana pasada, para el chip del indicador: sin dato de antes, no hay chip.
+  const variacion = (hoy: number, antes: number) => (antes > 0 ? { valor: Math.round(((hoy - antes) / antes) * 1000) / 10 } : undefined)
   const proximos = turnos.filter(t => t.inicio + t.duracion > AHORA_DEMO && t.estado !== 'cancelado').sort((a, b) => a.inicio - b.inicio)
   // El tiempo libre de acá al cierre, en bloques de media hora: es el número de "Huecos libres".
   const libresFuturos = recursos.map(r => ({ r, libres: huecosDe(turnos, jornada(r.id), r.id).filter(m => m >= AHORA_DEMO) }))
@@ -151,11 +151,11 @@ export default function ResumenDia({ negocio, saludo: aQuien, rubro, turnos, tur
         </button>
       )}
 
-      <div className="rv-kpis tu-res-kpis" data-n={verNumeros ? 4 : 3}>
-        <Indicador label="Turnos hoy" valor={activos.length} Icon={CalendarCheck} cambio={variacion(activos.length, pasado.turnos)} nota={pasado.turnos > 0 ? contraDia : 'en todas las agendas'} />
-        <Indicador label="Huecos libres" valor={`${(totalLibres * SLOT / 60).toLocaleString('es-AR', { maximumFractionDigits: 1 })} h`} Icon={Clock3} nota="de acá al cierre" />
-        <Indicador label="Ausencias" valor={ausentes} Icon={UserX} bueno="baja" nota="en lo que va del día" />
-        {verNumeros && <Indicador label="Ingresos estimados" valor={plata(ingresos)} Icon={Wallet} cambio={variacion(ingresos, pasado.ingresos)} nota={pasado.ingresos > 0 ? contraDia : 'si vienen todos'} />}
+      <div className={`rv-kpis${verNumeros ? '' : ' rv-kpis--3'}`}>
+        <Kpi label="Turnos hoy" valor={activos.length} Icon={CalendarCheck} delta={variacion(activos.length, pasado.turnos)} nota={pasado.turnos > 0 ? contraDia : 'en todas las agendas'} />
+        <Kpi label="Huecos libres" valor={`${(totalLibres * SLOT / 60).toLocaleString('es-AR', { maximumFractionDigits: 1 })} h`} Icon={Clock3} nota="de acá al cierre" />
+        <Kpi label="Ausencias" valor={ausentes} Icon={UserX} nota="en lo que va del día" />
+        {verNumeros && <Kpi label="Ingresos estimados" valor={plata(ingresos)} Icon={Wallet} delta={variacion(ingresos, pasado.ingresos)} nota={pasado.ingresos > 0 ? contraDia : 'si vienen todos'} />}
       </div>
 
       {(enCurso || sigue) && (

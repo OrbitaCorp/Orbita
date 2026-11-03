@@ -8,9 +8,8 @@ import { ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react'
 import { DIAS_CORTOS, fechaLarga, grillaMes, mesTxt, moverMes, partes, sumarDias, type ISO } from '@/lib/reservas/fechas'
 import { pesos } from '@/lib/reservas/precio'
 import { precioNoche, temporadaDe, type TarifaEstadia, type Temporada } from '@/lib/reservas/estadia'
-import { Campo, Seccion, Selector } from '@/design-system/reservas/piezas'
+import { BarraGuardar, Campo, Seccion, Selector } from '@/design-system/reservas/piezas'
 import { HOY, TIPOS, type Propiedad } from '../../datos'
-import { Guardar } from '../piezas'
 import { PaginaForm, idNuevo, igual, num, type Form } from './comun'
 
 /**
@@ -97,7 +96,7 @@ export default function Temporadas({ negocio, onGuardar }: Form) {
           </Seccion>
         </div>
       )}
-      <Guardar cambiado={cambiado} onDescartar={() => { setLista(negocio.propiedades); setAbierta(negocio.propiedades[0]?.id ?? '') }} onGuardar={() => onGuardar({ propiedades: lista })} />
+      <BarraGuardar cambiado={cambiado} onDescartar={() => { setLista(negocio.propiedades); setAbierta(negocio.propiedades[0]?.id ?? '') }} onGuardar={() => onGuardar({ propiedades: lista })} />
     </PaginaForm>
   )
 }

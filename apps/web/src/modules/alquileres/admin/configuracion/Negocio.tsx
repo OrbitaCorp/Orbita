@@ -1,9 +1,8 @@
 // Datos del negocio: nombre, descripción, contacto y dirección. Aparecen en el
 // sitio, en cada confirmación y en el pie de cada reserva.
 import { useState } from 'react'
-import { Area, Campo, Nota, Seccion } from '@/design-system/reservas/piezas'
+import { Area, BarraGuardar, Campo, Nota, Seccion } from '@/design-system/reservas/piezas'
 import { TIPOS, type NegocioAlquiler } from '../../datos'
-import { Guardar } from '../piezas'
 import { PaginaForm, igual, type Form } from './comun'
 
 const de = (n: NegocioAlquiler) => ({ nombre: n.nombre, descripcion: n.descripcion, telefono: n.telefono, direccion: n.direccion, ciudad: n.ciudad })
@@ -31,7 +30,7 @@ export default function Negocio({ negocio, onGuardar }: Form) {
         </Seccion>
         <Nota><span>Tu sitio público es <b>orbita.site/{negocio.slug}</b>. Se abre desde “Tu sitio”, abajo del menú, y muestra estos datos al instante.</span></Nota>
       </div>
-      <Guardar cambiado={cambiado} onDescartar={() => setV(de(negocio))} onGuardar={() => onGuardar({ ...v, nombre: v.nombre.trim() || negocio.nombre })} />
+      <BarraGuardar cambiado={cambiado} onDescartar={() => setV(de(negocio))} onGuardar={() => onGuardar({ ...v, nombre: v.nombre.trim() || negocio.nombre })} />
     </PaginaForm>
   )
 }

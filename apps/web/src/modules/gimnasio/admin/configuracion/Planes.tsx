@@ -3,8 +3,8 @@
 // tienen hoy: apagar o quitar un plan no les saca nada hasta que venza.
 import { Plus, Trash2 } from 'lucide-react'
 import { estadoPlanDe, rubroPorKey, type Plan, type Socio } from '../../datos'
-import { Campo, Chip, Encabezado, FilaSwitch, Selector } from '@/design-system/reservas/piezas'
-import { BarraGuardar, num, useBorrador, type PropsConfig } from '../piezas'
+import { BarraGuardar, Campo, Chip, Encabezado, FilaSwitch, Selector, useBorrador } from '@/design-system/reservas/piezas'
+import { num, type PropsConfig } from '../piezas'
 
 const TIPO: Record<Plan['tipo'], string> = { prueba: 'Prueba · una vez por persona', suelta: 'Clase suelta', pack: 'Pack de clases', membresia: 'Membresía mensual' }
 

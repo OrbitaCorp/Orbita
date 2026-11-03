@@ -13,10 +13,10 @@
 // turnos que atendió. Lo que queda para el negocio y lo de los demás no se ve.
 import { useState } from 'react'
 import { Building2, CalendarCheck, Check, ChevronRight, Clock3, HandCoins, MessageCircle, Settings2, Users, Wallet } from 'lucide-react'
-import { Encabezado, Sigla, Vacio } from '@/design-system/reservas/piezas'
+import { Encabezado, Kpi, Modal, Sigla, Vacio } from '@/design-system/reservas/piezas'
 import { horaTxt, type Cliente, type RubroTurnos } from '@/modules/turnos/datos'
 import { Segmentado } from './configuracion/ui'
-import { Modal, DatoFila, Indicador } from './piezasPanel'
+import { DatoFila } from './piezasPanel'
 import { CamposPago } from './PagoPersona'
 import { fechaCorta, fechaLarga, type MensajeWA, type TurnoAgenda } from '../datos/agenda'
 import {
@@ -160,19 +160,19 @@ export default function Ganancias({ rubro, personas, roles, clientes, turnosDelD
       <div className="rv-kpis" style={{ marginBottom: 16 }}>
         {yo ? (
           <>
-            <Indicador label="Turnos atendidos" valor={yo.l.turnos} Icon={CalendarCheck} />
-            <Indicador label="Facturaste" valor={plata(yo.l.facturado)} Icon={Wallet} />
-            <Indicador label="Te corresponde" valor={plata(yo.l.paraLaPersona)} Icon={HandCoins} nota={pagoTxt(yo.p.pago, rubro)} />
+            <Kpi label="Turnos atendidos" valor={yo.l.turnos} Icon={CalendarCheck} />
+            <Kpi label="Facturaste" valor={plata(yo.l.facturado)} Icon={Wallet} />
+            <Kpi label="Te corresponde" valor={plata(yo.l.paraLaPersona)} Icon={HandCoins} nota={pagoTxt(yo.p.pago, rubro)} />
             {yo.p.pago?.forma === 'alquiler'
-              ? <Indicador label="Alquiler por pagar" valor={plata(aCobrar(yo.p, yo.pend))} Icon={Clock3} nota={aCobrar(yo.p, yo.pend) > 0 ? `lo pagás ${CADA_TXT[yo.p.pago.cada]}` : 'Estás al día'} />
-              : <Indicador label="Pendiente de cobro" valor={plata(aPagar(yo.p, yo.pend))} Icon={Clock3} nota={aPagar(yo.p, yo.pend) > 0 ? `se te liquida ${yo.p.pago ? CADA_TXT[yo.p.pago.cada] : ''}` : 'Estás al día'} />}
+              ? <Kpi label="Alquiler por pagar" valor={plata(aCobrar(yo.p, yo.pend))} Icon={Clock3} nota={aCobrar(yo.p, yo.pend) > 0 ? `lo pagás ${CADA_TXT[yo.p.pago.cada]}` : 'Estás al día'} />
+              : <Kpi label="Pendiente de cobro" valor={plata(aPagar(yo.p, yo.pend))} Icon={Clock3} nota={aPagar(yo.p, yo.pend) > 0 ? `se te liquida ${yo.p.pago ? CADA_TXT[yo.p.pago.cada] : ''}` : 'Estás al día'} />}
           </>
         ) : (
           <>
-            <Indicador label="Facturado" valor={plata(negocioTotal.total)} Icon={Wallet} nota={`${negocioTotal.turnos} turno${negocioTotal.turnos === 1 ? '' : 's'} atendido${negocioTotal.turnos === 1 ? '' : 's'}`} />
-            <Indicador label="Para el equipo" valor={plata(equipo)} Icon={Users} nota="comisiones y sueldos" />
-            <Indicador label="Queda para el negocio" valor={plata(negocio)} Icon={Building2} nota={negocioTotal.total > 0 ? `${Math.round((negocio / negocioTotal.total) * 100)}% de lo facturado` : undefined} />
-            <Indicador label="Pendiente de pago" valor={plata(pendiente)} Icon={Clock3} nota={conPendiente ? `a ${conPendiente} persona${conPendiente === 1 ? '' : 's'}` : 'Estás al día'} />
+            <Kpi label="Facturado" valor={plata(negocioTotal.total)} Icon={Wallet} nota={`${negocioTotal.turnos} turno${negocioTotal.turnos === 1 ? '' : 's'} atendido${negocioTotal.turnos === 1 ? '' : 's'}`} />
+            <Kpi label="Para el equipo" valor={plata(equipo)} Icon={Users} nota="comisiones y sueldos" />
+            <Kpi label="Queda para el negocio" valor={plata(negocio)} Icon={Building2} nota={negocioTotal.total > 0 ? `${Math.round((negocio / negocioTotal.total) * 100)}% de lo facturado` : undefined} />
+            <Kpi label="Pendiente de pago" valor={plata(pendiente)} Icon={Clock3} nota={conPendiente ? `a ${conPendiente} persona${conPendiente === 1 ? '' : 's'}` : 'Estás al día'} />
           </>
         )}
       </div>

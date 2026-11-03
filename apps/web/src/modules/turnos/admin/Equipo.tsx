@@ -15,11 +15,11 @@
 // En cada tarjeta se ve cuánto se le paga: comisión, sueldo fijo o lo que sea.
 import { useState } from 'react'
 import { Check, Eye, Mail, MapPin, Pencil, Plus, UserPlus } from 'lucide-react'
-import { Encabezado, Sigla } from '@/design-system/reservas/piezas'
+import { Encabezado, Modal, Sigla } from '@/design-system/reservas/piezas'
 import { type Recurso, type RubroTurnos, type Turno } from '@/modules/turnos/datos'
 import type { Semana, Tramo } from '@/modules/turnos/horario'
 import { Campo, Dos, Selector } from './configuracion/ui'
-import { Modal, ErrorCampo, Borrar, CamposAgenda, agendaDeForm, agendaFormDe, errorAgenda } from './piezasPanel'
+import { ErrorCampo, Borrar, CamposAgenda, agendaDeForm, agendaFormDe, errorAgenda } from './piezasPanel'
 import { Ocupacion, ResumenAgenda, ocupacionDe } from './Espacios'
 import RolesPermisos from './Roles'
 import { CamposPago } from './PagoPersona'

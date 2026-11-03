@@ -38,6 +38,8 @@ const idNuevo = (prefijo: string) => `${prefijo}${Date.now().toString(36)}`
 
 const CSS = `
   .alg-tira { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+  /* Las flechas y "Hoy" no se encogen: lo que no entra lo absorbe la tira de días, que scrollea (si no, a 390 las flechas quedaban en 32 px). */
+  .alg-tira > .rv-btn { flex-shrink: 0; }
   .alg-dias { position: relative; flex: 1 1 auto; min-width: 0; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px; }
   .alg-dias::-webkit-scrollbar { display: none; }
   .alg-dia { flex: 0 0 auto; min-width: 64px; min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border-radius: 10px; border: 1px solid var(--color-border); background: var(--color-bg); font: inherit; color: var(--color-body); cursor: pointer; }

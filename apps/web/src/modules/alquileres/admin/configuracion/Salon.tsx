@@ -6,10 +6,9 @@ import { ArrowRight } from 'lucide-react'
 import { hhmm } from '@/lib/reservas/fechas'
 import { armarBloques } from '@/lib/reservas/disponibilidad'
 import { pesos } from '@/lib/reservas/precio'
-import { Campo, Nota, Seccion, Selector } from '@/design-system/reservas/piezas'
+import { BarraGuardar, Campo, Nota, Seccion, Selector } from '@/design-system/reservas/piezas'
 import { TIPOS, type Salon as SalonT } from '../../datos'
 import type { Vista } from '../navegacion'
-import { Guardar } from '../piezas'
 import { PaginaForm, igual, num, type Form } from './comun'
 
 const de = (s: SalonT | null) => ({ capacidad: s?.capacidad ?? 50, duracionBloque: s?.duracionBloque ?? 240, limpieza: s?.limpieza ?? 60, fotos: s?.fotos ?? [] })
@@ -44,7 +43,7 @@ export default function Salon({ negocio, onGuardar, onIr }: Form & { onIr: (vist
         </Seccion>
         <Nota><span style={{ flex: 1, minWidth: 0 }}>El depósito de garantía ({s?.deposito ? pesos(s.deposito) : 'no se pide'}) se define en Pagos y señas; los paquetes y los extras, en sus propias páginas.</span><button type="button" className="rv-btn rv-btn--sm" onClick={() => onIr('pagos')}>Ir a Pagos y señas <ArrowRight size={14} aria-hidden /></button></Nota>
       </div>
-      <Guardar cambiado={cambiado && bloques.length > 0} nota={bloques.length ? undefined : 'Con esos valores no queda ningún bloque.'} onDescartar={() => setV(de(s))} onGuardar={guardar} />
+      <BarraGuardar cambiado={cambiado} motivo={bloques.length ? undefined : 'Con esos valores no queda ningún bloque.'} onDescartar={() => setV(de(s))} onGuardar={guardar} />
     </PaginaForm>
   )
 }

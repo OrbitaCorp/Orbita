@@ -5,9 +5,8 @@ import { useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { DIAS_CORTOS, DIAS_SEMANA, hhmm } from '@/lib/reservas/fechas'
 import { pesos, precioPorHora, type ReglaFranja } from '@/lib/reservas/precio'
-import { Seccion, Selector, Vacio } from '@/design-system/reservas/piezas'
+import { BarraGuardar, Seccion, Selector, Vacio } from '@/design-system/reservas/piezas'
 import { TIPOS } from '../../datos'
-import { Guardar } from '../piezas'
 import { HORAS, PaginaForm, igual, type Form } from './comun'
 
 const AJUSTES = [-30, -20, -15, -10, 0, 10, 15, 20, 30].map(a => ({ id: a, label: a === 0 ? 'Sin cambio' : `${a > 0 ? '+' : ''}${a}%` }))
@@ -82,7 +81,7 @@ export default function Precios({ negocio, onGuardar }: Form) {
           </Seccion>
         )}
       </div>
-      <Guardar cambiado={cambiado} onDescartar={() => setReglas(negocio.reglasPrecio)} onGuardar={() => onGuardar({ reglasPrecio: reglas })} />
+      <BarraGuardar cambiado={cambiado} onDescartar={() => setReglas(negocio.reglasPrecio)} onGuardar={() => onGuardar({ reglasPrecio: reglas })} />
     </PaginaForm>
   )
 }

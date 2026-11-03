@@ -9,8 +9,7 @@ import { MESES, fechaCorta, hhmm, moverMes, partes, rangoTxt } from '@/lib/reser
 import { pesos } from '@/lib/reservas/precio'
 import { nochesEntre } from '@/lib/reservas/estadia'
 import { ESTADO_RESERVA, HOY, TIPOS, fechaDeReserva, nochesTxt, unidadPorId, type Cliente, type NegocioAlquiler, type Reserva } from '../datos'
-import { Chip, Encabezado, Modal, Sigla, Vacio } from '@/design-system/reservas/piezas'
-import { Kpi } from './piezas'
+import { Chip, Encabezado, Kpi, Modal, Sigla, Vacio } from '@/design-system/reservas/piezas'
 
 interface P {
   negocio: NegocioAlquiler
@@ -56,7 +55,7 @@ export default function Clientes({ negocio, reservas, clientes, abierto, onAbrir
   return (
     <div className="rv-pagina">
       <Encabezado rotulo={`${filas.length} en total`} titulo={plural} bajada={`Quiénes reservaron, cuántas veces y cuánto gastaron. Se arma solo con cada ${negocio.tipo === 'bloque' ? 'evento' : 'reserva'}.`} />
-      <div className="ala-kpis ala-kpis--3" style={{ marginBottom: 16 }}>
+      <div className="rv-kpis rv-kpis--3" style={{ marginBottom: 16 }}>
         <Kpi i={0} label={plural} Icon={Contact} valor={filas.length} nota="con al menos una reserva" />
         <Kpi i={1} label="Nuevos este mes" Icon={UserPlus} valor={nuevos} nota={`primera reserva en ${MESES[partes(HOY).mes - 1]}`} />
         <Kpi i={2} label="Con reserva próxima" Icon={CalendarCheck} valor={conProxima} nota="ya tienen fecha" />

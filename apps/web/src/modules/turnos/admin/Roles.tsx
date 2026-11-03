@@ -9,7 +9,8 @@ import { useState } from 'react'
 import { Check, Crown, Eye, Lock, Minus, Pencil, Plus, RotateCcw, ShieldCheck, UserCog, Users } from 'lucide-react'
 import type { RubroTurnos } from '@/modules/turnos/datos'
 import { Campo, Selector } from './configuracion/ui'
-import { Borrar, ErrorCampo, Llave, Modal } from './piezasPanel'
+import { Borrar, ErrorCampo, Llave } from './piezasPanel'
+import { Modal } from '@/design-system/reservas/piezas'
 import { sinAcentos } from '../datos/agenda'
 import {
   PERMISOS_MINIMOS, normalizar, permisosDe, resumenRol, rolCambiado, rolDeFabrica, trabaDe,

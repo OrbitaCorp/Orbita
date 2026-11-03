@@ -13,8 +13,7 @@ import { BellRing, HandCoins, Percent, UserCheck } from 'lucide-react'
 import { DIAS_SEMANA, diaSemana, diasEntre, fechaCorta, minFecha, rangoTxt, sumarDias, type ISO } from '@/lib/reservas/fechas'
 import { pesos } from '@/lib/reservas/precio'
 import { HOY, cupoDe, estadoPlanDe, planDe, rubroPorKey, type Inscripcion, type NegocioGym, type Socio } from '../datos'
-import { Barras, Encabezado, Segmentado } from '@/design-system/reservas/piezas'
-import { KpiGym } from './piezas'
+import { Barras, Encabezado, Kpi, Segmentado } from '@/design-system/reservas/piezas'
 
 type Periodo = 'mes' | 'anterior' | 'trimestre'
 const PERIODOS: { id: Periodo; label: string }[] = [{ id: 'mes', label: 'Este mes' }, { id: 'anterior', label: 'Mes pasado' }, { id: 'trimestre', label: 'Últimos 3 meses' }]
@@ -147,11 +146,11 @@ export default function Ingresos({ negocio, inscripciones, socios }: { negocio: 
       <style>{CSS}</style>
       <Encabezado rotulo={`${fechaCorta(desde)} al ${fechaCorta(hasta)}`} titulo="Ingresos" bajada="Planes vendidos y renovados y clases sueltas, por la fecha en que se pagaron, comparados con el período anterior. Los cobros se registran a mano."
         acciones={<Segmentado label="Período" valor={periodo} onChange={setPeriodo} opciones={PERIODOS} />} />
-      <div className="gip-kpis">
-        <KpiGym i={0} label="Ingresos" valor={pesos(total)} Icon={HandCoins} delta={totalAnt > 0 ? { valor: variacion(total, totalAnt) } : undefined} nota={`${ventas.length} ${ventas.length === 1 ? 'venta' : 'ventas'} · ${totalAnt > 0 ? `vs. ${comparado}` : 'sin ventas en el período anterior'}`} />
-        <KpiGym i={1} label={`${r.socios} al día`} valor={String(activos)} Icon={UserCheck} tono="ok" delta={{ valor: activos - activosAlInicio, unidades: true }} nota={`de ${socios.length} · desde que arrancó el período`} />
-        <KpiGym i={2} label="Vencen en 7 días" valor={String(vencen)} Icon={BellRing} tono="aviso" nota={vencen ? 'para renovar esta semana' : 'nadie por ahora'} />
-        <KpiGym i={3} label="Ocupación" valor={ocupacion.total === null ? '—' : `${Math.round(ocupacion.total * 100)}%`} Icon={Percent}
+      <div className="rv-kpis">
+        <Kpi i={0} label="Ingresos" valor={pesos(total)} Icon={HandCoins} delta={totalAnt > 0 ? { valor: variacion(total, totalAnt) } : undefined} nota={`${ventas.length} ${ventas.length === 1 ? 'venta' : 'ventas'} · ${totalAnt > 0 ? `vs. ${comparado}` : 'sin ventas en el período anterior'}`} />
+        <Kpi i={1} label={`${r.socios} al día`} valor={String(activos)} Icon={UserCheck} tono="ok" delta={{ valor: activos - activosAlInicio, unidades: true }} nota={`de ${socios.length} · desde que arrancó el período`} />
+        <Kpi i={2} label="Vencen en 7 días" valor={String(vencen)} Icon={BellRing} tono="aviso" nota={vencen ? 'para renovar esta semana' : 'nadie por ahora'} />
+        <Kpi i={3} label="Ocupación" valor={ocupacion.total === null ? '—' : `${Math.round(ocupacion.total * 100)}%`} Icon={Percent}
           delta={ocupacion.total !== null && ocupacionAnt.total !== null ? { valor: Math.round((ocupacion.total - ocupacionAnt.total) * 100), unidades: true } : undefined}
           nota={ocupacion.total === null ? 'todavía no pasó ninguna clase del período' : ocupacionAnt.total !== null ? `puntos vs. ${comparado} · lugares tomados sobre el cupo` : `lugares tomados sobre el cupo · sin historial antes del ${fechaCorta(primerDia)}`} />
       </div>

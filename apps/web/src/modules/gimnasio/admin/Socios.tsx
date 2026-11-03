@@ -10,8 +10,7 @@ import { ArrowRight, BellRing, Check, MessageCircle, Plus, Search, UserCheck, Us
 import { diasEntre, fechaCorta, fechaLarga, hhmm, mesTxt, sumarDias } from '@/lib/reservas/fechas'
 import { pesos } from '@/lib/reservas/precio'
 import { ESTADO_INSCRIPCION, ESTADO_PLAN, HOY, actividadDe, colorDe, estadoPlanDe, planDe, rubroPorKey, type EstadoPlan, type Inscripcion, type NegocioGym, type Socio } from '../datos'
-import { Campo, Chip, Encabezado, Modal, Nota, Selector, Sigla, Vacio } from '@/design-system/reservas/piezas'
-import { KpiGym } from './piezas'
+import { Campo, Chip, Encabezado, Kpi, Modal, Nota, Selector, Sigla, Vacio } from '@/design-system/reservas/piezas'
 
 interface P {
   negocio: NegocioGym; inscripciones: Inscripcion[]; socios: Socio[]
@@ -46,6 +45,8 @@ const CSS = `
   .gso-vence[data-estado='por-vencer'] { color: var(--chip-warning-fg); font-weight: 600; }
   .gso-vence[data-estado='vencido'] { color: var(--chip-error-fg); }
   .gso-mas { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 14px; }
+  /* "Ves N de M" va suelto sobre el fondo del panel: en claro, sobre el cielo, el apagado no llega a AA. */
+  .gso-mas .rv-ayuda { color: var(--rv-tinta-fondo, var(--color-muted)); }
   @media (max-width: 768px) {
     .gso-tira { gap: 8px; padding: 2px 0; border: none; background: transparent; border-radius: 0; }
     .gso-chip { min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--color-border); background: var(--color-bg); }
@@ -116,11 +117,11 @@ export default function Socios({ negocio, inscripciones, socios, onAgregar, onCa
           </Nota>
         </div>
       )}
-      <div className="gip-kpis" style={{ marginBottom: 16 }}>
-        <KpiGym i={0} label="Al día" valor={String(cuenta('vigente') + cuenta('por-vencer'))} Icon={UserCheck} tono="ok" nota="con plan vigente" />
-        <KpiGym i={1} label="Vencen en 7 días" valor={String(cuenta('por-vencer'))} Icon={BellRing} tono="aviso" nota={cuenta('por-vencer') ? 'para avisarles esta semana' : 'nadie por ahora'} />
-        <KpiGym i={2} label="Vencidos" valor={String(cuenta('vencido'))} Icon={UserX} tono="error" nota="plan vencido o pack agotado" />
-        <KpiGym i={3} label="Sin plan" valor={String(cuenta('sin-plan'))} Icon={UserMinus} nota="de prueba, con clase suelta o sin clases" />
+      <div className="rv-kpis" style={{ marginBottom: 16 }}>
+        <Kpi i={0} label="Al día" valor={String(cuenta('vigente') + cuenta('por-vencer'))} Icon={UserCheck} tono="ok" nota="con plan vigente" />
+        <Kpi i={1} label="Vencen en 7 días" valor={String(cuenta('por-vencer'))} Icon={BellRing} tono="aviso" nota={cuenta('por-vencer') ? 'para avisarles esta semana' : 'nadie por ahora'} />
+        <Kpi i={2} label="Vencidos" valor={String(cuenta('vencido'))} Icon={UserX} tono="error" nota="plan vencido o pack agotado" />
+        <Kpi i={3} label="Sin plan" valor={String(cuenta('sin-plan'))} Icon={UserMinus} nota="de prueba, con clase suelta o sin clases" />
       </div>
       <div className="gso-filtros">
         <div className="gso-tira" role="group" aria-label="Filtrar por plan">
@@ -204,10 +205,10 @@ function Ficha({ negocio, socio: s, estado, suyas, vino, falto, onCerrar, onCamb
           {avisable && <button type="button" className="rv-btn rv-btn--sm" onClick={avisar}><MessageCircle size={14} aria-hidden /> Avisar que vence</button>}
         </div>
       </div>
-      <div className="rv-kpis" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', marginBottom: 14 }}>
-        <div className="rv-card rv-kpi"><span className="rv-rotulo">Vino</span><span className="rv-kpi-valor" style={{ fontSize: 20 }}>{vino}</span><span className="rv-kpi-nota">últimos 30 días</span></div>
-        <div className="rv-card rv-kpi"><span className="rv-rotulo">Faltó</span><span className="rv-kpi-valor" style={{ fontSize: 20 }}>{falto}</span><span className="rv-kpi-nota">sin avisar</span></div>
-        <div className="rv-card rv-kpi"><span className="rv-rotulo">Asistencia</span><span className="rv-kpi-valor" style={{ fontSize: 20 }}>{vino + falto ? `${Math.round((vino / (vino + falto)) * 100)}%` : '—'}</span></div>
+      <div className="rv-kpis rv-kpis--3" style={{ marginBottom: 14 }}>
+        <Kpi label="Vino" valor={vino} nota="últimos 30 días" />
+        <Kpi i={1} label="Faltó" valor={falto} nota="sin avisar" />
+        <Kpi i={2} label="Asistencia" valor={vino + falto ? `${Math.round((vino / (vino + falto)) * 100)}%` : '—'} />
       </div>
       <div className="rv-rotulo" style={{ marginBottom: 6 }}>Últimas clases</div>
       <div className="rv-lista">

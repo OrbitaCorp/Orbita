@@ -1,8 +1,10 @@
 // Piezas chicas de reservas (design system): encabezado de pantalla, campos, modal, aviso,
-// indicadores y el gráfico de barras. Todas pintan con las clases rv- de
-// estilo.tsx. Nada de acá sabe de canchas ni de propiedades.
-import { useEffect, useEffectEvent, useId, useRef, useState, type CSSProperties, type ReactNode, type Ref } from 'react'
-import { SlidersHorizontal, X } from 'lucide-react'
+// indicadores, el gráfico de barras, el borrador de un formulario y su barra de
+// guardar. Todas pintan con las clases rv- de estilo.tsx. Nada de acá sabe de
+// canchas, de socios ni de turnos.
+import { useEffect, useEffectEvent, useId, useRef, useState, type CSSProperties, type ReactNode, type Ref, type RefObject } from 'react'
+import type { LucideIcon } from 'lucide-react'
+import { Check, RotateCcw, SlidersHorizontal, X } from 'lucide-react'
 import { Toast } from '@/design-system/components/Toast'
 
 export function Encabezado({ rotulo, titulo, bajada, acciones }: { rotulo?: string; titulo: ReactNode; bajada?: ReactNode; acciones?: ReactNode }) {
@@ -169,38 +171,64 @@ export function frenarScroll(): () => void {
 
 /**
  * Modal centrado (hoja desde abajo en celular): Escape y el velo cierran, el
- * foco entra, da la vuelta adentro y vuelve a donde estaba al cerrar.
+ * foco entra, da la vuelta adentro y vuelve a donde estaba al cerrar. La
+ * cabecera lleva rótulo, título y bajada; `icono` va a la izquierda del título
+ * y conserva su tamaño (solo el texto se estira). Con `onEnviar` el cuerpo y el
+ * pie van dentro de un <form>: Enter guarda y un botón type="submit" del pie
+ * envía. `encima` lo apila sobre otro modal abierto; `foco` es el campo donde
+ * arranca el teclado al abrir (un buscador); sin eso, el modal.
+ *
+ * Con dos abiertos, Escape y Tab los atiende solo el de más arriba (el último
+ * del documento). Un desplegable abierto adentro (data-esc="propio") se cierra
+ * primero: recién el segundo Escape cierra el modal.
  */
-export function Modal({ titulo, bajada, onCerrar, children, pie, ancho }: { titulo: string; bajada?: ReactNode; onCerrar: () => void; children: ReactNode; pie?: ReactNode; ancho?: number }) {
+export function Modal({ titulo, rotulo, bajada, icono, onCerrar, onEnviar, children, pie, encima, ancho, foco }: {
+  titulo: ReactNode; rotulo?: string; bajada?: ReactNode; icono?: ReactNode; onCerrar: () => void; onEnviar?: () => void
+  children: ReactNode; pie?: ReactNode; encima?: boolean; ancho?: number; foco?: RefObject<HTMLElement | null>
+}) {
   const caja = useRef<HTMLDivElement>(null)
   const id = useId()
-  // El último onCerrar sin volver a montar el efecto: los padres lo pasan como
-  // función nueva en cada render, y remontar devolvía el foco al disparador y
-  // lo traía de nuevo al modal (con el teclado, el foco saltaba en cada clic).
-  const cerrarConTecla = useEffectEvent(() => onCerrar())
+  // Los últimos onCerrar y foco sin volver a montar el efecto: los padres los
+  // pasan como valores nuevos en cada render, y remontar devolvía el foco al
+  // disparador y lo traía de nuevo al modal (con el teclado, el foco saltaba en
+  // cada clic).
+  const cerrar = useEffectEvent(() => onCerrar())
+  const enfocar = useEffectEvent(() => (foco?.current ?? caja.current)?.focus())
   useEffect(() => {
-    const antes = document.activeElement as HTMLElement | null
-    caja.current?.focus()
+    const antes = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    enfocar()
+    // En captura, para ganarle a lo que quedó abajo del velo.
     const tecla = (e: globalThis.KeyboardEvent) => {
-      if (e.key === 'Escape') { cerrarConTecla(); return }
-      if (caja.current) retenerFoco(e, caja.current)
+      if (e.key !== 'Escape' && e.key !== 'Tab') return
+      const abiertos = document.querySelectorAll('.rv-modal')
+      if (abiertos[abiertos.length - 1] !== caja.current) return
+      if (e.key === 'Tab') { if (caja.current) retenerFoco(e, caja.current); return }
+      if (e.target instanceof Element && e.target.closest('[data-esc="propio"]')) return
+      e.stopPropagation()
+      cerrar()
     }
-    document.addEventListener('keydown', tecla)
+    window.addEventListener('keydown', tecla, true)
     const soltar = frenarScroll()
-    return () => { document.removeEventListener('keydown', tecla); soltar(); antes?.focus?.() }
+    return () => { window.removeEventListener('keydown', tecla, true); soltar(); if (antes?.isConnected) antes.focus({ preventScroll: true }) }
   }, [])
+  const cuerpo = <div className="rv-modal-cuerpo">{children}</div>
+  const acciones = pie ? <div className="rv-modal-pie">{pie}</div> : null
   return (
-    <div className="rv-velo" onClick={e => { if (e.target === e.currentTarget) onCerrar() }}>
+    // mousedown y no click: soltar el mouse afuera después de seleccionar un texto no cierra.
+    <div className="rv-velo" data-encima={encima || undefined} onMouseDown={e => { if (e.target === e.currentTarget) onCerrar() }}>
       <div ref={caja} className="rv-modal" role="dialog" aria-modal="true" aria-labelledby={id} tabIndex={-1} style={ancho ? ({ ['--rv-ancho' as string]: `${ancho}px` } as CSSProperties) : undefined}>
         <div className="rv-modal-cab">
-          <div>
-            <h2 id={id} className="rv-h2" style={{ fontSize: 18 }}>{titulo}</h2>
-            {bajada && <p className="rv-bajada" style={{ marginTop: 3, fontSize: 13 }}>{bajada}</p>}
+          {icono}
+          <div className="rv-modal-cab-txt">
+            {rotulo && <div className="rv-rotulo" style={{ marginBottom: 6 }}>{rotulo}</div>}
+            <h2 id={id} className="rv-h2" style={{ fontSize: 18, overflowWrap: 'anywhere' }}>{titulo}</h2>
+            {bajada && <div className="rv-bajada" style={{ marginTop: 3, fontSize: 13 }}>{bajada}</div>}
           </div>
           <button type="button" className="rv-btn rv-btn--icono rv-btn--sm" onClick={onCerrar} aria-label="Cerrar"><X size={16} /></button>
         </div>
-        <div className="rv-modal-cuerpo">{children}</div>
-        {pie && <div className="rv-modal-pie">{pie}</div>}
+        {onEnviar
+          ? <form className="rv-modal-form" noValidate onSubmit={e => { e.preventDefault(); onEnviar() }}>{cuerpo}{acciones}</form>
+          : <>{cuerpo}{acciones}</>}
       </div>
     </div>
   )
@@ -225,12 +253,104 @@ export function useAviso(): [(titulo: string, descripcion?: string) => void, Rea
   return [avisar, nodo]
 }
 
-export function Kpi({ label, valor, nota, i = 0 }: { label: string; valor: ReactNode; nota?: string; i?: number }) {
+/**
+ * El borrador de un formulario: arranca igual a lo guardado y sabe si cambió.
+ * `set` toca una clave; `descartar` vuelve a lo guardado. `base` es lo guardado:
+ * - un valor (lo que llega del negocio): si cambia de afuera, el borrador lo
+ *   sigue y `cambiado` se apaga solo al guardar;
+ * - una función que lo arma: lo guardado queda en memoria y `guardar` lo pisa
+ *   con el borrador (las pantallas de la demo que no persisten nada).
+ */
+export function useBorrador<T extends object>(base: T | (() => T)) {
+  const [enMemoria, setEnMemoria] = useState<T | null>(() => (typeof base === 'function' ? (base as () => T)() : null))
+  const guardado = enMemoria ?? (base as T)
+  const [v, setV] = useState<T>(() => guardado)
+  const cambiado = JSON.stringify(v) !== JSON.stringify(guardado)
+  return {
+    v, setV, cambiado,
+    set: <K extends keyof T>(k: K, x: T[K]) => setV(a => ({ ...a, [k]: x })),
+    descartar: () => setV(guardado),
+    guardar: () => setEnMemoria(v),
+  }
+}
+
+/**
+ * La barra de guardar: solo aparece con cambios, pegada abajo mientras se
+ * sigue bajando. `motivo` es por qué todavía no se puede guardar ("Marcá al
+ * menos un día"): se muestra y el botón queda apagado. `nota` es un detalle
+ * debajo del estado ("Al quitar una actividad, sus clases salen de la grilla").
+ */
+export function BarraGuardar({ cambiado, onGuardar, onDescartar, motivo, nota }: { cambiado: boolean; onGuardar: () => void; onDescartar: () => void; motivo?: string; nota?: string }) {
+  if (!cambiado) return null
+  return (
+    <div className="rv-guardar" role="region" aria-label="Cambios sin guardar">
+      <span className="rv-guardar-txt">{motivo ?? 'Tenés cambios sin guardar.'}{nota && !motivo && <small>{nota}</small>}</span>
+      <span className="rv-guardar-btns">
+        <button type="button" className="rv-btn" onClick={onDescartar}><RotateCcw size={15} aria-hidden /> Descartar</button>
+        <button type="button" className="rv-btn rv-btn--primario" onClick={onGuardar} disabled={!!motivo}><Check size={15} aria-hidden /> Guardar cambios</button>
+      </span>
+    </div>
+  )
+}
+
+/**
+ * La variación de un indicador contra el período anterior: un porcentaje o,
+ * con `unidades`, una cantidad (con `sufijo`, p. ej. " pts"). `valor: null` es
+ * que no hay período anterior: el chip lo dice en vez de inventar un número.
+ * `invertir` da vuelta el color cuando subir es malo (ausencias, costos).
+ * `vs` es contra qué se compara ("el mes pasado"): va en la nota y en el tooltip.
+ */
+export interface DeltaKpi { valor: number | null; unidades?: boolean; sufijo?: string; invertir?: boolean; vs?: string }
+
+const TOPE_PCT = 999
+
+/**
+ * Un indicador, con la anatomía de la KpiCard de Tienda: rótulo en mayúsculas,
+ * ícono en un chip (con `tono`), el valor en mono y, al pie, la variación con
+ * una nota corta. Sin `Icon` es un número con rótulo y nota. Sin `nota`, con
+ * `delta` la nota dice contra qué se compara. `i` escalona la entrada.
+ */
+export function Kpi({ label, valor, Icon, tono, delta, nota, i = 0 }: {
+  label: string; valor: ReactNode; Icon?: LucideIcon; tono?: 'primario' | 'ok' | 'aviso' | 'error'; delta?: DeltaKpi; nota?: ReactNode; i?: number
+}) {
+  let chip: ReactNode = null
+  if (delta) {
+    const v = delta.valor
+    if (v === null) chip = <span className="rv-kpi-delta">– sin datos previos</span>
+    else {
+      const abs = Math.abs(v)
+      const texto = delta.unidades ? `${Math.round(abs)}${delta.sufijo ?? ''}` : abs > TOPE_PCT ? `>${TOPE_PCT}%` : `${abs.toLocaleString('es-AR', { maximumFractionDigits: 1 })}%`
+      // Neutro es lo que se leería como cero: 0,04 % o 0,3 unidades no son una suba.
+      const neutro = delta.unidades ? Math.round(abs) === 0 : Math.round(abs * 10) === 0
+      const sube = v > 0
+      const bueno = delta.invertir ? !sube : sube
+      const vs = delta.vs ?? 'el período anterior'
+      // El número exacto queda en el tooltip (arriba de 999 % el chip dice ">999%").
+      const exacto = neutro ? undefined : `${sube ? '+' : '-'}${abs.toLocaleString('es-AR', { maximumFractionDigits: 1 })}${delta.unidades ? delta.sufijo ?? '' : '%'} vs ${vs}`
+      chip = (
+        <span className="rv-kpi-delta" data-tono={neutro ? undefined : bueno ? 'ok' : 'mal'} title={exacto}>
+          <span aria-hidden>{neutro ? '–' : sube ? '▲' : '▼'}</span>
+          <span className="rv-sr">{neutro ? 'Sin cambios:' : sube ? 'Subió' : 'Bajó'}</span>
+          {texto}
+        </span>
+      )
+    }
+  }
+  const notaPie = nota ?? (delta ? `vs ${delta.vs ?? 'el período anterior'}` : null)
+  const titulo = typeof valor === 'string' || typeof valor === 'number' ? String(valor) : undefined
   return (
     <div className="rv-card rv-kpi rv-entra" style={{ ['--i' as string]: i } as CSSProperties}>
-      <span className="rv-rotulo">{label}</span>
-      <span className="rv-kpi-valor">{valor}</span>
-      {nota && <span className="rv-kpi-nota">{nota}</span>}
+      <div className="rv-kpi-cab">
+        <span className="rv-kpi-rotulo">{label}</span>
+        {Icon && <span className="rv-kpi-ico" data-tono={tono} aria-hidden><Icon size={16} strokeWidth={1.5} /></span>}
+      </div>
+      <span className="rv-kpi-valor" title={titulo}>{valor}</span>
+      {(chip || notaPie) && (
+        <div className="rv-kpi-pie">
+          {chip}
+          {notaPie && <span className="rv-kpi-nota">{notaPie}</span>}
+        </div>
+      )}
     </div>
   )
 }

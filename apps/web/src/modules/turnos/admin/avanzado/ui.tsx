@@ -11,10 +11,10 @@
 import { createContext, useCallback, useContext, useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { Check, Eye, Signal, Sparkles, Wifi, BatteryFull } from 'lucide-react'
-import { Encabezado } from '@/design-system/reservas/piezas'
+import { Encabezado, Kpi } from '@/design-system/reservas/piezas'
 import type { RubroTurnos } from '@/modules/turnos/datos'
 import { temaDe, variablesTema } from '@/modules/turnos/storefront/tema'
-import { Indicador, Llave, Volver } from '../piezasPanel'
+import { Llave, Volver } from '../piezasPanel'
 import { Boton, FilaSwitch, Rotulo, SecCard, Segmentado, Vacio } from '../configuracion/ui'
 import { cargarFuentesTurnos } from '../configuracion/datos'
 import { grupoPorId, type Funcion } from './datosAvanzado'
@@ -47,7 +47,6 @@ export const CSS_AVANZADO = `
   .tua-maestro b { display: block; font-size: 14px; font-weight: 600; color: var(--color-text); }
   .tua-maestro small { display: block; margin-top: 2px; font-size: 12.5px; line-height: 1.45; color: var(--color-muted); }
   .rv-kpis.tua-kpis { margin-bottom: 16px; }
-  @media (min-width: 1025px) { .rv-kpis.tua-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   .tua-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: 20px; align-items: start; }
   .tua-sticky { position: sticky; top: 16px; min-width: 0; }
   .tua-guardar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -129,7 +128,7 @@ export function CampoLibre({ label, htmlFor, ayuda, children, style }: { label: 
 
 /** Número de contexto de una función. La nota dice siempre si es un dato de ejemplo. */
 export function Dato({ label, valor, nota, Icon }: { label: string; valor: string; nota?: string; Icon?: LucideIcon }) {
-  return <Indicador label={label} valor={valor} nota={nota} Icon={Icon ?? Sparkles} />
+  return <Kpi label={label} valor={valor} nota={nota} Icon={Icon ?? Sparkles} />
 }
 
 /** Botón de solo ícono (borrar, subir, bajar): 34 px en escritorio, 44 en celular. Siempre con `label`. */
@@ -187,7 +186,7 @@ export function ShellFuncion({ funcion, rubro, activo, onActivo, onVolver, avisa
         <Llave on={activo} onChange={onActivo} label={`${funcion.label}: ${activo ? 'activo' : 'apagado'}`} />
       </div>
 
-      {kpis && <div className="rv-kpis tua-kpis">{kpis}</div>}
+      {kpis && <div className="rv-kpis rv-kpis--3 tua-kpis">{kpis}</div>}
 
       <div className="tua-cols">
         <div className="rv-pila" style={{ minWidth: 0 }}>

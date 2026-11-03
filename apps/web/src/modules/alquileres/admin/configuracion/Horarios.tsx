@@ -5,9 +5,8 @@
 import { useState } from 'react'
 import { DIAS_CORTOS, DIAS_SEMANA, hhmm } from '@/lib/reservas/fechas'
 import { armarBloques } from '@/lib/reservas/disponibilidad'
-import { Nota, Seccion, Selector } from '@/design-system/reservas/piezas'
+import { BarraGuardar, Nota, Seccion, Selector } from '@/design-system/reservas/piezas'
 import { TIPOS } from '../../datos'
-import { Guardar } from '../piezas'
 import { HORAS, PaginaForm, igual, type Form } from './comun'
 
 export default function Horarios({ negocio, onGuardar }: Form) {
@@ -46,7 +45,7 @@ export default function Horarios({ negocio, onGuardar }: Form) {
           ? <Nota tono="info"><span>Con este horario quedan {bloques.length === 1 ? 'un bloque fijo' : `${bloques.length} bloques fijos`}: {bloques.map(b => `${b.nombre.toLowerCase()} de ${hhmm(b.inicio)} a ${hhmm(b.fin)}`).join(', ')}. Cuánto dura cada uno y la limpieza del medio se cambian en Salón.</span></Nota>
           : <Nota tono="aviso"><span>Con este horario no entra ningún bloque: abrí más horas o acortá los bloques en Salón.</span></Nota>)}
       </div>
-      <Guardar cambiado={cambiado && v.dias.length > 0} nota={v.dias.length === 0 ? 'Marcá al menos un día.' : undefined} onDescartar={() => setV(negocio.apertura)} onGuardar={() => onGuardar({ apertura: v })} />
+      <BarraGuardar cambiado={cambiado} motivo={v.dias.length === 0 ? 'Marcá al menos un día.' : undefined} onDescartar={() => setV(negocio.apertura)} onGuardar={() => onGuardar({ apertura: v })} />
     </PaginaForm>
   )
 }

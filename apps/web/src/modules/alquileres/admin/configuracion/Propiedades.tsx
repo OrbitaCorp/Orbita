@@ -4,11 +4,10 @@
 // de reserva; las fechas bloqueadas, en Bloqueos.
 import { useState } from 'react'
 import { ArrowRight, Plus, Trash2 } from 'lucide-react'
-import { Area, Campo, Nota, Seccion, Selector } from '@/design-system/reservas/piezas'
+import { Area, BarraGuardar, Campo, Nota, Seccion, Selector } from '@/design-system/reservas/piezas'
 import { TIPOS, type Propiedad } from '../../datos'
 import { Mapa } from '../../storefront/Sitio'
 import type { Vista } from '../navegacion'
-import { Guardar } from '../piezas'
 import { PaginaForm, idNuevo, igual, num, type Form } from './comun'
 
 /** Las comodidades que se ofrecen para marcar; las que el dueño ya tenga cargadas se suman. */
@@ -73,7 +72,7 @@ export default function Propiedades({ negocio, onGuardar, onIr }: Form & { onIr:
           {lista.length > 1 && <button type="button" className="rv-btn rv-btn--peligro" style={{ alignSelf: 'flex-start' }} onClick={() => { const resto = lista.filter(x => x.id !== p.id); setLista(resto); setAbierta(resto[0].id) }}><Trash2 size={15} aria-hidden /> Quitar esta propiedad</button>}
         </div>
       )}
-      <Guardar cambiado={cambiado} onDescartar={() => { setLista(negocio.propiedades); setAbierta(negocio.propiedades[0]?.id ?? '') }} onGuardar={() => onGuardar({ propiedades: lista.map(x => ({ ...x, nombre: x.nombre.trim() || 'Propiedad' })) })} />
+      <BarraGuardar cambiado={cambiado} onDescartar={() => { setLista(negocio.propiedades); setAbierta(negocio.propiedades[0]?.id ?? '') }} onGuardar={() => onGuardar({ propiedades: lista.map(x => ({ ...x, nombre: x.nombre.trim() || 'Propiedad' })) })} />
     </PaginaForm>
   )
 }

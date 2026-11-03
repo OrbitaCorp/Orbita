@@ -8,8 +8,8 @@ import type { LucideIcon } from 'lucide-react'
 import { BellRing, CalendarCheck, CheckCheck, ChevronDown, Hourglass, RotateCcw, Send, Tag } from 'lucide-react'
 import { fechaLarga, hhmm, sumarDias } from '@/lib/reservas/fechas'
 import { HOY, MOMENTOS, VARIABLES_MENSAJE, clasesDelDia, estadoPlanDe, mensajesDe, planDe, rubroPorKey, type Momento, type NegocioGym, type Plantilla, type Socio } from '../../datos'
-import { Campo, Chip, Encabezado, FilaSwitch, Seccion, Selector, Switch } from '@/design-system/reservas/piezas'
-import { BarraGuardar, useBorrador, type PropsConfig } from '../piezas'
+import { BarraGuardar, Campo, Chip, Encabezado, FilaSwitch, Seccion, Selector, Switch, useBorrador } from '@/design-system/reservas/piezas'
+import { type PropsConfig } from '../piezas'
 
 interface Meta { titulo: string; ayuda: string; Icon: LucideIcon; cuando?: { id: number; label: string }[] }
 const METAS: Record<Momento, Meta> = {

@@ -1,13 +1,14 @@
 // Piezas de los formularios del panel de Turnos: tarjeta de sección, rótulos,
 // llave, selector segmentado, campos con prefijo o sufijo, tarjeta-opción,
-// estado vacío y la barra de "cambios sin guardar". Todas pintan con las
-// clases rv- del kit de reservas (design-system/reservas/estilo.tsx); lo que
+// estado vacío (el borrador y la barra de "cambios sin guardar" son del kit:
+// useBorrador y BarraGuardar en design-system/reservas/piezas.tsx). Pintan con
+// las clases rv- del kit de reservas (design-system/reservas/estilo.tsx); lo que
 // el kit no trae va con prefijo tuc- en CSS_UI_CONFIG, que PanelTurnos monta
 // una sola vez.
 //
 // Lo visual que cambia con hover, foco o selección vive en clases y no en
 // estilos inline a propósito: un estilo inline le gana a cualquier :hover.
-import { useId, useState, type ButtonHTMLAttributes, type CSSProperties, type ReactNode } from 'react'
+import { useId, type ButtonHTMLAttributes, type CSSProperties, type ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { Check } from 'lucide-react'
 import { Encabezado as EncabezadoKit } from '@/design-system/reservas/piezas'
@@ -71,21 +72,12 @@ export const CSS_UI_CONFIG = `
   /* ── Renglón de lista dentro de una tarjeta ── */
   .tuc-renglon { border-radius: var(--rv-r-sm); border: 1px solid var(--color-border); background: var(--color-bg); }
 
-  /* ── Barra de guardado: queda al pie del área que scrollea, sobre el contenido ── */
-  .tuc-barra { position: sticky; bottom: 16px; z-index: 40; display: flex; justify-content: center; margin-top: 24px; pointer-events: none; }
-  .tuc-barra-in { pointer-events: auto; display: flex; align-items: center; gap: 10px; max-width: 100%; border-radius: var(--rv-r); padding: 8px 8px 8px 16px; background: var(--color-bg); border: 1px solid var(--color-border-strong); box-shadow: 0 12px 36px rgba(0,0,0,0.18); }
-  .tuc-barra-txt, .tuc-barra-corto { font-size: 13px; font-weight: 500; color: var(--color-text); white-space: nowrap; }
-  .tuc-barra-corto { display: none; flex: 1; }
-
   /* ── Vista previa a pantalla completa (Apariencia en celular): un velo oscuro, como el de un modal ── */
   .tuc-velo { position: fixed; inset: var(--rv-tope, 0px) 0 0 0; z-index: 300; background: rgba(3,6,14,0.62); display: flex; flex-direction: column; padding: 12px; }
 
   @media (max-width: 768px) {
     .tuc-field--fila { min-height: 46px; font-size: 16px; }
     .tuc-field--fila > input { height: 44px; }
-    .tuc-barra-txt { display: none; }
-    .tuc-barra-corto { display: inline; }
-    .tuc-barra-in { width: 100%; }
     .tuc-icono { width: 44px; height: 44px; }
     .tuc-link { min-height: 44px; }
     .tuc-alto-campo { min-height: 46px; }
@@ -93,20 +85,6 @@ export const CSS_UI_CONFIG = `
     .rv-seg.tuc-seg > button { min-width: 44px; }
   }
 `
-
-// ─── Borrador con "Descartar" ────────────────────────────────────────────────
-// Cada pantalla edita un borrador y compara contra lo "guardado" (en memoria):
-// así la barra de guardado aparece solo si de verdad cambió algo.
-// "arranque" deja que el borrador empiece distinto de lo guardado (por ejemplo,
-// con la plantilla que se eligió en otra pantalla): ya nace como cambio pendiente.
-
-export function useBorrador<T>(inicial: () => T, arranque?: (guardado: T) => T) {
-  const [guardado, setGuardado] = useState<T>(inicial)
-  const [valor, setValor] = useState<T>(() => arranque ? arranque(guardado) : guardado)
-  const dirty = JSON.stringify(valor) !== JSON.stringify(guardado)
-  const set = <K extends keyof T>(k: K, v: T[K]) => setValor(p => ({ ...p, [k]: v }))
-  return { valor, setValor, set, dirty, descartar: () => setValor(guardado), guardar: () => setGuardado(valor) }
-}
 
 // ─── Encabezado de pantalla ──────────────────────────────────────────────────
 
@@ -291,24 +269,6 @@ export function Vacio({ Icon, titulo, children, accion }: { Icon: LucideIcon; ti
       <div className="rv-h3">{titulo}</div>
       {children && <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.5, maxWidth: 360 }}>{children}</p>}
       {accion && <div style={{ marginTop: 4 }}>{accion}</div>}
-    </div>
-  )
-}
-
-// ─── Barra de guardado ───────────────────────────────────────────────────────
-// Sticky al pie del área que scrollea (.admin-main): queda centrada sobre el
-// contenido y no hace falta volver arriba para guardar.
-
-export function BarraGuardar({ dirty, onDescartar, onGuardar }: { dirty: boolean; onDescartar: () => void; onGuardar: () => void }) {
-  if (!dirty) return null
-  return (
-    <div className="tuc-barra">
-      <div role="status" className="tuc-barra-in">
-        <span className="tuc-barra-txt">Tenés cambios sin guardar</span>
-        <span className="tuc-barra-corto">Sin guardar</span>
-        <Boton variant="ghost" size="sm" onClick={onDescartar}>Descartar</Boton>
-        <Boton variant="primary" size="sm" onClick={onGuardar} icon={<Check size={14} strokeWidth={2.4} aria-hidden />}>Guardar</Boton>
-      </div>
     </div>
   )
 }

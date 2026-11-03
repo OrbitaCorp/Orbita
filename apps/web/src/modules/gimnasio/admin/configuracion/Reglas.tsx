@@ -4,8 +4,8 @@
 // pero conviene saberlo.
 import type { LucideIcon } from 'lucide-react'
 import { Gift, Hourglass, Repeat, Ticket } from 'lucide-react'
-import { Encabezado, Seccion, Selector } from '@/design-system/reservas/piezas'
-import { BarraGuardar, useBorrador, type PropsConfig } from '../piezas'
+import { BarraGuardar, Encabezado, Seccion, Selector, useBorrador } from '@/design-system/reservas/piezas'
+import { type PropsConfig } from '../piezas'
 
 const CSS = `
   .grg-reglas { display: flex; flex-direction: column; }

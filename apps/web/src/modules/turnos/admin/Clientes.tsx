@@ -13,11 +13,11 @@
 import { useState } from 'react'
 import { Phone, MessageCircle, ShieldCheck, ChevronRight, CalendarPlus, CalendarClock, UserPlus, Check, Lock } from 'lucide-react'
 import { Avatar } from '@/design-system/components/Avatar'
-import { Encabezado, Vacio } from '@/design-system/reservas/piezas'
+import { Encabezado, Modal, Vacio } from '@/design-system/reservas/piezas'
 import { horaTxt, pesos, esSalud, type Cliente, type RubroTurnos } from '@/modules/turnos/datos'
 import { ChipEstado } from '@/modules/turnos/_shared/components/ChipEstado'
 import { Campo, Segmentado } from './configuracion/ui'
-import { Modal, ErrorCampo, Buscador } from './piezasPanel'
+import { ErrorCampo, Buscador } from './piezasPanel'
 import { cuandoTxt, fechaCorta, sinAcentos, tieneTelefono, type TurnoAgenda } from '../datos/agenda'
 import { taparTelefono } from '../datos/equipo'
 

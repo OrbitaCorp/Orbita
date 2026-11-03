@@ -6,8 +6,8 @@ import { Building2, MapPin, Phone, AtSign, Mail, Link2, Copy, QrCode, Check, Mes
 import { temaDe } from '@/modules/turnos/storefront/tema'
 import { FAMILIAS, MODO_LABEL } from '@/modules/turnos/datos'
 import { QR, matrizQR } from '@/modules/turnos/_shared/components/QR'
-import { Modal } from '../piezasPanel'
-import { useBorrador, Encabezado, SecCard, Campo, Dos, Rotulo, BarraGuardar, FilaSwitch, Boton, Chip, type PropsTab } from './ui'
+import { Encabezado, SecCard, Campo, Dos, Rotulo, FilaSwitch, Boton, Chip, type PropsTab } from './ui'
+import { BarraGuardar, Modal, useBorrador } from '@/design-system/reservas/piezas'
 import { subdominioDe, vozDe } from './datos'
 
 const CSS = `
@@ -34,7 +34,7 @@ export default function Negocio({ rubro, avisar }: PropsTab) {
       telefono: t.telefono, whatsapp: t.telefono, mismoWhatsapp: true, instagram: t.instagram, email: `hola@${subdominioDe(t.nombre)}.com.ar`,
     }
   })
-  const v = b.valor
+  const v = b.v
   const familia = FAMILIAS.find(f => f.id === rubro.familia)
   const link = `${subdominioDe(v.nombre)}.orbita.site`
   const [copiado, setCopiado] = useState(false)
@@ -121,7 +121,7 @@ export default function Negocio({ rubro, avisar }: PropsTab) {
         </SecCard>
       </div>
 
-      <BarraGuardar dirty={b.dirty} onDescartar={b.descartar} onGuardar={() => { b.guardar(); avisar('Datos guardados', 'Es una demo: no se guardó nada de verdad.') }} />
+      <BarraGuardar cambiado={b.cambiado} onDescartar={b.descartar} onGuardar={() => { b.guardar(); avisar('Datos guardados', 'Es una demo: no se guardó nada de verdad.') }} />
 
       {qr && (
         <Modal titulo="QR para tu mostrador" rotulo="Tu link de reservas" ancho={420} onCerrar={() => setQr(false)}

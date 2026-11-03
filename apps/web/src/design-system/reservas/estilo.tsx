@@ -64,7 +64,8 @@ export const CSS_RESERVAS = `
      La opción que no se puede elegir lleva el radio disabled: el lector la anuncia como no
      disponible y las flechas la saltean. */
   .rv-card--radio { position: relative; }
-  .rv-card--radio > input[type='radio'] { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+  /* El radio cubre también el borde de 1 px: es el toque, y con inset: 0 medía 42 px adentro de una franja de 44. */
+  .rv-card--radio > input[type='radio'] { position: absolute; inset: -1px; z-index: 1; width: calc(100% + 2px); height: calc(100% + 2px); margin: 0; opacity: 0; cursor: pointer; }
   .rv-card--radio > input[type='radio']:disabled { cursor: not-allowed; }
   .rv-card--radio:has(> input:focus-visible) { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
@@ -186,15 +187,30 @@ export const CSS_RESERVAS = `
     .rv-tabla td:not([data-label]) { justify-content: flex-end; }
   }
 
-  /* ── Indicadores y gráficos ── */
+  /* ── Indicadores (la KpiCard de Tienda: rótulo, ícono en chip, valor mono y la variación) ── */
   .rv-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-  .rv-kpi { padding: 14px 16px; min-width: 0; }
-  /* La tarjeta es un contenedor: el número se achica con el ancho de SU tarjeta
-     (no con el de la pantalla), de 24 px en escritorio a 16 px en dos columnas a
-     390. Un monto que igual no entre se parte en vez de desbordar la tarjeta. */
+  .rv-kpis--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .rv-kpi { display: flex; flex-direction: column; padding: 16px; min-width: 0; }
+  /* La tarjeta es un contenedor: el número se achica con el ancho de SU tarjeta (no con el de
+     la pantalla), de 30 px en escritorio a 20 en dos columnas; lo que igual no entre se corta
+     con puntos suspensivos (el valor entero queda en el title) en vez de pisar la de al lado. */
   .rv-kpis > .rv-kpi { container-type: inline-size; }
-  .rv-kpi-valor { display: block; font-family: var(--rv-mono); font-size: 24px; font-size: clamp(16px, 13cqi, 24px); font-weight: 600; letter-spacing: -0.02em; color: var(--color-text); margin-top: 6px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-  .rv-kpi-nota { display: block; font-size: 12.5px; color: var(--color-muted); margin-top: 4px; }
+  .rv-kpi-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
+  .rv-kpi-rotulo { font-size: 12px; font-weight: 600; line-height: 1.3; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-muted); }
+  .rv-kpi-ico { width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0; display: grid; place-items: center; background: var(--color-primary-bg); color: var(--color-primary); }
+  .rv-kpi-ico[data-tono='ok'] { background: var(--color-success-bg); color: var(--chip-success-fg); }
+  .rv-kpi-ico[data-tono='aviso'] { background: var(--color-warning-bg); color: var(--chip-warning-fg); }
+  .rv-kpi-ico[data-tono='error'] { background: var(--color-error-bg); color: var(--chip-error-fg); }
+  .rv-kpi-valor { display: block; min-width: 0; font-family: var(--rv-mono); font-size: 30px; font-size: clamp(20px, 13cqi, 30px); font-weight: 700; letter-spacing: -0.02em; line-height: 1; color: var(--color-text); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 10px; }
+  /* El pie va abajo de todo: en una fila de tarjetas los chips quedan alineados aunque una nota sea más larga. */
+  .rv-kpi-pie { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; margin-top: auto; }
+  /* Sin cambio o sin datos previos el chip va en tinta de cuerpo: muted sobre surface-alt no llega a AA. */
+  .rv-kpi-delta { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: 6px; flex-shrink: 0; font-family: var(--rv-mono); font-size: 12px; font-weight: 600; white-space: nowrap; background: var(--color-surface-alt); color: var(--color-body); }
+  .rv-kpi-delta[data-tono='ok'] { background: var(--color-success-bg); color: var(--chip-success-fg); }
+  .rv-kpi-delta[data-tono='mal'] { background: var(--color-error-bg); color: var(--chip-error-fg); }
+  .rv-kpi-nota { font-size: 11.5px; line-height: 1.4; color: var(--color-muted); min-width: 0; }
+
+  /* ── Gráfico de barras ── */
   /* Columnas finas (24 px como máximo: el resto del lugar es aire) que crecen desde la base. */
   .rv-barras { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; align-items: end; height: 160px; padding-top: 22px; }
   .rv-barra { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 6px; min-width: 0; border-radius: 6px; outline: none; }
@@ -257,7 +273,13 @@ export const CSS_RESERVAS = `
   .rv-modal { width: 100%; max-width: var(--rv-ancho, 520px); max-height: calc(100vh - var(--rv-tope, 0px) - 48px); max-height: calc(100dvh - var(--rv-tope, 0px) - 48px); display: flex; flex-direction: column; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: 16px; box-shadow: 0 16px 40px rgba(3,6,14,0.24); overflow: hidden; animation: rvModal 200ms var(--rv-ease); }
   .rv-modal:focus { outline: none; }
   .rv-modal-cab { display: flex; align-items: flex-start; gap: 12px; padding: 16px 16px 14px 20px; border-bottom: 1px solid var(--color-border); }
-  .rv-modal-cab > div { flex: 1; min-width: 0; }
+  /* Solo el texto se estira (.rv-modal-cab-txt): un ícono o un avatar antes del título conserva su tamaño. */
+  .rv-modal-cab > * { flex-shrink: 0; }
+  .rv-modal-cab-txt { flex: 1; min-width: 0; }
+  /* Con onEnviar, el cuerpo y el pie van adentro de un <form>: hereda la columna del modal para que el cuerpo scrollee. */
+  .rv-modal-form { display: flex; flex-direction: column; flex: 1; min-height: 0; margin: 0; }
+  /* Un modal apilado sobre otro (encima) va por delante del primero. */
+  .rv-velo[data-encima='true'] { z-index: 152; }
   .rv-modal-cuerpo { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 18px 20px; }
   .rv-modal-pie { display: flex; justify-content: flex-end; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 20px; border-top: 1px solid var(--color-border); background: var(--color-surface); }
   .rv-modal-pie > .rv-modal-izq { margin-right: auto; }
@@ -289,6 +311,12 @@ export const CSS_RESERVAS = `
   .rv-nota--info { background: var(--color-primary-bg); border-color: transparent; color: var(--chip-primary-fg); }
   /* Se lee tal cual está escrito ("Demo: sincronización simulada"), sin pasarlo a mayúsculas. */
   .rv-demo { display: inline-flex; align-items: center; gap: 6px; min-height: 24px; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; line-height: 1.3; background: var(--color-warning-bg); color: var(--chip-warning-fg); }
+
+  /* ── Barra de guardar (BarraGuardar): aparece abajo cuando hay cambios y queda a la vista mientras se baja ── */
+  .rv-guardar { position: sticky; bottom: 12px; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 10px 14px; flex-wrap: wrap; margin-top: 20px; padding: 10px 10px 10px 16px; border-radius: 12px; border: 1px solid var(--color-border-strong); background: var(--color-bg); box-shadow: 0 10px 30px rgba(0,0,0,0.14); animation: rvModal 200ms var(--rv-ease); }
+  .rv-guardar-txt { flex: 1 1 200px; min-width: 0; font-size: 13.5px; font-weight: 500; color: var(--color-text); }
+  .rv-guardar-txt > small { display: block; font-weight: 400; color: var(--color-muted); font-size: 12.5px; margin-top: 1px; }
+  .rv-guardar-btns { display: flex; gap: 8px; }
 
   /* ── Filtros que se pliegan en celular (ver Filtros en piezas.tsx) ── */
   .rv-filtros { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
@@ -326,13 +354,28 @@ export const CSS_RESERVAS = `
   @media (max-width: 640px) {
     .rv-h1 { font-size: 22px; }
     .rv-grid--2, .rv-grid--3, .rv-grid--4, .rv-dos { grid-template-columns: minmax(0, 1fr); }
-    .rv-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-    .rv-kpi { padding: 12px 12px; }
+    .rv-kpis, .rv-kpis--3 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    /* Tres indicadores en dos columnas: el tercero a todo el ancho. */
+    .rv-kpis--3 > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+    .rv-guardar { bottom: 8px; padding: 10px 12px; }
+    .rv-guardar-btns { width: 100%; }
+    .rv-guardar-btns > .rv-btn { flex: 1; }
     .rv-cab-acciones { width: 100%; }
     .rv-cab-acciones > .rv-btn { flex: 1 1 auto; }
   }
+  /* La densidad de celular de Tienda (.ds-kpi-* en globals.css): mismas piezas, más chicas, dos por fila. */
+  @media (max-width: 480px) {
+    .rv-kpi { padding: 13px; }
+    .rv-kpi-cab { margin-bottom: 8px; }
+    .rv-kpi-rotulo { font-size: 10.5px; letter-spacing: 0.02em; }
+    .rv-kpi-ico { width: 26px; height: 26px; border-radius: 7px; }
+    .rv-kpi-ico > svg { width: 14px; height: 14px; }
+    .rv-kpi-valor { font-size: 21px; margin-bottom: 7px; }
+    .rv-kpi-pie { flex-direction: column; align-items: flex-start; gap: 3px; }
+    .rv-kpi-delta { height: 20px; padding: 0 6px; font-size: 11px; }
+  }
   @media (prefers-reduced-motion: reduce) {
-    .rv-entra, .rv-modal, .rv-velo, .rv-toast { animation: none !important; }
+    .rv-entra, .rv-modal, .rv-velo, .rv-toast, .rv-guardar { animation: none !important; }
     .rv-btn, .rv-card--accion, .rv-switch::after { transition: none; }
   }
 `

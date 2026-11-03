@@ -8,9 +8,8 @@ import { useRef, useState } from 'react'
 import { CheckCheck, ChevronDown, RotateCcw, Send } from 'lucide-react'
 import { fechaCorta, hhmm } from '@/lib/reservas/fechas'
 import { pesos } from '@/lib/reservas/precio'
-import { Chip, EtiquetaDemo, Seccion, Sigla } from '@/design-system/reservas/piezas'
+import { BarraGuardar, Chip, EtiquetaDemo, Seccion, Sigla } from '@/design-system/reservas/piezas'
 import { HOY, MENSAJES, TIPOS, VARIABLES_MENSAJE, clientePorId, fechaDeReserva, mensajesDeFabrica, rellenarMensaje, unidadPorId, type Cliente, type InfoMensaje, type MensajeAuto, type NegocioAlquiler, type Reserva, type VariableMensaje } from '../../datos'
-import { Guardar } from '../piezas'
 import { PaginaForm, igual, type Form } from './comun'
 
 const CSS = `
@@ -73,7 +72,7 @@ export default function Mensajes({ negocio, reservas, clientes, onGuardar, onAvi
           </div>
         </Seccion>
       </div>
-      <Guardar cambiado={cambiado} onDescartar={() => setLista(negocio.mensajes)} onGuardar={() => onGuardar({ mensajes: lista }, 'Mensajes guardados')} />
+      <BarraGuardar cambiado={cambiado} onDescartar={() => setLista(negocio.mensajes)} onGuardar={() => onGuardar({ mensajes: lista }, 'Mensajes guardados')} />
     </PaginaForm>
   )
 }

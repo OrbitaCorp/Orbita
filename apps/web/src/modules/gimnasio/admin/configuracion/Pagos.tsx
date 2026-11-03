@@ -5,8 +5,8 @@
 // desconectar es visual: no hay OAuth ni backend.
 import { ArrowRight, CircleCheck, PlugZap, Unplug, Wallet } from 'lucide-react'
 import { HOY, estadoPlanDe, rubroPorKey, type Socio } from '../../datos'
-import { Campo, Chip, Encabezado, FilaSwitch, Nota, Seccion, Selector } from '@/design-system/reservas/piezas'
-import { BarraGuardar, useBorrador, type PropsConfig } from '../piezas'
+import { BarraGuardar, Campo, Chip, Encabezado, FilaSwitch, Nota, Seccion, Selector, useBorrador } from '@/design-system/reservas/piezas'
+import { type PropsConfig } from '../piezas'
 
 const CSS = `
   .gpg-mp { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 16px; border-radius: 12px; border: 1px dashed var(--color-border-strong); background: var(--color-surface); }

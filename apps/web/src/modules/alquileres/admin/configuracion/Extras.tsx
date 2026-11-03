@@ -6,9 +6,8 @@ import { useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { MESES, partes } from '@/lib/reservas/fechas'
 import { pesos, type Extra } from '@/lib/reservas/precio'
-import { Campo, Nota, Vacio } from '@/design-system/reservas/piezas'
+import { BarraGuardar, Campo, Nota, Vacio } from '@/design-system/reservas/piezas'
 import { HOY, TIPOS, cuenta, type Reserva } from '../../datos'
-import { Guardar } from '../piezas'
 import { PaginaForm, idNuevo, igual, num, type Form } from './comun'
 
 export default function Extras({ negocio, reservas, onGuardar }: Form & { reservas: Reserva[] }) {
@@ -48,7 +47,7 @@ export default function Extras({ negocio, reservas, onGuardar }: Form & { reserv
         )}
         {origen.length > 0 && <Nota tono="info"><span>En {MESES[partes(HOY).mes - 1]} los extras sumaron {pesos(sumaMes)} en {cuenta(delMes.length, enSalon ? 'evento' : 'reserva', enSalon ? 'eventos' : 'reservas')}.</span></Nota>}
       </div>
-      <Guardar cambiado={cambiado} onDescartar={() => setLista(origen)} onGuardar={guardar} />
+      <BarraGuardar cambiado={cambiado} onDescartar={() => setLista(origen)} onGuardar={guardar} />
     </PaginaForm>
   )
 }

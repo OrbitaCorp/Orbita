@@ -27,7 +27,8 @@ import {
   TIPOGRAFIAS, tipografiaPorId, RADIOS, radioDeTema, ESTILOS_BOTON, seccionesIniciales, fotosPara,
   botonesSugeridos, esHex, iniciales, subdominioDe, vozDe, type EstiloBoton, type Paleta, type PlantillaSitio,
 } from './datos'
-import { useBorrador, Encabezado, SecCard, Rotulo, Switch, Campo, Chip, BarraGuardar, Boton, type PropsTab } from './ui'
+import { Encabezado, SecCard, Rotulo, Switch, Campo, Chip, Boton, type PropsTab } from './ui'
+import { BarraGuardar, useBorrador } from '@/design-system/reservas/piezas'
 import VistaPrevia, { armarPisar, CSS_VISTA_PREVIA } from './VistaPrevia'
 import { MiniSitio, TarjetaPlantilla, datosMini, CSS_MINI, CSS_PLANTILLA } from './MiniSitio'
 
@@ -109,7 +110,7 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
       nombre: t.nombre, frase: t.tagline, boton: botonesSugeridos(rubro)[0],
     }
   })
-  const ap = b.valor
+  const ap = b.v
   const plantilla = orden.find(p => p.id === vestido.plantilla) ?? orden[0]
   const estiloBoton = ap.estiloBoton ?? plantilla.boton
   const hero = ap.hero ?? plantilla.hero
@@ -138,7 +139,7 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
 
   const tocada = color.toLowerCase() !== plantilla.c.primary.toLowerCase() || tipo.id !== plantilla.tipo || radioPx !== plantilla.radio || estiloBoton !== plantilla.boton || hero !== plantilla.hero || vestido.foto !== ''
   // Elegir una plantilla trae todo lo suyo: también el botón y la portada.
-  const elegir = (p: PlantillaSitio) => { setVestidoBorrador(deFabrica(p)); b.setValor(v => ({ ...v, estiloBoton: null, hero: null })) }
+  const elegir = (p: PlantillaSitio) => { setVestidoBorrador(deFabrica(p)); b.setV(v => ({ ...v, estiloBoton: null, hero: null })) }
 
   const ajustes = useMemo(() => ({ color, tipo: tipo.id, radio: radioPx, foto: vestido.foto }), [color, tipo.id, radioPx, vestido.foto])
   const pisar = useMemo(() => armarPisar(rubro, plantilla, ajustes), [rubro, plantilla, ajustes])
@@ -149,7 +150,7 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
 
   const subdominio = subdominioDe(ap.nombre)
   const seAplica = formaDirty || disenoDirty || vestidoDirty
-  const dirty = b.dirty || seAplica
+  const cambiado = b.cambiado || seAplica
   const guardar = () => {
     if (!esHex(vestido.color)) { avisar('Revisá el color de acento', 'Escribilo como #RRGGBB, por ejemplo #C9A36A.'); return }
     b.guardar()
@@ -194,9 +195,9 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
         titulo="Apariencia"
         bajada="La identidad de tu sitio de reservas: elegí una plantilla y ajustala a tu marca. Cada cambio se ve al instante en la vista previa."
         acciones={<>
-          <Chip tono={dirty ? 'aviso' : 'ok'}>{dirty ? 'Cambios sin guardar' : <><Check size={12} strokeWidth={3} aria-hidden />Publicado</>}</Chip>
+          <Chip tono={cambiado ? 'aviso' : 'ok'}>{cambiado ? 'Cambios sin guardar' : <><Check size={12} strokeWidth={3} aria-hidden />Publicado</>}</Chip>
           <span className="tuc-solo-angosto"><Boton variant="outline" icon={<Eye size={15} aria-hidden />} onClick={() => setPreviewAbierta(true)}>Ver vista previa</Boton></span>
-          <span className="tuc-solo-ancho"><Boton variant="primary" disabled={!dirty} onClick={guardar}>Guardar cambios</Boton></span>
+          <span className="tuc-solo-ancho"><Boton variant="primary" disabled={!cambiado} onClick={guardar}>Guardar cambios</Boton></span>
         </>}
       />
 
@@ -466,7 +467,7 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
         </aside>
       </div>
 
-      <BarraGuardar dirty={dirty} onDescartar={descartar} onGuardar={guardar} />
+      <BarraGuardar cambiado={cambiado} onDescartar={descartar} onGuardar={guardar} />
 
       {previewAbierta && (
         <div role="dialog" aria-modal="true" aria-label="Vista previa del sitio" className="tuc-velo" onClick={() => setPreviewAbierta(false)}

@@ -13,9 +13,8 @@ import { useState } from 'react'
 import { CalendarCheck, Gauge, HandCoins, LogIn, LogOut, Wallet } from 'lucide-react'
 import { diaSemana, diasEntre, fechaCorta, fechaRelativa, hhmm, moverMes, rangoTxt, sumarDias, type ISO } from '@/lib/reservas/fechas'
 import { pesos } from '@/lib/reservas/precio'
-import { Barras, Chip, Encabezado, Filtros, Segmentado } from '@/design-system/reservas/piezas'
+import { Barras, Chip, Encabezado, Filtros, Kpi, Segmentado } from '@/design-system/reservas/piezas'
 import { HOY, bloquesDe, clientePorId, cuenta, fechaDeReserva, tituloEvento, unidadPorId, unidadesDe, type Cliente, type NegocioAlquiler, type Reserva } from '../datos'
-import { Kpi } from './piezas'
 
 type Periodo = 'mes' | 'anterior' | 'trimestre'
 const PERIODOS: { id: Periodo; label: string }[] = [{ id: 'mes', label: 'Este mes' }, { id: 'anterior', label: 'Mes pasado' }, { id: 'trimestre', label: 'Últimos 3 meses' }]
@@ -100,7 +99,7 @@ export default function Ingresos({ negocio, reservas, clientes, onAbrirReserva }
     <div className="rv-pagina">
       <Encabezado rotulo={`${fechaCorta(desde)} al ${fechaCorta(hasta)}`} titulo="Ingresos" bajada="Lo facturado cuenta las reservas confirmadas y realizadas, por la fecha de la reserva. Cada variación es contra el período anterior."
         acciones={<Filtros resumen={PERIODOS.find(p => p.id === periodo)?.label}><Segmentado label="Período" valor={periodo} onChange={setPeriodo} opciones={PERIODOS} /></Filtros>} />
-      <div className="ala-kpis" style={{ marginBottom: 14 }}>
+      <div className="rv-kpis" style={{ marginBottom: 14 }}>
         <Kpi i={0} label="Facturado" Icon={HandCoins} valor={pesos(ahora.facturado)} delta={{ valor: variacion(ahora.facturado, antes.facturado), vs: VS[periodo] }} />
         <Kpi i={1} label={tipo === 'bloque' ? 'Eventos' : 'Reservas'} Icon={CalendarCheck} valor={ahora.cobradas.length} delta={{ valor: antes.cobradas.length ? ahora.cobradas.length - antes.cobradas.length : null, unidades: true, vs: VS[periodo] }} />
         <Kpi i={2} label="Ocupación" Icon={Gauge} valor={`${Math.round(ahora.ocupacion * 100)}%`} delta={{ valor: antes.cobradas.length ? Math.round((ahora.ocupacion - antes.ocupacion) * 100) : null, unidades: true, sufijo: ' pts', vs: VS[periodo] }} nota={ocupacionNota} />
@@ -158,7 +157,7 @@ export default function Ingresos({ negocio, reservas, clientes, onAbrirReserva }
               <div className="rv-lista">
                 {movimientos.slice(0, 10).map(({ r, llega, f }) => (
                   <button key={`${llega ? 'in' : 'out'}-${r.id}`} type="button" className="rv-item" onClick={() => onAbrirReserva(r.id)}>
-                    <span className="ala-kpi-ico" aria-hidden style={{ width: 30, height: 30, ...(llega ? {} : { background: 'var(--color-surface-alt)', color: 'var(--color-muted)' }) }}>{llega ? <LogIn size={15} strokeWidth={1.7} /> : <LogOut size={15} strokeWidth={1.7} />}</span>
+                    <span className="rv-kpi-ico" aria-hidden style={{ width: 30, height: 30, ...(llega ? {} : { background: 'var(--color-surface-alt)', color: 'var(--color-muted)' }) }}>{llega ? <LogIn size={15} strokeWidth={1.7} /> : <LogOut size={15} strokeWidth={1.7} />}</span>
                     <span className="rv-item-cuerpo"><span className="rv-item-titulo">{nombre(r)}</span><span className="rv-item-sub">{donde(r)} · {cuenta(r.huespedes ?? 1, 'huésped', 'huéspedes')} · {horaDe(r, llega)}</span></span>
                     <Chip tono={llega ? 'ok' : 'gris'}>{llega ? 'Llega' : 'Sale'} {fechaRelativa(f, HOY).toLowerCase()}</Chip>
                   </button>

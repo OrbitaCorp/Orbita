@@ -9,10 +9,10 @@
 // vive en PanelTurnos, así un servicio nuevo aparece también al agendar.
 import { useId, useState } from 'react'
 import { Plus, Globe, Pencil, Check, Pause, Play } from 'lucide-react'
-import { Encabezado, Vacio } from '@/design-system/reservas/piezas'
+import { Encabezado, Modal, Vacio } from '@/design-system/reservas/piezas'
 import { pesos, duracionTxt, type RubroTurnos } from '@/modules/turnos/datos'
 import { Campo, Selector, Segmentado } from './configuracion/ui'
-import { Modal, ErrorCampo, Borrar, Buscador, Llave } from './piezasPanel'
+import { ErrorCampo, Borrar, Buscador, Llave } from './piezasPanel'
 import { sinAcentos, type ServicioPanel } from '../datos/agenda'
 
 const DURACIONES = [10, 15, 20, 25, 30, 40, 45, 50, 60, 75, 90, 120, 150, 180, 240]

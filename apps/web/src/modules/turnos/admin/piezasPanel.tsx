@@ -1,26 +1,23 @@
-// Piezas del panel de Turnos (demo) que no trae el kit de reservas: el modal
-// con formulario (Enter guarda) y apilable, la confirmación antes de borrar, el
-// indicador con variación (el KpiCard de Tienda sobre una .rv-card), la llave,
-// los días y los turnos de atención (mañana y tarde), la tira de días y los
-// horarios libres, la jornada en línea y el mensaje de WhatsApp.
+// Piezas del panel de Turnos (demo) que no trae el kit de reservas: la
+// confirmación antes de borrar, la llave, los días y los turnos de atención
+// (mañana y tarde), la tira de días y los horarios libres, la jornada en línea
+// y el mensaje de WhatsApp. El modal (con formulario, apilable y con ícono) y
+// el indicador con variación son del kit (design-system/reservas/piezas.tsx).
 //
 // Todo pinta con las clases rv- del kit (design-system/reservas/estilo.tsx) y
 // lo propio va con prefijo tu- en CSS_PIEZAS_PANEL, que PanelTurnos monta una
 // sola vez. Nada de hover por JS: lo que se toca lleva ds-hover o una clase
 // del kit que ya trae su hover y su foco.
-import { useEffect, useEffectEvent, useId, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { ArrowLeft, X, Copy, Check, CheckCheck, Clock3, Search, Send, Share2, Trash2, PhoneOff, Sun, Sunset, CalendarX } from 'lucide-react'
-import { frenarScroll, retenerFoco } from '@/design-system/reservas/piezas'
+import { ArrowLeft, Copy, Check, CheckCheck, Clock3, Search, Send, Share2, Trash2, PhoneOff, Sun, Sunset, CalendarX } from 'lucide-react'
+import { Modal } from '@/design-system/reservas/piezas'
 import { DIAS, DIAS_CORTOS, horaTxt, type Recurso, type Turno } from '@/modules/turnos/datos'
 import { AHORA_DEMO, MEDIAS_HORAS, diasAbiertos, diasTxt, errorJornada, hhmm, jornadaDe, jornadaTxt, tramosDe, type Bloque, type Jornada, type Semana, type Tramo } from '@/modules/turnos/horario'
 import { Segmentado } from './configuracion/ui'
 import { copiar, fechaDe, indiceDia, type Avisar, type GrupoLibres, type MensajeWA } from '../datos/agenda'
 
 export const CSS_PIEZAS_PANEL = `
-  /* Un modal apilado sobre otro (cambiar cómo cobra desde la liquidación) va encima del primero. */
-  .rv-velo[data-encima='true'] { z-index: 152; }
-  .tu-modal-form { display: flex; flex-direction: column; flex: 1; min-height: 0; margin: 0; }
   .tu-error { display: flex; align-items: center; gap: 6px; margin: -8px 0 14px; font-size: 12.5px; font-weight: 500; color: var(--color-error); }
   .tu-dato-fila { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; font-size: 13px; border-top: 1px solid var(--color-border); }
   .tu-dato-fila:first-child { border-top: none; }
@@ -41,27 +38,6 @@ export const CSS_PIEZAS_PANEL = `
   .tu-buscar { position: relative; display: block; width: 100%; max-width: 380px; }
   .tu-buscar > svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--color-subtle); pointer-events: none; }
   .tu-buscar > .rv-input { padding-left: 36px; }
-
-  /* ── Indicador: el KpiCard de Tienda (rótulo, ícono en chip, valor mono, variación) sobre una tarjeta del kit ── */
-  .tu-kpi { container-type: inline-size; padding: 14px 16px; min-width: 0; }
-  .tu-kpi-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
-  .tu-kpi-rotulo { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-muted); line-height: 1.3; }
-  .tu-kpi-ico { width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0; display: grid; place-items: center; background: var(--color-primary-bg); color: var(--color-primary); }
-  .tu-kpi-valor { font-family: var(--rv-mono); font-size: 30px; font-size: clamp(20px, 14cqi, 30px); font-weight: 700; letter-spacing: -0.02em; line-height: 1; color: var(--color-text); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 10px; }
-  .tu-kpi-pie { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; min-height: 22px; }
-  .tu-kpi-delta { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: 6px; flex-shrink: 0; font-family: var(--rv-mono); font-size: 12px; font-weight: 600; white-space: nowrap; background: var(--color-surface-alt); color: var(--color-muted); }
-  .tu-kpi-delta[data-tono='ok'] { background: var(--color-success-bg); color: var(--chip-success-fg); }
-  .tu-kpi-delta[data-tono='mal'] { background: var(--color-error-bg); color: var(--chip-error-fg); }
-  .tu-kpi-nota { font-size: 11px; color: var(--color-muted); }
-  @media (max-width: 480px) {
-    .tu-kpi { padding: 12px; }
-    .tu-kpi-cab { margin-bottom: 8px; }
-    .tu-kpi-rotulo { font-size: 10.5px; letter-spacing: 0.02em; }
-    .tu-kpi-ico { width: 26px; height: 26px; border-radius: 7px; }
-    .tu-kpi-ico > svg { width: 14px; height: 14px; }
-    .tu-kpi-valor { font-size: 21px; margin-bottom: 7px; }
-    .tu-kpi-pie { flex-direction: column; align-items: flex-start; gap: 3px; }
-  }
 
   /* ── Barra fina de avance (ocupación, uso) ── */
   .tu-barra { display: block; height: 6px; border-radius: 999px; background: var(--color-surface-alt); overflow: hidden; }
@@ -142,75 +118,6 @@ export const CSS_PIEZAS_PANEL = `
   @media (max-width: 420px) { .tu-dias { gap: 3px; margin: 0 -4px; } }
 `
 
-/**
- * Modal del panel: cabecera (rótulo, título, bajada), cuerpo que scrollea y
- * pie de acciones a la derecha. Es el modal del kit (rv-velo / rv-modal: hoja
- * desde abajo en celular) con lo que el panel necesita encima: con `onEnviar` el
- * cuerpo y el pie van dentro de un <form> (Enter guarda); `encima` lo apila
- * sobre otro modal abierto; `icono` va a la izquierda del título; `foco` es el
- * campo donde arranca el teclado al abrir (un buscador); sin eso, el modal.
- */
-export function Modal({ titulo, rotulo, bajada, icono, onCerrar, onEnviar, pie, encima, ancho = 520, foco, children }: {
-  titulo: ReactNode; rotulo?: string; bajada?: ReactNode; icono?: ReactNode; onCerrar: () => void; onEnviar?: () => void
-  pie?: ReactNode; encima?: boolean; ancho?: number; foco?: RefObject<HTMLElement | null>; children: ReactNode
-}) {
-  const caja = useRef<HTMLDivElement>(null)
-  const id = useId()
-  // Los últimos onCerrar y foco sin volver a montar el efecto: remontarlo
-  // devolvía el foco al disparador y lo traía de nuevo al modal en cada render.
-  const cerrar = useEffectEvent(() => onCerrar())
-  const enfocar = useEffectEvent(() => (foco?.current ?? caja.current)?.focus())
-
-  // El foco entra al abrir y vuelve a lo que se había tocado al cerrar; la
-  // página de atrás no scrollea mientras tanto. Escape cierra solo el modal de
-  // más arriba (el último del documento): se escucha en captura para ganarle a
-  // los que quedan abajo. Un desplegable abierto adentro (el buscador de
-  // clientes, data-esc="propio") se cierra primero: recién el segundo Escape
-  // cierra el modal.
-  useEffect(() => {
-    const antes = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    enfocar()
-    const esc = (e: globalThis.KeyboardEvent) => {
-      if (e.key !== 'Escape') return
-      const abiertos = document.querySelectorAll('.rv-modal')
-      if (abiertos[abiertos.length - 1] !== caja.current) return
-      if (e.target instanceof Element && e.target.closest('[data-esc="propio"]')) return
-      e.stopPropagation()
-      cerrar()
-    }
-    window.addEventListener('keydown', esc, true)
-    const soltar = frenarScroll()
-    return () => { window.removeEventListener('keydown', esc, true); soltar(); if (antes?.isConnected) antes.focus({ preventScroll: true }) }
-  }, [])
-
-  // Tab da la vuelta adentro del modal: no se escapa a lo que quedó detrás del velo.
-  const vuelta = (e: KeyboardEvent<HTMLDivElement>) => { if (caja.current) retenerFoco(e.nativeEvent, caja.current) }
-
-  const cuerpo = <div className="rv-modal-cuerpo">{children}</div>
-  const acciones = pie ? <div className="rv-modal-pie">{pie}</div> : null
-
-  return (
-    // mousedown y no click: soltar el mouse afuera después de seleccionar un texto no cierra.
-    <div className="rv-velo" data-encima={encima || undefined} onMouseDown={e => { if (e.target === e.currentTarget) onCerrar() }}>
-      <div ref={caja} tabIndex={-1} className="rv-modal" role="dialog" aria-modal="true" aria-labelledby={id} style={{ ['--rv-ancho' as string]: `${ancho}px` }} onKeyDown={vuelta}>
-        <div className="rv-modal-cab">
-          {/* El ícono va envuelto: la cabecera del kit estira su primer <div> (el Avatar es un div) a todo el ancho. */}
-          {icono && <span style={{ flexShrink: 0, display: 'inline-flex' }}>{icono}</span>}
-          <div>
-            {rotulo && <div className="rv-rotulo" style={{ marginBottom: 6 }}>{rotulo}</div>}
-            <h2 id={id} className="rv-h2" style={{ fontSize: 18, overflowWrap: 'anywhere' }}>{titulo}</h2>
-            {bajada && <div className="rv-bajada" style={{ marginTop: 3, fontSize: 13 }}>{bajada}</div>}
-          </div>
-          <button type="button" onClick={onCerrar} aria-label="Cerrar" className="rv-btn rv-btn--icono rv-btn--sm"><X size={16} /></button>
-        </div>
-        {onEnviar
-          ? <form className="tu-modal-form" noValidate onSubmit={e => { e.preventDefault(); onEnviar() }}>{cuerpo}{acciones}</form>
-          : <>{cuerpo}{acciones}</>}
-      </div>
-    </div>
-  )
-}
-
 export function ErrorCampo({ children }: { children: ReactNode }) {
   return <p role="alert" className="tu-error">{children}</p>
 }
@@ -259,35 +166,6 @@ export function Buscador({ value, onChange, placeholder, label }: { value: strin
       <Search size={15} aria-hidden />
       <input type="search" className="rv-input" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} aria-label={label ?? placeholder} />
     </span>
-  )
-}
-
-/**
- * Indicador del tablero, con la anatomía del KpiCard de Tienda: rótulo en
- * mayúsculas, ícono en un chip, el valor en mono y la variación. `cambio` es
- * el porcentaje contra el período anterior (sin dato, no hay variación);
- * `bueno` dice hacia dónde es una mejora: en ausencias, bajar es bueno.
- */
-export function Indicador({ label, valor, Icon, cambio, bueno = 'sube', nota }: { label: string; valor: ReactNode; Icon: LucideIcon; cambio?: number | null; bueno?: 'sube' | 'baja'; nota?: string }) {
-  const hay = typeof cambio === 'number' && Number.isFinite(cambio)
-  const neutro = hay && Math.round(cambio * 10) === 0
-  const sube = hay && cambio > 0
-  const ok = hay && !neutro && (bueno === 'sube') === sube
-  const pct = !hay ? '' : Math.abs(cambio) > 999 ? '>999%' : `${Math.abs(cambio).toLocaleString('es-AR', { maximumFractionDigits: 1 })}%`
-  return (
-    <div className="rv-card tu-kpi">
-      <div className="tu-kpi-cab">
-        <span className="tu-kpi-rotulo">{label}</span>
-        <span className="tu-kpi-ico" aria-hidden><Icon size={16} strokeWidth={1.5} /></span>
-      </div>
-      <div className="tu-kpi-valor">{valor}</div>
-      {(hay || nota) && (
-        <div className="tu-kpi-pie">
-          {hay && <span className="tu-kpi-delta" data-tono={neutro ? 'neutro' : ok ? 'ok' : 'mal'} title={`${sube ? '+' : '-'}${pct} vs período anterior`}>{neutro ? '-' : sube ? '▲' : '▼'} {pct}</span>}
-          {nota && <span className="tu-kpi-nota">{nota}</span>}
-        </div>
-      )}
-    </div>
   )
 }
 

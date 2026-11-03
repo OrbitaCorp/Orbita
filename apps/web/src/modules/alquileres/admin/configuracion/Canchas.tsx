@@ -4,9 +4,8 @@ import { useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { MESES, partes } from '@/lib/reservas/fechas'
 import { conAjuste, pesos, redondearCien } from '@/lib/reservas/precio'
-import { Campo } from '@/design-system/reservas/piezas'
+import { BarraGuardar, Campo } from '@/design-system/reservas/piezas'
 import { HOY, TIPOS, cuenta, type Reserva, type Unidad } from '../../datos'
-import { Guardar } from '../piezas'
 import { PaginaForm, idNuevo, igual, num, type Form } from './comun'
 
 export default function Canchas({ negocio, reservas, onGuardar }: Form & { reservas: Reserva[] }) {
@@ -42,7 +41,7 @@ export default function Canchas({ negocio, reservas, onGuardar }: Form & { reser
           )
         })}
       </div>
-      <Guardar cambiado={cambiado} onDescartar={() => setLista(negocio.unidades)} onGuardar={() => onGuardar({ unidades: lista.map(u => ({ ...u, nombre: u.nombre.trim() || 'Cancha' })) })} />
+      <BarraGuardar cambiado={cambiado} onDescartar={() => setLista(negocio.unidades)} onGuardar={() => onGuardar({ unidades: lista.map(u => ({ ...u, nombre: u.nombre.trim() || 'Cancha' })) })} />
     </PaginaForm>
   )
 }

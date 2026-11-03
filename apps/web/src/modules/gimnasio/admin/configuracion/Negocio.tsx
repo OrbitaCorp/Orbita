@@ -1,7 +1,7 @@
 // Datos del negocio: lo que aparece en el sitio y en cada confirmación, y
 // quién administra (la cuenta con la que se mira el panel).
-import { Area, Campo, Encabezado, Seccion } from '@/design-system/reservas/piezas'
-import { BarraGuardar, useBorrador, type PropsConfig } from '../piezas'
+import { Area, BarraGuardar, Campo, Encabezado, Seccion, useBorrador } from '@/design-system/reservas/piezas'
+import { type PropsConfig } from '../piezas'
 
 export default function Negocio({ negocio, onGuardar }: PropsConfig) {
   const b = useBorrador({ nombre: negocio.nombre, descripcion: negocio.descripcion, telefono: negocio.telefono, direccion: negocio.direccion, ciudad: negocio.ciudad, dueno: negocio.dueno.nombre })

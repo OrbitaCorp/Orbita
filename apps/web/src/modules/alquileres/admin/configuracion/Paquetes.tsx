@@ -3,9 +3,8 @@
 import { useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { pesos } from '@/lib/reservas/precio'
-import { Area, Campo, Vacio } from '@/design-system/reservas/piezas'
+import { Area, BarraGuardar, Campo, Vacio } from '@/design-system/reservas/piezas'
 import { TIPOS, cuenta, type Paquete, type Reserva } from '../../datos'
-import { Guardar } from '../piezas'
 import { PaginaForm, idNuevo, igual, num, type Form } from './comun'
 
 export default function Paquetes({ negocio, reservas, onGuardar }: Form & { reservas: Reserva[] }) {
@@ -41,7 +40,7 @@ export default function Paquetes({ negocio, reservas, onGuardar }: Form & { rese
           )
         })}
       </div>
-      <Guardar cambiado={cambiado && lista.length > 0} onDescartar={() => setLista(origen)} onGuardar={guardar} />
+      <BarraGuardar cambiado={cambiado} motivo={lista.length === 0 ? 'Agregá al menos un paquete.' : undefined} onDescartar={() => setLista(origen)} onGuardar={guardar} />
     </PaginaForm>
   )
 }

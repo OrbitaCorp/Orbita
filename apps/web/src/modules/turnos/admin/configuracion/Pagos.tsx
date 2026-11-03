@@ -7,7 +7,8 @@ import { Wallet, Store, Banknote, ArrowLeftRight, CreditCard, QrCode, Landmark, 
 import { useState } from 'react'
 import { temaDe } from '@/modules/turnos/storefront/tema'
 import { horaTxt, pesos } from '@/modules/turnos/datos'
-import { useBorrador, Encabezado, SecCard, FilaSwitch, Campo, Dos, Selector, BarraGuardar, Chip, BotonBorde, Boton, type PropsTab } from './ui'
+import { Encabezado, SecCard, FilaSwitch, Campo, Dos, Selector, Chip, BotonBorde, Boton, type PropsTab } from './ui'
+import { BarraGuardar, useBorrador } from '@/design-system/reservas/piezas'
 import { subdominioDe, vozDe } from './datos'
 import { cuandoTxt, type TurnoAgenda } from '../../datos/agenda'
 
@@ -43,7 +44,7 @@ export default function Pagos({ rubro, avisar, senas, nombreDe, onAbrir, onRegis
     efectivo: true, transferencia: true, debito: true, credito: rubro.familia !== 'clases', qr: true,
     alias: `${subdominioDe(t.nombre).slice(0, 14)}.mp`, cbu: '0000003100012345678901', titular: t.nombre, mostrarDatos: true,
   }))
-  const v = b.valor
+  const v = b.v
   const [copiado, setCopiado] = useState(false)
   const senaDe = (x: TurnoAgenda) => Math.round(x.precio * rubro.sena / 100)
   const totalSenas = senas.reduce((s, x) => s + senaDe(x), 0)
@@ -148,7 +149,7 @@ export default function Pagos({ rubro, avisar, senas, nombreDe, onAbrir, onRegis
         )}
       </div>
 
-      <BarraGuardar dirty={b.dirty} onDescartar={b.descartar} onGuardar={() => { b.guardar(); avisar('Pagos guardados', 'Es una demo: no se guardó nada de verdad.') }} />
+      <BarraGuardar cambiado={b.cambiado} onDescartar={b.descartar} onGuardar={() => { b.guardar(); avisar('Pagos guardados', 'Es una demo: no se guardó nada de verdad.') }} />
     </div>
   )
 }

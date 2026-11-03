@@ -4,8 +4,8 @@
 // de una actividad quitada salen de la grilla: se avisa cuántas.
 import { ArrowRight, Plus, Trash2 } from 'lucide-react'
 import { COLORES_ACTIVIDAD, type Actividad } from '../../datos'
-import { Campo, Encabezado, Seccion, Selector } from '@/design-system/reservas/piezas'
-import { BarraGuardar, Punto, num, useBorrador, type PropsConfig } from '../piezas'
+import { BarraGuardar, Campo, Encabezado, Seccion, Selector, useBorrador } from '@/design-system/reservas/piezas'
+import { Punto, num, type PropsConfig } from '../piezas'
 
 const CSS = `
   .gac-fila { grid-template-columns: 12px minmax(0, 1.4fr) 128px 104px auto; }

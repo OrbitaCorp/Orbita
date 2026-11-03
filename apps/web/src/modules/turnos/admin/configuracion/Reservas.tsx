@@ -18,7 +18,8 @@ import {
 import { esSalud, pesos, duracionTxt, horaTxt } from '@/modules/turnos/datos'
 import { beneficiosTxt, plazoTxt, politicaTxt, useNegocioDemo, type BeneficiosCuenta, type PoliticaReserva } from '@/modules/turnos/datos/negocio'
 import { temaDe } from '@/modules/turnos/storefront/tema'
-import { useBorrador, Encabezado, SecCard, Segmentado, Selector, Campo, Dos, FilaSwitch, Divisor, BarraGuardar, BotonBorde, Rotulo, OpcionTarjeta, type PropsTab } from './ui'
+import { Encabezado, SecCard, Segmentado, Selector, Campo, Dos, FilaSwitch, Divisor, BotonBorde, Rotulo, OpcionTarjeta, type PropsTab } from './ui'
+import { BarraGuardar, useBorrador } from '@/design-system/reservas/piezas'
 import { vozDe, cap } from './datos'
 
 const ANT_MIN = [{ id: 0, label: 'Sin mínimo' }, { id: 60, label: '1 hora' }, { id: 120, label: '2 horas' }, { id: 240, label: '4 horas' }, { id: 720, label: '12 horas' }, { id: 1440, label: '1 día' }]
@@ -72,7 +73,7 @@ export default function Reservas({ rubro, avisar }: PropsTab) {
     limite: 2, espera: rubro.modo === 'profesional', esperaMin: 30, ausentes: true,
     obraSocial: salud, dni: salud, motivo: salud && rubro.key !== 'psico',
   }))
-  const v = b.valor
+  const v = b.v
   const ejemplo = rubro.servicios.find(s => s.precio > 0) ?? rubro.servicios[0]
   const senaMonto = v.senaTipo === 'pct' ? Math.round(ejemplo.precio * v.senaPct / 100 / 100) * 100 : Number(v.senaFijo) || 0
   const grillas = [15, 30, 60]
@@ -233,7 +234,7 @@ export default function Reservas({ rubro, avisar }: PropsTab) {
         </aside>
       </div>
 
-      <BarraGuardar dirty={b.dirty || seAplica} onDescartar={descartar} onGuardar={guardar} />
+      <BarraGuardar cambiado={b.cambiado || seAplica} onDescartar={descartar} onGuardar={guardar} />
     </div>
   )
 }

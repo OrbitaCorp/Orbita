@@ -5,10 +5,9 @@
 import { useState } from 'react'
 import { ArrowRight, CircleCheck, PlugZap, Unplug, Wallet } from 'lucide-react'
 import { pesos, senaDe } from '@/lib/reservas/precio'
-import { Campo, Chip, FilaSwitch, Nota, Seccion, Selector } from '@/design-system/reservas/piezas'
+import { BarraGuardar, Campo, Chip, FilaSwitch, Nota, Seccion, Selector } from '@/design-system/reservas/piezas'
 import { FORMAS_PAGO, TIPOS, type FormaPago, type NegocioAlquiler } from '../../datos'
 import type { Vista } from '../navegacion'
-import { Guardar } from '../piezas'
 import { PaginaForm, igual, num, type Form } from './comun'
 import { plazoTxt } from './Reglas'
 
@@ -65,7 +64,7 @@ export default function Pagos({ negocio, onGuardar, onIr }: Form & { onIr: (vist
           <FilaSwitch titulo={FORMAS_PAGO.mercadopago.label} ayuda={FORMAS_PAGO.mercadopago.ayuda} on={tiene('mercadopago')} onChange={x => forma('mercadopago', x)} />
           {tiene('mercadopago') && (
             <div className="alc-mp" style={{ marginTop: 2 }}>
-              <span className="ala-kpi-ico" aria-hidden><Wallet size={16} strokeWidth={1.6} /></span>
+              <span className="rv-kpi-ico" aria-hidden><Wallet size={16} strokeWidth={1.6} /></span>
               <span className="rv-item-cuerpo">
                 <span className="rv-item-titulo" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', whiteSpace: 'normal' }}>{v.pagos.mpConectado ? negocio.nombre : 'Conectá tu cuenta'} {v.pagos.mpConectado ? <Chip tono="ok"><CircleCheck size={12} aria-hidden /> Conectada</Chip> : <Chip tono="aviso">Sin conectar</Chip>}</span>
                 <span className="rv-item-sub">{v.pagos.mpConectado ? 'La seña se cobra online al reservar y va directo a tu cuenta.' : 'Te lleva a Mercado Pago, aceptás y volvés. Hasta entonces, la seña se registra a mano.'}</span>
@@ -94,7 +93,7 @@ export default function Pagos({ negocio, onGuardar, onIr }: Form & { onIr: (vist
           <Nota tono="info"><span style={{ flex: 1, minWidth: 0 }}>Así lo lee el cliente: “Si cancelás hasta {plazoTxt(negocio.cancelaHastaHoras)} antes, {A_TIEMPO[v.pagos.cancelaATiempo]}. Después, {TARDE[v.pagos.cancelaTarde]}.”</span><button type="button" className="rv-btn rv-btn--sm" onClick={() => onIr('reglas')}>Reglas de reserva <ArrowRight size={14} aria-hidden /></button></Nota>
         </Seccion>
       </div>
-      <Guardar cambiado={cambiado} deshabilitado={v.pagos.formas.length === 0} onDescartar={() => setV(de(negocio))} onGuardar={guardar} />
+      <BarraGuardar cambiado={cambiado} motivo={v.pagos.formas.length === 0 ? 'Dejá al menos una forma de pago.' : undefined} onDescartar={() => setV(de(negocio))} onGuardar={guardar} />
     </PaginaForm>
   )
 }
