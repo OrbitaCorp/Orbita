@@ -6,6 +6,7 @@ import { decidirPrimerosPasos, pasoInicial } from '../primerosPasos'
 import { ESTADO_AYUDA_VACIO, parsear } from '../almacen'
 import { puedeUsarModoPrueba, comandoDeQuery, cumplidasSimuladas, siguientePasoDePrueba } from '../acceso'
 import { INTERVALO_MS, SUGERENCIAS, claveDeSugerencia, elegirSugerencia } from '../sugerencias'
+import { VIDEOS, idDeYoutube, videosDe } from '../videos'
 
 describe('recorrido por módulo', () => {
     it('las claves son secciones del panel o una vista de Configuración', () => {
@@ -222,5 +223,33 @@ describe('quién puede usar el modo prueba', () => {
         expect(parsear('{"prueba":"listo"}').pruebaElegida).toBe(false)
         expect(parsear('{"pruebaElegida":true}').pruebaElegida).toBe(true)
         expect(parsear('{"descartadasSeguidas":2,"silenciadoHasta":"x"}')).toMatchObject({ descartadasSeguidas: 2, silenciadoHasta: 0 })
+    })
+})
+
+describe('videos tutoriales', () => {
+    it('cada pantalla con videos también tiene recorrido (las dos opciones de "Ver tutorial")', () => {
+        for (const clave of Object.keys(VIDEOS)) expect(recorridoDe(clave), clave).not.toBeNull()
+    })
+
+    it('cada link cargado es un video de YouTube que se reconoce', () => {
+        for (const [clave, lista] of Object.entries(VIDEOS)) {
+            for (const v of lista) if (v.youtube) expect(idDeYoutube(v.youtube), `${clave}: ${v.titulo}`).not.toBeNull()
+        }
+    })
+
+    it('saca el id de los links de YouTube', () => {
+        const id = 'dQw4w9WgXcQ'
+        for (const link of [
+            id, `https://youtu.be/${id}`, `https://youtu.be/${id}?si=abc`, `https://www.youtube.com/watch?v=${id}&t=3`,
+            `youtube.com/watch?v=${id}`, `https://m.youtube.com/watch?v=${id}`, `https://www.youtube.com/shorts/${id}`,
+            `https://www.youtube.com/embed/${id}`, `https://www.youtube-nocookie.com/embed/${id}`,
+        ]) expect(idDeYoutube(link), link).toBe(id)
+        for (const malo of ['', 'hola', 'https://vimeo.com/123456', `https://evil.com/watch?v=${id}`, 'https://youtu.be/corto'])
+            expect(idDeYoutube(malo), malo).toBeNull()
+    })
+
+    it('solo ofrece los videos que ya tienen link', () => {
+        expect(videosDe('no-existe')).toEqual([])
+        expect(videosDe('clientes').every(v => v.id.length === 11)).toBe(true)
     })
 })

@@ -40,6 +40,8 @@ import { AvisoChico, EstilosAyuda, Tarjeta } from './piezas'
 import Recorrido from './Recorrido'
 import { EVENTO_ABRIR_AYUDA } from './AyudaBoton'
 import Foco from './Foco'
+import EleccionTutorial from './EleccionTutorial'
+import { VIDEOS } from './videos'
 
 // Mientras hay un paso a medias se vuelve a preguntar cada tanto: crear la
 // categoría o el producto no cambia de ruta, y el cierre tiene que aparecer
@@ -281,16 +283,27 @@ export default function AyudaHost() {
         }, 600)
     }, [actualizarAyuda])
 
-    // El botón "?" de la barra de arriba abre el tutorial de la pantalla cuando se quiera.
+    // "Ver tutorial" (la barra de arriba, la fila del celular o el aviso del módulo) primero
+    // pregunta cómo verlo: video o recorrido guiado (EleccionTutorial).
+    const [eligiendo, setEligiendo] = useState<string | null>(null)
+    const abrirRecorrido = useCallback((c: string) => {
+        setEligiendo(null)
+        if (!recorridoDe(c)) return
+        setAvisada(c)
+        setAvisoCerrado(true)
+        setSugerencia(null)
+        setHojaAbierta(true)
+    }, [])
     const claveRef = useRef(clave)
     useEffect(() => { claveRef.current = clave })
     useEffect(() => {
         const abrir = () => {
-            if (!recorridoDe(claveRef.current)) return
-            setAvisada(claveRef.current)
+            const c = claveRef.current
+            if (!recorridoDe(c) && !VIDEOS[c]) return
+            setHojaAbierta(false)
             setAvisoCerrado(true)
             setSugerencia(null)
-            setHojaAbierta(true)
+            setEligiendo(c)
         }
         window.addEventListener(EVENTO_ABRIR_AYUDA, abrir)
         return () => window.removeEventListener(EVENTO_ABRIR_AYUDA, abrir)
@@ -300,7 +313,7 @@ export default function AyudaHost() {
     // Solo a quien ya terminó los primeros pasos y no tiene nada más en pantalla.
     const avisoVisible = avisada === clave && !avisoCerrado && !hojaAbierta
     const puedeSugerir = esAdmin && !!ayuda && cumplidas !== null && pasoInicial(cumplidas) === 'listo'
-        && primeros.tipo === 'nada' && !eleccionVisible && !avisoVisible && !hojaAbierta && !confirmando
+        && primeros.tipo === 'nada' && !eleccionVisible && !avisoVisible && !hojaAbierta && !confirmando && !eligiendo
     useEffect(() => {
         if (!puedeSugerir || sugerencia || !cumplidas) return
         // En la prueba no se espera 25 segundos ni se respeta el intervalo entre sugerencias.
@@ -348,6 +361,15 @@ export default function AyudaHost() {
             onAbrir={encadenar}
         />
     )
+    const eleccionNodo = eligiendo && (
+        <EleccionTutorial
+            key={eligiendo}
+            clave={eligiendo}
+            hayRecorrido={!!recorridoDe(eligiendo)}
+            onRecorrido={() => abrirRecorrido(eligiendo)}
+            onCerrar={() => setEligiendo(null)}
+        />
+    )
 
     // ── Primeros pasos ──
     if (primeros.tipo === 'tira') {
@@ -387,6 +409,7 @@ export default function AyudaHost() {
                     />
                 )}
                 {recorridoNodo}
+                {eleccionNodo}
             </>
         )
     }
@@ -465,13 +488,14 @@ export default function AyudaHost() {
                     region="Tutorial del módulo"
                     texto={modulo.pregunta ?? `¿Querés ver cómo funciona ${modulo.titulo}?`}
                     principal="Ver tutorial"
-                    onPrincipal={() => setHojaAbierta(true)}
+                    onPrincipal={() => { setAvisoCerrado(true); setEligiendo(clave) }}
                     secundaria="Ahora no"
                     onSecundaria={() => setAvisoCerrado(true)}
                     onCerrar={() => setAvisoCerrado(true)}
                 />
             )}
             {recorridoNodo}
+            {eleccionNodo}
             {sugerenciaVisible && (
                 <AvisoChico
                     region="Sugerencia de tutorial"
