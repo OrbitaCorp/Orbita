@@ -16,11 +16,12 @@ import { TiraScrollHint, useTiraScroll } from '@/components/TiraScroll'
 import { useRouter } from 'next/router'
 import { Download, Plus, Search, Clock, ChevronDown, Globe, Store } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
+import { Modal } from '@/design-system/components/Modal'
 import { Toast } from '@/design-system/components/Toast'
 import { toastEsError } from '@/lib/utils'
 import { SkeletonFilas, SkeletonText, SkeletonChip } from '@/design-system/components/Skeleton'
 import { useAuth } from '@/hooks/useAuth'
-import { ApiError, exportOrders, getOrders, sendOrderEmail, updateOrderStatus, type ApiOrdersPage, type ApiOrderStatus, type ApiOrderSummary } from '@/lib/api'
+import { ApiError, deleteOrder, exportOrders, getOrders, sendOrderEmail, updateOrderStatus, type ApiOrdersPage, type ApiOrderStatus, type ApiOrderSummary } from '@/lib/api'
 
 import type { VistaPedido } from './components/PedidoTabs'
 import { PedidoTable } from './components/PedidoTable'
@@ -264,6 +265,36 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
             : `${ok} pedido${ok === 1 ? '' : 's'} confirmado${ok === 1 ? '' : 's'}`)
     }
 
+    // Eliminar pedidos del listado (uno o varios). Es solo de pantalla: se ocultan (no se borran de la base) y salen de la lista y
+    // de los reportes. Siempre con confirmación.
+    const [porEliminar, setPorEliminar] = useState<{ ids: string[]; numeros: string[] } | null>(null)
+    const [eliminando, setEliminando] = useState(false)
+    const pedirEliminar = (ids: string[]) => {
+        if (ids.length === 0) return
+        setPorEliminar({ ids, numeros: ids.map(i => '#' + (rows.find(r => r.id === i)?.numero ?? '?')) })
+    }
+    const eliminarConfirmado = async () => {
+        if (!porEliminar || eliminando) return
+        setEliminando(true)
+        let ok = 0
+        const fallas: string[] = []
+        for (const [i, oid] of porEliminar.ids.entries()) {
+            try {
+                await deleteOrder(oid)
+                ok++
+            } catch (e) {
+                void e
+                fallas.push(porEliminar.numeros[i])
+            }
+        }
+        setEliminando(false)
+        setPorEliminar(null)
+        setReintento(n => n + 1) // recargo la lista y los contadores de las pestañas
+        onToast?.(fallas.length
+            ? `${ok} eliminado${ok === 1 ? '' : 's'} · no se pudo con ${fallas.join(', ')}`
+            : ok === 1 ? `Pedido ${porEliminar.numeros[0]} eliminado del listado` : `${ok} pedidos eliminados del listado`)
+    }
+
     // Cambio de estado directo desde la fila (el chip de estado abre un menú
     // con los saltos válidos, sin entrar al detalle). El backend valida las
     // reglas de verdad: si rechaza el cambio, su motivo sale en el toast.
@@ -485,6 +516,8 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
                     onComprobante={(p) => setComprobante(p.id)}
                     onEmail={(p) => setEmail({ nombre: p.cliente, email: p.email, pedidoId: p.id })}
                     onConfirmarLote={puede('orders.manage') ? ids => void confirmarLote(ids) : undefined}
+                    onEliminar={puede('orders.manage') ? (p) => pedirEliminar([p.id]) : undefined}
+                    onEliminarLote={puede('orders.manage') ? pedirEliminar : undefined}
                     onCambiarEstado={puede('orders.manage') ? (p, nuevo) => void cambiarEstadoFila(p, nuevo) : undefined}
                     cambiandoEstadoId={cambiandoEstado}
                     onVerPostventa={(p: Pedido) => ir(p.cancelacionPendiente ? 'cancelaciones' : 'devoluciones')}
@@ -525,6 +558,28 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
 
             {/* Un click en "Comprobante" abre directo el comprobante real con su
                 botón de Imprimir — sin el resumen intermedio que pedía otro click. */}
+            <Modal
+                isOpen={porEliminar !== null}
+                onClose={() => { if (!eliminando) setPorEliminar(null) }}
+                title={porEliminar && porEliminar.ids.length > 1 ? `Eliminar ${porEliminar.ids.length} pedidos` : 'Eliminar pedido'}
+                variant="danger"
+                maxWidth={440}
+                footer={
+                    <>
+                        <Button variant="outline" size="sm" onClick={() => setPorEliminar(null)} disabled={eliminando}>Cancelar</Button>
+                        <Button variant="danger" size="sm" loading={eliminando} onClick={() => void eliminarConfirmado()}>Eliminar</Button>
+                    </>
+                }
+            >
+                {porEliminar && (
+                    <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: 'var(--color-body)' }}>
+                        {porEliminar.ids.length === 1
+                            ? <>Vas a eliminar el pedido <strong>{porEliminar.numeros[0]}</strong> del listado.</>
+                            : <>Vas a eliminar {porEliminar.ids.length} pedidos del listado: <strong>{porEliminar.numeros.slice(0, 6).join(', ')}{porEliminar.numeros.length > 6 ? '…' : ''}</strong>.</>}
+                        {' '}Dejan de verse en la lista y en los reportes. No se borran de forma definitiva, pero tampoco se devuelve el stock ni se anula ningún cobro.
+                    </p>
+                )}
+            </Modal>
             <ModalComprobante isOpen={comprobante !== null} onClose={() => setComprobante(null)} id={comprobante ?? undefined} onToast={onToast} abrirDirecto />
             {email && <ModalEmail isOpen onClose={() => setEmail(null)} cliente={email} onToast={onToast} onEnviar={async (a, c) => { await sendOrderEmail(email.pedidoId, a, c) }} />}
         </div>

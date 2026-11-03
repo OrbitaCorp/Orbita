@@ -575,7 +575,9 @@ export class OrdersService {
     // aviso al equipo del negocio, "primera venta" — NO salen acá: salen cuando el
     // pago se aprueba (ver avisarPedidoPagado, lo llama el webhook de MP). Si el
     // comprador abandona en Mercado Pago, no le llega nada a nadie.
-    opts?: { publicCheckout?: boolean; paymentMethodChosen?: boolean; memberId?: string; pagoPendiente?: boolean },
+    // `porWhatsapp`: lo tomó Orbi por el chat de WhatsApp. El cliente de WhatsApp no tiene email cargado (llega solo con su
+    // número), así que acá no se exige: se lo contacta por el mismo chat.
+    opts?: { publicCheckout?: boolean; paymentMethodChosen?: boolean; memberId?: string; pagoPendiente?: boolean; porWhatsapp?: boolean },
   ) {
     const esPresencial = dto.channel === 'POS';
     if (esPresencial && opts?.publicCheckout) {
@@ -680,7 +682,7 @@ export class OrdersService {
     // con el nombre. Si el pedido es de un cliente YA registrado, en cambio,
     // necesitamos poder contactarlo más adelante -- ahí el email sigue siendo
     // obligatorio (y tiene que venir cargado en la ficha del cliente).
-    if (dto.customerId && !buyerEmail) {
+    if (dto.customerId && !buyerEmail && !opts?.porWhatsapp) {
       throw new BadRequestException(
         'Ese cliente no tiene email cargado, agregaselo o elegí otro.',
       );
@@ -710,7 +712,7 @@ export class OrdersService {
         },
       },
       include: {
-        product: { select: { name: true } },
+        product: { select: { name: true, byOrder: true } },
         optionValues: { include: { optionValue: true } },
       },
     });
@@ -720,6 +722,16 @@ export class OrdersService {
         throw new NotFoundException('Alguno de los productos elegidos no existe en tu negocio.');
       }
     }
+
+    // Un producto "por pedido" no se vende por el checkout de la tienda: solo se consulta por WhatsApp. Un pedido que arma
+    // el dueño a mano sí puede llevarlo (lo carga él, sabe lo que hace), pero sin controlar ni descontar stock.
+    const porPedido = variants.filter((v) => v.product.byOrder);
+    if (opts?.publicCheckout && porPedido.length > 0) {
+      throw new UnprocessableEntityException(
+        `"${porPedido[0].product.name}" se hace por pedido: no se compra desde la tienda, consultalo por WhatsApp.`,
+      );
+    }
+    const idsPorPedido = new Set(porPedido.map((v) => v.id));
 
     // Validación de stock (tarjeta "Crear pedido manual"): si el producto tiene
     // stock cargado en la sucursal, no se puede pedir más de lo que hay. Si NO
@@ -739,6 +751,7 @@ export class OrdersService {
     }
     const faltantes: string[] = [];
     for (const [variantId, cantidad] of pedidoPorVariante) {
+      if (idsPorPedido.has(variantId)) continue; // no lleva stock
       const disponible = stockDe.get(variantId);
       if (disponible !== undefined && disponible < cantidad) {
         const v = porId.get(variantId)!;
@@ -1326,6 +1339,29 @@ export class OrdersService {
     }
   }
 
+  /**
+   * Oculta un pedido del listado (soft-delete: `deletedAt`). Es una acción "de pantalla": el pedido sigue en la base (y en el
+   * registro de auditoría), pero deja de verse en la lista, el detalle y los reportes. No toca el stock, los cobros ni los
+   * avisos ya enviados.
+   */
+  async eliminar(businessId: string, memberId: string | null, id: string) {
+    const order = await this.prisma.order.findFirst({ where: { id, businessId, deletedAt: null }, select: { id: true, orderNumber: true, status: true } });
+    if (!order) throw new NotFoundException('Pedido no encontrado');
+    await this.prisma.order.updateMany({ where: { id, businessId, deletedAt: null }, data: { deletedAt: new Date() } });
+    await this.audit?.registrar({
+      businessId,
+      memberId: memberId ?? undefined,
+      entityType: 'order',
+      entityId: id,
+      action: 'DELETE',
+      changes: [
+        { field: 'numero', before: order.orderNumber, after: null },
+        { field: 'estado', before: order.status, after: null },
+      ],
+    });
+    return { ok: true };
+  }
+
   async updateStatus(
     businessId: string,
     memberId: string | null,
@@ -1383,7 +1419,14 @@ export class OrdersService {
     // de "pendiente" a cualquier estado comprometido. Pendiente → enviado (o
     // → entregado) descuenta acá igual que pendiente → confirmado; un salto
     // que arranca DESPUÉS de pendiente ya lo descontó en su momento.
-    const renglonesConStock = order.items.filter((it) => !it.isConcept);
+    // Los productos "por pedido" no llevan stock: ni se descuenta al confirmar ni se repone al cancelar.
+    const idsPorPedido = new Set(
+      (await this.prisma.productVariant.findMany({
+        where: { id: { in: order.items.map((it) => it.variantId) }, product: { byOrder: true } },
+        select: { id: true },
+      })).map((v) => v.id),
+    );
+    const renglonesConStock = order.items.filter((it) => !it.isConcept && !idsPorPedido.has(it.variantId));
     const descuentaStock = order.status === 'PENDING' && nuevo !== 'CANCELLED';
 
     await this.prisma.$transaction(async (tx) => {

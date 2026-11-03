@@ -1,5 +1,5 @@
 import { createHmac } from 'crypto';
-import { BadRequestException, ForbiddenException, UnprocessableEntityException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { InstagramService, IgWebhookBody } from '../../src/instagram/instagram.service';
 import { ConversationsService } from '../../src/conversations/conversations.service';
 
@@ -41,9 +41,16 @@ function mensaje(mid: string, texto: string, extra: Record<string, unknown> = {}
 }
 const evento = (...mensajes: unknown[]): IgWebhookBody => ({ object: 'instagram', entry: [{ id: IG_CUENTA, messaging: mensajes as any }] });
 
-function build(overrides: Record<string, any> = {}, cfg: Record<string, string> = {}) {
+function build(overrides: Record<string, any> = {}, cfg: Record<string, string> = {}, mail?: any) {
   const prisma: any = {
     business: { findUnique: jest.fn().mockResolvedValue({ subdomain: 'mitienda' }) },
+    member: { findFirst: jest.fn().mockResolvedValue(null) },
+    instagramEarlyAccess: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+      upsert: jest.fn().mockImplementation(({ create }) => Promise.resolve({ username: create.username, requestedAt: new Date('2026-10-08') })),
+      update: jest.fn().mockResolvedValue({}),
+    },
     instagramConnection: {
       findUnique: jest.fn().mockResolvedValue({ businessId: BIZ, status: 'ACTIVE' }),
       findMany: jest.fn().mockResolvedValue([]),
@@ -69,7 +76,7 @@ function build(overrides: Record<string, any> = {}, cfg: Record<string, string> 
     $transaction: jest.fn().mockResolvedValue([]),
     ...overrides,
   };
-  return { svc: new InstagramService(prisma, config(cfg)), prisma };
+  return { svc: new InstagramService(prisma, config(cfg), mail), prisma };
 }
 
 function respuesta(json: unknown, ok = true, status = 200) {
@@ -104,6 +111,14 @@ describe('InstagramService (unit)', () => {
   });
 
   describe('login de Instagram', () => {
+    // Con force_reauth Instagram pedía el login de nuevo aunque el navegador ya tuviera la sesión abierta, y mucha
+    // gente no se acordaba de la contraseña. Sin él, usa la sesión y solo pide confirmar los permisos.
+    it('no fuerza volver a iniciar sesión: usa la cuenta de Instagram que el navegador ya tiene abierta', () => {
+      const { svc } = build();
+      expect(new URL(svc.urlDeAutorizacion(BIZ, 'mem-1')).searchParams.has('force_reauth')).toBe(false);
+      expect(new URL(svc.urlDeAutorizacionEmpresa(BIZ, 'kit')).searchParams.has('force_reauth')).toBe(false);
+    });
+
     it('la dirección de autorización lleva los permisos, la redirección y un state firmado', () => {
       const { svc } = build();
       const url = new URL(svc.urlDeAutorizacion(BIZ, 'mem-1'));
@@ -145,7 +160,7 @@ describe('InstagramService (unit)', () => {
 
       const r = await svc.manejarCallback('code-1', state);
 
-      expect(r).toEqual({ businessId: BIZ, subdomain: 'mitienda', suscripta: true });
+      expect(r).toEqual({ businessId: BIZ, subdomain: 'mitienda', suscripta: true, retorno: 'http://localhost:3001/admin/mitienda/ventas/mensajes' });
       const urls = fetchSpy.mock.calls.map((c) => c[0] as string);
       expect(urls[0]).toBe('https://api.instagram.com/oauth/access_token');
       expect(urls[1]).toContain('ig_exchange_token');
@@ -191,6 +206,30 @@ describe('InstagramService (unit)', () => {
       expect(prisma.conversation.update).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 'cv-nueva' }, data: expect.objectContaining({ isUnread: true }) }),
       );
+    });
+
+    it('una imagen del cliente se guarda como adjunto, bajada al almacenamiento propio', async () => {
+      const medios: any = { guardarImagenEntrante: jest.fn().mockResolvedValue('https://almacen/mensajes/a.jpg') };
+      const { prisma } = build();
+      const svc = new InstagramService(prisma, config(), undefined, medios);
+      const msg = { sender: { id: IGSID }, recipient: { id: IG_CUENTA }, timestamp: 1790000000000, message: { mid: 'mid.IMG', attachments: [{ type: 'image', payload: { url: 'https://scontent.cdninstagram.com/x.jpg' } }] } };
+      await svc.procesarWebhook(evento(msg));
+
+      expect(medios.guardarImagenEntrante).toHaveBeenCalledWith(BIZ, 'https://scontent.cdninstagram.com/x.jpg');
+      expect(prisma.message.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ text: '[Imagen]', attachments: [{ tipo: 'image', url: 'https://almacen/mensajes/a.jpg' }] }),
+      });
+    });
+
+    it('si no se pudo guardar la imagen, queda con la dirección que dio Instagram', async () => {
+      const medios: any = { guardarImagenEntrante: jest.fn().mockResolvedValue(null) };
+      const { prisma } = build();
+      const svc = new InstagramService(prisma, config(), undefined, medios);
+      const msg = { sender: { id: IGSID }, recipient: { id: IG_CUENTA }, timestamp: 1790000000000, message: { mid: 'mid.IMG2', attachments: [{ type: 'image', payload: { url: 'https://scontent.cdninstagram.com/y.jpg' } }] } };
+      await svc.procesarWebhook(evento(msg));
+      expect(prisma.message.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ attachments: [{ tipo: 'image', url: 'https://scontent.cdninstagram.com/y.jpg' }] }),
+      });
     });
 
     it('resuelve el negocio por la cuenta del evento: una cuenta sin conexión activa se ignora', async () => {
@@ -356,6 +395,223 @@ describe('InstagramService (unit)', () => {
       await expect(build({}, lista).svc.asegurarHabilitado(BIZ)).resolves.toBeUndefined();
       const ajeno = build({ business: { findUnique: jest.fn().mockResolvedValue({ subdomain: 'ajena' }) } }, lista);
       await expect(ajeno.svc.asegurarHabilitado(BIZ)).rejects.toBeInstanceOf(ForbiddenException);
+    });
+  });
+
+  // Tras el login de Instagram se vuelve al MISMO panel desde el que se empezó: antes se volvía siempre a
+  // FRONTEND_URL, que en local (localhost vs mitienda.orbita.local) es otro sitio que el de la sesión y
+  // mandaba a la persona al login.
+  describe('retorno al panel', () => {
+    const retornoPara = async (origen: string | undefined, cfg: Record<string, string> = {}) => {
+      const { svc } = build({}, cfg);
+      const url = svc.urlDeAutorizacion(BIZ, 'm-1', origen);
+      return svc.retornoDelState(new URL(url).searchParams.get('state') ?? undefined);
+    };
+
+    it('vuelve al host de la tienda desde el que se abrió el panel (sin el subdominio en la ruta)', async () => {
+      expect(await retornoPara('http://mitienda.orbita.local:3001')).toBe('http://mitienda.orbita.local:3001/admin/ventas/mensajes');
+      expect(await retornoPara('https://mitienda.orbita.site', { NODE_ENV: 'production', FRONTEND_URL: 'https://orbita.site' })).toBe('https://mitienda.orbita.site/admin/ventas/mensajes');
+    });
+
+    it('desde el apex vuelve con el subdominio en la ruta', async () => {
+      expect(await retornoPara('https://orbita.site', { NODE_ENV: 'production', FRONTEND_URL: 'https://orbita.site' })).toBe('https://orbita.site/admin/mitienda/ventas/mensajes');
+    });
+
+    it('sin origen, o con uno ajeno, vuelve a FRONTEND_URL: el state no sirve para redirigir a otro sitio', async () => {
+      expect(await retornoPara(undefined)).toBe('http://localhost:3001/admin/mitienda/ventas/mensajes');
+      expect(await retornoPara('https://sitio-malicioso.com')).toBe('http://localhost:3001/admin/mitienda/ventas/mensajes');
+      expect(await retornoPara('https://orbita.site.sitio-malicioso.com', { FRONTEND_URL: 'https://orbita.site' })).toBe('https://orbita.site/admin/mitienda/ventas/mensajes');
+    });
+
+    it('en producción un origen de desarrollo se descarta', async () => {
+      expect(await retornoPara('http://localhost:3001', { NODE_ENV: 'production', FRONTEND_URL: 'https://orbita.site' })).toBe('https://orbita.site/admin/mitienda/ventas/mensajes');
+    });
+
+    // La cuenta de la empresa la conecta un administrador de la plataforma desde Marketing: no es miembro del negocio
+    // ni tiene sesión en su panel, así que al terminar se vuelve al super panel (en el apex), no al panel del negocio.
+    it('la conexión de la empresa vuelve al super panel, en Marketing, y no al panel del negocio', async () => {
+      const { svc } = build({}, { FRONTEND_URL: 'https://orbita.site', NODE_ENV: 'production' });
+      const state = new URL(svc.urlDeAutorizacionEmpresa(BIZ)).searchParams.get('state') ?? undefined;
+      expect(await svc.retornoDelState(state)).toBe('https://orbita.site/superadmin?seccion=marketing');
+    });
+
+    it('el destino "superadmin" solo lo fija la conexión de la empresa: la del panel de un negocio sigue volviendo a su panel', async () => {
+      const { svc } = build({}, {});
+      const normal = new URL(svc.urlDeAutorizacion(BIZ, 'm-1', 'http://mitienda.orbita.local:3001')).searchParams.get('state') ?? '';
+      expect(JSON.parse(Buffer.from(normal.split('.')[0], 'base64url').toString()).destino).toBeUndefined();
+      const empresa = new URL(svc.urlDeAutorizacionEmpresa(BIZ)).searchParams.get('state') ?? '';
+      expect(JSON.parse(Buffer.from(empresa.split('.')[0], 'base64url').toString())).toMatchObject({ businessId: BIZ, destino: 'superadmin' });
+    });
+
+    it('vuelve a la pantalla desde la que se pidió la conexión (Mensajes por defecto, o Difusión)', async () => {
+      const volver = async (seccion?: 'mensajes' | 'difusion' | 'publicaciones') => {
+        const { svc } = build({}, {});
+        const url = svc.urlDeAutorizacion(BIZ, 'm-1', 'http://mitienda.orbita.local:3001', seccion);
+        return svc.retornoDelState(new URL(url).searchParams.get('state') ?? undefined);
+      };
+      expect(await volver()).toBe('http://mitienda.orbita.local:3001/admin/ventas/mensajes');
+      expect(await volver('mensajes')).toBe('http://mitienda.orbita.local:3001/admin/ventas/mensajes');
+      expect(await volver('difusion')).toBe('http://mitienda.orbita.local:3001/admin/ventas/difusion');
+      // Publicaciones es una vista de Difusión: vuelve con ?vista= (el controlador agrega ?ig= con &).
+      expect(await volver('publicaciones')).toBe('http://mitienda.orbita.local:3001/admin/ventas/difusion?vista=publicaciones');
+    });
+
+    it('conectarse desde Difusión pide mensajes y publicar de una vez; desde Mensajes, solo mensajes', () => {
+      const MENSAJES = 'instagram_business_basic,instagram_business_manage_messages';
+      const TODO = `${MENSAJES},instagram_business_content_publish,instagram_business_manage_comments,instagram_business_manage_insights`;
+      const scopeDe = (seccion: 'mensajes' | 'difusion' | 'publicaciones' | undefined, cfg: Record<string, string> = {}) =>
+        new URL(build({}, cfg).svc.urlDeAutorizacion(BIZ, 'm-1', undefined, seccion)).searchParams.get('scope');
+      expect(scopeDe(undefined)).toBe(MENSAJES);
+      expect(scopeDe('mensajes')).toBe(MENSAJES);
+      expect(scopeDe('difusion')).toBe(TODO);
+      expect(scopeDe('publicaciones')).toBe(TODO);
+      // Interruptor para apagarlo si la app sale a producción sin los permisos de publicar aprobados.
+      expect(scopeDe('difusion', { INSTAGRAM_PEDIR_PUBLICAR: 'false' })).toBe(MENSAJES);
+    });
+
+    it('pedir el kit suma los permisos de publicar, comentarios y estadísticas al login', () => {
+      const { svc } = build({}, {});
+      // Desde Mensajes, sin pedirlo expresamente, solo mensajes.
+      const base = new URL(svc.urlDeAutorizacion(BIZ, 'm-1', undefined, 'mensajes')).searchParams.get('scope');
+      expect(base).toBe('instagram_business_basic,instagram_business_manage_messages');
+      // Pidiéndolo expresamente (conexión vieja que autoriza publicar), también desde Mensajes.
+      const conPublicar = new URL(svc.urlDeAutorizacion(BIZ, 'm-1', undefined, 'mensajes', 'kit')).searchParams.get('scope');
+      expect(conPublicar).toBe('instagram_business_basic,instagram_business_manage_messages,instagram_business_content_publish,instagram_business_manage_comments,instagram_business_manage_insights');
+    });
+
+    it('una pantalla fuera de la lista no entra en la ruta de vuelta', async () => {
+      const { svc } = build({}, {});
+      expect(svc.urlDeRetorno('mitienda', 'http://mitienda.orbita.local:3001', '../../login' as any)).toBe('http://mitienda.orbita.local:3001/admin/ventas/mensajes');
+    });
+
+    it('con un state inválido no hay a dónde volver (cae al login)', async () => {
+      const { svc } = build({}, {});
+      expect(await svc.retornoDelState(undefined)).toBeUndefined();
+      expect(await svc.retornoDelState('inventado.firma')).toBeUndefined();
+    });
+  });
+
+  describe('acceso anticipado', () => {
+    const PROD = { NODE_ENV: 'production' };
+    const NEGOCIO = { findUnique: jest.fn().mockResolvedValue({ name: 'Mi Tienda', subdomain: 'mitienda' }) };
+    const pedidoHabilitado = { instagramEarlyAccess: { findUnique: jest.fn().mockResolvedValue({ status: 'ENABLED' }) } };
+
+    it('un pedido aceptado habilita al negocio aunque no esté en la lista de producción', async () => {
+      await expect(build(pedidoHabilitado, PROD).svc.asegurarHabilitado(BIZ)).resolves.toBeUndefined();
+      const pendiente = build({ instagramEarlyAccess: { findUnique: jest.fn().mockResolvedValue({ status: 'PENDING' }) } }, PROD);
+      await expect(pendiente.svc.asegurarHabilitado(BIZ)).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('estadoParaPanel: sin acceso devuelve el pedido, con acceso devuelve la conexión', async () => {
+      const pidio = { instagramEarlyAccess: { findUnique: jest.fn().mockResolvedValue({ username: 'mitienda', requestedAt: new Date('2026-10-08') }) } };
+      const sinAcceso = await build(pidio, PROD).svc.estadoParaPanel(BIZ);
+      expect(sinAcceso).toMatchObject({ habilitado: false, connected: false, solicitud: { username: 'mitienda' } });
+      const conAcceso = await build(pedidoHabilitado, PROD).svc.estadoParaPanel(BIZ);
+      expect(conAcceso).toMatchObject({ habilitado: true, connected: true });
+    });
+
+    it('solicitarAcceso guarda el usuario normalizado para ESE negocio y avisa al equipo', async () => {
+      const mail = { sendCustomEmail: jest.fn().mockResolvedValue(true) };
+      const { svc, prisma } = build({ business: NEGOCIO }, PROD, mail);
+      const pedido = await svc.solicitarAcceso(BIZ, '  @Mi.Tienda_1 ');
+      expect(pedido.username).toBe('mi.tienda_1');
+      expect(prisma.instagramEarlyAccess.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { businessId: BIZ }, create: { businessId: BIZ, username: 'mi.tienda_1', contactEmail: null } }));
+      expect(mail.sendCustomEmail).toHaveBeenCalledTimes(1);
+      expect(mail.sendCustomEmail.mock.calls[0][2]).toContain('@mi.tienda_1');
+    });
+
+    it('pedir de nuevo con el mismo usuario no vuelve a avisar; con otro, sí', async () => {
+      const mail = { sendCustomEmail: jest.fn().mockResolvedValue(true) };
+      const { svc } = build({ business: NEGOCIO, instagramEarlyAccess: { findUnique: jest.fn().mockResolvedValue({ username: 'mitienda', status: 'PENDING' }), upsert: jest.fn().mockResolvedValue({ username: 'mitienda', requestedAt: new Date() }) } }, PROD, mail);
+      await svc.solicitarAcceso(BIZ, '@mitienda');
+      expect(mail.sendCustomEmail).not.toHaveBeenCalled();
+      await svc.solicitarAcceso(BIZ, '@otrousuario');
+      expect(mail.sendCustomEmail).toHaveBeenCalledTimes(1);
+    });
+
+    it('rechaza usuarios inválidos y a los negocios que ya están habilitados', async () => {
+      const { svc } = build({}, PROD);
+      for (const malo of ['', 'con espacio', 'a'.repeat(31), '<script>']) {
+        await expect(svc.solicitarAcceso(BIZ, malo)).rejects.toBeInstanceOf(BadRequestException);
+      }
+      await expect(build(pedidoHabilitado, PROD).svc.solicitarAcceso(BIZ, 'mitienda')).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('si falla el correo, el pedido igual queda guardado', async () => {
+      const mail = { sendCustomEmail: jest.fn().mockRejectedValue(new Error('resend caído')) };
+      const { svc } = build({ business: NEGOCIO }, PROD, mail);
+      await expect(svc.solicitarAcceso(BIZ, 'mitienda')).resolves.toMatchObject({ username: 'mitienda' });
+      expect(mail.sendCustomEmail).toHaveBeenCalledTimes(1);
+    });
+
+    it('el superadmin habilita y quita el acceso; sin pedido, no encuentra el negocio', async () => {
+      const { svc, prisma } = build({ instagramEarlyAccess: { findUnique: jest.fn().mockResolvedValue({ id: 'a1' }), update: jest.fn().mockResolvedValue({}) } });
+      await svc.cambiarHabilitacion(BIZ, true);
+      expect(prisma.instagramEarlyAccess.update).toHaveBeenCalledWith(expect.objectContaining({ where: { businessId: BIZ }, data: expect.objectContaining({ status: 'ENABLED' }) }));
+      await svc.cambiarHabilitacion(BIZ, false);
+      expect(prisma.instagramEarlyAccess.update).toHaveBeenLastCalledWith(expect.objectContaining({ data: { status: 'PENDING', enabledAt: null } }));
+      await expect(build({}).svc.cambiarHabilitacion(BIZ, true)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('solicitarAcceso guarda el correo de quien pide, buscado en ESE negocio', async () => {
+      const { svc, prisma } = build({ member: { findFirst: jest.fn().mockResolvedValue({ email: 'dueno@tienda.com' }) } }, PROD);
+      await svc.solicitarAcceso(BIZ, 'mitienda', 'm-1');
+      expect(prisma.member.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'm-1', businessId: BIZ } }));
+      expect(prisma.instagramEarlyAccess.upsert).toHaveBeenCalledWith(expect.objectContaining({ create: { businessId: BIZ, username: 'mitienda', contactEmail: 'dueno@tienda.com' } }));
+    });
+
+    describe('aviso al habilitar', () => {
+      const pendiente = (extra: Record<string, unknown> = {}) => ({
+        instagramEarlyAccess: {
+          findUnique: jest.fn().mockResolvedValue({ id: 'a1', status: 'PENDING', username: 'mitienda', contactEmail: 'pidio@tienda.com', ...extra }),
+          update: jest.fn().mockResolvedValue({ businessId: BIZ, status: 'ENABLED' }),
+        },
+        business: { findUnique: jest.fn().mockResolvedValue({ name: 'Mi Tienda', subdomain: 'mitienda' }) },
+      });
+
+      it('al pasar de pendiente a habilitado manda el correo con el botón a Difusión', async () => {
+        const mail = { sendInstagramAccesoListo: jest.fn().mockResolvedValue(true) };
+        const { svc } = build(pendiente(), {}, mail);
+        const r = await svc.cambiarHabilitacion(BIZ, true);
+        expect(r.avisado).toBe(true);
+        expect(mail.sendInstagramAccesoListo).toHaveBeenCalledWith(
+          'pidio@tienda.com',
+          { storeName: 'Mi Tienda', username: 'mitienda', panelUrl: 'https://mitienda.orbita.site/admin/ventas/difusion' },
+          { businessId: BIZ },
+        );
+      });
+
+      it('sin correo guardado (pedido viejo) avisa al propietario del negocio', async () => {
+        const mail = { sendInstagramAccesoListo: jest.fn().mockResolvedValue(true) };
+        const { svc, prisma } = build({ ...pendiente({ contactEmail: null }), member: { findFirst: jest.fn().mockResolvedValue({ email: 'owner@tienda.com' }) } }, {}, mail);
+        await svc.cambiarHabilitacion(BIZ, true);
+        expect(prisma.member.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { businessId: BIZ, role: { name: 'owner' }, status: 'ACTIVE' } }));
+        expect(mail.sendInstagramAccesoListo.mock.calls[0][0]).toBe('owner@tienda.com');
+      });
+
+      it('no reenvía si ya estaba habilitado, ni al quitar el acceso', async () => {
+        const mail = { sendInstagramAccesoListo: jest.fn().mockResolvedValue(true) };
+        const yaHabilitado = build(pendiente({ status: 'ENABLED' }), {}, mail);
+        expect((await yaHabilitado.svc.cambiarHabilitacion(BIZ, true)).avisado).toBe(false);
+        const quitar = build(pendiente({ status: 'ENABLED' }), {}, mail);
+        expect((await quitar.svc.cambiarHabilitacion(BIZ, false)).avisado).toBe(false);
+        expect(mail.sendInstagramAccesoListo).not.toHaveBeenCalled();
+      });
+
+      it('si el correo falla, igual queda habilitado y avisado=false', async () => {
+        const mail = { sendInstagramAccesoListo: jest.fn().mockRejectedValue(new Error('resend caído')) };
+        const { svc, prisma } = build(pendiente(), {}, mail);
+        const r = await svc.cambiarHabilitacion(BIZ, true);
+        expect(r.avisado).toBe(false);
+        expect(prisma.instagramEarlyAccess.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'ENABLED' }) }));
+      });
+
+      it('sin ningún correo a quién avisar, avisado=false', async () => {
+        const mail = { sendInstagramAccesoListo: jest.fn() };
+        const { svc } = build(pendiente({ contactEmail: null }), {}, mail);
+        expect((await svc.cambiarHabilitacion(BIZ, true)).avisado).toBe(false);
+        expect(mail.sendInstagramAccesoListo).not.toHaveBeenCalled();
+      });
     });
   });
 });

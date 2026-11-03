@@ -116,7 +116,8 @@ describe('GET /business/tutorial: cumplidas de la segunda etapa', () => {
     expect(await cumplidasDe({ clientes: 3 })).toEqual(['clientes']);
     const prisma = prismaDe({ clientes: 3 });
     await servicio(prisma).getTutorial(BIZ);
-    expect(prisma.customer.count).toHaveBeenCalledWith({ where: { businessId: BIZ, deletedAt: null } });
+    // Los contactos que solo escribieron por WhatsApp/Instagram no cuentan como cliente.
+    expect(prisma.customer.count).toHaveBeenCalledWith({ where: { businessId: BIZ, deletedAt: null, AND: [{ OR: [{ isChatContact: false }, { orders: { some: { deletedAt: null } } }] }] } });
   });
 
   it('plantillas: con alguna plantilla de mensaje', async () => {

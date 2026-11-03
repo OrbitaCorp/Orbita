@@ -15,6 +15,7 @@ import { adminPath, currentSlug } from '@/lib/tenant'
 import { esVisitanteDemo } from '@/lib/demo/modo'
 import { useOrbiStore } from '@/components/orbi/useOrbiStore'
 import { OrbiPet } from '@/components/orbi/pet/OrbiPet'
+import AyudaBoton from '@/modules/ventas/panel/ayuda/AyudaBoton'
 import { ID_PANEL_ORBI } from '@/components/orbi/types'
 
 const seccionLabels: Record<string, string> = {
@@ -27,6 +28,7 @@ const seccionLabels: Record<string, string> = {
     descuentos: 'Descuentos',
     cupones: 'Cupones',
     mensajes: 'Mensajes',
+    difusion: 'Difusión',
     configuracion: 'Configuración',
     perfil: 'Mi perfil',
     manual: 'Manual',
@@ -406,6 +408,9 @@ export default function Header({ onMenuClick }: Props) {
 
                     <span className="admin-header-sep" aria-hidden style={{ width: 1, height: 20, background: 'var(--color-border)', flexShrink: 0, margin: '0 2px' }} />
 
+                    {/* Tutorial de la pantalla en la que estás (solo donde hay uno). */}
+                    <AyudaBoton />
+
                     {/* Dark mode toggle */}
                     <button
                         onClick={() => cambiarTema(isDark ? 'light' : 'dark')}
@@ -650,7 +655,8 @@ const SECCIONES_PANEL: { label: string; seccion: string; vista?: string; alias: 
     { label: 'Descuentos',           seccion: 'descuentos',    alias: ['descuentos', 'promociones'] },
     { label: 'Cupones',              seccion: 'cupones',       alias: ['cupones', 'cupon', 'cupón'] },
     { label: 'Mensajes',             seccion: 'mensajes',      alias: ['mensajes', 'chat', 'conversaciones'] },
-    { label: 'Configuración',        seccion: 'configuracion', alias: ['configuracion', 'configuración', 'ajustes', 'equipo', 'apariencia', 'notificaciones'] },
+    { label: 'Difusión',             seccion: 'difusion',      alias: ['difusion', 'difusión', 'instagram', 'publicar', 'publicaciones', 'redes'] },
+    { label: 'Configuración',       seccion: 'configuracion', alias: ['configuracion', 'configuración', 'ajustes', 'equipo', 'apariencia', 'notificaciones'] },
 ]
 
 function BusquedaGlobal() {

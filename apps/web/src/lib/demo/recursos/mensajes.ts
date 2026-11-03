@@ -38,8 +38,10 @@ function sinConversacion({ conversationId: _c, ...mensaje }: MensajeLocal): Chat
   return mensaje
 }
 
+// El almacén guarda lo nuevo primero: se devuelve del más viejo al más nuevo, así dos mensajes con la misma hora (mismo
+// milisegundo) quedan en el orden en que se escribieron cuando se ordena por fecha (el sort es estable).
 function mensajesLocales(): MensajeLocal[] {
-  return leerCapa<MensajeLocal>(MENSAJES).creados
+  return [...leerCapa<MensajeLocal>(MENSAJES).creados].reverse()
 }
 
 /** Lo que trajo la API más lo que se escribió en esta demo, en orden. */

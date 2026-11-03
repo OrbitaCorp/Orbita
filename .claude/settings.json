@@ -20,5 +20,16 @@
         ]
       }
     ]
+  },
+  "extraKnownMarketplaces": {
+    "orbita-videos": {
+      "source": {
+        "source": "github",
+        "repo": "Gisterkuk/Orbita-Videos"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "orbita-videos@orbita-videos": true
   }
 }

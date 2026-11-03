@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { soloClientesReales } from '../customers/clientes-visibles';
 
 // Cuántos resultados por grupo. La búsqueda es para saltar rápido a algo,
 // no para listar — para eso está cada sección con sus filtros.
@@ -64,6 +65,7 @@ export class SearchService {
             where: {
               businessId,
               deletedAt: null,
+              AND: [soloClientesReales],
               OR: [{ firstName: contains }, { lastName: contains }, { email: contains }, { phone: contains }, { dni: contains }],
             },
             orderBy: { createdAt: 'desc' },

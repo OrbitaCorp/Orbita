@@ -422,8 +422,30 @@ export default function Dashboard() {
 
             {/* 2. KPIs */}
             <div className="dash-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 12, marginBottom: 16 }}>
-                {/* "Ventas" es plata que quedó: el backend le resta las devoluciones aprobadas del período. */}
-                <KpiCard label="Ventas" value={k?.ventas ?? 0} delta={d?.ventas ?? 0} prefix="$" accent="#3B82F6" icon={Banknote} loading={cargandoKpis} footnote={<span style={{ fontSize: 11, color: 'var(--color-muted)' }}>neto de devoluciones</span>} />
+                {/* "Ganancias": ingresos de los productos con costo cargado − su costo − devoluciones aprobadas (ver
+                    kpisDe() en reports.service.ts). Los productos sin costo no entran, y se avisa abajo cuánto cubre. */}
+                <KpiCard
+                    label="Ganancias"
+                    value={k?.ganancias ?? 0}
+                    delta={d?.ganancias ?? 0}
+                    prefix="$"
+                    accent="#3B82F6"
+                    icon={Banknote}
+                    loading={cargandoKpis}
+                    footnote={
+                        <>
+                            <span style={{ display: 'block', fontSize: 11, color: 'var(--color-muted)' }}>neta de costos y devoluciones</span>
+                            {k?.gananciaCoberturaPct != null && k.gananciaCoberturaPct < 100 && (
+                                <span
+                                    style={{ display: 'block', fontSize: 11, color: 'var(--color-muted)', marginTop: 2 }}
+                                    title="Los productos sin costo cargado no se cuentan: cargá el campo Costo en Productos para que la ganancia los incluya."
+                                >
+                                    {k.gananciaCoberturaPct <= 0 ? 'ningún producto tiene costo cargado' : `solo el ${Math.round(k.gananciaCoberturaPct)}% de lo vendido tiene costo`}
+                                </span>
+                            )}
+                        </>
+                    }
+                />
                 <KpiCard label="Pedidos" value={k?.pedidos ?? 0} delta={d?.pedidos ?? 0} accent="#10B981" icon={ShoppingBag} loading={cargandoKpis} footnote={k && k.pedidosPendientes > 0 ? <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>{k.pedidosPendientes} pendiente{k.pedidosPendientes === 1 ? '' : 's'}</span> : undefined} />
                 <KpiCard label="Ticket promedio" value={k?.ticketPromedio ?? 0} delta={d?.ticketPromedio ?? 0} prefix="$" accent="#8B5CF6" icon={BarChart3} loading={cargandoKpis} />
                 <KpiCard label="Clientes nuevos" value={k?.clientesNuevos ?? 0} delta={d?.clientesNuevos ?? 0} accent="#F59E0B" icon={Users} loading={cargandoKpis} />

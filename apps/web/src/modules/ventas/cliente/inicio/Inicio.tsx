@@ -41,7 +41,7 @@ import { CATEGORY_LAYOUT_MAX, type CategoryLayout } from '@/modules/ventas/panel
 // datos reales en vez de los de muestra (ver plantillaReal.ts). Así una
 // plantilla nueva no necesita tocar este archivo.
 import { Home as PlantillaHome } from '@/modules/ventas/panel/avanzado/plantillas/homes'
-import { definicionPlantilla, plantillaReal } from './plantillaReal'
+import { definicionPlantilla, plantillaReal, slidesPorDefecto, degradeAutomatico } from './plantillaReal'
 import { EsqueletoPlantilla } from '@/modules/ventas/panel/avanzado/plantillas/esqueleto'
 
 // Fallback si el negocio nunca guardó su propia barra de stats (Apariencia →
@@ -358,10 +358,16 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
     // null: home clásico) — el prop del server solo tapa el instante ANTES
     // de que ese fetch responda, ver StorefrontChrome `homeTemplateSSR`.
     const homeTemplate = config ? (config.appearance?.homeTemplate ?? null) : __homeTemplate
-    const heroSlides = config?.appearance?.heroSlides ?? []
     // [] es válido: el dueño borró todas y no quiere barra (solo cae al default si no hay config).
     const stats = config?.appearance?.statsBar ?? STATS_DEFAULT
     const catsVisual: CatVisual[] = categorias.map(c => ({ ...toCategoria(c), slug: c.slug }))
+    // Los que cargó el dueño. Sin ninguno la portada no se queda pelada: ve tres
+    // de por defecto, armados con sus categorías (ver slidesPorDefecto). Recién
+    // cuando llega la config: antes no se sabe si los tiene.
+    const heroSlidesPropios = config?.appearance?.heroSlides ?? []
+    const heroSlides = heroSlidesPropios.length > 0 || !config
+        ? heroSlidesPropios
+        : slidesPorDefecto(catsVisual, tienda.nombre, config.appearance?.tagline ?? undefined)
 
     // ── Tira de marcas ──
     // Se filtran las que quedaron sin nombre: el nombre es lo que se dibuja
@@ -798,7 +804,7 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
                         categorias: catsVisual,
                         stats: (config?.appearance?.showStatsBar ?? true) ? stats : [],
                         cupon: config?.appearance?.homeTemplateData?.cupon ?? null,
-                        heroSlides,
+                        heroSlides: heroSlidesPropios,
                         transferPct,
                         // Para el pie: la raiz de la tienda (enlaces que
                         // navegan) y el contacto real (redes y horario).
@@ -927,7 +933,7 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
 
             {/* ══ STATS BAR ══ */}
             {(config?.appearance?.showStatsBar ?? true) && stats.length > 0 && (
-                    <div className="sf-stats-wrap" style={{ background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', padding: '12px 0' }}>
+                    <div data-ap-sec="stats" className="sf-stats-wrap" style={{ background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', padding: '12px 0' }}>
                         <div className="sf-w" style={{ display: 'flex', justifyContent: 'center' }}>
                             <div className="sf-stats-row" style={{ display: 'flex', alignItems: 'center' }}>
                                 {stats.map((s, i, arr) => (
@@ -964,28 +970,28 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
 
             {/* ══ ESTANTES ══ — ver "Estantes de productos" arriba. */}
             {(ap?.showFeaturedSection ?? true) && destacados.length > 0 && (
-                <section className="sf-w" style={{ paddingTop: 36, paddingBottom: 36 }}>
+                <section data-ap-sec="estante-destacados" className="sf-w" style={{ paddingTop: 36, paddingBottom: 36 }}>
                     <SectionHead color="#EF4444" eyebrow="Destacados" titulo="Productos destacados" onVer={() => go('/catalogo')} />
                     <EstanteProductos productos={destacados} modoLista={modoListaEstante} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />
                 </section>
             )}
 
             {(ap?.showNewArrivalsSection ?? true) && nuevosIngresos.length > 0 && (
-                <section className="sf-w" style={{ paddingBottom: 36 }}>
+                <section data-ap-sec="estante-nuevos" className="sf-w" style={{ paddingBottom: 36 }}>
                     <SectionHead color="#10B981" eyebrow="Nuevos ingresos" titulo="Recién llegados" onVer={() => go('/catalogo')} />
                     <EstanteProductos productos={nuevosIngresos} modoLista={modoListaEstante} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />
                 </section>
             )}
 
             {(ap?.showRecommendedSection ?? true) && estanteRecomendados.length > 0 && (
-                <section className="sf-w" style={{ paddingBottom: 36 }}>
+                <section data-ap-sec="estante-recomendados" className="sf-w" style={{ paddingBottom: 36 }}>
                     <SectionHead color="var(--color-primary)" eyebrow="Recomendados" titulo="Recomendados para vos" onVer={() => go('/catalogo')} />
                     <EstanteProductos productos={estanteRecomendados} modoLista={modoListaEstante} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />
                 </section>
             )}
 
             {(ap?.showBestSellersSection ?? true) && estanteTopVentas.length > 0 && (
-                <section className="sf-w" style={{ paddingBottom: 36 }}>
+                <section data-ap-sec="estante-topventas" className="sf-w" style={{ paddingBottom: 36 }}>
                     <SectionHead color="#F59E0B" eyebrow="Top ventas" titulo="Más vendidos" onVer={() => go('/catalogo?sort=bestselling')} />
                     <EstanteProductos productos={estanteTopVentas} modoLista={modoListaEstante} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />
                 </section>
@@ -1000,7 +1006,7 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
                 (fondo fijo, texto y CTA encima, el resto de la página
                 sigue el scroll normal). */}
             {(config?.appearance?.showParallaxBanner ?? false) && config?.appearance?.parallaxImageUrl && (
-                <section className="sf-parallax" style={{ backgroundImage: `url(${config.appearance.parallaxImageUrl})`, ['--sf-par-img' as string]: `url(${config.appearance.parallaxImageUrl})` }}>
+                <section data-ap-sec="parallax" className="sf-parallax" style={{ backgroundImage: `url(${config.appearance.parallaxImageUrl})`, ['--sf-par-img' as string]: `url(${config.appearance.parallaxImageUrl})` }}>
                     <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, rgba(15,23,42,0.62) 0%, rgba(15,23,42,0.30) 55%, rgba(15,23,42,0.10) 100%)' }} />
                     <div className="sf-w" style={{ position: 'relative', zIndex: 1, width: '100%' }}>
                         <div style={{ maxWidth: 520, padding: '56px 0' }}>
@@ -1029,7 +1035,7 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
                 stats ya ocupa ese lugar (el de "señal de confianza apenas
                 entrás") y dos franjas seguidas compitiendo se anulan. */}
             {(config?.appearance?.showBrands ?? false) && marcas.length > 0 && (
-                <section className="sf-marcas">
+                <section data-ap-sec="marcas" className="sf-marcas">
                     {tituloMarcas && <div className="sf-marcas-volanta">{tituloMarcas}</div>}
                     {marcasEnMarquee ? (
                         // Un poco más lenta que la de categorías (36s): estas
@@ -1052,14 +1058,16 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
                 diseño elegido en Apariencia → "Video en tu tienda". Sin
                 ningún link válido no dibuja nada. */}
             {(config?.appearance?.showVideo ?? false) && (
-                <SeccionVideos
-                    titulo={tituloVideo}
-                    subtitulo={subtituloVideo}
-                    layout={config?.appearance?.videoLayout}
-                    videos={config?.appearance?.videos}
-                    videoUrlLegado={config?.appearance?.videoUrl}
-                    go={go}
-                />
+                <div data-ap-sec="video">
+                    <SeccionVideos
+                        titulo={tituloVideo}
+                        subtitulo={subtituloVideo}
+                        layout={config?.appearance?.videoLayout}
+                        videos={config?.appearance?.videos}
+                        videoUrlLegado={config?.appearance?.videoUrl}
+                        go={go}
+                    />
+                </div>
             )}
 
             {/* ══ BANNER WHATSAPP ══ — diseño elegido en Apariencia (ver
@@ -1077,12 +1085,14 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
                     textos={TEXTOS_WHATSAPP_DEMO}
                 />
             )) : config?.appearance?.showWhatsapp !== false && tienda.wpp && (
-                <WhatsappBanner
-                    layout={config?.appearance?.whatsappLayout}
-                    wpp={tienda.wpp}
-                    message={config?.appearance?.whatsappText}
-                    scheduleText={config?.contact?.scheduleText}
-                />
+                <div data-ap-sec="whatsapp">
+                    <WhatsappBanner
+                        layout={config?.appearance?.whatsappLayout}
+                        wpp={tienda.wpp}
+                        message={config?.appearance?.whatsappText}
+                        scheduleText={config?.contact?.scheduleText}
+                    />
+                </div>
             )}
             </>
             )}
@@ -1378,7 +1388,7 @@ function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHero
     }
 
     return (
-        <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} {...deslizar}
+        <div data-ap-sec="hero" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} {...deslizar}
             style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--color-border)' }}>
             {/* alignItems:'stretch' + el `flex:1` de cada caja de fondo (abajo)
                 son lo que hace que TODOS los slides midan lo mismo: la pista
@@ -1436,7 +1446,10 @@ function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHero
                                     ) : (
                                         // Botón sólido que toma el color primario de Apariencia
                                         // adaptando inteligentemente el texto con var(--color-on-primary)
-                                        <button className="ds-hover" onClick={() => irACta(s.ctaLink)} style={{ height: 54, padding: '0 28px', borderRadius: 11, background: 'var(--color-primary)', color: 'var(--color-on-primary)', fontSize: 15.5, fontWeight: 700, border: textoOscuro ? '1px solid rgba(15,23,42,0.12)' : 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 22px rgba(0,0,0,0.22)', transition: 'background 150ms, color 150ms, transform 150ms' }}>
+                                        // El slide por defecto no tiene foto, solo un degradé
+                                        // del primario: el botón en el mismo primario no se
+                                        // distinguiría, así que va blanco.
+                                        <button className="ds-hover" onClick={() => irACta(s.ctaLink)} style={{ height: 54, padding: '0 28px', borderRadius: 11, background: s.automatico ? '#fff' : 'var(--color-primary)', color: s.automatico ? '#0F172A' : 'var(--color-on-primary)', fontSize: 15.5, fontWeight: 700, border: textoOscuro ? '1px solid rgba(15,23,42,0.12)' : 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 22px rgba(0,0,0,0.22)', transition: 'background 150ms, color 150ms, transform 150ms' }}>
                                             {s.cta || 'Ver catálogo'} <ArrowRight size={16} />
                                         </button>
                                     )}
@@ -1523,7 +1536,7 @@ function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHero
                                 flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center',
                                 background: s.img
                                     ? (overlayGradient ? `${overlayGradient}, url(${s.img})` : `url(${s.img})`)
-                                    : HERO_GRADS[i % HERO_GRADS.length],
+                                    : s.automatico ? degradeAutomatico('var(--color-primary)', i) : HERO_GRADS[i % HERO_GRADS.length],
                                 backgroundSize: 'cover', backgroundPosition: 'center',
                             }}>
                                 {/* Textura de puntos — solo con el overlay
@@ -1664,7 +1677,7 @@ function SeccionCategorias({ cats, go, estilo, categoryIds }: { cats: CatVisual[
     if (catsAMostrar.length === 0) return null
 
     return (
-        <div style={{ paddingTop: 24, paddingBottom: 28 }}>
+        <div data-ap-sec="categorias" style={{ paddingTop: 24, paddingBottom: 28 }}>
             <div className="sf-w" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: elegido === 'indice' ? 6 : 12, gap: 10 }}>
                 <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>Comprá por categoría</h2>
                 <button className="ds-link" onClick={() => go('/catalogo')} style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer' }}>Ver todas →</button>

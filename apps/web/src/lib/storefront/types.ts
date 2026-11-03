@@ -16,6 +16,8 @@ export type Producto = {
   // cuenta regresiva de la card. null = no tiene descuento, o lo tiene sin
   // fecha de fin. Opcional: los mocks (mock.ts) no lo traen.
   ofertaHasta?: string | null
+  // "Se hace por pedido": la card no lleva botones de compra y lleva a la ficha, donde solo se consulta por WhatsApp.
+  byOrder?: boolean
   lowStock?: boolean  // últimas unidades — gateado por showLowStock en el llamador. Opcional: PRODUCTOS (mock.ts) no lo trae.
   imgUrl?:   string | null  // foto real (Supabase Storage); sin ella se usa el degradé (hue) de siempre
   // Segunda foto REAL del producto (si tiene más de una cargada) — el

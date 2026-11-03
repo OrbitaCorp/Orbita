@@ -150,15 +150,26 @@ con `exit 1` (sin buildear nada) en el primero que falla:
 |---|---|---|---|
 | a | Árbol de git limpio | `git status --porcelain` vacío | lista lo sucio; commitear o descartar |
 | b | HEAD está en `main` | `git fetch origin` + `git merge-base --is-ancestor HEAD origin/main` | mergear a `main` (ff), pushear, esperar CI |
-| c | Misma red que CI, local | `pnpm typecheck` y `pnpm test` (**~10 minutos**) | arreglar en `main` |
-| d | Migraciones al día en PRODUCCIÓN | `./deploy/prisma-prod.sh migrate status` (solo lectura; lee `DATABASE_URL` / `DIRECT_URL` de Secret Manager, verifica que sean las de producción) | primero `./deploy/prisma-prod.sh migrate deploy` (ver § Rollback si es destructiva) |
-| e | CI verde en GitHub | `gh api repos/OrbitaCorp/Orbita/commits/<sha>/check-runs`: todo `completed` + `success` | esperar o arreglar; si `gh` no está o no está logueado, avisa y sigue |
+| c | CI verde en GitHub | `gh api repos/OrbitaCorp/Orbita/commits/<sha>/check-runs`: todo `completed` + `success`. Un check en rojo corta de inmediato; si siguen corriendo, **espera** hasta `DEPLOY_ESPERA_CI` segundos (900) | arreglar en `main`, o relanzar con más espera. Si `gh` no está o no está logueado, avisa y pasa al chequeo d |
+| d | Misma red que CI, local | `pnpm typecheck` y `pnpm test` (**~10 minutos**). **Se omite si el chequeo c vio CI en verde** para ese sha: CI corre exactamente eso en un checkout limpio, así que repetirlo no agrega seguridad | arreglar en `main` |
+| e | Migraciones al día en PRODUCCIÓN | `./deploy/prisma-prod.sh migrate status` (solo lectura; lee `DATABASE_URL` / `DIRECT_URL` de Secret Manager, verifica que sean las de producción) | primero `./deploy/prisma-prod.sh migrate deploy` (ver § Rollback si es destructiva) |
+
+El orden (CI antes que los tests locales) es a propósito: si CI está en rojo
+se entera en segundos, no después de 10 minutos de tests. Sin `gh` el script
+sigue exigiendo typecheck + tests, corridos acá; la garantía es la misma, solo
+más lenta (unos 15 minutos de deploy en vez de unos 5).
 
 `Web — lint (informativo)` tiene `continue-on-error` en `ci.yml` y su check run
 figura como `failure` aunque el workflow pase: el preflight lo ignora a
 propósito. El job `API — typecheck + tests` tiene que existir y estar en verde.
 
 Variables de entorno:
+
+- `DEPLOY_TESTS_LOCALES=1 ./deploy/deploy.sh`: corre typecheck + tests acá
+  aunque CI esté en verde (por ejemplo, para sospechas de diferencias entre
+  esta máquina y el runner de GitHub).
+- `DEPLOY_ESPERA_CI=1800 ./deploy/deploy.sh`: segundos máximos que espera a
+  que CI termine antes de abortar (por defecto 900).
 
 - `DEPLOY_SOLO_PREFLIGHT=1 ./deploy/deploy.sh`: corre el preflight y termina
   antes del build. Para probar el script o responder "¿se puede desplegar ya?"
@@ -170,6 +181,65 @@ Variables de entorno:
   y pide confirmar escribiendo `si`; sin terminal interactiva (stdin que no es
   una tty) aborta, así ningún script ni agente lo puede usar sin una persona
   adelante. Dejar constancia en el reporte de la tarea de que se usó y por qué.
+
+## Staging: probar en la nube sin tocar producción
+
+Un entorno aparte, "el `.env` de dev en la nube", para probar una rama antes de que llegue a
+`main`. Diseño y decisiones: `docs/superpowers/specs/2026-10-24-entorno-staging-design.md`.
+
+```
+https://caudaliguazu.com.ar (panel) · https://<subdominio>.caudaliguazu.com.ar (tiendas)
+   Vercel, proyecto "orbita-staging" (equipo OrbitaCorp), SIN git conectado
+        ▼
+https://orbita-api-staging-681215569277.southamerica-east1.run.app/api/v1
+   Cloud Run "orbita-api-staging" (mismo proyecto GCP), cuenta de servicio propia
+        ▼
+Base de DEV (hhaqlzrcskmwnvhgydon), la misma del .env local
+```
+
+```bash
+cd apps/api
+./deploy/staging.sh            # API + frontend, desde cualquier rama, sin push
+./deploy/staging.sh --solo-api
+./deploy/staging.sh --solo-web
+```
+
+- **Sube lo que está en el disco**, commiteado o no (la imagen queda con tag
+  `staging-<sha>[-sucio]`). No exige `main` ni CI: para eso existe. No pushea nada, así que no
+  interfiere con los deploys de producción de Vercel.
+- **Aplica las migraciones pendientes en DEV** (`prisma migrate deploy` con el `.env` local)
+  antes de desplegar la API. Producción no se toca.
+- **Secrets `STAGING_*`** en Secret Manager. Los carga `./deploy/staging-secretos.sh` desde el
+  `.env` de dev, sin imprimirlos, y se niega si las URLs de la base no son las de dev.
+  `JWT_SECRET` y `CRON_SECRET` son propios de staging. Solo la cuenta de servicio
+  `orbita-api-staging@` los puede leer, y esa cuenta **no** puede leer los de producción.
+  Para agregar uno: sumarlo a `DESDE_ENV` en ese script y a `SECRETS` en `staging.sh`.
+- **Variables no sensibles:** `deploy/env-vars.staging.yaml`. Diferencias con producción:
+  `TRUST_PROXY_HOPS=1` (no hay Firebase delante), `MAIL_FROM=onboarding@resend.dev` (Resend solo
+  entrega al dueño de la cuenta), WhatsApp/Instagram/TikTok apagados, sin `VERCEL_TOKEN` (daría
+  de alta dominios en el proyecto de producción), Google y Mercado Pago con los valores de dev
+  (la API no arranca sin ellos, pero el login con Google y la conexión con MP no andan).
+- **Archivos:** las fotos van al Supabase Storage de **dev** (`STAGING_SUPABASE_URL` /
+  `STAGING_SUPABASE_SERVICE_ROLE_KEY`; `staging-secretos.sh` pide la clave con el `SUPABASE_PAT`
+  del `.env`, siempre para el ref de dev, y con `ACTUALIZAR_ENV_LOCAL=1` también la agrega al
+  `.env` local). Los videos van al bucket R2 `orbita-dev` (cuenta de Cloudflare de Órbita, la misma
+  del bucket `orbita`; región ENAM, URL pública `pub-0959482d4a3a49f98c6481f59c779ee5.r2.dev`, mismo
+  CORS que producción), compartido con el entorno local. Su clave (`R2_ACCESS_KEY_ID` /
+  `R2_SECRET_ACCESS_KEY` del `.env` → `STAGING_R2_*`) es un token de R2 *Object Read & Write*
+  limitado a `orbita-dev`, sin vencimiento: contra `orbita` recibe AccessDenied (probado el
+  24/10). Si hay que rotarla, crear otro igual en *R2 → Manage R2 API Tokens*, reemplazarla en el
+  `.env` y correr `staging-secretos.sh`.
+- **Sin crons:** no hay jobs de Cloud Scheduler para staging; se disparan a mano con su
+  `CRON_SECRET`.
+- **Frontend:** `vercel deploy --prod` desde `apps/web` con los IDs del proyecto (no con
+  `vercel link`, que podría conectarle git). Lo que se sube lo filtra `apps/web/.vercelignore`.
+  Variables del proyecto: `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_ROOT_DOMAIN=caudaliguazu.com.ar` y
+  `NOINDEX=1` (header `X-Robots-Tag: noindex` en todo el sitio, ver `next.config.ts`).
+- **DNS** en Cloudflare (zona `caudaliguazu.com.ar`, todo en "DNS only"): `@` A a Vercel, `www` y
+  `*` CNAME al proyecto, y `_acme-challenge` NS a `ns1/ns2.vercel-dns.com` para que Vercel
+  renueve solo el certificado comodín. No borrar esos dos NS.
+- **Links con `orbita.site` fijo** (cupones, URL de la tienda, mails de dominios): en staging
+  apuntan a producción. Es conocido; no rompe nada.
 
 ## Actualizar secrets
 
@@ -374,6 +444,155 @@ Los dominios propios NO necesitan ese paso: la cuenta se vuelve propietaria de c
 verificarlo por META. Si un dominio se queda en "pendiente", mirar `custom_domains.gsc_error`
 (o el superadmin): casi siempre es que la portada todavía no muestra la etiqueta (la API guarda
 el SEO ~1 minuto) o que el dominio no abre por HTTPS.
+
+## TikTok: videos de marketing de Órbita
+
+Qué hace (código en `src/marketing/tiktok/`): conecta la cuenta de TikTok de la EMPRESA (una sola) y
+publica videos con la Content Posting API (Direct Post). Se maneja desde Superadmin → Marketing. Los
+tokens van cifrados con `pgp_sym_encrypt` (igual que WhatsApp e Instagram) y se renuevan cada noche
+dentro del mantenimiento nocturno (el de acceso dura 24 h, el de renovación 365 días).
+
+**Mientras la app de TikTok no pase su auditoría, todo lo que se publique queda en privado
+("Solo yo")** y la cuenta tiene que ser privada. Es una regla de TikTok: la única forma de levantarla
+es la auditoría (video de demostración del flujo completo, que es esta misma pantalla).
+
+Secretos (Secret Manager, proyecto `orbita-api-corp`; se cargan UNA vez y se agregan a `SECRETS=` en
+`deploy/deploy.sh` — si se agregan a esa lista sin que existan, el deploy falla):
+
+- `TIKTOK_CLIENT_KEY` y `TIKTOK_CLIENT_SECRET`: de la app en developers.tiktok.com (Manage apps).
+- `TIKTOK_TOKEN_KEY`: clave con la que Postgres cifra los tokens. Una cadena larga al azar
+  (`openssl rand -base64 32`). **Si se pierde, hay que volver a conectar la cuenta.**
+
+```bash
+printf '%s' 'VALOR' | gcloud secrets create TIKTOK_CLIENT_KEY --data-file=- --project orbita-api-corp
+printf '%s' 'VALOR' | gcloud secrets create TIKTOK_CLIENT_SECRET --data-file=- --project orbita-api-corp
+openssl rand -base64 32 | tr -d '\n' | gcloud secrets create TIKTOK_TOKEN_KEY --data-file=- --project orbita-api-corp
+```
+
+Configuración de la app en TikTok: tipo **Other**; productos **Login Kit** y **Content Posting API**
+(con **Direct Post** activado); permisos `user.info.basic`, `video.publish` (Direct Post) y `video.upload` (borradores); dirección de redirección
+exacta `https://api.orbita.site/api/v1/platform/marketing/tiktok/callback` (se puede cambiar con la
+variable `TIKTOK_REDIRECT_URI`). Los videos se suben desde el servidor por trozos (FILE_UPLOAD), así
+que no hace falta verificar ningún dominio. Hay dos formas de mandarlos: **publicar directo** (Direct Post) y
+**enviar a borradores** (el video llega a la cuenta y una persona lo termina en la app de TikTok). Los permisos
+que se piden al conectar salen de `TIKTOK_SCOPES` (por defecto los tres) y tienen que coincidir con los de la app.
+
+**Ver los videos de la cuenta y sus números** (Marketing → TikTok → Videos de la cuenta) pide dos permisos más:
+`video.list` (los videos, con vistas, me gusta, comentarios y compartidos) y `user.info.stats` (seguidores y totales).
+Se activan en la app de TikTok (developers.tiktok.com → Products → Display API / Login Kit → Scopes), se suman a
+`TIKTOK_SCOPES` en `deploy/env-vars.yaml` (`user.info.basic,video.publish,video.upload,video.list,user.info.stats`),
+se despliega y se vuelve a conectar la cuenta desde Marketing. Mientras no estén, la pantalla muestra qué permiso
+falta en vez de fallar. Los **comentarios** de los videos no se pueden leer ni contestar: la API de TikTok solo da
+su cantidad.
+
+Sin los tres secretos cargados, la pantalla de Marketing avisa que TikTok no está configurado y el resto
+de la API sigue igual.
+
+## Rol Marketing del super panel
+
+Tercer rol de `platform_admins.role` (`MARKETING`, migración `20261021010000_platform_admin_rol_marketing`: agrega el valor al enum, no toca datos).
+Es para quien lleva las redes y los videos (por ejemplo, Milagros). A diferencia del OPERATOR, que **lee todo** y no escribe lo sensible, un MARKETING
+solo entra a lo que lo nombra a propósito (`PlatformAdminGuard`: sin `@SuperadminYMarketing()` / `@TodoElEquipo()` lo rechaza, también en lectura).
+Hoy puede: Resumen (sin facturación: `overview` le saca el MRR y las suscripciones), Marketing completo (TikTok, Instagram con mensajes directos y
+contenido, videos, tutoriales, prospección y el conector de Claude), y Correo (ver, vista previa y enviar; las casillas siguen siendo de SUPERADMIN).
+No ve Negocios, Soporte, Costos, Admins, Actividad, Auditoría ni campañas. La lista exacta está fijada en `test/unit/platform.rol-marketing.unit-spec.ts`.
+Dar el rol: Super panel → Admins → editar → Rol «Marketing». Ahí mismo se le saca el acceso total a quien lo tenga como SUPERADMIN.
+Sus videos los aprueba la dirección (`politica-aprobacion.ts` sigue mandando por quién subió); los avisos por correo de videos también le llegan.
+
+## Prospección: consulta de cuentas de Instagram y conector de Claude
+
+Qué hace (código en `src/marketing/prospeccion/`): Superadmin → Marketing → Prospección consulta cuentas
+profesionales de Instagram con Business Discovery (API de Meta), las puntúa con el criterio de cliente ideal y las
+guarda en lotes. Cada superadmin analiza los lotes con SU propio Claude, por un **conector MCP remoto** que vive en
+esta misma API (`/api/v1/mcp`, OAuth 2.1 con PKCE; metadata en `/.well-known/oauth-*`, que llega a la API
+porque Firebase Hosting reescribe `**` a Cloud Run). No hay clave de Anthropic ni nada local. Claude lee lotes y guarda
+análisis; **no tiene ninguna herramienta que envíe, contacte o borre**: los mensajes los manda una persona.
+
+Acceso: solo un superadmin activo con correo de `orbita-corp.com` u `orbita.site`
+(`MCP_DOMINIOS_PERMITIDOS`), verificado en CADA llamada del conector, no solo al conectar. La persona autoriza en
+`orbita.site/superadmin/conectar-claude` (reusa el login con Google y 2FA del panel). Los tokens del conector se firman
+con claves derivadas de `JWT_SECRET` con una etiqueta propia, así que no sirven como sesión del panel. «Desconectar
+Claude» (Prospección) revoca todos los Claude de esa persona. Rotar `JWT_SECRET` desconecta a todos.
+
+**Secreto `META_PROSPECCION_TOKEN`** (cargado el 14/10/2026, ya está en `SECRETS=` de `deploy.sh`). Business Discovery necesita un token de USUARIO de Facebook con
+`instagram_basic`, `pages_show_list`, `pages_read_engagement` e `instagram_manage_insights` (los de Instagram Login no
+sirven: devuelven «nonexisting field (business_discovery)»). Los de usuario normales duran 1–2 h, así que en producción
+se usa el de un **usuario del sistema** (Meta Business Suite → Configuración → Usuarios del sistema → generar token,
+sin vencimiento, con la app de Órbita y esos 4 permisos; activos: la página de Órbita, la cuenta de Instagram y la app):
+
+```bash
+printf '%s' 'TOKEN' | gcloud secrets create META_PROSPECCION_TOKEN --data-file=- --project orbita-api-corp
+```
+
+Si hay que rotarlo: `gcloud secrets versions add META_PROSPECCION_TOKEN --data-file=...` y redesplegar. Sin el secreto,
+consultar cuentas responde un error claro y lo demás (conector, lotes ya guardados) sigue andando.
+
+Variables opcionales (no sensibles, ya tienen valor por defecto; solo se ponen en `deploy/env-vars.yaml` para cambiarlas):
+`MCP_PUBLIC_URL` (`https://api.orbita.site`), `MCP_CONSENT_URL` (`https://orbita.site/superadmin/conectar-claude`),
+`MCP_DOMINIOS_PERMITIDOS` (`orbita-corp.com,orbita.site`), `MCP_RETORNOS_EXTRA` (direcciones de retorno extra, p. ej. otro
+cliente MCP), `META_PROSPECCION_IG_ID` y `META_PROSPECCION_GRAPH_VERSION` (`v23.0`).
+
+Migraciones (3, tablas `marketing_prospectos`, `marketing_prospeccion_lotes`, `marketing_mcp_codigos` y
+`marketing_mcp_refresh`, todas con RLS): `20261014110000_marketing_prospeccion`, `20261014120000_marketing_mcp_oauth` y
+`20261014130000_marketing_prospeccion_rls`. Son solo aditivas (tablas nuevas): se aplican en producción con
+`./deploy/prisma-prod.sh migrate deploy` antes de `deploy.sh`.
+
+### Cola de videos (Marketing → Videos)
+
+Cada persona le pide a SU Claude, con el conector (por ejemplo «generame 3 videos» o «hacé el tutorial de Atender un pedido»);
+Claude los hace en su computadora (HyperFrames; skills y agentes en el repo público `Orbita-Videos`: las instrucciones del conector le dicen a Claude Code que lo clone en `~/orbita-videos/repo` la primera vez, avisando antes; también existe como plugin de Claude Code, opcional) y por el conector: `videos_pedir_subida` (reserva un lugar y
+devuelve una dirección firmada), sube el mp4 con un PUT directo a R2 (`marketing/videos/<uuid>.mp4`) y `videos_registrar` (lo deja
+en la cola con su guion, texto sugerido y controles de calidad). No hay pedidos en el panel ni se renderiza nada en la nube.
+Código en `src/marketing/videos/`; tablas `marketing_videos`, `marketing_video_comentarios` y `marketing_tutoriales`
+(migraciones `20261014140000_marketing_videos`, `20261014180000_marketing_videos_tipos_y_tutoriales` y
+`20261014190000_marketing_videos_comentarios`, todas con RLS).
+
+- **Dos tipos que no se mezclan** (pestañas del panel): **MARKETING** (se usa afuera; se puede pasar como borrador a TikTok o
+  Instagram; vence a los 7 días sin aprobar) y **TUTORIAL** (interno, no se pasa a redes; vence a los 30 días; puede cubrir un ítem
+  de la lista de tutoriales). **No hay tope de peso** en ninguno de los dos (R2 no lo pide); el único límite que queda es el de la
+  vía de Instagram (50 MB, del bucket de la cuenta): un video más pesado se descarga y se sube a mano a Instagram.
+- **Estados:** SUBIENDO (vence en 1 h) → PENDIENTE → APROBADO (queda como registro, con su archivo, sin vencer) → PUBLICADO (se
+  pasó a un borrador). **Rechazar borra el archivo de R2, el registro y sus comentarios.**
+- **Quién aprueba depende de QUIÉN LO SUBIÓ** (`politica-aprobacion.ts`, con tests). Es interno: el panel solo ofrece «Aprobar» a quien
+  puede y nunca muestra quién aprobó ni qué falta.
+  - Lo sube un **socio** (CEO, CTO o CPO): se aprueba a sí mismo, para verificar lo que hizo su Claude. **Ningún socio aprueba ni
+    rechaza el video de otro socio.**
+  - Lo sube **cualquier otra persona** (por ejemplo, Milagros, de marketing): lo aprueba la dirección. Alcanza con el CEO; el
+    CTO y el CPO también pueden, pero entonces tienen que aprobar los dos. Quien lo subió nunca aprueba el suyo.
+  - Quién es «la dirección» (`MARKETING_DIRECCION`): una lista de ROLES separados por coma (el primero es el CEO) y los correos de
+    cada rol separados por `|`, porque cada socio tiene dos cuentas y son la misma persona. Por defecto
+    `ceo@orbita-corp.com|ceo@orbita.site,cto@orbita-corp.com|cto@orbita.site,cpo@orbita-corp.com|cpo@orbita.site`. Con una cuenta no se
+    aprueba lo que subió la otra del mismo rol, y las dos cuentas de un rol cuentan como una sola aprobación. **Si en producción
+    usan otros correos, hay que fijarla en `deploy/env-vars.yaml`: si no coincide, nadie puede aprobar lo de Milagros** (falla del
+    lado seguro).
+- **Comentarios** (`/platform/marketing/videos/:id/comentarios`): cualquiera del equipo puede opinar sobre cualquier video en todas
+  sus fases (para aprobar, aprobado, pasado a borrador) y borrar los suyos.
+- **Mejorar un video:** el botón «Mejorar con Claude» abre Claude con el video si la persona tiene el conector
+  (`GET /platform/mcp/estado`); si no, le explica cómo conectarlo. Claude lee el video y los comentarios con `videos_obtener` y
+  registra la versión nueva con `videos_registrar` + `mejora_de`: queda como un video aparte que apunta al original, que no se toca
+  (sirve también para videos ya aprobados). La mejora se aprueba según quién la subió.
+- **Lista de tutoriales** (`marketing_tutoriales`, cargada en la migración con los 39 tutoriales definidos): estados FALTA,
+  EN_PROCESO, EN_REVISION, HECHO. La actualiza el Claude de cada persona (`tutoriales_listar` / `tutoriales_actualizar`); registrar el
+  video de un tutorial lo pasa a EN_REVISION y aprobarlo, a HECHO; rechazarlo o que venza lo devuelve a FALTA. También se corrige
+  desde el panel.
+- **Aviso por correo a TODO el equipo:** cuando entra un video, un correo (por Resend, con el diseño de Órbita) a los superadmins
+  ACTIVOS con correo `@orbita.site` u `@orbita-corp.com` (`MCP_DOMINIOS_PERMITIDOS`) y también a su correo personal si lo cargó:
+  «Hay N videos nuevos para ver y comentar», con los títulos y un botón al panel (el texto no habla de aprobaciones). Sale **uno por
+  tanda y por tipo**: no repite si ya salió otro hace menos de 10 minutos, y al terminar Claude llama a `videos_avisar` (fin de tanda),
+  que avisa solo si quedó algún pendiente sin anunciar. El último aviso se lee del registro de acciones (`video_aviso`). Es mejor
+  esfuerzo: si el correo falla, el video queda registrado igual. El botón usa `FRONTEND_URL`.
+- **Sin cron:** los vencidos se borran al listar la cola y al pedir una subida (`purgarVencidos`). Como los aprobados conservan su
+  archivo, el almacenamiento solo crece con ellos (≈ 20–40 MB por video de marketing).
+- **Tope de la cola:** 20 videos de cada tipo entre SUBIENDO y PENDIENTE; con más, `videos_pedir_subida` avisa que hay que revisar.
+- **Pasar a TikTok / Instagram** (solo marketing aprobado): siempre como BORRADOR y solo por una persona (nada se publica solo).
+  TikTok: borradores de la cuenta (la persona lo termina en la app). Instagram: borrador en Marketing → Instagram → Publicaciones,
+  desde donde se publica o se programa. El video se copia al almacenamiento de Instagram (bucket de la cuenta de la empresa).
+- Usa las variables de R2 que ya existen (`R2_*`, `R2_PUBLIC_URL`); no hay secretos nuevos.
+- Migraciones aditivas (columnas con valor por defecto y tablas nuevas): `./deploy/prisma-prod.sh migrate deploy` antes de
+  `deploy.sh`, como siempre. Los videos que ya existían quedan como MARKETING.
+
+Para agregar el conector en Claude (una vez por persona): Configuración → Conectores → «Agregar conector personalizado»
+con `https://api.orbita.site/api/v1/mcp`. Requiere un plan de Claude que permita conectores personalizados.
 
 ## Ver logs
 
@@ -617,6 +836,7 @@ request como cualquier otra.
 | `nightly-subscriptions-maintenance` | 03:00 diario | `reconcileOverdueSubscriptions()` + `cleanupExpiredPendingSignups()` (antes eran 2 `@Cron` separados a las 3am/4am — se juntaron en 1 solo disparo, sin razón de negocio para separarlos). También sincroniza los costos de proveedores (`CostsService.syncAll()`) para la pantalla Costos del super admin |
 | `resumen-diario` | 22:00 diario | `resumenDiario()` |
 | `reporte-semanal` | 09:00 lunes | `reporteSemanal()` |
+| `instagram-cada-5-minutos` | cada 5 minutos | `instagramCada5Minutos()`: lanza las publicaciones de Instagram **programadas** (Difusión → Publicaciones) que ya llegaron a su hora, sigue avanzando las que se están procesando y modera los comentarios de los negocios que prendieron la moderación. **Es un 4º job: cuesta ~US$0.10/mes** (ver abajo). Sin este job, las publicaciones programadas no salen |
 
 **Por qué son 3 jobs y no 4:** Cloud Scheduler regala **3 jobs gratis por
 proyecto/mes**; del 4to en adelante cobra **US$0.10/job/mes**. Consolidando
@@ -645,11 +865,106 @@ devuelven 401.
    ```
 4. Si ya hay 3 jobs activos, el nuevo cuesta US$0.10/mes — no es necesario evitarlo a toda costa, es un costo menor.
 
+**Job de Instagram (cada 5 minutos)** — se crea una sola vez, después del primer deploy que trae las publicaciones programadas:
+```bash
+gcloud scheduler jobs create http instagram-cada-5-minutos \
+  --project=orbita-api-corp --location=southamerica-east1 \
+  --schedule="*/5 * * * *" --time-zone="Etc/UTC" \
+  --uri="https://api.orbita.site/api/v1/internal-cron/instagram-cada-5-minutos" \
+  --http-method=POST --headers="x-cron-secret=$(gcloud secrets versions access latest --secret=CRON_SECRET --project=orbita-api-corp)"
+```
+No pasa por `correrUnaVez` a propósito: es idempotente (cada publicación se toma con un candado propio en la base) y se dispara muchas veces por día. Una programada que no pudo lanzarse queda `FAILED` con el motivo y se ve en Difusión → Publicaciones.
+
 **Para debuggear un job que no corrió:**
 ```bash
 gcloud scheduler jobs describe NOMBRE_DEL_JOB --project=orbita-api-corp --location=southamerica-east1
 gcloud scheduler jobs run NOMBRE_DEL_JOB --project=orbita-api-corp --location=southamerica-east1  # dispara ahora, a mano
 ```
+
+## WhatsApp: conexión por Embedded Signup (cada negocio conecta su cuenta)
+
+Órbita es **proveedor de tecnología** de Meta (app «Orbita», id `1634368494718041`): cada negocio conecta su WhatsApp
+Business desde Mensajes → WhatsApp con el botón de Meta, sin pegar datos a mano.
+
+- **Cómo funciona:** el panel abre `FB.login` con la configuración de inicio de sesión (`config_id` en
+  `apps/web/src/lib/meta/embeddedSignup.ts`, o `NEXT_PUBLIC_WHATSAPP_CONFIG_ID`). Meta devuelve un código (vale unos
+  segundos) y, por un mensaje de su ventana, los ids de la cuenta y el número. `POST /whatsapp/embedded-signup` canjea el
+  código por el token del negocio (`/oauth/access_token` con `WHATSAPP_APP_ID` + `WHATSAPP_APP_SECRET`), **comprueba contra
+  Meta que el número sea de esa cuenta**, registra el número en la Cloud API (PIN derivado del secreto: no se guarda),
+  guarda el token cifrado y suscribe la app a la cuenta (`subscribed_apps`).
+- **Variables:** `WHATSAPP_APP_ID` (no secreta, en `env-vars.yaml`) y `WHATSAPP_NEGOCIOS_HABILITADOS` (`*` = todos los
+  negocios; una lista de subdominios la restringe). `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN` y
+  `WHATSAPP_TOKEN_KEY` siguen en Secret Manager.
+- **En Meta (panel de la app):** el dominio de la web (`orbita.site`) tiene que estar en los dominios permitidos del
+  inicio de sesión con Facebook / SDK de JavaScript, y el webhook de WhatsApp Business Account apunta a
+  `https://api.orbita.site/api/v1/webhooks/whatsapp` (un solo webhook para todos los negocios: el negocio se resuelve por
+  `phone_number_id`).
+- **Coexistencia (el número sigue en la app WhatsApp Business):** el flujo del panel usa `featureType:
+  whatsapp_business_app_onboarding` y `version: v4` (`embeddedSignup.ts`; `NEXT_PUBLIC_WHATSAPP_FEATURE_TYPE` lo cambia).
+  Meta termina con `FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING` y solo da el id de la cuenta: la API busca el número que
+  sigue en la app (`is_on_biz_app`), **no lo registra** y pide el volcado de contactos e historial
+  (`POST /{phone}/smb_app_data`, una sola vez y dentro de las 24 h de conectar). Para que esto llegue, **en el panel de Meta
+  (WhatsApp → Configuración → Webhook) hay que suscribir los campos `smb_message_echoes`, `history` y
+  `smb_app_state_sync`** además de `messages`: los dos primeros los procesa `whatsapp.service.ts` (lo que el dueño escribe
+  desde el celular y el historial de chats); `smb_app_state_sync` (contactos) todavía se ignora. Límites de Meta: la app tiene
+  que ser WhatsApp Business ≥ 2.24.17, los grupos no se sincronizan, se desvinculan los dispositivos vinculados (Web y
+  Desktop) y con ~14 días sin abrir la app en el celular Meta corta la conexión (`PARTNER_REMOVED`). Disponibilidad por país:
+  confirmarla en la documentación de Meta.
+- **Las dos bandejas de Mensajes no se mezclan:** `GET /conversations` devuelve `canales` (último mensaje y «sin leer» de
+  cada canal), `GET /conversations/:id/messages?canal=` filtra por canal y `POST .../messages` acepta `canal` para
+  responder siempre por el de la bandeja desde la que se contesta.
+- **Fotos en los chats (solo imágenes):** las que mandan los clientes se bajan de Meta (`GET /{media_id}` → `url`, con el
+  token del negocio) y las que manda el panel salen por `POST /conversations/:id/messages/image`; en los dos casos se
+  guardan como JPEG (≤ 2048 px, ≤ 5 MB) en el bucket **`whatsapp-media`** de Supabase Storage, que se crea solo la primera
+  vez (público, rutas con UUID: WhatsApp tiene que poder bajar la imagen por su dirección). No hace falta migración ni
+  variable nueva. Audio, video y documentos no se guardan: siguen entrando como etiqueta en el texto.
+- **Orbi como atención al público (paquete Avanzado):** el bot (`src/whatsapp/whatsapp-bot*.ts`) contesta los chats de
+  WhatsApp donde el dueño lo activó. Corre DENTRO del pedido del webhook (Cloud Run corre con `--cpu-throttling`: lo que
+  queda después de responder no recibe CPU), con una espera de ~3,5 s para juntar mensajes seguidos
+  (`WHATSAPP_BOT_ESPERA_MS`). Modelo de IA con respaldos, del más barato al más caro: **Groq** (`GROQ_MODEL`,
+  gpt-oss-120b) → **Workers AI de Cloudflare** (`CF_LLM_MODEL`, `@cf/openai/gpt-oss-120b`; usa `R2_ACCOUNT_ID` +
+  `CF_WORKERS_AI_API_TOKEN`, que necesita el permiso de Workers AI) → **Gemini** (`ORBI_MODEL_WHATSAPP` →
+  `ORBI_MODEL_PANEL` → `ORBI_MODEL`). Cada uno tiene 15 s para contestar; si se cae (429, 5xx, red) o no contesta,
+  sigue el próximo, y los que no tienen credenciales se saltean (`cadenaDeRespaldos` en `llm-adapter.provider.ts`). Sin
+  secrets nuevos. Herramientas de solo lectura: el catálogo sale de `StorefrontService` (lo mismo que ve un comprador) y
+  los pedidos solo los de la persona que escribe. **Cupo aparte** del de Orbi del panel: `WHATSAPP_BOT_CREDITOS_MES`
+  (2000 por defecto), con tope propio opcional del dueño; lo gastado sale de `whatsapp_bot_turns`. Habilitación: el
+  addon `ADVANCED` activo; `WHATSAPP_BOT_SIN_PACK=true` lo salta y es SOLO para desarrollo (nunca en `env-vars.yaml`).
+  Tablas nuevas: `whatsapp_bot_configs`, `whatsapp_bot_turns` y columnas en `conversations` (`bot_estado`, `bot_motivo`,
+  `bot_cambiado_at`) y `messages` (`via_orbi`); migración `20261019010000_whatsapp_bot` (aplicar en producción con
+  `prisma-prod.sh migrate deploy` ANTES de desplegar la API).
+- **Modalidades de Orbi (las elige el dueño):** `CONVERSACIONAL` (todo con IA), `MENU_Y_CONVERSACION` (el primer contacto
+  y los saludos abren con un menú; lo demás, IA) y `SOLO_MENU` (menú y respuestas fijas, sin IA: no gasta cupo y sigue
+  andando con el cupo agotado). El menú sale como mensaje **interactivo** (lista de hasta 10 opciones o hasta 3 botones;
+  no necesita plantilla aprobada, solo dentro de las 24 h) y, si WhatsApp lo rechaza, como texto numerado (el "2" suelto
+  se entiende como la opción 2 solo si lo último que mandó Orbi fue ese menú). Lo que el cliente toca llega en el webhook
+  como `interactive.list_reply` / `button_reply` con el `id` de la opción. Opciones y saludo en `whatsapp_bot_configs`
+  (`menu_opciones`, `bienvenida`, `menu_estilo`, `modalidad`); migración `20261019020000_whatsapp_bot_modalidades`
+  (aplicar en producción antes de desplegar la API). A confirmar con una cuenta real: cómo se ven los interactivos en la
+  app WhatsApp Business del celular cuando el número está en coexistencia.
+- **Orbi toma pedidos (el dueño lo enciende, apagado por defecto):** `whatsapp_bot_configs.toma_pedidos` + topes
+  `max_unidades` / `max_monto`. Solo en las modalidades con IA. Flujo (`whatsapp-bot-pedidos.ts`): el modelo llama a
+  `preparar_pedido`; el servicio valida contra la tienda (`StorefrontService.validateCart`: precios con descuentos y stock reales,
+  nunca lo que diga el modelo) y deja un **borrador** en `conversations.bot_borrador` (vence a los 30 min). Al cliente le llega el
+  resumen que arma el sistema, con botones `pedido-confirmar` / `pedido-cambiar` (o "sí" / "cambiar" en texto). Al confirmar, el
+  borrador se **reclama** (updateMany; dos toques no crean dos pedidos) y se llama a `OrdersService.create` como el checkout
+  público (`publicCheckout`, canal ONLINE, PENDIENTE, `TRANSFER` = "Coordinar por WhatsApp", o sin método si la tienda coordina el pago
+  después) con la opción nueva `porWhatsapp` (el cliente de WhatsApp no tiene email: no se exige). Orbi nunca cobra ni pide dirección.
+  Requiere tienda en modo FULL y `acceptsTransfer` o `acceptsCoordinateLater`.
+- **Avisos al dueño por correo:** dos eventos nuevos del motor de notificaciones (`NOTIFICATION_EVENTS`): `orbi_necesita_atencion`
+  (cada vez que un chat pasa a DERIVADO, a lo sumo uno por chat cada 30 min: `conversations.bot_aviso_at`) y `orbi_pedido_pendiente`.
+  Llegan por panel **y** email aunque el dueño no haya configurado nada (`PREFS_POR_EVENTO`); él puede apagarlos en Notificaciones.
+  Se despachan dentro del pedido del webhook (con `await`), no con el emisor de eventos: Cloud Run con `--cpu-throttling` no corre lo
+  que queda después de responder. Migración `20261020010000_whatsapp_bot_pedidos` (aplicar en producción antes de desplegar la API).
+- **Fotos de producto:** herramienta `mostrar_foto_producto` (hasta 3 por respuesta, sin repetir). Las fotos del catálogo están en WebP y WhatsApp
+  no las acepta como imagen, así que `WhatsappMediosService.prepararFotoDeProducto` las baja (solo del host de `SUPABASE_URL`), las convierte a
+  JPEG y las guarda en el bucket `whatsapp-media` en `<negocio>/productos/<hash de la URL>.jpg`: se convierte una sola vez por foto. No usa IA
+  extra, pero cada foto es un mensaje de WhatsApp más (cuenta para los 1.000 gratis por mes). Se guarda en el chat con `attachments` y `viaOrbi`.
+- **Eliminar pedidos del listado:** `DELETE /orders/:id` (permiso `orders.manage`) hace soft-delete (`deletedAt`) y deja registro en
+  `audit_logs`. Es solo de pantalla: no devuelve stock ni anula cobros; el pedido sigue en la base y sale de lista, detalle y reportes.
+- **Probar sin un número real:** cuenta sandbox desde el panel de Meta (WhatsApp → Testear integraciones) o el formulario
+  manual («Conectala a mano» en la pantalla de conectar).
+- **Cobro:** en Embedded Signup cada cliente agrega su propio medio de pago en Meta y paga ahí sus conversaciones.
 
 ## Troubleshooting — problemas ya resueltos (para no repetir la pelea)
 

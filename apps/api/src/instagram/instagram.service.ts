@@ -6,6 +6,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
   ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -13,6 +14,11 @@ import { ConfigService } from '@nestjs/config';
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { describeError } from '../common/utils/describe-error.util';
+import { escaparHtml } from '../common/utils/html';
+import { MailService } from '../mail/mail.service';
+import { PANTALLAS_DE_RETORNO, type PantallaDeRetorno } from './dto/conectar-instagram.dto';
+import { InstagramAjustesService } from './instagram-ajustes.service';
+import { InstagramMediosService } from './instagram-medios.service';
 
 // Instagram (mensajes directos) dentro de la bandeja de Mensajes.
 //
@@ -35,17 +41,45 @@ const STATE_TTL_MS = 10 * 60 * 1000;
 const RENOVAR_CON_ANTICIPACION_MS = 15 * 24 * 60 * 60 * 1000;
 // Límite de la API de Instagram para un mensaje de texto.
 const MAX_BYTES_TEXTO = 1000;
-const SCOPES = 'instagram_business_basic,instagram_business_manage_messages';
+const SCOPES_BASE = 'instagram_business_basic,instagram_business_manage_messages';
+// Kit de difusión: publicar, comentarios y estadísticas. Se piden cuando la persona se conecta desde Difusión (o
+// autoriza el kit desde ahí), para que quien solo quiere mensajes no vea en Instagram una pantalla que pide más
+// de lo que usa.
+export const SCOPE_PUBLICAR = 'instagram_business_content_publish';
+export const SCOPE_COMENTAR = 'instagram_business_manage_comments';
+export const SCOPE_ESTADISTICAS = 'instagram_business_manage_insights';
+const SCOPES_KIT = [SCOPE_PUBLICAR, SCOPE_COMENTAR, SCOPE_ESTADISTICAS];
+const SCOPES_COMPLETOS = [SCOPES_BASE, ...SCOPES_KIT].join(',');
+
+// Qué hay que hacer cuando falta cada permiso (el mensaje que ve la persona).
+const MENSAJE_SIN_PERMISO: Record<string, string> = {
+  [SCOPE_PUBLICAR]: 'Falta autorizar la publicación: volvé a conectar Instagram dándole ese permiso a Órbita.',
+  [SCOPE_COMENTAR]: 'Falta autorizar los comentarios: volvé a conectar Instagram dándole ese permiso a Órbita.',
+  [SCOPE_ESTADISTICAS]: 'Falta autorizar las estadísticas: volvé a conectar Instagram dándole ese permiso a Órbita.',
+};
 
 interface StatePayload {
   businessId: string;
   memberId?: string;
+  // Desde dónde se abrió el panel (el Origin del navegador): a ese mismo lugar se vuelve al terminar el
+  // login. Sin esto se volvía siempre a FRONTEND_URL, que puede ser otro sitio que el de la sesión
+  // (en local, localhost vs negocio.orbita.local) y la persona caía en el login.
+  origen?: string;
+  // Pantalla del panel desde la que se pidió la conexión (mensajes o difusion).
+  seccion?: PantallaDeRetorno;
+  // 'kit' = además del permiso de mensajes, pide los del kit de difusión (publicar, comentarios y estadísticas).
+  permisos?: 'kit';
+  // 'superadmin' = la conexión la inició un administrador de la plataforma desde Marketing (la cuenta de la
+  // empresa): al terminar se vuelve al super panel y no al panel de ningún negocio. Solo lo fija
+  // `urlDeAutorizacionEmpresa`; ningún cuerpo de petición llega a este campo.
+  destino?: 'superadmin';
   nonce: string;
   exp: number;
 }
 
 interface IgAttachment {
   type?: string;
+  payload?: { url?: string };
 }
 interface IgMessage {
   mid?: string;
@@ -97,6 +131,12 @@ export class InstagramService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    // Opcional: solo avisa los pedidos de acceso anticipado.
+    @Optional() private readonly mail?: MailService,
+    // Opcional: guarda las imágenes que llegan por mensaje directo (la dirección de Instagram vence).
+    @Optional() private readonly medios?: InstagramMediosService,
+    // Opcional: las respuestas automáticas (bienvenida y ausencia) de los mensajes.
+    @Optional() private readonly ajustes?: InstagramAjustesService,
   ) {}
 
   // Las credenciales se leen al usarlas y no al arrancar: la API sigue
@@ -127,19 +167,155 @@ export class InstagramService {
    * negocios listados en INSTAGRAM_NEGOCIOS_HABILITADOS (subdominios separados
    * por coma); sin la variable, en ninguno. Fuera de producción, sin la
    * variable, están todos habilitados para poder probar.
+   *
+   * Además de la variable, un negocio queda habilitado cuando el equipo acepta su
+   * pedido de acceso anticipado (InstagramEarlyAccess en ENABLED): así no hace
+   * falta tocar variables ni redesplegar para sumar un piloto.
    */
-  async asegurarHabilitado(businessId: string): Promise<void> {
+  async estaHabilitado(businessId: string): Promise<boolean> {
+    const acceso = await this.prisma.instagramEarlyAccess.findUnique({ where: { businessId }, select: { status: true } });
+    if (acceso?.status === 'ENABLED') return true;
     const lista = (this.config.get<string>('INSTAGRAM_NEGOCIOS_HABILITADOS') ?? '')
       .split(',')
       .map((s) => s.trim().toLowerCase())
       .filter(Boolean);
-    if (lista.length === 0) {
-      if (this.config.get<string>('NODE_ENV') === 'production') throw new ForbiddenException('Instagram todavía no está disponible para este negocio');
-      return;
-    }
+    if (lista.length === 0) return this.config.get<string>('NODE_ENV') !== 'production';
     const negocio = await this.prisma.business.findUnique({ where: { id: businessId }, select: { subdomain: true } });
-    if (!negocio || !lista.includes(negocio.subdomain.toLowerCase())) {
+    return !!negocio && lista.includes(negocio.subdomain.toLowerCase());
+  }
+
+  async asegurarHabilitado(businessId: string): Promise<void> {
+    if (!(await this.estaHabilitado(businessId))) {
       throw new ForbiddenException('Instagram todavía no está disponible para este negocio');
+    }
+  }
+
+  // ── Acceso anticipado ──────────────────────────────────────────────────────
+
+  // Usuario de Instagram: letras, números, puntos y guiones bajos, hasta 30.
+  private normalizarUsuario(crudo: string): string {
+    const usuario = (crudo ?? '').trim().replace(/^@/, '').toLowerCase();
+    if (!/^[a-z0-9._]{1,30}$/.test(usuario)) {
+      throw new BadRequestException('Escribí tu usuario de Instagram sin espacios (letras, números, puntos y guiones bajos).');
+    }
+    return usuario;
+  }
+
+  /**
+   * Lo que ve el panel: si el negocio puede conectar, el estado de la conexión; si
+   * no, su pedido de acceso anticipado (o null si todavía no pidió).
+   */
+  async estadoParaPanel(businessId: string) {
+    if (await this.estaHabilitado(businessId)) {
+      return { habilitado: true as const, ...(await this.estado(businessId)) };
+    }
+    const pedido = await this.prisma.instagramEarlyAccess.findUnique({
+      where: { businessId },
+      select: { username: true, requestedAt: true },
+    });
+    return { habilitado: false as const, connected: false as const, solicitud: pedido };
+  }
+
+  /**
+   * El dueño deja su @usuario para que el equipo lo sume como evaluador de la app
+   * de Meta. Un pedido por negocio: pedir de nuevo con otro usuario lo corrige, y
+   * el aviso al equipo sale solo si el pedido es nuevo o cambió el usuario.
+   */
+  async solicitarAcceso(businessId: string, usuarioCrudo: string, memberId?: string) {
+    const username = this.normalizarUsuario(usuarioCrudo);
+    if (await this.estaHabilitado(businessId)) {
+      throw new ConflictException('Instagram ya está habilitado para este negocio');
+    }
+    // A esa persona se le avisa cuando habiliten el negocio. Si no hay (o no se encuentra),
+    // el aviso va al propietario.
+    const quien = memberId
+      ? await this.prisma.member.findFirst({ where: { id: memberId, businessId }, select: { email: true } })
+      : null;
+    const contactEmail = quien?.email ?? null;
+    const previo = await this.prisma.instagramEarlyAccess.findUnique({ where: { businessId }, select: { username: true } });
+    const pedido = await this.prisma.instagramEarlyAccess.upsert({
+      where: { businessId },
+      create: { businessId, username, contactEmail },
+      update: { username, ...(contactEmail ? { contactEmail } : {}) },
+      select: { username: true, requestedAt: true },
+    });
+    if (!previo || previo.username !== username) await this.avisarPedido(businessId, username);
+    return pedido;
+  }
+
+  // El aviso nunca rompe el pedido: si el correo falla, el pedido igual queda en
+  // el superadmin.
+  private async avisarPedido(businessId: string, username: string): Promise<void> {
+    try {
+      const negocio = await this.prisma.business.findUnique({ where: { id: businessId }, select: { name: true, subdomain: true } });
+      if (!negocio || !this.mail) return;
+      const html =
+        `<p><strong>${escaparHtml(negocio.name)}</strong> (${escaparHtml(negocio.subdomain)}) pidió acceso anticipado a Instagram con la cuenta <strong>@${escaparHtml(username)}</strong>.</p>` +
+        '<p>Sumala como evaluadora de Instagram en los roles de la app de Meta y después habilitala en el superadmin.</p>';
+      await this.mail.sendCustomEmail('soporte@orbita.site', `Instagram: pedido de acceso de ${negocio.name}`, html);
+    } catch (e) {
+      this.logger.warn(`No se pudo avisar el pedido de acceso a Instagram: ${describeError(e)}`);
+    }
+  }
+
+  // ── Superadmin: pedidos de acceso ──────────────────────────────────────────
+
+  async pedidosDeAcceso() {
+    return this.prisma.instagramEarlyAccess.findMany({
+      orderBy: { requestedAt: 'desc' },
+      select: {
+        businessId: true,
+        username: true,
+        status: true,
+        requestedAt: true,
+        enabledAt: true,
+        business: { select: { name: true, subdomain: true } },
+      },
+    });
+  }
+
+  /**
+   * Habilitar es decirle al dueño que la invitación de evaluador ya está enviada: se le avisa por
+   * correo (con un botón directo a Difusión) la primera vez que pasa de pendiente a habilitado.
+   * Volver a habilitar uno que ya estaba habilitado no reenvía nada.
+   */
+  async cambiarHabilitacion(businessId: string, habilitar: boolean) {
+    const pedido = await this.prisma.instagramEarlyAccess.findUnique({
+      where: { businessId },
+      select: { id: true, status: true, username: true, contactEmail: true },
+    });
+    if (!pedido) throw new NotFoundException('Ese negocio no pidió acceso a Instagram');
+    const actualizado = await this.prisma.instagramEarlyAccess.update({
+      where: { businessId },
+      data: habilitar ? { status: 'ENABLED', enabledAt: new Date() } : { status: 'PENDING', enabledAt: null },
+      select: { businessId: true, username: true, status: true, enabledAt: true },
+    });
+    const avisado = habilitar && pedido.status !== 'ENABLED' ? await this.avisarHabilitacion(businessId, pedido) : false;
+    return { ...actualizado, avisado };
+  }
+
+  // Si el correo falla, el negocio igual queda habilitado: el superadmin se entera por `avisado: false`.
+  private async avisarHabilitacion(businessId: string, pedido: { username: string; contactEmail: string | null }): Promise<boolean> {
+    try {
+      if (!this.mail) return false;
+      const negocio = await this.prisma.business.findUnique({ where: { id: businessId }, select: { name: true, subdomain: true } });
+      if (!negocio) return false;
+      const destino =
+        pedido.contactEmail ??
+        (await this.prisma.member.findFirst({ where: { businessId, role: { name: 'owner' }, status: 'ACTIVE' }, select: { email: true } }))?.email;
+      if (!destino) return false;
+      return await this.mail.sendInstagramAccesoListo(
+        destino,
+        {
+          storeName: negocio.name,
+          username: pedido.username,
+          panelUrl: `https://${negocio.subdomain}.orbita.site/admin/ventas/difusion`,
+        },
+        { businessId },
+      );
+    } catch (e) {
+      this.logger.warn(`No se pudo avisar la habilitación de Instagram: ${describeError(e)}`);
+      return false;
     }
   }
 
@@ -148,10 +324,14 @@ export class InstagramService {
   // El callback es público (vuelve desde Instagram sin sesión), así que el
   // negocio que inició la conexión viaja en un `state` firmado con JWT_SECRET:
   // no se puede inventar. Mismo patrón que Mercado Pago.
-  private firmarState(businessId: string, memberId?: string): string {
+  private firmarState(businessId: string, memberId?: string, origen?: string, seccion?: PantallaDeRetorno, permisos?: 'kit', destino?: 'superadmin'): string {
     const payload: StatePayload = {
       businessId,
       ...(memberId ? { memberId } : {}),
+      ...(origen && this.esOrigenDePanel(origen) ? { origen } : {}),
+      ...(seccion && PANTALLAS_DE_RETORNO.includes(seccion) ? { seccion } : {}),
+      ...(permisos === 'kit' ? { permisos } : {}),
+      ...(destino === 'superadmin' ? { destino } : {}),
       nonce: randomBytes(16).toString('hex'),
       exp: Date.now() + STATE_TTL_MS,
     };
@@ -175,23 +355,78 @@ export class InstagramService {
     return payload;
   }
 
-  urlDeAutorizacion(businessId: string, memberId?: string): string {
+  /**
+   * ¿Es este origen un panel de Órbita al que se puede volver? Mismos orígenes fijos que acepta CORS
+   * (main.ts): FRONTEND_URL, orbita.site y sus subdominios, y en desarrollo localhost:3001 y
+   * orbita.local:3001. Cualquier otra cosa se descarta y se vuelve a FRONTEND_URL: el `state` no puede
+   * servir para mandar a la persona a un sitio ajeno.
+   */
+  private esOrigenDePanel(origen: string): boolean {
+    const frontend = this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
+    if (origen === frontend) return true;
+    if (/^https:\/\/([a-z0-9-]+\.)?orbita\.site$/.test(origen)) return true;
+    if (this.config.get<string>('NODE_ENV') === 'production') return false;
+    return /^http:\/\/localhost:3001$/.test(origen) || /^http:\/\/([a-z0-9-]+\.)?orbita\.local:3001$/.test(origen);
+  }
+
+  /**
+   * Dirección del panel de Mensajes del negocio para volver tras el login de Instagram. En un host de la
+   * tienda (negocio.orbita.site) las rutas del panel no llevan el subdominio; en el apex sí.
+   */
+  urlDeRetorno(subdomain: string, origen?: string, seccion: PantallaDeRetorno = 'mensajes', destino?: 'superadmin'): string {
+    // La cuenta de la empresa se conecta desde Marketing, en el super panel (que vive en el apex): se vuelve ahí.
+    if (destino === 'superadmin') return `${this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001'}/superadmin?seccion=marketing`;
+    const base = origen && this.esOrigenDePanel(origen) ? origen : (this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001');
+    const enHostDeLaTienda = new URL(base).hostname.startsWith(`${subdomain}.`);
+    const pantalla = PANTALLAS_DE_RETORNO.includes(seccion) ? seccion : 'mensajes';
+    // Publicaciones, comentarios y estadísticas son vistas de Difusión (?vista=), no secciones aparte.
+    const esVistaDeDifusion = pantalla === 'publicaciones' || pantalla === 'comentarios' || pantalla === 'estadisticas';
+    const ruta = esVistaDeDifusion ? `difusion?vista=${pantalla}` : pantalla;
+    return `${base}/admin/${enHostDeLaTienda ? '' : `${subdomain}/`}ventas/${ruta}`;
+  }
+
+  /**
+   * A dónde volver cuando el login de Instagram falló (el usuario canceló, no tiene permiso...): el panel de
+   * Mensajes del negocio del `state`, si el state se puede verificar. undefined si no (vencido, inventado).
+   */
+  async retornoDelState(state: string | undefined): Promise<string | undefined> {
+    try {
+      const { businessId, origen, seccion, destino } = this.verificarState(state);
+      const negocio = await this.prisma.business.findUnique({ where: { id: businessId }, select: { subdomain: true } });
+      return negocio ? this.urlDeRetorno(negocio.subdomain, origen, seccion, destino) : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  urlDeAutorizacion(businessId: string, memberId?: string, origen?: string, seccion?: PantallaDeRetorno, permisos?: 'kit', destino?: 'superadmin'): string {
     const params = new URLSearchParams({
       client_id: this.requerida('INSTAGRAM_APP_ID'),
       redirect_uri: this.redirectUri,
       response_type: 'code',
-      scope: SCOPES,
-      state: this.firmarState(businessId, memberId),
-      // Si el navegador ya tiene una sesión de Instagram abierta, obliga a elegir la
-      // cuenta (Meta lo recomienda sobre todo en celulares).
-      force_reauth: 'true',
+      scope: this.permisosPedidos(permisos, seccion),
+      state: this.firmarState(businessId, memberId, origen, seccion, permisos, destino),
+      // SIN force_reauth: si el navegador ya tiene una sesión de Instagram abierta, Instagram la usa y solo pide
+      // confirmar los permisos ("Continuar como @usuario"), sin volver a pedir la contraseña. Antes se forzaba el
+      // login de nuevo y mucha gente no se acordaba de la contraseña. Con la cuenta equivocada abierta, esa misma
+      // pantalla ofrece cambiar de cuenta.
     });
     return `https://www.instagram.com/oauth/authorize?${params.toString()}`;
   }
 
+  /**
+   * La conexión de la cuenta de la EMPRESA, iniciada por un administrador de la plataforma desde Marketing. La
+   * cuenta queda guardada en el negocio de la empresa (los mensajes y los webhooks son por negocio), pero quien
+   * conecta no necesita ser miembro de ese negocio ni iniciar sesión en su panel: la autorización la da el guard
+   * del super panel y al terminar se vuelve a Marketing.
+   */
+  urlDeAutorizacionEmpresa(businessId: string, permisos?: 'kit'): string {
+    return this.urlDeAutorizacion(businessId, undefined, undefined, undefined, permisos, 'superadmin');
+  }
+
   /** Vuelta del login: cambia el code por el token, lo guarda cifrado y suscribe el webhook. */
-  async manejarCallback(code: string, state: string | undefined): Promise<{ businessId: string; subdomain: string; suscripta: boolean }> {
-    const { businessId } = this.verificarState(state);
+  async manejarCallback(code: string, state: string | undefined): Promise<{ businessId: string; subdomain: string; suscripta: boolean; retorno: string }> {
+    const { businessId, origen, seccion, permisos, destino } = this.verificarState(state);
     await this.asegurarHabilitado(businessId);
 
     const negocio = await this.prisma.business.findUnique({ where: { id: businessId }, select: { subdomain: true } });
@@ -205,12 +440,17 @@ export class InstagramService {
       redirect_uri: this.redirectUri,
       code,
     });
-    const corto = await this.llamar<{ access_token?: string; data?: { access_token?: string }[] }>('https://api.instagram.com/oauth/access_token', {
+    const corto = await this.llamar<{ access_token?: string; permissions?: string | string[]; data?: { access_token?: string; permissions?: string | string[] }[] }>('https://api.instagram.com/oauth/access_token', {
       method: 'POST',
       body: form,
     });
     const tokenCorto = corto.access_token ?? corto.data?.[0]?.access_token;
     if (!tokenCorto) throw new BadGatewayException('Instagram no devolvió el token esperado');
+    // Qué permisos concedió la persona (puede destildar alguno en la pantalla de Instagram). Si la respuesta no
+    // los trae, se toman los que se pidieron.
+    const concedidos = corto.permissions ?? corto.data?.[0]?.permissions;
+    const scopes = (Array.isArray(concedidos) ? concedidos.join(',') : concedidos)
+      ?? this.permisosPedidos(permisos, seccion);
 
     // 2) token corto (1 hora) → token largo (60 días). Siempre desde el servidor:
     // lleva el App Secret.
@@ -234,17 +474,18 @@ export class InstagramService {
 
     try {
       await this.prisma.$executeRaw`
-        INSERT INTO instagram_connections (id, business_id, ig_user_id, username, access_token, token_expires_at, status, created_at, updated_at)
+        INSERT INTO instagram_connections (id, business_id, ig_user_id, username, access_token, token_expires_at, scopes, status, created_at, updated_at)
         VALUES (
           ${randomUUID()}, ${businessId}, ${igUserId}, ${perfil.username ?? null},
           encode(pgp_sym_encrypt(${largo.access_token}, ${this.tokenKey}), 'base64'),
-          ${vence}, 'ACTIVE'::"InstagramConnectionStatus", now(), now()
+          ${vence}, ${scopes}, 'ACTIVE'::"InstagramConnectionStatus", now(), now()
         )
         ON CONFLICT (business_id) DO UPDATE SET
           ig_user_id = EXCLUDED.ig_user_id,
           username = EXCLUDED.username,
           access_token = EXCLUDED.access_token,
           token_expires_at = EXCLUDED.token_expires_at,
+          scopes = EXCLUDED.scopes,
           status = 'ACTIVE'::"InstagramConnectionStatus",
           updated_at = now()`;
     } catch (e) {
@@ -266,16 +507,89 @@ export class InstagramService {
       suscripta = false;
       this.logger.warn(`No se pudo suscribir la cuenta de Instagram al webhook (negocio ${businessId}): ${describeError(e)}`);
     }
-    return { businessId, subdomain: negocio.subdomain, suscripta };
+    return { businessId, subdomain: negocio.subdomain, suscripta, retorno: this.urlDeRetorno(negocio.subdomain, origen, seccion, destino) };
   }
 
   async estado(businessId: string) {
     const c = await this.prisma.instagramConnection.findUnique({
       where: { businessId },
-      select: { status: true, username: true, tokenExpiresAt: true, createdAt: true },
+      select: { status: true, username: true, tokenExpiresAt: true, createdAt: true, scopes: true },
     });
     if (!c || c.status !== 'ACTIVE') return { connected: false as const };
-    return { connected: true as const, username: c.username, connectedAt: c.createdAt, tokenExpiresAt: c.tokenExpiresAt };
+    return {
+      connected: true as const,
+      username: c.username,
+      connectedAt: c.createdAt,
+      tokenExpiresAt: c.tokenExpiresAt,
+      // ¿Qué permisos del kit se concedieron? Sin ellos, la pantalla correspondiente pide volver a autorizar.
+      puedePublicar: this.concede(c.scopes, SCOPE_PUBLICAR),
+      puedeComentar: this.concede(c.scopes, SCOPE_COMENTAR),
+      puedeVerEstadisticas: this.concede(c.scopes, SCOPE_ESTADISTICAS),
+    };
+  }
+
+
+  /**
+   * Permisos que se piden en el login. Quien se conecta desde Difusión (el kit de difusión) autoriza de una
+   * vez los de mensajes y los de publicar: se piden desde la primera conexión, para no volver a pedirle nada
+   * cuando use Publicaciones. Quien se conecta desde el botón de Mensajes autoriza solo los de mensajes.
+   *
+   * INSTAGRAM_PEDIR_PUBLICAR=false lo apaga (Difusión pasa a pedir solo mensajes). Hay que apagarlo si la app
+   * sale a producción con los permisos de publicar sin aprobar: un permiso sin aprobar en el login hace fallar
+   * la conexión de todos los clientes reales.
+   */
+  private permisosPedidos(permisos?: 'kit', seccion?: PantallaDeRetorno): string {
+    const desdeDifusion = seccion === 'difusion' || seccion === 'publicaciones' || seccion === 'comentarios' || seccion === 'estadisticas';
+    const apagado = this.config.get<string>('INSTAGRAM_PEDIR_PUBLICAR') === 'false';
+    const conKit = permisos === 'kit' || (desdeDifusion && !apagado);
+    return conKit ? SCOPES_COMPLETOS : SCOPES_BASE;
+  }
+
+  private concede(scopes: string | null | undefined, permiso: string): boolean {
+    return (scopes ?? '').split(',').map((s) => s.trim()).includes(permiso);
+  }
+
+  /** ¿La conexión del negocio está activa y tiene este permiso? */
+  async tienePermiso(businessId: string, permiso: string): Promise<boolean> {
+    const c = await this.prisma.instagramConnection.findUnique({ where: { businessId }, select: { status: true, scopes: true } });
+    return !!c && c.status === 'ACTIVE' && this.concede(c.scopes, permiso);
+  }
+
+  /** ¿La conexión del negocio tiene el permiso de publicar contenido? */
+  puedePublicar(businessId: string): Promise<boolean> {
+    return this.tienePermiso(businessId, SCOPE_PUBLICAR);
+  }
+
+  /**
+   * Llamada a la API de Instagram con el token de la conexión del negocio, para las pantallas del kit
+   * (comentarios, estadísticas). Exige antes el permiso que corresponde. "{ig}" en la ruta se reemplaza por el
+   * id de la cuenta. El token vencido (código 190) corta la conexión para que el panel pida volver a conectar;
+   * otros errores (por ejemplo, un permiso que falta) NO la cortan.
+   */
+  async graph<T>(
+    businessId: string,
+    permiso: string,
+    ruta: string,
+    init: { metodo?: 'GET' | 'POST' | 'DELETE'; query?: Record<string, string>; cuerpo?: Record<string, unknown> } = {},
+  ): Promise<T> {
+    if (!(await this.tienePermiso(businessId, permiso))) {
+      throw new ForbiddenException(MENSAJE_SIN_PERMISO[permiso] ?? 'Falta autorizar un permiso de Instagram.');
+    }
+    const cred = await this.credenciales(businessId);
+    if (!cred) throw new BadRequestException('Instagram no está conectado');
+    const qs = new URLSearchParams(init.query ?? {}).toString();
+    const url = `https://graph.instagram.com/${this.version}/${ruta.replace('{ig}', cred.ig_user_id)}${qs ? `?${qs}` : ''}`;
+    const headers: Record<string, string> = { Authorization: `Bearer ${cred.access_token}` };
+    if (init.cuerpo) headers['Content-Type'] = 'application/json';
+    try {
+      return await this.llamar<T>(url, { method: init.metodo ?? 'GET', headers, ...(init.cuerpo ? { body: JSON.stringify(init.cuerpo) } : {}) });
+    } catch (e) {
+      if (e instanceof InstagramApiError && e.code === 190) {
+        await this.prisma.instagramConnection.update({ where: { businessId }, data: { status: 'DISCONNECTED', accessToken: '' } });
+        throw new UnprocessableEntityException('Instagram ya no acepta la conexión de esta cuenta. Volvé a conectarla desde Difusión.');
+      }
+      throw e;
+    }
   }
 
   async desconectar(businessId: string) {
@@ -356,6 +670,22 @@ export class InstagramService {
     }
   }
 
+  // Los archivos que vinieron con el mensaje. Las imágenes se guardan en el almacenamiento propio; el resto
+  // (video, audio) conserva la dirección que dio Instagram, que sirve un rato.
+  private async adjuntosDe(businessId: string, msg: IgMessage): Promise<{ tipo: string; url: string }[]> {
+    const salida: { tipo: string; url: string }[] = [];
+    for (const a of msg.attachments ?? []) {
+      const url = a.payload?.url;
+      if (!a.type || !url) continue;
+      if (a.type === 'image') {
+        salida.push({ tipo: 'image', url: (await this.medios?.guardarImagenEntrante(businessId, url)) ?? url });
+      } else if (a.type === 'video' || a.type === 'audio' || a.type === 'file') {
+        salida.push({ tipo: a.type, url });
+      }
+    }
+    return salida;
+  }
+
   private textoDe(msg: IgMessage): string | null {
     if (msg.is_deleted) return null;
     if (msg.text?.trim()) return msg.text.trim();
@@ -391,14 +721,20 @@ export class InstagramService {
     const customerId = await this.resolverCliente(conexion.businessId, idCliente);
     if (!customerId) return;
 
+    // Primera vez que esta persona escribe: es la ocasión de la bienvenida.
+    let esNueva = false;
     const conv =
       (await this.prisma.conversation.findFirst({ where: { businessId: conexion.businessId, customerId }, select: { id: true } })) ??
-      (await this.prisma.conversation.create({ data: { businessId: conexion.businessId, customerId, isUnread: !eco }, select: { id: true } }));
+      ((esNueva = true), await this.prisma.conversation.create({ data: { businessId: conexion.businessId, customerId, isUnread: !eco }, select: { id: true } }));
 
     const creado = m.timestamp ? new Date(m.timestamp > 1e12 ? m.timestamp : m.timestamp * 1000) : new Date();
+    const adjuntos = await this.adjuntosDe(conexion.businessId, msg);
     await this.prisma.$transaction([
       this.prisma.message.create({
-        data: { conversationId: conv.id, sender: eco ? 'STORE' : 'CUSTOMER', text: texto, channel: 'INSTAGRAM', externalId: msg.mid, createdAt: creado },
+        data: {
+          conversationId: conv.id, sender: eco ? 'STORE' : 'CUSTOMER', text: texto, channel: 'INSTAGRAM', externalId: msg.mid, createdAt: creado,
+          ...(adjuntos.length > 0 ? { attachments: adjuntos } : {}),
+        },
       }),
       this.prisma.conversation.update({
         where: { id: conv.id },
@@ -406,6 +742,23 @@ export class InstagramService {
         data: eco ? { updatedAt: new Date() } : { isUnread: true, isArchived: false, updatedAt: new Date() },
       }),
     ]);
+    if (!eco) await this.responderSolo(conexion.businessId, conv.id, idCliente, esNueva, creado);
+  }
+
+  // Bienvenida y ausencia: si corresponde, contesta solo. Nunca tira: un mensaje automático que falla no puede
+  // perder el mensaje del cliente (que ya quedó guardado) ni hacer que Meta reintente el lote.
+  private async responderSolo(businessId: string, conversationId: string, igsid: string, esNueva: boolean, enviadoEn: Date): Promise<void> {
+    if (!this.ajustes) return;
+    try {
+      const texto = await this.ajustes.respuestaAutomatica(businessId, conversationId, { esNueva, enviadoEn });
+      if (!texto) return;
+      const externalId = await this.enviarTexto(businessId, conversationId, igsid, texto);
+      await this.prisma.message.create({
+        data: { conversationId, sender: 'STORE', text: texto, channel: 'INSTAGRAM', externalId, deliveryStatus: 'sent' },
+      });
+    } catch (e) {
+      this.logger.warn(`No se pudo mandar la respuesta automática de Instagram (negocio ${businessId}): ${describeError(e)}`);
+    }
   }
 
   private async conexionActiva(ids: (string | undefined)[]): Promise<{ businessId: string } | null> {
@@ -419,7 +772,7 @@ export class InstagramService {
 
   // Un cliente de Instagram es un Customer del negocio identificado por su IGSID.
   // A diferencia de WhatsApp no hay teléfono con el cual vincularlo a un cliente
-  // existente: se crea uno nuevo (el dueño lo ve igual en la bandeja).
+  // existente: se crea uno nuevo (el dueño lo ve igual en la bandeja). Ese Customer es solo el dueño técnico de la\r\n  // charla: va marcado isChatContact y no aparece en Clientes mientras no compre (ver soloClientesReales).
   private async resolverCliente(businessId: string, igsid: string): Promise<string | null> {
     const existente = await this.prisma.customer.findUnique({
       where: { businessId_instagramId: { businessId, instagramId: igsid } },
@@ -434,7 +787,7 @@ export class InstagramService {
     }
     const nombre = await this.nombreDelPerfil(businessId, igsid);
     const creado = await this.prisma.customer.create({
-      data: { businessId, firstName: nombre ?? `Instagram ${igsid.slice(-4)}`, instagramId: igsid },
+      data: { businessId, firstName: nombre ?? `Instagram ${igsid.slice(-4)}`, instagramId: igsid, isChatContact: true },
       select: { id: true },
     });
     return creado.id;
@@ -473,6 +826,15 @@ export class InstagramService {
     if (Buffer.byteLength(texto, 'utf8') > MAX_BYTES_TEXTO) {
       throw new BadRequestException('El mensaje es demasiado largo para Instagram (máximo 1000 caracteres).');
     }
+    return this.enviarCarga(businessId, conversationId, igsid, { text: texto });
+  }
+
+  /** Manda una imagen (de una dirección pública) por mensaje directo; mismas reglas de plazo que el texto. */
+  async enviarImagen(businessId: string, conversationId: string, igsid: string, url: string): Promise<string> {
+    return this.enviarCarga(businessId, conversationId, igsid, { attachment: { type: 'image', payload: { url } } });
+  }
+
+  private async enviarCarga(businessId: string, conversationId: string, igsid: string, mensaje: Record<string, unknown>): Promise<string> {
     const ultimo = await this.prisma.message.findFirst({
       where: { conversationId, channel: 'INSTAGRAM', sender: 'CUSTOMER' },
       orderBy: { createdAt: 'desc' },
@@ -490,7 +852,7 @@ export class InstagramService {
       const res = await this.llamar<{ message_id?: string }>(`https://graph.instagram.com/${this.version}/${cred.ig_user_id}/messages`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${cred.access_token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipient: { id: igsid }, message: { text: texto } }),
+        body: JSON.stringify({ recipient: { id: igsid }, message: mensaje }),
       });
       if (!res.message_id) throw new BadGatewayException('Instagram no confirmó el envío');
       return res.message_id;
@@ -500,7 +862,7 @@ export class InstagramService {
       // que el panel pida volver a conectar.
       if (e instanceof InstagramApiError && (e.code === 190 || e.tipo === 'OAuthException')) {
         await this.prisma.instagramConnection.update({ where: { businessId }, data: { status: 'DISCONNECTED', accessToken: '' } });
-        throw new UnprocessableEntityException('Instagram ya no acepta la conexión de esta cuenta. Volvé a conectarla desde Mensajes.');
+        throw new UnprocessableEntityException('Instagram ya no acepta la conexión de esta cuenta. Volvé a conectarla desde Difusión.');
       }
       throw e;
     }

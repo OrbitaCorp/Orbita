@@ -21,7 +21,7 @@ import type { PropsSeccion } from '../utils'
     (mismo reporte): no tenía ningún efecto real, y no valía la
     pena construírselo — ver el comentario en apariencia.mapper.ts. */
 export function SeccionLayout({ ap, set, actualizar, enlaces, categorias }: PropsSeccion & {
-    actualizar: (fn: (p: Ap) => Ap) => void
+    actualizar: (fn: (p: Ap) => Ap, campo?: keyof Ap) => void
     enlaces: EnlacesHeader
     categorias: ApiCategory[]
 }) {
@@ -35,6 +35,9 @@ export function SeccionLayout({ ap, set, actualizar, enlaces, categorias }: Prop
 
     return (
         <SecCard id="ap-sec-layout" title="Diseño y layout" icon={LayoutGrid} ayuda={AYUDA_SECCIONES.layout}>
+            {/* Tres zonas, cada una con su parte de la tienda: al entrar a una, la
+                vista previa va ahí (ver focoPreview.ts). */}
+            <div data-ap-foco="header">
             <FieldLabel>Estilo de header</FieldLabel>
             <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 10, marginTop: -4 }}>Define qué elementos y navegación muestra el encabezado de tu tienda.</div>
             <div style={{ marginBottom: 18 }}>
@@ -77,10 +80,10 @@ export function SeccionLayout({ ap, set, actualizar, enlaces, categorias }: Prop
                     },
                 ]} />
             </div>
-            <FieldLabel help="Elegí qué enlaces de navegación se muestran en el header: los de siempre y las categorías de tu tienda. La cantidad máxima depende del estilo de header que elijas. En el estilo Minimal no se muestra navegación.">Elementos del header</FieldLabel>
+            <FieldLabel help="Elegí qué enlaces de navegación se muestran en el header: los de siempre y las categorías de tu tienda. La cantidad máxima depende del estilo de header que elijas. En el estilo Minimal no se muestra navegación. En el celular, el menú de la hamburguesa siempre empieza con 'Inicio'.">Elementos del header</FieldLabel>
             {ap.layoutHeader === 'minimal' ? (
                 <div style={{ marginBottom: 18, fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.5, border: '1px solid var(--color-border)', borderRadius: 8, padding: '12px 14px' }}>
-                    El estilo <strong style={{ color: 'var(--color-text)' }}>Minimal</strong> no muestra navegación en el header. Elegí Completo, Estándar o Centrado para armar los enlaces.
+                    El estilo <strong style={{ color: 'var(--color-text)' }}>Minimal</strong> no muestra enlaces en el header. En el celular, el menú de la hamburguesa igual trae "Inicio" para volver a la portada. Elegí Completo, Estándar o Centrado para armar los enlaces.
                 </div>
             ) : (
                 <div style={{ marginBottom: 18 }}>
@@ -90,6 +93,9 @@ export function SeccionLayout({ ap, set, actualizar, enlaces, categorias }: Prop
                             : enLimite
                                 ? `${linksActivos} de ${limiteNav}: llegaste al máximo para este estilo de header. Apagá uno para sumar otro.`
                                 : `${linksActivos} de ${limiteNav} posibles con este estilo de header.`}
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 8, lineHeight: 1.45 }}>
+                        En el celular, el menú de la hamburguesa siempre empieza con "Inicio", sin que tengas que prenderlo.
                     </div>
                     <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, padding: '2px 12px' }}>
                         {itemsHeader.filter(x => !x.esCategoria).map((it, i, fijos) => (
@@ -124,6 +130,8 @@ export function SeccionLayout({ ap, set, actualizar, enlaces, categorias }: Prop
                     </div>
                 </div>
             )}
+            </div>
+            <div data-ap-foco="estantes">
             <FieldLabel>Grilla de productos</FieldLabel>
             <div style={{ marginBottom: 18 }}>
                 <VisualPick
@@ -136,7 +144,7 @@ export function SeccionLayout({ ap, set, actualizar, enlaces, categorias }: Prop
                             ...p,
                             layoutGrid: nuevoLayout,
                             maxNuevosIngresos: compatible ? p.maxNuevosIngresos : opts[0].valor,
-                        }))
+                        }), 'layoutGrid')
                     }}
                     options={[
                         { id: '3col', label: '3 columnas', svg: hline(<g>{[8, 26, 44].map(x => <rect key={x} x={x} y="10" width="14" height="14" rx="2" fill="var(--color-border)" />)}</g>) },
@@ -146,6 +154,8 @@ export function SeccionLayout({ ap, set, actualizar, enlaces, categorias }: Prop
                 />
             </div>
 
+            </div>
+            <div data-ap-foco="categorias">
             {/* Estilo de la sección "Comprá por categoría" del home
                 (ver SeccionCategorias en Inicio.tsx). Mosaico y
                 Tarjetas se ofrecen deshabilitados mientras ninguna
@@ -189,6 +199,7 @@ export function SeccionLayout({ ap, set, actualizar, enlaces, categorias }: Prop
                     onChange={ids => set('categoriasIds', ids)}
                 />
             )}
+            </div>
         </SecCard>
     )
 }

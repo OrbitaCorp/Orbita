@@ -1,17 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Modal } from '@/design-system/components/Modal'
 import { Button } from '@/design-system/components/Button'
-import { ApiError, connectWhatsapp, disconnectWhatsapp, getWhatsappConnection, type WhatsappEstado } from '@/lib/api'
+import { ApiError, connectWhatsapp, disconnectWhatsapp, type WhatsappEstado } from '@/lib/api'
 
-// Conexión de WhatsApp Business del negocio, desde el encabezado de la bandeja.
+// Ventana para conectar (o administrar y desconectar) la cuenta de WhatsApp Business del negocio. Se abre desde
+// Mensajes → WhatsApp.
 //
 // Por ahora es MANUAL: se pegan los datos de la app de Meta (WhatsApp → API
 // Setup). El botón "Conectar con Facebook" (Embedded Signup) va a reemplazar
 // este formulario cuando Órbita tenga la verificación de Tech Provider.
 //
 // Conectar/desconectar es solo de propietario/admin, y en producción solo de los
-// negocios habilitados: si el backend responde 403 al consultar el estado, el
-// botón directamente no se muestra.
+// negocios habilitados: si el backend responde 403 al consultar el estado, Mensajes → WhatsApp avisa que todavía no
+// está disponible y no ofrece conectar.
 
 const inputStyle: React.CSSProperties = {
   width: '100%', boxSizing: 'border-box', height: 38, padding: '0 12px',
@@ -30,43 +31,7 @@ function Campo({ label, ayuda, children }: { label: string; ayuda?: string; chil
   )
 }
 
-export function WhatsappBoton() {
-  const [estado, setEstado] = useState<WhatsappEstado | null>(null)
-  const [visible, setVisible] = useState(true)
-  const [abierto, setAbierto] = useState(false)
-
-  // 403: el negocio no está habilitado. 404: la API todavía no tiene el endpoint
-  // (el front sale unos minutos antes que la API). En ambos casos no se muestra.
-  const cargar = () => getWhatsappConnection().then(setEstado).catch((e) => {
-    if (e instanceof ApiError && (e.status === 403 || e.status === 404)) setVisible(false)
-  })
-  useEffect(() => { cargar() }, [])
-
-  if (!visible) return null
-  const conectado = estado?.connected === true
-
-  return (
-    <>
-      <button
-        type="button"
-        className="ds-hover"
-        onClick={() => setAbierto(true)}
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6, height: 24, padding: '0 8px',
-          border: 'none', borderRadius: 6, background: 'transparent', cursor: 'pointer',
-          fontSize: 11.5, fontWeight: 500, color: 'var(--color-muted)', fontFamily: 'inherit',
-        }}
-      >
-        {/* El punto verde es el dato: solo aparece si está conectado. */}
-        {conectado && <span aria-hidden style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-success)' }} />}
-        {conectado ? 'WhatsApp conectado' : 'Conectar WhatsApp'}
-      </button>
-      {abierto && <ModalConexion estado={estado} onCerrar={() => setAbierto(false)} onCambio={cargar} />}
-    </>
-  )
-}
-
-function ModalConexion({ estado, onCerrar, onCambio }: { estado: WhatsappEstado | null; onCerrar: () => void; onCambio: () => void }) {
+export function WhatsappModal({ estado, onCerrar, onCambio }: { estado: WhatsappEstado | null; onCerrar: () => void; onCambio: () => void }) {
   const [phoneNumberId, setPhoneNumberId] = useState('')
   const [wabaId, setWabaId] = useState('')
   const [accessToken, setAccessToken] = useState('')
@@ -112,7 +77,7 @@ function ModalConexion({ estado, onCerrar, onCambio }: { estado: WhatsappEstado 
             Conectado al número <strong>{estado.displayPhone ?? estado.phoneNumberId}</strong>.
           </p>
           <p style={{ margin: '0 0 16px', fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.5 }}>
-            Los mensajes que te lleguen por WhatsApp aparecen en esta bandeja, y tus respuestas salen por el mismo canal.
+            Los mensajes que te lleguen por WhatsApp aparecen en Mensajes → WhatsApp, y tus respuestas salen por el mismo canal.
             WhatsApp solo permite responder dentro de las 24 horas del último mensaje del cliente.
           </p>
           {error && <p style={{ margin: '0 0 12px', fontSize: 12.5, color: 'var(--color-error)' }}>{error}</p>}
@@ -121,7 +86,7 @@ function ModalConexion({ estado, onCerrar, onCambio }: { estado: WhatsappEstado 
       ) : (
         <div>
           <p style={{ margin: '0 0 14px', fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.5 }}>
-            Pegá los datos de tu app de Meta (WhatsApp → API Setup). Los mensajes de tus clientes van a llegar a esta bandeja.
+            Pegá los datos de tu app de Meta (WhatsApp → API Setup). Los mensajes de tus clientes van a llegar a Mensajes → WhatsApp.
           </p>
           <Campo label="ID del número de teléfono">
             <input style={inputStyle} inputMode="numeric" value={phoneNumberId} onChange={(e) => setPhoneNumberId(e.target.value)} />

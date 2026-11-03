@@ -159,6 +159,35 @@ describe('Subdominio: una sola regla para todos los caminos', () => {
     for (const r of SUBDOMINIOS_RESERVADOS) expect(motivoSubdominioInvalido(r)).toMatch(/reservado|caracteres/);
   });
 
+  it.each([
+    'api', 'www', 'admin', 'panel', 'soporte', 'pagos', 'login', 'mercadopago', 'afip', 'webmail', 'noreply',
+  ])('reserva %s', (s) => {
+    expect(motivoSubdominioInvalido(s)).toMatch(/reservado/);
+  });
+
+  // El mismo nombre disfrazado: números al final, números por letras, guiones.
+  it.each([
+    'api2', 'admin1', 'soporte2', 's0porte', '4dmin', 'ap1', 'pane1', 'log-in', 'pa-gos', 'no-reply', '0rbita', 'orbita2',
+  ])('reserva la variante disfrazada %s', (s) => {
+    expect(motivoSubdominioInvalido(s)).toMatch(/reservado/);
+  });
+
+  // "orbita" + una palabra de confianza, y las marcas de pagos/gobierno dentro del nombre.
+  it.each([
+    'orbita-soporte', 'soporteorbita', 'orbitaoficial', 'orbita-pagos', 'mi-orbita-login',
+    'mercadopago-ayuda', 'ayuda-mercadolibre', 'afip-turnos', 'paypal-ar',
+  ])('reserva el nombre que se hace pasar por Órbita o un cobro: %s', (s) => {
+    expect(motivoSubdominioInvalido(s)).toMatch(/reservado/);
+  });
+
+  // Lo que NO tiene que bloquear: tiendas de verdad con palabras parecidas.
+  it.each([
+    'zapatos-lorena', 'orbitagym', 'orbita-fitness', 'apiarios-del-sur', 'la-naranja', 'tienda1', 'demo2', 'mp3', 'app2go',
+    'soporte-tienda', 'api-tienda', 'ropa-test', 'casa-admin-hogar', 'patagonia-pagos-chicos',
+  ])('deja pasar %s', (s) => {
+    expect(motivoSubdominioInvalido(s)).toBeNull();
+  });
+
   it('PUT /onboarding/business valida con la misma regla', async () => {
     const mal = await validate(plainToInstance(UpdateOnboardingBusinessDto, { subdomain: 'soporte' }));
     const bien = await validate(plainToInstance(UpdateOnboardingBusinessDto, { subdomain: 'zapatoslorena' }));
@@ -199,6 +228,9 @@ describe('Subdominio: una sola regla para todos los caminos', () => {
     ['Soporte', 'soporte-tienda'],
     ['AB', 'ab-tienda'],
     ['Zapatos Lorena', 'zapatos-lorena'],
+    // Reservado aun con el sufijo: cae a un nombre neutro, nunca queda creado uno que se haga pasar por Órbita.
+    ['Orbita Soporte', 'negocio'],
+    ['API', 'api-tienda'],
   ])('el subdominio auto-generado para %j es %j', async (nombre, esperado) => {
     const { svc } = onboarding();
     await expect((svc as any).generateUniqueSubdomain(nombre)).resolves.toBe(esperado);

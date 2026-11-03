@@ -21,6 +21,7 @@ const QUE_ES: Record<SeccionDelPanel, string> = {
   descuentos: 'descuentos',
   cupones: 'cupones',
   mensajes: 'mensajes de clientes',
+  difusion: 'difusión en redes (Instagram)',
   perfil: 'perfil de la persona',
   avanzado: 'opciones avanzadas',
   manual: 'manual de uso',

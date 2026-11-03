@@ -34,7 +34,7 @@ export function StorefrontFooter({ tienda, slug, logoUrl, contact, showSocial = 
 
   const base = `/tienda/${slug}`
   return (
-    <footer style={{
+    <footer data-ap-sec="footer" style={{
       borderTop: '1px solid var(--color-border)',
       background: 'var(--color-surface)',
       padding: '48px 32px 24px',

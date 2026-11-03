@@ -7,13 +7,25 @@ import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 // (SuperAdminDashboard) y la página de detalle de negocio (BusinessDetailPage)
 // — extraídas de lo que antes vivía todo en pages/superadmin/index.tsx.
 
-export const ROLE_LABELS: Record<string, string> = { SUPERADMIN: 'Super administrador', OPERATOR: 'Operador' }
+export const ROLE_LABELS: Record<string, string> = { SUPERADMIN: 'Super administrador', OPERATOR: 'Operador', MARKETING: 'Marketing' }
 // Mismos strings que escribe PlatformService en platformAdminLog.create (ver platform.service.ts).
 export const ACTION_LABELS: Record<string, string> = {
   suspend_business: 'Suspender negocio',
   reactivate_business: 'Reactivar negocio',
   hide_business_from_search: 'Ocultar de Google y del directorio',
   show_business_in_search: 'Volver a mostrar en Google y el directorio',
+  tiktok_connect: 'Conectar la cuenta de TikTok de Órbita',
+  tiktok_publish: 'Publicar un video en TikTok',
+  tiktok_draft: 'Enviar un video a los borradores de TikTok',
+  tiktok_disconnect: 'Desconectar la cuenta de TikTok de Órbita',
+  instagram_connect: 'Conectar la cuenta de Instagram de Órbita',
+  instagram_publish: 'Publicar en Instagram',
+  instagram_schedule: 'Programar una publicación de Instagram',
+  instagram_discard: 'Descartar una publicación de Instagram',
+  instagram_comment_reply: 'Responder un comentario de Instagram',
+  instagram_comment_hide: 'Ocultar un comentario de Instagram',
+  instagram_comment_show: 'Volver a mostrar un comentario de Instagram',
+  instagram_disconnect: 'Desconectar la cuenta de Instagram de Órbita',
   grant_comp: 'Ceder cortesía',
   create_price_campaign: 'Crear campaña de precio',
   update_price_campaign: 'Editar campaña de precio',
@@ -21,6 +33,9 @@ export const ACTION_LABELS: Record<string, string> = {
   create_admin: 'Crear admin',
   update_admin: 'Editar admin',
   deactivate_admin: 'Desactivar admin',
+  reactivate_admin: 'Reactivar admin',
+  reset_admin_password: 'Restablecer la contraseña de un admin',
+  change_own_password: 'Cambiar su propia contraseña',
   audit_item_update: 'Actualizar ítem de auditoría',
   audit_item_create: 'Crear ítem de auditoría',
   audit_item_delete: 'Borrar ítem de auditoría',

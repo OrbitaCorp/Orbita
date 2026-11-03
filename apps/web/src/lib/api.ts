@@ -280,6 +280,7 @@ export type UpdateBusinessConfigInput = Partial<{
   transferAlias: string
   transferCbu: string
   transferHolder: string
+  transferBank: string
   pickupPaymentMethods: string[]
   // % de descuento por pagar en efectivo (ej: 10 = 10%) — ya existía en el
   // backend/DTO/checkout, faltaba exponerlo acá para poder configurarlo.
@@ -334,7 +335,7 @@ export function getBusinessConfig() {
     cuit: string | null; legalName: string | null
     acceptsMercadopago: boolean; acceptsCash: boolean; acceptsTransfer: boolean
     acceptsCard: boolean; acceptsPickup: boolean; acceptsCoordinateLater: boolean; transferAlias: string | null
-    transferCbu: string | null; transferHolder: string | null
+    transferCbu: string | null; transferHolder: string | null; transferBank: string | null
     pickupPaymentMethods: string[]
     // Ojo: los montos de plata llegan del backend como texto, no como número.
     freeShippingFrom: string | number | null
@@ -534,7 +535,7 @@ export function panelGetBusinessConfig() {
     cuit: string | null; legalName: string | null
     acceptsMercadopago: boolean; acceptsCash: boolean; acceptsTransfer: boolean
     acceptsCard: boolean; acceptsPickup: boolean; acceptsCoordinateLater: boolean; transferAlias: string | null
-    transferCbu: string | null; transferHolder: string | null
+    transferCbu: string | null; transferHolder: string | null; transferBank: string | null
     pickupPaymentMethods: string[]
     cashDiscountPercent: string | number | null
     // RBT-692 — mismo criterio, generalizado a Mercado Pago y "Transferencia".
@@ -1658,6 +1659,10 @@ export function rejectCancellation(id: string, rejectionMessage?: string) {
   })
 }
 
+/** "Eliminar" un pedido del listado: lo oculta, no lo borra de la base (ver OrdersController.eliminar). */
+export function deleteOrder(id: string) {
+  return panelRequest<{ ok: boolean }>(`/orders/${id}`, { method: 'DELETE' })
+}
 export function updateOrderStatus(id: string, status: ApiOrderStatus) {
   return panelRequest<ApiOrderDetail>(`/orders/${id}/status`, {
     method: 'PATCH',
@@ -1754,7 +1759,7 @@ export type ApiProductListItem = {
   status: string
 }
 
-export function panelGetProducts(params: { search?: string; page?: number; limit?: number } = {}) {
+export function panelGetProducts(params: { search?: string; categoryId?: string; status?: ProductStatusFilter; page?: number; limit?: number } = {}) {
   const qs = new URLSearchParams()
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined && v !== null && v !== '') qs.set(k, String(v))
@@ -1872,6 +1877,10 @@ export type ApiProductRow = {
   status: ProductStatus
   isFeatured: boolean
   totalStock: number
+  /** false = ninguna variante tiene el stock cargado (vidriera o "por pedido"): el panel muestra "—" y no lo cuenta como "sin stock". */
+  showStock?: boolean
+  /** "Se hace por pedido": sin stock, se muestra en la tienda y solo se consulta por WhatsApp. */
+  byOrder?: boolean
   variantCount: number
   primaryImageUrl: string | null
   // Todas las fotos del producto, la que se ve por default primero — para el
@@ -1949,6 +1958,8 @@ export type ApiProductFull = {
   // "Fondo con IA" premium: flat (plano) usa Gemini, volume (con volumen)
   // usa Workers AI — ver ImageStudioService.generatePremiumBackground().
   photoType: 'flat' | 'volume'
+  /** "Se hace por pedido": sin stock, se muestra en la tienda y solo se consulta por WhatsApp. */
+  byOrder?: boolean
   // Ficha técnica opcional ("RAM" -> "16GB") — [] = el producto no tiene,
   // el detalle del storefront no muestra la tabla de "Características".
   specs: { label: string; value: string }[]
@@ -1966,6 +1977,8 @@ export type ApiProductFull = {
     comparePrice: number | null
     isDefault: boolean
     isActive: boolean
+    /** false = el negocio (vidriera) dejó el stock en blanco: no se muestra en la tienda. */
+    showStock?: boolean
     optionValues: { optionValueId: string; value: string }[]
     stock: { branchId: string; quantity: number; stockMin: number }[]
   }[]
@@ -1987,6 +2000,8 @@ export type UpsertProductInput = {
   cost?: number
   status?: ProductStatus
   photoType?: 'flat' | 'volume'
+  // "Se hace por pedido" (sin stock, solo consulta por WhatsApp). Omitido en una edición = no cambia.
+  byOrder?: boolean
   tagIds?: string[]
   specs?: { label: string; value: string }[]
   videoUrl?: string
@@ -2003,6 +2018,8 @@ export type UpsertProductInput = {
     stockMin?: number
     // false = esta combinación no se ofrece (se conserva igual, no se borra).
     isActive?: boolean
+    // Solo en una vidriera: false = el stock quedó en blanco y la tienda no lo muestra (sin initialStock).
+    showStock?: boolean
   }[]
 }
 
@@ -2428,6 +2445,11 @@ export type ApiDashboardReport = {
   hasta: string
   kpis: {
     ventas: number
+    // Ganancia del período: ingresos de productos con costo cargado − su costo − devoluciones
+    // aprobadas (puede ser negativa). `gananciaCoberturaPct` es qué parte de los ingresos de
+    // productos tiene costo cargado (0–100); null si no hubo ventas de productos.
+    ganancias?: number
+    gananciaCoberturaPct?: number | null
     pedidos: number
     ticketPromedio: number
     clientesNuevos: number
@@ -2439,7 +2461,7 @@ export type ApiDashboardReport = {
     visitasDominio?: number
     visitasTotalSubdominio?: number
     visitasTotalDominio?: number
-    deltas: { ventas: number; pedidos: number; ticketPromedio: number; clientesNuevos: number; comisionMp: number; visitas?: number }
+    deltas: { ventas: number; ganancias?: number; pedidos: number; ticketPromedio: number; clientesNuevos: number; comisionMp: number; visitas?: number }
   }
   alertas: {
     stockCritico: number
@@ -3294,7 +3316,9 @@ export function meRevokeAllSessions() { return bffRequest<{ ok: boolean }>('/api
 // usan el cliente (storefront) y el panel (dueño/staff).
 // `channel`/`deliveryStatus` son de WhatsApp: los mensajes del chat de la tienda vienen como STOREFRONT y sin estado.
 export type ChatChannel = 'STOREFRONT' | 'WHATSAPP' | 'INSTAGRAM'
-export type ChatMessage = { id: string; sender: 'CUSTOMER' | 'STORE'; text: string; orderId: string | null; channel?: ChatChannel; deliveryStatus?: string | null; createdAt: string }
+// `attachments`: las fotos del mensaje (solo WhatsApp). El resto de los archivos llega como etiqueta en el texto.
+export type ChatAttachment = { tipo: 'image'; url: string }
+export type ChatMessage = { id: string; sender: 'CUSTOMER' | 'STORE'; text: string; orderId: string | null; channel?: ChatChannel; deliveryStatus?: string | null; attachments?: ChatAttachment[] | null; viaOrbi?: boolean; createdAt: string }
 
 // Storefront (cliente logueado)
 export type MeConversation = { id: string | null; messages: ChatMessage[] }
@@ -3307,11 +3331,63 @@ export function meSendConversationMessage(text: string) {
 export type ConversationRow = {
   id: string; customerId: string; customerName: string; customerEmail: string | null; customerAvatar: string | null
   isUnread: boolean; isArchived: boolean; lastChannel?: ChatChannel; lastMessage: ChatMessage | null; updatedAt: string
+  // Lo último de cada bandeja y su propio "sin leer". Ausente en respuestas viejas o de la demo.
+  canales?: Partial<Record<CanalDeBandeja, { lastMessage: ChatMessage; isUnread: boolean }>>
+  // Orbi en este chat de WhatsApp: su estado y, si está pausado o derivado, por qué.
+  bot?: { estado: BotChatEstado; motivo: string | null }
 }
 export function listConversations() { return panelRequest<ConversationRow[]>('/conversations') }
-export function getConversationMessages(id: string) { return panelRequest<ChatMessage[]>(`/conversations/${id}/messages`) }
-export function sendConversationMessage(id: string, input: { text: string; orderId?: string }) {
+// `canal`: la bandeja desde la que se mira o se contesta (Mensajes locales = STOREFRONT, o WhatsApp). Las dos no se
+// mezclan: cada una ve solo los mensajes de su canal.
+export type CanalDeBandeja = 'STOREFRONT' | 'WHATSAPP'
+export function getConversationMessages(id: string, canal?: CanalDeBandeja) {
+  return panelRequest<ChatMessage[]>(`/conversations/${id}/messages${canal ? `?canal=${canal}` : ''}`)
+}
+export function sendConversationMessage(id: string, input: { text: string; orderId?: string; canal?: CanalDeBandeja }) {
   return panelRequest<ChatMessage>(`/conversations/${id}/messages`, { method: 'POST', body: JSON.stringify(input) })
+}
+// Manda una foto por WhatsApp (JPG, PNG o WebP, hasta 10 MB). `texto` es el pie de foto.
+export async function sendConversationImage(id: string, input: { foto: File; texto?: string }) {
+  const form = new FormData()
+  form.append('file', input.foto, input.foto.name)
+  if (input.texto?.trim()) form.append('texto', input.texto.trim())
+  const res = await authedFetch(`${API_BASE}/conversations/${id}/messages/image`, { method: 'POST', body: form })
+  const body = await res.json().catch(() => null)
+  if (!res.ok) {
+    const message = mensajeDeError(res.status, body)
+    throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
+  }
+  return body as ChatMessage
+}
+// ── Orbi como atención al público por WhatsApp (paquete Avanzado) ─────────────
+// DEFAULT sigue el modo general; ON/OFF lo decide el dueño para ese chat; PAUSADO = entró una persona y Orbi se calló;
+// DERIVADO = Orbi pidió que lo atienda una persona. PAUSADO y DERIVADO solo los levanta el dueño.
+export type BotModo = 'SELECCIONADOS' | 'TODOS'
+export type BotChatEstado = 'DEFAULT' | 'ON' | 'OFF' | 'PAUSADO' | 'DERIVADO'
+// Cómo atiende Orbi (lo elige el dueño): todo con IA, un menú de opciones y después IA, o solo menú (sin IA).
+export type BotModalidad = 'CONVERSACIONAL' | 'MENU_Y_CONVERSACION' | 'SOLO_MENU'
+export type MenuEstilo = 'LISTA' | 'BOTONES'
+/** Una opción del menú. Las de fábrica: catalogo, pedidos, promos, envios, horarios, persona. Las del dueño: custom-N (con su `respuesta`). */
+export type OpcionDeMenu = { id: string; titulo: string; descripcion?: string; activa: boolean; respuesta?: string }
+export type WhatsappBotEstado = {
+  disponible: boolean; conectado: boolean; enabled: boolean; modo: BotModo
+  instrucciones: string | null; topeCreditos: number | null
+  modalidad: BotModalidad; menuEstilo: MenuEstilo; bienvenida: string | null; bienvenidaPorDefecto: string; menuOpciones: OpcionDeMenu[]
+  // Orbi toma pedidos (quedan pendientes, "coordinar por WhatsApp"), sus topes por pedido y si la tienda puede (o qué le falta).
+  tomaPedidos: boolean; maxUnidades: number; maxMonto: number; pedidos: { disponible: boolean; motivo?: string }
+  cupo: { mes: string; usados: number; total: number; limite: number; porcentaje: number }
+}
+export function getWhatsappBot() { return panelRequest<WhatsappBotEstado>('/whatsapp/bot') }
+export function updateWhatsappBot(input: {
+  enabled?: boolean; modo?: BotModo; instrucciones?: string | null; topeCreditos?: number | null
+  modalidad?: BotModalidad; menuEstilo?: MenuEstilo; bienvenida?: string | null; menuOpciones?: OpcionDeMenu[]
+  tomaPedidos?: boolean; maxUnidades?: number; maxMonto?: number
+}) {
+  return panelRequest<WhatsappBotEstado>('/whatsapp/bot', { method: 'PATCH', body: JSON.stringify(input) })
+}
+/** Enciende (ON, también reactiva un chat pausado o derivado) o apaga (OFF) a Orbi en un chat de WhatsApp. */
+export function setConversationBot(id: string, estado: 'ON' | 'OFF') {
+  return panelRequest<{ botEstado: BotChatEstado }>(`/conversations/${id}/bot`, { method: 'PATCH', body: JSON.stringify({ estado }) })
 }
 export function updateConversation(id: string, input: { isUnread?: boolean; isArchived?: boolean }) {
   return panelRequest<{ ok: boolean }>(`/conversations/${id}`, { method: 'PATCH', body: JSON.stringify(input) })
@@ -3328,14 +3404,269 @@ export function getWhatsappConnection() { return panelRequest<WhatsappEstado>('/
 export function connectWhatsapp(input: { phoneNumberId: string; wabaId: string; accessToken: string }) {
   return panelRequest<{ connected: true; displayPhone: string | null; suscripta: boolean }>('/whatsapp/connection', { method: 'POST', body: JSON.stringify(input) })
 }
+// Conexión por Embedded Signup (el botón de Meta): el código y los ids que dio Meta al terminar el proceso.
+export function connectWhatsappIntegrado(input: { code: string; phoneNumberId?: string; wabaId: string; businessId?: string }) {
+  return panelRequest<{ connected: true; displayPhone: string | null; suscripta: boolean; coexistencia: boolean }>('/whatsapp/embedded-signup', { method: 'POST', body: JSON.stringify(input) })
+}
 export function disconnectWhatsapp() { return panelRequest<{ connected: false }>('/whatsapp/connection', { method: 'DELETE' }) }
 
 // Instagram — conexión del negocio (solo propietario/admin). Conectar devuelve la
 // dirección del login de Instagram: el panel redirige al dueño ahí y Instagram lo
 // devuelve a la API, que lo manda de vuelta a Mensajes con ?ig=conectado.
-export type InstagramEstado = { connected: false } | { connected: true; username: string | null; connectedAt: string; tokenExpiresAt: string }
+//
+// Mientras la app de Meta no tenga acceso avanzado, solo conectan las cuentas que el
+// equipo sumó como evaluadoras: `habilitado: false` es un negocio que todavía no
+// pidió (solicitud null) o que pidió y espera (solicitud con su @usuario). La API
+// anterior no mandaba `habilitado`, por eso es opcional en los casos habilitados.
+export type InstagramEstado =
+  | { habilitado: false; connected: false; solicitud: { username: string; requestedAt: string } | null }
+  | { habilitado?: true; connected: false }
+  | { habilitado?: true; connected: true; username: string | null; connectedAt: string; tokenExpiresAt: string; puedePublicar?: boolean; puedeComentar?: boolean; puedeVerEstadisticas?: boolean }
 export function getInstagramConnection() { return panelRequest<InstagramEstado>('/instagram/connection') }
-export function startInstagramConnect() { return panelRequest<{ url: string }>('/instagram/connect', { method: 'POST' }) }
+export function requestInstagramAccess(username: string) {
+  return panelRequest<{ username: string; requestedAt: string }>('/instagram/access-request', { method: 'POST', body: JSON.stringify({ username }) })
+}
+// `seccion`: la pantalla del panel a la que se vuelve al terminar el login de Instagram (por defecto Mensajes).
+// `permisos: 'kit'`: además de los mensajes, pide los permisos del kit de difusión (publicar, comentarios y estadísticas).
+export function startInstagramConnect(seccion?: 'mensajes' | 'difusion' | 'publicaciones' | 'comentarios' | 'estadisticas', permisos?: 'kit') {
+  return panelRequest<{ url: string }>('/instagram/connect', {
+    method: 'POST',
+    body: JSON.stringify({ ...(seccion ? { seccion } : {}), ...(permisos ? { permisos } : {}) }),
+  })
+}
+
+// Lo que Órbita publicó en el Instagram del negocio (Difusión → Publicaciones). Una publicación con video tarda
+// en procesarse: nace PROCESSING y el panel la sigue con `continuar` hasta que queda PUBLISHED o FAILED.
+export type InstagramPublicacion = {
+  id: string
+  estado: 'DRAFT' | 'SCHEDULED' | 'PROCESSING' | 'PUBLISHING' | 'PUBLISHED' | 'FAILED'
+  tipo: 'IMAGE' | 'VIDEO' | 'CAROUSEL' | string
+  productId: string | null
+  productName: string | null
+  caption: string
+  /** 'image' o 'video' por cada elemento, en orden. */
+  elementos: ('image' | 'video')[]
+  miniatura: string | null
+  permalink: string | null
+  error: string | null
+  createdAt: string
+  /** Programadas: cuándo salen (ISO). */
+  programadaPara: string | null
+  /** Borradores y programadas: lo necesario para retomarlas en el compositor. */
+  formato: 'cuadrado' | 'vertical' | null
+  items: (InstagramItemPublicacion & { vista: string })[] | null
+}
+export type InstagramItemPublicacion = { origen: 'producto' | 'subida'; ref: string; tipo: 'image' | 'video' }
+export type InstagramArchivoSubido = { ref: string; tipo: 'image' | 'video'; url: string }
+export function getInstagramPosts() { return panelRequest<InstagramPublicacion[]>('/instagram/posts') }
+export function crearPublicacionInstagram(input: { productId?: string; caption: string; formato: 'cuadrado' | 'vertical'; items: InstagramItemPublicacion[] }) {
+  return panelRequest<InstagramPublicacion>('/instagram/posts', { method: 'POST', body: JSON.stringify(input) })
+}
+export type InstagramPublicacionBody = { id?: string; productId?: string; caption: string; formato: 'cuadrado' | 'vertical'; items: InstagramItemPublicacion[] }
+export function programarPublicacionInstagram(input: InstagramPublicacionBody & { programarPara: string }) {
+  return panelRequest<InstagramPublicacion>('/instagram/posts/schedule', { method: 'POST', body: JSON.stringify(input) })
+}
+export function guardarBorradorInstagram(input: InstagramPublicacionBody) {
+  return panelRequest<InstagramPublicacion>('/instagram/posts/draft', { method: 'POST', body: JSON.stringify(input) })
+}
+export function desprogramarPublicacionInstagram(id: string) {
+  return panelRequest<InstagramPublicacion>(`/instagram/posts/${id}/unschedule`, { method: 'POST' })
+}
+/** `conservarArchivos`: el borrador se acaba de publicar y sus archivos ya son de esa publicación. */
+export function descartarPublicacionInstagram(id: string, conservarArchivos = false) {
+  return panelRequest<{ ok: true }>(`/instagram/posts/${id}${conservarArchivos ? '?conservar=1' : ''}`, { method: 'DELETE' })
+}
+/** Lo publicado y lo programado de un mes (`2026-10`). */
+export function getInstagramCalendario(mes: string) {
+  return panelRequest<InstagramPublicacion[]>(`/instagram/posts/calendar?mes=${encodeURIComponent(mes)}`)
+}
+export function continuarPublicacionInstagram(id: string) {
+  return panelRequest<InstagramPublicacion>(`/instagram/posts/${id}/continuar`, { method: 'POST' })
+}
+export function subirFotoInstagram(file: File) {
+  const form = new FormData()
+  form.append('file', file, file.name)
+  return panelRequest<InstagramArchivoSubido>('/instagram/media/foto', { method: 'POST', body: form })
+}
+// El video no pasa por la API (pesa demasiado): se pide una dirección firmada y el navegador lo sube directo
+// al almacenamiento, con el mismo formato que usa su librería (PUT con un FormData).
+export async function subirVideoInstagram(file: File, onProgreso?: (porcentaje: number) => void): Promise<InstagramArchivoSubido> {
+  const tipo = file.type || (file.name.toLowerCase().endsWith('.mov') ? 'video/quicktime' : 'video/mp4')
+  const prep = await panelRequest<InstagramArchivoSubido & { subida: { url: string; token: string } }>('/instagram/media/video', {
+    method: 'POST',
+    body: JSON.stringify({ tipo, bytes: file.size }),
+  })
+  await new Promise<void>((resolve, reject) => {
+    const form = new FormData()
+    form.append('cacheControl', '3600')
+    form.append('', file)
+    const xhr = new XMLHttpRequest()
+    xhr.open('PUT', prep.subida.url)
+    xhr.setRequestHeader('x-upsert', 'false')
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgreso?.(Math.round((e.loaded / e.total) * 100)) }
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new ApiError(xhr.status, 'No se pudo subir el video. Probá de nuevo.')))
+    xhr.onerror = () => reject(new ApiError(0, 'Se cortó la subida del video. Revisá tu conexión y probá de nuevo.'))
+    xhr.send(form)
+  })
+  return { ref: prep.ref, tipo: 'video', url: prep.url }
+}
+// Bandeja de mensajes directos (Difusión → Mensajes).
+export type InstagramCharla = {
+  id: string
+  nombre: string
+  ultimo: string
+  ultimoDe: 'cliente' | 'negocio' | null
+  fecha: string
+  noLeida: boolean
+  /** Hasta cuándo se puede contestar (24 h desde el último mensaje del cliente); null si ya venció. */
+  puedeResponderHasta: string | null
+}
+export type InstagramMensaje = {
+  id: string
+  de: 'cliente' | 'negocio'
+  texto: string
+  adjuntos: { tipo: 'image' | 'video' | 'audio' | 'file'; url: string }[]
+  estado: string | null
+  creado: string
+}
+export function getInstagramCharlas() { return panelRequest<InstagramCharla[]>('/instagram/inbox') }
+export function getInstagramNoLeidos() { return panelRequest<{ count: number }>('/instagram/inbox/unread-count') }
+export function getInstagramMensajes(id: string) {
+  return panelRequest<{ mensajes: InstagramMensaje[]; puedeResponderHasta: string | null }>(`/instagram/inbox/${id}/messages`)
+}
+export function responderInstagram(id: string, input: { texto?: string; foto?: File }) {
+  const form = new FormData()
+  if (input.texto?.trim()) form.append('texto', input.texto.trim())
+  if (input.foto) form.append('file', input.foto, input.foto.name)
+  return panelRequest<InstagramMensaje[]>(`/instagram/inbox/${id}/messages`, { method: 'POST', body: form })
+}
+export function marcarCharlaInstagram(id: string, leida: boolean) {
+  return panelRequest<{ ok: true }>(`/instagram/inbox/${id}`, { method: 'PATCH', body: JSON.stringify({ leida }) })
+}
+// Comentarios de las últimas publicaciones (Difusión → Comentarios).
+export type InstagramRespuesta = { id: string; usuario: string; texto: string; fecha: string | null }
+export type InstagramComentario = InstagramRespuesta & { likes: number; oculto: boolean; respuestas: InstagramRespuesta[] }
+export type InstagramPublicacionComentada = {
+  id: string
+  texto: string
+  imagen: string | null
+  enlace: string | null
+  fecha: string | null
+  totalComentarios: number
+  comentarios: InstagramComentario[]
+}
+export function getInstagramComentarios() {
+  return panelRequest<{ publicaciones: InstagramPublicacionComentada[]; ocultadosAutomaticamente?: number }>('/instagram/comments')
+}
+export function replyInstagramComment(id: string, texto: string) {
+  return panelRequest<{ id: string }>(`/instagram/comments/${id}/reply`, { method: 'POST', body: JSON.stringify({ texto }) })
+}
+export function hideInstagramComment(id: string, oculto: boolean) {
+  return panelRequest<{ id: string; oculto: boolean }>(`/instagram/comments/${id}/hide`, { method: 'POST', body: JSON.stringify({ oculto }) })
+}
+
+// Estadísticas de la cuenta (Difusión → Estadísticas). Una métrica en null es una que Instagram todavía no
+// tiene (datos que demoran, cuentas con pocos seguidores).
+export type InstagramEstadisticas = {
+  dias: 7 | 28
+  desde: string
+  hasta: string
+  cuenta: { usuario: string | null; seguidores: number | null; siguiendo: number | null; publicaciones: number | null }
+  metricas: {
+    alcance: number | null
+    visualizaciones: number | null
+    interacciones: number | null
+    cuentasInteractuaron: number | null
+    visitasAlPerfil: number | null
+  }
+  /** Las mismas métricas del período inmediatamente anterior, para comparar. */
+  anterior?: InstagramEstadisticas['metricas']
+  destacadas: { id: string; texto: string; imagen: string | null; enlace: string | null; fecha: string | null; likes: number; comentarios: number }[]
+}
+export function getInstagramEstadisticas(dias: 7 | 28) { return panelRequest<InstagramEstadisticas>(`/instagram/insights?dias=${dias}`) }
+
+// Orbi en Difusión: todo es una sugerencia que la persona revisa; nada se publica ni se manda solo.
+export type InstagramTextoDeOrbi = {
+  versiones: { estilo: 'cercano' | 'vendedor' | 'breve'; texto: string }[]
+  /** Sin el #. */
+  hashtags: string[]
+}
+export function pedirTextoAOrbi(input: { productId?: string; idea?: string; elementos?: number; hayVideo?: boolean }) {
+  return panelRequest<InstagramTextoDeOrbi>('/instagram/orbi/texto', { method: 'POST', body: JSON.stringify(input) })
+}
+export function pedirRespuestaAOrbi(input: { tipo: 'comentario' | 'mensaje'; texto?: string; publicacion?: string; conversationId?: string }) {
+  return panelRequest<{ sugerencias: string[] }>('/instagram/orbi/respuesta', { method: 'POST', body: JSON.stringify(input) })
+}
+export function pedirLecturaAOrbi(dias: 7 | 28) {
+  return panelRequest<{ resumen: string; sugerencias: string[] }>(`/instagram/orbi/lectura?dias=${dias}`)
+}
+// Publicaciones que Orbi armó a partir de las métricas de la cuenta: producto, fotos, texto, hashtags y cuándo
+// conviene publicarlas. La persona las revisa; Orbi no publica nada solo.
+export type InstagramSugerida = {
+  productId: string
+  nombre: string
+  fotos: string[]
+  tipo: 'foto' | 'carrusel'
+  texto: string
+  hashtags: string[]
+  /** ISO (UTC). */
+  cuando: string
+  motivos: string[]
+  basadaEnMetricas: boolean
+}
+export function getInstagramSugeridas(refrescar = false) {
+  return panelRequest<InstagramSugerida[]>(`/instagram/orbi/sugeridas${refrescar ? '?refrescar=1' : ''}`)
+}
+
+// Qué tipo de publicación y qué momento le funciona mejor a la cuenta (sus últimas 50 publicaciones).
+export type InstagramRendimiento = {
+  muestra: number
+  suficiente: boolean
+  publicaciones: { id: string; texto: string; imagen: string | null; enlace: string | null; fecha: string | null; tipo: 'foto' | 'carrusel' | 'reel' | 'video'; likes: number; comentarios: number; interacciones: number }[]
+  tipos: { tipo: 'foto' | 'carrusel' | 'reel' | 'video'; publicaciones: number; promedio: number }[]
+  /** `clave`: día de la semana (0 = domingo … 6 = sábado). */
+  mejoresDias: { clave: number; publicaciones: number; promedio: number }[]
+  /** `clave`: hora (de Argentina) en que empieza la ventana de 3 horas. */
+  mejoresHoras: { clave: number; publicaciones: number; promedio: number }[]
+  proximoMomento: string
+  momentos: string[]
+  momentoDeLaCuenta: boolean
+}
+export function getInstagramRendimiento() { return panelRequest<InstagramRendimiento>('/instagram/insights/rendimiento') }
+
+// Ajustes de Difusión: respuestas automáticas de los mensajes y moderación de los comentarios.
+export type InstagramAjustes = {
+  bienvenida: { activa: boolean; texto: string }
+  ausencia: { activa: boolean; texto: string; desde: string; hasta: string; dias: number[] }
+  moderacion: { activa: boolean; palabras: string[] }
+}
+export function getInstagramAjustes() { return panelRequest<InstagramAjustes>('/instagram/settings') }
+export function saveInstagramAjustes(a: InstagramAjustes) {
+  return panelRequest<InstagramAjustes>('/instagram/settings', { method: 'PUT', body: JSON.stringify(a) })
+}
+
+// De la charla a la venta (Difusión → Mensajes).
+export type InstagramFichaCliente = {
+  id: string
+  nombre: string
+  email: string | null
+  telefono: string | null
+  desde: string
+  pedidos: { cantidad: number; total: number; ultimos: { id: string; numero: number; estado: string; total: number; fecha: string }[] }
+}
+export function enviarProductoInstagram(charlaId: string, productId: string) {
+  return panelRequest<InstagramMensaje[]>(`/instagram/inbox/${charlaId}/product`, { method: 'POST', body: JSON.stringify({ productId }) })
+}
+export function getInstagramClienteDeCharla(charlaId: string) {
+  return panelRequest<InstagramFichaCliente>(`/instagram/inbox/${charlaId}/customer`)
+}
+export function vincularInstagramCliente(charlaId: string, customerId: string) {
+  return panelRequest<{ conversationId: string }>(`/instagram/inbox/${charlaId}/link`, { method: 'POST', body: JSON.stringify({ customerId }) })
+}
+
+// Productos de la tienda que todavía no se mostraron en Instagram desde Órbita.
+export type InstagramIdea = { productId: string; nombre: string; foto: string | null; fotos: number; motivo: string }
+export function getInstagramIdeas() { return panelRequest<InstagramIdea[]>('/instagram/posts/ideas') }
 export function disconnectInstagram() { return panelRequest<{ connected: false }>('/instagram/connection', { method: 'DELETE' }) }
 
 // Plantillas de mensaje (RBT-657)

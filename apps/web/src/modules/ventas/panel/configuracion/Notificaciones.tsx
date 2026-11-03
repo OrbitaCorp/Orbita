@@ -17,7 +17,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
     Bell, Mail, ShoppingBag, XCircle, PackageX, RotateCcw, Ban,
     CreditCard, UserPlus, Sun, CalendarDays, Check,
-    PartyPopper, Star, Globe, Receipt, Send,
+    PartyPopper, Star, Globe, Receipt, Send, MessageCircleWarning, Sparkles,
 } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { Card } from '@/design-system/components/Card'
@@ -37,7 +37,8 @@ type Canal = 'panel' | 'email'
 // Los eventos que valida el backend (businesses.service.ts), agrupados por
 // tema: "qué pasó con una venta", "qué pasó con el stock", "los resúmenes".
 // Sin los grupos eran nueve filas indistinguibles una de otra.
-export const GRUPOS: { titulo: string; desc: string; eventos: { key: string; label: string; desc: string; Icon: IconType }[] }[] = [
+// `defecto`: lo que vale si el dueño nunca lo guardó (igual que PREFS_POR_EVENTO del backend). Sin él: solo en el panel.
+export const GRUPOS: { titulo: string; desc: string; eventos: { key: string; label: string; desc: string; Icon: IconType; defecto?: { panel: boolean; email: boolean } }[] }[] = [
     {
         titulo: 'Ventas',
         desc: 'Lo que pasa con tus pedidos y tus cobros',
@@ -48,6 +49,14 @@ export const GRUPOS: { titulo: string; desc: string; eventos: { key: string; lab
             { key: 'cancelacion_pedida', label: 'Cancelación pedida',  desc: 'Un cliente pidió cancelar un pedido ya confirmado',  Icon: Ban },
             { key: 'devolucion',         label: 'Devolución',          desc: 'Un cliente inició una devolución',                   Icon: RotateCcw },
             { key: 'primera_venta',      label: 'Primera venta',       desc: 'Tu primer pedido registrado en Órbita — una sola vez', Icon: PartyPopper },
+        ],
+    },
+    {
+        titulo: 'Orbi en WhatsApp',
+        desc: 'Cuando Orbi necesita de una persona o te deja una venta para cerrar',
+        eventos: [
+            { key: 'orbi_necesita_atencion', label: 'Un chat necesita atención', desc: 'Orbi te pasó un chat (un reclamo, una duda que no pudo resolver o alguien que pidió hablar con una persona)', Icon: MessageCircleWarning, defecto: { panel: true, email: true } },
+            { key: 'orbi_pedido_pendiente',  label: 'Pedido pendiente de Orbi', desc: 'Orbi tomó un pedido por WhatsApp: falta coordinar el pago y la entrega',                                         Icon: Sparkles,             defecto: { panel: true, email: true } },
         ],
     },
     {
@@ -98,7 +107,7 @@ const CANALES: { key: Canal; label: string; desc: string; Icon: IconType; color:
 ]
 
 const matrizVacia = (): ApiNotificationMatrix =>
-    Object.fromEntries(EVENTOS.map(e => [e.key, { panel: true, email: false }]))
+    Object.fromEntries(EVENTOS.map(e => [e.key, e.defecto ?? { panel: true, email: false }]))
 
 export default function Notificaciones({ ir }: { ir: (v: VistaConfig) => void }) {
     void ir

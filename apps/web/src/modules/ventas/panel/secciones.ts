@@ -26,6 +26,7 @@ export const SECCIONES_DEL_PANEL = [
   'descuentos',
   'cupones',
   'mensajes',
+  'difusion',
   'perfil',
   'avanzado',
   'manual',

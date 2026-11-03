@@ -214,8 +214,11 @@ function EnlaceProducto({ href, nombre }: { href: string; nombre: string }) {
   return <Link href={href} prefetch={false} className="orb-pcard-link" aria-label={nombre} draggable={false} />
 }
 
-export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', tema, sangre, alto, transferPct }: Props) {
+export function ProductCard({ producto, rank, layout = 'grid', mode: modoDeLaTienda = 'FULL', tema, sangre, alto, transferPct }: Props) {
   const router = useRouter()
+  // Un producto "por pedido" se comporta como en la vidriera aunque la tienda sea completa: sin botones de compra rápida,
+  // la card lleva a la ficha y ahí solo se consulta por WhatsApp.
+  const mode: 'FULL' | 'SHOWCASE' = producto.byOrder ? 'SHOWCASE' : modoDeLaTienda
   // Precio pagando con transferencia, si el negocio tiene el descuento
   // cargado y activo — mismo cálculo que ProductoDetalle.tsx (sobre el
   // precio YA final, nunca se suma/resta nada más que esto).

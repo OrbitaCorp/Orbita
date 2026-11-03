@@ -46,6 +46,7 @@ export class UpdateBusinessConfigDto {
   @IsOptional() @IsString() @MaxLength(60) transferAlias?: string;
   @IsOptional() @IsString() @MaxLength(30) transferCbu?: string;
   @IsOptional() @IsString() @MaxLength(120) transferHolder?: string;
+  @IsOptional() @IsString() @MaxLength(80) transferBank?: string;
   @IsOptional() @IsArray() @ArrayMaxSize(PICKUP_PAYMENT_METHODS.length) @IsIn(PICKUP_PAYMENT_METHODS, { each: true }) pickupPaymentMethods?: string[];
   @IsOptional() @IsNumber() @Min(0, { message: 'El descuento no puede ser negativo' }) @Max(100, { message: 'El descuento no puede superar el 100%' }) cashDiscountPercent?: number;
   // RBT-692 — mismo criterio que cashDiscountPercent, generalizado. transferDiscountPercent

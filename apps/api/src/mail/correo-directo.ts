@@ -86,3 +86,19 @@ export function remitenteParaFrom(name: string, email: string): string {
     .slice(0, 80);
   return `"${limpio || 'Órbita'}" <${email}>`;
 }
+
+export const MAX_DESTINATARIOS_DIRECTO = 20;
+
+// Separa uno o varios emails por coma o punto y coma, los pasa a minúscula y
+// quita repetidos manteniendo el orden.
+export function extraerDestinatarios(raw: string): string[] {
+  const vistos = new Set<string>();
+  const lista: string[] = [];
+  for (const parte of raw.split(/[,;]+/)) {
+    const limpio = parte.trim().toLowerCase();
+    if (!limpio || vistos.has(limpio)) continue;
+    vistos.add(limpio);
+    lista.push(limpio);
+  }
+  return lista;
+}

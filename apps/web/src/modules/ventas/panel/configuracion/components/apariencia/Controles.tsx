@@ -1,9 +1,12 @@
 // Los controles básicos del formulario de Apariencia: la tarjeta de sección,
 // el rótulo de campo, el separador, el input y la fila de interruptor.
 
-import { useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { AyudaBoton, AyudaPanel, type Ayuda } from './AyudaSeccion'
+import { useCtxApariencia } from './contexto'
+import { FOCO_POR_TARJETA, type ObjetivoPreview } from './focoPreview'
 import type { IconT } from './utils'
 
 export function SecCard({ id, title, icon: I, badge, ayuda, children }: { id?: string; title: string; icon: IconT; badge?: ReactNode; ayuda?: Ayuda; children: ReactNode }) {
@@ -11,20 +14,74 @@ export function SecCard({ id, title, icon: I, badge, ayuda, children }: { id?: s
     // exclamación al lado del título la abre (ver AyudaSeccion.tsx).
     const [ayudaAbierta, setAyudaAbierta] = useState(false)
     const panelAyudaId = useId()
+    const cuerpoId = useId()
+    const { movil, abierta, alternar, pedirFoco } = useCtxApariencia()
+    // En el celular las tarjetas son plegables, de a una: sin eso la pantalla
+    // eran doce tarjetas largas apiladas. En escritorio están siempre abiertas
+    // (ahí el índice de la izquierda es el que ordena).
+    const plegable = movil && !!id
+    const abierto = !plegable || abierta === id
+
+    // Al abrir una tarjeta en el celular se la lleva arriba de la pantalla:
+    // sin esto queda el título fuera de vista, porque la que estaba abierta
+    // antes se cierra y el contenido de más abajo sube.
+    const tarjetaRef = useRef<HTMLDivElement>(null)
+    const estabaAbierto = useRef(abierto)
+    useEffect(() => {
+        if (plegable && abierto && !estabaAbierto.current) {
+            const quieto = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+            tarjetaRef.current?.scrollIntoView({ block: 'start', behavior: quieto ? 'auto' : 'smooth' })
+        }
+        estabaAbierto.current = abierto
+    }, [plegable, abierto])
+
     return (
         // `id` + `scrollMarginTop`: ancla para el índice de secciones del
         // IndiceDeVista (ver INDICES ahí) — sin el margen, el
         // scroll-into-view deja el título de la tarjeta pegado contra el
         // borde de arriba de la ventana.
-        <div id={id} className="ap-sec-card" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24, scrollMarginTop: 24 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
-                <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--color-primary-bg)', color: 'var(--color-primary)', display: 'grid', placeItems: 'center', flexShrink: 0 }}><I size={16} strokeWidth={1.6} /></div>
-                <h3 style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)', margin: 0, flex: 1 }}>{title}</h3>
-                {ayuda && <AyudaBoton nombre={title} abierta={ayudaAbierta} onToggle={() => setAyudaAbierta(a => !a)} panelId={panelAyudaId} />}
-                {badge}
+        //
+        // onFocusCapture: entrar a la tarjeta (o a una de sus zonas, ver
+        // data-ap-foco) lleva la vista previa a esa parte de la tienda, antes
+        // de tocar nada (ver focoPreview.ts).
+        <div
+            ref={tarjetaRef}
+            id={id}
+            className="ap-sec-card"
+            data-abierta={abierto}
+            onFocusCapture={e => {
+                const zona = (e.target as HTMLElement).closest?.('[data-ap-foco]')?.getAttribute('data-ap-foco')
+                const objetivo = (zona ?? (id ? FOCO_POR_TARJETA[id] : undefined)) as ObjetivoPreview | undefined
+                if (objetivo) pedirFoco(objetivo)
+            }}
+            style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24, scrollMarginTop: 12 }}
+        >
+            <div className="ap-sec-head" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: abierto ? 18 : 0 }}>
+                {/* Sin caja de color: el ícono es solo una pista para ubicar la
+                    tarjeta, en el gris de siempre. */}
+                <h3 style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)', margin: 0, flex: 1, minWidth: 0 }}>
+                    {plegable ? (
+                        <button type="button" className="ap-sec-toggle" aria-expanded={abierto} aria-controls={cuerpoId} onClick={() => alternar(id!)}>
+                            <I size={18} strokeWidth={1.6} style={{ color: 'var(--color-muted)', flexShrink: 0 }} />
+                            <span style={{ flex: 1, minWidth: 0 }}>{title}</span>
+                            <ChevronDown size={18} strokeWidth={1.8} className="ap-sec-chevron" style={{ color: 'var(--color-muted)', flexShrink: 0 }} />
+                        </button>
+                    ) : (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <I size={18} strokeWidth={1.6} style={{ color: 'var(--color-muted)', flexShrink: 0 }} />
+                            {title}
+                        </span>
+                    )}
+                </h3>
+                {ayuda && abierto && <AyudaBoton nombre={title} abierta={ayudaAbierta} onToggle={() => setAyudaAbierta(a => !a)} panelId={panelAyudaId} />}
+                {abierto && badge}
             </div>
-            {ayuda && <AyudaPanel ayuda={ayuda} id={panelAyudaId} abierta={ayudaAbierta} style={{ marginBottom: 18 }} />}
-            {children}
+            {/* hidden y no desmontar: lo que está a medias en una tarjeta cerrada
+                (una subida, un slide abierto) no se pierde al plegarla. */}
+            <div id={cuerpoId} className="ap-sec-body" hidden={!abierto}>
+                {ayuda && <AyudaPanel ayuda={ayuda} id={panelAyudaId} abierta={ayudaAbierta} style={{ marginBottom: 18 }} />}
+                {children}
+            </div>
         </div>
     )
 }

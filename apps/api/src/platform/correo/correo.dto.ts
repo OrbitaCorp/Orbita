@@ -45,7 +45,8 @@ export class EnviarCorreoDto {
   @IsUUID()
   senderId!: string;
 
-  @IsEmail({}, { message: 'El destinatario no es un email válido' })
+  @IsString()
+  @Length(3, 2000, { message: 'Escribí al menos un email de destino' })
   to!: string;
 
   @IsString()

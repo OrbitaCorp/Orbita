@@ -17,7 +17,17 @@ export const PLATFORM_ROLE_KEY = 'platformRole';
  * El corte, decidido en esa auditoría: **leer, todos; lo que toca plata,
  * accesos o el estado de un negocio, solo SUPERADMIN.**
  */
-export const PlatformRole = (...roles: ('SUPERADMIN' | 'OPERATOR')[]) => SetMetadata(PLATFORM_ROLE_KEY, roles);
+export type RolDePlataforma = 'SUPERADMIN' | 'OPERATOR' | 'MARKETING';
+export const PlatformRole = (...roles: RolDePlataforma[]) => SetMetadata(PLATFORM_ROLE_KEY, roles);
 
 /** Atajo para el caso normal: solo fundadores. */
 export const SoloSuperadmin = () => PlatformRole('SUPERADMIN');
+
+/**
+ * Lo que también usa el equipo de marketing (rol MARKETING): videos, TikTok, Instagram contenido, correo, el conector de
+ * Claude. Un MARKETING solo entra a lo que lleve este decorador o `TodoElEquipo`: ver `PlatformAdminGuard`.
+ */
+export const SuperadminYMarketing = () => PlatformRole('SUPERADMIN', 'MARKETING');
+
+/** Lectura abierta a todo el equipo, marketing incluido (por ejemplo el Resumen): el OPERATOR también pasa. */
+export const TodoElEquipo = () => PlatformRole('SUPERADMIN', 'OPERATOR', 'MARKETING');

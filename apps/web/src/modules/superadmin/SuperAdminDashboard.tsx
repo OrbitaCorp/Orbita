@@ -11,7 +11,7 @@ import {
 } from '@/lib/platform/api'
 import {
   LayoutDashboard, Store, Globe, Users, ShieldCheck, ScrollText, Mail, Ticket, Tag, Wand2, ClipboardCheck, LifeBuoy,
-  Search, Plus, DollarSign, Bot, Send, Blocks,
+  Search, Plus, DollarSign, Bot, Send, Blocks, Megaphone, MessageCircle,
 } from 'lucide-react'
 import { SuperAdminShell, type ItemNav } from './Shell'
 import { TabDescuentos } from './Descuentos'
@@ -23,6 +23,8 @@ import { TabSoporte } from './Soporte'
 import { TabCostos } from './Costos'
 import { TabOrbi } from './Orbi'
 import { TabCorreo } from './Correo'
+import { TabMarketing } from './Marketing'
+import { TabInstagram } from './InstagramAccesos'
 import {
   useFetch, Grid, Row2, Kpi, Card, Table, StatusBadge, SubBadge, Pill, Chip,
   Loader, ErrorBox, Empty, ModalShell, Field, ConfirmModal, PageHeader,
@@ -37,13 +39,18 @@ import { LineSeriesChart, AreaSeriesChart, BarDistribution, ChartSkeleton, Range
 
 const ES_TAB = (v: unknown): v is Tab => typeof v === 'string' && NAV.some((n) => n.id === v)
 
+// El rol de marketing ve solo estas secciones (el servidor además le cierra todo lo demás, aunque llame a la API a mano).
+const SECCIONES_DE_MARKETING: Tab[] = ['resumen', 'marketing', 'correo']
+export const navDelRol = (rol: string | undefined) => (rol === 'MARKETING' ? NAV.filter((n) => SECCIONES_DE_MARKETING.includes(n.id)) : NAV)
+
 export function SuperAdminDashboard() {
-  const { user, logout } = useAuth()
+  const { user, logout, marcarContrasenaPropia } = useAuth()
   const router = useRouter()
   // La sección vive en la URL (?seccion=negocios), no en un useState: así cada
   // sección queda enlazable, el botón "atrás" del navegador funciona, y el
   // "volver" de la ficha de un negocio aterriza en Negocios y no en Resumen.
-  const tab: Tab = ES_TAB(router.query.seccion) ? router.query.seccion : 'resumen'
+  const rol = user?.type === 'platform_admin' ? user.admin.role : undefined
+  const tab: Tab = ES_TAB(router.query.seccion) && (rol !== 'MARKETING' || SECCIONES_DE_MARKETING.includes(router.query.seccion)) ? router.query.seccion : 'resumen'
   const setTab = (t: Tab) => void router.push(`/superadmin?seccion=${t}`, undefined, { shallow: true })
 
   // Consultas de soporte abiertas, para la pastilla del sidebar: es lo único
@@ -51,7 +58,8 @@ export function SuperAdminDashboard() {
   // cualquier sección, no solo entrando a Soporte. Se vuelve a pedir cada
   // minuto (solo con la pestaña visible) y cada vez que Soporte avisa que
   // respondió o cerró algo, para que el número no quede viejo un minuto.
-  const esAdmin = !!user && user.type === 'platform_admin'
+  // Marketing no ve soporte ni el estado de Orbi ni los pedidos de Instagram: no se piden (el servidor se los negaría).
+  const esAdmin = !!user && user.type === 'platform_admin' && user.admin.role !== 'MARKETING'
   const [tickSoporte, setTickSoporte] = useState(0)
   const refrescarSoporte = () => setTickSoporte((k) => k + 1)
   useEffect(() => {
@@ -71,7 +79,19 @@ export function SuperAdminDashboard() {
     [esAdmin, tickSoporte],
   )
   const orbiApagado = estadoOrbi?.estado.status === 'MAINTENANCE' ? 1 : 0
-  const items = NAV.map((n) => (n.id === 'soporte' ? { ...n, badge: abiertas } : n.id === 'orbi' ? { ...n, badge: orbiApagado, badgeLabel: 'apagado' } : n))
+  // Pedidos de acceso a Instagram que esperan que los habilitemos: también tienen que verse desde
+  // cualquier sección, porque nadie entra a mirar una pestaña que no sabe que tiene algo.
+  const { data: pedidosInstagram } = useFetch(
+    () => (esAdmin ? platformApi.instagramPedidos().catch(() => null) : Promise.resolve(null)),
+    [esAdmin, tickSoporte],
+  )
+  const instagramPendientes = pedidosInstagram?.filter((p) => p.status === 'PENDING').length ?? 0
+  const items = navDelRol(rol).map((n) => (
+    n.id === 'soporte' ? { ...n, badge: abiertas }
+      : n.id === 'orbi' ? { ...n, badge: orbiApagado, badgeLabel: 'apagado' }
+        : n.id === 'instagram' ? { ...n, badge: instagramPendientes, badgeLabel: `${instagramPendientes} pendientes` }
+          : n
+  ))
 
   // Hasta que el router tiene la query, la sección sería "resumen" por
   // default: un link directo (?seccion=modulos&modulo=…) montaba un instante
@@ -79,6 +99,11 @@ export function SuperAdminDashboard() {
   if (!user || user.type !== 'platform_admin' || !router.isReady) return null
 
   const cerrarSesion = () => void logout().then(() => (window.location.href = apexUrl('/login')))
+
+  // Entró con la contraseña temporal que le generó un superadmin: no puede usar el panel hasta elegir una propia.
+  if (user.admin.hasTempPassword) {
+    return <ElegirContrasena email={user.admin.email} onListo={marcarContrasenaPropia} onSalir={cerrarSesion} />
+  }
 
   return (
     <SuperAdminShell
@@ -88,7 +113,7 @@ export function SuperAdminDashboard() {
       usuario={{ nombre: user.admin.name, rol: ROLE_LABELS[user.admin.role] ?? user.admin.role }}
       onCerrarSesion={cerrarSesion}
     >
-      {tab === 'resumen' && <TabResumen />}
+      {tab === 'resumen' && <TabResumen sinFacturacion={user.admin.role === 'MARKETING'} />}
       {tab === 'wizard' && <TabWizard />}
       {tab === 'negocios' && <TabNegocios />}
       {tab === 'soporte' && <TabSoporte currentAdminId={user.admin.id} onCambio={refrescarSoporte} />}
@@ -102,13 +127,15 @@ export function SuperAdminDashboard() {
       {tab === 'auditoria' && <TabAuditoria currentAdminId={user.admin.id} />}
       {tab === 'admins' && <TabAdmins currentAdminId={user.admin.id} />}
       {tab === 'logs' && <TabLogs />}
-      {tab === 'correo' && <TabCorreo puedeEnviar={user.admin.role === 'SUPERADMIN'} />}
+      {tab === 'correo' && <TabCorreo puedeEnviar={user.admin.role !== 'OPERATOR'} puedeEditarCasillas={user.admin.role === 'SUPERADMIN'} adminEmail={user.admin.email} />}
+      {tab === 'marketing' && <TabMarketing puedePublicar={user.admin.role !== 'OPERATOR'} />}
+      {tab === 'instagram' && <TabInstagram puedeHabilitar={user.admin.role === 'SUPERADMIN'} onCambio={refrescarSoporte} />}
       {tab === 'testeo' && <TabTesteo />}
     </SuperAdminShell>
   )
 }
 
-export type Tab = 'resumen' | 'wizard' | 'negocios' | 'soporte' | 'dominios' | 'duenos' | 'descuentos' | 'campanias' | 'modulos' | 'auditoria' | 'admins' | 'logs' | 'testeo' | 'costos' | 'orbi' | 'correo'
+export type Tab = 'resumen' | 'wizard' | 'negocios' | 'soporte' | 'dominios' | 'duenos' | 'descuentos' | 'campanias' | 'modulos' | 'auditoria' | 'admins' | 'logs' | 'testeo' | 'costos' | 'orbi' | 'correo' | 'marketing' | 'instagram'
 // Mismos 7 destinos de siempre, en el mismo orden, ahora agrupados en el
 // sidebar: primero la foto general, después lo que es de los clientes y al
 // final lo de puertas adentro de Órbita.
@@ -125,6 +152,9 @@ export const NAV: ItemNav<Tab>[] = [
   { id: 'dominios', label: 'Dominios', Icono: Globe, grupo: 'Clientes' },
   { id: 'duenos', label: 'Dueños', Icono: Users, grupo: 'Clientes' },
   { id: 'descuentos', label: 'Descuentos', Icono: Ticket, grupo: 'Clientes' },
+  // Pedidos de acceso anticipado a Instagram: los negocios que quieren conectar su cuenta
+  // mientras la app de Meta no tiene acceso avanzado.
+  { id: 'instagram', label: 'Instagram', Icono: MessageCircle, grupo: 'Clientes' },
   // Al lado de Descuentos: las dos son formas de cobrarle menos a un negocio.
   // Un código descuenta el primer cobro; una campaña congela el precio varios meses.
   { id: 'campanias', label: 'Precios y campañas', Icono: Tag, grupo: 'Clientes' },
@@ -145,18 +175,21 @@ export const NAV: ItemNav<Tab>[] = [
   // el testeo de los emails automáticos (antes "Emails", que se confundía).
   { id: 'correo', label: 'Correo', Icono: Send, grupo: 'Interno' },
   { id: 'testeo', label: 'Testeo de emails', Icono: Mail, grupo: 'Interno' },
+  // Publicar los videos de marketing de Órbita en TikTok, desde la cuenta de la empresa.
+  { id: 'marketing', label: 'Marketing', Icono: Megaphone, grupo: 'Interno' },
 ]
 
 // ─── Resumen ──────────────────────────────────────────────────────────────────
-function TabResumen() {
+function TabResumen({ sinFacturacion = false }: { sinFacturacion?: boolean }) {
   const { data, error } = useFetch(() => platformApi.overview(), [])
   // Un solo rango para toda la pantalla: antes había un selector adentro de
   // cada tarjeta y los dos gráficos podían quedar mirando períodos distintos,
   // que es la forma más fácil de sacar una conclusión equivocada.
   const [range, setRange] = useRange(30)
   const { data: growth, loading: cargandoGrowth } = useFetch(() => platformApi.growthSeries(range), [range])
-  const { data: revenue, loading: cargandoRevenue } = useFetch(() => platformApi.revenueSeries(range), [range])
-  const { data: subs } = useFetch(() => platformApi.subscriptions(), [])
+  // Sin facturación (rol de marketing) no se piden los ingresos ni las suscripciones: el servidor se las niega.
+  const { data: revenue, loading: cargandoRevenue } = useFetch(() => (sinFacturacion ? Promise.resolve(null) : platformApi.revenueSeries(range)), [range, sinFacturacion])
+  const { data: subs } = useFetch(() => (sinFacturacion ? Promise.resolve(null) : platformApi.subscriptions()), [sinFacturacion])
 
   if (error) return <ErrorBox msg="No se pudo cargar el resumen." />
   if (!data) return <Loader />
@@ -170,12 +203,12 @@ function TabResumen() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <PageHeader
         title="Resumen"
-        subtitle="Cómo viene la plataforma hoy: facturación, negocios y dominios."
+        subtitle={sinFacturacion ? 'Cómo viene la plataforma hoy: negocios y altas.' : 'Cómo viene la plataforma hoy: facturación, negocios y dominios.'}
         action={<RangePicker value={range} onChange={setRange} />}
       />
 
       <Grid>
-        <Kpi label="Facturación mensual" value={money(data.subscriptions.mrr)} accent hint="Suma de las suscripciones pagas activas" />
+        {!sinFacturacion && <Kpi label="Facturación mensual" value={money(data.subscriptions.mrr)} accent hint="Suma de las suscripciones pagas activas" />}
         <Kpi label="Negocios totales" value={String(data.businesses.total)} hint={`${data.businesses.active} funcionando hoy`} />
         <Kpi label="Altas últimos 30 días" value={`+${data.businesses.newLast30Days}`} hint="Negocios nuevos" />
         <Kpi label="Negocios activos" value={String(data.businesses.active)} hint="Vendiendo con normalidad" />
@@ -205,6 +238,8 @@ function TabResumen() {
         )}
       </Card>
 
+      {!sinFacturacion && (
+      <>
       <Card
         title="Ingresos por día"
         subtitle="Solo pagos ya aprobados"
@@ -252,6 +287,8 @@ function TabResumen() {
           <BarDistribution items={reparto(data.subscriptions.byOrigin, SUB_ORIGIN_LABELS)} />
         </Card>
       </Row2>
+      </>
+      )}
 
       <Row2>
         <Card title="Negocios por modo" subtitle="Vidriera (solo catálogo) o checkout (venden y cobran online)">
@@ -481,6 +518,9 @@ function TabAdmins({ currentAdminId }: { currentAdminId: string }) {
   const [reloadKey, setReloadKey] = useState(0)
   const [editando, setEditando] = useState<AdminRow | 'nuevo' | null>(null)
   const [desactivando, setDesactivando] = useState<AdminRow | null>(null)
+  const [reactivando, setReactivando] = useState<AdminRow | null>(null)
+  const [restableciendo, setRestableciendo] = useState<AdminRow | null>(null)
+  const [aviso, setAviso] = useState('')
   const { data, error } = useFetch(() => platformApi.admins(), [reloadKey])
   const recargar = () => setReloadKey((k) => k + 1)
 
@@ -498,6 +538,11 @@ function TabAdmins({ currentAdminId }: { currentAdminId: string }) {
           </button>
         }
       />
+      {aviso && (
+        <div role="status" style={{ padding: '10px 14px', borderRadius: 10, background: 'var(--color-success-bg)', color: 'var(--chip-success-fg)', fontSize: 13.5, fontWeight: 600 }}>
+          {aviso}
+        </div>
+      )}
       <Card noPad>
         <Table
           head={['Nombre', 'Cargo', 'Email', 'Rol', 'Cómo entra', 'Último acceso', 'Estado', 'Acciones']}
@@ -512,15 +557,24 @@ function TabAdmins({ currentAdminId }: { currentAdminId: string }) {
               a.jobTitle
                 ? <span key="c" style={{ color: 'var(--color-body)' }}>{a.jobTitle}</span>
                 : <span key="c" style={{ color: 'var(--color-subtle)' }}>Sin cargo</span>,
-              <span key="e" style={{ color: 'var(--color-body)' }}>{a.email}</span>,
+              <span key="e" style={{ display: 'inline-flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{ color: 'var(--color-body)' }}>{a.email}</span>
+                {a.personalEmail && <span style={{ fontSize: 11.5, color: 'var(--color-muted)' }}>Personal: {a.personalEmail}</span>}
+              </span>,
               <Pill key="r" text={ROLE_LABELS[a.role] ?? a.role} tone={a.role === 'SUPERADMIN' ? 'blue' : 'gray'} />,
               <span key="acc" style={{ fontSize: 12.5, color: 'var(--color-muted)' }}>
-                {[a.hasPassword && 'Contraseña', a.hasGoogle && 'Google'].filter(Boolean).join(' · ') || 'Todavía no configuró'}
+                {[a.hasPassword && (a.hasTempPassword ? 'Contraseña temporal' : 'Contraseña'), a.hasGoogle && 'Google'].filter(Boolean).join(' · ') || 'Todavía no configuró'}
               </span>,
               a.lastAccessAt ? date(a.lastAccessAt) : <span key="la" style={{ color: 'var(--color-subtle)' }}>Nunca entró</span>,
               <Chip key="st" text={a.isActive ? 'Activo' : 'Inactivo'} tone={a.isActive ? 'green' : 'gray'} dot />,
               <div key="acciones" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                 <button onClick={() => setEditando(a)} className="ds-hover" style={btnGhostSm}>Editar</button>
+                {a.isActive && a.id !== currentAdminId && (
+                  <button onClick={() => { setAviso(''); setRestableciendo(a) }} className="ds-hover" style={btnGhostSm}>Restablecer contraseña</button>
+                )}
+                {!a.isActive && (
+                  <button onClick={() => { setAviso(''); setReactivando(a) }} className="ds-hover" style={btnGhostSm}>Reactivar</button>
+                )}
                 {a.isActive && a.id !== currentAdminId && (
                   <button onClick={() => setDesactivando(a)} className="ds-hover" style={{ ...btnGhostSm, color: 'var(--color-error)', borderColor: 'var(--color-error)' }}>Desactivar</button>
                 )}
@@ -537,15 +591,40 @@ function TabAdmins({ currentAdminId }: { currentAdminId: string }) {
           onSaved={() => { setEditando(null); recargar() }}
         />
       )}
+      {restableciendo && (
+        <RestablecerContrasenaModal
+          admin={restableciendo}
+          onClose={() => setRestableciendo(null)}
+          onEnviado={(enviadoA) => {
+            setAviso(`Le mandamos a ${restableciendo.name} el correo de la cuenta y una contraseña temporal a ${enviadoA}.`)
+            setRestableciendo(null)
+            recargar()
+          }}
+        />
+      )}
       {desactivando && (
         <ConfirmModal
           title={`¿Desactivar a ${desactivando.name}?`}
-          body="No va a poder iniciar sesión hasta que lo reactives creándolo de nuevo con el mismo email."
+          body="No va a poder iniciar sesión hasta que lo reactives con el botón «Reactivar» de esta misma lista."
           confirmLabel="Desactivar"
           onCancel={() => setDesactivando(null)}
           onConfirm={async () => {
             await platformApi.removeAdmin(desactivando.id)
             setDesactivando(null)
+            recargar()
+          }}
+        />
+      )}
+      {reactivando && (
+        <ConfirmModal
+          title={`¿Reactivar a ${reactivando.name}?`}
+          body="Vuelve a poder iniciar sesión con su misma cuenta, rol y contraseña. Se cierran sus sesiones viejas. Si no recuerda la contraseña, restablecésela después."
+          confirmLabel="Reactivar"
+          onCancel={() => setReactivando(null)}
+          onConfirm={async () => {
+            await platformApi.reactivateAdmin(reactivando.id)
+            setAviso(`${reactivando.name} quedó activo de nuevo.`)
+            setReactivando(null)
             recargar()
           }}
         />
@@ -559,6 +638,7 @@ function AdminFormModal({ admin, onClose, onSaved }: { admin: AdminRow | null; o
   const [email, setEmail] = useState(admin?.email ?? '')
   const [role, setRole] = useState<PlatformAdminRole>(admin?.role ?? 'OPERATOR')
   const [jobTitle, setJobTitle] = useState(admin?.jobTitle ?? '')
+  const [personalEmail, setPersonalEmail] = useState(admin?.personalEmail ?? '')
   const [error, setError] = useState('')
   const [guardando, setGuardando] = useState(false)
 
@@ -571,7 +651,7 @@ function AdminFormModal({ admin, onClose, onSaved }: { admin: AdminRow | null; o
     }
     setGuardando(true)
     try {
-      const input = { name: name.trim(), email: email.trim(), role, jobTitle: jobTitle.trim() }
+      const input = { name: name.trim(), email: email.trim(), role, jobTitle: jobTitle.trim(), personalEmail: personalEmail.trim() }
       if (admin) await platformApi.updateAdmin(admin.id, input)
       else await platformApi.createAdmin(input)
       onSaved()
@@ -598,20 +678,116 @@ function AdminFormModal({ admin, onClose, onSaved }: { admin: AdminRow | null; o
           {/* El backend no soporta cambiar el email de un admin existente. */}
           <input value={email} onChange={(e) => setEmail(e.target.value)} disabled={!!admin} className="ds-field" style={{ ...inputStyle, opacity: admin ? 0.6 : 1 }} />
         </Field>
+        <Field label="Correo personal (opcional)" hint="A este correo (Gmail, etc.) viaja la contraseña temporal cuando la restablecés, y también el código de acceso al panel, además del correo de la cuenta.">
+          <input type="email" value={personalEmail} onChange={(e) => setPersonalEmail(e.target.value)} placeholder="nombre@gmail.com" autoComplete="off" className="ds-field" style={inputStyle} />
+        </Field>
         <Field label="Rol">
           <select value={role} onChange={(e) => setRole(e.target.value as PlatformAdminRole)} className="ds-field" style={inputStyle}>
             <option value="OPERATOR">Operador</option>
+            <option value="MARKETING">Marketing (solo Marketing, Correo y Resumen)</option>
             <option value="SUPERADMIN">Super administrador</option>
           </select>
         </Field>
         {!admin && (
           <p style={{ margin: 0, fontSize: 12, color: 'var(--color-muted)' }}>
-            Sin contraseña inicial: entra vinculando su cuenta de Google en el primer login, o pedís que resetee la contraseña.
+            Sin contraseña inicial: entra vinculando su cuenta de Google en el primer login, o la creás después con "Restablecer contraseña" (le llega por mail).
           </p>
         )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 6 }}>
           <button type="button" onClick={onClose} className="ds-hover" style={btnGhost}>Cancelar</button>
           <button type="submit" disabled={guardando} className="ds-hover" style={btnPrimary}>{guardando ? 'Guardando…' : 'Guardar'}</button>
+        </div>
+      </form>
+    </ModalShell>
+  )
+}
+
+// Restablecer la contraseña de otro admin: se genera una temporal y se le manda por mail a su correo personal, junto con
+// el correo de la cuenta. La contraseña no se muestra acá: la ve solo quien recibe el mail.
+function RestablecerContrasenaModal({ admin, onClose, onEnviado }: { admin: AdminRow; onClose: () => void; onEnviado: (enviadoA: string) => void }) {
+  const [personalEmail, setPersonalEmail] = useState(admin.personalEmail ?? '')
+  const [error, setError] = useState('')
+  const [enviando, setEnviando] = useState(false)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError('')
+    if (!personalEmail.trim()) {
+      setError('Escribí el correo personal de esta persona.')
+      return
+    }
+    setEnviando(true)
+    try {
+      const res = await platformApi.resetAdminPassword(admin.id, personalEmail.trim())
+      onEnviado(res.enviadoA)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo restablecer la contraseña.')
+      setEnviando(false)
+    }
+  }
+
+  return (
+    <ModalShell onClose={onClose} title={`Restablecer la contraseña de ${admin.name}`}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {error && <ErrorBox msg={error} />}
+        <p style={{ margin: 0, fontSize: 13.5, color: 'var(--color-body)', lineHeight: 1.55 }}>
+          Le generamos una contraseña temporal y se la mandamos por mail junto con su correo de la cuenta (<strong>{admin.email}</strong>). Al entrar, el panel le pide elegir una propia. La temporal vence a las 72 horas y cierra sus sesiones abiertas.
+        </p>
+        <Field label="Correo personal al que se envía" hint="Se guarda en su cuenta: también recibe ahí el código de acceso al panel.">
+          <input type="email" value={personalEmail} onChange={(e) => setPersonalEmail(e.target.value)} placeholder="nombre@gmail.com" autoComplete="off" autoFocus className="ds-field" style={inputStyle} />
+        </Field>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 6 }}>
+          <button type="button" onClick={onClose} className="ds-hover" style={btnGhost}>Cancelar</button>
+          <button type="submit" disabled={enviando} className="ds-hover" style={btnPrimary}>{enviando ? 'Enviando…' : 'Enviar contraseña'}</button>
+        </div>
+      </form>
+    </ModalShell>
+  )
+}
+
+// Pantalla que reemplaza al panel mientras el admin tiene una contraseña temporal: "Contraseña actual" es la temporal.
+function ElegirContrasena({ email, onListo, onSalir }: { email: string; onListo: () => void; onSalir: () => void }) {
+  const [actual, setActual] = useState('')
+  const [nueva, setNueva] = useState('')
+  const [confirmar, setConfirmar] = useState('')
+  const [error, setError] = useState('')
+  const [guardando, setGuardando] = useState(false)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError('')
+    if (nueva.length < 8) { setError('La contraseña nueva tiene que tener al menos 8 caracteres.'); return }
+    if (nueva !== confirmar) { setError('Las contraseñas nuevas no coinciden.'); return }
+    if (nueva === actual) { setError('Elegí una contraseña distinta de la temporal.'); return }
+    setGuardando(true)
+    try {
+      await platformApi.changeOwnPassword(actual, nueva)
+      onListo()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo cambiar la contraseña. Intentá de nuevo.')
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <ModalShell title="Elegí tu contraseña" onClose={onSalir} cerrarAlClickAfuera={false}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <p style={{ margin: 0, fontSize: 13.5, color: 'var(--color-body)', lineHeight: 1.55 }}>
+          Entraste con una contraseña temporal ({email}). Elegí una propia para seguir usando el panel: en &quot;Contraseña actual&quot; va la temporal que te mandamos por mail.
+        </p>
+        {error && <ErrorBox msg={error} />}
+        <Field label="Contraseña actual (la temporal)">
+          <input type="password" value={actual} onChange={(e) => setActual(e.target.value)} autoComplete="current-password" autoFocus className="ds-field" style={inputStyle} />
+        </Field>
+        <Field label="Contraseña nueva">
+          <input type="password" value={nueva} onChange={(e) => setNueva(e.target.value)} placeholder="Mínimo 8 caracteres" autoComplete="new-password" className="ds-field" style={inputStyle} />
+        </Field>
+        <Field label="Repetí la contraseña nueva">
+          <input type="password" value={confirmar} onChange={(e) => setConfirmar(e.target.value)} autoComplete="new-password" className="ds-field" style={inputStyle} />
+        </Field>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 6 }}>
+          <button type="button" onClick={onSalir} className="ds-hover" style={btnGhost}>Cerrar sesión</button>
+          <button type="submit" disabled={guardando || !actual || !nueva || !confirmar} className="ds-hover" style={btnPrimary}>{guardando ? 'Guardando…' : 'Guardar contraseña'}</button>
         </div>
       </form>
     </ModalShell>

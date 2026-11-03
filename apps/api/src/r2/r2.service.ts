@@ -1,6 +1,6 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 // Cloudflare R2 — almacenamiento de los VIDEOS (de producto y del storefront
@@ -104,6 +104,48 @@ export class R2Service {
     } catch (err) {
       this.logger.error(`No se pudo firmar la subida a R2 (${bucket}/${path}): ${(err as Error).message}`);
       throw new ServiceUnavailableException('No se pudo preparar la subida: probá de nuevo en un rato');
+    }
+  }
+
+  // Descarga firmada: el navegador baja el archivo (Content-Disposition: attachment) en vez de abrirlo en el reproductor.
+  // 10 minutos para empezar la descarga.
+  async presignDescarga(path: string, nombreDeArchivo: string): Promise<string> {
+    const bucket = this.config.get<string>('R2_BUCKET') ?? 'orbita';
+    const nombre = nombreDeArchivo.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120) || 'video.mp4';
+    try {
+      return await getSignedUrl(
+        this.client,
+        new GetObjectCommand({ Bucket: bucket, Key: path, ResponseContentDisposition: `attachment; filename="${nombre}"` }),
+        { expiresIn: 600 },
+      );
+    } catch (err) {
+      this.logger.error(`No se pudo firmar la descarga de R2 (${bucket}/${path}): ${(err as Error).message}`);
+      throw new ServiceUnavailableException('No se pudo preparar la descarga: probá de nuevo en un rato');
+    }
+  }
+
+  /** Si el archivo existe, su tamaño en bytes; si no existe, null. Un error real del proveedor sí se propaga. */
+  async tamanioDe(path: string): Promise<number | null> {
+    const bucket = this.config.get<string>('R2_BUCKET') ?? 'orbita';
+    try {
+      const r = await this.client.send(new HeadObjectCommand({ Bucket: bucket, Key: path }));
+      return r.ContentLength ?? 0;
+    } catch (err) {
+      const e = err as { name?: string; $metadata?: { httpStatusCode?: number } };
+      if (e.name === 'NotFound' || e.name === 'NoSuchKey' || e.$metadata?.httpStatusCode === 404) return null;
+      this.logger.error(`No se pudo consultar R2 (${bucket}/${path}): ${(err as Error).message}`);
+      throw new ServiceUnavailableException('El almacenamiento no respondió, probá de nuevo en un rato');
+    }
+  }
+
+  /** Borra el archivo. Borrar uno que no existe no es un error en R2. */
+  async eliminar(path: string): Promise<void> {
+    const bucket = this.config.get<string>('R2_BUCKET') ?? 'orbita';
+    try {
+      await this.client.send(new DeleteObjectCommand({ Bucket: bucket, Key: path }));
+    } catch (err) {
+      this.logger.error(`No se pudo borrar de R2 (${bucket}/${path}): ${(err as Error).message}`);
+      throw new ServiceUnavailableException('No se pudo borrar el archivo: el almacenamiento no respondió, probá de nuevo en un rato');
     }
   }
 }

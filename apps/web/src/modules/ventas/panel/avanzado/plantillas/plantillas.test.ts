@@ -8,10 +8,11 @@ import { fileURLToPath } from 'node:url'
 import { PLANTILLAS } from './datos'
 import { EsqueletoPlantilla } from './esqueleto'
 import { Home, LAYOUTS_CON_HEADER_PROPIO, FRACCION_MAXIMA_HERO } from './homes'
-import { itemsMenuMovil } from './piezas'
+import { itemsMenuMovil, navDe, CSS } from './piezas'
+import { navRealDe } from '@/components/storefront/StorefrontHeader'
 import { SECCIONES_POR_PLANTILLA, TITULOS_ESTANTE, dibujaCupon, seccionesDe } from './secciones'
 import { BLOQUES_ESTANDAR, ESTANTES, type AccionesHome, type Plantilla } from './tipos'
-import { plantillaReal } from '@/modules/ventas/cliente/inicio/plantillaReal'
+import { plantillaReal, slidesPorDefecto, degradeAutomatico } from '@/modules/ventas/cliente/inicio/plantillaReal'
 import type { Producto } from '@/lib/storefront/types'
 
 // El modo check de las plantillas de Home. Correr con `pnpm test plantillas`.
@@ -897,7 +898,7 @@ describe('en celular, el hero se desliza con el dedo', () => {
     it(p.id, () => {
       const mal: string[] = []
       const html = dibujar({ p: plantillaReal({ base: p, ...TIENDAS.completa }), movil: true, acciones: ACCIONES, soloCuerpo: !p.headerPropio })
-      if (!sinLinksYEstilos(html).startsWith('<div style="display:contents">')) mal.push('la portada no viene dentro del envoltorio que escucha el gesto')
+      if (!sinLinksYEstilos(html).startsWith('<div data-pl-raiz="" style="display:contents">')) mal.push('la portada no viene dentro del envoltorio que escucha el gesto')
 
       const region = regionDelHeroEnHtml(html)
       if (region === null) {
@@ -940,11 +941,138 @@ describe('el menú de celular vuelve al inicio', () => {
     expect(itemsMenuMovil([], con({ nav: [] })).map(i => i.label)).toEqual(['Inicio'])
   })
 
-  it('con el header en "minimal" no hay menú, como antes', () => {
-    expect(itemsMenuMovil([], con({ navLayout: 'minimal' }))).toEqual([])
+  it('con el header en "minimal" no hay enlaces del catálogo, pero "Inicio" sí', () => {
+    expect(itemsMenuMovil([], con({ navLayout: 'minimal' })).map(i => i.label)).toEqual(['Inicio'])
   })
 
   it('en la vitrina del panel (sin acciones) la hamburguesa queda como estaba', () => {
     expect(itemsMenuMovil(['Uno', 'Dos'], undefined).map(i => i.label)).toEqual(['Uno', 'Dos'])
+  })
+})
+
+describe('enlaces del nav', () => {
+  it('en la vitrina (sin acciones) todos los enlaces hacen algo: no quedan muertos', () => {
+    const nav = navDe(['Inicio', 'Catálogo', 'Ofertas', 'Contacto'])
+    expect(nav.map(l => typeof l.onClick)).toEqual(['function', 'function', 'function', 'function'])
+  })
+
+  it('en la tienda real los enlaces son los de Apariencia, sin tocar', () => {
+    const real = [{ label: 'Catálogo', onClick: () => {} }]
+    expect(navDe(['Otro'], { nav: real } as never)).toBe(real)
+  })
+
+  it('el hover del nav no baja la opacidad (sobre un gris quedaba un gris sucio)', () => {
+    const hover = CSS.split('\n').find(l => l.startsWith('.pl-nav:hover'))
+    expect(hover).toBeTruthy()
+    expect(hover).not.toMatch(/opacity/)
+    expect(hover).toMatch(/underline/)
+  })
+})
+
+describe('enlaces del header de una tienda real', () => {
+  it('headerLinks vacío es "nunca configurado": salen los de siempre, no los de muestra', () => {
+    expect(navRealDe([]).map(l => l.label)).toEqual(['Catálogo', 'Ofertas', 'Más vendidos'])
+    expect(navRealDe(undefined).length).toBe(3)
+  })
+
+  it('con todos apagados no hay enlaces, y la portada no pinta los de la maqueta', () => {
+    const todosApagados = [{ id: 'catalogo', label: 'Catálogo', on: false }]
+    expect(navRealDe(todosApagados)).toEqual([])
+    expect(navDe(['Cocina', 'Textil'], { nav: [] } as never)).toEqual([])
+  })
+})
+
+// ─── Los sliders por defecto ─────────────────────────────────────────────────
+//
+// Una tienda sin ningún slider propio no queda pelada arriba: ve hasta tres,
+// uno por categoría, con un texto genérico y un degradé del color de la marca.
+// Son virtuales (no están guardados): en cuanto el dueño carga el suyo,
+// desaparecen. Los dibuja el hero de cada plantilla (las de `heroPropio`, acá)
+// y el HeroCarousel del home clásico (Inicio.tsx, con la misma función).
+
+describe('sliders por defecto', () => {
+  const cats = (n: number) => Array.from({ length: n }, (_, i) => ({ nombre: `Rubro ${RUBROS[i]}`, slug: `rubro-${RUBROS[i].toLowerCase()}`, count: i + 1 }))
+
+  describe('qué se arma', () => {
+    it('con cuatro categorías o más, tres: las que más productos tienen', () => {
+      const s = slidesPorDefecto(cats(5))
+      expect(s).toHaveLength(3)
+      expect(s.map(x => x.titulo)).toEqual(['Rubro ' + RUBROS[4], 'Rubro ' + RUBROS[3], 'Rubro ' + RUBROS[2]])
+    })
+
+    it('con menos de tres no repite una para llegar a tres', () => {
+      expect(slidesPorDefecto(cats(2))).toHaveLength(2)
+      expect(slidesPorDefecto(cats(1))).toHaveLength(1)
+    })
+
+    it('cada slide lleva directo a su categoría, sin foto y marcado como automático', () => {
+      for (const [i, x] of slidesPorDefecto(cats(3)).entries()) {
+        expect(x.automatico).toBe(true)
+        expect(x.img).toBeNull()
+        expect(x.ctaLink).toMatch(/^\/catalogo\?cat=rubro-/)
+        expect(x.id).toBe(`auto-${x.ctaLink!.split('=')[1]}`)
+        expect(x.titulo.length).toBeGreaterThan(0)
+        expect(x.cta).toBe('Ver productos')
+        expect(degradeAutomatico('var(--color-primary)', i)).toMatch(/^linear-gradient\(/)
+      }
+    })
+
+    it('el texto no promete nada: ni precios, ni envíos, ni cantidades', () => {
+      for (const x of slidesPorDefecto(cats(3))) expect(`${x.subtitulo} ${x.cta}`).not.toMatch(/[\d$%]|gratis|env[ií]o|cuotas/i)
+    })
+
+    it('un nombre de categoría larguísimo se recorta: no desborda el hero en el celular', () => {
+      const [x] = slidesPorDefecto([{ nombre: 'Accesorios y repuestos para bicicletas de ruta y de montaña', slug: 'larga', count: 1 }])
+      expect(x.titulo.length).toBeLessThanOrEqual(36)
+      expect(x.titulo.endsWith('…')).toBe(true)
+    })
+
+    it('sin categorías, uno solo de bienvenida al catálogo, con el nombre del negocio', () => {
+      const s = slidesPorDefecto([], 'Negocio Check', 'Bajada Check')
+      expect(s).toHaveLength(1)
+      expect(s[0]).toMatchObject({ titulo: 'Negocio Check', subtitulo: 'Bajada Check', ctaLink: '/catalogo', automatico: true })
+      expect(slidesPorDefecto([])[0].titulo).toBe('Bienvenidos')
+    })
+
+    it('ignora las categorías sin nombre o sin slug', () => {
+      expect(slidesPorDefecto([{ nombre: '  ', slug: 'x' }, { nombre: 'Y', slug: '' }])[0].ctaLink).toBe('/catalogo')
+    })
+  })
+
+  describe('en la portada de cada plantilla', () => {
+    // Las tiendas de prueba con categorías pero sin un slider propio.
+    const sinSlidersPropios = (nombre: keyof typeof TIENDAS): Tienda => ({ ...TIENDAS[nombre], heroSlides: [] })
+    const portada = (p: Plantilla, t: Tienda, movil: boolean) => dibujar({
+      p: plantillaReal({ base: p, ...t }), movil, acciones: ACCIONES, soloCuerpo: !p.headerPropio,
+    })
+
+    for (const p of PLANTILLAS.filter(x => x.heroPropio)) {
+      it(p.id, () => {
+        const mal: string[] = []
+        for (const movil of [false, true]) {
+          const donde = movil ? 'celular' : 'compu'
+          // Con categorías: el primer slide es el de la categoría con más productos.
+          for (const nombre of ['minima', 'completa', 'grande'] as const) {
+            const t = sinSlidersPropios(nombre)
+            const esperados = slidesPorDefecto(t.categorias.map(c => ({ nombre: c.nombre, slug: c.slug })))
+            const real = plantillaReal({ base: p, ...t }).slides
+            if (real.length !== esperados.length) mal.push(`[${nombre}, ${donde}] arma ${real.length} slides y tendrían que ser ${esperados.length}`)
+            if (real.some(s => !s.img.startsWith('linear-gradient') || s.fotoPropia)) mal.push(`[${nombre}, ${donde}] un slide por defecto lleva una foto: tendría que ser un degradé`)
+            if (real[0]?.link !== esperados[0]?.ctaLink) mal.push(`[${nombre}, ${donde}] el primer slide no lleva a su categoría`)
+            if (!dice(nodos(portada(p, t, movil)), esperados[0].titulo)) mal.push(`[${nombre}, ${donde}] no se lee el slide por defecto "${esperados[0].titulo}"`)
+          }
+          // Sin categorías: la bienvenida con el nombre del negocio.
+          if (!dice(nodos(portada(p, sinSlidersPropios('vacia'), movil)), 'Negocio Check')) mal.push(`[vacia, ${donde}] sin categorías no se lee el nombre del negocio en el hero`)
+          // Con un slider propio, ninguno por defecto.
+          const propio = portada(p, TIENDAS.completa, movil)
+          if (!propio.includes('Hero Check')) mal.push(`[completa, ${donde}] el slider propio no se ve`)
+          for (const c of TIENDAS.completa.categorias) {
+            const slide = slidesPorDefecto([{ nombre: c.nombre, slug: c.slug }])[0]
+            if (propio.includes(slide.subtitulo)) mal.push(`[completa, ${donde}] con un slider propio se sigue viendo uno por defecto`)
+          }
+        }
+        sinProblemas(`sliders por defecto > ${p.id}`, mal)
+      })
+    }
   })
 })

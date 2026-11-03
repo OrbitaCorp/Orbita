@@ -3,6 +3,7 @@ import { SkipThrottle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import { Public } from '../common/decorators/public.decorator';
 import { WhatsappService, WaWebhookBody } from './whatsapp.service';
+import { WhatsappBotService } from './whatsapp-bot.service';
 
 // Webhook ÚNICO de WhatsApp para toda la plataforma (Meta lo registra una sola
 // vez en la app). Es público — Meta no tiene sesión —, así que la autenticidad
@@ -15,7 +16,10 @@ import { WhatsappService, WaWebhookBody } from './whatsapp.service';
 @Controller('webhooks/whatsapp')
 @SkipThrottle()
 export class WhatsappWebhookController {
-  constructor(private readonly whatsapp: WhatsappService) {}
+  constructor(
+    private readonly whatsapp: WhatsappService,
+    private readonly bot: WhatsappBotService,
+  ) {}
 
   // Verificación al registrar el webhook: Meta llama con hub.* y espera el
   // challenge tal cual, como texto.
@@ -42,7 +46,10 @@ export class WhatsappWebhookController {
     if (!this.whatsapp.firmaValida(req.rawBody, firma)) throw new ForbiddenException();
     // Siempre 200 rápido: Meta reintenta durante días si no lo recibe. Los
     // errores por mensaje se registran adentro sin cortar el resto.
-    await this.whatsapp.procesarWebhook(body);
+    const nuevos = await this.whatsapp.procesarWebhook(body);
+    // Orbi atiende los chats donde corresponde. Va dentro del pedido (Cloud Run no le da CPU a lo que corre después de
+    // contestar) y no puede tirar: el webhook siempre responde 200.
+    if (nuevos.length > 0) await this.bot.atender(nuevos);
     return { received: true };
   }
 }

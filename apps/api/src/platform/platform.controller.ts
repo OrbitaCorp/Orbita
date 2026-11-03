@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req, ServiceUnavailableException, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { PlatformAdminGuard } from '../common/guards/platform-admin.guard';
-import { SoloSuperadmin } from '../common/decorators/platform-role.decorator';
+import { SoloSuperadmin, TodoElEquipo } from '../common/decorators/platform-role.decorator';
 import { PlatformAdminContext } from '../common/types/auth-context.type';
 import { PlatformService } from './platform.service';
 import { WizardAnalyticsService } from '../wizard-analytics/wizard-analytics.service';
@@ -9,6 +10,8 @@ import { ListBusinessesQueryDto } from './dto/list-businesses-query.dto';
 import { SuspendBusinessDto } from './dto/suspend-business.dto';
 import { GrantCompDto } from './dto/grant-comp.dto';
 import { UpsertPlatformAdminDto } from './dto/upsert-platform-admin.dto';
+import { ResetAdminPasswordDto } from './dto/reset-admin-password.dto';
+import { ChangeOwnPasswordDto } from './dto/change-own-password.dto';
 import { ListLogsQueryDto } from './dto/list-logs-query.dto';
 import { SeriesQueryDto } from './dto/series-query.dto';
 import { SendMailTestDto } from './dto/send-mail-test.dto';
@@ -73,13 +76,18 @@ export class PlatformController {
 
   // ── Dashboard / lecturas ──────────────────────────────────────────────────
 
+  // Marketing ve cómo crece la plataforma, no la facturación: a su rol se le saca lo que es plata (el resto del Resumen es conteo de negocios).
   @Get('overview')
-  overview() {
-    return this.platformService.overview();
+  @TodoElEquipo()
+  async overview(@Req() req: RequestWithAdmin) {
+    const resumen = await this.platformService.overview();
+    if (req.user.adminRole !== 'MARKETING') return resumen;
+    return { ...resumen, subscriptions: { byStatus: {}, byOrigin: {}, mrr: 0, currency: resumen.subscriptions.currency } };
   }
 
   // Series para los gráficos del dashboard (RBT — dashboard de super admin).
   @Get('growth-series')
+  @TodoElEquipo()
   growthSeries(@Query() query: SeriesQueryDto) {
     return this.platformService.growthSeries(query);
   }
@@ -226,10 +234,32 @@ export class PlatformController {
     return this.platformService.updateAdmin(req.user.adminId, id, dto);
   }
 
+  // Genera una contraseña temporal y se la manda por mail al correo personal de ese admin (con el correo de la cuenta).
+  @Post('admins/:id/reset-password')
+  @SoloSuperadmin()
+  @Throttle({ default: { limit: 10, ttl: 900_000 } })
+  resetAdminPassword(@Req() req: RequestWithAdmin, @Param('id') id: string, @Body() dto: ResetAdminPasswordDto) {
+    return this.platformService.resetAdminPassword(req.user.adminId, id, dto);
+  }
+
+  // Cualquier admin cambia SU contraseña (la actual como verificación). Es la salida de la contraseña temporal.
+  @Post('me/change-password')
+  @Throttle({ default: { limit: 5, ttl: 900_000 } })
+  changeOwnPassword(@Req() req: RequestWithAdmin, @Body() dto: ChangeOwnPasswordDto) {
+    return this.platformService.changeOwnPassword(req.user.adminId, dto);
+  }
+
   @Delete('admins/:id')
   @SoloSuperadmin()
   removeAdmin(@Req() req: RequestWithAdmin, @Param('id') id: string) {
     return this.platformService.removeAdmin(req.user.adminId, id);
+  }
+
+  // Vuelve a habilitar a un admin que se había desactivado.
+  @Post('admins/:id/reactivate')
+  @SoloSuperadmin()
+  reactivateAdmin(@Req() req: RequestWithAdmin, @Param('id') id: string) {
+    return this.platformService.reactivateAdmin(req.user.adminId, id);
   }
 
   // ── Testeo de plantillas de email (RBT-607) ─────────────────────────────

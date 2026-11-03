@@ -31,6 +31,8 @@ export const PET_MODULOS: PetModulo[] = [
   { id: 'clientes', nombre: 'Clientes', cuerpo: 's3', cara: 'f3', visor: [-8, 0], accesorio: 'ac3', gesto: 'wiggle', frase: 'Te ayudo a conocer mejor a tus clientes.' },
   { id: 'productos', nombre: 'Productos', cuerpo: 's4', cara: 'f10', visor: [0, 8], accesorio: 'ac10', gesto: 'sort', frase: 'Todo en su lugar: ordenemos tu catálogo y tu stock.' },
   { id: 'mensajes', nombre: 'Mensajes', cuerpo: 's5', cara: 'f5', visor: [0, -2], accesorio: 'ac5', gesto: 'pulse', frase: 'Te ayudo a responderle a tus clientes.' },
+  // Forma provisional: arma el cuerpo de Mensajes con cara y accesorio de otros módulos. Falta el diseño propio.
+  { id: 'difusion', nombre: 'Difusión', cuerpo: 's5', cara: 'f3', visor: [0, -2], accesorio: 'ac3', gesto: 'wiggle', frase: 'Armemos algo para que más gente te conozca.' },
   { id: 'descuentos', nombre: 'Descuentos', cuerpo: 's6', cara: 'f6', visor: [0, 8], accesorio: 'ac6', gesto: 'spin', frase: '¡Armemos un cupón con tope y vencimiento!' },
   { id: 'config', nombre: 'Configuración', cuerpo: 's7', cara: 'f4', visor: [0, 0], accesorio: 'ac11', gesto: 'tilt', frase: 'Mmm, dejame pensar… ¿ajustamos tu tienda, tu dominio y tus cobros?' },
   { id: 'avanzado', nombre: 'Avanzado', cuerpo: 's8', cara: 'f8', visor: [0, 0], accesorio: 'ac8', gesto: 'flip', frase: 'Probemos algo nuevo para vender más.' },

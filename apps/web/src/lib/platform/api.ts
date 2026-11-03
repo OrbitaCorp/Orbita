@@ -4,6 +4,7 @@
 // así que no se manda X-Business-Slug.
 
 import { authedFetch } from '@/lib/auth/authClient'
+import type { InstagramArchivoSubido, InstagramEstadisticas, InstagramItemPublicacion, InstagramPublicacion, InstagramPublicacionComentada, InstagramRendimiento } from '@/lib/api'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'
 
@@ -68,6 +69,183 @@ export type CorreoEnviado = {
   createdAt: string
 }
 export type CorreoInput = { senderId: string; to: string; subject: string; body: string }
+export type CorreoRecibido = {
+  messageId: string
+  folderId: string
+  fromEmail: string
+  fromName: string
+  to: string
+  subject: string
+  summary: string
+  receivedAt: string
+  unread: boolean
+}
+
+// Un negocio que pidió acceso anticipado a Instagram: PENDING hasta que el equipo lo suma como
+// evaluador en Meta y lo habilita.
+export type InstagramPedido = {
+  businessId: string
+  username: string
+  status: 'PENDING' | 'ENABLED'
+  requestedAt: string
+  enabledAt: string | null
+  business: { name: string; subdomain: string }
+}
+
+// Marketing de Órbita en TikTok (ver apps/api/src/marketing/tiktok/).
+// Instagram y WhatsApp de la empresa: se leen del negocio al que están conectados (ver apps/api/src/marketing/canales.service.ts).
+export type MarketingCanales = {
+  negocio: { nombre: string; subdominio: string } | null
+  instagram:
+    | { conectado: false }
+    | {
+        conectado: true; usuario: string | null; venceEl: string; diasRestantes: number; mensajesSinLeer: number
+        /** Los permisos del kit de difusión que concedió la cuenta: sin ellos hay que volver a conectarla. */
+        permisos: { publicar: boolean; comentarios: boolean; estadisticas: boolean }
+      }
+  whatsapp: { conectado: false } | { conectado: true; numero: string | null; dePrueba: boolean }
+}
+// Lo que se manda para publicar o programar en la cuenta de la empresa: de 1 a 10 elementos (varios forman un carrusel).
+export type IgPublicacionInput = { caption: string; formato: 'cuadrado' | 'vertical'; items: InstagramItemPublicacion[] }
+// Todo lo publicado en la cuenta de Instagram de la empresa, con sus números (ver instagram-contenido.service.ts).
+// null = Instagram no dio ese número para esa publicación.
+export type IgPublicacionDeLaCuenta = {
+  id: string
+  tipo: 'foto' | 'video' | 'carrusel'
+  reel: boolean
+  texto: string
+  imagen: string | null
+  enlace: string | null
+  fecha: string | null
+  likes: number
+  comentarios: number
+  vistas: number | null
+  alcance: number | null
+  guardados: number | null
+  compartidos: number | null
+}
+// Los videos de la cuenta de TikTok de la empresa y sus números (ver tiktok.service.ts, contenidoDeLaCuenta).
+export type TiktokVideo = {
+  id: string
+  titulo: string
+  portada: string | null
+  enlace: string | null
+  fecha: string | null
+  duracionSeg: number
+  vistas: number
+  likes: number
+  comentarios: number
+  compartidos: number
+}
+export type TiktokContenido = {
+  /** null = a la conexión le falta el permiso `video.list`. */
+  videos: TiktokVideo[] | null
+  /** null = a la conexión le falta el permiso `user.info.stats`. */
+  perfil: { seguidores: number; siguiendo: number; likes: number; videos: number } | null
+  /** Los permisos de TikTok que la conexión no tiene. */
+  faltan: string[]
+}
+// La bandeja de mensajes directos de Instagram de la empresa (ver apps/api/src/marketing/instagram-bandeja.service.ts).
+export type IgConversacion = {
+  id: string
+  nombre: string
+  avatar: string | null
+  sinLeer: boolean
+  ultimo: { texto: string; esMio: boolean; fecha: string } | null
+  actualizadaEl: string
+}
+export type IgMensaje = { id: string; sender: 'CUSTOMER' | 'STORE'; text: string; channel: string; createdAt: string }
+export type TiktokEstado = {
+  configurado: boolean
+  conectado: boolean
+  cuenta: { nombre: string | null; avatar: string | null; permisos: string[]; conectadaEl: string; renovacionVenceEl: string } | null
+}
+export type TiktokCreador = {
+  avatar: string | null
+  usuario: string
+  nombre: string
+  privacidades: string[]
+  comentariosDeshabilitados: boolean
+  duetosDeshabilitados: boolean
+  stitchDeshabilitado: boolean
+  duracionMaximaSeg: number
+}
+export type TiktokPublicacion = {
+  id: string
+  publishId: string
+  title: string
+  privacyLevel: string
+  videoUrl: string
+  status: string
+  failReason: string | null
+  postId: string | null
+  createdAt: string
+}
+export type TiktokPublicar = {
+  title: string
+  videoUrl: string
+  privacyLevel: string
+  disableComment?: boolean
+  disableDuet?: boolean
+  disableStitch?: boolean
+  brandContent?: boolean
+  brandOrganic?: boolean
+  isAigc?: boolean
+}
+
+// ─── Marketing → Prospección (apps/api/src/marketing/prospeccion) ──────────────
+export type ProspectoNivel = 'A' | 'B' | 'C' | 'D' | '—'
+export type ProspectoEstado = 'NUEVO' | 'CONTACTADO' | 'RESPONDIO' | 'DEMO' | 'CLIENTE' | 'DESCARTADO' | 'NO_CONTACTAR'
+export type ProspectoEvaluacion = { puntaje: number | null; nivel: ProspectoNivel; accion: string; motivo: string; subrubro: string | null; partes: Record<string, number> }
+export type ProspectoDatos = {
+  usuario: string; nombre: string | null; bio: string; web: string | null; enlace: string
+  seguidores: number; publicaciones: number; postsPorSemana: number | null; diasDesdeUltimo: number | null; engagementPct: number | null; local: boolean
+}
+export type ProspectoAnalisis = {
+  usuario: string; subrubro: string; confianza: 'alta' | 'media' | 'baja'; vende_productos: boolean | null; canal_venta: string
+  senales_dolor: string[]; nivel_final: 'A' | 'B' | 'C' | 'D'; motivo: string; angulo: string; mensaje_sugerido: string
+}
+export type Prospecto = {
+  id: string; usuario: string; datos: ProspectoDatos; evaluacion: ProspectoEvaluacion; analisis: ProspectoAnalisis | null
+  analizadoAt: string | null; estado: ProspectoEstado; notas: string | null; ultimaConsultaAt: string
+}
+export type ProspeccionLote = { id: string; createdAt: string; creadoPor: string; cuentas: number; sinDatos: number; niveles: Record<string, number>; analizadas: number }
+export type ProspeccionLoteDetalle = { id: string; createdAt: string; versionCriterio: string; sinDatos: { usuario: string; motivo: string }[]; prospectos: Prospecto[] }
+export type ProspeccionConsulta = {
+  lote: { id: string; createdAt: string }
+  conDatos: number
+  sinDatos: { usuario: string; motivo: string }[]
+  resumen: { usuario: string; puntaje: number | null; nivel: ProspectoNivel; subrubro: string | null; estado: ProspectoEstado }[]
+  aviso: string | null
+}
+export type McpSolicitud = { cliente: string; retorno: string; permisos: string[]; dominios: string[]; usuario: string }
+
+export type VideoEstado = 'PENDIENTE' | 'APROBADO' | 'PUBLICADO'
+export type VideoTipo = 'MARKETING' | 'TUTORIAL'
+export type VideoControl = { nombre: string; ok: boolean; detalle: string }
+export type VideoDeCola = {
+  id: string; tipo: VideoTipo; titulo: string; formato: 'REEL_9_16' | 'CUADRADO' | 'HORIZONTAL_16_9'; guion: string; caption: string
+  duracionSeg: number | null; bytes: number; estado: VideoEstado; controles: VideoControl[]; url: string
+  tutorialId: string | null
+  /** Si es una versión mejorada de otro video de la cola, el original. */
+  mejoraDeId: string | null
+  comentarios: number
+  aprobadoAt: string | null; publicaciones: { destino: 'tiktok' | 'instagram'; id: string; fecha: string }[]
+  expiraAt: string | null; createdAt: string
+  /** Qué puede hacer QUIEN MIRA con este video (el servidor nunca dice quién aprobó ni qué falta). */
+  puedeAprobar?: boolean; puedeRechazar?: boolean; yaAprobaste?: boolean; esTuyo?: boolean
+}
+export type VideoComentario = { id: string; autor: string; texto: string; fecha: string; esTuyo: boolean }
+export type TutorialEstado = 'FALTA' | 'EN_PROCESO' | 'EN_REVISION' | 'HECHO'
+export type ResponsableTutorial = 'ALAN' | 'MATEO' | 'ALE'
+export type TutorialDeLaLista = {
+  id: string; grupo: string; titulo: string; estado: TutorialEstado; asignadoA: ResponsableTutorial | null; opcional: boolean; prioridadAlta: boolean
+  notas: string | null; videoId: string | null; updatedAt: string
+}
+export type TutorialesRespuesta = {
+  resumen: { total: number; hechos: number; enRevision: number; enProceso: number; faltan: number }
+  tutoriales: TutorialDeLaLista[]
+}
 
 async function getJSON<T>(path: string): Promise<T> {
   const res = await authedFetch(`${API_BASE}${path}`, { method: 'GET' })
@@ -75,7 +253,19 @@ async function getJSON<T>(path: string): Promise<T> {
   return (await res.json()) as T
 }
 
-async function sendJSON<T>(path: string, method: 'POST' | 'PUT' | 'DELETE', body?: unknown): Promise<T> {
+// Igual que getJSON, pero el error lleva el motivo que dio el servidor (por ejemplo "Falta autorizar los comentarios:
+// volvé a conectar Instagram"), que la pantalla muestra tal cual en vez de un "Platform API 403".
+async function getJSONConMensaje<T>(path: string): Promise<T> {
+  const res = await authedFetch(`${API_BASE}${path}`, { method: 'GET' })
+  const data = await res.json().catch(() => null)
+  if (!res.ok) {
+    const msg = (data as { message?: string | string[] } | null)?.message
+    throw new PlatformApiError(res.status, Array.isArray(msg) ? msg.join('. ') : (msg ?? `Platform API ${res.status}`))
+  }
+  return data as T
+}
+
+async function sendJSON<T>(path: string, method: 'POST' | 'PUT' | 'PATCH' | 'DELETE', body?: unknown): Promise<T> {
   const res = await authedFetch(`${API_BASE}${path}`, {
     method,
     headers: { 'Content-Type': 'application/json' },
@@ -451,7 +641,7 @@ export interface OrbiConversacionAbierta {
   mensajes: { rol: 'user' | 'assistant'; texto: string; fecha: string | null }[]
 }
 
-export type PlatformAdminRole = 'SUPERADMIN' | 'OPERATOR'
+export type PlatformAdminRole = 'SUPERADMIN' | 'OPERATOR' | 'MARKETING'
 
 export interface AdminRow {
   id: string
@@ -459,8 +649,12 @@ export interface AdminRow {
   email: string
   role: PlatformAdminRole
   jobTitle: string | null
+  // Correo personal (Gmail, etc.): a donde viaja la contraseña temporal y, además del de la cuenta, el código de acceso.
+  personalEmail: string | null
   isActive: boolean
   hasPassword: boolean
+  // Tiene una contraseña temporal sin cambiar (todavía no eligió una propia).
+  hasTempPassword: boolean
   hasGoogle: boolean
   lastAccessAt: string | null
   createdAt: string
@@ -471,6 +665,8 @@ export interface UpsertAdminInput {
   email: string
   role: PlatformAdminRole
   jobTitle?: string
+  // Ausente = no se toca; vacío = se borra.
+  personalEmail?: string
 }
 
 export interface LogRow {
@@ -938,12 +1134,99 @@ export const platformApi = {
     return getJSON<BusinessList>(`/platform/businesses${q ? `?${q}` : ''}`)
   },
   business: (id: string) => getJSON<BusinessDetail>(`/platform/businesses/${id}`),
+  // Pedidos de acceso anticipado a Instagram (apps/api/src/instagram/instagram-admin.controller.ts).
+  instagramPedidos: () => getJSON<InstagramPedido[]>('/platform/instagram/acceso'),
+  // `avisado`: salió el correo "tu acceso está listo" al dueño (false si ya estaba habilitado o falló el envío).
+  instagramHabilitar: (businessId: string) => sendJSON<{ avisado: boolean }>(`/platform/instagram/acceso/${businessId}/habilitar`, 'POST'),
+  instagramDeshabilitar: (businessId: string) => sendJSON<unknown>(`/platform/instagram/acceso/${businessId}/deshabilitar`, 'POST'),
   suspendBusiness: (id: string, reason?: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/suspend`, 'POST', { reason }),
   reactivateBusiness: (id: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/reactivate`, 'POST'),
   hideBusinessFromSearch: (id: string, reason?: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/hide-from-search`, 'POST', { reason }),
   showBusinessInSearch: (id: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/show-in-search`, 'POST'),
   businessSearchConsole: (id: string) => getJSON<GoogleResumen>(`/platform/businesses/${id}/search-console`),
   syncBusinessSearchConsole: (id: string) => sendJSON<GoogleSincronizacion>(`/platform/businesses/${id}/search-console/sync`, 'POST'),
+  marketingCanales: () => getJSON<MarketingCanales>('/platform/marketing/channels'),
+  igConversaciones: () => getJSON<IgConversacion[]>('/platform/marketing/instagram/conversations'),
+  igMensajes: (id: string) => getJSON<IgMensaje[]>(`/platform/marketing/instagram/conversations/${id}/messages`),
+  igConectar: () => sendJSON<{ url: string }>('/platform/marketing/instagram/connect', 'POST'),
+  // Contenido de la cuenta: publicaciones, comentarios y estadísticas (mismas formas que Difusión en el panel de un negocio).
+  igPublicacionesDeLaCuenta: () => getJSONConMensaje<IgPublicacionDeLaCuenta[]>('/platform/marketing/instagram/posts/account'),
+  igPublicacionesDeOrbita: () => getJSONConMensaje<InstagramPublicacion[]>('/platform/marketing/instagram/posts'),
+  igPublicar: (input: IgPublicacionInput) => sendJSON<InstagramPublicacion>('/platform/marketing/instagram/posts', 'POST', input),
+  igProgramar: (input: IgPublicacionInput & { programarPara: string }) => sendJSON<InstagramPublicacion>('/platform/marketing/instagram/posts/schedule', 'POST', input),
+  igContinuarPublicacion: (id: string) => sendJSON<InstagramPublicacion>(`/platform/marketing/instagram/posts/${id}/continuar`, 'POST'),
+  igDescartarPublicacion: (id: string) => sendJSON<{ ok: true }>(`/platform/marketing/instagram/posts/${id}`, 'DELETE'),
+  igSubirFoto: async (file: File): Promise<InstagramArchivoSubido> => {
+    const form = new FormData()
+    form.append('file', file, file.name)
+    const res = await authedFetch(`${API_BASE}/platform/marketing/instagram/media/foto`, { method: 'POST', body: form })
+    const data = (await res.json().catch(() => null)) as (InstagramArchivoSubido & { message?: string | string[] }) | null
+    if (!res.ok || !data?.ref) {
+      const msg = data?.message
+      throw new PlatformApiError(res.status, Array.isArray(msg) ? msg.join('. ') : (msg ?? 'No se pudo subir la foto.'))
+    }
+    return data
+  },
+  // El video no pasa por la API (pesa demasiado): se pide una dirección firmada y el navegador lo sube directo al almacenamiento.
+  igSubirVideo: async (file: File, onProgreso?: (porcentaje: number) => void): Promise<InstagramArchivoSubido> => {
+    const tipo = file.type || (file.name.toLowerCase().endsWith('.mov') ? 'video/quicktime' : 'video/mp4')
+    const prep = await sendJSON<InstagramArchivoSubido & { subida: { url: string; token: string } }>('/platform/marketing/instagram/media/video', 'POST', { tipo, bytes: file.size })
+    await new Promise<void>((resolve, reject) => {
+      const form = new FormData()
+      form.append('cacheControl', '3600')
+      form.append('', file)
+      const xhr = new XMLHttpRequest()
+      xhr.open('PUT', prep.subida.url)
+      xhr.setRequestHeader('x-upsert', 'false')
+      xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgreso?.(Math.round((e.loaded / e.total) * 100)) }
+      xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new PlatformApiError(xhr.status, 'No se pudo subir el video. Probá de nuevo.')))
+      xhr.onerror = () => reject(new PlatformApiError(0, 'Se cortó la subida del video. Revisá tu conexión y probá de nuevo.'))
+      xhr.send(form)
+    })
+    return { ref: prep.ref, tipo: 'video', url: prep.url }
+  },
+  igComentarios: () => getJSONConMensaje<{ publicaciones: InstagramPublicacionComentada[]; ocultadosAutomaticamente?: number }>('/platform/marketing/instagram/comments'),
+  igResponderComentario: (id: string, texto: string) => sendJSON<{ id: string }>(`/platform/marketing/instagram/comments/${id}/reply`, 'POST', { texto }),
+  igOcultarComentario: (id: string, oculto: boolean) => sendJSON<{ id: string; oculto: boolean }>(`/platform/marketing/instagram/comments/${id}/hide`, 'POST', { oculto }),
+  igEstadisticas: (dias: 7 | 28) => getJSONConMensaje<InstagramEstadisticas>(`/platform/marketing/instagram/insights?dias=${dias}`),
+  igRendimiento: () => getJSONConMensaje<InstagramRendimiento>('/platform/marketing/instagram/insights/rendimiento'),
+  tiktokContenido: () => getJSONConMensaje<TiktokContenido>('/platform/marketing/tiktok/content'),
+  igDesconectar: () => sendJSON<{ connected: false }>('/platform/marketing/instagram/connection', 'DELETE'),
+  igResponder: (id: string, text: string) => sendJSON<IgMensaje>(`/platform/marketing/instagram/conversations/${id}/messages`, 'POST', { text }),
+  tiktokUrlDeSubida: (mimetype: string) => sendJSON<{ uploadUrl: string; publicUrl: string }>('/platform/marketing/tiktok/video-upload-url', 'POST', { mimetype }),
+  tiktokEstado: () => getJSON<TiktokEstado>('/platform/marketing/tiktok'),
+  tiktokConectar: () => sendJSON<{ url: string }>('/platform/marketing/tiktok/connect', 'POST'),
+  tiktokCreador: () => getJSON<TiktokCreador>('/platform/marketing/tiktok/creator-info'),
+  tiktokPublicaciones: () => getJSON<TiktokPublicacion[]>('/platform/marketing/tiktok/posts'),
+  tiktokPublicar: (body: TiktokPublicar) => sendJSON<{ id: string; publishId: string; status: string }>('/platform/marketing/tiktok/posts', 'POST', body),
+  tiktokBorrador: (videoUrl: string) => sendJSON<{ id: string; publishId: string; status: string }>('/platform/marketing/tiktok/posts/draft', 'POST', { videoUrl }),
+  tiktokEstadoPublicacion: (publishId: string) => getJSON<TiktokPublicacion>(`/platform/marketing/tiktok/posts/${publishId}`),
+  tiktokDesconectar: () => sendJSON<{ ok: true }>('/platform/marketing/tiktok', 'DELETE'),
+  // Prospección: las cuentas se consultan por la API de Meta y se guardan en un lote; el análisis lo hace el Claude de
+  // cada superadmin por el conector MCP. Las rutas de "mcp" son la pantalla de consentimiento y el botón Desconectar.
+  prospeccionLotes: () => getJSONConMensaje<ProspeccionLote[]>('/platform/marketing/prospeccion/lotes'),
+  prospeccionLote: (id: string) => getJSONConMensaje<ProspeccionLoteDetalle>(`/platform/marketing/prospeccion/lotes/${id}`),
+  prospeccionConsultar: (usuarios: string[]) => sendJSON<ProspeccionConsulta>('/platform/marketing/prospeccion/lotes', 'POST', { usuarios }),
+  prospeccionActualizar: (id: string, cambios: { estado?: ProspectoEstado; notas?: string }) => sendJSON<Prospecto>(`/platform/marketing/prospeccion/prospectos/${id}`, 'PATCH', cambios),
+  mcpSolicitud: (req: string) => getJSONConMensaje<McpSolicitud>(`/platform/mcp/solicitud?req=${encodeURIComponent(req)}`),
+  mcpResolver: (req: string, decision: 'aprobar' | 'cancelar') => sendJSON<{ redirect: string }>('/platform/mcp/resolver', 'POST', { req, decision }),
+  mcpDesconectar: () => sendJSON<{ revocados: number }>('/platform/mcp/conexiones', 'DELETE'),
+  // Cola de videos que genera el equipo con su Claude (apps/api/src/marketing/videos).
+  videosCola: (tipo?: VideoTipo) => getJSONConMensaje<VideoDeCola[]>(`/platform/marketing/videos${tipo ? `?tipo=${tipo}` : ''}`),
+  videoAprobar: (id: string) => sendJSON<VideoDeCola>(`/platform/marketing/videos/${id}/aprobar`, 'POST'),
+  videoRechazar: (id: string) => sendJSON<{ ok: true }>(`/platform/marketing/videos/${id}/rechazar`, 'POST'),
+  videoDescarga: (id: string) => getJSONConMensaje<{ url: string; nombre: string }>(`/platform/marketing/videos/${id}/descarga`),
+  videoATiktok: (id: string) => sendJSON<{ video: VideoDeCola }>(`/platform/marketing/videos/${id}/tiktok-borrador`, 'POST'),
+  videoAInstagram: (id: string) => sendJSON<{ video: VideoDeCola }>(`/platform/marketing/videos/${id}/instagram-borrador`, 'POST', {}),
+  // Comentarios de cualquiera del equipo sobre un video, en todas sus fases.
+  videoComentarios: (id: string) => getJSONConMensaje<VideoComentario[]>(`/platform/marketing/videos/${id}/comentarios`),
+  videoComentar: (id: string, texto: string) => sendJSON<VideoComentario>(`/platform/marketing/videos/${id}/comentarios`, 'POST', { texto }),
+  videoBorrarComentario: (id: string, comentarioId: string) => sendJSON<{ ok: true }>(`/platform/marketing/videos/${id}/comentarios/${comentarioId}`, 'DELETE'),
+  // La lista de tutoriales: qué hay y qué falta. La actualiza el Claude de cada persona; acá se mira y se corrige.
+  tutorialesLista: () => getJSONConMensaje<TutorialesRespuesta>('/platform/marketing/tutoriales'),
+  tutorialActualizar: (id: string, cambios: { estado?: Exclude<TutorialEstado, 'EN_REVISION'>; asignadoA?: ResponsableTutorial | null; notas?: string }) => sendJSON<{ id: string; estado: TutorialEstado; asignadoA: ResponsableTutorial | null }>(`/platform/marketing/tutoriales/${id}`, 'PATCH', cambios),
+  // ¿Tengo un Claude conectado? Decide si «Mejorar con Claude» abre Claude o pide conectarlo primero.
+  mcpEstado: () => getJSONConMensaje<{ conectado: boolean }>('/platform/mcp/estado'),
   grantComp: (businessId: string, input: GrantCompInput) => sendJSON<SubscriptionRow>(`/platform/subscriptions/${businessId}/grant-comp`, 'POST', input),
   domains: () => getJSON<DomainsList>('/platform/domains'),
   owners: () => getJSON<OwnerRow[]>('/platform/owners'),
@@ -970,6 +1253,13 @@ export const platformApi = {
   createAdmin: (input: UpsertAdminInput) => sendJSON<{ id: string }>('/platform/admins', 'POST', input),
   updateAdmin: (id: string, input: UpsertAdminInput) => sendJSON<{ id: string }>(`/platform/admins/${id}`, 'PUT', input),
   removeAdmin: (id: string) => sendJSON<{ ok: true }>(`/platform/admins/${id}`, 'DELETE'),
+  reactivateAdmin: (id: string) => sendJSON<{ ok: true }>(`/platform/admins/${id}/reactivate`, 'POST', {}),
+  // Genera una contraseña temporal y se la manda por mail al correo personal (no vuelve en la respuesta).
+  resetAdminPassword: (id: string, personalEmail?: string) =>
+    sendJSON<{ ok: true; enviadoA: string }>(`/platform/admins/${id}/reset-password`, 'POST', personalEmail ? { personalEmail } : {}),
+  // El admin logueado cambia su propia contraseña (la temporal con la que entró, por una propia).
+  changeOwnPassword: (currentPassword: string, newPassword: string) =>
+    sendJSON<{ message: string }>('/platform/me/change-password', 'POST', { currentPassword, newPassword }),
 
   logs: (params: { adminId?: string; action?: string; businessId?: string; page?: number; limit?: number } = {}) => {
     const qs = new URLSearchParams()
@@ -1058,4 +1348,7 @@ export const platformApi = {
   correoVistaPrevia: (input: { senderId: string; body: string }) => sendJSON<{ html: string }>('/platform/correo/vista-previa', 'POST', input),
   enviarCorreo: (input: CorreoInput) => sendJSON<{ sent: boolean; simulated: boolean; error: string | null }>('/platform/correo/enviar', 'POST', input),
   correosEnviados: () => getJSON<CorreoEnviado[]>('/platform/correo/enviados'),
+  correosRecibidos: () => getJSON<CorreoRecibido[]>('/platform/correo/recibidos'),
+  correoRecibidoDetalle: (folderId: string, messageId: string) =>
+    getJSON<{ html: string }>(`/platform/correo/recibidos/${encodeURIComponent(folderId)}/${encodeURIComponent(messageId)}`),
 }

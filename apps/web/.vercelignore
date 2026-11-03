@@ -1,0 +1,11 @@
+# Lo que NO sube `vercel deploy` desde esta carpeta (deploy/staging.sh de
+# apps/api sube el frontend de staging así, sin git). Espeja lo que el
+# .gitignore de la raíz ya deja afuera de los deploys de producción, que salen
+# de git: sin esto la CLI subiría el .env.local y el build local de .next.
+.next
+node_modules
+.vercel
+.env*
+!.env.example
+*.tsbuildinfo
+next-env.d.ts

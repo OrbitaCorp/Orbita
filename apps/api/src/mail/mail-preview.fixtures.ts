@@ -315,6 +315,15 @@ export const MAIL_PREVIEW_FIXTURES: MailPreviewFixture[] = [
     data: { code: '773102', expiresIn: '10 minutos' },
   },
   {
+    id: 'platform-admin-temp-password',
+    label: 'Contraseña temporal (admin de plataforma)',
+    group: 'Plataforma',
+    template: 'platform-admin-temp-password',
+    isPlatform: true,
+    subject: 'Tu acceso al panel de plataforma de Órbita',
+    data: { name: 'Milagros', email: 'milagros@orbita.site', tempPassword: 'Km7xQp3Wd9Zt', tempPasswordHoras: 72, loginUrl: 'https://orbita.site/login' },
+  },
+  {
     id: 'orbi-mantenimiento',
     label: 'Orbi en mantenimiento (aviso a admins)',
     group: 'Plataforma',
@@ -327,6 +336,19 @@ export const MAIL_PREVIEW_FIXTURES: MailPreviewFixture[] = [
       desde: '01/10/2026 14:05',
       recordatorio: false,
       panelUrl: 'https://orbita.site/superadmin?seccion=orbi',
+    },
+  },
+  {
+    id: 'instagram-acceso-listo',
+    label: 'Acceso a Instagram listo (al dueño)',
+    group: 'Plataforma',
+    template: 'instagram-acceso-listo',
+    isPlatform: true,
+    subject: 'Tu acceso a Instagram en Órbita está listo',
+    data: {
+      storeName: FIXTURE_BUSINESS_BRANDING.storeName,
+      username: 'panaderialopez',
+      panelUrl: 'https://panaderialopez.orbita.site/admin/ventas/difusion',
     },
   },
   {

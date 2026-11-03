@@ -72,3 +72,39 @@ describe('R2Service.presignUpload', () => {
     expect((err as Error).message).not.toMatch(/AccessDenied|credencial/);
   });
 });
+
+describe('R2Service.tamanioDe / eliminar / presignDescarga (cola de videos de Marketing)', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it('tamanioDe devuelve el tamaño del archivo, y null si no existe', async () => {
+    const send = jest.spyOn(S3Client.prototype, 'send') as unknown as jest.Mock;
+    send.mockResolvedValueOnce({ ContentLength: 1234 });
+    expect(await new R2Service(config).tamanioDe('marketing/videos/a.mp4')).toBe(1234);
+    send.mockRejectedValueOnce(Object.assign(new Error('x'), { name: 'NotFound', $metadata: { httpStatusCode: 404 } }));
+    expect(await new R2Service(config).tamanioDe('marketing/videos/b.mp4')).toBeNull();
+  });
+
+  it('tamanioDe propaga un error real del proveedor, sin su detalle', async () => {
+    (jest.spyOn(S3Client.prototype, 'send') as unknown as jest.Mock).mockRejectedValue(new Error('AccessDenied: credencial'));
+    const err = await new R2Service(config).tamanioDe('marketing/videos/a.mp4').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ServiceUnavailableException);
+    expect((err as Error).message).not.toMatch(/AccessDenied|credencial/);
+  });
+
+  it('eliminar borra el archivo y, si R2 falla, avisa sin mostrar el detalle', async () => {
+    const send = jest.spyOn(S3Client.prototype, 'send') as unknown as jest.Mock;
+    send.mockResolvedValueOnce({});
+    await expect(new R2Service(config).eliminar('marketing/videos/a.mp4')).resolves.toBeUndefined();
+    send.mockRejectedValueOnce(new Error('AccessDenied: credencial'));
+    const err = await new R2Service(config).eliminar('marketing/videos/a.mp4').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ServiceUnavailableException);
+    expect((err as Error).message).not.toMatch(/AccessDenied|credencial/);
+  });
+
+  it('presignDescarga firma con Content-Disposition: attachment y un nombre de archivo seguro', async () => {
+    (getSignedUrl as jest.Mock).mockClear().mockResolvedValue('https://firmada');
+    expect(await new R2Service(config).presignDescarga('marketing/videos/a.mp4', 'mi video "raro"/../x.mp4')).toBe('https://firmada');
+    const comando = (getSignedUrl as jest.Mock).mock.calls[0][1];
+    expect(comando.input.ResponseContentDisposition).toBe('attachment; filename="mi_video__raro__.._x.mp4"');
+  });
+});

@@ -48,7 +48,7 @@ describe('Exportar clientes deja registro', () => {
     expect(r.total).toBe(1);
     expect(r.data[0]).not.toHaveProperty('passwordHash');
     expect(r.data[0]).toMatchObject({ hasAccount: true, email: 'ana@x.com' });
-    expect(prisma.customer.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { businessId: BIZ, deletedAt: null } }));
+    expect(prisma.customer.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { businessId: BIZ, deletedAt: null, AND: [{ OR: [{ isChatContact: false }, { orders: { some: { deletedAt: null } } }] }] } }));
     expect(prisma.auditLog.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         businessId: BIZ, entityType: 'customer_export', action: 'CREATE', memberId: 'm-1', memberName: 'Dueña',

@@ -26,7 +26,7 @@ type Contacto = NonNullable<StorefrontConfigResponse['contact']>
 
 type Apariencia = NonNullable<StorefrontConfigResponse['appearance']>
 
-type CatReal = { id: string; slug: string; nombre: string; hue: number; imageUrl: string | null }
+type CatReal = { id: string; slug: string; nombre: string; hue: number; imageUrl: string | null; count?: number }
 
 /** La definición de la plantilla elegida, o null si el id no existe. */
 export function definicionPlantilla(id: string | null | undefined): Plantilla | null {
@@ -176,24 +176,74 @@ function aProductoPlantilla(p: Producto, transferPct?: number | null): ProductoP
 // así que es un gris neutro fijo en vez del degradé por `hue` del resto.
 
 
-// El hero de una tienda que todavía no cargó ninguno. El fondo es un degradé
-// del primario de la plantilla hacia oscuro: los heros escriben en blanco
-// sobre la foto, y así se lee en cualquier paleta.
+// El fondo de un slide sin foto: un degradé del primario de la plantilla hacia
+// oscuro. Los heros escriben en blanco sobre la foto, y así se lee en cualquier
+// paleta.
 const degradeDe = (base: Plantilla) =>
   `linear-gradient(135deg, color-mix(in srgb, ${base.tema.primary} 78%, black), color-mix(in srgb, ${base.tema.primary} 38%, black))`
 
-function heroNeutro(base: Plantilla, marca?: string, tagline?: string): Slide {
-  return {
-    img: degradeDe(base),
-    titulo: marca?.trim() || 'Bienvenidos',
-    bajada: tagline?.trim() ?? '',
-    cta: 'Ver el catálogo',
-    link: '/catalogo',
-  }
+function aSlidePlantilla(s: StorefrontHeroSlide, base: Plantilla, i = 0): Slide {
+  const fondo = s.automatico ? degradeAutomatico(base.tema.primary, i) : degradeDe(base)
+  return { img: s.img ?? fondo, fotoPropia: !!s.img, titulo: s.titulo, bajada: s.subtitulo, cta: s.cta, link: s.ctaLink }
 }
 
-function aSlidePlantilla(s: StorefrontHeroSlide, base: Plantilla): Slide {
-  return { img: s.img ?? degradeDe(base), fotoPropia: !!s.img, titulo: s.titulo, bajada: s.subtitulo, cta: s.cta, link: s.ctaLink }
+// ── Sliders por defecto ─────────────────────────────────────────────────────
+// La portada se rellena sola con los productos, pero los sliders no, y mucha
+// gente no llega a cargarlos: la tienda quedaba pelada arriba. Mientras el
+// negocio NO tenga ningún slider propio, la portada dibuja hasta tres armados
+// al vuelo con sus categorías: un texto genérico, un degradé del color de la
+// marca (sin foto) y el enlace directo a la categoría.
+//
+// Son virtuales: no hay filas ni migración, y no pasan por Apariencia ni por el
+// editor de la plantilla (que lee lo guardado, no esto). En cuanto el dueño
+// crea el primero, `heroSlides` deja de venir vacío y estos no se arman más.
+// Los usa el home clásico (HeroCarousel) y toda plantilla de Home.
+
+export const MAX_SLIDERS_POR_DEFECTO = 3
+
+// Degradé del primario hacia oscuro, un poco distinto en cada slide para que
+// pasar de uno a otro se note sin salirse de la paleta. Oscuro a propósito: el
+// texto del hero es blanco y tiene que leerse con cualquier primario.
+const GIROS_AUTOMATICOS: Array<[number, number, number]> = [[120, 55, 25], [200, 38, 62], [160, 62, 32]]
+
+export function degradeAutomatico(primary: string, i: number): string {
+  const [angulo, a, b] = GIROS_AUTOMATICOS[i % GIROS_AUTOMATICOS.length]
+  return `linear-gradient(${angulo}deg, color-mix(in srgb, ${primary} ${a}%, black), color-mix(in srgb, ${primary} ${b}%, black))`
+}
+
+// Se recorta para que el título no desborde el hero en el celular.
+const recortar = (t: string, max: number) => (t.length > max ? `${t.slice(0, max - 1).trimEnd()}…` : t)
+
+/**
+ * Los sliders de una tienda que no cargó ninguno. Hasta tres categorías, las que
+ * más productos tienen; con menos, tantos slides como categorías (no se repite
+ * una para llegar a tres). Sin categorías, un único slide de bienvenida al
+ * catálogo. El texto es el mismo en tienda y en vidriera: no promete nada.
+ */
+export function slidesPorDefecto(
+  categorias: Array<{ nombre: string; slug: string; count?: number }>,
+  marca?: string,
+  tagline?: string,
+): StorefrontHeroSlide[] {
+  const elegidas = categorias
+    .filter(c => c.nombre.trim() !== '' && c.slug !== '')
+    // sort estable: a igual cantidad queda el orden en que las ordenó el negocio
+    .sort((x, y) => (y.count ?? 0) - (x.count ?? 0))
+    .slice(0, MAX_SLIDERS_POR_DEFECTO)
+  if (elegidas.length === 0) {
+    return [{
+      id: 'auto-bienvenida', automatico: true, img: null,
+      titulo: marca?.trim() || 'Bienvenidos', subtitulo: tagline?.trim() ?? '',
+      cta: 'Ver el catálogo', ctaLink: '/catalogo',
+    }]
+  }
+  return elegidas.map(c => ({
+    id: `auto-${c.slug}`, automatico: true, img: null,
+    titulo: recortar(c.nombre.trim(), 36),
+    subtitulo: 'Mirá lo que tenemos para vos.',
+    cta: 'Ver productos',
+    ctaLink: `/catalogo?cat=${encodeURIComponent(c.slug)}`,
+  }))
 }
 
 /**
@@ -332,8 +382,9 @@ export function plantillaReal({
   categorias: CatReal[]
   stats: StorefrontStatsItem[]
   cupon?: { titulo: string; bajada: string; codigo: string } | null
-  // Los slides editados en Apariencia (mismo editor que ya usa Vidriera).
-  // Solo se usan si `base.heroPropio` — el resto dibuja su hero con
+  // Los slides editados en Apariencia (mismo editor que ya usa Vidriera). Los
+  // que cargó el dueño, no los de por defecto: si no hay, `plantillaReal` arma
+  // los suyos. Solo se usan si `base.heroPropio` — el resto dibuja su hero con
   // HeroCarousel directo en Inicio.tsx (no pasa por `Home()`), así que pasar
   // esto para esas plantillas no haría nada: se ignora a propósito.
   heroSlides?: StorefrontHeroSlide[]
@@ -396,13 +447,13 @@ export function plantillaReal({
     // `productos` y `productosSecundarios` ya vienen de `contenidoDeApariencia`:
     // son los estantes que muestran las filas propias de la plantilla.
     catalogo: productos.map(p => aProductoPlantilla(p, transferPct)),
-    // Sin slides cargados, un hero neutro armado con lo que el negocio SÍ
-    // tiene: su nombre, su bajada y un botón al catálogo. Antes se quedaba
-    // con los de muestra de `base`, y una tienda de ropa con Nocturno puesta
-    // abría con "Auriculares V-90 Pro · Driver de 50 mm". Sin hero no se puede
-    // dejar: en varias plantillas es media portada.
+    // Sin slides cargados, los de por defecto (ver slidesPorDefecto): armados
+    // con lo que el negocio SÍ tiene —sus categorías, o su nombre y su bajada—.
+    // Antes se quedaba con los de muestra de `base`, y una tienda de ropa con
+    // Nocturno puesta abría con "Auriculares V-90 Pro · Driver de 50 mm". Sin
+    // hero no se puede dejar: en varias plantillas es media portada.
     ...(base.heroPropio
-      ? { slides: heroSlides && heroSlides.length > 0 ? heroSlides.map(x => aSlidePlantilla(x, base)) : [heroNeutro(base, marca, tagline)] }
+      ? { slides: (heroSlides && heroSlides.length > 0 ? heroSlides : slidesPorDefecto(categorias, marca, tagline)).map((x, i) => aSlidePlantilla(x, base, i)) }
       : {}),
     // El pie: el DISEÑO sigue siendo el de la plantilla (lo pone su `tema`),
     // pero el contenido pasa a ser el real. Antes quedaba el de la maqueta:

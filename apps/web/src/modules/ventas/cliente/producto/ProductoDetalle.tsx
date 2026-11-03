@@ -391,6 +391,8 @@ export default function ProductoDetalle() {
     .map(m => ({ key: m.key, label: m.label, pct: m.pct as number }))
     .sort((a, b) => b.pct - a.pct)
   const enStock = varianteSeleccionada ? varianteSeleccionada.inStock : producto.variants.some(v => v.inStock)
+  // Vidriera: si el negocio dejó el stock en blanco no se escribe ninguna cantidad ni "Sin stock" (ver stockVisible en la API).
+  const mostrarStock = varianteSeleccionada ? varianteSeleccionada.stockVisible !== false : producto.variants.some(v => v.stockVisible !== false)
   // "Negro · Talle L" a partir de la selección real — mismo criterio que ya
   // usa agregarAlCarrito() más abajo, pero acá arriba para que lo pueda usar
   // también el mensaje de WhatsApp sin duplicar el cálculo.
@@ -402,6 +404,8 @@ export default function ProductoDetalle() {
   // es la ÚNICA forma de comprar. En tienda completa, es una opción más
   // al lado de "Agregar al carrito"/"Comprar ahora".
   const esVidriera = config?.business?.mode === 'SHOWCASE'
+  // "Se hace por pedido": aunque la tienda sea completa, esta ficha no vende — sin cantidad, carrito ni compra; solo WhatsApp.
+  const soloConsulta = esVidriera || producto.byOrder === true
   // El número exacto SOLO se ve cuando queda poco (maxQty acotado del lado
   // del backend, ver storefront.service.ts). NO depende del toggle "Indicador
   // de stock bajo" de Apariencia: ese toggle manda solo sobre el badge de las
@@ -898,7 +902,7 @@ export default function ProductoDetalle() {
               <div style={{ fontSize: 13, color: 'var(--color-error)', fontWeight: 600, marginBottom: 20 }}>
                 Esa combinación no está disponible
               </div>
-            ) : (
+            ) : !mostrarStock ? null : (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: !enStock ? 'var(--color-error)' : todoEnCarrito ? 'var(--color-muted)' : bajoStock ? '#D97706' : 'var(--color-success)', fontWeight: 600, marginBottom: 20 }}>
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: !enStock ? 'var(--color-error)' : todoEnCarrito ? 'var(--color-muted)' : bajoStock ? '#D97706' : 'var(--color-success)', flexShrink: 0 }} />
                 {!enStock
@@ -914,7 +918,7 @@ export default function ProductoDetalle() {
             {/* Vidriera digital: no hay carrito ni checkout — se saca el
                 stepper y los botones de compra entera, WhatsApp queda como
                 única forma de avanzar (botón de abajo). */}
-            {!esVidriera && (
+            {!soloConsulta && (
               <>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
                   <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid var(--color-border)', borderRadius: 8, height: 48, flexShrink: 0, overflow: 'hidden' }}>
@@ -961,7 +965,7 @@ export default function ProductoDetalle() {
                   fontSize: 14, fontWeight: 700,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                   transition: 'background 150ms, opacity 150ms',
-                  ...(esVidriera
+                  ...(soloConsulta
                     ? { background: '#25D366', color: '#fff', border: 'none', boxShadow: '0 4px 12px rgba(37,211,102,0.25)' }
                     : { background: 'transparent', color: '#25D366', border: '1px solid #25D366' }),
                 }}

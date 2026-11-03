@@ -18,9 +18,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/router'
-import { Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Sparkles, Trash2, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle, Info, ImagePlus, Loader2, Clapperboard } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Sparkles, Trash2, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle, Info, ImagePlus, Loader2, Clapperboard, GripVertical } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
+import { Modal } from '@/design-system/components/Modal'
 import { Skeleton } from '@/design-system/components/Skeleton'
 import { fmtMoney, formatMiles } from '@/lib/utils'
 import { adminPath, currentSlug } from '@/lib/tenant'
@@ -135,6 +136,8 @@ interface ProdForm {
     nombre: string; descripcion: string; categoriaId: string; tags: string[]; estado: ProductStatus
     precio: string; costo: string; sku: string
     stock: string; stockMinimo: string
+    /** "Se hace por pedido": sin stock; en la tienda se ve pero solo se consulta por WhatsApp (sin carrito ni compra). */
+    porPedido: boolean
     // "Fondo con IA" premium: flat (plano) o volume (con volumen) — ver
     // ImageStudioService.generatePremiumBackground(). Se sugiere solo según
     // la categoría al elegirla por primera vez (ver sugerirPhotoType), el
@@ -228,7 +231,7 @@ function sugerirPhotoType(nombreCategoria: string): 'flat' | 'volume' {
 const FORM_INICIAL: ProdForm = {
     nombre: '', descripcion: '', categoriaId: '', tags: [], estado: 'PUBLISHED',
     precio: '', costo: '', sku: '',
-    stock: '0', stockMinimo: '5',
+    stock: '0', stockMinimo: '5', porPedido: false,
     photoType: 'flat',
     tieneVariantes: false,
     tiposVariante: [{ id: 'v1', nombre: 'Talle', opciones: [], sugeridos: ['S', 'M', 'L', 'XL'], habituales: ['S', 'M', 'L', 'XL'] }],
@@ -297,6 +300,7 @@ async function subirVideoProducto(file: File, onProgress?: (pct: number) => void
 export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoNuevoProps) {
     const editando = !!editarId
     const [contenidoAbierto, setContenidoAbierto] = useState(false)
+    const [vistaMovilAbierta, setVistaMovilAbierta] = useState(false)
     const [bloquesContenido, setBloquesContenido] = useState<ApiProductContentBlock[]>([])
     const [bloquesContenidoModificado, setBloquesContenidoModificado] = useState(false)
     const router = useRouter()
@@ -356,6 +360,9 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     // por fila era lo más tedioso. El precio no tiene fila propia: el "Precio"
     // de arriba ya se copia a todas las filas (ver cambiarPrecio).
     const [stockMasivo, setStockMasivo] = useState('')
+    // Vidriera digital (modo SHOWCASE): el stock es OPCIONAL. En blanco = la tienda no muestra unidades, "Sin stock" ni
+    // "Últimas unidades"; con un número = se muestra en la ficha. En una tienda con checkout sigue siendo obligatorio.
+    const [vidriera, setVidriera] = useState(false)
     const [imagenes, setImagenes] = useState<ImagenPendiente[]>([])
     const [guardadas, setGuardadas] = useState<ImagenGuardada[]>([])
     // valor de opción (ej. "S") → id real de ese OptionValue — se arma una
@@ -475,7 +482,15 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     useEffect(() => {
         let vigente = true
         panelGetBusiness()
-            .then(b => { if (vigente) setSpecsSugeridas(specsDelNegocio(b.subrubros)) })
+            .then(b => {
+                if (!vigente) return
+                setSpecsSugeridas(specsDelNegocio(b.subrubros))
+                if (b.mode === 'SHOWCASE') {
+                    setVidriera(true)
+                    // Alta nueva en una vidriera: el stock arranca vacío (opcional) y no en 0.
+                    if (!editando) setProd(p => (p.stock === '0' ? { ...p, stock: '' } : p))
+                }
+            })
             .catch(() => { /* sin negocio, el formulario queda como siempre */ })
         panelGetVariantHistory()
             .then(h => { if (vigente) setHistorialVariantes(h) })
@@ -584,8 +599,9 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                     precio: String(Math.round(Number(p.basePrice))),
                     costo: p.cost != null ? String(Math.round(Number(p.cost))) : '',
                     sku: p.variants.find(v => v.isDefault)?.sku ?? p.variants[0]?.sku ?? '',
-                    stock: String(p.variants[0]?.stock.reduce((s, st) => s + st.quantity, 0) ?? 0),
+                    stock: p.variants[0]?.showStock === false ? '' : String(p.variants[0]?.stock.reduce((s, st) => s + st.quantity, 0) ?? 0),
                     stockMinimo: String(p.variants[0]?.stock[0]?.stockMin ?? 5),
+                    porPedido: p.byOrder === true,
                     tieneVariantes: conVariantes,
                     tiposVariante: conVariantes
                         ? p.options.map(o => ({ id: o.id, nombre: o.name, opciones: o.values.map(v => v.value), esVisual: o.isVisual }))
@@ -605,7 +621,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             id: v.id,
                             sku: v.sku ?? '',
                             precio: String(Math.round(Number(v.price))),
-                            stock: String(v.stock.reduce((s, st) => s + st.quantity, 0)),
+                            stock: v.showStock === false ? '' : String(v.stock.reduce((s, st) => s + st.quantity, 0)),
                             stockMin: String(v.stock[0]?.stockMin ?? 0),
                             activa: v.isActive,
                         }))
@@ -701,8 +717,11 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                     clave: c.clave,
                     valores: c.valores,
                     sku: `${prod.sku || generarSKU(prod.nombre)}-${sufijo}`,
-                    precio: precioHeredado || prod.precio || '0',
-                    stock: '0',
+                    // Vacíos: el "0" se ve solo como placeholder gris, para escribir el
+                    // número directo sin borrar nada. Vacío vale 0 al guardar y al sumar
+                    // (Number('') || 0; en la vidriera el stock vacío es "sin stock cargado").
+                    precio: precioHeredado || prod.precio || '',
+                    stock: '',
                     stockMin: prod.stockMinimo || '0',
                     activa: true,
                 }
@@ -1402,13 +1421,22 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             ? tiposValidos.map(tp => ({ name: tp.nombre.trim(), values: tp.opciones, isVisual: opcionVisual?.id === tp.id }))
             : undefined
 
+        // Vidriera con el stock en blanco: no hay un número que mandar, la variante queda "sin stock cargado" y la tienda no
+        // lo muestra. Con un número (aunque sea 0) se manda y se refleja en la ficha. Fuera de la vidriera nada cambia.
+        const stockDeLaVariante = (valor: string): Pick<UpsertProductInput['variants'][number], 'initialStock' | 'showStock'> =>
+            prod.porPedido
+                ? {} // por pedido: no lleva stock, no se manda ninguno (el servidor deja las variantes sin stock cargado)
+                : vidriera && valor.trim() === ''
+                ? { showStock: false }
+                : { initialStock: Number(valor) || 0, ...(vidriera ? { showStock: true } : {}) }
+
         const variants: UpsertProductInput['variants'] = prod.tieneVariantes
             ? filas.map(f => ({
                 ...(f.id ? { id: f.id } : {}),
                 sku: f.sku || undefined,
                 price: Number(f.precio) || precio,
                 optionValues: f.valores,
-                initialStock: Number(f.stock) || 0,
+                ...stockDeLaVariante(f.stock),
                 stockMin: Number(f.stockMin) || 0,
                 isActive: f.activa,
             }))
@@ -1424,7 +1452,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 sku: prod.sku || undefined,
                 price: precio,
                 optionValues: [],
-                initialStock: Number(prod.stock) || 0,
+                ...stockDeLaVariante(prod.stock),
                 stockMin: Number(prod.stockMinimo) || 0,
             }]
 
@@ -1442,6 +1470,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             cost: prod.costo ? Number(prod.costo) : undefined,
             status: estado,
             photoType: prod.photoType,
+            byOrder: prod.porPedido,
             ...(tagIds.length > 0 ? { tagIds } : {}),
             specs,
             videoUrl: prod.videoUrl.trim() || undefined,
@@ -1498,7 +1527,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         // Toast, no banner fijo — es una validación disparada por la acción
         // de guardar (mismo criterio que el resto del sistema, ej. el chequeo
         // de envío en PedidoNuevo.tsx), no un error persistente de la pantalla.
-        if (estado === 'PUBLISHED' && stockTotal <= 0) {
+        if (estado === 'PUBLISHED' && !vidriera && !prod.porPedido && stockTotal <= 0) {
             onToast('No podés publicar un producto sin stock. Cargá stock inicial o guardalo como borrador.')
             return
         }
@@ -1769,7 +1798,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         }
         if (valoresConFotoDuplicada.length > 0) f.push({ id: 'pn-variantes', texto: 'una sola foto por valor' })
         if (fondosEnCurso > 0) f.push({ id: 'pn-fotos', texto: 'que termine de aplicarse el fondo de las fotos' })
-        if (estado === 'PUBLISHED' && stockTotal <= 0) f.push({ id: 'pn-stock', texto: 'el stock (o guardalo como borrador)' })
+        if (estado === 'PUBLISHED' && !vidriera && !prod.porPedido && stockTotal <= 0) f.push({ id: 'pn-stock', texto: 'el stock (o guardalo como borrador)' })
         return f
     }
     const faltasVisibles = intento ? faltantes(intento) : []
@@ -1883,7 +1912,14 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
 
     const agregarValores = (ti: number, vals: string[]) => {
         const tp = prod.tiposVariante[ti]
-        actualizarTipo(ti, { opciones: ordenarValores(tp, [...tp.opciones, ...vals]) })
+        // Si el vendedor ya los ordenó a mano (no coinciden con el orden del
+        // modelo), lo suyo manda: los nuevos van al final y no se reacomoda nada.
+        const reordenadoAMano = ordenarValores(tp, tp.opciones).some((v, i) => v !== tp.opciones[i])
+        actualizarTipo(ti, {
+            opciones: reordenadoAMano
+                ? [...tp.opciones, ...ordenarValores(tp, vals.filter(v => !tp.opciones.includes(v)))]
+                : ordenarValores(tp, [...tp.opciones, ...vals]),
+        })
     }
 
     // Con variantes, el "Precio" de arriba se copia a las filas que todavía
@@ -1893,7 +1929,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         const anterior = prod.precio
         set('precio', v)
         if (prod.tieneVariantes) {
-            setFilas(prev => prev.map(f => (f.precio === '' || f.precio === '0' || f.precio === anterior) ? { ...f, precio: v || '0' } : f))
+            setFilas(prev => prev.map(f => (f.precio === '' || f.precio === '0' || f.precio === anterior) ? { ...f, precio: v } : f))
         }
     }
     const cambiarStockMasivo = (v: string) => {
@@ -1920,7 +1956,44 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const sinFotos = imagenes.length + guardadas.length === 0
     const hayGenerales = imagenes.some(i => !i.valorOpcion) || guardadas.some(g => !g.optionValueId)
     const inactivas = filas.filter(f => !f.activa).length
+    // Un stock en 0 se muestra vacío (con el "0" de placeholder): así, al volver a
+    // cargar unidades se escribe el número directo en vez de borrar el 0 primero.
+    // En la vidriera no: ahí "0" (se ve "Sin stock") y vacío (no se muestra) son
+    // cosas distintas, y el 0 tiene que verse.
+    const verCantidad = (v: string) => (!vidriera && v === '0' ? '' : v)
     const errorPrecioFila = (f: FilaVariante) => hayFalta('pn-variantes-tabla') && f.activa && !(Number(f.precio) > 0)
+
+    // La misma vista previa en la columna de escritorio y en la hoja del celular.
+    const vistaPrevia = (
+        <PreviewProducto
+            nombre={prod.nombre}
+            descripcion={prod.descripcion}
+            precio={prod.tieneVariantes ? String(precioMinVariantes || '') : prod.precio}
+            desde={prod.tieneVariantes && !precioUnicoVariantes && precioMinVariantes > 0}
+            estado={prod.estado}
+            categoria={categorias.find(c => c.id === prod.categoriaId)?.name}
+            imagenPrincipal={
+                // Igual criterio que el backend (pickPrimaryImageUrl): principal
+                // marcada > primera general > primera de variante que exista. Se
+                // usa solo para decidir CON QUÉ arranca la navegación (índice 0) —
+                // si el producto es puramente de variantes (solo fotos por color,
+                // ninguna general), arranca en la primera foto de variante en vez
+                // de quedar sin foto.
+                imagenes.find(i => i.principal)?.preview
+                ?? imagenes.find(i => !i.valorOpcion)?.preview
+                ?? guardadas.find(g => g.principal)?.url
+                ?? guardadas.find(g => !g.optionValueId)?.url
+            }
+            fotosGenerales={fotosGeneralesPreview}
+            nombreOpcionVisual={opcionVisual?.nombre}
+            fotosPorValor={fotosPorValorPreview}
+            variantes={prod.tieneVariantes ? prod.tiposVariante.filter(t => t.nombre.trim() && t.opciones.length && t.id !== opcionVisual?.id) : []}
+            stockTotal={stockTotal}
+            sinStockCargado={prod.porPedido || vidriera && !(prod.tieneVariantes ? filas.some(f => f.activa && f.stock.trim() !== '') : prod.stock.trim() !== '')}
+            urlsConFondoIA={urlsConFondoIA}
+            urlsEnProceso={urlsEnProceso}
+        />
+    )
 
     return (
         <div className="pn-page" style={pageWrap}>
@@ -1928,6 +2001,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 .pn-page    { padding: 24px 32px 64px; }
                 .pn-layout  { display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 20px; align-items: start; }
                 .pn-preview { position: sticky; top: 20px; }
+                .pn-vista-movil { display: none; }
                 .pn-3col    { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: start; }
                 .pn-3col > * { min-width: 0; }
                 /* Un <input> trae un ancho mínimo propio (~170px): sin esto, dentro de una columna
@@ -1955,8 +2029,10 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                     .pn-vgrid-sku { grid-template-columns: minmax(0,1fr) 88px !important; }
                     .pn-vgrid-sku > :nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
                     /* Celular: la vista previa iba al final de todo, después del botón de guardar —
-                       una pantalla entera de scroll que no aporta mientras se carga. Se oculta. */
+                       una pantalla entera de scroll que no aporta mientras se carga. La columna se
+                       oculta y la vista previa se abre en una hoja desde el botón de arriba. */
                     .pn-preview { display: none !important; }
+                    .pn-vista-movil { display: inline-flex !important; }
                     .pn-titulo { font-size: 22px !important; margin-bottom: 14px !important; }
                     /* iOS hace zoom al enfocar un campo de menos de 16px y deja la pantalla movida. */
                     .pn-page input:not([type='checkbox']):not([type='radio']):not([type='file']), .pn-page textarea, .pn-page select { font-size: 16px !important; }
@@ -1976,6 +2052,19 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             <h1 className="pn-titulo" style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: '0 0 20px' }}>
                 {editando ? 'Editar producto' : 'Crear producto'}
             </h1>
+
+            <button
+                type="button"
+                className="pn-vista-movil ds-hover"
+                onClick={() => setVistaMovilAbierta(true)}
+                style={{
+                    alignItems: 'center', gap: 6, height: 34, padding: '0 14px', margin: '0 0 14px',
+                    border: '1px solid var(--color-border)', borderRadius: 9999, background: 'var(--color-surface)',
+                    color: 'var(--color-text)', fontSize: 13, fontWeight: 500, fontFamily: 'inherit', cursor: 'pointer',
+                }}
+            >
+                <Eye size={14} /> Ver vista previa
+            </button>
 
             {error && (
                 <div style={{ padding: '10px 14px', borderRadius: 10, background: 'var(--color-error-bg)', border: '1px solid var(--color-error)', color: 'var(--color-error)', fontSize: 13, marginBottom: 16, maxWidth: 860 }}>
@@ -2225,14 +2314,32 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                 <div>
                                                     <label style={lbl}>Stock</label>
                                                     <div style={{ height: 40, display: 'flex', alignItems: 'center', fontSize: 13, color: 'var(--color-muted)' }}>
-                                                        <span style={{ fontFamily: '"Geist Mono", monospace', color: 'var(--color-text)', fontWeight: 600, marginRight: 6 }}>{stockTotal}</span> en total, por variante
+                                                        {prod.porPedido
+                                                            ? <span style={{ color: 'var(--color-text)', fontWeight: 600 }}>Por pedido</span>
+                                                            : <><span style={{ fontFamily: '"Geist Mono", monospace', color: 'var(--color-text)', fontWeight: 600, marginRight: 6 }}>{stockTotal}</span> en total, por variante</>}
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <PField label="Stock" value={prod.stock} onChange={v => set('stock', v.replace(/\D/g, ''))} mono error={hayFalta('pn-stock')} />
+                                                <PField label={vidriera ? 'Stock (opcional)' : 'Stock'} value={prod.porPedido ? '' : verCantidad(prod.stock)} onChange={v => set('stock', v.replace(/\D/g, ''))} mono error={hayFalta('pn-stock')} disabled={prod.porPedido} placeholder={prod.porPedido ? 'Por pedido' : vidriera ? undefined : '0'} />
+                                            )}
+                                            {vidriera && (
+                                                <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 4 }}>
+                                                    Si lo dejás vacío, la ficha no muestra stock. Si escribís una cantidad, se ve en la ficha.
+                                                </div>
                                             )}
                                             {hayFalta('pn-stock') && <div style={{ fontSize: 11.5, color: 'var(--color-error)', marginTop: 4 }}>Para publicar necesitás stock</div>}
                                         </div>
+                                        {/* En una vidriera nada se compra online y el stock ya es opcional: este interruptor no aplica. */}
+                                        {!vidriera && (
+                                            <div style={{ gridColumn: '1 / -1' }}>
+                                                <InterruptorFila
+                                                    on={prod.porPedido}
+                                                    onChange={v => { set('porPedido', v); setStockMasivo('') }}
+                                                    titulo="Se hace por pedido"
+                                                    detalle="Sin stock. Se muestra en tu tienda pero no se puede comprar: el cliente te consulta por WhatsApp."
+                                                />
+                                            </div>
+                                        )}
                                         <div id="pn-categoria" style={{ gridColumn: '1 / -1' }}>
                                             <label style={lbl}>Categoría <span style={{ color: 'var(--color-error)' }}>*</span></label>
                                             <CategoriaSelect
@@ -2342,11 +2449,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                             </div>
                                                         )}
                                                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-                                                            {tp.opciones.map(op => (
-                                                                <span key={op} style={{ ...chip, border: '1px solid var(--color-primary)' }}>{op}
-                                                                    <button type="button" className="ds-hover" aria-label={`Quitar ${op}`} onClick={() => actualizarTipo(ti, { opciones: tp.opciones.filter(o => o !== op) })} style={chipX}><X size={11} strokeWidth={2} /></button>
-                                                                </span>
-                                                            ))}
+                                                            <ChipsValores grupo={tp.id} opciones={tp.opciones} onChange={opciones => actualizarTipo(ti, { opciones })} />
                                                             {/* Sugeridos: un toque los suma. Ninguno viene elegido de antemano. */}
                                                             {restantes.map(v => (
                                                                 <button key={v} type="button" className="ds-hover" onClick={() => agregarValores(ti, [v])} style={chipSugerido}>+ {v}</button>
@@ -2357,6 +2460,11 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                             ))}
                                                             <OpInput tipo={tp.nombre} onAdd={vals => agregarValores(ti, vals)} />
                                                         </div>
+                                                        {tp.opciones.length > 1 && (
+                                                            <div style={{ marginTop: 8, fontSize: 11.5, color: 'var(--color-muted)' }}>
+                                                                Arrastrá los valores para cambiar el orden en que se ven en la tienda (en el celular, mantené apretado un instante).
+                                                            </div>
+                                                        )}
                                                         {tp.opciones.length === 0 && habituales.length > 0 ? (
                                                             <button type="button" className="ds-link" onClick={() => agregarValores(ti, habituales)} style={{ ...enlace, marginTop: 10, fontSize: 12 }}>
                                                                 Usar los habituales ({habituales.join(', ')})
@@ -2494,8 +2602,10 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                                     )}
                                                                 </div>
                                                                 <GrillaStock
+                                                                    deshabilitado={prod.porPedido}
                                                                     tipos={tiposValidos}
                                                                     filas={filas}
+                                                                    ceroVacio={!vidriera}
                                                                     onStock={(clave, valor) => setFilas(prev => prev.map(f => f.clave === clave ? { ...f, stock: valor.replace(/\D/g, '') } : f))}
                                                                 />
                                                                 <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 6 }}>
@@ -2519,6 +2629,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                                         onChange={e => cambiarStockMasivo(e.target.value)}
                                                                         placeholder="0"
                                                                         aria-label="Stock para todas las variantes"
+                                                                        disabled={prod.porPedido}
                                                                         style={celdaGrande}
                                                                     />
                                                                     <span />
@@ -2539,8 +2650,9 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                                     <input
                                                                         className="ds-field"
                                                                         inputMode="numeric"
-                                                                        value={f.stock}
-                                                                        disabled={!f.activa}
+                                                                        value={prod.porPedido ? '' : verCantidad(f.stock)}
+                                                                        placeholder="0"
+                                                                        disabled={!f.activa || prod.porPedido}
                                                                         onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, stock: e.target.value.replace(/\D/g, '') } : x))}
                                                                         aria-label={`Stock de ${f.clave}`}
                                                                         style={celdaGrande}
@@ -3002,36 +3114,16 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                         <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>
                             Vista previa
                         </div>
-                        <PreviewProducto
-                            nombre={prod.nombre}
-                            descripcion={prod.descripcion}
-                            precio={prod.tieneVariantes ? String(precioMinVariantes || '') : prod.precio}
-                            desde={prod.tieneVariantes && !precioUnicoVariantes && precioMinVariantes > 0}
-                            estado={prod.estado}
-                            categoria={categorias.find(c => c.id === prod.categoriaId)?.name}
-                            imagenPrincipal={
-                                // Igual criterio que el backend (pickPrimaryImageUrl): principal
-                                // marcada > primera general > primera de variante que exista. Se
-                                // usa solo para decidir CON QUÉ arranca la navegación (índice 0) —
-                                // si el producto es puramente de variantes (solo fotos por color,
-                                // ninguna general), arranca en la primera foto de variante en vez
-                                // de quedar sin foto.
-                                imagenes.find(i => i.principal)?.preview
-                                ?? imagenes.find(i => !i.valorOpcion)?.preview
-                                ?? guardadas.find(g => g.principal)?.url
-                                ?? guardadas.find(g => !g.optionValueId)?.url
-                            }
-                            fotosGenerales={fotosGeneralesPreview}
-                            nombreOpcionVisual={opcionVisual?.nombre}
-                            fotosPorValor={fotosPorValorPreview}
-                            variantes={prod.tieneVariantes ? prod.tiposVariante.filter(t => t.nombre.trim() && t.opciones.length && t.id !== opcionVisual?.id) : []}
-                            stockTotal={stockTotal}
-                            urlsConFondoIA={urlsConFondoIA}
-                            urlsEnProceso={urlsEnProceso}
-                        />
+                        {vistaPrevia}
                     </Card>
                 </div>
             </div>
+
+            {/* Celular: la columna de la derecha está oculta, así que la vista previa se abre
+                en una hoja desde el botón de arriba. Solo se monta abierta: no duplica trabajo. */}
+            <Modal isOpen={vistaMovilAbierta} onClose={() => setVistaMovilAbierta(false)} title="Vista previa" maxWidth={400}>
+                {vistaPrevia}
+            </Modal>
 
             <EstudioFondoModal
                 isOpen={modalFondoIA}
@@ -3075,7 +3167,7 @@ function hueDeTexto(s: string): number {
 
 function PreviewProducto({
     nombre, descripcion, precio, desde, estado, categoria, imagenPrincipal,
-    fotosGenerales, nombreOpcionVisual, fotosPorValor, variantes, stockTotal, urlsConFondoIA, urlsEnProceso,
+    fotosGenerales, nombreOpcionVisual, fotosPorValor, variantes, stockTotal, sinStockCargado, urlsConFondoIA, urlsEnProceso,
 }: {
     nombre: string; descripcion: string; precio: string; desde?: boolean
     estado: ProductStatus; categoria?: string
@@ -3087,6 +3179,8 @@ function PreviewProducto({
     nombreOpcionVisual?: string
     fotosPorValor: { valor: string; url?: string }[]
     variantes: TipoVariante[]; stockTotal: number
+    /** Vidriera con el stock en blanco: la vista previa no escribe "Sin stock". */
+    sinStockCargado?: boolean
     // URLs con fondo compuesto por "Fondo con IA" — esas se muestran con
     // object-fit:cover (llenan el cuadro), el resto sigue en contain. Ver
     // comentario largo más abajo, sigue aplicando a las fotos comunes.
@@ -3252,9 +3346,9 @@ function PreviewProducto({
                         </div>
                     </div>
                 ))}
-                <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--color-border)', fontSize: 11, color: stockTotal > 0 ? 'var(--color-muted)' : 'var(--color-error)' }}>
+                {!sinStockCargado && <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--color-border)', fontSize: 11, color: stockTotal > 0 ? 'var(--color-muted)' : 'var(--color-error)' }}>
                     {stockTotal > 0 ? `${stockTotal} unidades disponibles` : 'Sin stock'}
-                </div>
+                </div>}
             </div>
         </div>
     )
@@ -3334,10 +3428,13 @@ function useTouchReorder({
     enabled,
     itemsLength,
     onMover,
+    atributo = 'data-galeria-index',
 }: {
     enabled: boolean
     itemsLength: number
     onMover: (origen: number, destino: number) => void
+    /** Atributo con el índice de cada elemento arrastrable. Cada lista usa el suyo: con uno solo, soltar un chip sobre una foto movía cualquiera. */
+    atributo?: string
 }) {
     const [arrastrando, setArrastrando] = useState<number | null>(null)
     const [sobre, setSobre] = useState<number | null>(null)
@@ -3383,9 +3480,9 @@ function useTouchReorder({
                 const t = ev.touches[0]
                 if (!t) return
                 const elem = document.elementFromPoint(t.clientX, t.clientY)
-                const card = elem?.closest('[data-galeria-index]')
+                const card = elem?.closest(`[${atributo}]`)
                 if (card) {
-                    const targetIdx = Number(card.getAttribute('data-galeria-index'))
+                    const targetIdx = Number(card.getAttribute(atributo))
                     if (!Number.isNaN(targetIdx) && targetIdx !== touchTargetRef.current) {
                         touchTargetRef.current = targetIdx
                         setSobre(targetIdx)
@@ -3418,7 +3515,7 @@ function useTouchReorder({
             window.addEventListener('touchend', onWindowTouchEnd)
             window.addEventListener('touchcancel', onWindowTouchEnd)
         }, 180)
-    }, [enabled, itemsLength, onMover])
+    }, [enabled, itemsLength, onMover, atributo])
 
     const verificarMovimientoTouch = useCallback((e: React.TouchEvent) => {
         if (!touchPosRef.current || isTouchDragging) return
@@ -3986,6 +4083,17 @@ function ZonaSubida({ onArchivos }: { onArchivos: (files: FileList | null) => vo
 // (tarjeta con borde y un switch grande), no una línea de texto chica.
 function InterruptorVariantes({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
     return (
+        <InterruptorFila
+            on={on} onChange={onChange}
+            titulo="Este producto viene en varias opciones"
+            detalle="Talle, color, tamaño… cada combinación lleva su propio stock."
+        />
+    )
+}
+
+// La fila con interruptor (tarjeta con borde y un switch), compartida por "varias opciones" y "se hace por pedido".
+function InterruptorFila({ on, onChange, titulo, detalle }: { on: boolean; onChange: (v: boolean) => void; titulo: string; detalle: string }) {
+    return (
         <button
             type="button"
             role="switch"
@@ -4000,8 +4108,8 @@ function InterruptorVariantes({ on, onChange }: { on: boolean; onChange: (v: boo
             }}
         >
             <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Este producto viene en varias opciones</span>
-                <span style={{ display: 'block', fontSize: 12.5, color: 'var(--color-muted)', marginTop: 2 }}>Talle, color, tamaño… cada combinación lleva su propio stock.</span>
+                <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{titulo}</span>
+                <span style={{ display: 'block', fontSize: 12.5, color: 'var(--color-muted)', marginTop: 2 }}>{detalle}</span>
             </span>
             <span aria-hidden style={{ width: 44, height: 24, borderRadius: 12, flexShrink: 0, position: 'relative', transition: 'background 150ms', background: on ? 'var(--color-primary)' : 'var(--color-surface-alt)', border: on ? 'none' : '1px solid var(--color-border-strong, var(--color-border))' }}>
                 <span style={{ position: 'absolute', top: on ? 3 : 2, left: on ? 23 : 2, width: 18, height: 18, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(15,23,42,0.2)', transition: 'left 150ms' }} />
@@ -4015,8 +4123,10 @@ function InterruptorVariantes({ on, onChange }: { on: boolean; onChange: (v: boo
 // menos en columnas. Enter/flecha abajo pasa a la celda de abajo (y, al final de
 // la columna, a la siguiente); Tab recorre la fila. Al enfocar una celda se
 // selecciona su contenido, así escribir reemplaza el 0.
-function GrillaStock({ tipos, filas, onStock }: {
-    tipos: TipoVariante[]; filas: FilaVariante[]; onStock: (clave: string, valor: string) => void
+function GrillaStock({ tipos, filas, onStock, deshabilitado, ceroVacio }: {
+    tipos: TipoVariante[]; filas: FilaVariante[]; onStock: (clave: string, valor: string) => void; deshabilitado?: boolean
+    /** Un stock en 0 se muestra vacío con el "0" de placeholder (no en la vidriera, donde 0 y vacío son distintos). */
+    ceroVacio?: boolean
 }) {
     const ref = useRef<HTMLDivElement>(null)
     const [ri, ci] = tipos[0].opciones.length >= tipos[1].opciones.length ? [0, 1] : [1, 0]
@@ -4069,8 +4179,9 @@ function GrillaStock({ tipos, filas, onStock }: {
                                                 className="ds-field"
                                                 data-celda={`${i}-${j}`}
                                                 inputMode="numeric"
-                                                value={f.stock}
-                                                disabled={!f.activa}
+                                                value={deshabilitado || (ceroVacio && f.stock === '0') ? '' : f.stock}
+                                                placeholder="0"
+                                                disabled={!f.activa || deshabilitado}
                                                 title={f.activa ? undefined : 'No se ofrece — activala en "Precio y stock"'}
                                                 aria-label={`Stock de ${f.clave}`}
                                                 onChange={e => onStock(f.clave, e.target.value)}
@@ -4278,9 +4389,9 @@ function InputPrecio({
     )
 }
 
-function PField({ label, value, onChange, placeholder, prefix, mono, h = 40, big, miles, error }: {
+function PField({ label, value, onChange, placeholder, prefix, mono, h = 40, big, miles, error, disabled }: {
     label: ReactNode; value: string; onChange: (v: string) => void; placeholder?: string
-    prefix?: string; mono?: boolean; h?: number; big?: boolean; miles?: boolean; error?: boolean
+    prefix?: string; mono?: boolean; h?: number; big?: boolean; miles?: boolean; error?: boolean; disabled?: boolean
 }) {
     return (
         <div>
@@ -4296,7 +4407,7 @@ function PField({ label, value, onChange, placeholder, prefix, mono, h = 40, big
                         style={{ flex: 1, height: '100%', border: 'none', outline: 'none', background: 'transparent', fontSize: big ? 18 : 14, fontWeight: big ? 600 : 400, color: 'var(--color-text)' }}
                     />
                 ) : (
-                    <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={{ flex: 1, height: '100%', border: 'none', outline: 'none', background: 'transparent', fontSize: big ? 18 : 14, fontWeight: big ? 600 : 400, color: 'var(--color-text)', fontFamily: mono ? '"Geist Mono", monospace' : 'inherit' }} />
+                    <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} disabled={disabled} style={{ flex: 1, height: '100%', border: 'none', outline: 'none', background: 'transparent', fontSize: big ? 18 : 14, fontWeight: big ? 600 : 400, color: 'var(--color-text)', fontFamily: mono ? '"Geist Mono", monospace' : 'inherit' }} />
                 )}
             </div>
         </div>
@@ -4406,6 +4517,87 @@ function CategoriaSelect({ categorias, value, onChange, error }: {
                 </div>
             )}
         </div>
+    )
+}
+
+// Los valores de una opción (S, M, L…) como chips que se arrastran para
+// ordenarlos. El orden es el que ve el cliente en la tienda y el de las
+// combinaciones; antes la única forma de cambiarlo era borrar y volver a
+// cargar. Mouse: arrastrar y soltar. Celular: mantener apretado un instante y
+// mover (useTouchReorder). Con el teclado, flechas izquierda/derecha. Devuelve
+// los chips sueltos (un fragmento) para que compartan la fila con las
+// sugerencias y el campo de agregar.
+function ChipsValores({ grupo, opciones, onChange }: { grupo: string; opciones: string[]; onChange: (o: string[]) => void }) {
+    // Un atributo por opción: Talle y Color no se mezclan, ni con la galería de fotos.
+    const atributo = `data-chip-${grupo.replace(/[^a-zA-Z0-9_-]/g, '')}`
+    const puede = opciones.length > 1
+
+    const mover = useCallback((origen: number, destino: number) => {
+        if (destino < 0 || destino >= opciones.length || origen === destino) return
+        const nuevo = [...opciones]
+        const [movido] = nuevo.splice(origen, 1)
+        nuevo.splice(destino, 0, movido)
+        onChange(nuevo)
+    }, [opciones, onChange])
+
+    const {
+        arrastrando, sobre, isTouchDragging,
+        setArrastrando, setSobre,
+        iniciarTouchDrag, verificarMovimientoTouch, cancelarTouchAntesDeIniciar,
+    } = useTouchReorder({ enabled: puede, itemsLength: opciones.length, onMover: mover, atributo })
+
+    function soltar(destino: number) {
+        if (arrastrando !== null && arrastrando !== destino) mover(arrastrando, destino)
+        setArrastrando(null)
+        setSobre(null)
+    }
+
+    return (
+        <>
+            {opciones.map((op, i) => {
+                const encima = puede && sobre === i && arrastrando !== null && arrastrando !== i
+                const agarrado = arrastrando === i
+                return (
+                    <span
+                        key={op}
+                        {...{ [atributo]: i }}
+                        draggable={puede}
+                        tabIndex={puede ? 0 : undefined}
+                        onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', op); setArrastrando(i) }}
+                        onDragOver={e => { if (arrastrando !== null) { e.preventDefault(); if (sobre !== i) setSobre(i) } }}
+                        onDragLeave={() => setSobre(s => (s === i ? null : s))}
+                        onDrop={e => { e.preventDefault(); soltar(i) }}
+                        onDragEnd={() => { setArrastrando(null); setSobre(null) }}
+                        onTouchStart={e => iniciarTouchDrag(e, i)}
+                        onTouchMove={verificarMovimientoTouch}
+                        onTouchEnd={cancelarTouchAntesDeIniciar}
+                        onTouchCancel={cancelarTouchAntesDeIniciar}
+                        onKeyDown={e => {
+                            if (!puede || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return
+                            e.preventDefault()
+                            mover(i, i + (e.key === 'ArrowLeft' ? -1 : 1))
+                        }}
+                        title={puede ? 'Arrastralo para cambiar el orden' : undefined}
+                        style={{
+                            ...chip, border: '1px solid var(--color-primary)',
+                            cursor: puede ? 'grab' : 'default',
+                            opacity: agarrado ? (isTouchDragging ? 0.75 : 0.4) : 1,
+                            transform: isTouchDragging && agarrado ? 'scale(1.08)' : encima ? 'scale(0.94)' : 'none',
+                            outline: encima ? '2px dashed var(--color-primary)' : 'none',
+                            outlineOffset: 2,
+                            boxShadow: isTouchDragging && agarrado ? '0 6px 14px rgba(0,0,0,0.25)' : 'none',
+                            transition: 'opacity 120ms ease, transform 120ms ease',
+                            userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none',
+                            position: 'relative', zIndex: isTouchDragging && agarrado ? 10 : 1,
+                        } as React.CSSProperties}
+                    >
+                        {puede && <GripVertical size={11} strokeWidth={2} style={{ marginLeft: -4, opacity: 0.55, pointerEvents: 'none' }} aria-hidden />}
+                        {op}
+                        <button type="button" className="ds-hover" aria-label={`Quitar ${op}`} onClick={() => onChange(opciones.filter(o => o !== op))} style={chipX}><X size={11} strokeWidth={2} /></button>
+                    </span>
+                )
+            })}
+        </>
     )
 }
 

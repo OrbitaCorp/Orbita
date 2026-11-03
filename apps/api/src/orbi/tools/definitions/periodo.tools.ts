@@ -152,6 +152,10 @@ export class GetResumenDelPeriodoTool implements OrbiTool {
             ? { incluyeHoyQueNoTermino: true, notaDeHoy: 'El período incluye el día de hoy, que todavía no terminó: la comparación contra el período anterior completo puede dar más baja de lo que va a ser.' }
             : {}),
           ventas: d.kpis.ventas,
+          // La tarjeta "Ganancias" del Inicio: ingresos de productos con costo cargado − su costo − devoluciones.
+          // gananciaCoberturaPct < 100 = parte de lo vendido son productos sin costo cargado y no entran.
+          ganancias: d.kpis.ganancias,
+          gananciaCoberturaPct: d.kpis.gananciaCoberturaPct,
           pedidos: d.kpis.pedidos,
           ticketPromedio: d.kpis.ticketPromedio,
           clientesNuevos: d.kpis.clientesNuevos,
@@ -160,6 +164,7 @@ export class GetResumenDelPeriodoTool implements OrbiTool {
           visitasALaTienda: d.kpis.visitas,
           variacionPorcentualContraElPeriodoAnterior: {
             ventas: d.kpis.deltas.ventas,
+            ganancias: d.kpis.deltas.ganancias,
             pedidos: d.kpis.deltas.pedidos,
             ticketPromedio: d.kpis.deltas.ticketPromedio,
             clientesNuevos: d.kpis.deltas.clientesNuevos,

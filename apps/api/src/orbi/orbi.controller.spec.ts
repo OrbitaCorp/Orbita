@@ -2,7 +2,7 @@ import { Test } from '@nestjs/testing';
 import { DemoIaService } from '../demo/demo-ia.service';
 import { ConflictException, ForbiddenException, HttpException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { OrbiController, PROMPT_DEMO } from './orbi.controller';
+import { OrbiController, MENSAJE_ORBI_DEMO } from './orbi.controller';
 import { CIERRE_DEL_CONTEXTO, ENCABEZADO_DEL_CONTEXTO } from './turno/mensajes-del-turno';
 import { LLM_ADAPTER, type LlmAdapter } from './llm/llm-adapter.interface';
 import { ConversationService } from './conversation/conversation.service';
@@ -358,7 +358,7 @@ describe('OrbiController', () => {
       soloLectura as any,
     );
 
-    expect(registry.getTools).toHaveBeenCalledWith(OrbiSurface.PANEL, [], undefined, { soloLectura: false });
+    expect(registry.getTools).toHaveBeenCalledWith(OrbiSurface.PANEL, [], undefined);
   });
 
   // El dueño no depende de filas de permisos (igual que PermissionsGuard): Orbi
@@ -375,14 +375,14 @@ describe('OrbiController', () => {
       createMockResponse() as any,
       usuario('owner', []) as any,
     );
-    expect(registry.getTools).toHaveBeenLastCalledWith(OrbiSurface.PANEL, CODIGOS_DEL_CATALOGO, undefined, { soloLectura: false });
+    expect(registry.getTools).toHaveBeenLastCalledWith(OrbiSurface.PANEL, CODIGOS_DEL_CATALOGO, undefined);
 
     await controller.chat(
       { message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any,
       createMockResponse() as any,
       usuario('empleado', ['orders.view']) as any,
     );
-    expect(registry.getTools).toHaveBeenLastCalledWith(OrbiSurface.PANEL, ['orders.view'], undefined, { soloLectura: false });
+    expect(registry.getTools).toHaveBeenLastCalledWith(OrbiSurface.PANEL, ['orders.view'], undefined);
   });
 
   // Escrituras seguras (spec §3.2): cuando los argumentos que armó el modelo no
@@ -439,26 +439,11 @@ describe('OrbiController', () => {
       expect(res.chunks.join('')).toContain('event: action_pending');
     });
 
-    it('en la demo, proponer y execute reciben soloLectura: true', async () => {
-      registry.getTools.mockReturnValue([{ name: 'listProducts' }]);
-      registry.execute.mockResolvedValue({ success: true, label: 'ok' });
-      llmQuePide({ name: 'listProducts', arguments: {} });
-
-      await controller.chat(
-        { message: 'Mostrame los productos', context: { surface: OrbiSurface.PANEL } } as any,
-        createMockResponse() as any,
-        { ...duenio, readOnly: true } as any,
-      );
-      expect(registry.proponer).toHaveBeenCalledWith('listProducts', {}, expect.anything(), undefined, { soloLectura: true });
-      expect(registry.execute).toHaveBeenCalledWith('listProducts', {}, expect.anything(), undefined, { soloLectura: true });
-    });
-
     // Una escritura NUNCA se ejecuta desde el chat, solo desde /orbi/confirm.
     // proponer() devuelve null cuando no pasa las puertas (demo, sin permiso,
     // otra surface); antes eso caía en "ejecutar directo" y la única barrera
     // era que execute() repitiera las mismas puertas.
     it.each([
-      ['en la demo', { readOnly: true }],
       ['sin permiso', { roleName: 'empleado', permissions: [] as string[] }],
     ])('%s, una escritura con proponer null no se ejecuta: el modelo recibe un fallo', async (_caso, extra) => {
       registry.getTools.mockReturnValue([{ name: 'listProducts' }]);
@@ -629,17 +614,6 @@ describe('OrbiController', () => {
 
       const [fila] = [...prisma.filas.values()];
       expect(fila.conversationId).toBe(PROPIA);
-    });
-
-    it('en la demo no hay evento conversation ni se guarda nada', async () => {
-      const res = createMockResponse();
-      await controller.chat(chatPanel(PROPIA), res as any, { ...duenio, readOnly: true } as any);
-
-      expect(res.chunks.join('')).not.toContain('event: conversation');
-      expect(res.chunks.join('')).toContain('event: text');
-      expect(conversaciones.historialSiEsPropia).not.toHaveBeenCalled();
-      expect(conversaciones.crear).not.toHaveBeenCalled();
-      expect(conversaciones.appendMessage).not.toHaveBeenCalled();
     });
   });
 
@@ -1426,17 +1400,6 @@ describe('OrbiController', () => {
       expect(cuota.devolver).not.toHaveBeenCalled();
     });
 
-    it('la demo que falla no devuelve cupo ni registra turno', async () => {
-      mockLlm.streamChat = async function* () {
-        throw new Error('boom');
-      } as any;
-
-      await controller.chat({ message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any, createMockResponse() as any, { ...duenio, readOnly: true } as any);
-
-      expect(cuota.devolver).not.toHaveBeenCalled();
-      expect(turnos.registrar).not.toHaveBeenCalled();
-    });
-
     it('cuota diaria rechazada: 429 y queda registrado un turno con status quota', async () => {
       cuota.consumir.mockResolvedValue(false);
       const res = createMockResponse();
@@ -1492,17 +1455,19 @@ describe('OrbiController', () => {
       expect(res.chunks.join('')).toContain('event: done');
     });
 
-    it('la demo no pasa por el cupo mensual', async () => {
-      cupoOrbi.motivoDeBloqueo.mockResolvedValue('negocio');
+    // El chat de Orbi está cerrado al visitante de la demo (todos comparten el
+    // mismo miembro readOnly): la demo del panel responde con mensajes
+    // prearmados en el navegador, y quien le pegue a la API directo no llega al
+    // modelo ni gasta cupo.
+    it('el visitante de la demo recibe 403 y no llega al modelo, ni al cupo, ni al stream', async () => {
       const res = createMockResponse();
-      await controller.chat({ message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any, res as any, { ...duenio, readOnly: true } as any);
-      expect(cupoOrbi.motivoDeBloqueo).not.toHaveBeenCalled();
-      expect(res.chunks.join('')).toContain('event: done');
-    });
+      await expect(
+        controller.chat({ message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any, res as any, { ...duenio, readOnly: true } as any),
+      ).rejects.toMatchObject({ response: { error: 'DEMO_SOLO_LECTURA', message: MENSAJE_ORBI_DEMO } });
 
-    it('cuota diaria rechazada en la demo: no se registra', async () => {
-      cuota.consumir.mockResolvedValue(false);
-      await expect(controller.chat({ message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any, createMockResponse() as any, { ...duenio, readOnly: true } as any)).rejects.toThrow(HttpException);
+      expect(cupoOrbi.motivoDeBloqueo).not.toHaveBeenCalled();
+      expect(cuota.consumir).not.toHaveBeenCalled();
+      expect(res.chunks).toHaveLength(0);
       expect(turnos.registrar).not.toHaveBeenCalled();
     });
 
@@ -1536,26 +1501,6 @@ describe('OrbiController', () => {
       const res = createMockResponse();
       await controller.chat({ message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any, res as any, duenio as any);
       expect(res.end).toHaveBeenCalled();
-    });
-
-    // Los visitantes de la demo comparten negocio y miembro: sus turnos se
-    // mezclarían con las métricas de uso real. El metering sí queda: el
-    // consumo se paga igual.
-    it('la demo no escribe en orbi_turns, pero el metering sí', async () => {
-      mockLlm.streamChat = async function* () {
-        yield { type: 'text' as const, chunk: 'Hola' };
-        yield { type: 'usage' as const, usage: { model: 'gemini-3.6-flash', promptTokens: 10, completionTokens: 5, provider: 'gemini' as const } };
-        yield { type: 'done' as const };
-      } as any;
-
-      await controller.chat(
-        { message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any,
-        createMockResponse() as any,
-        { ...duenio, readOnly: true } as any,
-      );
-
-      expect(turnos.registrar).not.toHaveBeenCalled();
-      expect(metering.track).toHaveBeenCalledWith(expect.objectContaining({ category: 'prompt_tokens', quantity: 10 }));
     });
 
     it('el wizard no escribe en orbi_turns (tiene su propia analítica)', async () => {
@@ -1613,17 +1558,6 @@ describe('OrbiController', () => {
       expect(contexto.content).toContain('Negocio: "Rama".');
       expect(contexto.content.endsWith(CIERRE_DEL_CONTEXTO)).toBe(true);
       expect(resto.map(m => m.content)).toEqual(['antes', 'respuesta', 'y ahora?']);
-    });
-
-    it('en la demo, la nota de la demo va al final del contexto y el system no cambia', async () => {
-      contextBuilder.armarPrompt.mockResolvedValue({ sistema: 'FIJO', contexto: 'Negocio: "Nébula Tech".' });
-      const vistos = llmQueAnota();
-
-      await controller.chat({ message: 'hola', context: { surface: OrbiSurface.PANEL } } as any, createMockResponse() as any, { ...duenio, readOnly: true } as any);
-
-      expect(vistos[0][0]).toEqual({ role: 'system', content: 'FIJO' });
-      expect(vistos[0][1].content).toContain(`Negocio: "Nébula Tech".\n\n${PROMPT_DEMO}`);
-      expect(vistos[0][2]).toEqual({ role: 'user', content: 'hola' });
     });
   });
 

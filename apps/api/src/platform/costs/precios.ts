@@ -43,6 +43,10 @@ export const PRECIOS_IA: Record<string, Record<string, Tramo[]>> = {
     'openai/gpt-oss-20b': [{ entrada: 0.075, salida: 0.3 }],
     'qwen/qwen3.8-27b': [{ entrada: 0.8, salida: 4 }],
   },
+  // Workers AI de Cloudflare (chat del bot de WhatsApp). Aparte de 'cloudflare', que es la factura externa de R2 y de las imágenes.
+  'workers-ai': {
+    '@cf/openai/gpt-oss-120b': [{ entrada: 0.35, salida: 0.75 }],
+  },
 };
 
 // Con qué modelo se cobra un evento cuyo modelo no está en la tabla, o que no lo trae
@@ -51,6 +55,7 @@ export const PRECIOS_IA: Record<string, Record<string, Tramo[]>> = {
 const MODELO_POR_DEFECTO: Record<string, string> = {
   gemini: 'gemini-3.6-flash',
   groq: 'openai/gpt-oss-120b',
+  'workers-ai': '@cf/openai/gpt-oss-120b',
 };
 
 // El resto: USD por unidad de la categoría del evento.
@@ -64,7 +69,9 @@ const PRECIO_POR_UNIDAD: Record<string, Record<string, number>> = {
 };
 
 /** Proveedores cuyo costo sale de usage_events (los sincroniza InternalCostAdapter). */
-export const PROVEEDORES_INTERNOS = [...Object.keys(PRECIOS_IA), ...Object.keys(PRECIO_POR_UNIDAD)];
+// 'workers-ai' queda afuera: no escribe usage_events (el bot de WhatsApp anota su gasto en whatsapp_bot_turns) y lo que
+// cobra Cloudflare ya entra por su adaptador externo de facturación.
+export const PROVEEDORES_INTERNOS = [...Object.keys(PRECIOS_IA).filter((p) => p !== 'workers-ai'), ...Object.keys(PRECIO_POR_UNIDAD)];
 
 const LADO_DE_LA_CATEGORIA: Record<string, 'entrada' | 'salida'> = {
   prompt_tokens: 'entrada',

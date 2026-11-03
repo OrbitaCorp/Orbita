@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Pencil, Plus, Send, Trash2 } from 'lucide-react'
-import { platformApi, type CasillaCorreo, type CasillaCorreoInput, type CorreoEnviado } from '@/lib/platform/api'
+import { Pencil, Plus, RefreshCw, Send, Trash2 } from 'lucide-react'
+import { platformApi, type CasillaCorreo, type CasillaCorreoInput, type CorreoEnviado, type CorreoRecibido } from '@/lib/platform/api'
 import { Toast, type ToastVariant } from '@/design-system/components/Toast'
 import {
   useFetch, Card, Table, Chip, Loader, ErrorBox, Empty, PageHeader, ModalShell, Field, dateTime,
@@ -36,9 +36,50 @@ function leerBorrador(): Partial<Borrador> {
 }
 
 const dominioDe = (email: string) => email.split('@')[1] ?? ''
+const EMAIL_VALIDO = /^[^\s@,;<>"()]+@[^\s@,;<>"()]+\.[^\s@,;<>"()]+$/
+const MAX_DESTINATARIOS = 20
+
+function extraerDestinatarios(raw: string): string[] {
+  const vistos = new Set<string>()
+  const lista: string[] = []
+  for (const parte of raw.split(/[,;]+/)) {
+    const limpio = parte.trim().toLowerCase()
+    if (!limpio || vistos.has(limpio)) continue
+    vistos.add(limpio)
+    lista.push(limpio)
+  }
+  return lista
+}
 const textarea: React.CSSProperties = { ...inputStyle, height: 'auto', minHeight: 300, padding: '11px 13px', lineHeight: 1.6, resize: 'vertical', width: '100%' }
 
-export function TabCorreo({ puedeEnviar }: { puedeEnviar: boolean }) {
+const CORREOS_CEO = new Set(['ceo@orbita-corp.com', 'ceo@orbita.site', 'mateo@orbita.site', 'mateo@orbita-corp.com'])
+
+export function TabCorreo({ puedeEnviar, puedeEditarCasillas, adminEmail }: { puedeEnviar: boolean; puedeEditarCasillas: boolean; adminEmail?: string }) {
+  const esCeo = !!adminEmail && CORREOS_CEO.has(adminEmail.trim().toLowerCase())
+  const [tickRecibidos, setTickRecibidos] = useState(0)
+  const { data: recibidos, error: errorRecibidos, loading: cargandoRecibidos } = useFetch(
+    () => (esCeo ? platformApi.correosRecibidos() : Promise.resolve(null)),
+    [esCeo, tickRecibidos],
+  )
+  const [recibidoAbierto, setRecibidoAbierto] = useState<CorreoRecibido | null>(null)
+  const [htmlRecibido, setHtmlRecibido] = useState<string | null>(null)
+  const [errorDetalleRecibido, setErrorDetalleRecibido] = useState('')
+
+  useEffect(() => {
+    if (!recibidoAbierto) {
+      setHtmlRecibido(null)
+      setErrorDetalleRecibido('')
+      return
+    }
+    let cancelado = false
+    setHtmlRecibido(null)
+    setErrorDetalleRecibido('')
+    platformApi.correoRecibidoDetalle(recibidoAbierto.folderId, recibidoAbierto.messageId)
+      .then((r) => { if (!cancelado) setHtmlRecibido(r.html) })
+      .catch((err) => { if (!cancelado) setErrorDetalleRecibido(err instanceof Error ? err.message : 'No se pudo cargar el contenido del correo.') })
+    return () => { cancelado = true }
+  }, [recibidoAbierto])
+
   const [tickCasillas, setTickCasillas] = useState(0)
   const [tickEnviados, setTickEnviados] = useState(0)
   const { data: casillas, error: errorCasillas } = useFetch(() => platformApi.correoCasillas(), [tickCasillas])
@@ -98,7 +139,17 @@ export function TabCorreo({ puedeEnviar }: { puedeEnviar: boolean }) {
     e.preventDefault()
     setError('')
     if (!casilla) { setError('Elegí desde qué casilla sale.'); return }
-    if (!/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(to.trim())) { setError('Escribí un solo email de destino, válido.'); return }
+    const destinatarios = extraerDestinatarios(to)
+    if (destinatarios.length === 0) { setError('Escribí al menos un email de destino.'); return }
+    const invalido = destinatarios.find((d) => !EMAIL_VALIDO.test(d))
+    if (invalido) {
+      setError(destinatarios.length === 1 ? 'Escribí un email de destino válido.' : `"${invalido}" no es un email válido.`)
+      return
+    }
+    if (destinatarios.length > MAX_DESTINATARIOS) {
+      setError(`Podés enviar a hasta ${MAX_DESTINATARIOS} destinatarios por correo.`)
+      return
+    }
     if (subject.trim().length < 3) { setError('Ponele un asunto.'); return }
     if (body.trim().length < 10) { setError('El mensaje está vacío.'); return }
     setConfirmando(true)
@@ -108,7 +159,8 @@ export function TabCorreo({ puedeEnviar }: { puedeEnviar: boolean }) {
     if (!casilla) return
     setEnviando(true)
     try {
-      const r = await platformApi.enviarCorreo({ senderId: casilla.id, to: to.trim(), subject: subject.trim(), body })
+      const destino = extraerDestinatarios(to).join(', ')
+      const r = await platformApi.enviarCorreo({ senderId: casilla.id, to: destino, subject: subject.trim(), body })
       setConfirmando(false)
       setTickEnviados((k) => k + 1)
       if (!r.sent) {
@@ -117,7 +169,7 @@ export function TabCorreo({ puedeEnviar }: { puedeEnviar: boolean }) {
       }
       setAviso(r.simulated
         ? { variant: 'success', title: 'Envío simulado', description: 'Este entorno no tiene proveedor de correo: quedó registrado, pero no salió.' }
-        : { variant: 'success', title: `Enviado a ${to.trim()}`, description: `Las respuestas llegan a ${casilla.email}.` })
+        : { variant: 'success', title: `Enviado a ${destino}`, description: `Las respuestas llegan a ${casilla.email}.` })
       setTo(''); setSubject(''); setBody('')
     } catch (err) {
       setConfirmando(false)
@@ -132,6 +184,17 @@ export function TabCorreo({ puedeEnviar }: { puedeEnviar: boolean }) {
     if (misma) setElegida(misma.id)
     setTo(c.to); setSubject(c.subject); setBody(c.body)
     setAbierto(null)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function responderRecibido(r: CorreoRecibido) {
+    const destinoPropio = r.to.toLowerCase()
+    const misma = casillas?.find((x) => destinoPropio.includes(x.email.toLowerCase())) ?? casillas?.find((x) => x.email === 'mateo@orbita.site' || x.email === 'ceo@orbita.site')
+    if (misma) setElegida(misma.id)
+    setTo(r.fromEmail)
+    const asuntoBase = r.subject.trim()
+    setSubject(/^re:/i.test(asuntoBase) ? asuntoBase : `Re: ${asuntoBase}`)
+    setRecibidoAbierto(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -165,8 +228,8 @@ export function TabCorreo({ puedeEnviar }: { puedeEnviar: boolean }) {
                 </p>
               )}
 
-              <Field label="Para">
-                <input type="email" value={to} onChange={(e) => setTo(e.target.value)} placeholder="nombre@empresa.com" autoComplete="off" className="ds-field" style={{ ...inputStyle, width: '100%' }} />
+              <Field label="Para" hint="Si son varios, separalos con coma.">
+                <input type="text" inputMode="email" value={to} onChange={(e) => setTo(e.target.value)} placeholder="nombre@empresa.com, otro@empresa.com" autoComplete="off" className="ds-field" style={{ ...inputStyle, width: '100%' }} />
               </Field>
 
               <Field label="Asunto">
@@ -207,6 +270,57 @@ export function TabCorreo({ puedeEnviar }: { puedeEnviar: boolean }) {
         </Card>
       </div>
 
+      {esCeo && (
+        errorRecibidos ? (
+          <ErrorBox msg="No se pudieron cargar los correos recibidos." />
+        ) : !recibidos ? (
+          <Loader />
+        ) : (
+          <Card
+            title="Recibidos (CEO)"
+            subtitle="Bandeja de entrada de mateo@orbita.site / ceo@orbita.site — visible solo desde tu cuenta de CEO"
+            action={(
+              <button
+                type="button"
+                onClick={() => setTickRecibidos((k) => k + 1)}
+                disabled={cargandoRecibidos}
+                className="ds-hover"
+                style={{ ...btnGhostSm, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              >
+                <RefreshCw size={13} /> {cargandoRecibidos ? 'Actualizando…' : 'Actualizar'}
+              </button>
+            )}
+            noPad={recibidos.length > 0}
+          >
+            {recibidos.length === 0 ? (
+              <Empty text="No hay correos recibidos en la bandeja." />
+            ) : (
+              <Table
+                head={['Fecha', 'De', 'Para', 'Asunto', 'Estado']}
+                rows={recibidos.map((r) => ({
+                  key: `${r.folderId}-${r.messageId}`,
+                  onClick: () => setRecibidoAbierto(r),
+                  cells: [
+                    dateTime(r.receivedAt),
+                    r.fromName && r.fromName !== r.fromEmail ? `${r.fromName} <${r.fromEmail}>` : r.fromEmail,
+                    r.to || 'mateo@orbita.site',
+                    <div key="a" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <span style={{ fontWeight: r.unread ? 700 : 600, color: 'var(--color-text)' }}>{r.subject}</span>
+                      {r.summary && (
+                        <span style={{ fontSize: 12, color: 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 420 }}>
+                          {r.summary}
+                        </span>
+                      )}
+                    </div>,
+                    <Chip key="e" text={r.unread ? 'Sin leer' : 'Leído'} tone={r.unread ? 'blue' : 'gray'} dot />,
+                  ],
+                }))}
+              />
+            )}
+          </Card>
+        )
+      )}
+
       {errorEnviados ? (
         <ErrorBox msg="No se pudieron cargar los enviados." />
       ) : !enviados ? (
@@ -240,7 +354,7 @@ export function TabCorreo({ puedeEnviar }: { puedeEnviar: boolean }) {
             <dt style={{ color: 'var(--color-muted)' }}>De</dt>
             <dd style={{ margin: 0, color: 'var(--color-text)', overflowWrap: 'anywhere' }}>{casilla.name} &lt;{casilla.email}&gt;</dd>
             <dt style={{ color: 'var(--color-muted)' }}>Para</dt>
-            <dd style={{ margin: 0, color: 'var(--color-text)', fontWeight: 600, overflowWrap: 'anywhere' }}>{to.trim()}</dd>
+            <dd style={{ margin: 0, color: 'var(--color-text)', fontWeight: 600, overflowWrap: 'anywhere' }}>{extraerDestinatarios(to).join(', ')}</dd>
             <dt style={{ color: 'var(--color-muted)' }}>Asunto</dt>
             <dd style={{ margin: 0, color: 'var(--color-text)', overflowWrap: 'anywhere' }}>{subject.trim()}</dd>
           </dl>
@@ -275,8 +389,37 @@ export function TabCorreo({ puedeEnviar }: { puedeEnviar: boolean }) {
         </ModalShell>
       )}
 
+      {recibidoAbierto && (
+        <ModalShell title={recibidoAbierto.subject} onClose={() => setRecibidoAbierto(null)}>
+          <div style={{ fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.6, overflowWrap: 'anywhere' }}>
+            De <strong>{recibidoAbierto.fromName}</strong> &lt;{recibidoAbierto.fromEmail}&gt; para {recibidoAbierto.to || 'mateo@orbita.site'}<br />
+            {dateTime(recibidoAbierto.receivedAt)}
+          </div>
+          <div style={{ marginTop: 14 }}>
+            {errorDetalleRecibido ? (
+              <ErrorBox msg={errorDetalleRecibido} />
+            ) : htmlRecibido === null ? (
+              <Loader />
+            ) : (
+              <iframe
+                title={recibidoAbierto.subject}
+                srcDoc={htmlRecibido}
+                sandbox=""
+                style={{ width: '100%', height: 420, border: '1px solid var(--color-border)', borderRadius: 10, display: 'block', background: '#fff' }}
+              />
+            )}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18 }}>
+            <button type="button" onClick={() => setRecibidoAbierto(null)} className="ds-hover" style={btnGhost}>Cerrar</button>
+            <button type="button" onClick={() => responderRecibido(recibidoAbierto)} className="ds-hover" style={btnPrimary}>
+              <Send size={14} strokeWidth={2} /> Responder
+            </button>
+          </div>
+        </ModalShell>
+      )}
+
       {gestionando && (
-        <ModalCasillas casillas={casillas} puedeEditar={puedeEnviar} onClose={() => setGestionando(false)} onCambio={recargarCasillas} />
+        <ModalCasillas casillas={casillas} puedeEditar={puedeEditarCasillas} onClose={() => setGestionando(false)} onCambio={recargarCasillas} />
       )}
 
       {aviso && (

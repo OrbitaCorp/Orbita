@@ -78,6 +78,14 @@ export class StorefrontController {
     return this.storefrontService.listProducts(slug, query);
   }
 
+  // Link corto de un producto para las redes (ver resolverLinkCorto).
+  @Get(':slug/p/:codigo')
+  @Public()
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
+  linkCorto(@Param('slug') slug: string, @Param('codigo') codigo: string) {
+    return this.storefrontService.resolverLinkCorto(slug, codigo);
+  }
+
   @Get(':slug/products/:id')
   @Public()
   productDetail(@Param('slug') slug: string, @Param('id') id: string) {

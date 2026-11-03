@@ -21,6 +21,11 @@
 // antes y el después sin recargar ni guardar nada. Tocar cualquier campo
 // vuelve solo a "Con tus cambios" — si no, se editaría a ciegas.
 //
+// Foco: cuando el dueño toca algo en el formulario, `foco` pide llevar la
+// mirada a esa parte de la tienda — la tienda se desplaza hasta ahí y la marca
+// un instante (ver lib/storefront/previewFoco.ts). Se manda un poco DESPUÉS
+// del borrador, para que lo recién prendido ya esté dibujado.
+//
 // Si el dueño clickea un link adentro del preview, navega de verdad: esa
 // página pierde el `?preview=1` y muestra lo guardado. Es correcto — sigue
 // siendo su tienda real, solo sin el borrador encima.
@@ -29,8 +34,10 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Monitor, Smartphone } from 'lucide-react'
 import { ROOT_DOMAIN, currentSlug } from '@/lib/tenant'
 import { MSG_BORRADOR, MSG_LISTA, PREVIEW_QUERY } from '@/lib/storefront/previewBridge'
+import { MSG_FOCO } from '@/lib/storefront/previewFoco'
 import { apToUpdateDto } from '../../mock/apariencia.mapper'
 import type { Apariencia } from '../../mock/apariencia.mock'
+import type { PedidoFoco } from './focoPreview'
 
 const DESIGN_W = 1280
 // Vista de celular: el iframe se dibuja a 390×844 (un teléfono común) y la
@@ -51,9 +58,18 @@ interface StorePreviewProps {
     publicado?: Apariencia | null
     full?: boolean
     subdomain?: string
+    /** A qué parte de la tienda llevar la mirada (ver focoPreview.ts). */
+    foco?: PedidoFoco | null
+    /** En un celular de verdad: la tienda a tamaño natural, sin marco ni escalado. */
+    nativo?: boolean
 }
 
-export function StorePreview({ ap, publicado, full, subdomain }: StorePreviewProps) {
+// Cuánto esperar, tras la carga del iframe, para pedir el foco: la portada
+// trae los productos aparte y las secciones aparecen de a poco (la tienda
+// además reintenta unos segundos).
+const FOCO_TRAS_CARGA_MS = 400
+
+export function StorePreview({ ap, publicado, full, subdomain, foco, nativo = false }: StorePreviewProps) {
     const wrapRef = useRef<HTMLDivElement>(null)
     const iframeRef = useRef<HTMLIFrameElement>(null)
     const [scale, setScale] = useState(0.5)
@@ -62,7 +78,9 @@ export function StorePreview({ ap, publicado, full, subdomain }: StorePreviewPro
     // sin salir del panel — la mayoría de las visitas a una tienda entran
     // desde el teléfono.
     const [dispositivo, setDispositivo] = useState<Dispositivo>('escritorio')
-    const esMovil = dispositivo === 'celular'
+    // `nativo` no es el "modo celular" del interruptor de abajo (que simula uno
+    // dentro de una pantalla grande): es estar EN un celular.
+    const esMovil = !nativo && dispositivo === 'celular'
 
     // En un effect y no inline: el src depende del host (currentSlug lee
     // window.location) y calcularlo durante el render rompería la hidratación.
@@ -81,7 +99,7 @@ export function StorePreview({ ap, publicado, full, subdomain }: StorePreviewPro
     useLayoutEffect(() => {
         const medir = () => {
             const wrap = wrapRef.current
-            if (!wrap || wrap.clientWidth === 0) return
+            if (!wrap || wrap.clientWidth === 0 || nativo) return
             setWrapH(wrap.clientHeight)
             // En celular el teléfono entra ENTERO (se achica por alto y por
             // ancho, lo que sea más chico), con un respiro alrededor; en
@@ -95,7 +113,7 @@ export function StorePreview({ ap, publicado, full, subdomain }: StorePreviewPro
         if (wrapRef.current) ro.observe(wrapRef.current)
         window.addEventListener('resize', medir)
         return () => { ro.disconnect(); window.removeEventListener('resize', medir) }
-    }, [esMovil])
+    }, [esMovil, nativo])
 
     // Exactamente lo que se mandaría al guardar: así el preview no puede
     // divergir de lo que va a quedar en la tienda.
@@ -116,42 +134,71 @@ export function StorePreview({ ap, publicado, full, subdomain }: StorePreviewPro
     // El iframe avisa cuando ya puede escuchar (MSG_LISTA): un postMessage
     // mandado antes de eso se pierde sin error. Vale para la carga inicial y
     // para cualquier recarga posterior del iframe.
+    const focoRef = useRef(foco)
+    useEffect(() => { focoRef.current = foco }, [foco])
+    const mandarFoco = useCallback(() => {
+        const f = focoRef.current
+        if (!f) return
+        iframeRef.current?.contentWindow?.postMessage(
+            { type: MSG_FOCO, objetivo: f.objetivo },
+            window.location.origin,
+        )
+    }, [])
+
     useEffect(() => {
+        let t = 0
         const alMensaje = (e: MessageEvent) => {
             if (e.origin !== window.location.origin) return
-            if ((e.data as { type?: string } | null)?.type === MSG_LISTA) mandarBorrador()
+            if ((e.data as { type?: string } | null)?.type === MSG_LISTA) {
+                mandarBorrador()
+                // Carga inicial (o recarga del iframe): ir a donde se estaba editando.
+                window.clearTimeout(t)
+                t = window.setTimeout(mandarFoco, FOCO_TRAS_CARGA_MS)
+            }
         }
         window.addEventListener('message', alMensaje)
-        return () => window.removeEventListener('message', alMensaje)
-    }, [mandarBorrador])
+        return () => { window.removeEventListener('message', alMensaje); window.clearTimeout(t) }
+    }, [mandarBorrador, mandarFoco])
 
     useEffect(() => {
         const t = setTimeout(mandarBorrador, DEBOUNCE_MS)
         return () => clearTimeout(t)
     }, [borrador, mandarBorrador])
 
-    const frameHeight = full ? '100%' : 'calc(100vh - 150px)'
+    // Después del borrador (DEBOUNCE_MS) más un respiro para que la tienda lo dibuje.
+    useEffect(() => {
+        if (!foco) return
+        const t = setTimeout(mandarFoco, DEBOUNCE_MS + 160)
+        return () => clearTimeout(t)
+    }, [foco, mandarFoco])
+
+    const frameHeight = full || nativo ? '100%' : 'calc(100vh - 150px)'
 
     return (
-        <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--color-border)', boxShadow: full ? 'none' : '0 8px 32px rgba(15,23,42,0.12)', background: 'var(--color-bg)', display: 'flex', flexDirection: 'column', height: frameHeight }}>
+        <div style={{ borderRadius: nativo ? 0 : 12, overflow: 'hidden', border: nativo ? 'none' : '1px solid var(--color-border)', boxShadow: full || nativo ? 'none' : '0 8px 32px rgba(15,23,42,0.12)', background: 'var(--color-bg)', display: 'flex', flexDirection: 'column', height: frameHeight }}>
             {/* Solo el favicon y el subdominio real de ESTE negocio — sin los
                 puntitos de macOS ni una URL de mentira. */}
-            <div style={{ height: 36, flexShrink: 0, borderBottom: '1px solid var(--color-border)', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 8, padding: '0 8px' }}>
-                <div style={{ justifySelf: 'start' }}>
+            {/* En un celular la barra se reduce al "Publicado / Con tus cambios"
+                (y solo si hay algo que comparar): el interruptor de tamaño y la
+                dirección no tienen sentido ahí, la pantalla YA es el celular. */}
+            {(!nativo || publicado) && (
+            <div style={{ height: nativo ? 44 : 36, flexShrink: 0, borderBottom: '1px solid var(--color-border)', display: 'grid', gridTemplateColumns: nativo ? '1fr' : '1fr auto 1fr', alignItems: 'center', justifyItems: nativo ? 'center' : undefined, gap: 8, padding: '0 8px' }}>
+                {!nativo && <div style={{ justifySelf: 'start' }}>
                     <ToggleDispositivo valor={dispositivo} onChange={setDispositivo} />
-                </div>
-                <div style={{ height: 22, padding: '0 14px', borderRadius: 999, background: 'var(--color-surface)', border: '1px solid var(--color-border)', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', maxWidth: 280, overflow: 'hidden' }}>
+                </div>}
+                {!nativo && <div style={{ height: 22, padding: '0 14px', borderRadius: 999, background: 'var(--color-surface)', border: '1px solid var(--color-border)', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', maxWidth: 280, overflow: 'hidden' }}>
                     {(ap.logo ?? ap.favicon)
                         ? <img src={(ap.logo ?? ap.favicon)!} alt="" style={{ width: 12, height: 12, borderRadius: 3, flexShrink: 0, objectFit: 'cover' }} />
                         : <span aria-hidden style={{ fontSize: 11 }}>🔒</span>}
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {subdomain ? `${subdomain}.${ROOT_DOMAIN}` : (ap.nombreTienda || 'tu-tienda')}
                     </span>
-                </div>
-                <div style={{ justifySelf: 'end' }}>
-                    {publicado && <ToggleVista vista={vista} onChange={setVista} />}
+                </div>}
+                <div style={{ justifySelf: nativo ? 'center' : 'end' }}>
+                    {publicado && <ToggleVista vista={vista} onChange={setVista} alto={nativo ? 32 : 24} />}
                 </div>
             </div>
+            )}
 
             <div ref={wrapRef} style={esMovil
                 ? { flex: 1, overflow: 'hidden', background: 'var(--color-surface-alt)', display: 'grid', placeItems: 'center' }
@@ -167,7 +214,16 @@ export function StorePreview({ ap, publicado, full, subdomain }: StorePreviewPro
                     // escalado, porque `transform` no ocupa lugar en el layout
                     // y sin ella el teléfono no queda centrado. Como tiene
                     // medidas propias, no se estira.
-                    esMovil ? (
+                    nativo ? (
+                        // En un celular: la tienda a tamaño natural, a todo el
+                        // alto, y es ella la que scrollea por dentro.
+                        <iframe
+                            ref={iframeRef}
+                            src={src}
+                            title="Vista previa de tu tienda"
+                            style={{ width: '100%', height: '100%', border: 'none', display: 'block', background: 'var(--color-bg)' }}
+                        />
+                    ) : esMovil ? (
                         <div style={{ width: MOVIL_W * scale, height: MOVIL_H * scale, borderRadius: 22 * scale, overflow: 'hidden', border: '1px solid var(--color-border)', boxShadow: '0 8px 28px rgba(15,23,42,0.16)', background: 'var(--color-bg)', flexShrink: 0 }}>
                             <iframe
                                 ref={iframeRef}
@@ -240,7 +296,7 @@ function ToggleDispositivo({ valor, onChange }: { valor: Dispositivo; onChange: 
 
 const OPCIONES_VISTA: [Vista, string][] = [['publicado', 'Publicado'], ['cambios', 'Con tus cambios']]
 
-function ToggleVista({ vista, onChange }: { vista: Vista; onChange: (v: Vista) => void }) {
+function ToggleVista({ vista, onChange, alto }: { vista: Vista; onChange: (v: Vista) => void; alto: number }) {
     return (
         <div role="radiogroup" aria-label="Qué mostrar en la vista previa" style={{ display: 'inline-flex', padding: 2, gap: 2, borderRadius: 8, background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
             {OPCIONES_VISTA.map(([id, label]) => {
@@ -254,8 +310,8 @@ function ToggleVista({ vista, onChange }: { vista: Vista; onChange: (v: Vista) =
                         onClick={() => onChange(id)}
                         className="ds-hover"
                         style={{
-                            height: 24, padding: '0 10px', borderRadius: 6, border: 'none', cursor: 'pointer',
-                            fontSize: 11.5, fontWeight: activa ? 600 : 500, whiteSpace: 'nowrap',
+                            height: alto, padding: '0 10px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                            fontSize: alto > 24 ? 13 : 11.5, fontWeight: activa ? 600 : 500, whiteSpace: 'nowrap',
                             background: activa ? 'var(--color-bg)' : 'transparent',
                             color: activa ? 'var(--color-text)' : 'var(--color-muted)',
                             boxShadow: activa ? '0 1px 2px rgba(15,23,42,0.12)' : 'none',

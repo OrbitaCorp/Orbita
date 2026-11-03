@@ -81,7 +81,8 @@ export function ChatPanel({ cv, onToast, onPerfil, onPedido, onArchivar, plantil
   useEffect(() => {
     if (!cv) { setMsgs([]); return }
     let cancelado = false
-    const cargar = () => getConversationMessages(cv.id).then(rows => { if (!cancelado) setMsgs(rows) }).catch(() => {})
+    // Mensajes locales: solo los del chat de la tienda (los de WhatsApp están en su bandeja).
+    const cargar = () => getConversationMessages(cv.id, 'STOREFRONT').then(rows => { if (!cancelado) setMsgs(rows) }).catch(() => {})
     cargar()
     const interval = setInterval(cargar, POLL_MS)
     // Mismo motivo que MensajesCliente.tsx (lado storefront): el navegador
@@ -128,7 +129,7 @@ export function ChatPanel({ cv, onToast, onPerfil, onPedido, onArchivar, plantil
   const handleEnviar = async (txt: string): Promise<boolean> => {
     if (!cv) return false
     try {
-      const nuevo = await sendConversationMessage(cv.id, { text: txt })
+      const nuevo = await sendConversationMessage(cv.id, { text: txt, canal: 'STOREFRONT' })
       setMsgs(prev => [...prev, nuevo])
       onToast('Mensaje enviado')
       return true

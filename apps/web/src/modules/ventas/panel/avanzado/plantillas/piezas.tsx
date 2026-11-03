@@ -20,6 +20,11 @@ export const CSS = `
    producto. En la vitrina del panel no hay a dónde ir y el cursor de mano
    prometería un click que no hace nada. */
 .pl-card[data-link="1"] { cursor: pointer; }
+/* La vitrina es una maqueta: el cursor de texto (la I) sobre el logo, "Ingresar"
+   o el carrito prometería que se puede seleccionar y copiar. Flecha y sin
+   selección; lo que sí lleva a algún lado (enlaces, tarjetas) fija su propio
+   cursor inline y gana. La tienda real no lleva este atributo. */
+[data-pl-vitrina] { cursor: default; user-select: none; }
 .pl-media { position: relative; overflow: hidden; }
 .pl-media img { transition: transform .8s cubic-bezier(.2,.7,.3,1), opacity .55s; }
 .pl-card:hover .pl-media .pl-a { transform: scale(1.06); }
@@ -54,11 +59,13 @@ export const CSS = `
 .pl-fila:hover { padding-left: 12px; }
 
 /* Los enlaces del nav. No tenían ninguna señal de ser clickeables más que el
-   cursor. Va por opacidad y subrayado —no por color— para que sirva igual en
-   las paletas claras y en las oscuras, sin pedirle a cada plantilla un tono
-   de hover que hoy no define. */
-.pl-nav { transition: opacity .2s ease; }
-.pl-nav:hover { opacity: .58; text-decoration: underline; text-underline-offset: 5px; text-decoration-thickness: 1px; }
+   cursor. Subrayado, y el texto pasa de apagado (muted) al color pleno de la
+   plantilla (--pl-nav-hover, que fija el contenedor del nav con navHover).
+   Antes bajaba la opacidad al 58%: sobre un nav gris quedaba un gris sucio y
+   el hover se leía como "deshabilitado". Si el contenedor no fija la
+   variable, el enlace conserva su color y solo se subraya. */
+.pl-nav { transition: color .15s ease; }
+.pl-nav:hover { color: var(--pl-nav-hover, inherit); text-decoration: underline; text-underline-offset: 5px; text-decoration-thickness: 1px; }
 
 /* Banner parallax: el fondo se queda quieto y el contenido pasa por encima.
    Mismas dos guardas que el banner del storefront (ver Inicio.tsx): iOS
@@ -294,7 +301,7 @@ export function Boton({ t, children, grande, secundario, ancho, onClick }: { t: 
 // como el resto de la maqueta).
 export function Titulo({ t, volanta, texto, centrado, accion, movil, onAccion }: { t: Tema; volanta?: string; texto: string; centrado?: boolean; accion?: string; movil?: boolean; onAccion?: () => void }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', marginBottom: 20, ...(centrado ? { flexDirection: 'column', alignItems: 'center', textAlign: 'center' } : {}) }}>
+    <div data-pl-sec="" style={{ display: 'flex', alignItems: 'flex-end', marginBottom: 20, ...(centrado ? { flexDirection: 'column', alignItems: 'center', textAlign: 'center' } : {}) }}>
       <div>
         {volanta && <div style={{ fontSize: 11, letterSpacing: '0.16em', textTransform: 'uppercase', color: t.primary, fontWeight: 700, marginBottom: 7 }}>{volanta}</div>}
         <h2 style={{ fontFamily: t.fh, fontSize: movil ? 22 : 28, margin: 0, fontWeight: 700, letterSpacing: '-0.015em', lineHeight: 1.18 }}>{texto}</h2>
@@ -445,23 +452,68 @@ export function MenuMovil({ t, links, acciones, color }: { t: Tema; links: strin
  * adelante. Los enlaces de Apariencia son del catálogo y ninguno vuelve a la
  * portada. Solo la hamburguesa lo lleva; la barra de escritorio no. Si el
  * dueño ya cargó un enlace que se llama "Inicio", no se duplica. Con el
- * header en "minimal" (sin navegación) no hay menú, como antes. Pura, para
- * poder probarla sin abrir el menú.
+ * header en "minimal" (sin enlaces, `navDe` devuelve []) el menú queda con
+ * "Inicio" solo: sin él la hamburguesa era un `☰` muerto. Pura, para poder
+ * probarla sin abrir el menú.
  */
 export function itemsMenuMovil(links: string[], acciones?: AccionesHome): { label: string; onClick?: () => void; activo?: boolean }[] {
   const nav = navDe(links, acciones)
-  const sinNavegacion = acciones?.navLayout === 'minimal'
-  if (!acciones?.irAInicio || sinNavegacion || nav.some((l) => l.label.trim().toLowerCase() === 'inicio')) return nav
+  if (!acciones?.irAInicio || nav.some((l) => l.label.trim().toLowerCase() === 'inicio')) return nav
   return [{ label: 'Inicio', onClick: acciones.irAInicio, activo: false }, ...nav]
 }
 
-export function navDe(links: string[], acciones?: AccionesHome): { label: string; onClick?: () => void; activo?: boolean }[] {
+/**
+ * Lo que fija el contenedor de un nav para que el hover de `.pl-nav` lo lleve
+ * del gris apagado al color de texto de la plantilla. Se esparce en el `style`
+ * del div que agrupa los enlaces.
+ */
+export function navHover(t: Tema): React.CSSProperties {
+  return { '--pl-nav-hover': t.text } as React.CSSProperties
+}
+
+/**
+ * En la vitrina del panel no hay tienda a la que ir, pero un enlace que no
+ * hace nada parece roto. Ahí cada enlace lleva a la parte de la portada que
+ * le corresponde: "Inicio" arriba, "Contacto" y afines al pie, y el resto a
+ * las secciones con título, en orden. El destino se busca desde el propio
+ * clic (o, desde el menú de celular que no pasa el evento, en la primera
+ * portada de la pantalla). La tienda real nunca llega acá: trae `acciones.nav`.
+ */
+const ES_INICIO = /^\s*inicio\s*$/i
+const ES_CONTACTO = /contact|nosotr|ayuda|whatsapp/i
+function irEnVitrina(label: string, posicion: number, e?: React.MouseEvent<HTMLElement>) {
+  if (typeof document === 'undefined') return
+  const raiz = (e?.currentTarget.closest('[data-pl-raiz]') ?? document.querySelector('[data-pl-raiz]')) as HTMLElement | null
+  if (!raiz) return
+  const suave: ScrollIntoViewOptions = { behavior: 'smooth' }
+  if (ES_INICIO.test(label)) {
+    raiz.firstElementChild?.scrollIntoView({ ...suave, block: 'start' })
+    return
+  }
+  if (ES_CONTACTO.test(label)) {
+    raiz.lastElementChild?.scrollIntoView({ ...suave, block: 'end' })
+    return
+  }
+  const secciones = Array.from(raiz.querySelectorAll('[data-pl-sec]'))
+  secciones[posicion % Math.max(secciones.length, 1)]?.scrollIntoView({ ...suave, block: 'start' })
+}
+
+export function navDe(links: string[], acciones?: AccionesHome): { label: string; onClick?: (e?: React.MouseEvent<HTMLElement>) => void; activo?: boolean }[] {
   // "Minimal" en Apariencia = header sin navegacion. Se resuelve aca y no en
   // cada bloque para que valga en las catorce de una: el que elige esto
   // quiere el header limpio, sea cual sea la plantilla.
   if (acciones?.navLayout === 'minimal') return []
-  if (acciones?.nav && acciones.nav.length > 0) return acciones.nav
-  return links.map((label) => ({ label }))
+  // Con la tienda real, `nav` manda aunque venga vacío (el dueño apagó todos los
+  // enlaces): caer a `links` pintaba los de muestra de la maqueta, sin destino.
+  if (acciones?.nav) return acciones.nav
+  // Sin `acciones` es la vitrina. Con `acciones` pero sin `nav` (quien no lo
+  // trae) se dibujan los `links` de la plantilla, sin destino.
+  if (acciones) return links.map((label) => ({ label }))
+  let n = 0
+  return links.map((label) => {
+    const posicion = ES_INICIO.test(label) || ES_CONTACTO.test(label) ? 0 : n++
+    return { label, onClick: (e?: React.MouseEvent<HTMLElement>) => irEnVitrina(label, posicion, e) }
+  })
 }
 
 export function HeaderCentrado({ t, marca, links, conBuscador, movil, acciones }: { t: Tema; marca: string; links: string[]; conBuscador?: boolean; movil?: boolean; acciones?: AccionesHome }) {

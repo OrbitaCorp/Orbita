@@ -25,6 +25,10 @@ export const NOTIFICATION_EVENTS = [
   'primera_venta',
   'resena_nueva',
   'invitacion_cuenta_invitado',
+  // Orbi atendiendo WhatsApp (paquete Avanzado): un chat que necesita a una persona, y un pedido que Orbi dejó pendiente.
+  // Los dos van por panel Y email desde el principio (ver PREFS_POR_EVENTO en notifications.service.ts).
+  'orbi_necesita_atencion',
+  'orbi_pedido_pendiente',
 ] as const;
 
 export type NotificationEvent = (typeof NOTIFICATION_EVENTS)[number];

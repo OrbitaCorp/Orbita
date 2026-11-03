@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { CfgField, Toggle } from '../ConfigControls'
@@ -28,6 +29,122 @@ function MercadopagoBadge() {
 
 export function SeccionPagos({ cfg }: { cfg: ConfigGeneralState }) {
     const { pagos, setPagos, mp, mpBusy, mpError, conectarMp, desconectarMp, cambiado, guardando, guardarPagos, errores } = cfg
+
+    // Tarjeta de ajustes de Mercado Pago: se muestra pegada abajo de su toggle.
+    const tarjetaMercadoPago = (
+        <div style={{
+            marginTop: 2, marginBottom: 12, padding: '14px 16px', borderRadius: 12,
+            border: `1px solid ${mp?.connected ? 'rgba(0,177,234,0.35)' : 'var(--color-border)'}`,
+            background: mp?.connected ? 'rgba(0,177,234,0.06)' : 'var(--color-surface-alt)',
+        }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                    <MercadopagoBadge />
+                    <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--color-text)' }}>Mercado Pago</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                            <span style={{
+                                width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                                background: mp?.connected ? 'var(--color-success)' : 'var(--color-muted)',
+                            }} />
+                            <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>
+                                {mp?.connected
+                                    ? `Conectado a: ${mp.mpUserName ?? (mp.mpUserId ? `usuario ${mp.mpUserId}` : 'tu cuenta')}`
+                                    : 'Sin conectar. Es opcional: conectala si querés aceptar tarjeta y dinero en cuenta'}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                {mp?.connected ? (
+                    <Button variant="outline" size="sm" loading={mpBusy} onClick={desconectarMp}>Desconectar</Button>
+                ) : (
+                    <Button
+                        size="sm" loading={mpBusy} onClick={conectarMp}
+                        style={{ background: '#009EE3', color: '#fff' }}
+                    >
+                        Conectar cuenta
+                    </Button>
+                )}
+            </div>
+            <ErrorInline msg={mpError} />
+            {/* MP no tiene una tasa fija que mostrar acá — varía según
+                medio de pago (débito/crédito/cuotas) y puede cambiar. La
+                comisión REAL de cada cobro se ve en Pedidos → detalle, y
+                el total del período en el Dashboard. */}
+            {mp?.connected && (
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(0,177,234,0.2)', fontSize: 12, color: 'var(--color-muted)', lineHeight: 1.5 }}>
+                    Mercado Pago te cobra una comisión por cada cobro — varía según el medio de pago y las cuotas, no es un % fijo. La vas a ver reflejada en el detalle de cada pedido y sumada por período en Inicio.{' '}
+                    <a href="https://www.mercadopago.com.ar/ayuda/33399#ctes" target="_blank" rel="noopener noreferrer" style={{ color: '#009EE3', fontWeight: 600 }}>
+                        Ver tasas oficiales de MP →
+                    </a>
+                </div>
+            )}
+            {/* RBT-692 — mismo campo que el de Efectivo, generalizado. */}
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(0,177,234,0.2)' }}>
+                <CfgField
+                    label="Descuento por pagar con Mercado Pago (%) (opcional)"
+                    placeholder="Ej: 5"
+                    value={pagos.mercadopagoDiscountPercent}
+                    onChange={v => setPagos(p => ({ ...p, mercadopagoDiscountPercent: v.replace(/[^0-9.]/g, '') }))}
+                />
+                <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 4 }}>
+                    Se aplica solo en el checkout, cuando el cliente elige pagar con Mercado Pago. Dejalo vacío para no aplicar descuento.
+                </div>
+            </div>
+        </div>
+    )
+
+    // Tarjeta de ajustes de "Coordinar por WhatsApp": datos para transferir
+    // (opcionales) y descuento. Va pegada abajo de su toggle.
+    const tarjetaWhatsapp = (
+        <div style={{ marginTop: 2, marginBottom: 12, padding: 14, borderRadius: 10, background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)' }}>
+            <div style={{ fontSize: 12.5, color: 'var(--color-body)', lineHeight: 1.5 }}>
+                El cliente confirma el pedido y vos lo contactás por WhatsApp para coordinar cómo paga (transferencia, link de pago, crédito, u otro medio que acuerden).
+            </div>
+            {/* Datos opcionales: si los cargás, el checkout se los muestra al
+                cliente y no hace falta pasárselos por chat. */}
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--color-border)' }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Datos para transferir (opcional)</div>
+                <div style={{ fontSize: 11.5, color: 'var(--color-muted)', margin: '2px 0 12px', lineHeight: 1.5 }}>
+                    Si los cargás, el cliente los ve en el checkout y te ahorrás pasárselos por WhatsApp. Si paga antes de que lo contactes, le avisamos que te envíe el comprobante.
+                </div>
+                <CfgField
+                    label="Alias"
+                    placeholder="Ej: mi.tienda.mp"
+                    value={pagos.transferAlias}
+                    onChange={v => setPagos(p => ({ ...p, transferAlias: v }))}
+                />
+                <CfgField
+                    label="Nombre del titular"
+                    placeholder="Ej: Lorena Gómez"
+                    value={pagos.transferHolder}
+                    onChange={v => setPagos(p => ({ ...p, transferHolder: v }))}
+                />
+                <CfgField
+                    label="Entidad (banco o billetera)"
+                    placeholder="Ej: Banco Galicia, Mercado Pago, Ualá"
+                    value={pagos.transferBank}
+                    onChange={v => setPagos(p => ({ ...p, transferBank: v }))}
+                />
+            </div>
+            {/* RBT-692 — mismo campo que el de Efectivo, generalizado. Se
+                etiqueta "Transferencia" (así lo pidió el ticket) aunque el
+                método real sea "Coordinar por WhatsApp" — la aclaración de
+                arriba conecta ambos nombres para el dueño. */}
+            <div style={{ paddingTop: 12, borderTop: '1px solid var(--color-border)' }}>
+                <CfgField
+                    label="Descuento por transferencia / WhatsApp (%) (opcional)"
+                    placeholder="Ej: 15"
+                    value={pagos.transferDiscountPercent}
+                    onChange={v => setPagos(p => ({ ...p, transferDiscountPercent: v.replace(/[^0-9.]/g, '') }))}
+                />
+                <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 4 }}>
+                    Se aplica cuando el cliente coordina por WhatsApp. Dejalo vacío para no aplicar descuento.
+                </div>
+            </div>
+        </div>
+    )
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         {/* RBT-691 — vive en BusinessConfig (mismo ciclo guardarPagos()
@@ -113,99 +230,27 @@ export function SeccionPagos({ cfg }: { cfg: ConfigGeneralState }) {
             <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-subtle)', marginBottom: 4 }}>
                 Con envío a domicilio
             </div>
-            {PAGOS_META.map(({ key, label, desc }, i) => (
-                <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 0', borderBottom: i < PAGOS_META.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
-                    <div>
-                        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-body)' }}>{label}</div>
-                        <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>{desc}</div>
-                    </div>
-                    <Toggle on={pagos[key]} onChange={v => setPagos(p => ({ ...p, [key]: v }))} />
-                </div>
-            ))}
-            {pagos.acceptsMercadopago && (
-                <div style={{
-                    marginTop: 14, padding: '14px 16px', borderRadius: 12,
-                    border: `1px solid ${mp?.connected ? 'rgba(0,177,234,0.35)' : 'var(--color-border)'}`,
-                    background: mp?.connected ? 'rgba(0,177,234,0.06)' : 'var(--color-surface-alt)',
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-                            <MercadopagoBadge />
-                            <div style={{ minWidth: 0 }}>
-                                <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--color-text)' }}>Mercado Pago</div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
-                                    <span style={{
-                                        width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                                        background: mp?.connected ? 'var(--color-success)' : 'var(--color-muted)',
-                                    }} />
-                                    <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>
-                                        {mp?.connected
-                                            ? `Conectado a: ${mp.mpUserName ?? (mp.mpUserId ? `usuario ${mp.mpUserId}` : 'tu cuenta')}`
-                                            : 'Sin conectar. Es opcional: conectala si querés aceptar tarjeta y dinero en cuenta'}
-                                    </span>
-                                </div>
+            {/* Cada medio lleva su tarjeta de ajustes pegada abajo de su fila
+                (antes las dos quedaban juntas al final de la lista, y la de
+                Mercado Pago aparecía debajo de "Coordinar por WhatsApp"). */}
+            {PAGOS_META.map(({ key, label, desc }, i) => {
+                const abierta = pagos[key]
+                const ultima = i === PAGOS_META.length - 1
+                return (
+                    <Fragment key={key}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 0', borderBottom: !ultima && !abierta ? '1px solid var(--color-border)' : 'none' }}>
+                            <div>
+                                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-body)' }}>{label}</div>
+                                <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>{desc}</div>
                             </div>
+                            <Toggle on={pagos[key]} onChange={v => setPagos(p => ({ ...p, [key]: v }))} />
                         </div>
-                        {mp?.connected ? (
-                            <Button variant="outline" size="sm" loading={mpBusy} onClick={desconectarMp}>Desconectar</Button>
-                        ) : (
-                            <Button
-                                size="sm" loading={mpBusy} onClick={conectarMp}
-                                style={{ background: '#009EE3', color: '#fff' }}
-                            >
-                                Conectar cuenta
-                            </Button>
-                        )}
-                    </div>
-                    <ErrorInline msg={mpError} />
-                    {/* MP no tiene una tasa fija que mostrar acá — varía según
-                        medio de pago (débito/crédito/cuotas) y puede cambiar. La
-                        comisión REAL de cada cobro se ve en Pedidos → detalle, y
-                        el total del período en el Dashboard. */}
-                    {mp?.connected && (
-                        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(0,177,234,0.2)', fontSize: 12, color: 'var(--color-muted)', lineHeight: 1.5 }}>
-                            Mercado Pago te cobra una comisión por cada cobro — varía según el medio de pago y las cuotas, no es un % fijo. La vas a ver reflejada en el detalle de cada pedido y sumada por período en Inicio.{' '}
-                            <a href="https://www.mercadopago.com.ar/ayuda/33399#ctes" target="_blank" rel="noopener noreferrer" style={{ color: '#009EE3', fontWeight: 600 }}>
-                                Ver tasas oficiales de MP →
-                            </a>
-                        </div>
-                    )}
-                    {/* RBT-692 — mismo campo que el de Efectivo, generalizado. */}
-                    <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(0,177,234,0.2)' }}>
-                        <CfgField
-                            label="Descuento por pagar con Mercado Pago (%) (opcional)"
-                            placeholder="Ej: 5"
-                            value={pagos.mercadopagoDiscountPercent}
-                            onChange={v => setPagos(p => ({ ...p, mercadopagoDiscountPercent: v.replace(/[^0-9.]/g, '') }))}
-                        />
-                        <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 4 }}>
-                            Se aplica solo en el checkout, cuando el cliente elige pagar con Mercado Pago. Dejalo vacío para no aplicar descuento.
-                        </div>
-                    </div>
-                </div>
-            )}
-            {pagos.acceptsTransfer && (
-                <div style={{ marginTop: 14, padding: 14, borderRadius: 10, background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)' }}>
-                    <div style={{ fontSize: 12.5, color: 'var(--color-body)', lineHeight: 1.5 }}>
-                        No se le pide CBU ni alias al cliente — confirma el pedido y vos lo contactás por WhatsApp para coordinar cómo paga (transferencia, link de pago, crédito, u otro medio que acuerden).
-                    </div>
-                    {/* RBT-692 — mismo campo que el de Efectivo, generalizado. Se
-                        etiqueta "Transferencia" (así lo pidió el ticket) aunque el
-                        método real sea "Coordinar por WhatsApp" — la aclaración de
-                        arriba conecta ambos nombres para el dueño. */}
-                    <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--color-border)' }}>
-                        <CfgField
-                            label="Descuento por transferencia / WhatsApp (%) (opcional)"
-                            placeholder="Ej: 15"
-                            value={pagos.transferDiscountPercent}
-                            onChange={v => setPagos(p => ({ ...p, transferDiscountPercent: v.replace(/[^0-9.]/g, '') }))}
-                        />
-                        <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 4 }}>
-                            Se aplica cuando el cliente coordina por WhatsApp. Dejalo vacío para no aplicar descuento.
-                        </div>
-                    </div>
-                </div>
-            )}
+                        {abierta && key === 'acceptsMercadopago' && tarjetaMercadoPago}
+                        {abierta && key === 'acceptsTransfer' && tarjetaWhatsapp}
+                        {abierta && !ultima && <div style={{ borderBottom: '1px solid var(--color-border)' }} />}
+                    </Fragment>
+                )
+            })}
 
             <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-subtle)', marginTop: 22, marginBottom: 4 }}>
                 Con retiro en local

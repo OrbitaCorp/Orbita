@@ -38,6 +38,9 @@ async function storefrontRequest<T>(path: string, init?: RequestInit): Promise<T
 export type StorefrontHeroSlide = {
   id: string; titulo: string; subtitulo: string; img: string | null; cta: string; ctaLink?: string
   imageStyle?: string; imagePosition?: string; imageOverlay?: string; bgPattern?: string; bgPatternScope?: string; bgColor?: string
+  // Solo del front: el slide lo armó la tienda sola (ver slidesPorDefecto en
+  // plantillaReal.ts), no está guardado. La API nunca lo manda.
+  automatico?: boolean
 }
 export type StorefrontHeaderLink = { id: string; label: string; on: boolean }
 export type StorefrontStatsItem = { id: string; value: string; label: string }
@@ -192,6 +195,7 @@ export type StorefrontConfigResponse = {
     transferAlias: string | null
     transferCbu: string | null
     transferHolder: string | null
+    transferBank: string | null
     cashDiscountPercent: number | null
     // RBT-692 — mismo criterio, generalizado a Mercado Pago y "Transferencia"
     // (acceptsTransfer, hoy "Coordinar por WhatsApp").
@@ -343,6 +347,8 @@ export type StorefrontProductItem = {
   // texto (ver ProductCard.tsx).
   variantOptions: { name: string; isVisual: boolean; values: { value: string; imageUrl: string | null }[] }[]
   isFeatured: boolean
+  // "Se hace por pedido": se ve en la tienda pero no se compra, solo se consulta por WhatsApp (sin carrito).
+  byOrder?: boolean
   inStock: boolean
   // Vencimiento del descuento REAL que se le está aplicando a este producto —
   // de ahí sale el "termina en 2d 4h" de la card. null = sin descuento, o con
@@ -430,6 +436,8 @@ export type StorefrontProductDetail = {
   price: number
   comparePrice: number | null
   isFeatured: boolean
+  // "Se hace por pedido": la ficha no deja comprar ni agregar al carrito, solo consultar por WhatsApp.
+  byOrder?: boolean
   // Ver StorefrontProductItem.promoLabel — mismo criterio (badge de la foto).
   promoLabel: string | null
   // Explicación rica del 2x1/3x2 para la sección debajo del precio (RBT-675)
@@ -466,12 +474,20 @@ export type StorefrontProductDetail = {
     optionValues: { optionValueId: string; value: string }[]
     inStock: boolean
     lowStock: boolean
+    // false = el negocio (vidriera) no cargó el stock de esta variante: la ficha no escribe ninguna cantidad ni
+    // "Sin stock". Ausente (API anterior) = se muestra, como siempre.
+    stockVisible?: boolean
     // Techo público del stock real (nunca el inventario completo — ver
     // storefront.service.ts) y también el tope real para el carrito: nunca
     // se puede agregar más que esto de una variante.
     maxQty: number
   }[]
   images: { url: string; position: number; isPrimary: boolean; optionValueId: string | null; hasAiBackground: boolean }[]
+}
+
+// Link corto de un producto (/p/<código>): devuelve el id de la ficha a la que redirigir.
+export function getStorefrontProductoCorto(slug: string, codigo: string) {
+  return storefrontRequest<{ id: string }>(`/${slug}/p/${encodeURIComponent(codigo)}`)
 }
 
 export function getStorefrontProduct(slug: string, id: string) {
@@ -726,6 +742,7 @@ export function toProducto(
     badge: p.promoLabel ?? ((enOferta && showOffer) ? badgeOferta(p.price, p.comparePrice!) : (esNuevo && showNew) ? 'Nuevo' : null),
     hue: hueFromId(p.id),
     stock: inStock,
+    byOrder: p.byOrder === true,
     lowStock: bajoStock && showLowStock,
     imgUrl: imageUrl,
     imgUrl2: imageUrl2,

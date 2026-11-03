@@ -55,7 +55,9 @@ export function KpiCard({ label, value, delta, prefix = '', suffix = '', accent,
         return () => cancelAnimationFrame(raf)
     }, [value, loading])
 
-    const display = prefix + animVal.toLocaleString('es-AR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + suffix
+    // El signo va antes del prefijo ("-$1.200", no "$-1.200"): hay KPIs que pueden ser negativos (Ganancias).
+    const signo   = Math.round(animVal * 10 ** decimals) < 0 ? '-' : ''
+    const display = signo + prefix + Math.abs(animVal).toLocaleString('es-AR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + suffix
     const isPos   = delta >= 0
     // Variación 0 = sin cambio: badge neutro (gris, sin flecha) — antes se
     // mostraba "▲ 0.0%" en verde, como si hubiera crecido.

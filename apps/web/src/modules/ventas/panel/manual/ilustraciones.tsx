@@ -1110,7 +1110,7 @@ function Perfil() {
     )
 }
 
-/** Si te trabás: Orbi (botón, sugerencias, datos de tu negocio) y el tutorial de Primeros pasos. */
+/** Si te trabás: Orbi (botón, sugerencias, datos de tu negocio) y el aviso de tutorial del módulo. */
 function Orbi() {
     return (
         <Panel activo="dashboard" miga={['Inicio']}>
@@ -1127,10 +1127,10 @@ function Orbi() {
                 <Texto x={71} y={75} w={44} fuerte />
                 <Linea x={73} y={85} w={120} h={32} valores={[30, 44, 26, 52, 38, 60, 48]} />
             </g>
-            {/* Primeros pasos: el tutorial guiado */}
+            {/* Aviso de tutorial del módulo */}
             <Tarjeta x={66} y={132} w={134} h={46} />
-            <Rotulo x={71} y={141} size={5.5} fuerte>Primeros pasos</Rotulo>
-            <Rotulo x={195} y={141} size={4.4} derecha>3 de 7</Rotulo>
+            <Rotulo x={71} y={141} size={5.5} fuerte>Ver tutorial</Rotulo>
+            <Rotulo x={195} y={141} size={4.4} derecha>1 de 3</Rotulo>
             <rect x={71.5} y={144.5} width={124} height={3} rx={1.5} fill={BLOQUE} />
             <rect x={71.5} y={144.5} width={53} height={3} rx={1.5} fill={ACENTO} />
             {(['Confirmá tu email', 'Completá los datos del negocio', 'Conectá Mercado Pago', 'Armá tus categorías'] as const).map((p, i) => (
@@ -1351,14 +1351,14 @@ const ESQUEMAS: Record<IlustracionId, Esquema> = {
         dibujo: <Perfil />,
     },
     orbi: {
-        titulo: 'Orbi abierto a la derecha del Inicio: la X para cerrarlo, las preguntas sugeridas, una respuesta con datos del negocio y el campo para escribir; y la tarjeta de Primeros pasos.',
+        titulo: 'Orbi abierto a la derecha del Inicio: la X para cerrarlo, las preguntas sugeridas, una respuesta con datos del negocio y el campo para escribir; y el aviso de tutorial del módulo.',
         leyenda: [
             'El botón Orbi AI, al pie del menú (también está en la barra de arriba).',
             'La X lo cierra; el mismo botón lo vuelve a abrir desde cualquier pantalla.',
             'Preguntas sugeridas para arrancar.',
             'Contesta con los datos de TU negocio, no con ayuda genérica.',
             'Escribile lo que quieras: un número, un pedido, cómo se hace algo.',
-            'Primeros pasos: el tutorial guiado, que te lleva con el cursor y se tilda solo.',
+            'Tutorial del módulo: una hoja corta, de a una pantalla, que se puede omitir.',
         ],
         dibujo: <Orbi />,
     },

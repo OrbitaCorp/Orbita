@@ -32,6 +32,9 @@ class ProductVariantInput {
   // fila se crea/conserva igual — nunca se borra por esto. Default true si se
   // omite, para no romper otros callers que todavía no manden el campo.
   @IsOptional() @IsBoolean() isActive?: boolean;
+  // Solo en una VIDRERIA (modo SHOWCASE): false = el negocio dejó el stock en blanco y la tienda no muestra unidades,
+  // "Sin stock" ni "Últimas unidades" de esta variante. En una tienda con checkout se ignora: el stock es obligatorio.
+  @IsOptional() @IsBoolean() showStock?: boolean;
 }
 class ProductOptionInput {
   @IsString() @IsNotEmpty() @MaxLength(40) name!: string;
@@ -61,6 +64,8 @@ export class CreateProductDto {
   // default según la categoría; el vendedor lo puede cambiar. Default 'flat'
   // si se omite (mismo default que Product.photoType en el schema).
   @IsOptional() @IsIn(['flat', 'volume']) photoType?: 'flat' | 'volume';
+  // "Se hace por pedido": sin stock, solo se consulta por WhatsApp (ver Product.byOrder). Omitido en un PUT = no cambia.
+  @IsOptional() @IsBoolean() byOrder?: boolean;
   @IsOptional() @IsArray() @ArrayMaxSize(20) @IsUUID('4', { each: true }) tagIds?: string[];
   @IsOptional() @IsArray() @ArrayMaxSize(5) @ValidateNested({ each: true }) @Type(() => ProductOptionInput) options?: ProductOptionInput[];
   @IsArray() @ArrayMaxSize(200) @ValidateNested({ each: true }) @Type(() => ProductVariantInput) variants!: ProductVariantInput[];

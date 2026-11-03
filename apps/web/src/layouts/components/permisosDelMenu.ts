@@ -16,6 +16,9 @@ export const MODULOS_DEL_MENU: { id: string; label: string; permisos: string[] }
     { id: 'clientes', label: 'Clientes', permisos: ['customers.view'] },
     { id: 'productos', label: 'Productos', permisos: ['catalog.view', 'inventory.view'] },
     { id: 'mensajes', label: 'Mensajes', permisos: ['messages.view'] },
+    // Conectar y desconectar Instagram es solo de propietario/admin en la API: mismo permiso que Avanzado,
+    // que es el que esos roles traen y un empleado no.
+    { id: 'difusion', label: 'Difusión', permisos: ['advanced.manage'] },
     { id: 'descuentos', label: 'Descuentos', permisos: ['discounts.view', 'discounts.manage'] },
     { id: 'config', label: 'Configuración', permisos: ['config.edit', 'config.team.view', 'config.team.manage', 'config.audit.view', 'config.domains.manage'] },
     { id: 'avanzado', label: 'Avanzado', permisos: ['advanced.manage'] },

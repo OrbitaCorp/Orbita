@@ -12,4 +12,10 @@ export class SendMessageDto {
   text!: string;
 
   @IsOptional() @IsUUID() orderId?: string;
+
+  /**
+   * La bandeja desde la que se contesta: la local (el chat de la tienda) o la de WhatsApp. Sin esto, la respuesta sale por
+   * el canal del último mensaje del cliente (lo que hacen los demás llamadores).
+   */
+  @IsOptional() @IsIn(['STOREFRONT', 'WHATSAPP']) canal?: 'STOREFRONT' | 'WHATSAPP';
 }

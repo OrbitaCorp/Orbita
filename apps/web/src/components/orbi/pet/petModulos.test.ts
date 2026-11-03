@@ -26,7 +26,7 @@ describe('moduloDeSeccion', () => {
 
 describe('petModulo', () => {
   it('hay una forma por cada módulo del menú', () => {
-    const ids = ['dashboard', 'pedidos', 'clientes', 'productos', 'mensajes', 'descuentos', 'config', 'avanzado', 'manual']
+    const ids = ['dashboard', 'pedidos', 'clientes', 'productos', 'mensajes', 'difusion', 'descuentos', 'config', 'avanzado', 'manual']
     expect(PET_MODULOS.map(m => m.id)).toEqual(ids)
     for (const id of ids) expect(petModulo(id).id).toBe(id)
   })

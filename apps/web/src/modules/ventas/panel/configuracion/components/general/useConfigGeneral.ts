@@ -54,6 +54,10 @@ export function useConfigGeneral(onToast: (m: string) => void) {
         // "Transferencia" (acceptsTransfer, hoy "Coordinar por WhatsApp").
         mercadopagoDiscountPercent: '',
         transferDiscountPercent: '',
+        // Datos opcionales para que el cliente pueda adelantar el pago sin pedirlos por chat.
+        transferAlias: '',
+        transferHolder: '',
+        transferBank: '',
         // RBT-691 — vive en BusinessConfig (por eso está acá, en `pagos`),
         // aunque se RENDERIZA en la vista "Negocio" (ver más abajo) — así se
         // guarda con el mismo ciclo guardarPagos()/panelUpdateBusinessConfig
@@ -159,6 +163,9 @@ export function useConfigGeneral(onToast: (m: string) => void) {
                     cashDiscountPercent: cfg.cashDiscountPercent != null ? String(cfg.cashDiscountPercent) : '',
                     mercadopagoDiscountPercent: cfg.mercadopagoDiscountPercent != null ? String(cfg.mercadopagoDiscountPercent) : '',
                     transferDiscountPercent: cfg.transferDiscountPercent != null ? String(cfg.transferDiscountPercent) : '',
+                    transferAlias: cfg.transferAlias ?? '',
+                    transferHolder: cfg.transferHolder ?? '',
+                    transferBank: cfg.transferBank ?? '',
                     ivaRate: String(cfg.ivaRate),
                     ivaDisabled: cfg.ivaDisabled,
                 }
@@ -295,6 +302,11 @@ export function useConfigGeneral(onToast: (m: string) => void) {
                 ...(cash !== null ? { cashDiscountPercent: cash } : {}),
                 ...(mp !== null ? { mercadopagoDiscountPercent: mp } : {}),
                 ...(transfer !== null ? { transferDiscountPercent: transfer } : {}),
+                // Siempre se mandan (aunque estén vacíos): el backend guarda
+                // vacío como null, así se pueden borrar.
+                transferAlias: pagos.transferAlias.trim(),
+                transferHolder: pagos.transferHolder.trim(),
+                transferBank: pagos.transferBank.trim(),
                 // RBT-691 — siempre se manda (selector cerrado, no texto libre vacío).
                 ivaRate: Number(pagos.ivaRate),
                 ivaDisabled: pagos.ivaDisabled,

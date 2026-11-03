@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FileText, Mail, X } from 'lucide-react'
+import { FileText, Mail, Trash2, X } from 'lucide-react'
 import { Avatar } from '@/design-system/components/Avatar'
 import { Badge } from '@/design-system/components/Badge'
 import { Button } from '@/design-system/components/Button'
@@ -101,6 +101,9 @@ interface PedidoTableProps {
     // qué pedidos están tildados. Opcionales para no romper otros usos.
     onConfirmarLote?: (ids: string[]) => void
     onEmailLote?:     (ids: string[]) => void
+    // Eliminar (ocultar) pedidos del listado, de a uno o en lote. Solo llega si el rol puede gestionar pedidos.
+    onEliminar?:      (p: Pedido) => void
+    onEliminarLote?:  (ids: string[]) => void
     // Cambio de estado directo desde la fila, sin entrar al detalle: el chip
     // de estado se vuelve un botón con menú. Solo llega si el rol puede
     // gestionar pedidos; sin esto el chip queda como siempre, de lectura.
@@ -115,7 +118,7 @@ interface PedidoTableProps {
 }
 
 // ── Card mobile ────────────────────────────────────────────────────────────────
-function PedidoCard({ p, onRowClick, onComprobante, onEmail, onCambiarEstado, cambiandoEstadoId, onVerPostventa, onAbrirEstado }: { p: Pedido } & Omit<PedidoTableProps, 'rows'> & { onAbrirEstado?: (p: Pedido, e: React.MouseEvent<HTMLElement>) => void }) {
+function PedidoCard({ p, onRowClick, onComprobante, onEmail, onEliminar, onCambiarEstado, cambiandoEstadoId, onVerPostventa, onAbrirEstado }: { p: Pedido } & Omit<PedidoTableProps, 'rows'> & { onAbrirEstado?: (p: Pedido, e: React.MouseEvent<HTMLElement>) => void }) {
     const accentColor = ESTADO_COLORS[p.estado] ?? 'var(--color-border)'
     return (
         <div
@@ -186,6 +189,7 @@ function PedidoCard({ p, onRowClick, onComprobante, onEmail, onCambiarEstado, ca
                 <div style={{ display: 'flex', gap: 2 }} onClick={e => e.stopPropagation()}>
                     <button title="Comprobante" className="ds-hover" onClick={() => onComprobante(p)} style={iconBtn}><FileText size={13} /></button>
                     <button title="Email"        className="ds-hover" onClick={() => onEmail(p)}        style={iconBtn}><Mail size={13} /></button>
+                    {onEliminar && <button title="Eliminar" aria-label={`Eliminar el pedido #${p.numero}`} className="ds-hover" onClick={() => onEliminar(p)} style={iconBtn}><Trash2 size={13} /></button>}
                 </div>
             </div>
         </div>
@@ -193,7 +197,7 @@ function PedidoCard({ p, onRowClick, onComprobante, onEmail, onCambiarEstado, ca
 }
 
 // ── Tabla + Cards ──────────────────────────────────────────────────────────────
-export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfirmarLote, onEmailLote, onCambiarEstado, cambiandoEstadoId, onVerPostventa }: PedidoTableProps) {
+export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onEliminar, onEliminarLote, onConfirmarLote, onEmailLote, onCambiarEstado, cambiandoEstadoId, onVerPostventa }: PedidoTableProps) {
     const [sel,     setSel]     = useState<Set<string>>(new Set())
     const [hovered, setHovered] = useState<string | null>(null)
     // El menú de estado abierto: de qué fila es y dónde dibujarlo. Va con
@@ -260,6 +264,7 @@ export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfir
                     <div style={{ flex: 1 }} />
                     {onConfirmarLote && <Button variant="outline" size="sm" onClick={() => { onConfirmarLote([...sel]); setSel(new Set()) }}>Confirmar</Button>}
                     {onEmailLote && <Button variant="outline" size="sm" onClick={() => onEmailLote([...sel])}>Email masivo</Button>}
+                    {onEliminarLote && <Button variant="outline" size="sm" onClick={() => { onEliminarLote([...sel]); setSel(new Set()) }}>Eliminar</Button>}
                     <button className="ds-hover" onClick={() => setSel(new Set())} style={{ width: 28, height: 28, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
                         <X size={14} strokeWidth={1.8} />
                     </button>
@@ -356,6 +361,7 @@ export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfir
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }} onClick={e => e.stopPropagation()}>
                                 <button title="Comprobante" className="ds-hover" onClick={() => onComprobante(p)} style={iconBtn}><FileText size={15} /></button>
                                 <button title="Email"        className="ds-hover" onClick={() => onEmail(p)}        style={iconBtn}><Mail size={15} /></button>
+                                {onEliminar && <button title="Eliminar" aria-label={`Eliminar el pedido #${p.numero}`} className="ds-hover" onClick={() => onEliminar(p)} style={iconBtn}><Trash2 size={15} /></button>}
                             </div>
                         </div>
                     )
@@ -370,6 +376,7 @@ export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfir
                         onRowClick={onRowClick}
                         onComprobante={onComprobante}
                         onEmail={onEmail}
+                        onEliminar={onEliminar}
                         onCambiarEstado={onCambiarEstado}
                         cambiandoEstadoId={cambiandoEstadoId}
                         onVerPostventa={onVerPostventa}

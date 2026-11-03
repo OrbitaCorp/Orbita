@@ -42,7 +42,7 @@ export interface LlmUsage {
    * y como el fallback se decide por llamada, un mismo turno puede mezclar los
    * dos. El metering se separa por esto (spec §3.6).
    */
-  provider: 'gemini' | 'groq';
+  provider: 'gemini' | 'groq' | 'workers-ai';
 }
 
 export type LlmEvent =
@@ -74,3 +74,5 @@ export interface LlmAdapter {
 }
 
 export const LLM_ADAPTER = Symbol('LLM_ADAPTER');
+/** El modelo del bot de atención de WhatsApp: cadena Groq → Workers AI (Cloudflare) → Gemini, del más barato al más caro. */
+export const LLM_ADAPTER_BOT = Symbol('LLM_ADAPTER_BOT');

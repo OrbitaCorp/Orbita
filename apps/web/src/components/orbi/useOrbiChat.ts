@@ -6,6 +6,9 @@ import { authedFetch } from '@/lib/auth/authClient'
 import { track, wizardIds } from '@/lib/analytics/wizardTracker'
 import { getWizardFormState } from './useOrbiContext'
 import { leerStreamSse } from './sseParser'
+import { esVisitanteDemo } from '@/lib/demo/modo'
+import { TITULO_ACCION_DEMO, presetDeAccion, type PresetDemo } from '@/lib/demo/orbiPresets'
+import { reproducirPreset } from './presetDemo'
 import { mantenimientoDeLaRespuesta, mantenimientoDelEvento } from './mantenimiento'
 import {
   conversationIdParaEnviar,
@@ -83,6 +86,11 @@ export function useOrbiChat() {
   }, [queryClient])
 
   const send = useCallback(async (message: string, context: OrbiContext) => {
+    // El visitante de la demo no habla con el modelo: elige una pregunta
+    // prearmada (enviarPreset). Aunque algo llamara a send, no sale ningún
+    // pedido, y la API lo rechazaría igual (ver lib/demo/orbiPresets.ts).
+    if (context.surface === 'panel' && esVisitanteDemo()) return
+
     // El wizard es público/stateless en el backend (sin conversationId
     // persistido — ver ConversationService, que solo se usa en surface
     // panel). Sin esto, cada mensaje llegaba al LLM SIN los turnos previos:
@@ -290,6 +298,49 @@ export function useOrbiChat() {
   }, [store])
 
   /**
+   * Orbi en la demo pública: contesta con el texto prearmado de la pregunta
+   * elegida, "pensando" y escribiendo de a poco como una respuesta real, sin
+   * ninguna llamada a la API. Respeta lo mismo que `send`: Detener, cerrar el
+   * panel, Nueva conversación o otra pregunta cortan la respuesta en curso.
+   */
+  const enviarPreset = useCallback(async (preset: PresetDemo) => {
+    const sesionAlEnviar = useOrbiStore.getState().sesion
+    const corte = new AbortController()
+    const miEnvio = useOrbiStore.getState().iniciarEnvio(corte)
+    const sigueVigente = () => {
+      const s = useOrbiStore.getState()
+      return esEnvioVigente(sesionAlEnviar, s.sesion, miEnvio, s.envio)
+    }
+
+    store.addMessage({ id: `user-${Date.now()}-${miEnvio}`, role: 'user', content: preset.pregunta, timestamp: Date.now() })
+    const burbuja: OrbiMessage = { id: `assistant-${Date.now()}-${miEnvio}`, role: 'assistant', content: '', actions: [], timestamp: Date.now() }
+    store.addMessage(burbuja)
+    store.setStreaming(true)
+
+    try {
+      const completo = await reproducirPreset(preset, {
+        appendToLastAssistant: texto => useOrbiStore.getState().appendToLastAssistant(texto),
+        addActionToLastAssistant: accion => useOrbiStore.getState().addActionToLastAssistant(accion),
+        updateAction: (accionId, cambios) => useOrbiStore.getState().updateAction(burbuja.id, accionId, cambios),
+        // Resuelve al cortar (Detener, cerrar, reset): la espera no retiene a nadie.
+        esperar: ms => new Promise<void>(resolve => {
+          if (corte.signal.aborted) return resolve()
+          const timer = setTimeout(resolve, ms)
+          corte.signal.addEventListener('abort', () => { clearTimeout(timer); resolve() }, { once: true })
+        }),
+        vigente: () => sigueVigente() && !corte.signal.aborted,
+      })
+      // Cortada a mitad con Detener, cerrar o una pregunta nueva: queda lo que
+      // se escribió, marcado. Con un reset la burbuja ya no existe: no se toca.
+      if (!completo && corte.signal.aborted && !debeDescartar(sesionAlEnviar, useOrbiStore.getState().sesion)) {
+        store.marcarDetenido(burbuja.id)
+      }
+    } finally {
+      useOrbiStore.getState().terminarEnvio(miEnvio, sesionAlEnviar)
+    }
+  }, [store])
+
+  /**
    * Ejecuta de verdad una acción que Orbi propuso. Se llama cuando la persona
    * aprieta el botón de confirmar.
    *
@@ -300,6 +351,21 @@ export function useOrbiChat() {
    */
   const confirmarAccion = useCallback(async (mensajeId: string, accionId: string, actionId: string, tool: string) => {
     const sesionAlConfirmar = useOrbiStore.getState().sesion
+    // Tarjeta de la demo: no hay acción en el servidor. Se simula el "Aplicando…"
+    // y se dice que en la demo no se aplica nada.
+    const deLaDemo = presetDeAccion(actionId)
+    if (deLaDemo?.accion) {
+      useOrbiStore.getState().updateAction(mensajeId, accionId, { status: 'active', result: undefined })
+      await esperar(700)
+      if (debeDescartar(sesionAlConfirmar, useOrbiStore.getState().sesion)) return
+      useOrbiStore.getState().updateAction(mensajeId, accionId, {
+        status: 'error',
+        titulo: TITULO_ACCION_DEMO,
+        result: deLaDemo.accion.alConfirmar,
+        fin: Date.now(),
+      })
+      return
+    }
     useOrbiStore.getState().updateAction(mensajeId, accionId, { status: 'active', result: undefined, nota: undefined, titulo: undefined })
 
     // Mientras la API diga "se está aplicando" se vuelve a preguntar con el
@@ -331,6 +397,10 @@ export function useOrbiChat() {
    * "Ya se aplicó" en vez de decir "Cancelado".
    */
   const rechazarAccion = useCallback(async (mensajeId: string, accionId: string, actionId: string, tool: string) => {
+    if (presetDeAccion(actionId)) {
+      useOrbiStore.getState().updateAction(mensajeId, accionId, { status: 'rejected', fin: Date.now() })
+      return
+    }
     let respuesta: RespuestaCancelar
     try {
       const res = await authedFetch(`${API}/orbi/reject`, {
@@ -356,5 +426,5 @@ export function useOrbiChat() {
     if (paso.estado === 'complete') alAplicarse(tool, data)
   }, [alAplicarse])
 
-  return { send, confirmarAccion, rechazarAccion, isStreaming: store.isStreaming }
+  return { send, enviarPreset, confirmarAccion, rechazarAccion, isStreaming: store.isStreaming }
 }

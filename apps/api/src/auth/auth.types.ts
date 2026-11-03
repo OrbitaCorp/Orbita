@@ -23,7 +23,8 @@ export interface PlatformAdminAuthResponse {
   type: 'platform_admin';
   token: string;
   refreshToken: string;
-  admin: { id: string; name: string; email: string; role: string };
+  // hasTempPassword: entró con la contraseña temporal que le generó un superadmin; el panel le pide elegir una propia.
+  admin: { id: string; name: string; email: string; role: string; hasTempPassword?: boolean };
   // Sin `business`: un super admin no pertenece a ningún negocio.
 }
 

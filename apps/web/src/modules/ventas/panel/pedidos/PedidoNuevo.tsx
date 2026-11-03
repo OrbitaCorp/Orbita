@@ -24,8 +24,8 @@
 // tope de stock conocido, guarda contra doble click, ?clienteId= precargado),
 // solo cambió la disposición.
 
-import { useEffect, useState } from 'react'
-import { ArrowLeft, Banknote, Coins, Globe, Landmark, Mail, Minus, Package, Plus, Search, ShoppingBag, Store, Trash2, User, UserCheck, UserX } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { ArrowLeft, Banknote, Coins, Globe, Landmark, Mail, Minus, Package, Plus, Search, ShoppingBag, Store, Trash2, User, UserCheck, UserX, X } from 'lucide-react'
 import { imagenParaVariante } from '@/lib/storefront/utils'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
@@ -36,8 +36,8 @@ import { fmtMoney } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { useRouter } from 'next/router'
 import {
-    ApiError, getCustomers, getCustomer, panelGetProducts, panelGetProductFull, createOrder, panelEvaluateCart,
-    type ApiCustomer, type ApiProductListItem,
+    ApiError, getCustomers, getCustomer, panelGetProducts, panelGetProductFull, createOrder, panelEvaluateCart, panelGetCategoriesFlat,
+    type ApiCustomer, type ApiProductListItem, type ApiCategory, type ProductStatusFilter,
 } from '@/lib/api'
 import type { VistaPedido } from './components/PedidoTabs'
 import { ProductoThumb } from './components/ProductoThumb'
@@ -84,6 +84,14 @@ const EMAIL_OK = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 // Cuántos productos se piden por página al catálogo — con negocios de miles
 // de productos no tiene sentido traerlos todos para mostrar una grilla de a poco.
 const PROD_POR_PAGINA = 10
+
+// Fichas de estado del catálogo (mismos valores que entiende el backend).
+const ESTADOS_FILTRO: { valor: 'todos' | ProductStatusFilter; label: string }[] = [
+    { valor: 'todos',        label: 'Todos' },
+    { valor: 'PUBLISHED',    label: 'Publicados' },
+    { valor: 'DRAFT',        label: 'Borradores' },
+    { valor: 'OUT_OF_STOCK', label: 'Sin stock' },
+]
 
 export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
     const { status: authStatus, user } = useAuth()
@@ -140,6 +148,11 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
 
     // ── Catálogo ──
     const [buscaProd, setBuscaProd]   = useState('')
+    // Filtros del catálogo (los mismos que usa la lista de Productos): categoría
+    // y estado. Se aplican en el backend, así la paginación sigue siendo real.
+    const [filtroCat, setFiltroCat]   = useState('todos')
+    const [filtroEst, setFiltroEst]   = useState<'todos' | ProductStatusFilter>('todos')
+    const [categorias, setCategorias] = useState<ApiCategory[]>([])
     const [paginaProd, setPaginaProd] = useState(1)
     const [productos, setProductos]   = useState<ApiProductListItem[]>([])
     const [productosTotal, setProductosTotal] = useState(0)
@@ -150,20 +163,47 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
     const [carrito, setCarrito]       = useState<Linea[]>([])
 
     // Cualquier cambio de búsqueda vuelve a la primera página del catálogo.
-    useEffect(() => { setPaginaProd(1) }, [buscaProd])
+    useEffect(() => { setPaginaProd(1) }, [buscaProd, filtroCat, filtroEst])
+
+    // Las categorías del negocio para el filtro (si falla, el filtro simplemente
+    // no ofrece categorías: la búsqueda sigue andando).
+    useEffect(() => {
+        if (!esDueno) return
+        let cancelado = false
+        panelGetCategoriesFlat()
+            .then(cs => { if (!cancelado) setCategorias((cs ?? []).filter(c => c.isActive)) })
+            .catch(() => { if (!cancelado) setCategorias([]) })
+        return () => { cancelado = true }
+    }, [esDueno])
+
+    // Subcategorías indentadas debajo de su madre en el select.
+    const catsOrdenadas = useMemo(() => {
+        const raiz = categorias.filter(c => !c.parentId)
+        return raiz.flatMap(c => [
+            { ...c, nivel: 0 },
+            ...categorias.filter(h => h.parentId === c.id).map(h => ({ ...h, nivel: 1 })),
+        ])
+    }, [categorias])
+    const hayFiltros = filtroCat !== 'todos' || filtroEst !== 'todos'
+    const limpiarFiltros = () => { setBuscaProd(''); setFiltroCat('todos'); setFiltroEst('todos') }
 
     useEffect(() => {
         if (!esDueno) return
         let cancelado = false
         const t = setTimeout(() => {
             setCargandoProd(true)
-            panelGetProducts({ search: buscaProd || undefined, page: paginaProd, limit: PROD_POR_PAGINA })
+            panelGetProducts({
+                search: buscaProd || undefined,
+                categoryId: filtroCat !== 'todos' ? filtroCat : undefined,
+                status: filtroEst !== 'todos' ? filtroEst : undefined,
+                page: paginaProd, limit: PROD_POR_PAGINA,
+            })
                 .then(r => { if (!cancelado) { setProductos(r?.data ?? []); setProductosTotal(r?.total ?? 0); setErrorProd(null) } })
                 .catch(() => { if (!cancelado) { setProductos([]); setProductosTotal(0); setErrorProd('No se pudo cargar el catálogo.') } })
                 .finally(() => { if (!cancelado) setCargandoProd(false) })
         }, buscaProd ? 350 : 0)
         return () => { cancelado = true; clearTimeout(t) }
-    }, [buscaProd, paginaProd, esDueno, reintentoProd])
+    }, [buscaProd, filtroCat, filtroEst, paginaProd, esDueno, reintentoProd])
 
     // Agregar un producto: si tiene una sola variante va directo; si tiene
     // varias, primero se elige cuál (talle, color, etc.).
@@ -417,6 +457,15 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                 .npos-stock[data-nivel="sin"]  { color: var(--color-error);   background: var(--color-error-bg); }
                 .npos-prodvars { font-size: 11px; color: var(--color-muted); }
 
+                /* Filtros del catálogo: categoría (select) + estado (fichas). */
+                .npos-filtros { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+                .npos-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+                .npos-chip { display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 12px; border-radius: 9999px; font-family: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer; white-space: nowrap; border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-body); transition: border-color 150ms ease, background 150ms ease, color 150ms ease; }
+                .npos-chip:hover { border-color: var(--color-primary); }
+                .npos-chip[aria-pressed="true"] { border-color: var(--color-primary); background: var(--color-primary-bg); color: var(--color-primary); font-weight: 600; }
+                .npos-chip:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+                .npos-chip--limpiar { border-style: dashed; color: var(--color-muted); }
+
                 /* Modalidad y cobro: pares de botones grandes, con ícono y una
                    línea que dice qué implica cada uno. */
                 .npos-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -483,9 +532,36 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                             </div>
                         )}
                     </div>
-                    <div style={{ position: 'relative', marginBottom: 14 }}>
+                    <div data-ayuda="pedido-buscar" style={{ position: 'relative', marginBottom: 14 }}>
                         <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-muted)' }} />
                         <input className="ds-field" value={buscaProd} onChange={e => setBuscaProd(e.target.value)} placeholder="Buscar producto…" style={{ ...inputBase, paddingLeft: 32 }} />
+                    </div>
+
+                    {/* Filtros del catálogo: categoría y estado, además del buscador. */}
+                    <div data-ayuda="pedido-filtros" className="npos-filtros" role="group" aria-label="Filtros del catálogo">
+                        <select
+                            className="ds-field" value={filtroCat} onChange={e => setFiltroCat(e.target.value)}
+                            aria-label="Filtrar por categoría" style={selFiltro}
+                        >
+                            <option value="todos">Todas las categorías</option>
+                            {catsOrdenadas.map(c => (
+                                <option key={c.id} value={c.id}>{c.nivel === 1 ? `· ${c.name}` : c.name}</option>
+                            ))}
+                        </select>
+                        <div className="npos-chips" role="group" aria-label="Filtrar por estado">
+                            {ESTADOS_FILTRO.map(o => (
+                                <button
+                                    key={o.valor} type="button" className="npos-chip"
+                                    aria-pressed={filtroEst === o.valor}
+                                    onClick={() => setFiltroEst(o.valor)}
+                                >{o.label}</button>
+                            ))}
+                        </div>
+                        {(hayFiltros || buscaProd) && (
+                            <button type="button" className="npos-chip npos-chip--limpiar" onClick={limpiarFiltros}>
+                                <X size={12} strokeWidth={2.4} aria-hidden="true" /> Limpiar
+                            </button>
+                        )}
                     </div>
 
                     {cargandoProd ? (
@@ -507,7 +583,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                             <Button variant="outline" size="sm" onClick={() => setReintentoProd(n => n + 1)}>Reintentar</Button>
                         </div>
                     ) : productos.length === 0 ? (
-                        <div style={{ fontSize: 12.5, color: 'var(--color-muted)', padding: '24px 0', textAlign: 'center' }}>No hay productos {buscaProd ? 'con esa búsqueda' : 'en el catálogo todavía'}.</div>
+                        <div style={{ fontSize: 12.5, color: 'var(--color-muted)', padding: '24px 0', textAlign: 'center' }}>No hay productos {buscaProd || hayFiltros ? 'con esos filtros' : 'en el catálogo todavía'}.</div>
                     ) : (
                         <div className="npos-prodgrid">
                             {productos.map(pr => {
@@ -598,7 +674,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                         </div>
 
                         {/* Cliente */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                        <div data-ayuda="pedido-cliente" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                             <User size={13} style={{ color: 'var(--color-subtle)' }} />
                             <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-subtle)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cliente</span>
                         </div>
@@ -731,7 +807,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                         </div>
                         {/* Sin productos no hay nada que cobrar: el bloque queda apagado hasta
                             que se agrega el primero (Ale, 08/09). */}
-                        <div className={`npos-seg${esPresencial ? ' npos-seg--3' : ''}`} role="group" aria-label={esPresencial ? 'Cómo se cobró' : 'Cómo va a pagar'} aria-disabled={sinProductos || undefined} style={{ marginBottom: 12, opacity: sinProductos ? 0.45 : 1, pointerEvents: sinProductos ? 'none' : undefined }}>
+                        <div data-ayuda="pedido-cobro" className={`npos-seg${esPresencial ? ' npos-seg--3' : ''}`} role="group" aria-label={esPresencial ? 'Cómo se cobró' : 'Cómo va a pagar'} aria-disabled={sinProductos || undefined} style={{ marginBottom: 12, opacity: sinProductos ? 0.45 : 1, pointerEvents: sinProductos ? 'none' : undefined }}>
                             <button type="button" className="npos-segbtn" disabled={sinProductos} aria-pressed={cobro === 'CASH'} onClick={() => setCobro(c => c === 'CASH' && !esPresencial ? null : 'CASH')}>
                                 <span className="npos-segico"><Banknote size={15} strokeWidth={2} /></span>
                                 <span className="npos-segtxt"><b>Efectivo</b></span>
@@ -845,7 +921,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                                 <span>Total</span>
                                 <span style={{ fontFamily: '"Geist Mono", monospace', color: 'var(--color-primary-h)', fontSize: 20 }}>{fmtMoney(total)}</span>
                             </div>
-                            <Button variant="primary" loading={creando} disabled={!puedeCrear} onClick={() => void crear()} style={{ width: '100%', justifyContent: 'center' }}>
+                            <Button variant="primary" loading={creando} disabled={!puedeCrear} onClick={() => void crear()} data-ayuda="pedido-confirmar" style={{ width: '100%', justifyContent: 'center' }}>
                                 {esPresencial ? 'Registrar venta' : 'Crear pedido'}
                             </Button>
                             {!clienteListo && carrito.length > 0 && (
@@ -908,6 +984,7 @@ const inputBase: React.CSSProperties = {
     background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8,
     fontSize: 13, color: 'var(--color-text)', fontFamily: 'inherit', outline: 'none',
 }
+const selFiltro: React.CSSProperties = { height: 32, padding: '0 10px', borderRadius: 9999, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: 12.5, fontFamily: 'inherit', cursor: 'pointer', maxWidth: 220 }
 const linkBtn: React.CSSProperties = { background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }
 const variantRow: React.CSSProperties = {
     width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,

@@ -33,7 +33,7 @@ function archivosDe(dir: string): string[] {
  * ellas adentro, el contrato pasaba con "Generar con Orbi" cuando el botón
  * dice "Redactar con Orbi"), los mocks y los prototipos de propuestas.
  */
-const NO_ES_PANTALLA = [/[\\/]manual[\\/]/, /[\\/]tutoriales[\\/]/, /[\\/]mock[\\/]/, /[\\/]propuestas[\\/]/]
+const NO_ES_PANTALLA = [/[\\/]manual[\\/]/, /[\\/]tutoriales[\\/]/, /[\\/]ayuda[\\/]/, /[\\/]mock[\\/]/, /[\\/]propuestas[\\/]/]
 
 /** Como se compara un texto: sin íconos de flecha o tilde, sin el "+" de adelante, espacios simples. */
 const normalizar = (t: string) => t.replace(/[→✓]/g, '').replace(/^\s*\+\s*/, '').replace(/\s+/g, ' ').trim()
@@ -69,7 +69,7 @@ const TEXTOS_DE_PANTALLA = new Set(pantallasDe(SRC).flatMap(textosDelArchivo))
 const CARPETA_DE_SECCION: Record<string, string> = {
   pedidos: 'pedidos', catalogo: 'catalogo', categorias: 'catalogo', clientes: 'clientes',
   reportes: 'reportes', descuentos: 'descuentos', cupones: 'descuentos', mensajes: 'mensajes',
-  avanzado: 'avanzado', perfil: 'perfil',
+  avanzado: 'avanzado', perfil: 'perfil', difusion: 'difusion',
 }
 function textosDeSeccion(seccion: string): Set<string> {
   const carpeta = CARPETA_DE_SECCION[seccion]

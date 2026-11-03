@@ -439,6 +439,10 @@ export class OnboardingService {
     // cual: se le suma "-tienda", que sigue siendo legible. Con el tope de 50
     // y el sufijo random de abajo, nunca pasa de 63.
     if (motivoSubdominioInvalido(base)) base = `${base}-tienda`;
+    // "Orbita Soporte" sigue reservado con el sufijo: se pasa a un nombre neutro
+    // en vez de dejar creado, sin que nadie lo valide, un subdominio que se
+    // hace pasar por Órbita. El real se elige después en el wizard.
+    if (motivoSubdominioInvalido(base)) base = 'negocio';
     let candidate = base;
     for (let attempt = 0; attempt < 20; attempt++) {
       const existing = await this.prisma.business.findUnique({ where: { subdomain: candidate } });

@@ -44,6 +44,9 @@ import { CancellationsModule } from './cancellations/cancellations.module';
 import { ConversationsModule } from './conversations/conversations.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { InstagramModule } from './instagram/instagram.module';
+import { TiktokModule } from './marketing/tiktok/tiktok.module';
+import { MarketingModule } from './marketing/marketing.module';
+import { ProspeccionModule } from './marketing/prospeccion/prospeccion.module';
 import { MessageTemplatesModule } from './message-templates/message-templates.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ReviewsModule } from './reviews/reviews.module';
@@ -104,6 +107,9 @@ import { ImageStudioModule } from './image-studio/image-studio.module';
     ConversationsModule,
     WhatsappModule,
     InstagramModule,
+    TiktokModule,
+    MarketingModule,
+    ProspeccionModule,
     MessageTemplatesModule,
     NotificationsModule,
     ReviewsModule,

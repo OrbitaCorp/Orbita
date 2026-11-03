@@ -21,6 +21,7 @@
 import { useEffect, useState } from 'react'
 import { fontStack, googleFontsHref } from '@/lib/fonts'
 import { cssPrimarioTienda } from './primarioTema'
+import { MSG_FOCO, enfocarSeccion, esObjetivoPreview } from './previewFoco'
 import type { StorefrontConfigResponse } from './api'
 
 type Appearance = NonNullable<StorefrontConfigResponse['appearance']>
@@ -48,7 +49,12 @@ export function instalarPreviewBridge(): void {
   instalado = true
   window.addEventListener('message', (e: MessageEvent) => {
     if (e.origin !== window.location.origin) return
-    const data = e.data as { type?: string; appearance?: unknown } | null
+    const data = e.data as { type?: string; appearance?: unknown; objetivo?: unknown } | null
+    // Foco: el panel pide llevar la mirada a una sección (ver previewFoco.ts).
+    if (data?.type === MSG_FOCO) {
+      if (esObjetivoPreview(data.objetivo)) enfocarSeccion(data.objetivo)
+      return
+    }
     if (!data || data.type !== MSG_BORRADOR) return
     if (typeof data.appearance !== 'object' || data.appearance === null) return
     overrides = data.appearance as AppearanceOverrides

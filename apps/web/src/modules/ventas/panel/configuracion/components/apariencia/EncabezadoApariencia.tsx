@@ -40,7 +40,11 @@ export function EncabezadoApariencia({ soloContenido, errorCarga, categorias, pr
             {!soloContenido && (
                 <div>
                     <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Apariencia pública</h1>
-                    <div style={{ fontSize: 14, color: 'var(--color-muted)', marginTop: 4 }}>Construí la identidad visual de tu tienda. Los cambios se ven en vivo.</div>
+                    <div style={{ fontSize: 14, color: 'var(--color-muted)', marginTop: 4 }}>
+                        Construí la identidad visual de tu tienda.{' '}
+                        <span className="ap-solo-escritorio">Los cambios se ven en vivo.</span>
+                        <span className="ap-solo-movil">Para ver cómo queda, tocá “Ver mi tienda”.</span>
+                    </div>
                     {errorCarga && <div style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 4 }}>{errorCarga} — se muestran valores por defecto.</div>}
                     {/* La vista previa de acá abajo es la tienda real embebida
                         (ver StorePreview.tsx) — con poco catálogo las
@@ -88,7 +92,7 @@ export function EncabezadoApariencia({ soloContenido, errorCarga, categorias, pr
                         : <Check size={12} strokeWidth={3} />}
                     {dirty ? 'Cambios sin guardar' : 'Publicado'}
                 </span>
-                {!soloContenido && <Button variant="outline" icon={<ExternalLink size={15} />} onClick={onVistaPrevia}>Ver vista previa de diseño</Button>}
+                {!soloContenido && <span className="ap-solo-escritorio"><Button variant="outline" icon={<ExternalLink size={15} />} onClick={onVistaPrevia}>Ver vista previa de diseño</Button></span>}
                 {/* En mobile se saca — la barra flotante de "Tenés cambios
                     sin guardar" de más abajo ya cubre el guardado sin
                     tener que volver arriba, este quedaba de más y era

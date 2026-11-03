@@ -13,7 +13,10 @@ import { EmailVerificationService } from '../member-profile/email-verification.s
 import { CostsService } from '../platform/costs/costs.service';
 import { AlertasDeCostoService } from '../platform/costs/alertas-de-costo.service';
 import { SearchConsoleService } from '../search-console/search-console.service';
+import { TiktokService } from '../marketing/tiktok/tiktok.service';
 import { InstagramService } from '../instagram/instagram.service';
+import { InstagramPublicacionesService } from '../instagram/instagram-publicaciones.service';
+import { InstagramComentariosService } from '../instagram/instagram-comentarios.service';
 
 /**
  * Reemplazo de los @Cron() que tenía el backend antes de migrar a Cloud Run.
@@ -84,6 +87,13 @@ export class InternalCronController {
     // Renovación del token de Instagram (dura 60 días). Opcional por la misma razón de
     // compatibilidad con specs unitarios.
     private readonly instagram?: InstagramService,
+    // TikTok de marketing: renueva el token de acceso (dura 24 h) para que la conexión no se corte.
+    // Opcional por la misma razón de compatibilidad con specs unitarios.
+    private readonly tiktok?: TiktokService,
+    // Difusión: publicaciones programadas y moderación de comentarios de Instagram (cada pocos minutos).
+    // Opcionales por la misma razón de compatibilidad con specs unitarios.
+    private readonly instagramPublicaciones?: InstagramPublicacionesService,
+    private readonly instagramComentarios?: InstagramComentariosService,
   ) {}
 
   // Antes: @Cron(EVERY_DAY_AT_3AM) + @Cron(EVERY_DAY_AT_4AM), por separado.
@@ -176,8 +186,29 @@ export class InternalCronController {
         } catch (e) {
           this.logger.error(`Tokens de Instagram: no se pudo correr — ${describeError(e)}`);
         }
+        // Token de TikTok de marketing: el servicio ya no tira (si falla, queda en su propio log).
+        await this.tiktok?.renovarTokens();
       },
     );
+  }
+
+  // Difusión → Publicaciones: cada 5 minutos lanza las publicaciones de Instagram programadas que ya llegaron a su
+  // hora, sigue avanzando las que se están procesando y modera los comentarios de los negocios que lo pidieron.
+  // No pasa por correrUnaVez a propósito: es un disparo frecuente e idempotente (cada publicación se toma con un
+  // candado propio en la base), no una tarea de una vez por ventana.
+  @Post('instagram-cada-5-minutos')
+  async instagramCada5Minutos() {
+    const publicaciones = await this.instagramPublicaciones?.procesarPendientes();
+    let moderacion: { negocios: number; ocultados: number } | undefined;
+    try {
+      moderacion = await this.instagramComentarios?.moderarTodos();
+    } catch (e) {
+      this.logger.error(`Moderación de comentarios de Instagram: no se pudo correr — ${describeError(e)}`);
+    }
+    if (publicaciones && (publicaciones.lanzadas || publicaciones.falladas || publicaciones.avanzadas)) {
+      this.logger.log(`Instagram programadas: ${JSON.stringify(publicaciones)}`);
+    }
+    return { publicaciones, moderacion };
   }
 
   // Antes: @Cron('0 22 * * *')
