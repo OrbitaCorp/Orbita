@@ -521,6 +521,13 @@ export function panelGetTutorial() {
   return panelRequest<{ tutorial: TutorialRemoto | null; cumplidas: string[] }>('/business/tutorial')
 }
 
+// «Ver tutorial» → Video: los tutoriales con link de YouTube y en qué pantallas del panel se ofrecen (los mismos para
+// todas las tiendas; se cargan por el conector de Claude, ver apps/api/src/marketing/videos/tutoriales.service.ts).
+export type VideoTutorialRemoto = { titulo: string; youtubeId: string; pantallas: string[] }
+export function panelGetVideosTutorial() {
+  return panelRequest<{ videos: VideoTutorialRemoto[] }>('/business/tutoriales-video')
+}
+
 export function panelSetTutorial(tutorial: TutorialRemoto) {
   return panelRequest<{ tutorial: TutorialRemoto }>('/business/tutorial', {
     method: 'PUT',

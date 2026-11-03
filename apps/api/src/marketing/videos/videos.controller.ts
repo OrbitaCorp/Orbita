@@ -1,7 +1,9 @@
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { PlatformAdminGuard } from '../../common/guards/platform-admin.guard';
 import { SuperadminYMarketing } from '../../common/decorators/platform-role.decorator';
-import { PlatformAdminContext } from '../../common/types/auth-context.type';
+import { AuthContext, PlatformAdminContext } from '../../common/types/auth-context.type';
+import { CurrentBusiness } from '../../common/decorators/current-business.decorator';
+import { assertMemberContext } from '../../common/utils/assert-member-context';
 import { ActualizarTutorialDto, ComentarVideoDto, PublicarVideoInstagramDto } from './dto/videos.dto';
 import { VideosPublicarService } from './videos-publicar.service';
 import { TutorialesService } from './tutoriales.service';
@@ -93,6 +95,19 @@ export class TutorialesController {
 
   @Patch(':id')
   actualizar(@Req() req: RequestWithAdmin, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ActualizarTutorialDto) {
-    return this.tutoriales.actualizar(req.user.adminId, { tutorial: id, estado: dto.estado, asignadoA: dto.asignadoA, notas: dto.notas });
+    return this.tutoriales.actualizar(req.user.adminId, { tutorial: id, estado: dto.estado, asignadoA: dto.asignadoA, notas: dto.notas, youtube: dto.youtube, pantallas: dto.pantallas });
+  }
+}
+
+// «Ver tutorial» → Video, en el panel de cada tienda: los tutoriales con link de YouTube y en qué pantallas se ofrecen.
+// Lo lee cualquier member (es el mismo contenido para todas las tiendas).
+@Controller('business/tutoriales-video')
+export class TutorialesPanelController {
+  constructor(private readonly tutoriales: TutorialesService) {}
+
+  @Get()
+  listar(@CurrentBusiness() ctx: AuthContext) {
+    assertMemberContext(ctx);
+    return this.tutoriales.videosDelPanel();
   }
 }

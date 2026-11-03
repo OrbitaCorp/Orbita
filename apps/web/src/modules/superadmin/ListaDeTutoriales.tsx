@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import { platformApi, type TutorialDeLaLista, type TutorialEstado, type ResponsableTutorial } from '@/lib/platform/api'
 import type { ToastVariant } from '@/design-system/components/Toast'
-import { useFetch, Card, Chip, Loader, ErrorBox, Empty, btnGhostSm, btnPrimary, inputStyle } from './ui'
+import { Play } from 'lucide-react'
+import { useFetch, Card, Chip, Loader, ErrorBox, Empty, ModalShell, btnGhostSm, btnPrimary, inputStyle } from './ui'
 
 // La lista de tutoriales: qué hay y qué falta. La actualiza el Claude de cada persona por el conector (marca «en proceso» al
-// empezar uno, y «en revisión» / «hecho» salen solos al registrar y aprobar su video); acá se mira y, si hace falta, se corrige.
+// empezar uno y carga el link de YouTube cuando el video está subido, que lo deja «hecho»: sin cola, aprobación ni correo).
+// Acá se sigue el progreso y se mira cada video; los links NO se cargan desde esta pantalla, solo por el conector.
+// Los estados y responsables, si hace falta, se corrigen.
 // Se corrige de a uno (los selectores de cada fila) o de a varios: se tildan filas y una barra flotante pide confirmar el cambio.
 // Apps/api/src/marketing/videos/tutoriales.service.ts.
 
@@ -50,6 +53,7 @@ export function ListaDeTutoriales({ puedeEditar, setAviso }: { puedeEditar: bool
   const [destinoResponsable, setDestinoResponsable] = useState<ResponsableTutorial | 'SIN_CAMBIOS'>('SIN_CAMBIOS')
   const [guardando, setGuardando] = useState<Set<string>>(new Set())
   const [aplicando, setAplicando] = useState(false)
+  const [viendo, setViendo] = useState<TutorialDeLaLista | null>(null)
 
   const recargar = () => setTick((n) => n + 1)
   const marcar = (id: string, on: boolean) => setGuardando((prev) => {
@@ -102,6 +106,7 @@ export function ListaDeTutoriales({ puedeEditar, setAviso }: { puedeEditar: bool
   const grupos = new Map<string, TutorialDeLaLista[]>()
   for (const t of visibles) grupos.set(t.grupo, [...(grupos.get(t.grupo) ?? []), t])
   const r = data?.resumen
+  const conVideo = todosTutoriales.filter((t) => t.youtubeId).length
 
   // Solo se tildan los que se pueden cambiar a mano y se ven ahora: si uno pasa a «en revisión» o lo tapa el filtro, se suelta solo.
   const seleccionables = visibles.filter((t) => t.estado !== 'EN_REVISION')
@@ -151,7 +156,7 @@ export function ListaDeTutoriales({ puedeEditar, setAviso }: { puedeEditar: bool
   return (
     <Card
       title="Lista de tutoriales"
-      subtitle="Qué hay y qué falta. Dividido equitativamente entre los tres (13 cada uno) para avanzar en paralelo."
+      subtitle="Qué hay y qué falta, dividido entre los tres. Los videos están en YouTube: el link lo carga el Claude de cada uno por el conector."
       action={(
         <span style={{ display: 'inline-flex', gap: 8, flexWrap: 'wrap' }}>
           <button type="button" onClick={() => { setSoloFaltan((v) => !v) }} aria-pressed={soloFaltan} className="ds-hover" style={{ ...btnGhostSm, height: 34 }}>{soloFaltan ? 'Ver todos' : 'Ver solo lo que falta'}</button>
@@ -167,7 +172,8 @@ export function ListaDeTutoriales({ puedeEditar, setAviso }: { puedeEditar: bool
           {r && (
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, alignItems: 'center' }}>
               <strong style={{ fontSize: 14, color: 'var(--color-text)' }}>{r.hechos} de {r.total} hechos</strong>
-              <Chip text={`${r.enRevision} en revisión`} tone="blue" />
+              <span style={{ fontSize: 13, color: 'var(--color-muted)' }}>· {conVideo} con video</span>
+              {r.enRevision > 0 && <Chip text={`${r.enRevision} en revisión`} tone="blue" />}
               <Chip text={`${r.enProceso} en proceso`} tone="amber" />
               <Chip text={`${r.faltan} faltan`} tone="gray" />
               {puedeEditar && seleccionables.length > 1 && (
@@ -300,6 +306,11 @@ export function ListaDeTutoriales({ puedeEditar, setAviso }: { puedeEditar: bool
                             </div>
                           </div>
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                            {t.youtubeId && (
+                              <button type="button" onClick={() => setViendo(t)} className="ds-hover" style={{ ...btnGhostSm, height: 32 }}>
+                                <Play size={13} aria-hidden="true" /> Ver video
+                              </button>
+                            )}
                             {/* Responsable */}
                             {respInfo ? (
                               <Chip text={respInfo.etiqueta} tone={respInfo.tono} />
@@ -340,6 +351,25 @@ export function ListaDeTutoriales({ puedeEditar, setAviso }: { puedeEditar: bool
             </div>
           )}
         </>
+      )}
+
+      {viendo?.youtubeId && (
+        <ModalShell title={viendo.titulo} onClose={() => setViendo(null)} ancho={880}>
+          <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', borderRadius: 10, overflow: 'hidden', background: '#000' }}>
+            <iframe
+              src={`https://www.youtube-nocookie.com/embed/${viendo.youtubeId}?autoplay=1&rel=0&modestbranding=1&playsinline=1`}
+              title={viendo.titulo}
+              allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+              allowFullScreen
+              referrerPolicy="strict-origin-when-cross-origin"
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }}
+            />
+          </div>
+          <p style={{ margin: '12px 0 0', fontSize: 13, color: 'var(--color-muted)' }}>
+            {viendo.pantallas.length > 0 ? `En el panel se ofrece en: ${viendo.pantallas.join(', ')}.` : 'Todavía no tiene pantalla del panel: no se ofrece en «Ver tutorial».'}{' '}
+            <a href={`https://youtu.be/${viendo.youtubeId}`} target="_blank" rel="noreferrer" style={{ color: 'var(--color-primary)' }}>Abrir en YouTube</a>
+          </p>
+        </ModalShell>
       )}
 
       {/* Barra flotante: aparece al tildar y queda a la vista aunque la lista sea larga. No cambia nada hasta tocar «Confirmar». */}

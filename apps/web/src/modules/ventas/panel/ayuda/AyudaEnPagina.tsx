@@ -3,14 +3,13 @@
 // En el celular la barra de arriba no tiene lugar para un botón con texto, así que
 // el botón vive en la propia pantalla: una fila arriba del contenido, a la altura de
 // la primera tarjeta ("Información básica", la lista…). En la compu no se ve: ahí está
-// el botón de la barra (AyudaBoton). Solo aparece en pantallas que tienen recorrido o video.
+// el botón de la barra (AyudaBoton). Solo aparece en pantallas que tienen recorrido.
 
 import { ChevronRight, HelpCircle } from 'lucide-react'
 import { useRouter } from 'next/router'
 import { useAuth } from '@/lib/auth/AuthContext'
 import { EVENTO_ABRIR_AYUDA } from './AyudaBoton'
 import { claveDeAyuda, recorridoDe } from './recorridos'
-import { VIDEOS } from './videos'
 
 export default function AyudaEnPagina() {
     const router = useRouter()
@@ -21,8 +20,7 @@ export default function AyudaEnPagina() {
     const seccion = segmentos[segmentos.length - 1] ?? ''
     const vista = typeof router.query.vista === 'string' ? router.query.vista : undefined
     // Una pantalla de Orbi o del manual no la necesita; sin recorrido no hay botón.
-    const clave = claveDeAyuda(seccion, vista)
-    if (!recorridoDe(clave) && !VIDEOS[clave]) return null
+    if (!recorridoDe(claveDeAyuda(seccion, vista))) return null
 
     return (
         <div className="ayu-enpagina">

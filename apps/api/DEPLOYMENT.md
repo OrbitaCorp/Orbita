@@ -548,8 +548,9 @@ Código en `src/marketing/videos/`; tablas `marketing_videos`, `marketing_video_
 `20261014190000_marketing_videos_comentarios`, todas con RLS).
 
 - **Dos tipos que no se mezclan** (pestañas del panel): **MARKETING** (se usa afuera; se puede pasar como borrador a TikTok o
-  Instagram; vence a los 7 días sin aprobar) y **TUTORIAL** (interno, no se pasa a redes; vence a los 30 días; puede cubrir un ítem
-  de la lista de tutoriales). **No hay tope de peso** en ninguno de los dos (R2 no lo pide); el único límite que queda es el de la
+  Instagram; vence a los 7 días sin aprobar) y **TUTORIAL** (interno, no se pasa a redes; **entra APROBADO, sin aprobación ni
+  correo**; puede cubrir un ítem de la lista de tutoriales, que queda HECHO). Lo normal para un tutorial es no subir el archivo:
+  va a YouTube y se carga su link en la lista (abajo). **No hay tope de peso** en ninguno de los dos (R2 no lo pide); el único límite que queda es el de la
   vía de Instagram (50 MB, del bucket de la cuenta): un video más pesado se descarga y se sube a mano a Instagram.
 - **Estados:** SUBIENDO (vence en 1 h) → PENDIENTE → APROBADO (queda como registro, con su archivo, sin vencer) → PUBLICADO (se
   pasó a un borrador). **Rechazar borra el archivo de R2, el registro y sus comentarios.**
@@ -572,10 +573,13 @@ Código en `src/marketing/videos/`; tablas `marketing_videos`, `marketing_video_
   registra la versión nueva con `videos_registrar` + `mejora_de`: queda como un video aparte que apunta al original, que no se toca
   (sirve también para videos ya aprobados). La mejora se aprueba según quién la subió.
 - **Lista de tutoriales** (`marketing_tutoriales`, cargada en la migración con los 39 tutoriales definidos): estados FALTA,
-  EN_PROCESO, EN_REVISION, HECHO. La actualiza el Claude de cada persona (`tutoriales_listar` / `tutoriales_actualizar`); registrar el
-  video de un tutorial lo pasa a EN_REVISION y aprobarlo, a HECHO; rechazarlo o que venza lo devuelve a FALTA. También se corrige
-  desde el panel.
-- **Aviso por correo a TODO el equipo:** cuando entra un video, un correo (por Resend, con el diseño de Órbita) a los superadmins
+  EN_PROCESO, HECHO (EN_REVISION es de cuando los tutoriales se aprobaban). La actualiza el Claude de cada persona
+  (`tutoriales_listar` / `tutoriales_actualizar`). Cada tutorial tiene `youtube_id` (el video, subido como «No listado») y
+  `pantallas` (las claves de «Ver tutorial» del panel donde se ofrece; migración `20261102120000_marketing_tutoriales_youtube`, que
+  además las carga para la lista y aprueba los tutoriales que estaban pendientes en la cola). Cargar el link deja el tutorial HECHO.
+  El panel de cada tienda los lee con `GET /business/tutoriales-video` (cualquier member). Estado y responsable también se corrigen
+  desde el panel; el link, solo por el conector (o `PATCH /platform/marketing/tutoriales/:id` con `youtube` / `pantallas`).
+- **Aviso por correo a TODO el equipo (solo marketing; los tutoriales no avisan):** cuando entra un video, un correo (por Resend, con el diseño de Órbita) a los superadmins
   ACTIVOS con correo `@orbita.site` u `@orbita-corp.com` (`MCP_DOMINIOS_PERMITIDOS`) y también a su correo personal si lo cargó:
   «Hay N videos nuevos para ver y comentar», con los títulos y un botón al panel (el texto no habla de aprobaciones). Sale **uno por
   tanda y por tipo**: no repite si ya salió otro hace menos de 10 minutos, y al terminar Claude llama a `videos_avisar` (fin de tanda),

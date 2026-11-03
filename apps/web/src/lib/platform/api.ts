@@ -241,6 +241,8 @@ export type ResponsableTutorial = 'ALAN' | 'MATEO' | 'ALE'
 export type TutorialDeLaLista = {
   id: string; grupo: string; titulo: string; estado: TutorialEstado; asignadoA: ResponsableTutorial | null; opcional: boolean; prioridadAlta: boolean
   notas: string | null; videoId: string | null; updatedAt: string
+  /** El video en YouTube (lo carga el Claude de cada persona por el conector) y las pantallas del panel donde se ofrece. */
+  youtubeId: string | null; pantallas: string[]
 }
 export type TutorialesRespuesta = {
   resumen: { total: number; hechos: number; enRevision: number; enProceso: number; faltan: number }

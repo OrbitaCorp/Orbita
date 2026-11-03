@@ -42,7 +42,6 @@ const maxSegundosDe = (tipo: TipoVideo) => (tipo === 'TUTORIAL' ? 3600 : 600);
 /** Tope de videos esperando revisión de cada tipo: evita llenar el almacenamiento si algo se descontrola. */
 export const MAX_EN_COLA = 20;
 export const DIAS_PENDIENTE = 7;
-export const DIAS_PENDIENTE_TUTORIAL = 30;
 const MINUTOS_SUBIENDO = 60;
 const MAX_CONTROLES = 20;
 
@@ -143,7 +142,11 @@ export class VideosService {
     return t as TipoVideo;
   }
 
-  /** Paso 2 de Claude: confirmar la subida y dejar el video en la cola con su guion, su texto y sus controles. */
+  /**
+   * Paso 2 de Claude: confirmar la subida y dejar el video en la cola con su guion, su texto y sus controles.
+   * Marketing queda PENDIENTE (lo aprueba la dirección) y avisa por correo. Un tutorial es interno: entra APROBADO, su
+   * tutorial de la lista queda HECHO y no manda correo (lo normal igual es cargar su link de YouTube, sin subir el archivo).
+   */
   async registrar(adminId: string, e: EntradaVideo) {
     const video = await this.prisma.marketingVideo.findUnique({ where: { id: String(e.videoId ?? '') } });
     if (!video || video.estado !== 'SUBIENDO' || video.creadoPor !== adminId) throw new NotFoundException('No hay una subida pendiente con ese id (¿ya la registraste o venció?)');
@@ -188,14 +191,15 @@ export class VideosService {
         tutorialId,
         mejoraDeId,
         controles: this.controles(e.controles) as unknown as Prisma.InputJsonValue,
-        estado: 'PENDIENTE',
-        expiraAt: dias(tipo === 'TUTORIAL' ? DIAS_PENDIENTE_TUTORIAL : DIAS_PENDIENTE),
+        ...(tipo === 'TUTORIAL'
+          ? { estado: 'APROBADO', aprobaciones: [{ adminId, fecha: new Date().toISOString() }] as unknown as Prisma.InputJsonValue, aprobadoPor: adminId, aprobadoAt: new Date(), expiraAt: null }
+          : { estado: 'PENDIENTE', expiraAt: dias(DIAS_PENDIENTE) }),
       },
     });
-    if (tutorialId) await this.prisma.marketingTutorial.update({ where: { id: tutorialId }, data: { estado: 'EN_REVISION', actualizadoPor: adminId } });
+    if (tutorialId) await this.prisma.marketingTutorial.update({ where: { id: tutorialId }, data: { estado: 'HECHO', actualizadoPor: adminId } });
     await this.registrarLog(adminId, 'video_registrar', actualizado.id, { titulo, tipo, formato, bytes: tam, mejoraDe: mejoraDeId });
-    // Un correo (mejor esfuerzo, uno por tanda): hay un video para revisar.
-    await this.aviso.avisar(adminId, 'registro', tipo);
+    // Un correo (mejor esfuerzo, uno por tanda): hay un video de marketing para revisar.
+    if (tipo === 'MARKETING') await this.aviso.avisar(adminId, 'registro', tipo);
     return this.vista(actualizado);
   }
 
@@ -208,9 +212,11 @@ export class VideosService {
     return item.id;
   }
 
-  /** Al terminar de subir una tanda: avisa por correo si quedó algún video pendiente sin anunciar. */
-  avisarTanda(adminId: string, tipo: unknown = 'MARKETING') {
-    return this.aviso.avisar(adminId, 'tanda', this.tipoValido(tipo));
+  /** Al terminar de subir una tanda: avisa por correo si quedó algún video pendiente sin anunciar. Los tutoriales no avisan. */
+  async avisarTanda(adminId: string, tipo: unknown = 'MARKETING') {
+    const t = this.tipoValido(tipo);
+    if (t === 'TUTORIAL') return { enviados: 0, pendientes: 0 };
+    return this.aviso.avisar(adminId, 'tanda', t);
   }
 
   private controles(crudo: unknown): ControlDeCalidad[] {

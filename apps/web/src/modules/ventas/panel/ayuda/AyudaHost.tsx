@@ -41,7 +41,6 @@ import Recorrido from './Recorrido'
 import { EVENTO_ABRIR_AYUDA } from './AyudaBoton'
 import Foco from './Foco'
 import EleccionTutorial from './EleccionTutorial'
-import { VIDEOS } from './videos'
 
 // Mientras hay un paso a medias se vuelve a preguntar cada tanto: crear la
 // categoría o el producto no cambia de ruta, y el cierre tiene que aparecer
@@ -299,7 +298,7 @@ export default function AyudaHost() {
     useEffect(() => {
         const abrir = () => {
             const c = claveRef.current
-            if (!recorridoDe(c) && !VIDEOS[c]) return
+            if (!recorridoDe(c)) return
             setHojaAbierta(false)
             setAvisoCerrado(true)
             setSugerencia(null)

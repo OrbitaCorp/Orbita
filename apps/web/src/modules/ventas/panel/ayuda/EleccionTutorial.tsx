@@ -2,7 +2,7 @@
 //
 // Al tocar "Ver tutorial" (la barra de arriba, la fila del celular o el aviso del
 // módulo) se elige cómo aprender la pantalla:
-//   · Video: el tutorial grabado, alojado en YouTube (videos.ts). Si la pantalla
+//   · Video: el tutorial grabado, alojado en YouTube (videos.ts lo pide a la API). Si la pantalla
 //     tiene varios, primero la lista; con uno solo, se reproduce directo.
 //   · Recorrido guiado: los pasos sobre la pantalla real (Recorrido.tsx).
 // Si la pantalla todavía no tiene video, la opción se ve pero no se puede tocar.
@@ -10,9 +10,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, ChevronRight, MousePointerClick, PlayCircle, X } from 'lucide-react'
 import { EstilosAyuda } from './piezas'
-import { videosDe, type VideoTutorial } from './videos'
-
-type VideoListo = VideoTutorial & { id: string }
+import { useVideosDe, type VideoTutorial } from './videos'
 
 interface Props {
     clave: string
@@ -23,9 +21,10 @@ interface Props {
 }
 
 export default function EleccionTutorial({ clave, hayRecorrido, onRecorrido, onCerrar }: Props) {
-    const videos = videosDe(clave)
+    const cargados = useVideosDe(clave)
+    const videos = cargados ?? []
     const [vista, setVista] = useState<'elegir' | 'lista'>('elegir')
-    const [video, setVideo] = useState<VideoListo | null>(null)
+    const [video, setVideo] = useState<VideoTutorial | null>(null)
     const primero = useRef<HTMLButtonElement>(null)
 
     useEffect(() => { primero.current?.focus() }, [vista, video])
@@ -110,7 +109,8 @@ export default function EleccionTutorial({ clave, hayRecorrido, onRecorrido, onC
                         <span className="ayv-txt">
                             <span className="ayv-titulo">Video</span>
                             <span className="ayv-desc">
-                                {sinVideo ? 'Muy pronto para esta pantalla.'
+                                {cargados === null ? 'Buscando videos…'
+                                    : sinVideo ? 'Muy pronto para esta pantalla.'
                                     : videos.length === 1 ? 'Mirá cómo se hace, con voz.'
                                         : `${videos.length} videos cortos, con voz.`}
                             </span>

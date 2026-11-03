@@ -7,6 +7,8 @@ import { ListaDeTutoriales } from './ListaDeTutoriales'
 
 // Marketing → Videos: la cola de videos que genera el equipo con su propio Claude (en su computadora, con el conector de
 // Órbita). Hay dos pestañas que no se mezclan: Marketing (se usa afuera) y Tutoriales (internos, con la lista de lo que falta).
+// Los tutoriales no esperan aprobación ni mandan correo: van por YouTube (el link lo carga Claude por el conector) y, si alguno
+// se sube a la cola, entra aprobado. La aprobación es solo de marketing.
 //
 // Cualquiera del equipo puede COMENTAR cualquier video en todas sus fases y pedir que se MEJORE: «Mejorar con Claude» abre Claude
 // con ese video (si la persona tiene el conector; si no, le explica cómo conectarlo) y Claude lee el video y sus comentarios por
@@ -116,7 +118,7 @@ export function PanelVideos({ puedeEditar, setAviso }: { puedeEditar: boolean; s
           const n = (data ?? []).filter((v) => v.tipo === id && v.estado === 'PENDIENTE').length
           return (
             <button
-              key={id} type="button" role="tab" aria-selected={tipo === id} onClick={() => { setTipo(id); setFiltro('PENDIENTE') }}
+              key={id} type="button" role="tab" aria-selected={tipo === id} onClick={() => { setTipo(id); setFiltro(id === 'TUTORIAL' ? 'TODOS' : 'PENDIENTE') }}
               style={{ ...btnGhostSm, height: 38, padding: '0 18px', fontSize: 13.5, ...(tipo === id ? { borderColor: 'var(--color-primary)', color: 'var(--color-primary)', background: 'var(--color-primary-bg)' } : {}) }}
             >{texto}{n > 0 ? ` (${n})` : ''}</button>
           )
@@ -129,7 +131,7 @@ export function PanelVideos({ puedeEditar, setAviso }: { puedeEditar: boolean; s
         title={tipo === 'MARKETING' ? 'Videos de marketing' : 'Videos de tutoriales'}
         subtitle={tipo === 'MARKETING'
           ? 'Videos que generó el equipo con su Claude. Miralos, dejá tu opinión y pedí mejoras; los aprobados se pueden pasar como borrador a TikTok o Instagram.'
-          : 'Tutoriales internos del panel y la tienda. Miralos, dejá tu opinión y pedí mejoras. No se publican en redes.'}
+          : 'Tutoriales que se subieron como archivo a la cola. No esperan aprobación; los nuevos van por YouTube y se ven en la lista de arriba.'}
         action={<button type="button" onClick={recargar} className="ds-hover" style={{ ...btnGhostSm, height: 34 }}>Actualizar</button>}
       >
         <div role="tablist" aria-label="Estado de los videos" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
@@ -144,7 +146,8 @@ export function PanelVideos({ puedeEditar, setAviso }: { puedeEditar: boolean; s
         {loading ? <Loader /> : error || !data ? (
           <ErrorBox msg="No se pudo leer la cola de videos." action={<button type="button" onClick={recargar} style={btnGhostSm}>Reintentar</button>} />
         ) : visibles.length === 0 ? (
-          <Empty text={filtro === 'PENDIENTE'
+          <Empty text={tipo === 'TUTORIAL' ? 'No hay tutoriales subidos a la cola. Los nuevos van por YouTube: el link lo carga tu Claude con el conector y aparecen en la lista de arriba.'
+            : filtro === 'PENDIENTE'
             ? `No hay ${tipo === 'MARKETING' ? 'videos' : 'tutoriales'} para aprobar. Pedile a tu Claude, con el conector de Órbita, algo como «${tipo === 'MARKETING' ? 'generame 3 videos' : 'hacé el tutorial de Atender un pedido'}» y aparecen acá.${pendientesDelOtro > 0 ? ` Hay ${pendientesDelOtro} en la otra pestaña.` : ''}`
             : filtro === 'RECHAZADO' ? 'No hay videos rechazados.' : 'Todavía no hay videos en esta lista.'} />
         ) : (

@@ -1,68 +1,49 @@
 // ─── Los videos tutoriales, alojados en YouTube ──────────────────────────────
 //
 // "Ver tutorial" ofrece dos formas de aprender una pantalla: el video (este
-// archivo) o el recorrido guiado sobre la pantalla real (recorridos.ts). Las
-// claves son las mismas que las de los recorridos (claveDeAyuda).
+// archivo) o el recorrido guiado sobre la pantalla real (recorridos.ts).
 //
-// Para publicar un video, pegá en `youtube` el link del video (youtu.be/…,
-// youtube.com/watch?v=…, /shorts/…) o solo su id. Mientras esté vacío, ese
-// video no se ofrece; si una pantalla no tiene ninguno, la opción "Video" se
-// ve deshabilitada. Un mismo video puede ir en más de una pantalla.
-// Los originales están en docs/marketing/tutoriales/.
+// Los videos NO están en el código: cada tutorial de la lista de Marketing tiene
+// su link de YouTube y las pantallas donde se ofrece (las mismas claves que los
+// recorridos, claveDeAyuda). Los carga el Claude de cada persona por el conector
+// (tutoriales_actualizar), así que un video nuevo aparece sin deploy. Se piden
+// una sola vez por sesión, recién cuando alguien abre "Ver tutorial".
+
+import { useEffect, useState } from 'react'
+import { panelGetVideosTutorial, type VideoTutorialRemoto } from '@/lib/api'
 
 export interface VideoTutorial {
     titulo: string
-    /** Link de YouTube o id del video. Vacío = todavía no se subió. */
-    youtube: string
+    /** El id de 11 caracteres del video en YouTube. */
+    id: string
 }
 
-const VENTA_A_MANO: VideoTutorial = { titulo: 'Cargar una venta a mano', youtube: '' }
-const VARIANTES: VideoTutorial = { titulo: 'Variantes y stock', youtube: '' }
-const CUPON: VideoTutorial = { titulo: 'Crear y compartir un cupón', youtube: '' }
-
-export const VIDEOS: Record<string, VideoTutorial[]> = {
-    pedidos: [
-        VENTA_A_MANO,
-        { titulo: 'Pedidos en lote', youtube: '' },
-        { titulo: 'Cancelaciones y devoluciones', youtube: '' },
-    ],
-    'pedidos/nuevo': [VENTA_A_MANO],
-    catalogo: [VARIANTES, { titulo: 'Importar desde Excel', youtube: '' }],
-    'catalogo/nuevo': [VARIANTES],
-    categorias: [{ titulo: 'Organizar categorías', youtube: '' }],
-    clientes: [{ titulo: 'Tus clientes', youtube: '' }],
-    mensajes: [{ titulo: 'Responder mensajes', youtube: '' }],
-    cupones: [CUPON],
-    'cupones/crear': [CUPON],
-    reportes: [{ titulo: '¿Qué promo funcionó?', youtube: '' }],
-    'configuracion/apariencia': [
-        { titulo: 'Armar la portada', youtube: '' },
-        { titulo: 'Tu marca en la tienda', youtube: '' },
-    ],
-    'configuracion/dominios': [{ titulo: 'Dominio propio', youtube: '' }],
-}
-
-/** El id de 11 caracteres de un link de YouTube (o del id suelto), o null si no se reconoce. */
-export function idDeYoutube(valor: string): string | null {
-    const v = valor.trim()
-    if (/^[\w-]{11}$/.test(v)) return v
-    let url: URL
-    try { url = new URL(v.startsWith('http') ? v : `https://${v}`) } catch { return null }
-    const host = url.hostname.replace(/^(www\.|m\.)/, '')
-    let id: string | null = null
-    if (host === 'youtu.be') id = url.pathname.slice(1).split('/')[0]
-    else if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
-        id = url.searchParams.get('v')
-            ?? url.pathname.match(/^\/(?:shorts|embed|live)\/([\w-]{11})/)?.[1]
-            ?? null
+/** Los videos de cada pantalla, en el orden de la lista de tutoriales. */
+export function agruparPorPantalla(videos: VideoTutorialRemoto[]): Map<string, VideoTutorial[]> {
+    const mapa = new Map<string, VideoTutorial[]>()
+    for (const v of videos) {
+        if (!/^[\w-]{11}$/.test(v.youtubeId)) continue
+        for (const p of v.pantallas) mapa.set(p, [...(mapa.get(p) ?? []), { titulo: v.titulo, id: v.youtubeId }])
     }
-    return id && /^[\w-]{11}$/.test(id) ? id : null
+    return mapa
 }
 
-/** Los videos ya publicados de esa pantalla, con su id. */
-export function videosDe(clave: string): (VideoTutorial & { id: string })[] {
-    return (VIDEOS[clave] ?? []).flatMap(v => {
-        const id = idDeYoutube(v.youtube)
-        return id ? [{ ...v, id }] : []
-    })
+let pedido: Promise<Map<string, VideoTutorial[]>> | null = null
+function cargar() {
+    pedido ??= panelGetVideosTutorial()
+        .then(r => agruparPorPantalla(r.videos))
+        // Si falla, la opción Video queda apagada y se vuelve a intentar la próxima vez.
+        .catch(() => { pedido = null; return new Map<string, VideoTutorial[]>() })
+    return pedido
+}
+
+/** Los videos de esa pantalla; null mientras se cargan. */
+export function useVideosDe(clave: string): VideoTutorial[] | null {
+    const [porPantalla, setPorPantalla] = useState<Map<string, VideoTutorial[]> | null>(null)
+    useEffect(() => {
+        let vigente = true
+        cargar().then(m => { if (vigente) setPorPantalla(m) })
+        return () => { vigente = false }
+    }, [])
+    return porPantalla ? (porPantalla.get(clave) ?? []) : null
 }
