@@ -95,6 +95,7 @@ export function estricto<T extends object>(nombre: string, impl: T): T {
 export const PERMISOS_EMPLEADO = [
   'orders.view', 'customers.view', 'inventory.view', 'catalog.view', 'config.team.view',
   'messages.view', 'messages.manage',
+  'reservas.view', 'reservas.manage',
 ];
 
 export type Rol = 'dueno' | 'empleado';
