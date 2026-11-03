@@ -327,6 +327,7 @@ const GIMNASIO = plan('gimnasio', 'Gimnasio', 'Ale',
     t('2026-11-19', 'Ale', 'Gimnasio: Clases e Ingresos del panel sobre /reservas y /resumen', 'Las clases de hoy con su ocupación y la lista de espera salen de la API; Ingresos muestra lo cobrado según /resumen'),
     t('2026-12-01', 'Ale', 'Transversal: cobro online de la seña con Mercado Pago sobre /reservas (si Ale lo decide)', 'Una reserva con seña se paga con MP y el webhook la deja CONFIRMADA; sin MP conectado se registra a mano como hoy'),
     t('2026-12-02', 'Ale', 'Transversal: recordatorios del día anterior colgados del cron de las 22 h y avisos de reservas en la campanita del panel', 'El recordatorio sale una sola vez por reserva (idempotente por email_logs) y una reserva nueva aparece en la campanita'),
+    documentada(t('2026-11-04', 'Ale', 'Transversal: el kit toma el Kpi con variación, useBorrador + BarraGuardar y la cabecera del Modal; las copias de los tres módulos se borran', 'Un solo Kpi, una sola barra y un solo Modal en design-system/reservas; eslint sin imports cruzados; las pantallas se ven igual (capturas antes y después)'), GIM3('kit-kpi-guardar-modal')),
   ])
 
 export const PLANES: PlanModulo[] = [TURNOS, ALQUILERES, GIMNASIO]

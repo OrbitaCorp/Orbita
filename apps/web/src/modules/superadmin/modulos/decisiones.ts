@@ -144,33 +144,27 @@ export const DECISIONES: Entrada[] = [
   decisionAbierta({
     modulo: 'gimnasio', slug: 'pedidos-del-kit-sin-tomar', decide: 'Ale', transversal: true, fecha: '2026-10-27',
     titulo: 'Transversal: pedidos del kit que quedaron sin tomar',
-    foco: 'Lo que Alquileres, Gimnasio y Turnos le pidieron al kit design-system/reservas y el 27/10 no se tomó: el Kpi con ícono y variación (hoy tres copias), la barra de guardar y el borrador (duplicados), el toque de 44 de la llave en el medidor común, la tira de chips de 38 px de globals.css, la vista previa de mensajes (WhatsApp o chat neutro), la cabecera del Modal, el gris sobre primary-bg y el celular de vista previa.',
-    propuesta: `1. **\`Kpi\` con ícono y variación** en el kit (la anatomía de \`KpiCard\` de Tienda: \`Icon?\`, \`tono?\` y \`delta?: { valor, unidades?, invertir? }\`) y borrar las tres copias: \`Kpi\` de Alquileres, \`KpiGym\` de Gimnasio e \`Indicador\` de Turnos.
-2. **Barra de guardar y borrador** en el kit (\`BarraGuardar\` con \`motivo\` y \`useBorrador\`, la versión de Gimnasio) y borrar \`Guardar\` de Alquileres y la barra de Turnos.
+    foco: 'Lo que Alquileres, Gimnasio y Turnos le pidieron al kit design-system/reservas y el 27/10 no se tomó. El 03/11 se tomaron el Kpi, la barra de guardar y la cabecera del Modal (puntos 1, 2 y 6, ver la entrada "el kit toma el Kpi…"); quedan el toque de 44 de la llave en el medidor común, la tira de chips de 38 px de globals.css, la vista previa de mensajes (WhatsApp o chat neutro), el gris sobre primary-bg y el celular de vista previa.',
+    propuesta: `1. ~~**\`Kpi\` con ícono y variación** en el kit~~ **Hecho el 03/11** (entrada "Transversal: el kit toma el Kpi con variación…"): \`Kpi\` con \`Icon?\`, \`tono?\` y \`delta?\` en \`piezas.tsx\`; se borraron \`Kpi\` de Alquileres, \`KpiGym\` de Gimnasio e \`Indicador\` de Turnos.
+2. ~~**Barra de guardar y borrador** en el kit~~ **Hecho el 03/11:** \`useBorrador\` y \`BarraGuardar\` con \`motivo\` (la versión de Gimnasio) en el kit; Alquileres y Turnos migraron.
 3. **El toque de 44 de la llave \`rv-switch\`:** no tocar el kit (el \`::before\` con \`inset: -10px -6px\` ya da 54×44, verificado el 27/10) y que el medidor común de la QA (\`pw/superadmin/visual.cjs\`, en el scratchpad) cuente el pseudo-elemento, como ya hace el de Gimnasio; si se prefiere una caja real de 44, es un \`min-height: 44px\` con el visual adentro.
 4. **\`.ds-tira-chip\` de 38 px en celular:** es global de Tienda (\`globals.css\`) y no se toca en esta rama; mientras tanto los filtros de Alumnos usan \`.gso-chip\` de 44 px con el mismo aspecto. Entra en la decisión abierta "Tira de chips y botón Volver de 38 y 42 px".
 5. **Vista previa de mensajes:** Gimnasio la muestra como WhatsApp (verde) y Alquileres y Turnos como un chat neutro con los colores del panel. Unificar en una pieza del kit (Alan y Mateo proponen la neutra; Ale decide cuál) o dejar las dos.
-6. **La cabecera del \`Modal\` del kit estira su primer \`div\`** (\`.rv-modal-cab > div { flex: 1 }\`): un ícono o un avatar antes del título queda como una elipse (Turnos lo envuelve en un \`span\` en su propio \`Modal\`). Que estire solo un hijo marcado, por ejemplo \`.rv-modal-cab-txt\`.
+6. ~~**La cabecera del \`Modal\` del kit estira su primer \`div\`**~~ **Hecho el 03/11:** estira solo \`.rv-modal-cab-txt\`; Turnos borró su Modal propio y usa el del kit (que sumó \`onEnviar\`, \`encima\` y \`foco\`).
 7. **\`--color-muted\` sobre \`--color-primary-bg\` da 4,37:1:** Turnos pasa esos textos a \`--color-body\` y el kit ya dejó escrito en \`estilo.tsx\` qué tokens sirven para texto (da07e). La alternativa es subir un punto \`--color-muted\` en claro (#5B6B82 da 4,6:1 sobre #EFF6FF), pero eso es \`globals.css\`, de Tienda.
 8. **Un celular de vista previa compartido:** el \`VistaCliente\` de Avanzado de Turnos (marco plano, pantalla con las variables \`--color-*\` del tema) no sabe de turnos; Apariencia tiene otro con iframe. Si el kit quiere un "celular", ese es el candidato.`,
-    abierta: 'Los dos primeros tocan el kit y a los tres módulos a la vez; el tercero y el cuarto tocan la herramienta de QA y globals.css de Tienda, que está en producción; el quinto es una decisión de diseño entre dos criterios defendibles; el séptimo cambia un token de toda la app; el sexto y el octavo son API del kit que conviene decidir una vez.',
+    abierta: 'Quedan el tercero y el cuarto, que tocan la herramienta de QA y globals.css de Tienda, que está en producción; el quinto, una decisión de diseño entre dos criterios defendibles; el séptimo, que cambia un token de toda la app; y el octavo, API del kit que conviene decidir una vez. El primero, el segundo y el sexto se tomaron el 03/11.',
     origen: 'pedidos-kit-alquileres.md, pedidos-kit-gimnasio.md y pedidos-kit-turnos.md (26 y 27/10/2026, en el scratchpad de la sesión); el kit tomó el resto el 27/10 (entrada "El kit toma lo que pidieron los módulos", commits f1623 y da07e).',
     archivos: [
-      'apps/web/src/design-system/reservas/piezas.tsx:228',
-      'apps/web/src/modules/alquileres/admin/piezas.tsx:72',
-      'apps/web/src/modules/alquileres/admin/piezas.tsx:107',
-      'apps/web/src/modules/gimnasio/admin/piezas.tsx:81',
-      'apps/web/src/modules/gimnasio/admin/piezas.tsx:113',
-      'apps/web/src/modules/gimnasio/admin/piezas.tsx:128',
-      'apps/web/src/modules/turnos/admin/piezasPanel.tsx:271',
-      'apps/web/src/design-system/reservas/estilo.tsx:136',
+      'apps/web/src/design-system/reservas/piezas.tsx:313',
+      'apps/web/src/design-system/reservas/piezas.tsx:283',
+      'apps/web/src/design-system/reservas/piezas.tsx:185',
+      'apps/web/src/design-system/reservas/estilo.tsx:278',
       'apps/web/src/styles/globals.css:915',
       'apps/web/src/modules/gimnasio/admin/Socios.tsx:51',
       'apps/web/src/modules/gimnasio/admin/configuracion/Mensajes.tsx:37',
       'apps/web/src/modules/alquileres/admin/configuracion/comun.tsx:58',
       'apps/web/src/modules/turnos/admin/configuracion/Mensajes.tsx:53',
-      'apps/web/src/design-system/reservas/piezas.tsx:174',
-      'apps/web/src/modules/turnos/admin/piezasPanel.tsx:197',
       'apps/web/src/modules/turnos/admin/avanzado/ui.tsx:56-57',
       'apps/web/src/modules/turnos/admin/avanzado/ui.tsx:80-81',
     ],

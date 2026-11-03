@@ -2097,4 +2097,45 @@ El cobro online de la seña (Mercado Pago), la devolución automática, WhatsApp
       'apps/web/src/modules/orbi/markdown/parser.ts:62',
     ],
   }),
+
+  entrada({
+    modulo: 'gimnasio', fecha: F3, slug: 'kit-kpi-guardar-modal', tipo: 'diseño', quien: 'Ale', transversal: true,
+    titulo: 'Transversal: el kit toma el Kpi con variación, la barra de guardar con borrador y la cabecera del Modal; toques de 44 px en Alquileres',
+    foco: 'Puntos 1, 2 y 6 de "pedidos del kit sin tomar": un solo Kpi (con ícono, tono y variación), un solo useBorrador + BarraGuardar y un solo Modal para los tres módulos; se borraron las copias de Alquileres, Gimnasio y Turnos (48 archivos, −581 líneas). Las flechas de la semana y los horarios de Nueva reserva de Alquileres miden 44 px a 390.',
+    que: `Lo que los tres módulos tenían repetido pasó al kit (\`design-system/reservas/piezas.tsx\` y \`estilo.tsx\`) y las copias se borraron:
+
+1. **\`Kpi\`** con la anatomía de la KpiCard de Tienda: rótulo en mayúsculas, ícono en un chip con \`tono\`, valor en mono y al pie la variación (\`delta: { valor, unidades?, sufijo?, invertir?, vs? }\`). \`valor: null\` dice "sin datos previos" en vez de inventar un número; más de 999 % se escribe ">999%"; el chip neutro va en tinta de cuerpo (AA sobre surface-alt) y la flecha es \`aria-hidden\` con su texto para lectores. Reemplaza a \`Kpi\` de Alquileres, \`KpiGym\` de Gimnasio e \`Indicador\` de Turnos (en Turnos, nueve indicadores de Ganancias y los del Resumen).
+2. **\`useBorrador\` + \`BarraGuardar\`** (la versión de Gimnasio): el borrador sigue lo que llega del negocio, o queda en memoria si la pantalla no persiste nada; la barra aparece solo con cambios, pegada abajo, y con \`motivo\` ("Marcá al menos un día.") apaga Guardar y explica por qué. Alquileres (12 pantallas de Configuración) y Turnos (7) migraron; Turnos dejó su barra compacta propia.
+3. **La cabecera del \`Modal\`** ya no estira el primer hijo: estira solo \`.rv-modal-cab-txt\`, así un ícono o un avatar delante del título queda redondo. Turnos borró su Modal propio (con el \`span\` envoltorio que esquivaba el problema) y sus diez pantallas usan el del kit, que sumó \`onEnviar\` (Enter envía), \`encima\` (un modal sobre otro), \`foco\` y el cierre con mousedown en el velo; Escape y Tab los atiende solo el modal de más arriba.
+4. **Alquileres a 390 px:** las flechas de la semana en Reservas pasan de 32 a 44 px (\`.alg-tira > .rv-btn { flex-shrink: 0 }\`) y el radio de cada horario de Nueva reserva cubre los 44 px de la franja (\`.rv-card--radio\` con \`inset: -1px\`; vale también para el sitio).
+
+Cómo quedó, además de las capturas de abajo: la cabecera del Modal con el avatar del cliente en Turnos y las flechas de Alquileres a 390.
+
+![Modal con avatar · 1280](/auditoria/modulos/gimnasio/kit-modal-despues-1280.webp)
+![Flechas de la semana · 390](/auditoria/modulos/gimnasio/kit-flechas-despues-390.webp)
+
+Verificado con capturas antes/después de 16 pantallas a 1280 y 390 (y el oscuro de los chips) y un recorrido por teclado: dos modales apilados se cierran de a uno con Escape, Tab queda adentro, el foco vuelve a la fila, Enter envía, Horarios de Alquileres sin días deja Guardar apagado. Sin imports entre módulos (eslint), typecheck y vitest en verde. Lo que cambia a la vista: Alquileres ya no dice "Todo guardado." sin cambios y su variación se escribe "62,1%" (es-AR), como los otros dos; los KPIs de Turnos entran con la animación del kit; los tres números de la ficha del alumno de Gimnasio son Kpi del kit.
+
+Quedan abiertos del mismo pedido los puntos 3, 4, 5, 7 y 8 (globals.css de Tienda, la vista previa del chat y el celular de vista previa): siguen en la decisión.`,
+    antes: { 1280: 'kit-ingresos-antes-1280.webp', 390: 'kit-ingresos-antes-390.webp' },
+    despues: { 1280: 'kit-ingresos-despues-1280.webp', 390: 'kit-ingresos-despues-390.webp' },
+    archivos: [
+      'apps/web/src/design-system/reservas/piezas.tsx:185',
+      'apps/web/src/design-system/reservas/piezas.tsx:264',
+      'apps/web/src/design-system/reservas/piezas.tsx:283',
+      'apps/web/src/design-system/reservas/piezas.tsx:313',
+      'apps/web/src/design-system/reservas/estilo.tsx:68',
+      'apps/web/src/design-system/reservas/estilo.tsx:193',
+      'apps/web/src/design-system/reservas/estilo.tsx:278',
+      'apps/web/src/design-system/reservas/estilo.tsx:316',
+      'apps/web/src/modules/alquileres/admin/piezas.tsx:1',
+      'apps/web/src/modules/alquileres/admin/Reservas.tsx:42',
+      'apps/web/src/modules/gimnasio/admin/piezas.tsx:1',
+      'apps/web/src/modules/gimnasio/admin/Socios.tsx:1',
+      'apps/web/src/modules/turnos/admin/piezasPanel.tsx:1',
+      'apps/web/src/modules/turnos/admin/configuracion/ui.tsx:1',
+      'apps/web/src/modules/turnos/admin/KPIs.tsx:1',
+      'apps/web/src/modules/turnos/admin/Ganancias.tsx:1',
+    ],
+  }),
 ]
