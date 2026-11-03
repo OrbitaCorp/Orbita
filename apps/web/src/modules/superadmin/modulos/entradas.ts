@@ -2138,4 +2138,37 @@ Quedan abiertos del mismo pedido los puntos 3, 4, 5, 7 y 8 (globals.css de Tiend
       'apps/web/src/modules/turnos/admin/Ganancias.tsx:1',
     ],
   }),
+
+  entrada({
+    modulo: 'gimnasio', fecha: F3, slug: 'fondo-claro-planeta', tipo: 'diseño', quien: 'Ale', transversal: true,
+    titulo: 'Transversal: el fondo claro de los paneles es el planeta de la landing, fijo abajo, con cielo claro y meteoritos',
+    foco: 'La opción que eligió Ale el 27/10 ("Planeta como la landing"): en claro, el planeta de orbita.site en versión clara queda fijo abajo de la pantalla con su línea de luz, los anillos y el satélite del logo; arriba un cielo celeste muy suave con estrellas blancas y cometas azules; el contenido pasa por encima. Sin la banda debajo del encabezado. Oscuro, igual que antes.',
+    que: `Lo que Ale eligió entre las opciones del 27/10 (la banda del horizonte "me gusta, pero la idea es que no quede blanco lo demás"), hecho con la misma escena de la landing (\`design-system/EscenaEspacial\`):
+
+1. **La escena en una capa del panel.** \`EscenaEspacial\` suma tres props que la landing, el alta y el login no usan (sus defaults reproducen exactamente lo de antes): \`paleta\` (una paleta nueva \`panelClaro\`: solo azules de marca, estrellas blancas, el planeta del color de la superficie, línea y anillos más tenues), \`contenedor\` (la escena mide su propio contenedor con un ResizeObserver en vez de la ventana, porque en los paneles scrollea \`<main>\`) y \`satelite\` (una capa SVG propia donde el satélite del logo recorre el anillo interior con \`animateMotion\` y se funde en las puntas; con \`prefers-reduced-motion\` no se dibuja). Los cometas pasan a "marcados": cola con brillo ancho más una línea fina, cabeza con halo.
+2. **El armazón.** \`LayoutPanel\` deja de usar \`HorizonteOrbita\` y toda la medición del encabezado (\`.rvp-con-banda\`, tope/evitar/piso, los observers). El cielo vive en una zona nueva (\`.rvp-zona\`, la caja de \`<main>\`, debajo del header) con la escena en los dos temas: oscuro como estaba (estrellas y cometas de Tienda); claro con el planeta sobre un gradiente celeste que termina en la superficie. El planeta queda quieto porque la ventana no scrollea: el ápice del horizonte va al 72 % de la caja (86 % en celular), como en la landing.
+3. **Tintas sobre el fondo.** En claro, adentro de \`.rvp-main\`: \`--color-muted\` a #5B6B80, \`--rv-tinta-fondo\` igual al texto y un token nuevo \`--rv-tinta-link\` para links y botones fantasma sueltos. Cinco textos sueltos de los módulos que no llegaban a AA sobre la línea del horizonte pasaron a esas tintas (Espacios, Apariencia y el "Ver agenda" del Resumen de Turnos; "Ves N de M" de Alumnos de Gimnasio).
+4. **Lo que se verificó.** Capturas de los tres paneles a 1280 y 390, claro y oscuro, con y sin scroll; un script de contraste píxel a píxel (modo claro, tres posiciones de scroll, más el peor caso teórico contra el píxel más oscuro del cielo) sobre 60 pantallas × 2 anchos: 0 textos por debajo de AA; el peor par es el gris del cuerpo sobre la línea del horizonte, 5,0:1. Con \`prefers-reduced-motion\`: sin cometas ni satélite. Consola sin errores. \`HorizonteOrbita.tsx\` sigue en el repo para el comparador \`/fondos-demo\`.
+
+Cómo quedó al scrollear y en Gimnasio a 390:
+
+![Con scroll · 1280](/auditoria/modulos/gimnasio/fondo-scroll-despues-1280.webp)
+![Gimnasio · 390](/auditoria/modulos/gimnasio/fondo-gimnasio-despues-390.webp)
+
+Lo que queda para que decida Ale está en la decisión "Fondo claro: ajustes": cometas que cruzan detrás del texto, la altura del horizonte, qué tan presentes van las estrellas, las bandas del resplandor y la franja de 40 px de la demo de Turnos.`,
+    antes: { 1280: 'fondo-antes-1280.webp', 390: 'fondo-antes-390.webp' },
+    despues: { 1280: 'fondo-despues-1280.webp', 390: 'fondo-despues-390.webp' },
+    archivos: [
+      'apps/web/src/design-system/EscenaEspacial.tsx:84',
+      'apps/web/src/design-system/EscenaEspacial.tsx:234',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:63',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:72-75',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:529',
+      'apps/web/src/modules/turnos/admin/KPIs.tsx:189',
+      'apps/web/src/modules/turnos/admin/Espacios.tsx:37',
+      'apps/web/src/modules/turnos/admin/configuracion/Apariencia.tsx:532',
+      'apps/web/src/modules/gimnasio/admin/Socios.tsx:49',
+      'apps/web/src/pages/fondos-demo.tsx:15',
+    ],
+  }),
 ]
