@@ -2171,4 +2171,34 @@ Lo que queda para que decida Ale está en la decisión "Fondo claro: ajustes": c
       'apps/web/src/pages/fondos-demo.tsx:15',
     ],
   }),
+
+  entrada({
+    modulo: 'gimnasio', fecha: F3, slug: 'fundido-de-tema', tipo: 'diseño', quien: 'Ale', transversal: true,
+    titulo: 'Transversal: el cambio de tema se funde en vez de cortar: la noche baja desde arriba y el día sube desde el horizonte',
+    foco: 'Pedido de Ale del 03/11 ("sumaría una transición de lo que es modo claro a oscuro para hacerlo más limpio y bonito"). Al tocar la luna o el sol, el navegador fotografía la pantalla y la nueva se revela encima con una máscara degradada tan alta como la pantalla: cuando anochece, la noche baja desde el encabezado; cuando amanece, la luz sube desde el horizonte, donde está el planeta. 640 ms, sin borde visible; el botón responde en el acto.',
+    que: `Antes, al tocar la luna el cuadro siguiente ya era el oscuro: un corte. Ahora es un fundido con dirección. Las capturas de "después" son el mismo instante, 320 ms después del toque, con la noche a mitad de camino.
+
+1. **Cómo se hace.** \`conFundidoDeTema\` (\`hooks/useDarkMode\`) envuelve el cambio en una View Transition: el navegador fotografía la pantalla como está, React aplica el tema nuevo adentro de \`flushSync\` y la foto vieja queda quieta abajo mientras la pantalla nueva se revela encima. Mientras dura, \`<html>\` lleva \`data-tema-fundido="anochece"\` o \`"amanece"\` y las reglas viven en \`globals.css\` ("Cambio de tema con fundido"). Donde no existe la API (Safari anterior al 18, Firefox anterior al 144) el cambio es instantáneo, como antes. El armazón de los tres paneles la usa desde el botón del tema; el panel de Tienda sigue con el corte (es una decisión, ver abajo).
+2. **La máscara.** Un degradado de tres pantallas de alto (un tercio opaco, uno degradado, uno transparente) que se desplaza con \`mask-position\`: nunca hay un borde, se ve como una penumbra que baja o una claridad que sube. 640 ms con la curva estándar del panel (cubic-bezier 0.4, 0, 0.2, 1), arrancando y terminando suave. Con \`prefers-reduced-motion\`, un fundido parejo de 220 ms sin dirección.
+3. **El botón.** Va en su propia capa de la transición (\`view-transition-name: rvp-tema\`): el sol y la luna se cruzan ahí mismo en 250 ms y el ícono nuevo entra girando, así el toque responde en el acto aunque el resto tarde más.
+4. **Lo que se verificó.** Cuadros congelados de la transición a 0, 160, 320, 480 y 640 ms (pausando las animaciones de los pseudo-elementos \`::view-transition\` y fijando su tiempo) a 1280 y 390, en los dos sentidos; el atributo se limpia al terminar; consola sin errores nuevos (el 401 de la demo ya estaba). Cinco tests del helper: sin API cambia al instante; con API marca la dirección, cambia adentro y limpia; dos toques seguidos no se pisan; una transición salteada también limpia. Gotcha: el compilador de CSS colapsa un \`animation\` sin nombre a \`animation: none\` y pierde la duración, por eso van los longhands.
+
+Cuatro tiempos del anochecer, el amanecer a la mitad y el celular:
+
+![Anochece · cuatro tiempos · 1280](/auditoria/modulos/gimnasio/tema-cuadros-despues-1280.webp)
+![Amanece a los 320 ms · 1280](/auditoria/modulos/gimnasio/tema-amanece-despues-1280.webp)
+![Anochece · cuatro tiempos · 390](/auditoria/modulos/gimnasio/tema-cuadros-despues-390.webp)
+
+Lo que queda a gusto de Ale (punto 6 de la decisión "Fondo claro: ajustes"): la dirección y la duración, y si el panel de Tienda también lo toma.`,
+    antes: { 1280: 'tema-antes-1280.webp', 390: 'tema-antes-390.webp' },
+    despues: { 1280: 'tema-despues-1280.webp', 390: 'tema-despues-390.webp' },
+    archivos: [
+      'apps/web/src/hooks/useDarkMode.ts:71',
+      'apps/web/src/styles/globals.css:287',
+      'apps/web/src/styles/globals.css:320',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:146',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:510',
+      'apps/web/src/hooks/__tests__/useDarkMode.test.ts:1',
+    ],
+  }),
 ]

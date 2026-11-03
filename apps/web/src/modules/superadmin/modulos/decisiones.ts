@@ -195,18 +195,21 @@ export const DECISIONES: Entrada[] = [
   decisionAbierta({
     modulo: 'gimnasio', slug: 'fondo-claro-ajustes', decide: 'Ale', transversal: true, fecha: '2026-11-03',
     titulo: 'Transversal: fondo claro de los paneles, ajustes que quedan a gusto de Ale',
-    foco: 'El planeta como la landing ya está en los tres paneles en claro (entrada "el fondo claro de los paneles es el planeta…"); cinco detalles de gusto quedan para mirarlos en vivo: los cometas detrás del texto, la altura del horizonte, qué tan presentes van las estrellas, las bandas del resplandor y la franja de 40 px de la demo de Turnos.',
+    foco: 'El planeta como la landing ya está en los tres paneles en claro (entrada "el fondo claro de los paneles es el planeta…"); seis detalles de gusto quedan para mirarlos en vivo: los cometas detrás del texto, la altura del horizonte, qué tan presentes van las estrellas, las bandas del resplandor, la franja de 40 px de la demo de Turnos y el fundido al cambiar de tema.',
     propuesta: `1. **Cometas detrás del texto suelto.** Cruzan un instante por detrás del encabezado (como ya pasa en oscuro). Si molesta: apagarlos cerca del encabezado o acotarlos al tercio superior del cielo.
 2. **Altura del horizonte.** Quedó como en la landing: el ápice al 72 % de la caja de \`<main>\` (86 % en celular). Alternativa: más abajo (~80 %) para ver más cielo y menos planeta.
 3. **Estrellas.** Blancas y muy sutiles sobre el celeste, a propósito. Más presentes = un toque azul, con el riesgo del "polvo" que ya se descartó.
 4. **Resplandor del horizonte.** Va en las seis bandas de la landing; en claro los escalones se notan un poco. Alternativa: más bandas (más suave) a costa de un par de trazos más por cuadro.
-5. **La franja de 40 px de la demo de Turnos.** El armazón reserva \`--rv-tope\` para la tira de la demo, pero la demo de Turnos no la muestra: a 1280 queda una franja blanca abajo (ya pasaba antes del fondo nuevo). Alternativa: que Turnos muestre su BarraDemo como Alquileres y Gimnasio, o que el armazón reciba el tope como prop.`,
+5. **La franja de 40 px de la demo de Turnos.** El armazón reserva \`--rv-tope\` para la tira de la demo, pero la demo de Turnos no la muestra: a 1280 queda una franja blanca abajo (ya pasaba antes del fondo nuevo). Alternativa: que Turnos muestre su BarraDemo como Alquileres y Gimnasio, o que el armazón reciba el tope como prop.
+6. **El fundido al cambiar de tema.** La noche baja desde arriba y el día sube desde el horizonte, en 640 ms (entrada "el cambio de tema se funde en vez de cortar"). Alternativas: un fundido parejo sin dirección, más corto (~400 ms), o que el panel de Tienda también lo tome (el botón del Header usa el mismo hook: es envolver una línea con \`conFundidoDeTema\`).`,
     abierta: 'Son de gusto y se deciden mirando los paneles en vivo (localhost, los tres en claro): ninguna tiene una respuesta técnica mejor que otra.',
     origen: 'QA del fondo claro del 03/11/2026 (capturas y contraste en el scratchpad de la sesión; las finales en la entrada).',
     archivos: [
       'apps/web/src/design-system/EscenaEspacial.tsx:234',
       'apps/web/src/design-system/reservas/LayoutPanel.tsx:529',
       'apps/web/src/design-system/reservas/LayoutPanel.tsx:63',
+      'apps/web/src/styles/globals.css:287',
+      'apps/web/src/hooks/useDarkMode.ts:71',
     ],
   }),
 ]
