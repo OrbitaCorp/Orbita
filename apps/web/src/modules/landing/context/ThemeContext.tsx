@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { conFundidoDeTema } from '@/hooks/useDarkMode';
 
 interface ThemeContextValue {
   isDark:      boolean;
@@ -16,6 +17,15 @@ const CLAVE = 'orbita-theme-landing';
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
+// La clase del tema en <html>, separada del estado: el fundido la necesita
+// puesta adentro de la View Transition (toggleTheme) y el efecto de abajo la
+// repone cuando el estado cambia por otro camino (la carga inicial).
+function aplicarClase(dark: boolean) {
+  const html = document.documentElement;
+  html.classList.toggle('dark', dark);
+  html.classList.toggle('light', !dark);
+}
+
 export function ThemeProvider({ children, forceDark = false }: { children: ReactNode; forceDark?: boolean }) {
   const [isDark, setIsDark] = useState(true); // oscuro por defecto (SSR-safe)
 
@@ -28,25 +38,27 @@ export function ThemeProvider({ children, forceDark = false }: { children: React
   }, [forceDark]);
 
   useEffect(() => {
-    const html = document.documentElement;
-    if (isDark) {
-      html.classList.add('dark');
-      html.classList.remove('light');
-    } else {
-      html.classList.remove('dark');
-      html.classList.add('light');
-    }
+    aplicarClase(isDark);
     // Con forceDark no se persiste ni se toca la preferencia guardada: esta
     // página no ofrece elegir, así que no debe pisar lo que el visitante haya
     // guardado para cuando SÍ vea una página con el toggle.
     if (!forceDark) localStorage.setItem(CLAVE, isDark ? 'dark' : 'light');
   }, [isDark, forceDark]);
 
+  // El cambio se funde en vez de cortar (pedido de Ale, 04/11/2026: "modo oscuro
+  // y claro para todo, home incluida, con ese efecto"): conFundidoDeTema envuelve
+  // la clase y el estado en una View Transition y globals.css ("Cambio de tema
+  // con fundido") hace bajar la noche desde arriba o subir el día desde abajo.
+  // Con forceDark, toggleTheme no hace nada en vez de habilitar un claro que la
+  // página no sostiene (no debería haber botón que lo dispare).
+  const toggleTheme = () => {
+    if (forceDark) return;
+    const siguiente = !isDark;
+    conFundidoDeTema(siguiente, () => { aplicarClase(siguiente); setIsDark(siguiente); });
+  };
+
   return (
-    // Con forceDark, toggleTheme queda de adorno (no debería llamarse porque no
-    // hay botón que lo dispare) pero por las dudas no hace nada en vez de
-    // habilitar un claro que la página no sostiene.
-    <ThemeContext.Provider value={{ isDark, toggleTheme: () => { if (!forceDark) setIsDark(d => !d); } }}>
+    <ThemeContext.Provider value={{ isDark, toggleTheme }}>
       {children}
     </ThemeContext.Provider>
   );

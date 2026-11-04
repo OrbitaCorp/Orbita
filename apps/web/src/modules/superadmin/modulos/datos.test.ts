@@ -11,8 +11,10 @@ import { parsearMarkdown } from '../MarkdownInforme'
 import { CICLO, PERSONAS, PLANES, semanaDelCiclo } from './plan'
 import { AVISO_SESION, ENTRADAS, type Entrada } from './entradas'
 import { DECISIONES, avisoAbierta } from './decisiones'
+import { CARPETAS_COMPARTIDAS, REGLAS_COMPARTIDO } from './compartido'
 
 const PUBLIC = fileURLToPath(new URL('../../../../public', import.meta.url))
+const RAIZ = fileURLToPath(new URL('../../../../../../', import.meta.url))
 const RE_ISO = /^\d{4}-\d{2}-\d{2}$/
 const RE_KEY = /^auditoria\.(turnos|alquileres|gimnasio)\.\d{4}-\d{2}-\d{2}-[a-z0-9]+(-[a-z0-9]+)*$/
 // `ruta:línea` o `ruta:desde-hasta`, desde la raíz del repo.
@@ -218,5 +220,24 @@ describe('Módulos — entradas y decisiones', () => {
 
   it('cada módulo con plan tiene al menos una entrada', () => {
     for (const p of PLANES) expect(TODAS.some((e) => e.modulo === p.modulo)).toBe(true)
+  })
+})
+
+describe('Módulos — lo compartido', () => {
+  it('cada carpeta compartida existe en el repo, con su archivo de reglas, y dice qué es, quién la usa y cómo se prueba', () => {
+    expect(CARPETAS_COMPARTIDAS.length).toBeGreaterThanOrEqual(4)
+    expect(new Set(CARPETAS_COMPARTIDAS.map((c) => c.ruta)).size).toBe(CARPETAS_COMPARTIDAS.length)
+    for (const c of CARPETAS_COMPARTIDAS) {
+      expect(c.ruta, c.ruta).toMatch(/^apps\/[A-Za-z0-9/_-]+\/$/)
+      expect(existsSync(`${RAIZ}${c.ruta}`), `falta la carpeta ${c.ruta}`).toBe(true)
+      expect(existsSync(`${RAIZ}${c.reglas}`), `${c.ruta}: falta ${c.reglas}`).toBe(true)
+      for (const texto of [c.nombre, c.que, c.usan, c.probar]) expect(texto.trim().length).toBeGreaterThan(10)
+    }
+  })
+
+  it('las reglas son varias, cada una de una frase o dos, y la primera dice que un cambio es para los tres', () => {
+    expect(REGLAS_COMPARTIDO.length).toBeGreaterThanOrEqual(4)
+    for (const r of REGLAS_COMPARTIDO) expect(r.trim().length).toBeGreaterThan(40)
+    expect(REGLAS_COMPARTIDO[0]).toMatch(/Turnos, Alquileres y Gimnasio a la vez/)
   })
 })

@@ -323,6 +323,17 @@ html[data-tema-fundido='amanece']::view-transition-new(root) {
 @media (prefers-reduced-motion: reduce) {
   html[data-tema-fundido]::view-transition-new(root) { animation: 220ms ease both temaFundido; mask-image: none; }
 }
+/* El botón que dispara el cambio va en su propia capa de la transición: el sol
+   y la luna se cruzan ahí mismo y el ícono nuevo entra girando, así el toque
+   responde en el acto aunque el resto tarde más. Uno solo por pantalla: dos
+   elementos pintados con el mismo nombre anulan la transición entera (los que
+   están en display: none no cuentan). Lo usan el Header del panel, el navbar de
+   la landing y la cabecera de la tienda; los paneles de reservas tienen el suyo
+   (.rvp-tema). */
+.tema-boton { view-transition-name: tema-boton; }
+@keyframes temaBotonIco { from { opacity: 0; transform: rotate(-45deg) scale(0.6); } }
+html[data-tema-fundido] .tema-boton > svg { animation: temaBotonIco 360ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+@media (prefers-reduced-motion: reduce) { html[data-tema-fundido] .tema-boton > svg { animation: none; } }
 
 /* ─── Interacción estándar (hover / active / focus) ──────────────────────
    El panel se estila inline, donde :hover de CSS no llega — este bloque es

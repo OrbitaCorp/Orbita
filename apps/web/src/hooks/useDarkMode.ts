@@ -25,7 +25,8 @@ function prefiereSistemaOscuro(): boolean {
   return window.matchMedia('(prefers-color-scheme: dark)').matches
 }
 
-function esOscuro(tema: TemaPreferencia): boolean {
+/** Si una preferencia (claro, oscuro o sistema) termina en oscuro ahora mismo. */
+export function esOscuro(tema: TemaPreferencia): boolean {
   return tema === 'dark' || (tema === 'system' && prefiereSistemaOscuro())
 }
 

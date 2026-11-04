@@ -102,11 +102,15 @@ export function PaginaV2({ children, scrollKey, planeta = true }: { children: Re
         };
     }, [scrollKey]);
 
-    // forceDark: se sacó el modo claro de estas páginas — el diseño está
-    // pensado en oscuro (fondo espacial, planeta) y el claro quedaba como una
-    // versión de segunda, no una alternativa real.
+    // Oscuro por defecto y claro a elección (pedido de Ale, 04/11/2026: "modo
+    // oscuro y claro para todo, tanto home y demás"): el ThemeContext arranca
+    // en oscuro, el claro solo si el visitante lo eligió con el botón del
+    // navbar, y el cambio se funde (conFundidoDeTema). Del 06/09 al 04/11 estas
+    // páginas fueron solo oscuras (forceDark) porque el claro de entonces
+    // quedaba como una versión de segunda; la paleta clara de abajo es la que
+    // volvió a revisarse para esto.
     return (
-        <ThemeProvider forceDark>
+        <ThemeProvider>
             <div className="oc-page relative min-h-screen" style={{ background: 'var(--oc-bg)' }}>
                 <style>{`
                     /* ── Paleta ───────────────────────────────────────────────
@@ -147,17 +151,18 @@ export function PaginaV2({ children, scrollKey, planeta = true }: { children: Re
                         --oc-ghost-bd:      rgba(255,255,255,.16);
                         --oc-ghost-hover:   rgba(255,255,255,.10);
                     }
-                    /* Este bloque queda sin efecto mientras <ThemeProvider forceDark>
-                       esté activo arriba: html nunca lleva la clase "light", así
-                       que esta paleta no se aplica. Se deja escrita (no se borra)
-                       por si el modo claro vuelve a habilitarse más adelante — de
-                       lo contrario habría que rehacer estos valores de cero. */
+                    /* La paleta clara: aplica cuando el visitante elige claro
+                       (html.light, puesto por el ThemeContext de la landing).
+                       Texto principal #0f172a y secundario #334155 sobre #f6f8fc:
+                       los dos arriba de 4,5:1. */
                     html.light .oc-page {
                         --oc-bg:            #f6f8fc;
                         --oc-text:          #0f172a;
                         --oc-text-2:        #334155;
                         --oc-text-3:        #475569;
-                        --oc-text-4:        #64748b;
+                        /* #64748b daba 4,48:1 sobre #f6f8fc (justo abajo de AA):
+                           un punto más oscuro, 5,2:1. */
+                        --oc-text-4:        #5b6b80;
                         --oc-title-2:       #2563eb;
                         --oc-card-bg:       rgba(255,255,255,.86);
                         --oc-card-bd:       rgba(15,23,42,.10);

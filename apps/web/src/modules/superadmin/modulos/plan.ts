@@ -107,6 +107,7 @@ const TUR27 = (slug: string) => `auditoria.turnos.2026-10-27-${slug}`
 const GIM27 = (slug: string) => `auditoria.gimnasio.2026-10-27-${slug}`
 // Las del backend compartido de reservas (03/11).
 const GIM3 = (slug: string) => `auditoria.gimnasio.2026-11-03-${slug}`
+const GIM4 = (slug: string) => `auditoria.gimnasio.2026-11-04-${slug}`
 const ALQ3 = (slug: string) => `auditoria.alquileres.2026-11-03-${slug}`
 
 // ─── Turnos · Mateo ───────────────────────────────────────────────────────────
@@ -322,7 +323,7 @@ const GIMNASIO = plan('gimnasio', 'Gimnasio', 'Ale',
     documentada(t('2026-11-02', 'Ale', 'Transversal: backend compartido de reservas, modelo y migración (tablas reservas_*, restricción de exclusión, RLS y permisos)', 'Migración aplicada en dev, prisma validate en verde, las siete tablas con RLS y los tres permisos repartidos'), GIM3('backend-compartido-de-reservas')),
     documentada(t('2026-11-03', 'Ale', 'Transversal: backend compartido de reservas, el motor (candado por recurso, retenciones que vencen, cancelación con lista de espera, reprogramación) y sus tests', 'Unitarios y e2e en verde contra dev: seis pedidos simultáneos entran uno; ocho personas por tres lugares entran tres'), GIM3('backend-compartido-de-reservas')),
     documentada(t('2026-11-03', 'Ale', 'Transversal: rutas del panel y del sitio de reservas, cliente tipado en lib/reservasApi y contrato en el README del módulo', 'Las rutas de /reservas y /storefront/:slug/reservas responden; lib/reservasApi compila y sus tests pasan; el README dice cómo las usa cada módulo'), GIM3('backend-compartido-de-reservas')),
-    t('2026-11-04', 'Ale', 'Transversal: desplegar el backend compartido de reservas (migración en producción y deploy.sh), cuando Ale lo decida', 'Migración 20261103120000_reservas aplicada en producción con prisma-prod.sh y Cloud Run sirviendo la revisión que responde /reservas'),
+    documentada(t('2026-11-04', 'Ale', 'Transversal: todo a producción con Turnos, Alquileres y Gimnasio en Próximamente: main en Vercel, la migración de reservas con prisma-prod.sh y la API con deploy.sh', 'Migración 20261103120000_reservas aplicada en producción con prisma-prod.sh, Cloud Run sirviendo la revisión que responde /reservas y el alta real mostrando los tres módulos como Próximamente'), GIM4('a-produccion-con-proximamente')),
     t('2026-11-16', 'Ale', 'Gimnasio sobre el backend compartido: las clases con cupo como recursos CLASE con sus sesiones en el horario', 'Las clases del panel se crean con POST/PUT de /reservas/recursos y la grilla del sitio sale de GET disponibilidad con cupo y libres'),
     t('2026-11-17', 'Ale', 'Gimnasio sobre el backend compartido: reservar un lugar con cantidad y la lista de espera con /espera', 'Con la clase llena el sitio ofrece la lista de espera; al cancelar uno, el primero toma el lugar y recibe su email'),
     t('2026-11-18', 'Ale', 'Gimnasio: la página /mi-clase/<token> del sitio y Mis clases sobre /mi/:token', 'Desde el enlace del email se ve y se cancela el lugar según la política del negocio'),

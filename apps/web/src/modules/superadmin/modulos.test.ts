@@ -265,6 +265,18 @@ describe('Modulos — se pinta en el servidor', () => {
     expect(html).toContain('Sin plan en este ciclo.')
   })
 
+  it('lo compartido entre los tres módulos: abierto en la lista, plegado y con la nota al responsable dentro de un módulo', () => {
+    const lista = pintar({})
+    expect(lista).toContain('Lo compartido entre Turnos, Alquileres y Gimnasio')
+    expect(lista).toContain('aria-expanded="true"')
+    expect(lista).toContain('apps/api/src/reservas/')
+    const turnos = pintar({ modulo: 'turnos' })
+    expect(turnos).toContain('Turnos no vive solo:')
+    expect(turnos).toContain('Alquileres (Alan) y Gimnasio (Ale)')
+    expect(turnos).toContain('aria-expanded="false"')
+    expect(turnos).toContain('Ver carpetas y reglas')
+  })
+
   it('el plan, la auditoría y el resumen de un módulo', () => {
     expect(pintar({ modulo: 'gimnasio' })).toContain('Semana 1 · Lib de reservas y esqueleto de Módulos')
     const auditoria = pintar({ modulo: 'gimnasio', vista: 'auditoria' })

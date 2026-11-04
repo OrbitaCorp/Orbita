@@ -151,6 +151,8 @@ const F = '2026-10-26'
 const F27 = '2026-10-27'
 // El backend compartido de reservas (sesión del 03/11/2026).
 const F3 = '2026-11-03'
+// Lo que Ale decidió el 04/11/2026: a producción.
+const F4 = '2026-11-04'
 
 export const ENTRADAS: Entrada[] = [
   // ─── Transversal · la sección Módulos ───────────────────────────────────────
@@ -2277,6 +2279,38 @@ Lo que no entró y queda como decisión abierta ("cosas con stock"): alquilar ob
       'apps/web/src/modules/alquileres/storefront/Reserva.tsx:342',
       'apps/web/src/modules/alquileres/storefront/Home.tsx:282',
       'apps/web/src/modules/alquileres/onboarding/pasos.tsx:1',
+    ],
+  }),
+
+  // ─── 04/11/2026: a producción ───────────────────────────────────────────────
+  entrada({
+    modulo: 'gimnasio', fecha: F4, slug: 'a-produccion-con-proximamente', tipo: 'decisión', quien: 'Ale', transversal: true,
+    titulo: 'Transversal: todo a producción con los módulos en Próximamente, el fundido del tema en todo Órbita y lo compartido a la vista',
+    foco: 'Ale decidió el 04/11 mandar la rama entera a producción: Turnos, Alquileres y Gimnasio salen en el alta real como "Próximamente" (no se pueden elegir), el backend compartido se migra y se despliega, el cambio de tema se funde en el home, el panel, la tienda y los paneles, y Módulos muestra qué carpetas comparten los tres y las reglas para tocarlas.',
+    que: `Hasta hoy todo esto vivía en la rama \`feat/turnos-visual\` y se veía solo en localhost; Ale pidió verlo en producción y dejar claro al equipo qué es compartido.
+
+1. **A producción.** La rama entera (los tres paneles al estándar de Órbita, el kit, el backend compartido de reservas, el fondo claro, el fundido, las siluetas de carga y el Alquileres ampliado) se mergea a \`main\`: Vercel publica el frontend, \`prisma-prod.sh migrate deploy\` aplica \`20261103120000_reservas\` en producción y \`deploy.sh\` sube la API. Las demos (\`/turnos-demo\`, \`/alquileres-demo\`, \`/gimnasio-demo\`) siguen dando 404 en producción y los tres módulos siguen en \`MODULOS_PROXIMAMENTE\`: en el alta real se ven con el chip "Próximamente" y borde punteado, y no se pueden elegir. Tienda no cambia.
+2. **El fundido del tema en todo Órbita.** \`conFundidoDeTema\` ya no es solo de los paneles de reservas: lo usan el botón del Header y el selector de Mi Perfil del panel de Tienda, el botón nuevo del navbar del home (y de /nosotros, /planes y /tiendas), el de la tienda pública y la vista previa de Apariencia. La clase \`tema-boton\` le da al botón su propia capa en la transición: el sol y la luna se cruzan ahí mismo mientras la noche baja o el día sube. Y el home recupera el modo claro (del 06/09 al 04/11 fue solo oscuro): oscuro por defecto, claro si el visitante lo elige, con la paleta clara de \`PaginaV2\` y el script anti-flash leyendo la clave de la landing para que no parpadee al cargar.
+3. **Lo compartido, a la vista.** Debajo de las tarjetas de Módulos y dentro de cada módulo (plegada, con la nota para su responsable: "Turnos no vive solo: estas carpetas son también de Alquileres (Alan) y Gimnasio (Ale)") una tarjeta dice qué cuatro carpetas comparten los tres (\`apps/api/src/reservas\`, \`lib/reservasApi\`, \`lib/reservas\` y \`design-system/reservas\`), qué vive en cada una, quiénes la usan, dónde están sus reglas (los README) y cómo se prueba, más las cinco reglas para tocarlas. Los datos viven en \`modulos/compartido.ts\` y el test de datos verifica que cada ruta exista en el repo.
+4. **Lo que se verificó.** Typecheck y tests de la web y de la API; el fundido a mano en el home (claro y oscuro, 1280 y 390), en el panel de Tienda y en la tienda pública; el alta real con los tres módulos como Próximamente; la tarjeta de lo compartido en la lista y dentro de un módulo.`,
+    decision: 'Todo a producción ahora, con Turnos, Alquileres y Gimnasio en "Próximamente" en el alta real; el fundido del tema en todas las superficies, home incluida (que recupera el modo claro); y la tarjeta de lo compartido en Módulos. Quedan abiertos los puntos 1 a 5 de "lo que el backend compartido deja para decidir" (cobro de la seña, devolución, WhatsApp, recordatorio y habilitar los módulos) y los cinco ajustes de gusto del fondo claro.',
+    porque: 'Pedido de Ale del 04/11/2026: "mandá todo a producción", "en superadmin aclará que lo de reservas es compartido, la carpeta donde se guardan las reglas, que si actualizan algo lo actualizan para todos, a cada uno para que sepan", "los carteles de estos módulos en el wizard que digan Próximamente" y "lo de modo oscuro y claro para todo es así, tanto home y demás, mejoradísimo y con ese efecto". Con el superadmin en producción, Ale y el equipo ven Módulos sin levantar localhost; con los módulos en Próximamente nadie puede crear un negocio de reservas hasta que cada responsable conecte el suyo.',
+    archivos: [
+      'apps/web/src/modules/onboarding/alta/modelo.ts:67',
+      'apps/api/prisma/migrations/20261103120000_reservas/migration.sql:1',
+      'apps/web/src/modules/superadmin/modulos/compartido.ts:29',
+      'apps/web/src/modules/superadmin/modulos/compartido.ts:64',
+      'apps/web/src/modules/superadmin/Modulos.tsx:483',
+      'apps/web/src/hooks/useDarkMode.ts:29',
+      'apps/web/src/layouts/components/Header.tsx:124',
+      'apps/web/src/modules/ventas/panel/perfil/MiPerfil.tsx:86',
+      'apps/web/src/modules/landing/context/ThemeContext.tsx:54',
+      'apps/web/src/modules/landing/components/v2/PaginaV2.tsx:113',
+      'apps/web/src/modules/landing/components/v2/NavbarV2.tsx:194',
+      'apps/web/src/hooks/useStorefrontTheme.ts:36',
+      'apps/web/src/lib/storefront/previewBridge.ts:150',
+      'apps/web/src/lib/csp.ts:67',
+      'apps/web/src/styles/globals.css:333',
     ],
   }),
 ]
