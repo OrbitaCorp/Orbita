@@ -16,7 +16,8 @@ import { horaTxt, pesos, recursosDe, semanaDe, type RubroTurnos } from '@/module
 import type { FormaSitio } from '@/modules/turnos/datos/negocio'
 import { AHORA_DEMO, HOY_SEMANA, estadoA, tramosDelDia } from '@/modules/turnos/horario'
 import { HOY as HOY_FECHA, esHoy, fechaCortaRelativa, nombreDia, nombreDiaCorto, proximosDias, sumarDias } from './reserva/calendario'
-import { temaDe, type TemaNegocio } from './tema'
+import { conModo, temaDe, type TemaNegocio } from './tema'
+import { useModoSitio } from '@/design-system/reservas/modoSitio'
 
 // ─── El "ahora" de la demo ───────────────────────────────────────────────────
 // Todo el sitio cuenta la misma escena que la reserva y el panel: sábado
@@ -65,7 +66,10 @@ export const useForma = () => useContext(FormaCtx)
  * Configuración (plantilla, horarios) ya viene pegado al rubro (useRubroDemo).
  */
 export function useTema(rubro: RubroTurnos): TemaNegocio {
-  return useMemo(() => temaDe(rubro), [rubro])
+  const base = useMemo(() => temaDe(rubro), [rubro])
+  // El visitante puede dar vuelta el modo de la plantilla (sol o luna de la cabecera).
+  const oscuro = useModoSitio('turnos', base.oscuro)
+  return useMemo(() => conModo(base, oscuro), [base, oscuro])
 }
 
 /** La marca del negocio en chico: su logo si lo cargó; si no, el monograma con las iniciales. */

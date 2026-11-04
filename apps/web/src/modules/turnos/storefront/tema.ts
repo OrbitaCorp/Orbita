@@ -26,7 +26,7 @@
 import { semanaDe, type RubroTurnos, type FamiliaId } from '@/modules/turnos/datos'
 import { modalidadesRubro, type AparienciaDemo, type IdentidadDemo, type Modalidad } from '@/modules/turnos/datos/negocio'
 import { SEMANA_PARTIDA, type Semana } from '@/modules/turnos/horario'
-import { E_CLARO, E_OSCURO, aplicarPlantilla, esHex, lookDeFabrica, plantillasDe, type PlantillaSitio } from './plantillas'
+import { E_CLARO, E_OSCURO, aplicarPlantilla, esHex, lookDeFabrica, luzAmbiente, paletaEnModo, plantillasDe, type PlantillaSitio } from './plantillas'
 
 export type EstiloTema = 'estudio' | 'atelier' | 'clinica' | 'box' | 'taller'
 
@@ -311,6 +311,19 @@ export function temaDe(rubro: RubroTurnos): TemaNegocio {
   // El horario es uno solo para el sitio, la reserva y el panel: lo guardado en Configuración, lo
   // del alta o el de ejemplo, en ese orden (semanaDe).
   return { ...propio, horarios: semanaDe(rubro) }
+}
+
+/**
+ * El tema en el otro modo: el visitante tocó el sol o la luna (modoSitio del kit)
+ * sobre una plantilla que es de noche o de día. Cambian la paleta, los colores de
+ * estado y la luz ambiente; la tipografía, la composición, las formas, la textura
+ * y las fotos siguen siendo las de la plantilla. Con el modo propio del tema,
+ * devuelve el mismo objeto.
+ */
+export function conModo(t: TemaNegocio, oscuro: boolean): TemaNegocio {
+  if (t.oscuro === oscuro) return t
+  const c = paletaEnModo(t.c, oscuro)
+  return { ...t, oscuro, c, e: { ...(oscuro ? E_OSCURO : E_CLARO), acento: t.e.acento }, grad: luzAmbiente(c.primary, t.e.acento, oscuro) }
 }
 
 // La identidad de cada familia tal como la define este archivo, con el nombre que tiene en plantillas.ts.

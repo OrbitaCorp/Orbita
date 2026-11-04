@@ -2,8 +2,10 @@
 // reservar. Manda la marca del negocio: cada modo trae un tema (verde para
 // canchas, rosa para salones, terracota para alojamiento) que redefine los
 // tokens --color-* adentro de .als, así las piezas rv- se pintan solas.
-// Es claro siempre (es el sitio de un negocio, no una app), con fotos grandes
-// y una sola acción por pantalla: reservar.
+// Claro por defecto (es el sitio de un negocio, no una app), con fotos grandes
+// y una sola acción por pantalla: reservar. El visitante puede ponerlo en
+// oscuro con el sol o la luna de la cabecera (modoSitio del kit): los mismos
+// tokens, de noche, y el cambio se funde.
 //
 // Header fijo con el nombre y tres links; en celular, un botón de reservar
 // fijo al pie que no tapa el contenido: el sitio entero (pie incluido) deja
@@ -21,6 +23,7 @@ import { pesos } from '@/lib/reservas/precio'
 import type { GrupoNoches } from '@/lib/reservas/estadia'
 import { palabrasDe, type NegocioAlquiler, type TipoAlquiler } from '../datos'
 import { EstiloReservas } from '@/design-system/reservas/estilo'
+import { BotonTema, useModoSitio } from '@/design-system/reservas/modoSitio'
 
 export type PaginaSitio = 'inicio' | 'reserva' | 'mis-reservas'
 
@@ -47,9 +50,21 @@ export const CSS_SITIO = `
   .als[data-tipo='cancha'] { ${TEMAS.cancha} }
   .als[data-tipo='bloque'] { ${TEMAS.bloque} }
   .als[data-tipo='estadia'] { ${TEMAS.estadia} }
+  /* Oscuro, a elección del visitante: los neutros de noche y la marca de cada modo un punto más clara, para leerse sobre el fondo. */
+  .als[data-oscuro='true'] { color-scheme: dark;
+    --color-bg: #0F1217; --color-border: #2A323D; --color-border-strong: #3E4855; --color-text: #F1F5F9; --color-body: #CBD5E1; --color-muted: #9AA8BA; --color-subtle: #6B7A8C;
+    --color-success: #4ADE80; --color-success-bg: #14532D; --chip-success-fg: #86EFAC; --color-warning: #FBBF24; --color-warning-bg: #78350F; --chip-warning-fg: #FCD34D;
+    --color-error: #F87171; --color-error-bg: #7F1D1D; --chip-error-fg: #FCA5A5; }
+  .als[data-oscuro='true'][data-tipo='cancha'] { --color-primary: #4ADE80; --color-primary-h: #22C55E; --color-primary-bg: #14532D; --chip-primary-fg: #86EFAC; --color-on-primary: #052E16; --color-surface: #131C16; --color-surface-alt: #1A2620; }
+  .als[data-oscuro='true'][data-tipo='bloque'] { --color-primary: #F472B6; --color-primary-h: #EC4899; --color-primary-bg: #831843; --chip-primary-fg: #F9A8D4; --color-on-primary: #3B0A2A; --color-surface: #1D151B; --color-surface-alt: #2A1C25; }
+  .als[data-oscuro='true'][data-tipo='estadia'] { --color-primary: #FBBF24; --color-primary-h: #F59E0B; --color-primary-bg: #78350F; --chip-primary-fg: #FCD34D; --color-on-primary: #1C1206; --color-surface: #1B1711; --color-surface-alt: #27211A; }
+  /* Sol o luna (BotonTema del kit). */
+  .als-tema { width: 40px; height: 40px; flex-shrink: 0; border-radius: 8px; border: 1px solid var(--color-border); background: transparent; color: var(--color-body); display: grid; place-items: center; cursor: pointer; }
+  .als-tema:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  @media (hover: hover) { .als-tema:hover { border-color: var(--color-border-strong); color: var(--color-text); } }
   /* Solo los costados: si fuera "padding" entero, el pie (que también es .als-cont) perdía el aire de arriba y abajo en celular. */
   .als-cont { max-width: 1080px; margin: 0 auto; padding-inline: 24px; }
-  .als-header { position: sticky; top: var(--rv-tope, 0px); z-index: 50; background: rgba(255,255,255,0.92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--color-border); }
+  .als-header { position: sticky; top: var(--rv-tope, 0px); z-index: 50; background: color-mix(in srgb, var(--color-bg) 92%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--color-border); }
   .als-header-in { display: flex; align-items: center; gap: 16px; height: 64px; }
   .als-marca { display: flex; align-items: center; gap: 10px; min-height: 44px; text-decoration: none; color: var(--color-text); min-width: 0; }
   .als-marca:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 10px; }
@@ -171,10 +186,11 @@ export const CSS_SITIO = `
     .als-nav a { white-space: nowrap; }
     /* Lo que se toca con el dedo, de 44 px. */
     .als-nav a, .als-link, .als-hora { min-height: 44px; }
+    .als-tema { width: 44px; height: 44px; }
     /* La barra mide 10 + 48 + 10 px más el borde y el área segura del iPhone: todo el sitio deja ese lugar abajo. */
     /* --rv-pie es la variable del kit para que los avisos salgan encima de la barra. */
     .als[data-cta='true'] { --rv-pie: calc(64px + env(safe-area-inset-bottom)); padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
-    .als-cta-movil { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: rgba(255,255,255,0.94); backdrop-filter: blur(8px); border-top: 1px solid var(--color-border); gap: 10px; align-items: center; }
+    .als-cta-movil { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: color-mix(in srgb, var(--color-bg) 94%, transparent); backdrop-filter: blur(8px); border-top: 1px solid var(--color-border); gap: 10px; align-items: center; }
     .als-cta-movil > div { flex: 1; min-width: 0; font-size: 13px; color: var(--color-muted); }
     .als-cta-movil b { display: block; font-size: 14px; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .als-pasos { grid-template-columns: minmax(0, 1fr); }
@@ -198,6 +214,7 @@ interface Props {
 
 export default function Sitio({ negocio, pagina, cta, children }: Props) {
   const tipo = negocio.tipo
+  const oscuro = useModoSitio('alquileres', false)
   const sigla = negocio.nombre.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase()
   const nav: { id: PaginaSitio; label: string; fijo?: boolean }[] = [
     { id: 'inicio', label: 'Inicio' },
@@ -206,7 +223,7 @@ export default function Sitio({ negocio, pagina, cta, children }: Props) {
   ]
   const ctaAncho = { flex: cta?.sub ? '0 0 auto' : 1 }
   return (
-    <div className="rv als" data-tipo={tipo} data-cta={cta ? true : undefined}>
+    <div className="rv als" data-tipo={tipo} data-oscuro={oscuro || undefined} data-cta={cta ? true : undefined}>
       <EstiloReservas />
       <style>{CSS_SITIO}</style>
       <header className="als-header">
@@ -218,6 +235,7 @@ export default function Sitio({ negocio, pagina, cta, children }: Props) {
           <nav className="als-nav" aria-label="Secciones del sitio">
             {nav.map(n => <Link key={n.id} href={ruta(n.id, tipo)} aria-current={pagina === n.id ? 'page' : undefined} data-fijo={n.fijo || undefined} data-accion={n.id === 'reserva' || undefined}>{n.label}</Link>)}
           </nav>
+          <BotonTema modulo="alquileres" oscuro={oscuro} className="als-tema" />
         </div>
       </header>
       <main className="als-main">{children}</main>

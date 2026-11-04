@@ -71,13 +71,33 @@ const canales = (hex: string): [number, number, number] | null => {
  * dorado quedaba por debajo de 4,5:1.
  */
 export function textoSobre(hex: string): string {
+  return luminancia(hex) > 0.179 ? '#111111' : '#FFFFFF'
+}
+
+/** Luminancia relativa (0 a 1, la de WCAG); un color que no es hex vale 0. */
+export function luminancia(hex: string): number {
   const c = canales(hex)
-  if (!c) return '#FFFFFF'
+  if (!c) return 0
   const [r, g, b] = c.map(v => {
     const x = v / 255
     return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4
   })
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.179 ? '#111111' : '#FFFFFF'
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+/** Contraste entre dos colores (1 a 21). AA pide 4,5 para texto. */
+export function contraste(a: string, b: string): number {
+  const la = luminancia(a), lb = luminancia(b)
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05)
+}
+
+/** El color, corrido hacia el negro o el blanco lo justo para leerse (4,5:1) sobre ese fondo. */
+export function legibleSobre(color: string, fondo: string): string {
+  if (!esHex(color) || !esHex(fondo)) return color
+  const hacia = luminancia(fondo) > 0.179 ? '#000000' : '#FFFFFF'
+  let c = color
+  for (let k = 0.07; k <= 0.85 && contraste(c, fondo) < 4.5; k += 0.07) c = mezclar(color, hacia, k)
+  return c
 }
 
 export const esHex = (s: string) => /^#[0-9a-f]{6}$/i.test(s)
@@ -89,7 +109,12 @@ export function mezclar(a: string, b: string, t: number): string {
   return '#' + ca.map((v, i) => Math.round(v + (cb[i] - v) * t).toString(16).padStart(2, '0')).join('').toUpperCase()
 }
 
-const rgba = (hex: string, alfa: number) => { const c = canales(hex); return c ? `rgba(${c[0]},${c[1]},${c[2]},${alfa})` : hex }
+export const rgba = (hex: string, alfa: number) => { const c = canales(hex); return c ? `rgba(${c[0]},${c[1]},${c[2]},${alfa})` : hex }
+
+/** La luz ambiente del hero y del cierre: dos degradés con la marca y el acento, más presentes de noche. */
+export function luzAmbiente(primary: string, acento: string, oscuro: boolean): string {
+  return `radial-gradient(880px 470px at 88% -4%, ${rgba(primary, oscuro ? 0.2 : 0.14)}, transparent 62%), radial-gradient(680px 410px at 0% 104%, ${rgba(acento, oscuro ? 0.16 : 0.13)}, transparent 60%)`
+}
 
 /** La paleta de una plantilla con otro color de acento: recalcula lo que depende de él. */
 export function paletaCon(p: Paleta, color: string): Paleta {
@@ -98,6 +123,29 @@ export function paletaCon(p: Paleta, color: string): Paleta {
   // Si el fondo de la plantilla no es un hex (no pasa hoy), el tinte cae al color con transparencia.
   const tinte = canales(p.bg) ? mezclar(color, p.bg, 0.86) : `color-mix(in srgb, ${color} 14%, transparent)`
   return { ...p, primary: color, primaryH: mezclar(color, sobre === '#FFFFFF' ? '#000000' : '#FFFFFF', 0.14), onPrimary: sobre, primaryBg: tinte }
+}
+
+// La paleta de una plantilla dada vuelta: el visitante eligió claro sobre una
+// plantilla oscura (o al revés). Los neutros son una base de noche o de día con
+// un tinte leve del color de marca (no un gris cualquiera: "la misma marca, de
+// noche"), y la marca se corre lo justo para leerse sobre el fondo nuevo (un
+// dorado sobre blanco se oscurece; un bordó sobre negro se aclara). El texto,
+// el cuerpo y el apagado pasan AA sobre bg y surface.
+const BASE_NOCHE = { bg: '#0E0F12', surface: '#15171C', surfaceAlt: '#1D2026', border: '#2B2F37', text: '#F4F4F1', body: '#C9CCC8', muted: '#9CA3A0' }
+const BASE_DIA = { bg: '#FAFAF8', surface: '#FFFFFF', surfaceAlt: '#F1F2EF', border: '#E2E4DF', text: '#141412', body: '#3B3D39', muted: '#5F6660' }
+export function paletaEnModo(p: Paleta, oscuro: boolean): Paleta {
+  const base = oscuro ? BASE_NOCHE : BASE_DIA
+  const marca = esHex(p.primary) ? p.primary : (oscuro ? '#FFFFFF' : '#111111')
+  const bg = mezclar(base.bg, marca, 0.05)
+  const surface = mezclar(base.surface, marca, 0.03)
+  const surfaceAlt = mezclar(base.surfaceAlt, marca, 0.08)
+  const border = mezclar(base.border, marca, 0.12)
+  const primary = legibleSobre(marca, bg)
+  const sobre = textoSobre(primary)
+  return {
+    bg, surface, surfaceAlt, border, text: base.text, body: base.body, muted: base.muted,
+    primary, primaryH: mezclar(primary, sobre === '#FFFFFF' ? '#000000' : '#FFFFFF', 0.14), onPrimary: sobre, primaryBg: mezclar(primary, bg, 0.86),
+  }
 }
 
 // Estados sobre fondo oscuro y sobre fondo claro (todos ≥ 4.5:1 contra bg y surface).
@@ -492,7 +540,7 @@ export function aplicarPlantilla(t: TemaNegocio, p: PlantillaSitio, a: AjustesPl
     boton: formaBoton(radio), radio, c,
     fh: tipo.fh, fb: tipo.fb, mayus: tipo.mayus, pesoTitulo: tipo.peso, fuentes: tipo.google,
     e: { ...(p.oscuro ? E_OSCURO : E_CLARO), acento: p.acento },
-    grad: `radial-gradient(880px 470px at 88% -4%, ${rgba(c.primary, p.oscuro ? 0.2 : 0.14)}, transparent 62%), radial-gradient(680px 410px at 0% 104%, ${rgba(p.acento, p.oscuro ? 0.16 : 0.13)}, transparent 60%)`,
+    grad: luzAmbiente(c.primary, p.acento, p.oscuro),
     fotoHero: a.foto || p.foto || t.fotoHero,
   }
 }

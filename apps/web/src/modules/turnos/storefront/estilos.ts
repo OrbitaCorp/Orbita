@@ -256,6 +256,14 @@ export const CSS_SITIO = `
   .tu-nav + .tu-acciones { margin-left: 0; }
   .tu-hamb { width: 44px; height: 44px; border-radius: var(--tu-r-btn, 10px); border: 1px solid var(--color-border); background: transparent; color: inherit; display: grid; place-items: center; cursor: pointer; transition: background 160ms ease, border-color 160ms ease; }
   .tu-header[data-transparente="true"] .tu-hamb { border-color: rgba(255,255,255,.4); }
+  /* Sol o luna (BotonTema del kit): como la hamburguesa, 44 px con el radio del botón de la plantilla. */
+  .tu-tema { width: 44px; height: 44px; flex-shrink: 0; border-radius: var(--tu-r-btn, 10px); border: 1px solid var(--color-border); background: transparent; color: inherit; display: grid; place-items: center; cursor: pointer; transition: background 160ms ease, border-color 160ms ease; }
+  .tu-header[data-transparente="true"] .tu-tema { border-color: rgba(255,255,255,.4); }
+  .tu-tema:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  .tu-tema--pie { width: 36px; height: 36px; margin-left: auto; }
+  .tu-menu-tema { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 0; border: none; border-bottom: 1px solid var(--color-border); background: transparent; color: var(--color-text); font: inherit; font-size: 16px; font-weight: 600; text-align: left; cursor: pointer; }
+  .tu-menu-tema:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+  @media (hover: hover) { .tu-tema:hover { background: color-mix(in srgb, currentColor 10%, transparent); } }
   .tu-menu { border-top: 1px solid var(--color-border); background: var(--color-bg); padding: 8px 20px 22px; display: flex; flex-direction: column; max-height: calc(100vh - 112px); overflow-y: auto; }
   .tu-menu a:not(.tu-btn) { display: flex; align-items: center; justify-content: space-between; min-height: 56px; border-bottom: 1px solid var(--color-border); color: var(--color-text); text-decoration: none; font-family: var(--tu-fh); font-size: 22px; font-weight: var(--tu-peso); }
   .tu-sitio[data-mayus="true"] .tu-menu a:not(.tu-btn) { text-transform: uppercase; }

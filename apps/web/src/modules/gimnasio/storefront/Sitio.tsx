@@ -1,12 +1,15 @@
 // El sitio público de un gimnasio, box o estudio: lo que ven los socios para
-// reservar su lugar en una clase. Claro, con fotos grandes, un acento y una
-// sola acción por pantalla. Redefine los tokens --color-* adentro de .gis,
-// así las piezas rv- del design system se pintan solas.
+// reservar su lugar en una clase. Claro por defecto, con fotos grandes, un
+// acento y una sola acción por pantalla; el visitante puede ponerlo en oscuro
+// con el sol o la luna de la cabecera (modoSitio del kit). Redefine los tokens
+// --color-* adentro de .gis, así las piezas rv- del design system se pintan
+// solas, de día y de noche.
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { ArrowRight, MapPin, Phone } from 'lucide-react'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 import { EstiloReservas } from '@/design-system/reservas/estilo'
+import { BotonTema, useModoSitio } from '@/design-system/reservas/modoSitio'
 import type { NegocioGym } from '../datos'
 
 export type PaginaSitio = 'inicio' | 'reserva' | 'mis-clases'
@@ -45,8 +48,18 @@ export const CSS_SITIO = `
     --color-primary: #0F766E; --color-primary-h: #115E59; --color-primary-bg: #CCFBF1; --chip-primary-fg: #115E59; --color-on-primary: #FFFFFF;
     --color-success: #15803D; --color-success-bg: #DCFCE7; --chip-success-fg: #166534; --color-warning: #B45309; --color-warning-bg: #FEF3C7; --chip-warning-fg: #92400E;
     --color-error: #B91C1C; --color-error-bg: #FEE2E2; --chip-error-fg: #991B1B; }
+  /* Oscuro, a elección del visitante: los mismos tokens de noche, con el verde agua un punto más claro para leerse. */
+  .gis[data-oscuro='true'] { color-scheme: dark;
+    --color-bg: #0E1413; --color-surface: #15201D; --color-surface-alt: #1C2A26; --color-border: #263632; --color-border-strong: #3A4F49; --color-text: #F1F5F4; --color-body: #C9D4D1; --color-muted: #9AAEA8; --color-subtle: #6C807A;
+    --color-primary: #2DD4BF; --color-primary-h: #5EEAD4; --color-primary-bg: #134E4A; --chip-primary-fg: #5EEAD4; --color-on-primary: #042F2E;
+    --color-success: #4ADE80; --color-success-bg: #14532D; --chip-success-fg: #86EFAC; --color-warning: #FBBF24; --color-warning-bg: #78350F; --chip-warning-fg: #FCD34D;
+    --color-error: #F87171; --color-error-bg: #7F1D1D; --chip-error-fg: #FCA5A5; }
+  /* Sol o luna (BotonTema del kit). */
+  .gis-tema { width: 40px; height: 40px; flex-shrink: 0; border-radius: 8px; border: 1px solid var(--color-border); background: transparent; color: var(--color-body); display: grid; place-items: center; cursor: pointer; }
+  .gis-tema:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  @media (hover: hover) { .gis-tema:hover { border-color: var(--color-border-strong); color: var(--color-text); } }
   .gis-cont { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
-  .gis-header { position: sticky; top: var(--rv-tope, 0px); z-index: 50; background: rgba(255,255,255,0.92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--color-border); }
+  .gis-header { position: sticky; top: var(--rv-tope, 0px); z-index: 50; background: color-mix(in srgb, var(--color-bg) 92%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--color-border); }
   .gis-header-in { display: flex; align-items: center; gap: 16px; height: 64px; }
   .gis-marca { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--color-text); min-width: 0; }
   .gis-marca-sigla { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: var(--color-primary); color: var(--color-on-primary); font-weight: 700; font-size: 13px; flex-shrink: 0; }
@@ -149,6 +162,7 @@ export const CSS_SITIO = `
     .gis-cont { padding: 0 16px; }
     .gis-nav a:not([data-fijo]) { display: none; }
     .gis-nav a, .gis-link, .gis-marca { min-height: 44px; }
+    .gis-tema { width: 44px; height: 44px; }
     .gis-hero-datos { max-width: none; }
     /* El botón fijo al pie mide --rv-pie: el pie de página deja ese aire para que
        nada quede tapado al final, los avisos (rv-toast) salen por encima y el
@@ -156,7 +170,7 @@ export const CSS_SITIO = `
     .gis[data-cta='true'] { --rv-pie: calc(70px + env(safe-area-inset-bottom, 0px)); }
     .gis[data-cta='true'] .gis-pie { padding-bottom: calc(32px + var(--rv-pie)); }
     html:has(.gis[data-cta='true']) { scroll-padding-bottom: calc(86px + env(safe-area-inset-bottom, 0px)); }
-    .gis-cta-movil { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: rgba(255,255,255,0.94); backdrop-filter: blur(8px); border-top: 1px solid var(--color-border); gap: 10px; align-items: center; }
+    .gis-cta-movil { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: color-mix(in srgb, var(--color-bg) 94%, transparent); backdrop-filter: blur(8px); border-top: 1px solid var(--color-border); gap: 10px; align-items: center; }
     .gis-cta-movil > div { flex: 1; min-width: 0; font-size: 13px; color: var(--color-muted); }
     .gis-cta-movil b { display: block; font-size: 14px; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .gis-sec { padding-top: 32px; }
@@ -183,13 +197,14 @@ interface Props {
 
 export default function Sitio({ negocio, pagina, cta, children }: Props) {
   const sigla = negocio.nombre.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase()
+  const oscuro = useModoSitio('gimnasio', false)
   const nav: { id: PaginaSitio; label: string; fijo?: boolean }[] = [
     { id: 'inicio', label: 'Inicio' },
     { id: 'reserva', label: 'Reservar clase', fijo: true },
     { id: 'mis-clases', label: 'Mis clases', fijo: true },
   ]
   return (
-    <div className="rv gis" data-cta={!!cta || undefined}>
+    <div className="rv gis" data-oscuro={oscuro || undefined} data-cta={!!cta || undefined}>
       <EstiloReservas />
       <style>{CSS_SITIO + CSS_CUPO}</style>
       <header className="gis-header">
@@ -201,6 +216,7 @@ export default function Sitio({ negocio, pagina, cta, children }: Props) {
           <nav className="gis-nav" aria-label="Secciones del sitio">
             {nav.map(n => <Link key={n.id} href={ruta(n.id, negocio.rubro)} aria-current={pagina === n.id ? 'page' : undefined} data-fijo={n.fijo || undefined}>{n.label}</Link>)}
           </nav>
+          <BotonTema modulo="gimnasio" oscuro={oscuro} className="gis-tema" />
         </div>
       </header>
       <main className="gis-main">{children}</main>

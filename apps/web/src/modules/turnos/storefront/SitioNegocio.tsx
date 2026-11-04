@@ -29,6 +29,7 @@ import { Legales, LEGALES, type Legal } from './Legales'
 import { AnillosTema, FormaProvider, HOY, HorasDia, Marca, SelloOrbita, proximoLibre, ruta, useTema, type PaginaNegocio } from './piezas'
 import { linkMapa } from './reserva/acciones'
 import { variablesTema, type TemaNegocio } from './tema'
+import { BotonTema } from '@/design-system/reservas/modoSitio'
 
 export { ruta, useReveal, Reveal } from './piezas'
 export type { PaginaNegocio } from './piezas'
@@ -131,6 +132,8 @@ export default function SitioNegocio({ rubro, pagina, forma = 'web', sobreFoto, 
               {nav.map(n => <Link key={n.label} href={n.href} className="tu-nav-a" aria-current={n.actual ? 'page' : undefined}>{n.label}</Link>)}
             </nav>
             <div className="tu-acciones">
+              {/* Sol o luna: en escritorio acá; en celular, como fila del menú (nunca los dos pintados a la vez). */}
+              <BotonTema modulo="turnos" oscuro={t.oscuro} className="tu-tema tu-nav-desk" />
               <Link href={ruta('mis-turnos', rubro.key)} className="tu-nav-a tu-nav-desk" aria-current={pagina === 'mis-turnos' ? 'page' : undefined}>
                 <CalendarCheck size={16} aria-hidden /> Mis turnos
               </Link>
@@ -144,6 +147,7 @@ export default function SitioNegocio({ rubro, pagina, forma = 'web', sobreFoto, 
           </div>
           {menu && (
             <nav id="tu-menu" className="tu-menu tu-nav-movil tu-entra" aria-label="Menú">
+              <BotonTema modulo="turnos" oscuro={t.oscuro} className="tu-menu-tema" texto />
               {[...nav, { label: 'Mis turnos', href: ruta('mis-turnos', rubro.key) }].map(n => (
                 <Link key={n.label} href={n.href} onClick={() => setMenu(false)}>{n.label} <ChevronRight size={18} aria-hidden style={{ color: t.c.primary }} /></Link>
               ))}
@@ -163,6 +167,7 @@ export default function SitioNegocio({ rubro, pagina, forma = 'web', sobreFoto, 
               <span className="tu-marca-nombre">{t.nombre}</span>
             </Link>
             <div className="tu-acciones">
+              <BotonTema modulo="turnos" oscuro={t.oscuro} className="tu-tema" />
               {pagina === 'mis-turnos'
                 ? <Link href={ruta('reserva', rubro.key, { forma })} className="tu-btn" style={{ height: 44, padding: '0 18px' }}>{reservar}</Link>
                 : <Link href={ruta('mis-turnos', rubro.key, { forma })} className="tu-nav-a"><CalendarCheck size={16} aria-hidden /> Mis turnos</Link>}
@@ -180,6 +185,8 @@ export default function SitioNegocio({ rubro, pagina, forma = 'web', sobreFoto, 
         <footer className="tu-pie tu-pie--simple">
           <div className="tu-cont tu-pie-base">
             {LEGALES.map(l => <button key={l.id} type="button" className="tu-link-suave" onClick={() => setLegal(l.id)}>{l.label}</button>)}
+            {/* La portada simple no tiene cabecera: el sol o la luna van al pie (en las otras páginas ya está arriba). */}
+            {pagina === 'inicio' && <BotonTema modulo="turnos" oscuro={t.oscuro} className="tu-tema tu-tema--pie" tamano={16} />}
             <SelloOrbita />
           </div>
         </footer>
