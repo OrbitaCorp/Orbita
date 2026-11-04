@@ -404,7 +404,7 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
   )
 
   const themeBlock = (
-    <button className="sf-hdr-btn" onClick={toggleTema} aria-label={isDark ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}>
+    <button className="sf-hdr-btn tema-boton" onClick={toggleTema} aria-label={isDark ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}>
       {isDark ? <Sun size={18} strokeWidth={1.5} /> : <Moon size={18} strokeWidth={1.5} />}
     </button>
   )

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { Bell, Moon, Sun, Search, LogOut, User, AlertCircle, AlertTriangle, X, Menu, ArrowLeft, ShoppingBag, Users, Package, Tag, LayoutGrid, Store, Check } from 'lucide-react'
-import { useDarkMode, type TemaPreferencia } from '@/hooks/useDarkMode'
+import { conFundidoDeTema, esOscuro, useDarkMode, type TemaPreferencia } from '@/hooks/useDarkMode'
 import { useAuth } from '@/hooks/useAuth'
 import { nombreConversacion } from '@/modules/ventas/panel/mensajes/mock/mensajes.mock'
 import {
@@ -118,7 +118,10 @@ export default function Header({ onMenuClick }: Props) {
     // tema blanco y cuando reinicio vuelve al oscuro" (Ale, 20/09).
     const cambiarTema = (t: TemaPreferencia) => {
         eligioAhora.current = true
-        setTema(t)
+        // Con fundido, como los paneles de reservas (pedido de Ale, 04/11: "modo
+        // oscuro y claro para todo … con ese efecto"): la noche baja desde arriba
+        // y el día sube desde abajo (globals.css, "Cambio de tema con fundido").
+        conFundidoDeTema(esOscuro(t), () => setTema(t))
         if (user?.type !== 'member') return
         // Falla de red: el tema igual quedó aplicado y guardado en este
         // navegador — mismo criterio que Mi Perfil, no se interrumpe a nadie.
@@ -415,7 +418,7 @@ export default function Header({ onMenuClick }: Props) {
                     <button
                         onClick={() => cambiarTema(isDark ? 'light' : 'dark')}
                         aria-label={isDark ? 'Modo claro' : 'Modo oscuro'}
-                        className="admin-theme-btn ds-hover grid place-items-center rounded-lg"
+                        className="admin-theme-btn tema-boton ds-hover grid place-items-center rounded-lg"
                         style={{ width: 36, height: 36, background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-body)', flexShrink: 0 }}
                     >
                         {isDark ? <Sun size={17} strokeWidth={1.5} /> : <Moon size={17} strokeWidth={1.5} />}

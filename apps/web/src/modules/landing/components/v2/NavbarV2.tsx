@@ -28,9 +28,10 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { Menu, X } from 'lucide-react';
+import { Menu, Moon, Sun, X } from 'lucide-react';
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo';
 import { useAuth } from '@/lib/auth/AuthContext';
+import { useTheme } from '@/modules/landing/context/ThemeContext';
 import { tenantUrl } from '@/lib/tenant';
 
 const LINKS: { label: string; href: string }[] = [
@@ -47,6 +48,7 @@ const LINKS: { label: string; href: string }[] = [
 
 export function NavbarV2() {
     const { status, user } = useAuth();
+    const { isDark, toggleTheme } = useTheme();
     const router = useRouter();
     const [scrolleado, setScrolleado] = useState(false);
     const [abierto, setAbierto] = useState(false);
@@ -182,6 +184,21 @@ export function NavbarV2() {
                         </>
                     )}
 
+                    {/* Claro u oscuro, con fundido (ThemeContext → conFundidoDeTema). En
+                        el celular chico (<sm) no entra en la fila junto a "Iniciar
+                        sesión" y el menú: ahí va adentro del menú (más abajo). Las dos
+                        copias llevan la clase tema-boton (su capa en la transición):
+                        nunca se pintan a la vez, una siempre está en display: none. */}
+                    <button
+                        type="button"
+                        onClick={toggleTheme}
+                        className="oc-ghost tema-boton hidden h-10 w-10 cursor-pointer place-items-center rounded-xl transition-colors duration-200 sm:grid"
+                        style={{ border: '1px solid var(--oc-ghost-bd)', background: 'var(--oc-ghost-bg)' }}
+                        aria-label={isDark ? 'Pasar a modo claro' : 'Pasar a modo oscuro'}
+                    >
+                        {isDark ? <Sun size={17} strokeWidth={1.8} aria-hidden="true" /> : <Moon size={17} strokeWidth={1.8} aria-hidden="true" />}
+                    </button>
+
                     <button
                         onClick={() => setAbierto(a => !a)}
                         className="grid h-10 w-10 cursor-pointer place-items-center rounded-xl text-slate-300 transition-colors duration-200 hover:bg-white/10 xl:hidden"
@@ -199,6 +216,18 @@ export function NavbarV2() {
                     style={{ background: 'var(--oc-panel)', borderTop: '1px solid var(--oc-card-bd)' }}
                 >
                     <ul className="mx-auto max-w-6xl px-6 py-3">
+                        {/* El tema, solo en el celular chico (<sm): arriba no entra. */}
+                        <li className="sm:hidden">
+                            <button
+                                type="button"
+                                onClick={toggleTheme}
+                                className="tema-boton flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-[14.5px] font-semibold transition-colors duration-200 hover:bg-white/[0.06]"
+                                style={{ minHeight: 46, color: 'var(--oc-text-2)' }}
+                            >
+                                {isDark ? <Sun size={17} strokeWidth={1.8} aria-hidden="true" /> : <Moon size={17} strokeWidth={1.8} aria-hidden="true" />}
+                                {isDark ? 'Modo claro' : 'Modo oscuro'}
+                            </button>
+                        </li>
                         {LINKS.map(l => (
                             <li key={l.href}>
                                 <a

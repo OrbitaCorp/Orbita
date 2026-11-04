@@ -17,6 +17,7 @@ import { TiktokService } from '../marketing/tiktok/tiktok.service';
 import { InstagramService } from '../instagram/instagram.service';
 import { InstagramPublicacionesService } from '../instagram/instagram-publicaciones.service';
 import { InstagramComentariosService } from '../instagram/instagram-comentarios.service';
+import { ReservasMantenimientoService } from '../reservas/reservas-mantenimiento.service';
 
 /**
  * Reemplazo de los @Cron() que tenía el backend antes de migrar a Cloud Run.
@@ -94,6 +95,9 @@ export class InternalCronController {
     // Opcionales por la misma razón de compatibilidad con specs unitarios.
     private readonly instagramPublicaciones?: InstagramPublicacionesService,
     private readonly instagramComentarios?: InstagramComentariosService,
+    // Reservas: vence las retenidas que pasaron su tiempo (cada 5 minutos, colgado del mismo disparo).
+    // Opcional por la misma razón de compatibilidad con specs unitarios.
+    private readonly reservasMantenimiento?: ReservasMantenimientoService,
   ) {}
 
   // Antes: @Cron(EVERY_DAY_AT_3AM) + @Cron(EVERY_DAY_AT_4AM), por separado.
@@ -208,7 +212,15 @@ export class InternalCronController {
     if (publicaciones && (publicaciones.lanzadas || publicaciones.falladas || publicaciones.avanzadas)) {
       this.logger.log(`Instagram programadas: ${JSON.stringify(publicaciones)}`);
     }
-    return { publicaciones, moderacion };
+    // Reservas retenidas vencidas → VENCIDA. Nada de la integridad depende de esto (el motor las vence
+    // antes de contar): es prolijidad del estado y del historial. Si falla, se anota y sigue.
+    let reservas: { vencidas: number } | undefined;
+    try {
+      reservas = await this.reservasMantenimiento?.vencerRetenidas();
+    } catch (e) {
+      this.logger.error(`Reservas retenidas vencidas: no se pudo correr — ${describeError(e)}`);
+    }
+    return { publicaciones, moderacion, reservas };
   }
 
   // Antes: @Cron('0 22 * * *')

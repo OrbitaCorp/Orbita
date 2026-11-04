@@ -7,16 +7,18 @@
 // El día se elige en una tira (los días que esa agenda no atiende van apagados)
 // y los horarios que se ofrecen son los que de verdad están libres para esa
 // persona o espacio, donde entra la duración del servicio, separados por la
-// mañana y la tarde. En la demo el turno queda en memoria.
+// mañana y la tarde. Solo se ofrecen los servicios activos: uno pausado no se
+// da ni desde acá. En la demo el turno queda en memoria.
 import { useRef, useState, type KeyboardEvent } from 'react'
 import { CalendarPlus, CalendarX, Search, UserPlus, X } from 'lucide-react'
 import { Avatar } from '@/design-system/components/Avatar'
 import { duracionTxt, horaTxt, pesos, type Cliente, type Recurso, type RubroTurnos } from '@/modules/turnos/datos'
 import type { Tramo } from '@/modules/turnos/horario'
 import { Campo, Dos, Selector } from './configuracion/ui'
-import { Modal, ErrorCampo, DatoFila, TiraDias, HorasLibres } from './piezasPanel'
-import { fechaLarga, libresPorTramo, sinAcentos, tieneTelefono, type NuevoTurnoPre, type ServicioPanel, type TurnoAgenda } from './agendaDemo'
-import { clientesTxt, taparTelefono } from './equipoDemo'
+import { ErrorCampo, DatoFila, TiraDias, HorasLibres } from './piezasPanel'
+import { Modal } from '@/design-system/reservas/piezas'
+import { fechaLarga, horariosLibres, libresPorTramo, sinAcentos, tieneTelefono, type NuevoTurnoPre, type ServicioPanel, type TurnoAgenda } from '../datos/agenda'
+import { clientesTxt, taparTelefono } from '../datos/equipo'
 
 const DIAS_A_LA_VISTA = 14
 const MAX_RESULTADOS = 6
@@ -27,6 +29,7 @@ interface Props {
   clientes: Cliente[]
   /** Las agendas en las que quien mira puede dar turnos. */
   recursos: Recurso[]
+  /** Los servicios activos (sin los pausados). */
   servicios: ServicioPanel[]
   turnosDelDia: (dia: number) => TurnoAgenda[]
   /** En qué tramos atiende una agenda un día (contado desde hoy). [] = ese día no atiende. */
@@ -39,18 +42,23 @@ interface Props {
 
 const CSS = `
   .tu-nt-combo { position: relative; margin-bottom: 16px; }
-  .tu-nt-lista { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 5; max-height: 300px; overflow-y: auto; overscroll-behavior: contain; padding: 6px; border-radius: 12px; border: 1px solid var(--color-border); background: var(--color-bg); box-shadow: 0 18px 44px rgba(3,6,14,0.22), 0 2px 8px rgba(3,6,14,0.1); animation: tuNtLista 180ms cubic-bezier(0.22, 1, 0.36, 1) both; }
-  @keyframes tuNtLista { from { opacity: 0; transform: translateY(-4px) } to { opacity: 1; transform: none } }
-  .tu-nt-op { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 50px; padding: 6px 10px; border: none; border-radius: 9px; background: transparent; text-align: left; font-family: inherit; color: inherit; cursor: pointer; transition: background 140ms ease; }
+  .tu-nt-lista { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 5; max-height: 300px; overflow-y: auto; overscroll-behavior: contain; padding: 6px; border-radius: var(--rv-r); border: 1px solid var(--color-border-strong); background: var(--color-bg); box-shadow: 0 12px 36px rgba(0,0,0,0.18); }
+  .tu-nt-op { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 50px; padding: 6px 10px; border: none; border-radius: var(--rv-r-sm); background: transparent; text-align: left; font: inherit; color: inherit; cursor: pointer; }
   .tu-nt-op[aria-selected='true'] { background: var(--color-primary-bg); }
-  .tu-nt-op-ico { width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; color: var(--color-primary); background: var(--tuo-grad-suave); border: 1px dashed color-mix(in srgb, var(--color-primary) 45%, transparent); }
+  .tu-nt-op-visitas { flex: none; font-size: 12px; color: var(--color-muted); }
+  /* Sobre primary-bg (la opción marcada) el gris no llega a AA. */
+  .tu-nt-op[aria-selected='true'] small, .tu-nt-op[aria-selected='true'] .tu-nt-op-visitas { color: var(--color-body); }
+  .tu-nt-op > span { flex: 1; min-width: 0; }
+  .tu-nt-op b { display: block; font-size: 13.5px; font-weight: 600; color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tu-nt-op small { display: block; font-size: 12px; color: var(--color-muted); }
+  .tu-nt-op-ico { width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; color: var(--color-primary); background: var(--color-primary-bg); border: 1px dashed var(--color-primary); }
   .tu-nt-vacio { padding: 14px 10px 10px; font-size: 13px; color: var(--color-muted); }
-  .tu-nt-elegido { display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 12px; margin-bottom: 16px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--color-primary) 34%, var(--color-border)); background: color-mix(in srgb, var(--color-primary) 5%, var(--color-bg)); }
-  .tu-nt-nuevo { padding: 14px 14px 0; margin-bottom: 16px; border-radius: 12px; border: 1px dashed color-mix(in srgb, var(--color-primary) 50%, var(--color-border)); background: color-mix(in srgb, var(--color-primary) 4%, var(--color-bg)); animation: tuoEntra 320ms var(--tuo-ease, ease) both; }
+  .tu-nt-elegido { display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 12px; margin-bottom: 16px; border-radius: var(--rv-r-sm); border: 1px solid var(--color-border); background: var(--color-surface); }
+  .tu-nt-elegido > div { flex: 1; min-width: 0; }
+  .tu-nt-nuevo { padding: 14px 14px 0; margin-bottom: 16px; border-radius: var(--rv-r-sm); border: 1px dashed var(--color-border-strong); background: var(--color-surface); }
   .tu-nt-quien { display: flex; flex-wrap: wrap; gap: 6px; }
   .tu-nt-quien > button > i { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  @media (max-width: 640px) { .tu-nt-op { min-height: 56px; } }
-  @media (prefers-reduced-motion: reduce) { .tu-nt-lista, .tu-nt-nuevo { animation: none; } .tu-nt-op { transition: none; } }
+  @media (max-width: 768px) { .tu-nt-op { min-height: 56px; } }
 `
 
 export default function NuevoTurno({ rubro, pre, clientes, recursos, servicios, turnosDelDia, jornada, verContacto, onCerrar, onCrear }: Props) {
@@ -59,7 +67,17 @@ export default function NuevoTurno({ rubro, pre, clientes, recursos, servicios, 
   const [lista, setLista] = useState(false)
   const [cursor, setCursor] = useState(0)
   const [nuevo, setNuevo] = useState<{ nombre: string; telefono: string } | null>(null)
-  const [servicioId, setServicioId] = useState(servicios[0]?.id ?? '')
+  // Si se llega con la hora ya elegida (un hueco del Resumen, un toque en la agenda), arranca con
+  // el primer servicio que entra ahí: con el primero de la lista a secas, en un hueco de media
+  // hora uno de una hora no entraba y el modal decía "no quedan horarios" al lado del hueco libre.
+  const [servicioId, setServicioId] = useState(() => {
+    const h = pre.inicio
+    if (h === undefined) return servicios[0]?.id ?? ''
+    const d = Math.max(0, pre.dia ?? 0)
+    const rid = recursos.some(r => r.id === pre.recursoId) ? pre.recursoId ?? '' : recursos[0]?.id ?? ''
+    const entra = servicios.find(s => horariosLibres(turnosDelDia(d), jornada(rid, d), rid, s.duracion, d).includes(h))
+    return (entra ?? servicios[0])?.id ?? ''
+  })
   const [recursoElegido, setRecursoElegido] = useState(pre.recursoId ?? recursos[0]?.id ?? '')
   const [diaElegido, setDiaElegido] = useState(Math.max(0, pre.dia ?? 0))
   const [hora, setHora] = useState<number | null>(pre.inicio ?? null)
@@ -70,7 +88,7 @@ export default function NuevoTurno({ rubro, pre, clientes, recursos, servicios, 
   const limpiar = () => setError(null)
 
   const plural = clientesTxt(rubro)
-  const etiquetaRecurso = rubro.modo === 'profesional' ? `Con qué ${rubro.profesional.toLowerCase()}` : rubro.modo === 'cancha' ? 'En qué cancha' : 'Dónde'
+  const etiquetaRecurso = rubro.modo === 'profesional' ? `Con qué ${rubro.profesional.toLowerCase()}` : 'Dónde'
   // Si la agenda elegida ya no está entre las que se pueden usar, la primera.
   const recursoId = recursos.some(r => r.id === recursoElegido) ? recursoElegido : recursos[0]?.id ?? ''
   const recurso = recursos.find(r => r.id === recursoId)
@@ -140,11 +158,11 @@ export default function NuevoTurno({ rubro, pre, clientes, recursos, servicios, 
 
   if (servicios.length === 0 || recursos.length === 0) {
     return (
-      <Modal rotulo="Agenda" titulo="Nuevo turno" onCerrar={onCerrar} pie={<button type="button" onClick={onCerrar} className="tuo-btn tuo-btn--primario">Entendido</button>}>
+      <Modal rotulo="Agenda" titulo="Nuevo turno" onCerrar={onCerrar} pie={<button type="button" onClick={onCerrar} className="rv-btn rv-btn--primario">Entendido</button>}>
         <div style={{ textAlign: 'center', padding: '28px 8px' }}>
           <CalendarX size={24} color="var(--color-subtle)" />
           <div style={{ fontSize: 14.5, fontWeight: 600, color: 'var(--color-text)', marginTop: 10 }}>Todavía no se puede agendar</div>
-          <div style={{ fontSize: 13, color: 'var(--color-muted)', marginTop: 4, lineHeight: 1.5 }}>{servicios.length === 0 ? 'Para dar un turno hace falta al menos un servicio cargado. Sumalo desde “Tu negocio”.' : 'No hay ninguna agenda en la que puedas dar turnos.'}</div>
+          <div className="rv-ayuda" style={{ marginTop: 4, fontSize: 13 }}>{servicios.length === 0 ? 'Para dar un turno hace falta al menos un servicio activo. Sumalo o reanudalo desde Servicios.' : 'No hay ninguna agenda en la que puedas dar turnos.'}</div>
         </div>
       </Modal>
     )
@@ -160,8 +178,8 @@ export default function NuevoTurno({ rubro, pre, clientes, recursos, servicios, 
       onCerrar={onCerrar}
       onEnviar={crear}
       pie={<>
-        <button type="button" onClick={onCerrar} className="tuo-btn">Cancelar</button>
-        <button type="submit" className="tuo-btn tuo-btn--primario"><CalendarPlus size={16} /> Agendar turno</button>
+        <button type="button" onClick={onCerrar} className="rv-btn">Cancelar</button>
+        <button type="submit" className="rv-btn rv-btn--primario"><CalendarPlus size={16} /> Agendar turno</button>
       </>}
     >
       <style>{CSS}</style>
@@ -172,31 +190,31 @@ export default function NuevoTurno({ rubro, pre, clientes, recursos, servicios, 
           <div className="tuc-rotulo" style={{ marginBottom: 8 }}>{rubro.cliente}</div>
           <div className="tu-nt-elegido">
             <Avatar name={cliente.nombre} size={40} />
-            <div style={{ flex: 1, minWidth: 0 }}>
+            <div>
               <div style={{ fontSize: 14.5, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cliente.nombre}</div>
-              <div className="tuo-num" style={{ fontSize: 12.5, color: 'var(--color-muted)' }}>{verContacto ? cliente.telefono : taparTelefono(cliente.telefono)} · {cliente.visitas} visita{cliente.visitas === 1 ? '' : 's'}</div>
+              <div className="rv-num" style={{ fontSize: 12.5, color: 'var(--color-muted)' }}>{verContacto ? cliente.telefono : taparTelefono(cliente.telefono)} · {cliente.visitas} visita{cliente.visitas === 1 ? '' : 's'}</div>
             </div>
-            <button type="button" className="tuo-btn tuo-btn--sm" onClick={() => { setClienteId(null); setLista(true) }}><X size={14} /> Cambiar</button>
+            <button type="button" className="rv-btn rv-btn--sm" onClick={() => { setClienteId(null); setLista(true) }}><X size={14} /> Cambiar</button>
           </div>
         </>
       ) : nuevo ? (
         <div className="tu-nt-nuevo">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-            <span className="tuo-chip tuo-chip--primario"><UserPlus size={13} /> {rubro.cliente} que viene por primera vez</span>
+            <span className="rv-chip rv-chip--primario"><UserPlus size={13} /> {rubro.cliente} que viene por primera vez</span>
             <button type="button" className="tuc-link" style={{ marginLeft: 'auto' }} onClick={() => { setNuevo(null); setLista(true); limpiar() }}><Search size={13} aria-hidden /> Buscar en mi lista</button>
           </div>
           <Dos>
             <Campo label="Nombre y apellido" value={nuevo.nombre} onChange={v => { setNuevo({ ...nuevo, nombre: v.slice(0, 60) }); limpiar() }} placeholder="Ej.: Paula Herrera" style={{ marginBottom: 10 }} />
             <Campo label="Teléfono" value={nuevo.telefono} onChange={v => { setNuevo({ ...nuevo, telefono: v }); limpiar() }} placeholder="11 5555-0000" type="tel" mono style={{ marginBottom: 10 }} />
           </Dos>
-          <p className="tuc-ayuda" style={{ margin: '0 0 14px' }}>El teléfono es opcional: ahí le llegan la confirmación y el recordatorio. Queda en tu lista al agendar.</p>
+          <p className="rv-ayuda" style={{ margin: '0 0 14px' }}>El teléfono es opcional: ahí le llegan la confirmación y el recordatorio. Queda en tu lista al agendar.</p>
           {error?.en === 'cliente' && <ErrorCampo>{error.texto}</ErrorCampo>}
         </div>
       ) : (
         <>
           <label htmlFor="tu-nt-cliente" className="tuc-rotulo" style={{ marginBottom: 8 }}>{rubro.cliente}</label>
           <div className="tu-nt-combo" data-esc={lista ? 'propio' : undefined} onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setLista(false) }}>
-            <div className="tuc-field tuc-field--fila">
+            <div className="tuc-field--fila">
               <span className="tuc-field-adorno"><Search size={15} aria-hidden /></span>
               <input
                 id="tu-nt-cliente" ref={buscador} autoFocus value={q} autoComplete="off" placeholder="Escribí el nombre o el teléfono"
@@ -206,28 +224,22 @@ export default function NuevoTurno({ rubro, pre, clientes, recursos, servicios, 
             </div>
             {lista && (
               <div id="tu-nt-lista" role="listbox" aria-label={`Tus ${plural}`} className="tu-nt-lista">
-                {!texto && coinciden.length > 0 && <div className="tuo-rotulo" style={{ padding: '6px 10px 4px', fontSize: 9.5 }}>Tus {plural}</div>}
+                {!texto && coinciden.length > 0 && <div className="rv-rotulo" style={{ padding: '6px 10px 4px' }}>Tus {plural}</div>}
                 {coinciden.map((c, i) => (
                   // tabIndex -1 y mousedown sin foco: el foco se queda en el campo y las flechas mueven la selección.
                   <button key={c.id} type="button" id={`tu-nt-op-${i}`} role="option" aria-selected={i === marcado} tabIndex={-1} className="tu-nt-op"
                     onMouseDown={e => e.preventDefault()} onMouseEnter={() => setCursor(i)} onClick={() => elegir(c)}>
                     <Avatar name={c.nombre} size={34} />
-                    <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.nombre}</span>
-                      <span className="tuo-num" style={{ display: 'block', fontSize: 12, color: 'var(--color-muted)' }}>{verContacto ? c.telefono : taparTelefono(c.telefono)}</span>
-                    </span>
-                    <span style={{ fontSize: 12, color: 'var(--color-muted)', flexShrink: 0 }}>{c.visitas} visita{c.visitas === 1 ? '' : 's'}</span>
+                    <span><b>{c.nombre}</b><small className="rv-num">{verContacto ? c.telefono : taparTelefono(c.telefono)}</small></span>
+                    <span className="tu-nt-op-visitas">{c.visitas} visita{c.visitas === 1 ? '' : 's'}</span>
                   </button>
                 ))}
                 {coinciden.length === 0 && <div className="tu-nt-vacio">{ofreceNuevo ? `Nadie coincide con “${q.trim()}”.` : `Escribí al menos dos letras para buscar o agregar.`}</div>}
                 {ofreceNuevo && (
                   <button type="button" id={`tu-nt-op-${coinciden.length}`} role="option" aria-selected={marcado === coinciden.length} tabIndex={-1} className="tu-nt-op"
                     onMouseDown={e => e.preventDefault()} onMouseEnter={() => setCursor(coinciden.length)} onClick={agregar}>
-                    <span className="tu-nt-op-ico" aria-hidden><UserPlus size={15} /></span>
-                    <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: 'var(--color-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Agregar a “{q.trim()}”</span>
-                      <span style={{ display: 'block', fontSize: 12, color: 'var(--color-muted)' }}>Viene por primera vez: se suma a tus {plural} sin salir de acá</span>
-                    </span>
+                    <span className="tu-nt-op-ico" aria-hidden style={{ flex: 'none' }}><UserPlus size={15} /></span>
+                    <span><b style={{ color: 'var(--color-primary)' }}>Agregar a “{q.trim()}”</b><small>Viene por primera vez: se suma a tus {plural} sin salir de acá</small></span>
                   </button>
                 )}
               </div>
@@ -239,7 +251,7 @@ export default function NuevoTurno({ rubro, pre, clientes, recursos, servicios, 
 
       {/* ── Qué y con quién ── */}
       <Selector
-        label={rubro.modo === 'cupo' ? 'Actividad' : 'Servicio'}
+        label="Servicio"
         valor={servicioId}
         onChange={v => { setServicioId(v); limpiar() }}
         opciones={servicios.map(s => ({ id: s.id, label: `${s.nombre} · ${duracionTxt(s.duracion)}${s.precio ? ` · ${pesos(s.precio)}` : ''}` }))}
@@ -249,7 +261,7 @@ export default function NuevoTurno({ rubro, pre, clientes, recursos, servicios, 
           <div className="tuc-rotulo" style={{ marginBottom: 8 }}>{etiquetaRecurso}</div>
           <div className="tu-nt-quien" role="group" aria-label={etiquetaRecurso}>
             {recursos.map(r => (
-              <button key={r.id} type="button" className="tuc-pastilla" aria-pressed={r.id === recursoId} onClick={() => { setRecursoElegido(r.id); limpiar() }}>
+              <button key={r.id} type="button" className="rv-chip rv-chip--borde" aria-pressed={r.id === recursoId} onClick={() => { setRecursoElegido(r.id); limpiar() }}>
                 <i aria-hidden style={{ background: r.color }} />{r.nombre}
               </button>
             ))}
@@ -273,11 +285,11 @@ export default function NuevoTurno({ rubro, pre, clientes, recursos, servicios, 
       <Campo label="Nota" ayuda="Opcional. Solo la ve tu equipo." value={nota} onChange={setNota} area maxLength={140} placeholder="Ej.: viene con su hijo" />
 
       {servicio && inicio !== null && (
-        <div className="tuo-card" style={{ padding: '6px 14px', boxShadow: 'none', background: 'var(--color-surface)' }}>
-          <DatoFila label="Cuándo">{fechaLarga(dia)} · <span className="tuo-num">{horaTxt(inicio)} – {horaTxt(inicio + servicio.duracion)}</span></DatoFila>
+        <div className="rv-card" style={{ padding: '6px 14px', background: 'var(--color-surface)' }}>
+          <DatoFila label="Cuándo">{fechaLarga(dia)} · <span className="rv-num">{horaTxt(inicio)} – {horaTxt(inicio + servicio.duracion)}</span></DatoFila>
           {recurso && <DatoFila label={rubro.modo === 'profesional' ? rubro.profesional : 'Dónde'}>{recurso.nombre}</DatoFila>}
-          <DatoFila label="Precio"><span className="tuo-num">{pesos(servicio.precio)}</span></DatoFila>
-          {sena > 0 && <DatoFila label={`Seña ${rubro.sena}%`}><span className="tuo-num">{pesos(sena)}</span> · pendiente</DatoFila>}
+          <DatoFila label="Precio"><span className="rv-num">{pesos(servicio.precio)}</span></DatoFila>
+          {sena > 0 && <DatoFila label={`Seña ${rubro.sena}%`}><span className="rv-num">{pesos(sena)}</span> · pendiente</DatoFila>}
         </div>
       )}
     </Modal>

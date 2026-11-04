@@ -4,36 +4,35 @@
 // identidad completa, con miniatura fiel). Abajo, el editor a la izquierda y la vista previa en
 // vivo a la derecha. Elegir una plantilla trae sus valores de fábrica (paleta,
 // par tipográfico, bordes, botón y tipo de portada) y después cada cosa se
-// ajusta por separado. La plantilla puede venir elegida desde Avanzado →
-// Plantillas por ?plantilla=.
+// ajusta por separado.
 //
 // Antes que todo eso va el tipo de página: sitio web completo o página simple
 // (y, si es simple, cuál de sus cinco diseños).
 //
-// Qué se guarda de verdad (demo/negocioDemo.ts) y se ve en el sitio: el tipo de
+// Qué se guarda de verdad (datos/negocio.ts) y se ve en el sitio: el tipo de
 // página, el diseño de la página simple y la plantilla con sus ajustes (acento,
 // letra, bordes y foto). El botón, el logo, las secciones y los textos siguen
 // siendo una demo en memoria.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { useRouter } from 'next/router'
 import {
   Sparkles, Droplets, Type, Square, Image as ImageIcon, LayoutTemplate, PanelsTopLeft, AlignLeft,
-  Check, Upload, GripVertical, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Lock, Eye, X, Trash2, Info, RotateCcw, ArrowUpRight,
+  Check, Upload, GripVertical, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Lock, Eye, X, Trash2, Info, RotateCcw,
   MonitorSmartphone, Smartphone, type LucideIcon,
 } from 'lucide-react'
-import { useNegocioDemo, type DisenoSimple, type FormaSitio } from '@/modules/turnos/demo/negocioDemo'
-import { achicarFoto } from '@/modules/turnos/onboarding/imagen'
+import { useNegocioDemo, type DisenoSimple, type FormaSitio } from '@/modules/turnos/datos/negocio'
+import { achicarFoto } from '@/lib/achicarImagen'
 import { temaDe } from '@/modules/turnos/storefront/tema'
 import {
   cargarFuentesTurnos, plantillaEnUso, plantillasPara, temaConPlantilla, paletaCon,
   TIPOGRAFIAS, tipografiaPorId, RADIOS, radioDeTema, ESTILOS_BOTON, seccionesIniciales, fotosPara,
   botonesSugeridos, esHex, iniciales, subdominioDe, vozDe, type EstiloBoton, type Paleta, type PlantillaSitio,
 } from './datos'
-import { useBorrador, Encabezado, SecCard, Rotulo, Switch, Campo, Chip, BarraGuardar, Boton, type PropsTab } from './ui'
-import VistaPrevia, { armarPisar } from './VistaPrevia'
-import { MiniSitio, TarjetaPlantilla, datosMini } from './MiniSitio'
+import { Encabezado, SecCard, Rotulo, Switch, Campo, Chip, Boton, type PropsTab } from './ui'
+import { BarraGuardar, useBorrador } from '@/design-system/reservas/piezas'
+import VistaPrevia, { armarPisar, CSS_VISTA_PREVIA } from './VistaPrevia'
+import { MiniSitio, TarjetaPlantilla, datosMini, CSS_MINI, CSS_PLANTILLA } from './MiniSitio'
 
-/** Lo que SÍ se guarda de la apariencia: la plantilla y sus cuatro ajustes (demo/negocioDemo.ts → AparienciaDemo). */
+/** Lo que SÍ se guarda de la apariencia: la plantilla y sus cuatro ajustes (datos/negocio.ts → AparienciaDemo). */
 interface Vestido {
   plantilla: string
   color: string
@@ -76,10 +75,8 @@ const DISENOS: { id: DisenoSimple; titulo: string; texto: string }[] = [
 const deFabrica = (p: PlantillaSitio): Vestido => ({ plantilla: p.id, color: p.c.primary, tipo: p.tipo, radio: p.radio, foto: '' })
 
 export default function Apariencia({ rubro, avisar }: PropsTab) {
-  const router = useRouter()
   const voz = vozDe(rubro)
   const orden = useMemo(() => plantillasPara(rubro), [rubro])
-  const pedida = orden.find(p => p.id === router.query.plantilla)
 
   // Lo que se guarda en el negocio de la demo: el tipo de página, el diseño de la
   // página simple y la plantilla con sus ajustes. null = sin tocar: vale lo guardado
@@ -99,8 +96,7 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
     const g = demo.apariencia?.rubro === rubro.key && demo.apariencia.plantilla === p.id ? demo.apariencia : null
     return g ? { plantilla: p.id, color: esHex(g.color) ? g.color : p.c.primary, tipo: g.tipo || p.tipo, radio: g.radio > 0 ? g.radio : p.radio, foto: g.foto } : deFabrica(p)
   }, [rubro, demo.apariencia])
-  // Si se llegó con una plantilla pedida (desde la galería), el borrador arranca con esa: ya es un cambio sin guardar.
-  const [vestidoBorrador, setVestidoBorrador] = useState<Vestido | null>(() => (pedida ? deFabrica(pedida) : null))
+  const [vestidoBorrador, setVestidoBorrador] = useState<Vestido | null>(null)
   const vestido = vestidoBorrador ?? guardado
   const vestidoDirty = vestidoBorrador !== null && JSON.stringify(vestidoBorrador) !== JSON.stringify(guardado)
   const vestir = (cambio: Partial<Vestido>) => setVestidoBorrador({ ...vestido, ...cambio })
@@ -114,7 +110,7 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
       nombre: t.nombre, frase: t.tagline, boton: botonesSugeridos(rubro)[0],
     }
   })
-  const ap = b.valor
+  const ap = b.v
   const plantilla = orden.find(p => p.id === vestido.plantilla) ?? orden[0]
   const estiloBoton = ap.estiloBoton ?? plantilla.boton
   const hero = ap.hero ?? plantilla.hero
@@ -143,7 +139,7 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
 
   const tocada = color.toLowerCase() !== plantilla.c.primary.toLowerCase() || tipo.id !== plantilla.tipo || radioPx !== plantilla.radio || estiloBoton !== plantilla.boton || hero !== plantilla.hero || vestido.foto !== ''
   // Elegir una plantilla trae todo lo suyo: también el botón y la portada.
-  const elegir = (p: PlantillaSitio) => { setVestidoBorrador(deFabrica(p)); b.setValor(v => ({ ...v, estiloBoton: null, hero: null })) }
+  const elegir = (p: PlantillaSitio) => { setVestidoBorrador(deFabrica(p)); b.setV(v => ({ ...v, estiloBoton: null, hero: null })) }
 
   const ajustes = useMemo(() => ({ color, tipo: tipo.id, radio: radioPx, foto: vestido.foto }), [color, tipo.id, radioPx, vestido.foto])
   const pisar = useMemo(() => armarPisar(rubro, plantilla, ajustes), [rubro, plantilla, ajustes])
@@ -154,7 +150,7 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
 
   const subdominio = subdominioDe(ap.nombre)
   const seAplica = formaDirty || disenoDirty || vestidoDirty
-  const dirty = b.dirty || seAplica
+  const cambiado = b.cambiado || seAplica
   const guardar = () => {
     if (!esHex(vestido.color)) { avisar('Revisá el color de acento', 'Escribilo como #RRGGBB, por ejemplo #C9A36A.'); return }
     b.guardar()
@@ -176,11 +172,6 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
     const quieto = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     riel.current?.scrollBy({ left: d * Math.max(280, riel.current.clientWidth * 0.8), behavior: quieto ? 'auto' : 'smooth' })
   }
-  const irAGaleria = () => {
-    const { tab: _t, plantilla: _p, ...resto } = router.query
-    void _t; void _p
-    void router.replace({ pathname: router.pathname, query: { ...resto, vista: 'avanzado', funcion: 'plantillas' } }, undefined, { shallow: true })
-  }
 
   const preview = (alto: string, celular?: boolean) => (
     // key = forma: la página simple está pensada para el celular, así que al elegirla la vista previa arranca en celular.
@@ -195,21 +186,24 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
   )
 
   return (
-    <div className="panel-page panel-page--editor">
+    // El editor es la única pantalla ancha de Configuración (editor + vista previa lado a lado): 1760 px, como el editor de Tienda.
+    <div className="rv-pagina tuc-pagina--editor">
+      {/* Las hojas de la miniatura, la tarjeta de plantilla y la vista previa viven en sus archivos; se montan acá, una vez. */}
+      <style>{CSS_MINI + CSS_PLANTILLA + CSS_VISTA_PREVIA + CSS_APARIENCIA}</style>
       <Encabezado
         rotulo="Tu sitio"
         titulo="Apariencia"
         bajada="La identidad de tu sitio de reservas: elegí una plantilla y ajustala a tu marca. Cada cambio se ve al instante en la vista previa."
         acciones={<>
-          <Chip tono={dirty ? 'aviso' : 'ok'}>{dirty ? <><span aria-hidden className="tuo-late" style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} />Cambios sin guardar</> : <><Check size={12} strokeWidth={3} aria-hidden />Publicado</>}</Chip>
+          <Chip tono={cambiado ? 'aviso' : 'ok'}>{cambiado ? 'Cambios sin guardar' : <><Check size={12} strokeWidth={3} aria-hidden />Publicado</>}</Chip>
           <span className="tuc-solo-angosto"><Boton variant="outline" icon={<Eye size={15} aria-hidden />} onClick={() => setPreviewAbierta(true)}>Ver vista previa</Boton></span>
-          <span className="tuc-solo-ancho"><Boton variant="primary" disabled={!dirty} onClick={guardar}>Guardar cambios</Boton></span>
+          <span className="tuc-solo-ancho"><Boton variant="primary" disabled={!cambiado} onClick={guardar}>Guardar cambios</Boton></span>
         </>}
       />
 
       {/* ── Tipo de página ─────────────────────────────────────────────────── */}
       <section aria-labelledby="tuc-forma-tit" className="tuc-forma-zona">
-        <h2 id="tuc-forma-tit" className="tuo-h2" style={{ display: 'flex', alignItems: 'center', gap: 8 }}><MonitorSmartphone size={16} aria-hidden style={{ color: 'var(--color-primary)' }} />Tipo de página</h2>
+        <h2 id="tuc-forma-tit" className="rv-h2" style={{ display: 'flex', alignItems: 'center', gap: 8 }}><MonitorSmartphone size={16} aria-hidden style={{ color: 'var(--color-primary)' }} />Tipo de página</h2>
         <p className="tuc-card-bajada">Lo que ven tus {voz.clientes} al entrar a tu link. Las dos llevan tus colores y el botón de reservar, y en las dos se reserva sin registrarse.</p>
         <div role="radiogroup" aria-labelledby="tuc-forma-tit" className="tuc-grid-2 tuc-formas">
           {FORMAS.map(f => {
@@ -232,15 +226,14 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
       <section aria-label="Plantilla" className="tuc-riel-zona">
         <div className="tuc-riel-cab">
           <div style={{ minWidth: 0, flex: '1 1 260px' }}>
-            <h2 className="tuo-h2" style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Sparkles size={16} aria-hidden style={{ color: 'var(--color-primary)' }} />Plantilla</h2>
+            <h2 className="rv-h2" style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Sparkles size={16} aria-hidden style={{ color: 'var(--color-primary)' }} />Plantilla</h2>
             <p className="tuc-card-bajada">El punto de partida: {orden.length} identidades completas, pensadas para {rubro.label.toLowerCase()}. Elegí una y ajustala abajo.</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             {tocada && <button type="button" className="tuc-link" onClick={() => elegir(plantilla)}><RotateCcw size={13} aria-hidden />Volver a los valores de {plantilla.nombre}</button>}
-            <button type="button" className="tuc-link" onClick={irAGaleria}>Ver la galería<ArrowUpRight size={13} aria-hidden /></button>
             <span className="tuc-riel-flechas">
-              <button type="button" className="tuo-btn tuo-btn--sm tuo-btn--icono" aria-label="Plantillas anteriores" onClick={() => correr(-1)}><ChevronLeft size={16} aria-hidden /></button>
-              <button type="button" className="tuo-btn tuo-btn--sm tuo-btn--icono" aria-label="Plantillas siguientes" onClick={() => correr(1)}><ChevronRight size={16} aria-hidden /></button>
+              <button type="button" className="rv-btn rv-btn--sm rv-btn--icono" aria-label="Plantillas anteriores" onClick={() => correr(-1)}><ChevronLeft size={16} aria-hidden /></button>
+              <button type="button" className="rv-btn rv-btn--sm rv-btn--icono" aria-label="Plantillas siguientes" onClick={() => correr(1)}><ChevronRight size={16} aria-hidden /></button>
             </span>
           </div>
         </div>
@@ -258,7 +251,7 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
       </section>
 
       <div className="tuc-ap-split">
-        <div className="tuc-pila">
+        <div className="rv-pila">
 
           {/* El diseño de la página simple va acá, al lado de la vista previa: se elige viendo cómo queda. */}
           {simple && (
@@ -323,8 +316,8 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
                     <span style={{ display: 'block', fontFamily: t.fh, fontSize: 23, fontWeight: t.peso, color: 'var(--color-text)', lineHeight: 1.1, textTransform: t.mayus ? 'uppercase' : 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: 24 }}>{ap.nombre || 'Tu negocio'}</span>
                     <span style={{ display: 'block', fontFamily: t.fb, fontSize: 12.5, color: 'var(--color-body)', marginTop: 7, lineHeight: 1.45 }}>Elegí día y horario en segundos, desde el celular.</span>
                     <span style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: a ? 'var(--color-primary)' : 'var(--color-text)' }}>{t.nombre}</span>
-                      <span className="tuo-rotulo" style={{ textTransform: 'none', letterSpacing: 0, fontSize: 11 }}>{t.titulo} + {t.texto}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: a ? 'var(--chip-primary-fg)' : 'var(--color-text)' }}>{t.nombre}</span>
+                      <span className="rv-rotulo" style={{ textTransform: 'none', letterSpacing: 0, fontSize: 11, color: 'var(--color-body)' }}>{t.titulo} + {t.texto}</span>
                     </span>
                   </button>
                 )
@@ -343,7 +336,7 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
                       <span style={{ height: 22, borderRadius: Math.min(r.px * 0.6, 12), background: paleta.surfaceAlt }} />
                       <span style={{ height: 12, width: '64%', borderRadius: Math.min(r.px, 6), background: paleta.primary }} />
                     </span>
-                    <span style={{ fontSize: 12.5, fontWeight: a ? 700 : 500, color: a ? 'var(--color-primary)' : 'var(--color-body)' }}>{r.label}</span>
+                    <span style={{ fontSize: 12.5, fontWeight: a ? 700 : 500, color: a ? 'var(--chip-primary-fg)' : 'var(--color-body)' }}>{r.label}</span>
                   </button>
                 )
               })}
@@ -355,10 +348,11 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
                 const a = e.id === estiloBoton
                 return (
                   <button key={e.id} type="button" role="radio" aria-checked={a} onClick={() => b.set('estiloBoton', e.id)} className="tuc-opcion tuc-opcion--centro">
-                    <span aria-hidden style={{ display: 'grid', placeItems: 'center', width: '100%', minHeight: 62, borderRadius: 10, background: paleta.bg, border: `1px solid ${paleta.border}`, padding: '0 8px', boxSizing: 'border-box' }}>{muestraBoton(e.id, 'Reservar')}</span>
-                    <span>
-                      <span style={{ display: 'block', fontSize: 12.5, fontWeight: a ? 700 : 600, color: a ? 'var(--color-primary)' : 'var(--color-text)' }}>{e.label}</span>
-                      <span style={{ display: 'block', fontSize: 11.5, color: 'var(--color-muted)' }}>{e.ayuda}</span>
+                    {/* El ancho va en la clase y no inline: en celular la muestra se angosta para dejarle lugar al texto. */}
+                    <span aria-hidden className="tuc-boton-muestra" style={{ background: paleta.bg, border: `1px solid ${paleta.border}` }}>{muestraBoton(e.id, 'Reservar')}</span>
+                    <span className="tuc-boton-txt">
+                      <span style={{ display: 'block', fontSize: 12.5, fontWeight: a ? 700 : 600, color: a ? 'var(--chip-primary-fg)' : 'var(--color-text)' }}>{e.label}</span>
+                      <span style={{ display: 'block', fontSize: 11.5, color: 'var(--color-body)' }}>{e.ayuda}</span>
                     </span>
                   </button>
                 )
@@ -380,8 +374,8 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
                   <button key={id} type="button" role="radio" aria-checked={a} onClick={() => b.set('hero', id)} className="tuc-opcion tuc-opcion--mini">
                     <span className="tuc-opcion-tilde" aria-hidden><Check size={12} strokeWidth={3} /></span>
                     <span className="tuc-opcion-marco"><MiniSitio tema={{ ...temaActual, hero: id }} datos={datos} boton={estiloBoton} /></span>
-                    <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: a ? 'var(--color-primary)' : 'var(--color-text)', marginTop: 10 }}>{titulo}</span>
-                    <span style={{ display: 'block', fontSize: 11.5, color: 'var(--color-muted)' }}>{ayuda}</span>
+                    <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: a ? 'var(--chip-primary-fg)' : 'var(--color-text)', marginTop: 10 }}>{titulo}</span>
+                    <span style={{ display: 'block', fontSize: 11.5, color: 'var(--color-body)' }}>{ayuda}</span>
                   </button>
                 )
               })}
@@ -390,7 +384,7 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
             <div role="radiogroup" aria-label="Foto de portada" className="tuc-fotos">
               <label className="tuc-subir">
                 <Upload size={17} aria-hidden />Subir foto
-                <input type="file" accept="image/*" className="tuc-sr" onChange={e => { subirFoto(e.target.files?.[0]); e.target.value = '' }} />
+                <input type="file" accept="image/*" className="rv-sr" onChange={e => { subirFoto(e.target.files?.[0]); e.target.value = '' }} />
               </label>
               {fotos.map((f, i) => {
                 const a = f === foto
@@ -413,7 +407,7 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
           )}
 
           <SecCard titulo="Secciones de la página" Icon={PanelsTopLeft} bajada="Prendé, apagá y ordená lo que se muestra debajo de la portada: arrastrando o con las flechas." style={simple ? { display: 'none' } : undefined}
-            badge={<Chip tono="primario"><span className="tuo-num">{ap.secciones.filter(s => s.on).length}/{ap.secciones.length}</span> visibles</Chip>}>
+            badge={<Chip tono="primario"><span className="rv-num">{ap.secciones.filter(s => s.on).length}/{ap.secciones.length}</span> visibles</Chip>}>
             <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
               <li style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'var(--color-surface)', border: '1px dashed var(--color-border-strong)' }}>
                 <Lock size={15} aria-hidden style={{ color: 'var(--color-subtle)', flexShrink: 0 }} />
@@ -461,7 +455,7 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
             <Campo label="Texto del botón principal" value={ap.boton} onChange={v => b.set('boton', v)} maxLength={24} style={{ marginBottom: 8 }} />
             <div role="group" aria-label="Textos sugeridos para el botón" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {botonesSugeridos(rubro).map(t => (
-                <button key={t} type="button" aria-pressed={ap.boton === t} onClick={() => b.set('boton', t)} className="tuc-pastilla">{t}</button>
+                <button key={t} type="button" aria-pressed={ap.boton === t} onClick={() => b.set('boton', t)} className="rv-chip rv-chip--borde">{t}</button>
               ))}
             </div>
           </SecCard>
@@ -473,7 +467,7 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
         </aside>
       </div>
 
-      <BarraGuardar dirty={dirty} onDescartar={descartar} onGuardar={guardar} />
+      <BarraGuardar cambiado={cambiado} onDescartar={descartar} onGuardar={guardar} />
 
       {previewAbierta && (
         <div role="dialog" aria-modal="true" aria-label="Vista previa del sitio" className="tuc-velo" onClick={() => setPreviewAbierta(false)}
@@ -481,7 +475,7 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
           style={{ display: 'flex', flexDirection: 'column', padding: 12, placeItems: 'stretch' }}>
           <div onClick={e => e.stopPropagation()} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 1100, width: '100%', margin: '0 auto' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontFamily: 'var(--tuo-fh)', fontSize: 15, fontWeight: 600, color: '#fff' }}>Vista previa · {plantilla.nombre}</span>
+              <span style={{ fontSize: 15, fontWeight: 600, color: '#fff' }}>Vista previa · {plantilla.nombre}</span>
               <button type="button" onClick={() => setPreviewAbierta(false)} aria-label="Cerrar vista previa" autoFocus className="tuc-cerrar-claro"><X size={18} aria-hidden /></button>
             </div>
             {preview('100%', true)}
@@ -535,7 +529,7 @@ function BocetoSimple({ diseno, c, radio }: { diseno: DisenoSimple; c: Paleta; r
 
 function NotaAproximada() {
   return (
-    <p style={{ display: 'flex', gap: 7, alignItems: 'flex-start', fontSize: 12, color: 'var(--color-muted)', margin: '12px 2px 0', lineHeight: 1.5 }}>
+    <p style={{ display: 'flex', gap: 7, alignItems: 'flex-start', fontSize: 12, color: 'var(--rv-tinta-fondo, var(--color-muted))', margin: '12px 2px 0', lineHeight: 1.5 }}>
       <Info size={13} aria-hidden style={{ flexShrink: 0, marginTop: 2 }} />
       <span>La vista previa muestra tu sitio con la plantilla, el acento, la letra, los bordes y la foto que elegiste: es lo que se guarda. El diseño de la portada, el estilo del botón, los textos, el logo y el orden de las secciones se ven en las miniaturas.</span>
     </p>
@@ -565,7 +559,7 @@ function Logo({ ap, tipoFh, color, sobre, onLogo, onMonograma }: { ap: Ap; tipoF
             <span style={{ fontSize: 11.5, fontWeight: 400 }}>PNG o SVG con fondo transparente, hasta 2 MB</span>
           </button>
         )}
-        <input ref={input} type="file" accept="image/png,image/svg+xml,image/jpeg,image/webp" className="tuc-sr" aria-label="Archivo del logo" tabIndex={-1}
+        <input ref={input} type="file" accept="image/png,image/svg+xml,image/jpeg,image/webp" className="rv-sr" aria-label="Archivo del logo" tabIndex={-1}
           onChange={e => { const f = e.target.files?.[0]; if (f) onLogo(URL.createObjectURL(f)) }} />
       </div>
       <div className="tuc-renglon" style={{ flex: '1 1 200px', minWidth: 0, display: 'flex', alignItems: 'center', gap: 12, padding: 14 }}>
@@ -580,19 +574,24 @@ function Logo({ ap, tipoFh, color, sobre, onLogo, onMonograma }: { ap: Ap; tipoF
   )
 }
 
-// Estilos propios de esta pantalla. Van en ConfiguracionTurnos (una sola vez):
-// ver CSS_CONFIG ahí.
+// Estilos propios de esta pantalla: la pantalla los monta junto con los de la
+// miniatura, la tarjeta de plantilla y la vista previa (ver arriba).
 export const CSS_APARIENCIA = `
+  .tuc-pagina--editor { --rv-ancho: 1760px; }
   .tuc-forma-zona { margin: 0 0 26px; min-width: 0; }
+  /* El subtítulo de cada zona queda suelto sobre el fondo de la página (en claro, donde baja la
+     curva del horizonte del panel): tinta de fondo del kit. */
+  .tuc-forma-zona > .tuc-card-bajada, .tuc-riel-cab .tuc-card-bajada { color: var(--rv-tinta-fondo, var(--color-muted)); }
   .tuc-formas { margin-top: 12px; max-width: 900px; }
   .tuc-forma { display: flex; align-items: flex-start; gap: 12px; text-align: left; padding: 14px 46px 14px 14px; }
   .tuc-forma-ico { width: 40px; height: 40px; border-radius: 11px; flex-shrink: 0; display: grid; place-items: center; color: var(--color-primary); background: var(--color-primary-bg); }
   .tuc-forma-tit { display: block; font-size: 14px; font-weight: 600; color: var(--color-text); transition: color 160ms ease; }
-  .tuc-forma[aria-checked='true'] .tuc-forma-tit { color: var(--color-primary); }
+  .tuc-forma[aria-checked='true'] .tuc-forma-tit { color: var(--chip-primary-fg); }
   .tuc-forma-txt { display: block; margin-top: 3px; font-size: 12.5px; line-height: 1.5; color: var(--color-muted); }
+  .tuc-forma[aria-checked='true'] .tuc-forma-txt { color: var(--color-body); }
   .tuc-disenos { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px; }
   .tuc-diseno { display: flex; flex-direction: column; text-align: left; padding: 10px 10px 12px; }
-  .tuc-diseno .tuc-opcion-tilde { z-index: 2; top: 16px; right: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+  .tuc-diseno .tuc-opcion-tilde { z-index: 2; top: 16px; right: 16px; }
   .tuc-boceto { position: relative; display: block; width: 100%; aspect-ratio: 9 / 13; border-radius: 10px; border: 1px solid; overflow: hidden; }
   .tuc-simple-lista { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; font-size: 13px; color: var(--color-body); }
   .tuc-simple-lista li { display: flex; align-items: flex-start; gap: 8px; line-height: 1.45; }
@@ -614,30 +613,30 @@ export const CSS_APARIENCIA = `
   .tuc-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
   .tuc-grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
   .tuc-opcion--centro { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding: 12px 10px; }
+  .tuc-boton-muestra { display: grid; place-items: center; width: 100%; min-height: 62px; border-radius: 10px; padding: 0 8px; box-sizing: border-box; }
+  .tuc-boton-txt { min-width: 0; }
   .tuc-opcion--mini { padding: 8px 8px 12px; }
   .tuc-opcion-marco { display: block; border-radius: 9px; overflow: hidden; border: 1px solid var(--color-border); }
-  .tuc-opcion--mini .tuc-opcion-tilde { z-index: 3; top: 14px; right: 14px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+  .tuc-opcion--mini .tuc-opcion-tilde { z-index: 3; top: 14px; right: 14px; }
   .tuc-borde-muestra { width: 100%; max-width: 92px; box-sizing: border-box; padding: 8px; border: 1px solid; display: flex; flex-direction: column; gap: 7px; transition: border-radius 240ms ease; }
 
   .tuc-paletas { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
-  .tuc-paleta { padding: 6px 6px 8px; border-radius: 14px; border: 1.5px solid var(--color-border); background: var(--color-bg); cursor: pointer; font-family: inherit; color: var(--color-muted); min-width: 0;
-    transition: border-color 160ms ease, box-shadow 220ms ease, transform 220ms var(--tuo-ease, ease); }
+  .tuc-paleta { padding: 6px 6px 8px; border-radius: 12px; border: 1px solid var(--color-border); background: var(--color-bg); cursor: pointer; font-family: inherit; color: var(--color-muted); min-width: 0; transition: border-color 160ms ease; }
   .tuc-paleta-muestra { display: flex; flex-direction: column; gap: 5px; height: 66px; box-sizing: border-box; padding: 9px; border-radius: 9px; border: 1px solid; }
   .tuc-paleta-pie { display: flex; align-items: center; justify-content: center; gap: 5px; margin-top: 7px; font-size: 11px; font-weight: 500; }
-  .tuc-paleta[aria-checked='true'] { border-color: var(--color-primary); color: var(--color-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent); }
+  .tuc-paleta[aria-checked='true'] { border-color: var(--color-primary); color: var(--chip-primary-fg); box-shadow: 0 0 0 1px var(--color-primary); }
   .tuc-paleta:focus-visible, .tuc-foto:focus-visible, .tuc-subir:focus-visible, .tuc-subir:focus-within, .tuc-cerrar-claro:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .tuc-color-pozo { width: 30px; height: 30px; flex: none !important; border: none; padding: 0; background: transparent; cursor: pointer; border-radius: 8px; }
 
   .tuc-fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
-  .tuc-subir { aspect-ratio: 4 / 3; border-radius: 12px; border: 1.5px dashed var(--color-border-strong); background: var(--color-surface); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  .tuc-subir { aspect-ratio: 4 / 3; border-radius: 12px; border: 1px dashed var(--color-border-strong); background: var(--color-surface); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
     cursor: pointer; color: var(--color-muted); font-family: inherit; font-size: 11.5px; font-weight: 600; text-align: center; padding: 8px; box-sizing: border-box; transition: border-color 160ms ease, color 160ms ease, background 160ms ease; }
-  .tuc-subir > svg { color: var(--color-primary); transition: transform 240ms var(--tuo-ease, ease); }
+  .tuc-subir > svg { color: var(--color-primary); }
   .tuc-foto { position: relative; aspect-ratio: 4 / 3; border-radius: 12px; overflow: hidden; padding: 0; border: none; cursor: pointer; background: var(--color-surface-alt); transition: box-shadow 200ms ease; }
-  .tuc-foto > img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 500ms var(--tuo-ease, ease), filter 200ms ease; }
-  .tuc-foto[aria-checked='true'] { box-shadow: 0 0 0 2px var(--color-bg), 0 0 0 4.5px var(--color-primary); }
-  .tuc-foto-tilde { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 50%; background: var(--tuo-grad); color: #fff; display: grid; place-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.35);
-    opacity: 0; transform: scale(0.6); transition: opacity 180ms ease, transform 240ms var(--tuo-ease, ease); }
-  .tuc-foto[aria-checked='true'] .tuc-foto-tilde { opacity: 1; transform: none; }
+  .tuc-foto > img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .tuc-foto[aria-checked='true'] { box-shadow: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-primary); }
+  .tuc-foto-tilde { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 50%; background: var(--color-primary); color: var(--color-on-primary); display: grid; place-items: center; opacity: 0; transition: opacity 180ms ease; }
+  .tuc-foto[aria-checked='true'] .tuc-foto-tilde { opacity: 1; }
 
   .tuc-seccion { display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 8px; }
   .tuc-seccion > *, .tuc-seccion { transition: opacity 200ms ease, border-color 160ms ease, box-shadow 200ms ease; }
@@ -648,11 +647,8 @@ export const CSS_APARIENCIA = `
   .tuc-cerrar-claro { width: 44px; height: 44px; border-radius: 12px; background: rgba(255,255,255,0.14); border: none; color: #fff; cursor: pointer; display: grid; place-items: center; transition: background 150ms ease; }
 
   @media (hover: hover) {
-    .tuc-paleta:not([aria-checked='true']):hover { border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border)); transform: translateY(-2px); box-shadow: var(--shadow-card-hover); }
-    .tuc-foto:hover > img { transform: scale(1.07); }
+    .tuc-paleta:not([aria-checked='true']):hover { border-color: var(--color-border-strong); }
     .tuc-subir:hover { border-color: var(--color-primary); color: var(--color-text); background: var(--color-primary-bg); }
-    .tuc-subir:hover > svg { transform: translateY(-2px); }
-    .tuc-opcion--mini:hover .tuc-mini-lienzo { transform: scale(1.05); }
     .tuc-cerrar-claro:hover { background: rgba(255,255,255,0.26); }
   }
   @media (max-width: 1100px) {
@@ -672,11 +668,11 @@ export const CSS_APARIENCIA = `
     .tuc-grid-2 { grid-template-columns: minmax(0, 1fr); }
     .tuc-grid-3 { grid-template-columns: minmax(0, 1fr); }
     .tuc-grid-3 > .tuc-opcion--centro { flex-direction: row; text-align: left; }
-    .tuc-grid-3 > .tuc-opcion--centro > span:first-child { width: 132px; flex-shrink: 0; }
+    .tuc-grid-3 > .tuc-opcion--centro > .tuc-boton-muestra { width: 132px; flex-shrink: 0; }
+    .tuc-grid-3 > .tuc-opcion--centro > .tuc-boton-txt { flex: 1; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .tuc-paleta, .tuc-foto > img, .tuc-foto-tilde, .tuc-subir > svg, .tuc-borde-muestra { transition: none !important; }
-    .tuc-paleta:hover, .tuc-foto:hover > img, .tuc-subir:hover > svg, .tuc-opcion--mini:hover .tuc-mini-lienzo { transform: none !important; }
+    .tuc-paleta, .tuc-foto-tilde, .tuc-borde-muestra { transition: none !important; }
     .tuc-riel { scroll-behavior: auto; }
   }
 `

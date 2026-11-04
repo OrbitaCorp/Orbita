@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { CheckCircle2, Lock } from 'lucide-react'
 import { Avatar } from '@/design-system/components/Avatar'
-import { useDarkMode, type TemaPreferencia } from '@/hooks/useDarkMode'
+import { conFundidoDeTema, esOscuro, useDarkMode, type TemaPreferencia } from '@/hooks/useDarkMode'
 import { useAuth } from '@/hooks/useAuth'
 import { panelGetProfile, panelUpdateProfile, panelUpdateTheme, panelChangePassword, ApiError, type MemberProfile } from '@/lib/api'
 import { VerificarEmail } from './VerificarEmail'
@@ -82,7 +82,8 @@ export default function MiPerfil() {
   }
 
   async function handleCambiarTema(t: TemaPreferencia) {
-    setTema(t)
+    // Con fundido, igual que el botón del Header (globals.css, "Cambio de tema con fundido").
+    conFundidoDeTema(esOscuro(t), () => setTema(t))
     try {
       const p = await panelUpdateTheme(t.toUpperCase() as MemberProfile['themePreference'])
       setPerfil(p)

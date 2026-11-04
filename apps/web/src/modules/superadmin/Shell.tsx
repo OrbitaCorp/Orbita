@@ -76,8 +76,12 @@ export function SuperAdminShell<T extends string>({
             transform: translateX(0);
             box-shadow: 8px 0 32px rgba(0,0,0,0.25);
           }
-          .sa-burger { display: inline-flex; }
+          /* flex y no inline-flex: con inline la barra medía lo que el logo
+             (168 px) y el fondo y la línea se cortaban ahí. */
+          .sa-burger { display: flex; }
           .sa-contenido { padding: 20px 16px 48px !important; }
+          /* En el cajón se toca con el dedo: 44 px por ítem. */
+          .sa-sidebar nav button, .sa-sidebar > div:last-child button { height: 44px; }
         }
       `}</style>
 
@@ -201,7 +205,7 @@ export function SuperAdminShell<T extends string>({
             aria-label={abierto ? 'Cerrar menú' : 'Abrir menú'}
             className="ds-hover"
             style={{
-              width: 36, height: 36, borderRadius: 8, border: '1px solid var(--color-border)',
+              width: 44, height: 44, borderRadius: 10, border: '1px solid var(--color-border)',
               background: 'var(--color-bg)', color: 'var(--color-body)',
               display: 'grid', placeItems: 'center', fontFamily: 'inherit',
             }}

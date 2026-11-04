@@ -1,3 +1,4 @@
+import Head from 'next/head'
 import { useEffect } from 'react'
 import { RequireAuth } from '@/lib/auth/RequireAuth'
 import { SuperAdminDashboard } from '@/modules/superadmin/SuperAdminDashboard'
@@ -8,10 +9,13 @@ import { leerConexionPendiente } from '@/lib/platform/conexionClaude'
 // en pages/superadmin/negocios/[id].tsx), sobre los endpoints /platform/*.
 export default function SuperAdminPage() {
   return (
-    <RequireAuth type="platform_admin">
-      <RetomarConexionPendiente />
-      <SuperAdminDashboard />
-    </RequireAuth>
+    <>
+      <Head><title>Superadmin · Órbita</title></Head>
+      <RequireAuth type="platform_admin">
+        <RetomarConexionPendiente />
+        <SuperAdminDashboard />
+      </RequireAuth>
+    </>
   )
 }
 

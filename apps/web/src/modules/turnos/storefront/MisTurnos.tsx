@@ -18,8 +18,8 @@ import {
   ArrowRight, CalendarClock, CalendarPlus, Check, ChevronLeft, Clock, Coins, Gift, Home, Hourglass, LogOut, MapPin, MessageCircle,
   Navigation, RotateCcw, ShieldCheck, X,
 } from 'lucide-react'
-import { recursosDe, clasesDe, horaTxt, duracionTxt, pesos, type RubroTurnos } from '@/modules/turnos/datos'
-import { beneficiosTxt, plazoTxt, useNegocioDemo, type FormaSitio } from '@/modules/turnos/demo/negocioDemo'
+import { recursosDe, semanaDeRecurso, horaTxt, duracionTxt, pesos, type RubroTurnos } from '@/modules/turnos/datos'
+import { beneficiosTxt, plazoTxt, useNegocioDemo, type FormaSitio } from '@/modules/turnos/datos/negocio'
 import type { Semana } from '@/modules/turnos/horario'
 import { QR } from '@/modules/turnos/_shared/components/QR'
 import { arco, largoArco, punto } from '@/modules/turnos/_shared/orbita/geometria'
@@ -195,7 +195,7 @@ function Codigo({ tel, onListo, onVolver }: { tel: string; onListo: () => void; 
 
 // ─── Panel del cliente ───────────────────────────────────────────────────────
 
-interface TurnoCliente { id: string; servicio: number; recurso: number; fecha: Fecha; hora: number; estado: 'confirmado' | 'cancelado' | 'espera'; sena?: boolean; lugar?: number; cambiado?: boolean }
+interface TurnoCliente { id: string; servicio: number; recurso: number; fecha: Fecha; hora: number; estado: 'confirmado' | 'cancelado'; sena?: boolean; cambiado?: boolean }
 type Pendiente = { tipo: 'cancelar'; id: string } | { tipo: 'reprogramar'; id: string; fecha: Fecha; hora: number }
 
 const faltan = (f: Fecha) => { const n = enDias(f); return n <= 0 ? 'Es hoy' : n === 1 ? 'Es mañana' : `Faltan ${n} días` }
@@ -204,8 +204,6 @@ function Panel({ rubro, t, onSalir }: { rubro: RubroTurnos; t: TemaNegocio; onSa
   const router = useRouter()
   const sinNada = router.query.estado === 'vacio'
   const recursos = useMemo(() => recursosDe(rubro), [rubro])
-  const clases = useMemo(() => clasesDe(rubro), [rubro])
-  const cupo = rubro.modo === 'cupo'
   const persona = rubro.modo === 'profesional'
   const forma = useForma()
   const { cuentas, politica } = useNegocioDemo().demo
@@ -227,7 +225,7 @@ function Panel({ rubro, t, onSalir }: { rubro: RubroTurnos; t: TemaNegocio; onSa
 
   const [turnos, setTurnos] = useState<TurnoCliente[]>(() => sinNada ? [] : [
     { id: 'a', servicio: 1, recurso: 1, fecha: { mes: 9, dia: 29 }, hora: 16 * 60, estado: 'confirmado', sena: rubro.sena > 0 },
-    { id: 'b', servicio: 0, recurso: 0, fecha: { mes: 10, dia: 13 }, hora: 11 * 60, estado: cupo ? 'espera' : 'confirmado', lugar: 2 },
+    { id: 'b', servicio: 0, recurso: 0, fecha: { mes: 10, dia: 13 }, hora: 11 * 60, estado: 'confirmado' },
   ])
   const [reprog, setReprog] = useState<TurnoCliente | null>(null)
   const [cancelar, setCancelar] = useState<TurnoCliente | null>(null)
@@ -254,8 +252,8 @@ function Panel({ rubro, t, onSalir }: { rubro: RubroTurnos; t: TemaNegocio; onSa
   }, [pendiente])
 
   const servicioDe = (i: number) => rubro.servicios[i % rubro.servicios.length]
-  const nombreServ = (i: number) => (cupo ? clases[i * 3]?.nombre ?? servicioDe(i).nombre : servicioDe(i).nombre)
-  const duracionDe = (x: TurnoCliente) => (cupo ? 60 : servicioDe(x.servicio).duracion)
+  const nombreServ = (i: number) => servicioDe(i).nombre
+  const duracionDe = (x: TurnoCliente) => servicioDe(x.servicio).duracion
 
   // El protagonista es el turno activo más cercano; los cancelados quedan en la lista, avisados.
   const orden = (a: TurnoCliente, b: TurnoCliente) => enDias(a.fecha) - enDias(b.fecha) || a.hora - b.hora
@@ -281,22 +279,20 @@ function Panel({ rubro, t, onSalir }: { rubro: RubroTurnos; t: TemaNegocio; onSa
           <OrbitaVacia><CalendarPlus size={38} strokeWidth={1.5} aria-hidden /></OrbitaVacia>
           <h2 className="tur-h" style={{ fontSize: 'clamp(26px, 4vw, 36px)', fontWeight: 700, marginTop: 8 }}>Todavía no tenés turnos</h2>
           <p className="tur-bajada" style={{ margin: '12px auto 26px' }}>Cuando reserves en {t.nombre}, tu turno aparece acá con su QR, la cuenta regresiva y las opciones para cambiarlo.</p>
-          <Link href={ruta('reserva', rubro.key, { forma })} className="tur-btn">Reservar {cupo ? 'una clase' : 'un turno'} <ArrowRight size={18} className="tur-flecha" aria-hidden /></Link>
+          <Link href={ruta('reserva', rubro.key, { forma })} className="tur-btn">Reservar un turno <ArrowRight size={18} className="tur-flecha" aria-hidden /></Link>
           {tarjeta && <div style={{ marginTop: 36 }}>{tarjeta}</div>}
         </div>
       ) : (
         <div className="tur-mt">
           <div style={{ minWidth: 0 }}>
-            <h2 className="tur-rotulo tur-entra" style={{ margin: '0 0 12px' }}>{cupo ? 'Tu próxima clase' : 'Tu próximo turno'}</h2>
+            <h2 className="tur-rotulo tur-entra" style={{ margin: '0 0 12px' }}>Tu próximo turno</h2>
             {prox ? (
               <article className="tur-prox tur-entra" style={{ ['--i' as string]: 1 }}>
                 <div className="tur-prox-cuerpo">
                   <CuentaRegresiva key={`${prox.id}-${enDias(prox.fecha)}`} dias={enDias(prox.fecha)} />
                   <div style={{ minWidth: 0 }}>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-                      {prox.estado === 'espera'
-                        ? <span className="tur-estado" style={{ color: 'var(--tur-aviso)' }}><Hourglass size={13} aria-hidden /> En lista de espera · puesto {prox.lugar}</span>
-                        : <span className="tur-estado" style={{ color: 'var(--tur-ok)' }}><Check size={13} strokeWidth={3} aria-hidden /> Confirmado</span>}
+                      <span className="tur-estado" style={{ color: 'var(--tur-ok)' }}><Check size={13} strokeWidth={3} aria-hidden /> Confirmado</span>
                       {prox.cambiado && <span className="tur-estado" style={{ color: 'var(--color-body)' }}><CalendarClock size={13} aria-hidden /> Reprogramado</span>}
                     </div>
                     <div className="tur-h" style={{ fontSize: 'clamp(26px, 3.6vw, 34px)', fontWeight: 700 }}>{nombreServ(prox.servicio)}</div>
@@ -337,16 +333,14 @@ function Panel({ rubro, t, onSalir }: { rubro: RubroTurnos; t: TemaNegocio; onSa
                     <button type="button" className="tur-btn tur-btn--sec tur-btn--chico" onClick={() => setReprog(prox)}><CalendarClock size={16} aria-hidden /> Reprogramar</button>
                     <button type="button" className="tur-btn tur-btn--sec tur-btn--chico" style={{ color: 'var(--tur-error)' }} onClick={() => setCancelar(prox)}><X size={16} aria-hidden /> Cancelar</button>
                   </div>
-                  {prox.estado === 'confirmado' && (
-                    <div className="tur-prox-qr">
-                      <div className="tur-qr"><QR texto={urlTurno(t.nombre)} size={104} titulo={`Código QR de la reserva ${CODIGO_DEMO}`} /></div>
-                      <div style={{ minWidth: 0 }}>
-                        <div className="tur-rotulo">Reserva</div>
-                        <div className="tur-num" style={{ fontSize: 17, fontWeight: 600, letterSpacing: '0.06em', color: 'var(--color-text)', marginTop: 2 }}>{CODIGO_DEMO}</div>
-                        <div style={{ fontSize: 13.5, lineHeight: 1.45, color: 'var(--color-body)', marginTop: 5, maxWidth: 150 }}>{conLocal ? 'Mostrá el QR cuando llegues.' : 'Es el comprobante de tu reserva.'}</div>
-                      </div>
+                  <div className="tur-prox-qr">
+                    <div className="tur-qr"><QR texto={urlTurno(t.nombre)} size={104} titulo={`Código QR de la reserva ${CODIGO_DEMO}`} /></div>
+                    <div style={{ minWidth: 0 }}>
+                      <div className="tur-rotulo">Reserva</div>
+                      <div className="tur-num" style={{ fontSize: 17, fontWeight: 600, letterSpacing: '0.06em', color: 'var(--color-text)', marginTop: 2 }}>{CODIGO_DEMO}</div>
+                      <div style={{ fontSize: 13.5, lineHeight: 1.45, color: 'var(--color-body)', marginTop: 5, maxWidth: 150 }}>{conLocal ? 'Mostrá el QR cuando llegues.' : 'Es el comprobante de tu reserva.'}</div>
                     </div>
-                  )}
+                  </div>
                 </div>
               </article>
             ) : (
@@ -373,9 +367,7 @@ function Panel({ rubro, t, onSalir }: { rubro: RubroTurnos; t: TemaNegocio; onSa
                           <span className="tur-num">{horaTxt(x.hora)}</span>{persona ? ` · con ${recursos[x.recurso % recursos.length].nombre.split(' ')[0]}` : ''}{x.estado === 'confirmado' ? ` · ${faltan(x.fecha).toLowerCase()}` : ''}
                         </div>
                       </div>
-                      {x.estado === 'espera' ? (
-                        <span className="tur-estado" style={{ color: 'var(--tur-aviso)' }}><Hourglass size={13} aria-hidden /> Espera · puesto {x.lugar}</span>
-                      ) : x.estado === 'cancelado' ? (
+                      {x.estado === 'cancelado' ? (
                         <span className="tur-estado" style={{ color: 'var(--tur-error)' }}><X size={13} aria-hidden /> Cancelado</span>
                       ) : (
                         <button type="button" onClick={() => setReprog(x)} className="tur-btn tur-btn--sec tur-btn--chico">Cambiar</button>
@@ -400,9 +392,9 @@ function Panel({ rubro, t, onSalir }: { rubro: RubroTurnos; t: TemaNegocio; onSa
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div className="tur-rotulo">{h.f}</div>
                       <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 2 }}>{nombreServ(h.s)}</div>
-                      {!cupo && <div className="tur-num" style={{ fontSize: 13.5, color: 'var(--color-muted)' }}>{servicioDe(h.s).precio ? pesos(servicioDe(h.s).precio) : 'Sin cargo'}</div>}
+                      <div className="tur-num" style={{ fontSize: 13.5, color: 'var(--color-muted)' }}>{servicioDe(h.s).precio ? pesos(servicioDe(h.s).precio) : 'Sin cargo'}</div>
                     </div>
-                    <Link href={ruta('reserva', rubro.key, { forma, ...(cupo ? {} : { servicio: h.s % rubro.servicios.length, ...(persona ? { con: recursos[h.r % recursos.length].id } : {}) }) })}
+                    <Link href={ruta('reserva', rubro.key, { forma, servicio: h.s % rubro.servicios.length, ...(persona ? { con: recursos[h.r % recursos.length].id } : {}) })}
                       className="tur-enlace" aria-label={`Repetir ${nombreServ(h.s)}`}><RotateCcw size={15} aria-hidden /> Repetir</Link>
                   </div>
                 </li>
@@ -416,12 +408,13 @@ function Panel({ rubro, t, onSalir }: { rubro: RubroTurnos; t: TemaNegocio; onSa
         </div>
       )}
 
+      {/* Se reprograma con la misma persona: solo sus días y su horario (como en la reserva), no todo el del negocio. */}
       {reprog && (
-        <Reprogramar horarios={t.horarios} duracion={duracionDe(reprog)} actual={reprog} guardando={pendiente?.tipo === 'reprogramar'} onCerrar={() => !pendiente && setReprog(null)}
+        <Reprogramar horarios={persona ? semanaDeRecurso(recursos[reprog.recurso % recursos.length], t.horarios) : t.horarios} duracion={duracionDe(reprog)} actual={reprog} guardando={pendiente?.tipo === 'reprogramar'} onCerrar={() => !pendiente && setReprog(null)}
           onListo={(fecha, hora) => setPendiente({ tipo: 'reprogramar', id: reprog.id, fecha, hora })} />
       )}
       {cancelar && (
-        <Modal titulo={cupo ? '¿Cancelar la clase?' : '¿Cancelar el turno?'} onCerrar={() => !pendiente && setCancelar(null)}>
+        <Modal titulo="¿Cancelar el turno?" onCerrar={() => !pendiente && setCancelar(null)}>
           <p style={{ fontSize: 16, lineHeight: 1.6, color: 'var(--color-text)', margin: '0 0 8px', fontWeight: 600 }}>{nombreServ(cancelar.servicio)} · {fechaLarga(cancelar.fecha).toLowerCase()} a las <span className="tur-num">{horaTxt(cancelar.hora)}</span></p>
           <p style={{ fontSize: 14.5, lineHeight: 1.6, color: 'var(--color-body)', margin: '0 0 24px' }}>
             {enDias(cancelar.fecha) * 24 > politica.cancelaHasta

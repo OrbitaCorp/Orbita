@@ -1,5 +1,5 @@
 import { Fragment, memo, useMemo, type ReactNode } from 'react'
-import { parsear, sinMarcaAbierta, type Linea } from './markdown'
+import { parsear, sinMarcaAbierta, type Linea } from './parser'
 import s from '../orbi.module.css'
 
 function Lineas({ partes, onLink }: { partes: Linea[]; onLink: (ruta: string) => void }): ReactNode {

@@ -1,66 +1,54 @@
 // DEMO INTERNA — datos de ejemplo de Configuración del panel de Turnos.
-// Casi todo es visual; lo que sí se guarda vive en demo/negocioDemo.ts. Cuando exista el backend, cada bloque de
-// acá es la forma que va a tener la config del negocio (apariencia, horarios,
-// reglas de reserva, mensajes), no la fuente de datos.
+// Casi todo es visual; lo que sí se guarda vive en datos/negocio.ts. Acá van
+// las pestañas, cómo se nombra cada cosa según el rubro y lo que Apariencia
+// necesita para mostrar y editar las plantillas.
 import type { LucideIcon } from 'lucide-react'
-import {
-  Scissors, Users, Images, Heart, Gift, ListOrdered, MapPin,
-  Palette, Building2, Clock, CalendarCog, Bell, Wallet, Globe, Crown, ShieldCheck,
-} from 'lucide-react'
+import { Scissors, Users, Images, Heart, Gift, ListOrdered, MapPin } from 'lucide-react'
 import { esSalud, type RubroTurnos } from '@/modules/turnos/datos'
-import type { AparienciaDemo } from '@/modules/turnos/demo/negocioDemo'
+import type { AparienciaDemo } from '@/modules/turnos/datos/negocio'
 import { TIPOGRAFIAS, aplicarPlantilla, type AjustesPlantilla, type EstiloBoton, type PlantillaSitio } from '@/modules/turnos/storefront/plantillas'
 import { plantillasDelRubro, temaDe, type TemaNegocio } from '@/modules/turnos/storefront/tema'
 
-// ─── Pestañas ─────────────────────────────────────────────────────────────────
+// ─── Las sub-secciones de Configuración ──────────────────────────────────────
+// Son las del ítem "Configuración" de la barra lateral (viajan en ?tab=). Lo
+// que antes vivía adentro de Configuración como pestaña (servicios, equipo,
+// espacios, ganancias, reglas, mensajes, pagos) ahora es una sección propia del
+// menú: PanelTurnos redirige los links viejos.
 
-export type TabConfig =
-  | 'apariencia' | 'dominio'
-  | 'negocio' | 'horarios' | 'reservas' | 'mensajes' | 'pagos'
-  | 'equipo' | 'suscripcion'
+export type TabConfig = 'negocio' | 'horarios' | 'apariencia' | 'dominio' | 'suscripcion'
 
-export interface GrupoNav { label?: string; items: { id: TabConfig; label: string; Icon: LucideIcon }[] }
-
-export const GRUPOS_NAV: GrupoNav[] = [
-  { label: 'Tu sitio', items: [
-    { id: 'apariencia', label: 'Apariencia', Icon: Palette },
-    { id: 'dominio', label: 'Dominio', Icon: Globe },
-  ] },
-  { label: 'Tu negocio', items: [
-    { id: 'negocio', label: 'Datos del negocio', Icon: Building2 },
-    { id: 'horarios', label: 'Horarios', Icon: Clock },
-    { id: 'reservas', label: 'Reglas de reserva', Icon: CalendarCog },
-    { id: 'mensajes', label: 'Recordatorios y mensajes', Icon: Bell },
-    { id: 'pagos', label: 'Pagos', Icon: Wallet },
-  ] },
-  { label: 'Cuenta', items: [
-    { id: 'equipo', label: 'Equipo y permisos', Icon: ShieldCheck },
-    { id: 'suscripcion', label: 'Suscripción', Icon: Crown },
-  ] },
+export const SUBS_CONFIG: { id: TabConfig; label: string; separador?: boolean }[] = [
+  { id: 'negocio', label: 'Datos del negocio' },
+  { id: 'horarios', label: 'Horarios' },
+  { id: 'apariencia', label: 'Apariencia' },
+  { id: 'dominio', label: 'Dominio' },
+  { id: 'suscripcion', label: 'Suscripción', separador: true },
 ]
 
-export const TABS: TabConfig[] = GRUPOS_NAV.flatMap(g => g.items.map(i => i.id))
+/** Los links viejos (?vista=configuracion&tab=…) y la sección del menú a la que van ahora. */
+export const TABS_VIEJAS: Record<string, string> = {
+  servicios: 'servicios', equipo: 'equipo', espacios: 'espacios', ganancias: 'ganancias', reservas: 'reglas', mensajes: 'mensajes', pagos: 'pagos',
+}
 
 // ─── Cómo se nombra cada cosa según el rubro ─────────────────────────────────
-// Un consultorio no tiene "clientes" ni un gimnasio "turnos": el copy de toda
-// la configuración sale de acá para no repetir el if en cada pantalla.
+// Un consultorio no tiene "clientes" sino "pacientes": el copy de toda la
+// configuración sale de acá para no repetir el if en cada pantalla.
 
 export interface Voz {
-  /** "clientes" / "pacientes" / "alumnos". */
+  /** "clientes" / "pacientes". */
   clientes: string
   cliente: string
-  /** "turno" / "clase" / "reserva". */
   turno: string
   turnos: string
-  /** "profesional" / "cancha" / "sala". */
+  /** Quien atiende o dónde: "barbero", "consultorio", "cabina". */
   recurso: string
 }
 
 export function vozDe(r: RubroTurnos): Voz {
-  const clientes = esSalud(r) ? 'pacientes' : r.modo === 'cupo' ? 'alumnos' : 'clientes'
-  const cliente = esSalud(r) ? 'paciente' : r.modo === 'cupo' ? 'alumno' : 'cliente'
-  const turno = r.modo === 'cupo' ? 'clase' : r.modo === 'cancha' ? 'reserva' : 'turno'
-  const recurso = r.modo === 'profesional' ? r.profesional.toLowerCase() : r.modo === 'cancha' ? 'cancha' : r.modo === 'cupo' ? 'sala' : esSalud(r) ? 'consultorio' : 'cabina'
+  const clientes = esSalud(r) ? 'pacientes' : 'clientes'
+  const cliente = esSalud(r) ? 'paciente' : 'cliente'
+  const turno = 'turno'
+  const recurso = r.modo === 'profesional' ? r.profesional.toLowerCase() : esSalud(r) ? 'consultorio' : 'cabina'
   return { clientes, cliente, turno, turnos: `${turno}s`, recurso }
 }
 
@@ -123,9 +111,9 @@ export const temaConPlantilla = (r: RubroTurnos, p: PlantillaSitio, ajustes?: Aj
 export interface SeccionSitio { id: string; label: string; ayuda: string; Icon: LucideIcon; on: boolean }
 
 export function seccionesIniciales(r: RubroTurnos): SeccionSitio[] {
-  const equipo = r.modo === 'profesional' ? 'Equipo' : r.modo === 'cancha' ? 'Canchas' : r.modo === 'cupo' ? 'Profes y grilla' : 'Espacios'
+  const equipo = r.modo === 'profesional' ? 'Equipo' : 'Espacios'
   return [
-    { id: 'servicios', label: r.modo === 'cupo' ? 'Clases y actividades' : 'Servicios y precios', ayuda: 'Lo que se puede reservar, con duración y precio', Icon: Scissors, on: true },
+    { id: 'servicios', label: 'Servicios y precios', ayuda: 'Lo que se puede reservar, con duración y precio', Icon: Scissors, on: true },
     { id: 'equipo', label: equipo, ayuda: r.modo === 'profesional' ? 'Fotos y especialidad de quienes atienden' : 'Los espacios disponibles', Icon: Users, on: r.modo !== 'recurso' },
     { id: 'nosotros', label: 'Nosotros', ayuda: 'Quiénes son y cómo trabajan, en pocas líneas', Icon: Heart, on: true },
     { id: 'galeria', label: 'Galería', ayuda: 'Fotos del lugar y de trabajos', Icon: Images, on: true },
@@ -141,7 +129,7 @@ export const FOTOS_HERO: string[] = [
   '/plantillas/belleza-spa.jpg', '/plantillas/belleza-maquillaje.jpg', '/plantillas/belleza-manos.jpg',
   '/turnos/sal-hero.jpg', '/turnos/sal-consulta.jpg', '/turnos/sal-dentista.jpg',
   '/turnos/dep-hero.jpg', '/turnos/dep-barra.jpg', '/turnos/dep-yoga.jpg', '/turnos/dep-soga.jpg',
-  '/turnos/cla-hero.jpg', '/turnos/cla-torno.jpg', '/turnos/cla-vasija.jpg', '/turnos/cla-manos.jpg',
+  '/plantillas/libre-lectura.jpg', '/plantillas/libre-cuaderno.jpg', '/plantillas/libre-lapices.jpg',
 ]
 
 export function fotosPara(t: TemaNegocio): string[] {
@@ -150,8 +138,6 @@ export function fotosPara(t: TemaNegocio): string[] {
 }
 
 export function botonesSugeridos(r: RubroTurnos): string[] {
-  if (r.modo === 'cupo') return ['Reservá tu clase', 'Anotate', 'Ver horarios']
-  if (r.modo === 'cancha') return ['Reservá tu cancha', 'Ver disponibilidad', 'Reservar']
   if (esSalud(r)) return ['Sacá turno', 'Pedí tu turno', 'Reservar consulta']
   return ['Reservá tu turno', 'Sacá turno', 'Reservar ahora']
 }

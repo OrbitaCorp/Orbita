@@ -6,19 +6,20 @@
 //
 // Casi todo acá es una demo (se "guarda" en memoria). Las excepciones son la
 // cuenta de clientes con sus beneficios y la política de cancelación y
-// llegadas tarde: eso vive en el negocio de la demo (demo/negocioDemo.ts) y el
+// llegadas tarde: eso vive en el negocio de la demo (datos/negocio.ts) y el
 // sitio, la reserva, "Mis turnos" y los Términos lo leen de ahí, así que al
 // guardar se ve de verdad del otro lado.
 import { useState, type ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import {
-  CalendarClock, BadgeCheck, Wallet, RotateCcw, Repeat, Users, Hourglass, IdCard, UserX, CalendarRange,
+  CalendarClock, BadgeCheck, Wallet, RotateCcw, Repeat, Users, Hourglass, IdCard, UserX,
   Timer, ShieldCheck, Eye, Clock, CircleCheck, Gift, UserRound, UserRoundCheck, BellRing, AlarmClock, ScrollText, Copy,
 } from 'lucide-react'
 import { esSalud, pesos, duracionTxt, horaTxt } from '@/modules/turnos/datos'
-import { beneficiosTxt, plazoTxt, politicaTxt, useNegocioDemo, type BeneficiosCuenta, type PoliticaReserva } from '@/modules/turnos/demo/negocioDemo'
+import { beneficiosTxt, plazoTxt, politicaTxt, useNegocioDemo, type BeneficiosCuenta, type PoliticaReserva } from '@/modules/turnos/datos/negocio'
 import { temaDe } from '@/modules/turnos/storefront/tema'
-import { useBorrador, Encabezado, SecCard, Segmentado, Selector, Campo, Dos, FilaSwitch, Divisor, BarraGuardar, BotonBorde, Rotulo, OpcionTarjeta, type PropsTab } from './ui'
+import { Encabezado, SecCard, Segmentado, Selector, Campo, Dos, FilaSwitch, Divisor, BotonBorde, Rotulo, OpcionTarjeta, type PropsTab } from './ui'
+import { BarraGuardar, useBorrador } from '@/design-system/reservas/piezas'
 import { vozDe, cap } from './datos'
 
 const ANT_MIN = [{ id: 0, label: 'Sin mínimo' }, { id: 60, label: '1 hora' }, { id: 120, label: '2 horas' }, { id: 240, label: '4 horas' }, { id: 720, label: '12 horas' }, { id: 1440, label: '1 día' }]
@@ -32,31 +33,50 @@ const LIMITE = [{ id: 0, label: 'Sin límite' }, { id: 1, label: '1 a la vez' },
 const BIENVENIDA = [0, 5, 10, 15, 20].map(p => ({ id: p, label: p ? `${p}% de descuento` : 'No ofrecer' }))
 const SELLOS = [0, 5, 6, 8, 10].map(n => ({ id: n, label: n ? `Premio a los ${n} sellos` : 'No ofrecer' }))
 
+const CSS = `
+  .tuc-politica { padding: 16px 18px; border-radius: var(--rv-r-sm); background: var(--color-surface); border: 1px solid var(--color-border); border-left: 3px solid var(--color-primary); }
+  .tuc-politica h3 { margin: 0; font-size: 13px; font-weight: 600; color: var(--color-text); }
+  .tuc-politica p { margin: 4px 0 0; font-size: 13.5px; line-height: 1.6; color: var(--color-body); text-wrap: pretty; }
+  .tuc-politica p + h3 { margin-top: 14px; }
+  .tuc-sinreg { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; margin-bottom: 4px; border-radius: var(--rv-r-sm); background: var(--color-success-bg); }
+  .tuc-sinreg > svg { flex-shrink: 0; margin-top: 2px; color: var(--chip-success-fg); }
+  .tuc-sinreg strong { display: block; font-size: 13.5px; font-weight: 600; color: var(--chip-success-fg); }
+  .tuc-sinreg span { display: block; margin-top: 2px; font-size: 12.5px; line-height: 1.5; color: var(--color-body); }
+  .tuc-resumen { overflow: hidden; }
+  .tuc-resumen-cab { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--color-border); }
+  .tuc-resumen-linea { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--color-body); line-height: 1.45; padding: 6px 0; }
+  .tuc-resumen-ico { width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; flex-shrink: 0; color: var(--color-primary); background: var(--color-primary-bg); }
+  .tuc-res-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: 20px; align-items: start; }
+  .tuc-res-resumen { position: sticky; top: 16px; }
+  @media (max-width: 1024px) {
+    .tuc-res-split { grid-template-columns: minmax(0, 1fr); }
+    .tuc-res-resumen { position: static; }
+  }
+`
+
 interface Reglas {
   minAnt: number; maxAnt: number; buffer: number; grilla: number; confirmacion: 'auto' | 'manual'; elegirRecurso: boolean; cualquiera: boolean
   sena: boolean; senaTipo: 'pct' | 'fijo'; senaPct: number; senaFijo: string
   reprogramar: boolean; reproHoras: number; reproMax: number; limite: number; espera: boolean; esperaMin: number; ausentes: boolean
-  cupoDef: string; abrirDias: number; minAnotados: string; obraSocial: boolean; dni: boolean; motivo: boolean
+  obraSocial: boolean; dni: boolean; motivo: boolean
 }
 
 export default function Reservas({ rubro, avisar }: PropsTab) {
   const voz = vozDe(rubro)
-  const cupo = rubro.modo === 'cupo'
   const salud = esSalud(rubro)
   const b = useBorrador<Reglas>(() => ({
-    minAnt: salud ? 240 : 120, maxAnt: cupo ? 14 : 30, buffer: rubro.familia === 'belleza' ? 5 : 0, grilla: rubro.modo === 'cancha' ? 60 : 30,
+    minAnt: salud ? 240 : 120, maxAnt: 30, buffer: rubro.familia === 'belleza' ? 5 : 0, grilla: 30,
     confirmacion: (rubro.sena > 0 ? 'auto' : salud ? 'manual' : 'auto') as 'auto' | 'manual',
     elegirRecurso: true, cualquiera: true,
     sena: rubro.sena > 0, senaTipo: 'pct' as 'pct' | 'fijo', senaPct: rubro.sena || 30, senaFijo: '5000',
     reprogramar: true, reproHoras: 12, reproMax: 2,
-    limite: cupo ? 0 : 2, espera: cupo || rubro.modo === 'cancha', esperaMin: 30, ausentes: true,
-    cupoDef: '15', abrirDias: 7, minAnotados: '3',
+    limite: 2, espera: rubro.modo === 'profesional', esperaMin: 30, ausentes: true,
     obraSocial: salud, dni: salud, motivo: salud && rubro.key !== 'psico',
   }))
-  const v = b.valor
+  const v = b.v
   const ejemplo = rubro.servicios.find(s => s.precio > 0) ?? rubro.servicios[0]
   const senaMonto = v.senaTipo === 'pct' ? Math.round(ejemplo.precio * v.senaPct / 100 / 100) * 100 : Number(v.senaFijo) || 0
-  const grillas = rubro.modo === 'cancha' ? [30, 60, 90] : [15, 30, 60]
+  const grillas = [15, 30, 60]
 
   // La cuenta de clientes. null = sin tocar: vale lo guardado en el negocio de la
   // demo (que llega del navegador recién después de hidratar, por eso no se copia
@@ -88,38 +108,27 @@ export default function Reservas({ rubro, avisar }: PropsTab) {
   const descartar = () => { b.descartar(); setCuentasBorrador(null); setPoliticaBorrador(null) }
 
   return (
-    <div className="panel-page">
-      <Encabezado rotulo="Tu negocio" titulo="Reglas de reserva" bajada={`Cuándo y cómo pueden reservar tus ${voz.clientes}. A la derecha ves cómo les queda.`} />
+    <div className="rv-pagina">
+      <style>{CSS}</style>
+      <Encabezado rotulo="Reservas" titulo="Reglas de reserva" bajada={`Cuándo y cómo pueden reservar tus ${voz.clientes}. A la derecha ves cómo les queda.`} />
 
       <div className="tuc-res-split">
-        <div className="tuc-pila">
+        <div className="rv-pila">
 
           <SecCard titulo="Cuándo se puede reservar" Icon={CalendarClock} bajada="La ventana en la que tu agenda acepta reservas.">
             <Dos>
               <Selector label="Anticipación mínima" ayuda={`Evita ${voz.turnos} de último momento.`} valor={v.minAnt} opciones={ANT_MIN} onChange={x => b.set('minAnt', x)} />
               <Selector label="Hasta cuánto antes" ayuda="Qué tan lejos se ve la agenda." valor={v.maxAnt} opciones={ANT_MAX} onChange={x => b.set('maxAnt', x)} />
             </Dos>
-            {!cupo && <>
-              <Rotulo ayuda={`Cada cuánto arrancan los ${voz.turnos}: 9:00, 9:${v.grilla === 15 ? '15' : '30'}…`}>Horarios disponibles cada</Rotulo>
-              <Segmentado label="Horarios disponibles cada" valor={v.grilla} onChange={x => b.set('grilla', x)} opciones={grillas.map(g => ({ id: g, label: duracionTxt(g) }))} />
-              <div style={{ height: 16 }} />
-              <Rotulo ayuda={`Tiempo libre entre un ${voz.turno} y el siguiente para limpiar, ordenar o respirar.`}>Margen entre {voz.turnos}</Rotulo>
-              <Segmentado label={`Margen entre ${voz.turnos}`} valor={v.buffer} onChange={x => b.set('buffer', x)} opciones={[0, 5, 10, 15].map(m => ({ id: m, label: m ? `${m} min` : 'Sin margen' }))} />
-            </>}
+            <Rotulo ayuda={`Cada cuánto arrancan los ${voz.turnos}: 9:00, 9:${v.grilla === 15 ? '15' : '30'}…`}>Horarios disponibles cada</Rotulo>
+            <Segmentado label="Horarios disponibles cada" valor={v.grilla} onChange={x => b.set('grilla', x)} opciones={grillas.map(g => ({ id: g, label: duracionTxt(g) }))} />
+            <div style={{ height: 16 }} />
+            <Rotulo ayuda={`Tiempo libre entre un ${voz.turno} y el siguiente para limpiar, ordenar o respirar.`}>Margen entre {voz.turnos}</Rotulo>
+            <Segmentado label={`Margen entre ${voz.turnos}`} valor={v.buffer} onChange={x => b.set('buffer', x)} opciones={[0, 5, 10, 15].map(m => ({ id: m, label: m ? `${m} min` : 'Sin margen' }))} />
           </SecCard>
 
-          {cupo && (
-            <SecCard titulo="Clases con cupo" Icon={CalendarRange} bajada="Valores por defecto para cada clase nueva de la grilla. Cada clase se puede ajustar.">
-              <Dos>
-                <Campo label="Cupo por clase" value={v.cupoDef} onChange={x => b.set('cupoDef', x.replace(/\D/g, ''))} sufijo="lugares" />
-                <Selector label="Se abre la reserva" valor={v.abrirDias} onChange={x => b.set('abrirDias', x)} opciones={[1, 2, 3, 7, 14].map(d => ({ id: d, label: d === 1 ? '1 día antes' : `${d} días antes` }))} />
-              </Dos>
-              <Campo label="Suspender si hay menos de" value={v.minAnotados} onChange={x => b.set('minAnotados', x.replace(/\D/g, ''))} sufijo="anotados, 2 h antes" ayuda="Les avisamos a los anotados por WhatsApp y se libera el crédito." />
-            </SecCard>
-          )}
-
           <SecCard titulo="Confirmación" Icon={BadgeCheck} bajada="Qué pasa apenas alguien reserva.">
-            <div role="radiogroup" aria-label="Confirmación" className="tuc-grid-2">
+            <div role="radiogroup" aria-label="Confirmación" className="rv-dos">
               <OpcionTarjeta activa={v.confirmacion === 'auto'} onClick={() => b.set('confirmacion', 'auto')} Icon={CircleCheck} titulo="Automática" ayuda={`El ${voz.turno} queda confirmado al instante. Lo más cómodo para ${voz.clientes === 'pacientes' ? 'el paciente' : 'todos'}.`} />
               <OpcionTarjeta activa={v.confirmacion === 'manual'} onClick={() => b.set('confirmacion', 'manual')} Icon={Eye} titulo="La reviso yo" ayuda="Queda pendiente hasta que lo aceptás desde la agenda." />
             </div>
@@ -135,24 +144,22 @@ export default function Reservas({ rubro, avisar }: PropsTab) {
             </div>
             <FilaSwitch Icon={UserRound} titulo="Ofrecer una cuenta opcional" ayuda="Quien quiera la crea al reservar: entra con su celular, sin contraseña, y vos le reconocés que vuelve." on={cuentas.activo} onChange={x => ponerCuenta({ activo: x })}>
               <Dos>
-                <Selector label="Descuento de bienvenida" ayuda={`En ${cupo || rubro.modo === 'cancha' ? 'la primera' : 'el primer'} ${voz.turno} con cuenta.`} valor={cuentas.bienvenida} opciones={BIENVENIDA} onChange={x => ponerCuenta({ bienvenida: x })} />
+                <Selector label="Descuento de bienvenida" ayuda={`En el primer ${voz.turno} con cuenta.`} valor={cuentas.bienvenida} opciones={BIENVENIDA} onChange={x => ponerCuenta({ bienvenida: x })} />
                 <Selector label="Tarjeta de sellos" ayuda={`Un sello por ${voz.turno}; al completarla, un premio.`} valor={cuentas.sellos} opciones={SELLOS} onChange={x => ponerCuenta({ sellos: x })} />
               </Dos>
               <FilaSwitch Icon={BellRing} titulo="Promos por WhatsApp" ayuda="Les avisás primero cuando hay una promo o se libera un horario." on={cuentas.promos} onChange={x => ponerCuenta({ promos: x })} />
             </FilaSwitch>
           </SecCard>
 
-          {rubro.modo !== 'cupo' && (
-            <SecCard titulo={rubro.modo === 'profesional' ? `Elegir ${voz.recurso}` : rubro.modo === 'cancha' ? 'Elegir cancha' : 'Asignación de espacios'} Icon={Users}>
-              {rubro.modo === 'recurso' ? (
-                <FilaSwitch titulo={`Asignar ${voz.recurso} automáticamente`} ayuda="Toma el primer espacio libre para ese horario. Tu cliente no lo elige." on={v.elegirRecurso} onChange={x => b.set('elegirRecurso', x)} />
-              ) : <>
-                <FilaSwitch titulo={rubro.modo === 'cancha' ? 'Dejar elegir la cancha' : `Dejar elegir con quién atenderse`} ayuda={rubro.modo === 'cancha' ? 'Si está apagado, se asigna la primera cancha libre.' : `Tus ${voz.clientes} ven fotos y especialidad de cada ${voz.recurso}.`} on={v.elegirRecurso} onChange={x => b.set('elegirRecurso', x)}>
-                  <FilaSwitch titulo="Mostrar la opción “Cualquiera”" ayuda="Muestra todos los horarios libres, sin importar quién atiende. Llena más la agenda." on={v.cualquiera} onChange={x => b.set('cualquiera', x)} />
-                </FilaSwitch>
-              </>}
-            </SecCard>
-          )}
+          <SecCard titulo={rubro.modo === 'profesional' ? `Elegir ${voz.recurso}` : 'Asignación de espacios'} Icon={Users}>
+            {rubro.modo === 'recurso' ? (
+              <FilaSwitch titulo={`Asignar ${voz.recurso} automáticamente`} ayuda="Toma el primer espacio libre para ese horario. Tu cliente no lo elige." on={v.elegirRecurso} onChange={x => b.set('elegirRecurso', x)} />
+            ) : (
+              <FilaSwitch titulo="Dejar elegir con quién atenderse" ayuda={`Tus ${voz.clientes} ven fotos y especialidad de cada ${voz.recurso}.`} on={v.elegirRecurso} onChange={x => b.set('elegirRecurso', x)}>
+                <FilaSwitch titulo="Mostrar la opción “Cualquiera”" ayuda="Muestra todos los horarios libres, sin importar quién atiende. Llena más la agenda." on={v.cualquiera} onChange={x => b.set('cualquiera', x)} />
+              </FilaSwitch>
+            )}
+          </SecCard>
 
           <SecCard titulo="Seña" Icon={Wallet} bajada={`Con seña, las ausencias bajan mucho. Se paga con Mercado Pago al reservar${rubro.sena ? ` (en ${rubro.label.toLowerCase()} lo típico es ${rubro.sena}%)` : ''}.`}>
             <FilaSwitch titulo="Pedir seña para reservar" on={v.sena} onChange={x => b.set('sena', x)}>
@@ -163,14 +170,14 @@ export default function Reservas({ rubro, avisar }: PropsTab) {
                 </div>
                 {v.senaTipo === 'pct' ? (
                   <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-                    <Rotulo htmlFor="tuc-sena">Porcentaje del precio: <span className="tuo-num" style={{ color: 'var(--color-primary)', fontWeight: 600 }}>{v.senaPct}%</span></Rotulo>
+                    <Rotulo htmlFor="tuc-sena">Porcentaje del precio: <span className="rv-num" style={{ color: 'var(--color-primary)', fontWeight: 600 }}>{v.senaPct}%</span></Rotulo>
                     <input id="tuc-sena" type="range" min={10} max={100} step={5} value={v.senaPct} onChange={e => b.set('senaPct', Number(e.target.value))} className="tuc-rango" />
                   </div>
                 ) : (
                   <Campo label="Monto" value={v.senaFijo} onChange={x => b.set('senaFijo', x.replace(/\D/g, ''))} prefijo="$" style={{ flex: '1 1 160px', marginBottom: 0 }} />
                 )}
               </div>
-              <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 10 }}>Ejemplo: en “{ejemplo.nombre}” (<span className="tuo-num">{pesos(ejemplo.precio)}</span>) la seña es <b className="tuo-num" style={{ color: 'var(--color-text)' }}>{pesos(senaMonto)}</b>.</div>
+              <div className="tuc-ayuda" style={{ marginTop: 10 }}>Ejemplo: en “{ejemplo.nombre}” (<span className="rv-num">{pesos(ejemplo.precio)}</span>) la seña es <b className="rv-num" style={{ color: 'var(--color-text)' }}>{pesos(senaMonto)}</b>.</div>
             </FilaSwitch>
             <Divisor />
             <FilaSwitch Icon={UserX} titulo="Pedir seña a quien faltó sin avisar" ayuda="Aunque no pidas seña en general, quien tiene una ausencia la paga en su próximo turno." on={v.ausentes} onChange={x => b.set('ausentes', x)} />
@@ -209,7 +216,7 @@ export default function Reservas({ rubro, avisar }: PropsTab) {
             <FilaSwitch Icon={Hourglass} titulo="Lista de espera" ayuda={`Si un horario está lleno, se anotan. Cuando alguien cancela, le ofrecemos el lugar al primero por WhatsApp.`} on={v.espera} onChange={x => b.set('espera', x)}>
               <Rotulo>Tiempo para aceptar el lugar</Rotulo>
               <Segmentado label="Tiempo para aceptar el lugar" valor={v.esperaMin} onChange={x => b.set('esperaMin', x)} opciones={[15, 30, 60].map(m => ({ id: m, label: duracionTxt(m) }))} />
-              <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 8 }}>Si no responde a tiempo, pasa al siguiente de la lista.</div>
+              <div className="tuc-ayuda" style={{ marginTop: 8 }}>Si no responde a tiempo, pasa al siguiente de la lista.</div>
             </FilaSwitch>
           </SecCard>
 
@@ -227,7 +234,7 @@ export default function Reservas({ rubro, avisar }: PropsTab) {
         </aside>
       </div>
 
-      <BarraGuardar dirty={b.dirty || seAplica} onDescartar={descartar} onGuardar={guardar} />
+      <BarraGuardar cambiado={b.cambiado || seAplica} onDescartar={descartar} onGuardar={guardar} />
     </div>
   )
 }
@@ -240,7 +247,6 @@ const AHORA = 10 * 60 // la demo "está" a las 10:00
 function Resumen({ v, rubro, senaMonto, cuentas, politica }: { v: Reglas; rubro: PropsTab['rubro']; senaMonto: number; cuentas: BeneficiosCuenta; politica: PoliticaReserva }) {
   const voz = vozDe(rubro)
   const t = temaDe(rubro)
-  const cupo = rubro.modo === 'cupo'
   const ejemplo = rubro.servicios.find(s => s.precio > 0) ?? rubro.servicios[0]
   const paso = v.grilla
   const slots = Array.from({ length: 12 }, (_, i) => 9 * 60 + i * paso).filter(m => m <= 19 * 60).slice(0, 9)
@@ -260,21 +266,21 @@ function Resumen({ v, rubro, senaMonto, cuentas, politica }: { v: Reglas; rubro:
   lineas.push([RotateCcw, <>Cancelás sin cargo <b>{plazoTxt(politica.cancelaHasta)}</b>{v.sena ? <>; {politica.cancelaHasta > 0 ? 'después' : 'si faltás'}, {fuera}</> : ''}.</>])
   if (politica.tolerancia > 0) lineas.push([AlarmClock, <>Te esperamos <b>{politica.tolerancia} minutos</b>.</>])
   if (v.reprogramar) lineas.push([Repeat, <>Podés cambiar el horario hasta {v.reproMax === 1 ? '1 vez' : `${v.reproMax} veces`}.</>])
-  if (!cupo && rubro.modo !== 'recurso' && v.elegirRecurso) lineas.push([Users, <>Elegís {rubro.modo === 'cancha' ? 'la cancha' : `con quién atenderte`}{v.cualquiera ? <> o “Cualquiera”</> : ''}.</>])
+  if (rubro.modo === 'profesional' && v.elegirRecurso) lineas.push([Users, <>Elegís con quién atenderte{v.cualquiera ? <> o “Cualquiera”</> : ''}.</>])
   if (v.espera) lineas.push([Hourglass, <>Si está lleno, te anotás en la lista de espera y tenés <b>{duracionTxt(v.esperaMin)}</b> para aceptar el lugar.</>])
   if (v.limite) lineas.push([Timer, <>Hasta {v.limite} {v.limite === 1 ? voz.turno : voz.turnos} activos a la vez.</>])
   if (v.dni || v.obraSocial) lineas.push([IdCard, <>Te pedimos {[v.dni && 'DNI', v.obraSocial && 'obra social'].filter(Boolean).join(' y ')}.</>])
   if (beneficios.length) lineas.push([Gift, <>Si querés, creás tu cuenta y sumás <b>{beneficios.map(x => x.titulo.toLowerCase()).join(', ')}</b>.</>])
 
   return (
-    <div className="tuo-card tuo-card--luz tuc-resumen">
+    <div className="rv-card tuc-resumen">
       <div className="tuc-resumen-cab">
         <Eye size={14} aria-hidden style={{ color: 'var(--color-primary)' }} />
-        <span className="tuo-rotulo" style={{ flex: 1 }}>Así lo ve tu {voz.cliente}</span>
-        <span className="tuo-chip tuo-chip--ok" style={{ height: 22, fontSize: 11 }}><span aria-hidden className="tuo-late" style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} />En vivo</span>
+        <span className="rv-rotulo" style={{ flex: 1 }}>Así lo ve tu {voz.cliente}</span>
+        <span className="rv-chip rv-chip--ok" style={{ height: 22, fontSize: 11 }}>En vivo</span>
       </div>
       <div style={{ background: t.c.bg, color: t.c.body, padding: 18, fontFamily: t.fb }}>
-        <div style={{ fontFamily: t.fh, fontSize: 20, fontWeight: 700, color: t.c.text, textTransform: t.mayus ? 'uppercase' : 'none', lineHeight: 1.1 }}>{cupo ? 'Elegí tu clase' : 'Elegí día y horario'}</div>
+        <div style={{ fontFamily: t.fh, fontSize: 20, fontWeight: 700, color: t.c.text, textTransform: t.mayus ? 'uppercase' : 'none', lineHeight: 1.1 }}>Elegí día y horario</div>
         <div style={{ fontSize: 12.5, color: t.c.muted, marginTop: 4 }}>{ejemplo.nombre} · {duracionTxt(ejemplo.duracion)}</div>
         <div aria-hidden style={{ display: 'flex', gap: 6, marginTop: 14, overflow: 'hidden' }}>
           {dias.map((d, i) => {
@@ -282,35 +288,20 @@ function Resumen({ v, rubro, senaMonto, cuentas, politica }: { v: Reglas; rubro:
             return <span key={d} style={{ flex: '0 0 auto', padding: '7px 10px', borderRadius: t.radio, fontSize: 12, fontWeight: 600, background: i === 0 ? t.c.primary : t.c.surfaceAlt, color: i === 0 ? t.c.onPrimary : t.c.body, opacity: fuera ? 0.4 : 1 }}>{d}</span>
           })}
         </div>
-        {cupo ? (
-          <div aria-hidden style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 12 }}>
-            {[[18 * 60, 12], [19 * 60 + 15, 15], [20 * 60 + 30, 6]].map(([h, anot], i) => {
-              const lleno = anot >= (Number(v.cupoDef) || 15)
-              return (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: t.radio, background: t.c.surface, border: `1px solid ${t.c.border}` }}>
-                  <span style={{ fontWeight: 700, color: t.c.text, fontSize: 13, fontFamily: '"Geist Mono", monospace' }}>{horaTxt(h)}</span>
-                  <span style={{ flex: 1, fontSize: 12.5 }}>{rubro.servicios[i % rubro.servicios.length].nombre}</span>
-                  <span style={{ fontSize: 11.5, fontWeight: 700, color: lleno ? t.c.muted : t.c.primary }}>{lleno ? (v.espera ? 'Lista de espera' : 'Lleno') : `${(Number(v.cupoDef) || 15) - anot} lugares`}</span>
-                </div>
-              )
-            })}
-          </div>
-        ) : (
-          <div aria-hidden style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 6, marginTop: 12 }}>
-            {slots.map(m => {
-              const no = m < primero
-              return <span key={m} style={{ textAlign: 'center', padding: '8px 0', borderRadius: t.radio, fontSize: 12.5, fontWeight: 600, fontFamily: '"Geist Mono", monospace', border: `1px solid ${t.c.border}`, color: no ? t.c.muted : t.c.text, background: no ? 'transparent' : t.c.surface, textDecoration: no ? 'line-through' : 'none', opacity: no ? 0.55 : 1 }}>{horaTxt(m)}</span>
-            })}
-          </div>
-        )}
-        {!cupo && (v.buffer > 0 || v.minAnt > 0) && (
+        <div aria-hidden style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 6, marginTop: 12 }}>
+          {slots.map(m => {
+            const no = m < primero
+            return <span key={m} style={{ textAlign: 'center', padding: '8px 0', borderRadius: t.radio, fontSize: 12.5, fontWeight: 600, fontFamily: 'var(--rv-mono)', border: `1px solid ${t.c.border}`, color: no ? t.c.muted : t.c.text, background: no ? 'transparent' : t.c.surface, textDecoration: no ? 'line-through' : 'none', opacity: no ? 0.55 : 1 }}>{horaTxt(m)}</span>
+          })}
+        </div>
+        {(v.buffer > 0 || v.minAnt > 0) && (
           <div style={{ fontSize: 11.5, color: t.c.muted, marginTop: 8 }}>
             {v.minAnt > 0 && <>Hoy, desde las {horaTxt(Math.min(primero, 23 * 60))}. </>}
             {v.buffer > 0 && <>Con {v.buffer} min entre {voz.turnos}.</>}
           </div>
         )}
       </div>
-      <ul style={{ listStyle: 'none', margin: 0, padding: '14px 16px 16px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <ul style={{ listStyle: 'none', margin: 0, padding: '10px 16px 12px', display: 'flex', flexDirection: 'column' }}>
         {lineas.map(([I, txt], i) => (
           <li key={i} className="tuc-resumen-linea">
             <span aria-hidden className="tuc-resumen-ico"><I size={14} strokeWidth={1.8} /></span>
@@ -320,32 +311,9 @@ function Resumen({ v, rubro, senaMonto, cuentas, politica }: { v: Reglas; rubro:
       </ul>
       <div style={{ padding: '0 16px 16px' }}>
         <span aria-hidden style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 42, borderRadius: t.radio, background: t.c.primary, color: t.c.onPrimary, fontFamily: t.fb, fontWeight: 700, fontSize: 14 }}>
-          {v.sena ? `Pagar seña y ${cupo ? 'reservar' : 'confirmar'}` : `Confirmar ${voz.turno}`}
+          {v.sena ? 'Pagar seña y confirmar' : `Confirmar ${voz.turno}`}
         </span>
       </div>
     </div>
   )
 }
-
-export const CSS_RESERVAS = `
-  .tuc-politica { padding: 16px 18px; border-radius: 12px; background: var(--color-surface); border: 1px solid var(--color-border); border-left: 3px solid var(--color-primary); }
-  .tuc-politica h3 { margin: 0; font-size: 13px; font-weight: 600; color: var(--color-text); }
-  .tuc-politica p { margin: 4px 0 0; font-size: 13.5px; line-height: 1.6; color: var(--color-body); text-wrap: pretty; }
-  .tuc-politica p + h3 { margin-top: 14px; }
-  .tuc-sinreg { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; margin-bottom: 4px; border-radius: 12px; background: var(--color-success-bg); border: 1px solid color-mix(in srgb, var(--color-success) 30%, transparent); }
-  .tuc-sinreg > svg { flex-shrink: 0; margin-top: 2px; color: var(--color-success); }
-  .tuc-sinreg strong { display: block; font-size: 13.5px; font-weight: 600; color: var(--color-text); }
-  .tuc-sinreg span { display: block; margin-top: 2px; font-size: 12.5px; line-height: 1.5; color: var(--color-body); }
-  .tuc-resumen { overflow: hidden; box-shadow: 0 24px 60px -30px rgba(15,23,42,0.4), var(--shadow-card); }
-  .tuc-resumen-cab { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--color-border); }
-  .tuc-resumen-linea { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--color-body); line-height: 1.45; padding: 6px 8px; margin: 0 -8px; border-radius: 10px; transition: background 150ms ease; animation: tucAbre 260ms var(--tuo-ease, ease) both; }
-  .tuc-resumen-ico { width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center; flex-shrink: 0; color: var(--color-primary); background: var(--color-primary-bg); }
-  @media (hover: hover) { .tuc-resumen-linea:hover { background: var(--color-surface); } }
-  @media (prefers-reduced-motion: reduce) { .tuc-resumen-linea { animation: none; } }
-  .tuc-res-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: 24px; align-items: start; max-width: 1180px; }
-  .tuc-res-resumen { position: sticky; top: 16px; }
-  @media (max-width: 1024px) {
-    .tuc-res-split { grid-template-columns: minmax(0, 1fr); }
-    .tuc-res-resumen { position: static; }
-  }
-`

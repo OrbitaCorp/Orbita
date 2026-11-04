@@ -138,6 +138,14 @@ model Business {
   orbiTurns            OrbiTurn[]
   orbiCupoAjustes      OrbiCupoAjuste[]
   orbiCupoMiembros     OrbiCupoMiembro[]
+  // Reservas (Turnos, Alquileres y Gimnasio): el motor compartido, ver el bloque al final.
+  reservasConfig       ReservaConfig[]
+  reservasRecursos     ReservaRecurso[]
+  reservasServicios    ReservaServicio[]
+  reservas             Reserva[]
+  reservasHistorial    ReservaHistorial[]
+  reservasEspera       ReservaEspera[]
+  reservasBloqueos     ReservaBloqueo[]
 
   @@map("businesses")
 }
@@ -658,6 +666,7 @@ model Customer {
   emailLogs         EmailLog[]
   personalDiscounts Discount[]
   gameSessions      GameSession[]
+  reservas          Reserva[]
 
   @@unique([businessId, email])
   @@unique([businessId, googleId])
@@ -3761,4 +3770,336 @@ model MarketingVideoComentario {
 
   @@index([videoId, createdAt])
   @@map("marketing_video_comentarios")
+}
+
+// ─── Reservas: el backend compartido de Turnos, Alquileres y Gimnasio ────────
+//
+// Un solo motor de reservas para los tres módulos (pedido de Ale, 03/11/2026:
+// "uno profesional de lo que es los 3 y que compartan"). Cada módulo tiene su
+// panel y su sitio; acá vive lo que los tres resuelven igual y donde NO puede
+// haber tres versiones: qué se reserva (un recurso), cuándo (un rango), con
+// qué cupo, en qué estado está, y las reglas que lo mantienen íntegro aunque
+// dos personas toquen el botón a la vez, alguien cancele o nunca termine.
+//
+// Integridad (ver src/reservas/README.md):
+// - Dos reservas de un recurso exclusivo (cupo 1) no se pueden pisar: lo
+//   garantiza la base con una restricción de exclusión (btree_gist) sobre
+//   (recurso_id, [inicio, fin)) para las filas que ocupan lugar, en la
+//   migración 20261103120000_reservas. No depende del código.
+// - Con cupo > 1 (clases) el service toma el candado de la fila del recurso
+//   (SELECT … FOR UPDATE) y cuenta adentro de la misma transacción: dos
+//   pedidos simultáneos para el último lugar salen de a uno.
+// - "Si no completa": la reserva nace RETENIDA con `retenidaHasta`; vencida,
+//   deja de ocupar lugar aunque nadie la haya barrido todavía (el service la
+//   vence antes de contar) y el cron la marca VENCIDA.
+// - "Doble clic": `claveIdempotencia` única por negocio; repetir el pedido
+//   devuelve la misma reserva.
+// - Toda transición de estado es compare-and-set sobre (id, businessId,
+//   estado actual, version): la segunda de dos acciones simultáneas recibe 409.
+
+enum ReservaModulo {
+  TURNOS
+  ALQUILERES
+  GIMNASIO
+}
+
+// Qué tipo de cosa se reserva. PROFESIONAL y ESPACIO son de Turnos (la agenda
+// de una persona o de una cabina); CANCHA, SALON y ALOJAMIENTO de Alquileres;
+// CLASE de Gimnasio (con cupo).
+enum ReservaRecursoTipo {
+  PROFESIONAL
+  ESPACIO
+  CANCHA
+  SALON
+  ALOJAMIENTO
+  CLASE
+}
+
+// RETENIDA: el lugar está tomado mientras la persona termina de reservar
+// (vence sola). PENDIENTE: a confirmar por el negocio (confirmación manual).
+// CONFIRMADA: reserva firme. COMPLETADA / AUSENTE: lo que pasó después del
+// turno. CANCELADA y VENCIDA: ya no ocupan lugar.
+enum ReservaEstado {
+  RETENIDA
+  PENDIENTE
+  CONFIRMADA
+  COMPLETADA
+  CANCELADA
+  VENCIDA
+  AUSENTE
+}
+
+enum ReservaOrigen {
+  TIENDA
+  PANEL
+}
+
+enum ReservaActor {
+  CLIENTE
+  NEGOCIO
+  SISTEMA
+}
+
+enum ReservaConfirmacion {
+  AUTOMATICA
+  MANUAL
+}
+
+enum ReservaEsperaEstado {
+  ESPERANDO
+  TOMADA
+  CANCELADA
+}
+
+// Reglas de reserva de un negocio para un módulo. Existe = el negocio usa ese
+// módulo. Lo crea el panel (PUT /reservas/config) y lo leen el sitio público y
+// el motor.
+model ReservaConfig {
+  id         String        @id @default(uuid())
+  businessId String        @map("business_id")
+  modulo     ReservaModulo
+  activo     Boolean       @default(true)
+
+  confirmacion ReservaConfirmacion @default(AUTOMATICA)
+  /// Cuántos minutos queda tomado el lugar mientras la persona termina (RETENIDA).
+  retencionMinutos Int @default(10) @map("retencion_minutos")
+  /// Con cuánta anticipación mínima se puede reservar desde el sitio (minutos) y hasta cuántos días adelante.
+  anticipacionMinimaMinutos Int @default(60) @map("anticipacion_minima_minutos")
+  anticipacionMaximaDias    Int @default(60) @map("anticipacion_maxima_dias")
+  /// Hasta cuántas horas antes del inicio el cliente puede cancelar o reprogramar por su cuenta.
+  cancelacionHastaHoras    Int @default(24) @map("cancelacion_hasta_horas")
+  reprogramacionHastaHoras Int @default(24) @map("reprogramacion_hasta_horas")
+  reprogramacionesMaximas  Int @default(2) @map("reprogramaciones_maximas")
+  /// Seña: porcentaje del precio (0 = sin seña) y si se devuelve cuando se cancela a tiempo.
+  senaPorcentaje   Int     @default(0) @map("sena_porcentaje")
+  senaReembolsable Boolean @default(true) @map("sena_reembolsable")
+  /// Reservas activas (futuras) que una misma persona puede tener a la vez desde el sitio. 0 = sin tope.
+  maximoActivasPorCliente Int @default(3) @map("maximo_activas_por_cliente")
+  /// Si al cancelar una reserva de un recurso lleno, el primero de la lista de espera toma el lugar.
+  listaDeEspera Boolean @default(true) @map("lista_de_espera")
+  /// Minutos libres entre una reserva y la siguiente (limpieza, descanso).
+  margenMinutos Int @default(0) @map("margen_minutos")
+  /// Horario semanal por defecto de los recursos sin horario propio:
+  /// { "1": [[540, 780], [900, 1200]], … } con 0 = domingo y minutos desde las 00:00 de Argentina.
+  horario Json
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@unique([businessId, modulo])
+  @@map("reservas_config")
+}
+
+// Lo que se reserva: la agenda de un profesional, una cabina, una cancha, un
+// salón, un alojamiento o una clase con cupo. El precio y la duración de
+// fábrica viven acá; Turnos los toma del servicio elegido.
+model ReservaRecurso {
+  id          String             @id @default(uuid())
+  businessId  String             @map("business_id")
+  modulo      ReservaModulo
+  tipo        ReservaRecursoTipo
+  nombre      String             @db.VarChar(120)
+  descripcion String?            @db.VarChar(500)
+  /// Cuántas reservas entran a la vez en el mismo rango. 1 = exclusivo (lo protege la base).
+  cupo        Int                @default(1)
+  /// Minutos de lo que se reserva (un turno de cancha, una noche no: para ALOJAMIENTO se ignora, una sesión de clase).
+  /// null = lo define el servicio (Turnos).
+  duracionMinutos Int?           @map("duracion_minutos")
+  /// Cada cuántos minutos arranca una franja; null = cada `duracionMinutos`.
+  pasoMinutos     Int?           @map("paso_minutos")
+  /// Minutos libres entre reservas; null = el de la config.
+  margenMinutos   Int?           @map("margen_minutos")
+  /// Canchas: cuántas franjas seguidas se pueden tomar en una sola reserva.
+  maximoSeguidos  Int            @default(1) @map("maximo_seguidos")
+  /// Por franja, por noche o por lugar. Turnos usa el precio del servicio.
+  precio          Decimal        @default(0) @db.Decimal(12, 2)
+  /// Horario semanal propio (mismo formato que ReservaConfig.horario); null = el de la config.
+  /// En una CLASE cada tramo es una sesión completa (no se parte en franjas).
+  horario         Json?
+  /// Lo que cada módulo necesita además: { checkIn, checkOut, nochesMinimas, extras: [{ id, nombre, precio }], profesor, disciplina, superficie… }.
+  datos           Json?
+  /// PROFESIONAL: el miembro del equipo cuya agenda es.
+  memberId        String?        @map("member_id")
+  orden           Int            @default(0)
+  activo          Boolean        @default(true)
+  eliminadoEn     DateTime?      @map("eliminado_en")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  business Business         @relation(fields: [businessId], references: [id])
+  reservas Reserva[]
+  esperas  ReservaEspera[]
+  bloqueos ReservaBloqueo[]
+
+  @@index([businessId, modulo])
+  @@map("reservas_recursos")
+}
+
+// Lo que se elige antes del recurso en Turnos (corte, consulta, sesión): trae
+// la duración y el precio. Alquileres y Gimnasio pueden no tener ninguno.
+model ReservaServicio {
+  id               String        @id @default(uuid())
+  businessId       String        @map("business_id")
+  modulo           ReservaModulo
+  nombre           String        @db.VarChar(120)
+  descripcion      String?       @db.VarChar(500)
+  duracionMinutos  Int           @map("duracion_minutos")
+  precio           Decimal       @default(0) @db.Decimal(12, 2)
+  reservableOnline Boolean       @default(true) @map("reservable_online")
+  /// Recursos que lo hacen; vacío = cualquiera del módulo.
+  recursoIds       String[]      @default([]) @map("recurso_ids")
+  orden            Int           @default(0)
+  activo           Boolean       @default(true)
+  eliminadoEn      DateTime?     @map("eliminado_en")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@index([businessId, modulo])
+  @@map("reservas_servicios")
+}
+
+// Una reserva: un recurso, un rango [inicio, fin) y un estado. Guarda la foto
+// del cliente y del servicio al momento de reservar: lo que se borre o cambie
+// después no la toca.
+model Reserva {
+  id         String        @id @default(uuid())
+  businessId String        @map("business_id")
+  modulo     ReservaModulo
+  recursoId  String        @map("recurso_id")
+  servicioId String?       @map("servicio_id")
+  /// Referencia visible ("decile al negocio tu código 4F7K2Q"). Única por negocio. No autentica nada.
+  codigo     String        @db.VarChar(8)
+  /// Secreto del enlace personal del cliente (/mi-reserva/<token>). Se devuelve al crear y nunca en el panel.
+  tokenAcceso String       @unique @map("token_acceso")
+  estado     ReservaEstado @default(RETENIDA)
+  origen     ReservaOrigen @default(TIENDA)
+
+  inicio   DateTime
+  fin      DateTime
+  /// Día de Argentina del inicio, AAAA-MM-DD, para listar la agenda por día.
+  fecha    String   @db.VarChar(10)
+  /// Lugares que ocupa del cupo del recurso (una clase con dos amigos = 2).
+  cantidad Int      @default(1)
+  /// Copia de "el recurso tiene cupo 1": la restricción de exclusión de la base mira esta columna.
+  exclusivo Boolean @default(true)
+  /// RETENIDA: hasta cuándo ocupa lugar sin confirmar.
+  retenidaHasta DateTime? @map("retenida_hasta")
+
+  clienteId       String?  @map("cliente_id")
+  clienteNombre   String   @db.VarChar(120) @map("cliente_nombre")
+  clienteTelefono String?  @db.VarChar(30) @map("cliente_telefono")
+  clienteEmail    String?  @db.VarChar(200) @map("cliente_email")
+  notas           String?  @db.VarChar(500)
+  notaInterna     String?  @db.VarChar(500) @map("nota_interna")
+  /// Foto del servicio elegido: { id, nombre, duracionMinutos, precio }.
+  servicio        Json?
+  /// Extras elegidos del recurso: [{ id, nombre, precio }].
+  extras          Json?
+
+  precio     Decimal @default(0) @db.Decimal(12, 2)
+  sena       Decimal @default(0) @db.Decimal(12, 2)
+  pagado     Decimal @default(0) @db.Decimal(12, 2)
+  pagoMetodo String? @db.VarChar(30) @map("pago_metodo")
+
+  confirmadaEn      DateTime?     @map("confirmada_en")
+  completadaEn      DateTime?     @map("completada_en")
+  canceladaEn       DateTime?     @map("cancelada_en")
+  canceladaPor      ReservaActor? @map("cancelada_por")
+  motivoCancelacion String?       @db.VarChar(300) @map("motivo_cancelacion")
+  reprogramaciones  Int           @default(0)
+
+  /// La manda quien reserva (un uuid por intento): repetir el pedido devuelve la misma reserva.
+  claveIdempotencia String? @db.VarChar(80) @map("clave_idempotencia")
+  /// Sube en cada cambio de estado: quien actúa sobre una versión vieja recibe 409.
+  version           Int     @default(1)
+  creadaPorMemberId String? @map("creada_por_member_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  business  Business           @relation(fields: [businessId], references: [id])
+  recurso   ReservaRecurso     @relation(fields: [recursoId], references: [id])
+  cliente   Customer?          @relation(fields: [clienteId], references: [id])
+  historial ReservaHistorial[]
+
+  @@unique([businessId, codigo])
+  @@unique([businessId, claveIdempotencia])
+  @@index([businessId, recursoId, inicio])
+  @@index([businessId, fecha])
+  @@index([businessId, estado, inicio])
+  @@index([estado, retenidaHasta])
+  @@index([clienteId])
+  @@map("reservas")
+}
+
+// Cada cambio de estado de una reserva, con quién lo hizo y por qué. Solo se agrega.
+model ReservaHistorial {
+  id         String         @id @default(uuid())
+  businessId String         @map("business_id")
+  reservaId  String         @map("reserva_id")
+  de         ReservaEstado?
+  a          ReservaEstado
+  quien      ReservaActor
+  memberId   String?        @map("member_id")
+  motivo     String?        @db.VarChar(300)
+  /// Lo que acompaña al cambio: horario viejo y nuevo al reprogramar, qué pasó con la seña al cancelar.
+  datos      Json?
+  createdAt  DateTime       @default(now()) @map("created_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+  reserva  Reserva  @relation(fields: [reservaId], references: [id], onDelete: Cascade)
+
+  @@index([reservaId, createdAt])
+  @@index([businessId])
+  @@map("reservas_historial")
+}
+
+// Lista de espera de una sesión llena (una clase, un horario). Al liberarse un
+// lugar, el primero que espera lo toma y queda TOMADA, con su reserva.
+model ReservaEspera {
+  id              String              @id @default(uuid())
+  businessId      String              @map("business_id")
+  modulo          ReservaModulo
+  recursoId       String              @map("recurso_id")
+  inicio          DateTime
+  fin             DateTime
+  clienteId       String?             @map("cliente_id")
+  clienteNombre   String              @db.VarChar(120) @map("cliente_nombre")
+  clienteTelefono String?             @db.VarChar(30) @map("cliente_telefono")
+  clienteEmail    String?             @db.VarChar(200) @map("cliente_email")
+  tokenAcceso     String              @unique @map("token_acceso")
+  estado          ReservaEsperaEstado @default(ESPERANDO)
+  reservaId       String?             @map("reserva_id")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  business Business       @relation(fields: [businessId], references: [id])
+  recurso  ReservaRecurso @relation(fields: [recursoId], references: [id])
+
+  @@index([businessId, recursoId, inicio, estado])
+  @@map("reservas_espera")
+}
+
+// Un rango en que no se reserva: feriado, mantenimiento, vacaciones. Con
+// recursoId null tapa a todos los recursos del módulo. No cancela lo ya
+// reservado: el panel avisa cuántas reservas quedaron adentro.
+model ReservaBloqueo {
+  id                String        @id @default(uuid())
+  businessId        String        @map("business_id")
+  modulo            ReservaModulo
+  recursoId         String?       @map("recurso_id")
+  inicio            DateTime
+  fin               DateTime
+  motivo            String?       @db.VarChar(200)
+  creadoPorMemberId String?       @map("creado_por_member_id")
+  createdAt         DateTime      @default(now()) @map("created_at")
+
+  business Business        @relation(fields: [businessId], references: [id])
+  recurso  ReservaRecurso? @relation(fields: [recursoId], references: [id])
+
+  @@index([businessId, modulo, inicio])
+  @@map("reservas_bloqueos")
 }

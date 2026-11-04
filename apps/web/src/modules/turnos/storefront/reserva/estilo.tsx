@@ -79,7 +79,7 @@ export const CSS_RESERVA = `
     .tur-volver:hover > svg { transform: translateX(-3px); }
   }
 
-  /* ── Tarjeta de opción (servicio, profesional, cancha, clase) ──────────── */
+  /* ── Tarjeta de opción (servicio, profesional o espacio) ──────────────── */
   .tur-op { position: relative; display: block; width: 100%; min-width: 0; padding: 0; text-align: left; border-radius: var(--tur-r);
     border: 1.5px solid var(--color-border); background: var(--color-surface); color: var(--color-text); font-family: inherit; cursor: pointer;
     transition: border-color 180ms ease, background 180ms ease, box-shadow 240ms ease, transform 240ms var(--tur-ease); }
@@ -195,18 +195,6 @@ export const CSS_RESERVA = `
     .tur-rapido:hover .tur-flecha { transform: translateX(4px); }
   }
   .tur-flecha { transition: transform 220ms var(--tur-ease); }
-
-  /* ── Clases con cupo ───────────────────────────────────────────────────── */
-  .tur-clases { display: flex; flex-direction: column; gap: 12px; }
-  .tur-clase { display: grid; grid-template-columns: 78px minmax(0, 1fr) auto; align-items: center; gap: 18px; padding: 16px 20px; }
-  .tur-clase-hora { font-size: 24px; font-weight: 600; color: var(--color-text); }
-  .tur-clase-cupo { display: flex; align-items: center; gap: 12px; text-align: right; }
-  @media (max-width: 560px) {
-    .tur-clase { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 14px 16px; }
-    .tur-clase-hora { grid-column: 1; font-size: 21px; }
-    .tur-clase-info { grid-column: 1; }
-    .tur-clase-cupo { grid-column: 2; grid-row: 1 / span 2; flex-direction: column-reverse; gap: 6px; text-align: center; }
-  }
 
   /* ── Formulario ────────────────────────────────────────────────────────── */
   .tur-campos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 18px; }
@@ -472,6 +460,8 @@ export const CSS_RESERVA = `
   }
   .tur-toast { position: fixed; left: 50%; bottom: 24px; z-index: 200; display: flex; align-items: center; gap: 10px; max-width: calc(100vw - 32px); padding: 14px 18px; border-radius: 14px;
     background: var(--color-text); color: var(--color-bg); font-size: 15px; font-weight: 600; box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.55); transform: translateX(-50%); animation: turToast 300ms var(--tur-ease) both; }
+  /* Con un diálogo abierto el aviso sube: abajo taparía sus botones (en celular el diálogo es una hoja que sale de abajo). */
+  .tur-cont:has(.tur-velo) .tur-toast { top: 56px; bottom: auto; }
 
   /* ── Estado vacío ──────────────────────────────────────────────────────── */
   .tur-vacio { max-width: 520px; margin: 0 auto; text-align: center; }

@@ -67,7 +67,7 @@ export default function Page() {
         .tul-volver small { font-family: "Geist Mono", ui-monospace, monospace; font-size: 9.5px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: #FCD34D; padding-left: 8px; border-left: 1px solid rgba(147,197,253,0.24); }
         .tul-volver:focus-visible { outline: 2px solid #93C5FD; outline-offset: 3px; }
         @media (hover: hover) {
-          .tul-volver:hover { border-color: rgba(147,197,253,0.7); box-shadow: 0 14px 36px rgba(0,0,0,0.55), 0 0 30px rgba(59,130,246,0.4); transform: translateY(-2px); }
+          .tul-volver:hover { border-color: rgba(147,197,253,0.7); transform: translateY(-2px); }
           .tul-volver:hover svg { transform: translateX(-3px); }
         }
         @media (max-width: 480px) { .tul-volver small { display: none; } }

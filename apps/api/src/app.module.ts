@@ -67,6 +67,7 @@ import { InternalCronModule } from './internal-cron/internal-cron.module';
 import { WizardAnalyticsModule } from './wizard-analytics/wizard-analytics.module';
 import { SupportModule } from './support/support.module';
 import { ImageStudioModule } from './image-studio/image-studio.module';
+import { ReservasModule } from './reservas/reservas.module';
 
 @Module({
   imports: [
@@ -130,6 +131,8 @@ import { ImageStudioModule } from './image-studio/image-studio.module';
     WizardAnalyticsModule,
     SupportModule,
     ImageStudioModule,
+    // Reservas: el backend compartido de Turnos, Alquileres y Gimnasio (03/11/2026).
+    ReservasModule,
   ],
   controllers: [AppController],
   providers: [

@@ -1,6 +1,6 @@
 // DEMO INTERNA — tira fija arriba de cada pantalla de /turnos-demo: avisa que
 // es una vista previa local, deja cambiar de rubro y saltar entre pantallas.
-// No forma parte del producto: cuando Turnos sea real, esta tira no existe.
+// No forma parte del producto: es la herramienta para recorrer la demo.
 //
 // Mide SIEMPRE 40px de alto (el layout del panel hace calc(100vh - 40px)) y es
 // siempre oscura, "espacio profundo", sin importar el tema de la pantalla de
@@ -11,7 +11,7 @@ import { useRouter } from 'next/router'
 import { ChevronDown, X } from 'lucide-react'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 import { FAMILIAS, RUBROS_TURNOS, RUBRO_DEFAULT, rubroPorKey, type RubroTurnos } from '@/modules/turnos/datos'
-import { useNegocioDemo } from './negocioDemo'
+import { useNegocioDemo } from '../datos/negocio'
 
 export const PANTALLAS = [
   { href: '/turnos-demo',            label: 'Índice' },
@@ -60,7 +60,26 @@ export function useRubroDemo(): [RubroTurnos, (key: string) => void] {
   return [rubro, set]
 }
 
-// El selector sigue siendo un <select> nativo a propósito: 32 rubros en cuatro
+/**
+ * El rubro como lo ve el sitio público (la portada, Servicios y precios, la
+ * reserva, Mis turnos): el de useRubroDemo sin los servicios que el panel pausó
+ * en Servicios → Pausar. El panel los sigue viendo para poder reanudarlos; el
+ * cliente no tiene que poder reservarlos.
+ */
+export function useRubroSitio(): RubroTurnos {
+  const [rubro] = useRubroDemo()
+  const { demo } = useNegocioDemo()
+  // La lista viaja como texto: así el rubro no cambia de identidad en cada render.
+  const pausados = demo.pausados?.rubro === rubro.key ? demo.pausados.nombres.join('\u0000') : ''
+  return useMemo(() => {
+    if (!pausados) return rubro
+    const fuera = new Set(pausados.split('\u0000'))
+    const servicios = rubro.servicios.filter(s => !fuera.has(s.nombre))
+    return servicios.length === rubro.servicios.length ? rubro : { ...rubro, servicios }
+  }, [rubro, pausados])
+}
+
+// El selector sigue siendo un <select> nativo a propósito: los rubros en cuatro
 // grupos se eligen mejor con la rueda del celular que con un menú armado a
 // mano, y el teclado y el lector de pantalla salen gratis. Lo que se dibuja es
 // el marco: ícono del rubro a la izquierda y flecha propia a la derecha.
@@ -84,7 +103,12 @@ const CSS_SELECTOR = `
     .tu-selrubro:hover > svg:last-of-type { color: var(--color-text); transform: translateY(-50%) translateY(1px); }
   }
   /* En celular, 16px: con menos, iOS hace zoom al abrir el selector. */
-  @media (max-width: 640px) { .tu-selrubro > select { font-size: 16px; } .tu-selrubro[data-compacto='true'] > select { font-size: 16px; } }
+  @media (max-width: 640px) {
+    .tu-selrubro > select { font-size: 16px; }
+    .tu-selrubro[data-compacto='true'] > select { font-size: 16px; }
+    /* El selector grande (el del índice) mide un dedo; el compacto vive en la tira de 40 px. */
+    .tu-selrubro[data-compacto='false'] > select { height: 44px; }
+  }
   @media (prefers-reduced-motion: reduce) { .tu-selrubro > select, .tu-selrubro > svg { transition: none; } }
 `
 
@@ -114,14 +138,10 @@ const CSS_BARRA = `
     --color-text: #F1F5FD; --color-muted: #8794B2; --color-primary: #60A5FA;
     position: sticky; top: 0; z-index: 120; box-sizing: border-box; height: 40px;
     display: flex; align-items: center; gap: 10px; padding: 0 12px 0 14px;
-    font-size: 12px; color: #B6C2DA;
-    background:
-      radial-gradient(420px 90px at 8% -40%, rgba(59,130,246,0.30), transparent 70%),
-      radial-gradient(380px 90px at 96% 140%, rgba(99,102,241,0.26), transparent 70%),
-      #05080F;
+    font-size: 12px; color: #B6C2DA; background: #05080F;
   }
-  /* Filo de luz abajo en vez de borde: no suma alto y marca el corte con la pantalla. */
-  .tu-barra::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; pointer-events: none; background: linear-gradient(90deg, transparent, rgba(59,130,246,0.75) 18%, rgba(129,140,248,0.75) 50%, rgba(147,197,253,0.55) 82%, transparent); }
+  /* Filo abajo en vez de borde: no suma alto y marca el corte con la pantalla. */
+  .tu-barra::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; pointer-events: none; background: rgba(147,197,253,0.22); }
 
   .tu-barra-marca { display: inline-flex; align-items: center; gap: 8px; height: 40px; flex-shrink: 0; color: #F1F5FD; text-decoration: none; border-radius: 8px; padding: 0 4px; margin-left: -4px; cursor: pointer; transition: opacity 160ms ease; }
   .tu-barra-marca b { font-family: 'Sora', 'Geist', system-ui, sans-serif; font-size: 13px; font-weight: 700; letter-spacing: -0.02em; }
@@ -140,7 +160,7 @@ const CSS_BARRA = `
   /* El fondo y el subrayado van en pseudo-elementos para animarlos con
      opacity/transform sin mover nada del layout. */
   .tu-barra nav a::before { content: ''; position: absolute; inset: 7px 1px; border-radius: 7px; background: rgba(147,197,253,0.10); opacity: 0; transition: opacity 160ms ease; }
-  .tu-barra nav a::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: 0; height: 2px; border-radius: 2px 2px 0 0; background: linear-gradient(90deg, #3B82F6, #93C5FD); box-shadow: 0 0 10px rgba(96,165,250,0.9); transform: scaleX(0); transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1); }
+  .tu-barra nav a::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: 0; height: 2px; border-radius: 2px 2px 0 0; background: #60A5FA; transform: scaleX(0); transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1); }
   .tu-barra nav a > span { position: relative; }
   .tu-barra nav a[aria-current='page'] { color: #F1F5FD; font-weight: 600; }
   .tu-barra nav a[aria-current='page']::before { opacity: 1; }

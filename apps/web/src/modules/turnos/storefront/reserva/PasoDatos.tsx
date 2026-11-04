@@ -9,7 +9,7 @@
 import { useState } from 'react'
 import { BellRing, Check, Gift, Home, Info, Lock, MapPin, ShieldCheck, Store, UserRoundCheck, Wallet } from 'lucide-react'
 import { pesos, esSalud, type RubroTurnos } from '@/modules/turnos/datos'
-import { MODALIDAD_TXT, beneficiosTxt, plazoTxt, type BeneficiosCuenta, type Modalidad, type PoliticaReserva } from '@/modules/turnos/demo/negocioDemo'
+import { MODALIDAD_TXT, beneficiosTxt, plazoTxt, type BeneficiosCuenta, type Modalidad, type PoliticaReserva } from '@/modules/turnos/datos/negocio'
 import type { TemaNegocio } from '../tema'
 import { teclasRadio } from './acciones'
 import { BotonCarga, Campo, Interruptor, Tilde } from './piezas'
@@ -77,7 +77,7 @@ export function PasoDatos({ rubro, t, datos, onDatos, intento, conSena, onEnviar
   const tocar = (c: CampoValidado) => () => setTocados(x => ({ ...x, [c]: true }))
   const salud = esSalud(rubro)
   const lista = beneficiosTxt(beneficios, rubro)
-  const turno = rubro.modo === 'cupo' ? 'esta clase' : rubro.modo === 'cancha' ? 'esta reserva' : 'este turno'
+  const turno = 'este turno'
   const detalleLugar: Record<Modalidad, string> = {
     local: [t.direccion, t.barrio].filter(Boolean).join(', ') || 'En el local',
     domicilio: `Vamos a ${t.zonas}`,

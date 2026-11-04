@@ -1,9 +1,9 @@
-// Clientes (o pacientes, o alumnos) con su historial de turnos.
-// Lista con buscador y filtros rápidos + la ficha de cada uno en un modal. La
-// frecuencia de cada cliente se ve como una órbita: más visitas, más cerca del
-// negocio.
+// Clientes (o pacientes) con su historial de turnos: una lista con buscador y
+// filtros rápidos, como la de Tienda, y la ficha de cada uno en un modal.
 //
 // La lista vive en PanelTurnos: quien se agrega acá aparece al dar un turno.
+// El historial de la ficha sale de la misma agenda (los turnos pasados de esa
+// persona), no de una lista aparte: lo que se ve acá es lo que se ve en Agenda.
 // Desde la ficha se le agenda un turno (el mismo "Nuevo turno" de la agenda) o
 // se le escribe por WhatsApp (simulado: la demo no le manda nada a nadie).
 //
@@ -11,36 +11,80 @@
 // teléfono va tapado y no hay WhatsApp; sin permiso para ver los números del
 // negocio, tampoco cuánto gastó cada uno.
 import { useState } from 'react'
-import { Search, Phone, MessageCircle, ShieldCheck, ChevronRight, CalendarPlus, CalendarClock, Star, UserPlus, Users, Check, Lock } from 'lucide-react'
+import { Phone, MessageCircle, ShieldCheck, ChevronRight, CalendarPlus, CalendarClock, UserPlus, Check, Lock } from 'lucide-react'
 import { Avatar } from '@/design-system/components/Avatar'
-import { horaTxt, pesos, esSalud, type Cliente, type RubroTurnos, type EstadoTurno } from '@/modules/turnos/datos'
+import { Encabezado, Modal, Vacio } from '@/design-system/reservas/piezas'
+import { horaTxt, pesos, esSalud, type Cliente, type RubroTurnos } from '@/modules/turnos/datos'
 import { ChipEstado } from '@/modules/turnos/_shared/components/ChipEstado'
-import { Anillo } from '@/modules/turnos/_shared/orbita/OrbitaDia'
-import { Cabecera } from '@/modules/turnos/_shared/orbita/piezas'
-import { Campo } from './configuracion/ui'
-import { Modal, ErrorCampo } from './piezasPanel'
-import { cuandoTxt, sinAcentos, tieneTelefono, type ServicioPanel, type TurnoAgenda } from './agendaDemo'
-import { taparTelefono } from './equipoDemo'
+import { Campo, Segmentado } from './configuracion/ui'
+import { ErrorCampo, Buscador } from './piezasPanel'
+import { cuandoTxt, fechaCorta, sinAcentos, tieneTelefono, type TurnoAgenda } from '../datos/agenda'
+import { taparTelefono } from '../datos/equipo'
 
-export const pluralCliente = (r: RubroTurnos) => esSalud(r) ? 'Pacientes' : r.modo === 'cupo' ? 'Alumnos' : 'Clientes'
+export const pluralCliente = (r: RubroTurnos) => esSalud(r) ? 'Pacientes' : 'Clientes'
 
-const HISTORIAL: { fecha: string; estado: EstadoTurno }[] = [
-  { fecha: '19/09', estado: 'completado' }, { fecha: '05/09', estado: 'completado' },
-  { fecha: '22/08', estado: 'ausente' }, { fecha: '08/08', estado: 'completado' },
-]
+/** Cuántos turnos pasados se ven en la ficha antes de "Ver todos". */
+const A_LA_VISTA = 5
 
 type Filtro = 'todos' | 'frecuentes' | 'nuevos'
-const nivel = (c: Cliente) => c.visitas >= 10 ? { txt: 'Frecuente', clase: 'tuo-chip--primario', Icon: Star } : c.visitas <= 2 ? { txt: 'Nuevo', clase: 'tuo-chip--ok', Icon: UserPlus } : null
+const nivel = (c: Cliente) => c.visitas >= 10 ? { txt: 'Frecuente', clase: 'rv-chip--primario' } : c.visitas <= 2 ? { txt: 'Nuevo', clase: 'rv-chip--ok' } : null
+
+const CSS = `
+  .tu-cli-filtros { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .tu-cli-filtros > .tu-buscar { flex: 1 1 240px; }
+  .tu-cli-head, .tu-cli-fila { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr) 80px 80px 120px 18px; gap: 14px; }
+  .tu-cli-head { display: grid; }
+  .tu-cli-fila { display: grid; align-items: center; }
+  .tu-cli-quien { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .tu-cli-quien > span { min-width: 0; }
+  .tu-cli-quien b { font-size: 14px; font-weight: 600; color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tu-cli-quien small { display: block; font-size: 12px; color: var(--color-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+  .tu-cli-nombre { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .tu-cli-dato { font-size: 13px; color: var(--color-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tu-cli-flecha { color: var(--color-subtle); }
+  .tu-cli-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 16px; }
+  .tu-cli-tile { padding: 11px 12px; border-radius: var(--rv-r-sm); background: var(--color-surface); border: 1px solid var(--color-border); min-width: 0; }
+  .tu-cli-tile > small { display: block; font-size: 11px; color: var(--color-muted); margin-bottom: 3px; }
+  .tu-cli-tile > b { display: block; font-size: 14.5px; font-weight: 600; color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tu-cli-nota { margin: 0 0 18px; padding-left: 12px; border-left: 2px solid var(--color-border-strong); font-size: 13px; line-height: 1.5; color: var(--color-body); }
+  .tu-cli-prox { display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 14px; margin-bottom: 20px; }
+  .tu-cli-prox-ico { width: 36px; height: 36px; border-radius: 8px; flex: 0 0 36px; display: grid; place-items: center; color: var(--color-primary); background: var(--color-primary-bg); }
+  .tu-cli-prox > span:not(.tu-cli-prox-ico) { flex: 1; min-width: 0; }
+  .tu-cli-prox b { display: block; font-size: 14px; font-weight: 600; color: var(--color-text); }
+  .tu-cli-prox small { display: block; font-size: 12.5px; color: var(--color-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tu-cli-hist { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 0; border: none; border-top: 1px solid var(--color-border); border-radius: 0; background: none; font: inherit; font-size: 13px; color: inherit; text-align: left; cursor: pointer; }
+  .tu-cli-hist:first-of-type { border-top: none; }
+  .tu-cli-hist:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; border-radius: 6px; }
+  .tu-cli-hist-cuando { width: 44px; flex-shrink: 0; color: var(--color-muted); }
+  .tu-cli-hist-que { flex: 1; min-width: 0; color: var(--color-text); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tu-cli-hist-que > small { display: block; font-size: 12px; font-weight: 400; color: var(--color-muted); }
+  .tu-cli-hist-precio { flex-shrink: 0; color: var(--color-muted); }
+  @media (max-width: 480px) { .tu-cli-hist-precio { display: none; } }
+  @media (max-width: 900px) {
+    .tu-cli-head { display: none; }
+    .tu-cli-fila { grid-template-columns: minmax(0, 1fr) auto 18px; row-gap: 4px; }
+    .tu-cli-tel, .tu-cli-ult { display: none; }
+    .tu-cli-vis { grid-column: 1; grid-row: 2; padding-left: 52px; }
+    .tu-cli-extra { grid-column: 2; grid-row: 1; justify-self: end; }
+    .tu-cli-flecha { grid-column: 3; grid-row: 1; }
+  }
+  @media (max-width: 768px) {
+    .tu-cli-filtros > .rv-seg { width: 100%; display: flex; }
+    .tu-cli-filtros > .rv-seg > button { flex: 1; }
+  }
+  @media (max-width: 480px) { .tu-cli-tiles { grid-template-columns: minmax(0, 1fr); } }
+`
 
 interface Props {
   rubro: RubroTurnos
   clientes: Cliente[]
-  servicios: ServicioPanel[]
   /** Ficha abierta. Vive en PanelTurnos para que el buscador del header también la abra. */
   selId: string | null
   onSel: (id: string | null) => void
   /** Próximo turno de alguien (de acá en adelante), si tiene. */
   proximo: (clienteId: string) => TurnoAgenda | null
+  /** Los turnos pasados de alguien (atendidos o ausentes), del más reciente al más viejo. */
+  historial: (clienteId: string) => TurnoAgenda[]
   onAbrirTurno: (t: TurnoAgenda) => void
   onAgregar: (c: Cliente) => void
   onAgendar: (c: Cliente) => void
@@ -55,7 +99,7 @@ interface Props {
   soloLosSuyos: boolean
 }
 
-export default function Clientes({ rubro, clientes, servicios, selId, onSel, proximo, onAbrirTurno, onAgregar, onAgendar, onWhatsApp, verContacto, verNumeros, puedeAgendar, soloLosSuyos }: Props) {
+export default function Clientes({ rubro, clientes, selId, onSel, proximo, historial, onAbrirTurno, onAgregar, onAgendar, onWhatsApp, verContacto, verNumeros, puedeAgendar, soloLosSuyos }: Props) {
   const [q, setQ] = useState('')
   const [filtro, setFiltro] = useState<Filtro>('todos')
   // null: formulario cerrado; si no, el nombre con el que arranca.
@@ -63,7 +107,6 @@ export default function Clientes({ rubro, clientes, servicios, selId, onSel, pro
   const salud = esSalud(rubro)
   const titulo = pluralCliente(rubro)
   const sel = clientes.find(c => c.id === selId) ?? null
-  const maxVisitas = Math.max(...clientes.map(c => c.visitas), 1)
   // Se busca por nombre (sin importar acentos) o por un pedazo del teléfono.
   const texto = sinAcentos(q.trim())
   const digitos = q.replace(/\D/g, '')
@@ -71,8 +114,7 @@ export default function Clientes({ rubro, clientes, servicios, selId, onSel, pro
     .filter(c => !texto || sinAcentos(c.nombre).includes(texto) || (verContacto && digitos.length >= 3 && c.telefono.replace(/\D/g, '').includes(digitos)))
     .filter(c => filtro === 'todos' || (filtro === 'frecuentes' ? c.visitas >= 10 : c.visitas <= 2))
   const telefonoDe = (c: Cliente) => (verContacto ? c.telefono : taparTelefono(c.telefono))
-  // El historial de ejemplo usa los servicios que hay hoy (si se borraron todos, los del rubro).
-  const nombresServicio = (servicios.length ? servicios : rubro.servicios).map(s => s.nombre)
+  const extraCab = salud ? 'Cobertura' : verNumeros ? 'Gastado' : ''
 
   const agregar = (c: Cliente) => {
     onAgregar(c)
@@ -82,105 +124,66 @@ export default function Clientes({ rubro, clientes, servicios, selId, onSel, pro
   }
 
   return (
-    <div className="panel-page">
-      <style>{`
-        .tu-cli-fila { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr) 150px 96px 120px 18px; gap: 14px; align-items: center; width: 100%; min-height: 70px; padding: 10px 20px; border: none; border-bottom: 1px solid var(--color-border); background: transparent; text-align: left; font-family: inherit; color: inherit; }
-        .tu-cli-fila:last-child { border-bottom: none; }
-        .tu-cli-head { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr) 150px 96px 120px 18px; gap: 14px; padding: 12px 20px; border-bottom: 1px solid var(--color-border); background: var(--color-surface); border-radius: 16px 16px 0 0; }
-        .tu-cli-flecha { color: var(--color-subtle); transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1), color 160ms ease; }
-        .tu-cli-avatar { transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1); }
-        .tu-cli-barra { transition: width 700ms cubic-bezier(0.22, 1, 0.36, 1); }
-        @media (hover: hover) {
-          .tu-cli-fila:hover .tu-cli-flecha { transform: translateX(3px); color: var(--color-primary); }
-          .tu-cli-fila:hover .tu-cli-avatar { transform: scale(1.08); }
-        }
-        .tu-cli-barra-sup { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
-        @media (max-width: 900px) {
-          .tu-cli-head { display: none; }
-          .tu-cli-fila { grid-template-columns: minmax(0, 1fr) auto 18px; row-gap: 4px; padding: 12px 14px; }
-          .tu-cli-tel, .tu-cli-ult { display: none !important; }
-          .tu-cli-vis { grid-column: 1; grid-row: 2; padding-left: 52px; }
-          .tu-cli-extra { grid-column: 2; grid-row: 1; justify-self: end; }
-          .tu-cli-flecha { grid-column: 3; grid-row: 1; }
-        }
-        @media (max-width: 768px) {
-          .tu-cli-barra-sup .tuo-buscar { max-width: none; }
-          .tu-cli-barra-sup .tuo-buscar > input { height: 44px; font-size: 16px; }
-          .tu-cli-barra-sup .tuo-seg > button { height: 44px; }
-        }
-        @media (prefers-reduced-motion: reduce) { .tu-cli-flecha, .tu-cli-avatar, .tu-cli-barra { transition: none; } }
-      `}</style>
+    <div className="rv-pagina">
+      <style>{CSS}</style>
 
-      <Cabecera
-        rotulo={soloLosSuyos ? 'A quienes atendés' : 'Tu comunidad'}
+      <Encabezado
+        rotulo={`${clientes.length} ${clientes.length === 1 ? titulo.slice(0, -1).toLowerCase() : titulo.toLowerCase()}${soloLosSuyos ? ' · a quienes atendés' : ''}`}
         titulo={soloLosSuyos ? `Mis ${titulo.toLowerCase()}` : titulo}
-        contador={clientes.length}
         bajada="Quién viene, cada cuánto y cuándo fue la última vez. Tocá a cualquiera para ver su historial."
-        acciones={puedeAgendar ? <button type="button" onClick={() => setAgregando('')} className="tuo-btn tuo-btn--primario"><UserPlus size={16} /> Agregar</button> : undefined}
+        acciones={puedeAgendar ? <button type="button" onClick={() => setAgregando('')} className="rv-btn rv-btn--primario"><UserPlus size={16} /> Agregar</button> : undefined}
       />
 
-      <div className="tu-cli-barra-sup tuo-entra" style={{ ['--i' as string]: 1 }}>
-        <label className="tuo-buscar">
-          <Search size={15} />
-          <input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder={verContacto ? 'Buscar por nombre o teléfono' : 'Buscar por nombre'} aria-label={`Buscar ${titulo.toLowerCase()}`} />
-        </label>
-        <div className="tuo-seg" role="group" aria-label="Filtrar">
-          {([['todos', 'Todos'], ['frecuentes', 'Frecuentes'], ['nuevos', 'Nuevos']] as const).map(([id, l]) => <button key={id} type="button" aria-pressed={filtro === id} onClick={() => setFiltro(id)}>{l}</button>)}
-        </div>
+      <div className="tu-cli-filtros">
+        <Buscador value={q} onChange={setQ} placeholder={verContacto ? 'Buscar por nombre o teléfono' : 'Buscar por nombre'} label={`Buscar ${titulo.toLowerCase()}`} />
+        <Segmentado label="Filtrar" valor={filtro} onChange={setFiltro} opciones={[{ id: 'todos', label: 'Todos' }, { id: 'frecuentes', label: 'Frecuentes' }, { id: 'nuevos', label: 'Nuevos' }]} />
       </div>
 
-      <div className="tuo-card tuo-entra" style={{ ['--i' as string]: 2 }}>
-        <div className="tu-cli-head tuo-rotulo">
-          <span>Nombre</span><span>Teléfono</span><span>Visitas</span><span>Última</span><span>{salud ? 'Cobertura' : verNumeros ? 'Gastado' : ''}</span><span />
-        </div>
-        {lista.length === 0 && (
-          <div role="status" style={{ padding: '44px 20px', textAlign: 'center' }}>
-            <Users size={22} color="var(--color-subtle)" />
-            <div style={{ fontSize: 14.5, fontWeight: 600, color: 'var(--color-text)', marginTop: 10 }}>{q.trim() ? `Nadie coincide con “${q.trim()}”` : 'No hay nadie con ese filtro'}</div>
-            <div style={{ fontSize: 13, color: 'var(--color-muted)', marginTop: 4 }}>Probá con otro nombre o sacá el filtro.</div>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap', marginTop: 16 }}>
-              <button type="button" onClick={() => { setQ(''); setFiltro('todos') }} className="tuo-btn" style={{ height: 44 }}>Ver todos</button>
-              {puedeAgendar && q.trim() && !digitos && <button type="button" onClick={() => setAgregando(q.trim())} className="tuo-btn tuo-btn--primario" style={{ height: 44 }}><UserPlus size={16} /> Agregar “{q.trim()}”</button>}
-            </div>
+      {lista.length === 0 ? (
+        <Vacio
+          titulo={q.trim() ? `Nadie coincide con “${q.trim()}”` : 'No hay nadie con ese filtro'}
+          texto="Probá con otro nombre o sacá el filtro."
+          accion={<div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button type="button" onClick={() => { setQ(''); setFiltro('todos') }} className="rv-btn">Ver todos</button>
+            {puedeAgendar && q.trim() && !digitos && <button type="button" onClick={() => setAgregando(q.trim())} className="rv-btn rv-btn--primario"><UserPlus size={16} /> Agregar “{q.trim()}”</button>}
+          </div>}
+        />
+      ) : (
+        <div className="rv-card" style={{ overflow: 'hidden' }}>
+          <div className="tu-fila-cab tu-cli-head" aria-hidden>
+            <span>Nombre</span><span>Teléfono</span><span>Visitas</span><span>Última</span><span>{extraCab}</span><span />
           </div>
-        )}
-        {lista.map((c, i) => {
-          const n = nivel(c)
-          return (
-            <button key={c.id} type="button" onClick={() => onSel(c.id)} className="tu-cli-fila tuo-fila tuo-entra" style={{ ['--i' as string]: Math.min(i + 2, 10) }} aria-label={`${c.nombre}, ${c.visitas} visitas`}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-                <span className="tu-cli-avatar" style={{ display: 'inline-flex', flexShrink: 0 }}><Avatar name={c.nombre} size={40} /></span>
-                <span style={{ minWidth: 0 }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.nombre}</span>
-                    {n && <span className={`tuo-chip ${n.clase}`} style={{ height: 20, padding: '0 7px', fontSize: 10.5 }}><n.Icon size={10} /> {n.txt}</span>}
+          <div className="tu-filas">
+            {lista.map(c => {
+              const n = nivel(c)
+              return (
+                <button key={c.id} type="button" onClick={() => onSel(c.id)} className="ds-hover tu-fila tu-cli-fila" aria-label={`${c.nombre}, ${c.visitas} visitas`}>
+                  <span className="tu-cli-quien">
+                    <Avatar name={c.nombre} size={40} />
+                    <span>
+                      <span className="tu-cli-nombre"><b>{c.nombre}</b>{n && <span className={`rv-chip ${n.clase}`} style={{ height: 20, padding: '0 7px', fontSize: 10.5 }}>{n.txt}</span>}</span>
+                      {c.nota && <small>{c.nota}</small>}
+                    </span>
                   </span>
-                  {c.nota && <span style={{ display: 'block', fontSize: 12, color: 'var(--color-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 1 }}>{c.nota}</span>}
-                </span>
-              </span>
-              <span className="tu-cli-tel tuo-num" style={{ fontSize: 13, color: 'var(--color-body)' }}>{telefonoDe(c)}</span>
-              <span className="tu-cli-vis" style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                <span className="tuo-num" style={{ width: 22, fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)' }}>{c.visitas}</span>
-                <span aria-hidden style={{ flex: 1, maxWidth: 110, height: 5, borderRadius: 999, background: 'var(--color-surface-alt)', overflow: 'hidden' }}>
-                  <span className="tu-cli-barra" style={{ display: 'block', width: `${(c.visitas / maxVisitas) * 100}%`, height: '100%', borderRadius: 999, background: 'var(--tuo-grad)' }} />
-                </span>
-              </span>
-              <span className="tu-cli-ult tuo-num" style={{ fontSize: 13, color: 'var(--color-body)' }}>{c.ultima}</span>
-              <span className={salud ? 'tu-cli-extra' : 'tu-cli-extra tuo-num'} style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{salud ? c.obraSocial : !verNumeros ? '' : c.gastado ? pesos(c.gastado) : '—'}</span>
-              <ChevronRight size={16} className="tu-cli-flecha" aria-hidden />
-            </button>
-          )
-        })}
-      </div>
+                  <span className="tu-cli-tel tu-cli-dato rv-num">{telefonoDe(c)}</span>
+                  <span className="tu-cli-vis tu-cli-dato"><b className="rv-num" style={{ color: 'var(--color-text)' }}>{c.visitas}</b> visita{c.visitas === 1 ? '' : 's'}</span>
+                  <span className="tu-cli-ult tu-cli-dato rv-num">{c.ultima}</span>
+                  <span className={`tu-cli-extra tu-cli-dato${salud ? '' : ' rv-num'}`} style={{ fontWeight: 500, color: 'var(--color-text)' }}>{salud ? c.obraSocial : !verNumeros ? '' : c.gastado ? pesos(c.gastado) : '—'}</span>
+                  <ChevronRight size={16} className="tu-cli-flecha" aria-hidden />
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {sel && (
         <FichaCliente
           key={sel.id}
           cliente={sel}
           rubro={rubro}
-          maxVisitas={maxVisitas}
-          nombresServicio={nombresServicio}
           proximo={proximo(sel.id)}
+          historial={historial(sel.id)}
           verContacto={verContacto} verNumeros={verNumeros} puedeAgendar={puedeAgendar}
           onCerrar={() => onSel(null)}
           onAbrirTurno={onAbrirTurno}
@@ -197,67 +200,71 @@ export default function Clientes({ rubro, clientes, servicios, selId, onSel, pro
 }
 
 /** Ficha de una persona: números, próximo turno, historial y acciones. */
-function FichaCliente({ cliente: c, rubro, maxVisitas, nombresServicio, proximo, verContacto, verNumeros, puedeAgendar, onCerrar, onAbrirTurno, onAgendar, onWhatsApp }: {
-  cliente: Cliente; rubro: RubroTurnos; maxVisitas: number; nombresServicio: string[]; proximo: TurnoAgenda | null
+function FichaCliente({ cliente: c, rubro, proximo, historial, verContacto, verNumeros, puedeAgendar, onCerrar, onAbrirTurno, onAgendar, onWhatsApp }: {
+  cliente: Cliente; rubro: RubroTurnos; proximo: TurnoAgenda | null; historial: TurnoAgenda[]
   verContacto: boolean; verNumeros: boolean; puedeAgendar: boolean
   onCerrar: () => void; onAbrirTurno: (t: TurnoAgenda) => void; onAgendar: () => void; onWhatsApp: () => void
 }) {
   const salud = esSalud(rubro)
   const pila = c.nombre.split(' ')[0]
-  const historial = HISTORIAL.slice(0, Math.min(4, c.visitas))
+  const [todos, setTodos] = useState(false)
+  const visibles = todos ? historial : historial.slice(0, A_LA_VISTA)
+  // Las ausencias que la agenda recuerda, más la que figura en la nota de la ficha.
+  const ausencias = historial.filter(t => t.estado === 'ausente').length + (c.nota?.includes('Faltó') ? 1 : 0)
 
   return (
     <Modal
       ancho={560}
       rotulo={rubro.cliente}
       titulo={c.nombre}
-      bajada={<span className="tuo-num" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{verContacto ? <><Phone size={12} />{c.telefono}</> : <><Lock size={12} />{taparTelefono(c.telefono)}</>}</span>}
-      icono={<Anillo valor={c.visitas / maxVisitas} size={64} grosor={4} color="#60A5FA" label={`${c.visitas} visitas`}><Avatar name={c.nombre} size={48} /></Anillo>}
+      bajada={<span className="rv-num" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{verContacto ? <><Phone size={12} />{c.telefono}</> : <><Lock size={12} />{taparTelefono(c.telefono)}</>}</span>}
+      icono={<Avatar name={c.nombre} size={44} />}
       onCerrar={onCerrar}
       pie={<>
-        {verContacto && <button type="button" onClick={onWhatsApp} className="tuo-btn" aria-label={`Escribirle a ${pila} por WhatsApp`}><MessageCircle size={16} /> WhatsApp</button>}
+        {verContacto && <button type="button" onClick={onWhatsApp} className="rv-btn" aria-label={`Escribirle a ${pila} por WhatsApp`}><MessageCircle size={16} /> WhatsApp</button>}
         {puedeAgendar
-          ? <button type="button" onClick={onAgendar} className="tuo-btn tuo-btn--primario"><CalendarPlus size={16} /> Agendar turno</button>
-          : <button type="button" onClick={onCerrar} className="tuo-btn tuo-btn--primario">Listo</button>}
+          ? <button type="button" onClick={onAgendar} className="rv-btn rv-btn--primario"><CalendarPlus size={16} /> Agendar turno</button>
+          : <button type="button" onClick={onCerrar} className="rv-btn rv-btn--primario">Listo</button>}
       </>}
     >
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginBottom: 16 }}>
-        {[['Visitas', String(c.visitas)], ['Ausencias', c.nota?.includes('Faltó') ? '1' : '0'], salud ? ['Cobertura', c.obraSocial ?? '—'] : verNumeros ? ['Gastado', c.gastado ? pesos(c.gastado) : '—'] : ['Última visita', c.ultima]].map(([k, v], i) => (
-          <div key={k} className="tuo-entra" style={{ ['--i' as string]: i + 1, padding: '11px 12px', borderRadius: 12, background: 'var(--color-surface)', border: '1px solid var(--color-border)', minWidth: 0 }}>
-            <div style={{ fontSize: 11, color: 'var(--color-muted)', marginBottom: 3 }}>{k}</div>
-            <div className="tuo-num" style={{ fontSize: 14.5, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v}</div>
-          </div>
+      <div className="tu-cli-tiles">
+        {[['Visitas', String(c.visitas)], ['Ausencias', String(ausencias)], salud ? ['Cobertura', c.obraSocial ?? '—'] : verNumeros ? ['Gastado', c.gastado ? pesos(c.gastado) : '—'] : ['Última visita', c.ultima]].map(([k, v]) => (
+          <div key={k} className="tu-cli-tile"><small>{k}</small><b className="rv-num">{v}</b></div>
         ))}
       </div>
-      {c.nota && <p style={{ fontSize: 13, color: 'var(--color-body)', margin: '0 0 18px', paddingLeft: 12, borderLeft: '2px solid var(--color-border-strong)', lineHeight: 1.5 }}>{c.nota}</p>}
+      {c.nota && <p className="tu-cli-nota">{c.nota}</p>}
 
-      <div className="tuo-rotulo" style={{ marginBottom: 8 }}>Próximo turno</div>
+      <div className="rv-rotulo" style={{ marginBottom: 8 }}>Próximo turno</div>
       {proximo ? (
-        <button type="button" onClick={() => onAbrirTurno(proximo)} className="tuo-card tuo-card--accion" aria-label={`Ver el turno de ${cuandoTxt(proximo.dia ?? 0).toLowerCase()} a las ${horaTxt(proximo.inicio)}`}
-          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', marginBottom: 20, boxShadow: 'none' }}>
-          <span aria-hidden style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center', color: 'var(--color-primary)', background: 'var(--tuo-grad-suave)' }}><CalendarClock size={17} /></span>
-          <span style={{ flex: 1, minWidth: 0 }}>
-            <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{cuandoTxt(proximo.dia ?? 0)} · <span className="tuo-num">{horaTxt(proximo.inicio)}</span></span>
-            <span style={{ display: 'block', fontSize: 12.5, color: 'var(--color-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{proximo.servicio}</span>
-          </span>
+        <button type="button" onClick={() => onAbrirTurno(proximo)} className="rv-card rv-card--accion tu-cli-prox" aria-label={`Ver el turno de ${cuandoTxt(proximo.dia ?? 0).toLowerCase()} a las ${horaTxt(proximo.inicio)}`}>
+          <span className="tu-cli-prox-ico" aria-hidden><CalendarClock size={17} /></span>
+          <span><b>{cuandoTxt(proximo.dia ?? 0)} · <span className="rv-num">{horaTxt(proximo.inicio)}</span></b><small>{proximo.servicio}</small></span>
           <ChevronRight size={16} color="var(--color-subtle)" aria-hidden />
         </button>
       ) : (
-        <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: '0 0 20px' }}>No tiene turnos agendados.</p>
+        <p className="rv-ayuda" style={{ margin: '0 0 20px', fontSize: 13 }}>No tiene turnos agendados.</p>
       )}
 
-      <div className="tuo-rotulo" style={{ marginBottom: 6 }}>Historial</div>
-      {historial.length === 0 && <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: '4px 0 0' }}>Todavía no vino: el historial arranca con su primer turno.</p>}
-      {historial.map((hh, i, arr) => (
-        <div key={i} className="tuo-entra" style={{ ['--i' as string]: i + 3, position: 'relative', display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0 11px 22px', fontSize: 13 }}>
-          <span aria-hidden style={{ position: 'absolute', left: 4, top: i === 0 ? '50%' : 0, bottom: i === arr.length - 1 ? '50%' : 0, width: 1, background: 'var(--color-border)' }} />
-          <span aria-hidden style={{ position: 'absolute', left: 0, top: '50%', width: 9, height: 9, marginTop: -4.5, borderRadius: '50%', background: hh.estado === 'ausente' ? 'var(--color-error)' : 'var(--color-primary)', border: '2px solid var(--color-bg)' }} />
-          <span className="tuo-num" style={{ color: 'var(--color-muted)', width: 44 }}>{hh.fecha}</span>
-          <span style={{ flex: 1, minWidth: 0, color: 'var(--color-text)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{nombresServicio[i % nombresServicio.length]}</span>
-          <ChipEstado estado={hh.estado} size="sm" />
-        </div>
+      <div className="rv-entre" style={{ marginBottom: 6 }}>
+        <span className="rv-rotulo">Historial</span>
+        {historial.length > 0 && <span className="rv-rotulo">{historial.length} turno{historial.length === 1 ? '' : 's'} en dos meses</span>}
+      </div>
+      {historial.length === 0 && <p className="rv-ayuda" style={{ margin: '4px 0 0', fontSize: 13 }}>{c.visitas > 0 ? 'En los últimos dos meses no tuvo turnos.' : 'Todavía no vino: el historial arranca con su primer turno.'}</p>}
+      {/* Cada turno pasado se abre como cualquier otro de la agenda. */}
+      {visibles.map(t => (
+        <button key={t.id} type="button" className="ds-hover tu-cli-hist" onClick={() => onAbrirTurno(t)} aria-label={`Ver el turno del ${fechaCorta(t.dia ?? 0)}, ${t.servicio}`}>
+          <span className="tu-cli-hist-cuando rv-num">{fechaCorta(t.dia ?? 0)}</span>
+          <span className="tu-cli-hist-que">{t.servicio}<small className="rv-num">{horaTxt(t.inicio)}</small></span>
+          {verNumeros && <span className="tu-cli-hist-precio rv-num">{pesos(t.precio)}</span>}
+          <ChipEstado estado={t.estado} size="sm" />
+        </button>
       ))}
-      {salud && <p style={{ display: 'flex', gap: 7, fontSize: 12, color: 'var(--color-muted)', marginTop: 16, lineHeight: 1.5 }}><ShieldCheck size={14} style={{ flexShrink: 0, marginTop: 1 }} /> Datos de salud: solo visibles para el equipo del consultorio.</p>}
+      {historial.length > A_LA_VISTA && (
+        <button type="button" onClick={() => setTodos(v => !v)} aria-expanded={todos} className="rv-btn rv-btn--sm rv-btn--fantasma" style={{ marginTop: 6, color: 'var(--chip-primary-fg)' }}>
+          {todos ? 'Ver menos' : `Ver los ${historial.length} turnos`}
+        </button>
+      )}
+      {salud && <p className="rv-ayuda" style={{ display: 'flex', gap: 7, margin: '16px 0 0' }}><ShieldCheck size={14} style={{ flexShrink: 0, marginTop: 1 }} /> Datos de salud: solo visibles para el equipo del consultorio.</p>}
     </Modal>
   )
 }
@@ -294,8 +301,8 @@ function FormCliente({ inicial, rubro, clientes, onCerrar, onAgregar }: {
       onCerrar={onCerrar}
       onEnviar={guardar}
       pie={<>
-        <button type="button" onClick={onCerrar} className="tuo-btn">Cancelar</button>
-        <button type="submit" className="tuo-btn tuo-btn--primario"><Check size={16} /> Agregar</button>
+        <button type="button" onClick={onCerrar} className="rv-btn">Cancelar</button>
+        <button type="submit" className="rv-btn rv-btn--primario"><Check size={16} /> Agregar</button>
       </>}
     >
       <Campo label="Nombre y apellido" value={nombre} onChange={v => { setNombre(v); setError(null) }} placeholder="Ej.: Paula Herrera" maxLength={60} />

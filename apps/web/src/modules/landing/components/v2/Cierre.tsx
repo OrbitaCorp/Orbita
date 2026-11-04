@@ -108,7 +108,10 @@ export function Precios() {
                                 // solo en la tarjeta destacada para no repetir el efecto x2.
                                 <div
                                     className="pointer-events-none absolute left-1/2 -bottom-[220px] h-[300px] w-[560px] -translate-x-1/2 rounded-[50%]"
-                                    style={{ background: '#000', boxShadow: '0 0 40px 4px rgba(226,240,255,.55), 0 0 120px 30px rgba(99,102,241,.42)' }}
+                                    // El disco es del color del fondo de la página (negro en oscuro,
+                                    // casi blanco en claro): en claro, con #000 fijo, quedaba un
+                                    // bloque negro asomando bajo el botón en vez de un arco de luz.
+                                    style={{ background: 'var(--oc-bg)', boxShadow: '0 0 40px 4px rgba(226,240,255,.55), 0 0 120px 30px rgba(99,102,241,.42)' }}
                                     aria-hidden="true"
                                 />
                             )}

@@ -2,9 +2,9 @@
 // van descontando solos con cada turno. La vista previa muestra el pack en
 // venta y, abajo, cómo ve el cliente su pack en curso.
 import { useState } from 'react'
-import { Plus, Trash2, Package, Wallet, Layers, Eye } from 'lucide-react'
-import { Button } from '@/design-system/components/Button'
-import { ShellFuncion, Seccion, Campo, Segmentado, FilaSwitch, Dato, VistaCliente, BotonVista, BotonIcono, inputStyle } from './ui'
+import { Plus, Trash2, Package, Wallet, Layers, Eye, BellRing, Users } from 'lucide-react'
+import { Barra } from '../piezasPanel'
+import { Boton, ShellFuncion, SecCard, CampoLibre, Segmentado, FilaSwitch, Dato, VistaCliente, BotonVista, BotonIcono } from './ui'
 import { ars, paquetesDe, serviciosVendibles, redondear, USOS_PAQUETE, type Paquete } from './datosAvanzado'
 import type { PropsFuncion } from './tipos'
 import { pluralCliente } from '../Clientes'
@@ -52,84 +52,81 @@ export default function Paquetes(p: PropsFuncion) {
       textoOn="Los paquetes aparecen en tu sitio junto a los servicios, y al reservar se ofrece usar una sesión del pack."
       kpis={<>
         <Dato label="Packs vendidos" valor={String(paquetes.reduce((s, x) => s + x.vendidos, 0))} nota="Datos de ejemplo" Icon={Package} />
-        <Dato label="Cobrado por adelantado" valor={ars(cobrado)} nota="Datos de ejemplo" Icon={Wallet} acento="var(--color-success)" />
-        <Dato label="Sesiones por usar" valor="38" nota="En packs vigentes · ejemplo" Icon={Layers} acento="#8B5CF6" />
+        <Dato label="Cobrado por adelantado" valor={ars(cobrado)} nota="Datos de ejemplo" Icon={Wallet} />
+        <Dato label="Sesiones por usar" valor="38" nota="En packs vigentes · ejemplo" Icon={Layers} />
       </>}
       preview={<PreviewPaquete p={enPreview} precioSuelto={precioServicio(enPreview.servicio)} {...p} />}
     >
-      <Seccion titulo="Tus paquetes" desc="Tocá uno para verlo en la vista previa.">
-        {paquetes.length === 0 && <div style={{ fontSize: 13, color: 'var(--color-muted)', padding: '6px 0' }}>Todavía no armaste ningún paquete.</div>}
+      <SecCard titulo="Tus paquetes" Icon={Package} bajada="Tocá uno para verlo en la vista previa.">
+        {paquetes.length === 0 && <p className="rv-ayuda" style={{ margin: 0 }}>Todavía no armaste ningún paquete.</p>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {paquetes.map(x => {
             const suelto = precioServicio(x.servicio) * x.sesiones
             const ahorro = suelto > 0 ? Math.round((1 - x.precio / suelto) * 100) : 0
             const sel = verId === x.id
             return (
-              <div key={x.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, border: `1.5px solid ${sel ? 'var(--color-primary)' : 'var(--color-border)'}`, background: sel ? 'var(--color-primary-bg)' : 'var(--color-bg)', flexWrap: 'wrap' }}>
-                <button type="button" className="tua-opc" aria-pressed={sel} onClick={() => setVerId(x.id)} style={{ flex: '1 1 200px', minWidth: 0, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', color: 'inherit' }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)' }}>{x.sesiones} × {x.servicio}</div>
-                  <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>{venceTxt(x.vence)} · {x.vendidos} vendidos</div>
+              <div key={x.id} className="tua-item" data-sel={sel}>
+                <button type="button" className="tua-item-txt" aria-pressed={sel} onClick={() => setVerId(x.id)}>
+                  <b>{x.sesiones} × {x.servicio}</b>
+                  <small>{venceTxt(x.vence)} · {x.vendidos} vendidos</small>
                 </button>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontFamily: '"Geist Mono", monospace', fontWeight: 700, fontSize: 14, color: 'var(--color-text)' }}>{ars(x.precio)}</div>
-                  {ahorro > 0 && <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--color-success)' }}>{ahorro}% menos que suelto</div>}
-                </div>
+                <span className="tua-item-num">
+                  <b className="rv-num">{ars(x.precio)}</b>
+                  {ahorro > 0 && <small>{ahorro}% menos que suelto</small>}
+                </span>
                 <BotonIcono Icon={Trash2} peligro label={`Borrar paquete ${x.sesiones} × ${x.servicio}`} onClick={() => { setPaquetes(l => l.filter(y => y.id !== x.id)); if (sel) setVerId('p1'); setEstado(`Se borró el paquete ${x.sesiones} × ${x.servicio}.`) }} />
               </div>
             )
           })}
         </div>
-      </Seccion>
+      </SecCard>
 
-      <Seccion titulo="Nuevo paquete" desc="Mientras lo armás, la vista previa te muestra cómo va a quedar.">
+      <SecCard titulo="Nuevo paquete" Icon={Plus} bajada="Mientras lo armás, la vista previa te muestra cómo va a quedar.">
         <div className="tua-2">
-          <Campo label="Servicio" htmlFor="tua-paq-serv">
-            <select id="tua-paq-serv" className="tuc-field" value={servicio} onChange={e => { setServicio(e.target.value); tocarBorrador() }} style={inputStyle}>
+          <CampoLibre label="Servicio" htmlFor="tua-paq-serv">
+            <select id="tua-paq-serv" className="rv-select" value={servicio} onChange={e => { setServicio(e.target.value); tocarBorrador() }}>
               {vendibles.map(s => <option key={s.nombre} value={s.nombre}>{s.nombre} · {ars(s.precio)}</option>)}
             </select>
-          </Campo>
-          <Campo label="Precio del pack" htmlFor="tua-paq-precio" ayuda={<>Suelto serían {ars(precioServicio(servicio) * sesiones)}. Sugerido: <button type="button" className="ds-link tua-btn-txt" onClick={() => { setPrecio(sugerido); tocarBorrador() }} style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', fontWeight: 600, color: 'var(--color-primary)', cursor: 'pointer' }}>{ars(sugerido)} (12% menos)</button></>}>
-            <input id="tua-paq-precio" className="tuc-field" type="number" inputMode="numeric" min={0} step={1000} placeholder={String(sugerido)} value={precio} onChange={e => { setPrecio(e.target.value === '' ? '' : Number(e.target.value)); tocarBorrador() }} style={inputStyle} />
-          </Campo>
+          </CampoLibre>
+          <CampoLibre label="Precio del pack" htmlFor="tua-paq-precio" ayuda={<>Suelto serían {ars(precioServicio(servicio) * sesiones)}. Sugerido: <button type="button" className="tuc-link" onClick={() => { setPrecio(sugerido); tocarBorrador() }}>{ars(sugerido)} (12% menos)</button></>}>
+            <span className="rv-con-prefijo"><i>$</i><input id="tua-paq-precio" className="rv-input rv-num" type="number" inputMode="numeric" min={0} step={1000} placeholder={String(sugerido)} value={precio} onChange={e => { setPrecio(e.target.value === '' ? '' : Number(e.target.value)); tocarBorrador() }} /></span>
+          </CampoLibre>
         </div>
-        <Campo label="Cantidad de sesiones">
-          <Segmentado label="Cantidad de sesiones" valor={sesiones} onChange={v => { setSesiones(v); tocarBorrador() }} opciones={[4, 6, 8, 10, 12].map(n => ({ valor: n, label: String(n) }))} />
-        </Campo>
-        <Campo label="Vencimiento" ayuda="Un vencimiento razonable evita sesiones colgadas de hace un año.">
-          <Segmentado label="Vencimiento" valor={vence} onChange={v => { setVence(v); tocarBorrador() }} opciones={[{ valor: 60, label: '60 días' }, { valor: 90, label: '90 días' }, { valor: 120, label: '4 meses' }, { valor: 180, label: '6 meses' }, { valor: 0, label: 'No vence' }]} />
-        </Campo>
-        <FilaSwitch titulo="Se puede compartir" desc="Por ejemplo, entre dos personas de la misma familia." on={compartir} onChange={v => { setCompartir(v); tocarBorrador() }} />
+        <CampoLibre label="Cantidad de sesiones">
+          <Segmentado label="Cantidad de sesiones" valor={sesiones} onChange={v => { setSesiones(v); tocarBorrador() }} opciones={[4, 6, 8, 10, 12].map(n => ({ id: n, label: String(n) }))} />
+        </CampoLibre>
+        <CampoLibre label="Vencimiento" ayuda="Un vencimiento razonable evita sesiones colgadas de hace un año.">
+          <Segmentado label="Vencimiento" valor={vence} onChange={v => { setVence(v); tocarBorrador() }} opciones={[{ id: 60, label: '60 días' }, { id: 90, label: '90 días' }, { id: 120, label: '4 meses' }, { id: 180, label: '6 meses' }, { id: 0, label: 'No vence' }]} />
+        </CampoLibre>
+        <FilaSwitch titulo="Se puede compartir" ayuda="Por ejemplo, entre dos personas de la misma familia." on={compartir} onChange={v => { setCompartir(v); tocarBorrador() }} />
         <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-          <Button variant="outline" icon={<Plus size={15} />} onClick={agregar}>Agregar paquete</Button>
-          {verId !== 'borrador' && <Button variant="ghost" icon={<Eye size={15} />} onClick={tocarBorrador}>Ver borrador</Button>}
+          <Boton variant="outline" icon={<Plus size={15} aria-hidden />} onClick={agregar}>Agregar paquete</Boton>
+          {verId !== 'borrador' && <Boton variant="ghost" icon={<Eye size={15} aria-hidden />} onClick={tocarBorrador}>Ver borrador</Boton>}
         </div>
-        <div role="status" className="tua-estado" style={{ marginTop: 8 }}>{estado}</div>
-      </Seccion>
+        <div role="status" className="tua-estado">{estado}</div>
+      </SecCard>
 
-      <Seccion titulo={`${pluralCliente(rubro)} con un pack en curso`} desc="Se descuenta una sesión cada vez que asisten. Datos de ejemplo.">
+      <SecCard titulo={`${pluralCliente(rubro)} con un pack en curso`} Icon={Users} bajada="Se descuenta una sesión cada vez que asisten. Datos de ejemplo.">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {USOS_PAQUETE.map(u => {
             const pk = paquetes.find(x => x.id === u.paquete) ?? paquetesDe(rubro).find(x => x.id === u.paquete)!
-            const pct = Math.round((u.usadas / pk.sesiones) * 100)
             return (
               <div key={u.cliente}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13, marginBottom: 5, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13, marginBottom: 6, flexWrap: 'wrap' }}>
                   <span style={{ color: 'var(--color-text)', fontWeight: 600 }}>{u.cliente} <span style={{ color: 'var(--color-muted)', fontWeight: 400 }}>· {pk.servicio}</span></span>
-                  <span style={{ color: 'var(--color-muted)' }}><b style={{ color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{u.usadas}/{pk.sesiones}</b> · vence {u.vence}</span>
+                  <span style={{ color: 'var(--color-muted)' }}><b className="rv-num" style={{ color: 'var(--color-text)' }}>{u.usadas}/{pk.sesiones}</b> · vence <span className="rv-num">{u.vence}</span></span>
                 </div>
-                <div role="progressbar" aria-valuenow={u.usadas} aria-valuemin={0} aria-valuemax={pk.sesiones} aria-label={`Sesiones usadas por ${u.cliente}`} style={{ height: 7, borderRadius: 999, background: 'var(--color-surface-alt)', overflow: 'hidden' }}>
-                  <div style={{ width: `${pct}%`, height: '100%', borderRadius: 999, background: pct >= 80 ? 'var(--color-warning)' : 'var(--color-primary)' }} />
-                </div>
+                <Barra valor={u.usadas / pk.sesiones} label={`Sesiones usadas por ${u.cliente}: ${u.usadas} de ${pk.sesiones}`} />
               </div>
             )
           })}
         </div>
-      </Seccion>
+      </SecCard>
 
-      <Seccion titulo="Avisos automáticos">
-        <FilaSwitch titulo="Avisar cuando quedan 2 sesiones" desc="Un WhatsApp con el link para renovar el pack." on={avisoUltimas} onChange={setAvisoUltimas} />
-        <FilaSwitch titulo="Avisar 7 días antes de que venza" desc="Para que use lo que le queda y no lo pierda." on={avisoVence} onChange={setAvisoVence} />
-      </Seccion>
+      <SecCard titulo="Avisos automáticos" Icon={BellRing}>
+        <FilaSwitch titulo="Avisar cuando quedan 2 sesiones" ayuda="Un WhatsApp con el link para renovar el pack." on={avisoUltimas} onChange={setAvisoUltimas} />
+        <FilaSwitch titulo="Avisar 7 días antes de que venza" ayuda="Para que use lo que le queda y no lo pierda." on={avisoVence} onChange={setAvisoVence} />
+      </SecCard>
     </ShellFuncion>
   )
 }
@@ -140,9 +137,9 @@ function PreviewPaquete({ p, precioSuelto, rubro }: { p: Paquete; precioSuelto: 
   const usadas = Math.min(3, p.sesiones - 1)
   return (
     <VistaCliente rubro={rubro}>
-      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Paquetes</div>
-      <div style={{ borderRadius: 'var(--tu-r2)', border: '1px solid var(--color-border)', background: 'var(--color-surface)', padding: 16 }}>
-        <div style={{ fontFamily: 'var(--tu-fh)', fontSize: 22, lineHeight: 1.1, color: 'var(--color-text)', fontWeight: 700 }}>Pack de {p.sesiones} sesiones</div>
+      <div className="tua-eyebrow">Paquetes</div>
+      <div className="tua-tarjeta">
+        <div className="tua-titulo">Pack de {p.sesiones} sesiones</div>
         <div style={{ fontSize: 13, color: 'var(--color-muted)', marginTop: 4 }}>{p.servicio}</div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 26, fontWeight: 800, color: 'var(--color-text)' }}>{ars(p.precio)}</span>
@@ -154,8 +151,8 @@ function PreviewPaquete({ p, precioSuelto, rubro }: { p: Paquete; precioSuelto: 
         <BotonVista style={{ marginTop: 14 }} aviso={`Demo: acá se paga el pack (${ars(p.precio)}) y las ${p.sesiones} sesiones quedan en “Mis turnos”.`}>Comprar pack</BotonVista>
       </div>
 
-      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--color-muted)', marginTop: 4 }}>En “Mis turnos”</div>
-      <div style={{ borderRadius: 'var(--tu-r2)', border: '1px solid var(--color-border)', padding: 14 }}>
+      <div className="tua-eyebrow" style={{ color: 'var(--color-muted)', marginTop: 4 }}>En “Mis turnos”</div>
+      <div className="tua-tarjeta" style={{ background: 'transparent' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-text)', fontWeight: 600 }}>
           <span>Tu pack</span><span>{p.sesiones - usadas} de {p.sesiones} disponibles</span>
         </div>

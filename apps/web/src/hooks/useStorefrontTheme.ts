@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { conFundidoDeTema } from './useDarkMode'
 
 const KEY = 'orbita-theme-tienda'
 
@@ -27,12 +28,15 @@ export function useStorefrontTheme() {
     setIsDark(document.documentElement.classList.contains('dark'))
   }, [])
 
+  // Con fundido (View Transition), igual que el panel y la landing: la clase,
+  // lo guardado y el estado cambian adentro de la transición (globals.css,
+  // "Cambio de tema con fundido"). Pedido de Ale, 04/11/2026: el efecto en todo.
   function toggle() {
-    setIsDark(prev => {
-      const next = !prev
-      document.documentElement.classList.toggle('dark', next)
-      localStorage.setItem(KEY, next ? 'dark' : 'light')
-      return next
+    const siguiente = !isDark
+    conFundidoDeTema(siguiente, () => {
+      document.documentElement.classList.toggle('dark', siguiente)
+      localStorage.setItem(KEY, siguiente ? 'dark' : 'light')
+      setIsDark(siguiente)
     })
   }
 

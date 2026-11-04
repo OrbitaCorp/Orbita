@@ -5,12 +5,12 @@ import { Check, ChevronLeft, Shield, ShoppingBag, Zap, HeadphonesIcon, Globe, Pe
 import { completeOnboarding, publishBusiness, uploadLogo, dataUrlToBlob, startPendingCheckout, previewDiscountCode, getOfertaPublica, ApiError, type PlanKey, type OfertaCampania } from '@/lib/api'
 import { track, trackPaso, flush as flushAnalitica } from '@/lib/analytics/wizardTracker'
 import { useOnboardingStore, useOnboardingHidratado } from '@/modules/onboarding/useOnboardingStore'
-import { borrarAlta, useAlta } from '@/modules/turnos/onboarding/estadoAlta'
+import { borrarAlta, useAlta } from '@/modules/onboarding/alta/estadoAlta'
 import { EstiloTurnos } from '@/modules/turnos/_shared/orbita/estilo'
 import { EscenaEspacial } from '@/modules/landing/components/v2/EscenaEspacial'
-import { pasosDe } from '@/modules/turnos/onboarding/modelo'
-import { OrbitaPasos } from '@/modules/turnos/onboarding/OrbitaPasos'
-import { CSS_ONBOARDING } from '@/modules/turnos/onboarding/estilo'
+import { pasosDe } from '@/modules/onboarding/alta/modelo'
+import { OrbitaPasos } from '@/modules/onboarding/alta/OrbitaPasos'
+import { CSS_ONBOARDING } from '@/modules/onboarding/alta/estilo'
 import { useAuth } from '@/hooks/useAuth'
 import { tenantUrl } from '@/lib/tenant'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
@@ -119,7 +119,7 @@ function MercadoPagoLogo({ size = 22 }: { size?: number }) {
 
 // ─── Header con stepper (compartido) ────────────────────────────────────────
 
-// La cabecera es LA MISMA del alta (modules/turnos/onboarding/Alta.tsx): la
+// La cabecera es LA MISMA del alta (modules/onboarding/alta/Alta.tsx): la
 // marca a la izquierda y el arco de pasos, con el pago como última estación.
 // Antes esta pantalla tenía su propia barra pegada arriba y otro dibujo del
 // arco dentro de una franja, y al llegar parecía que la página se rediseñaba.
@@ -1108,7 +1108,7 @@ function PlanContenido() {
   // vino (tienda o turnos); si no lo dice, al selector de rubro, que reconstruye
   // el camino sin perder lo ya cargado.
   function volverAPoner() {
-    // El alta es una sola pantalla (modules/turnos/onboarding/Alta.tsx) y
+    // El alta es una sola pantalla (modules/onboarding/alta/Alta.tsx) y
     // retoma sola en "Tu cuenta" con lo que ya estaba cargado.
     void router.push('/onboarding/rubro?paso=cuenta')
   }
@@ -1139,7 +1139,7 @@ function PlanContenido() {
   )
 }
 
-// El mismo lienzo del alta (modules/turnos/onboarding/Alta.tsx): fondo negro
+// El mismo lienzo del alta (modules/onboarding/alta/Alta.tsx): fondo negro
 // con el cielo de estrellas, sus tipografías y sus tokens de color, para que el
 // pago sea un paso más del mismo wizard y no otra página. `.tuo-espacio`
 // redefine los tokens a la paleta oscura; las tres pantallas (plan, procesando,

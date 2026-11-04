@@ -36,13 +36,11 @@ export function datosMini(rubro: RubroTurnos, t: TemaNegocio, pisa?: Partial<Dat
 export const CSS_MINI = `
   .tuc-mini { container-type: inline-size; position: relative; overflow: hidden; width: 100%; aspect-ratio: 16 / 11; isolation: isolate; }
   .tuc-mini--movil { aspect-ratio: 9 / 17; }
-  .tuc-mini-lienzo { position: absolute; inset: 0; display: flex; flex-direction: column; font-size: 10px; font-size: 2.5cqw; line-height: 1.3;
-    transform-origin: 50% 35%; transition: transform 600ms var(--tuo-ease, ease); }
+  .tuc-mini-lienzo { position: absolute; inset: 0; display: flex; flex-direction: column; font-size: 10px; font-size: 2.5cqw; line-height: 1.3; }
   .tuc-mini--movil .tuc-mini-lienzo { font-size: 14px; font-size: 5.6cqw; }
   .tuc-mini-foto { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
   .tuc-mini-una { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tuc-mini-dos { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  @media (prefers-reduced-motion: reduce) { .tuc-mini-lienzo { transition: none; } }
 `
 
 interface Props {
@@ -170,35 +168,20 @@ export function MuestraPaleta({ colores, size = 22 }: { colores: string[]; size?
 // letra. Es un radio: va dentro de un role="radiogroup".
 
 export const CSS_PLANTILLA = `
-  /* Entrada propia y no .tuo-entra: aquella deja el transform final aplicado (fill both) y una animación
-     le gana a cualquier :hover, así que la tarjeta no se podría elevar. Esta solo rellena hacia atrás. */
-  @keyframes tucEntra { from { opacity: 0; transform: translateY(12px); } }
-  .tuc-entra { animation: tucEntra 520ms var(--tuo-ease, ease) backwards; animation-delay: calc(var(--i, 0) * 55ms); }
-  @media (prefers-reduced-motion: reduce) { .tuc-entra { animation: none; } }
-  .tuc-plantilla { position: relative; display: flex; flex-direction: column; text-align: left; padding: 0; border-radius: 20px; border: 1px solid var(--color-border); background: var(--color-bg); color: inherit;
-    font-family: inherit; cursor: pointer; min-width: 0; box-shadow: var(--shadow-card);
-    transition: transform 300ms var(--tuo-ease, ease), box-shadow 300ms ease, border-color 180ms ease; }
-  .tuc-plantilla-marco { position: relative; margin: 10px 10px 0; border-radius: 12px; overflow: hidden; border: 1px solid var(--color-border); background: var(--color-surface-alt); }
+  /* Tarjeta plana, como las del panel: borde fino, radio 12, sin sombra ni elevación; la elegida lleva el acento en el borde. */
+  .tuc-plantilla { position: relative; display: flex; flex-direction: column; text-align: left; padding: 0; border-radius: var(--rv-r, 12px); border: 1px solid var(--color-border); background: var(--color-bg); color: inherit;
+    font-family: inherit; cursor: pointer; min-width: 0; transition: border-color 160ms ease; }
+  .tuc-plantilla-marco { position: relative; margin: 10px 10px 0; border-radius: 8px; overflow: hidden; border: 1px solid var(--color-border); background: var(--color-surface-alt); }
   .tuc-plantilla-cuerpo { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
-  .tuc-plantilla-nombre { font-family: var(--tuo-fh); font-size: 16px; font-weight: 700; letter-spacing: -0.02em; color: var(--color-text); }
+  .tuc-plantilla-nombre { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; color: var(--color-text); }
   .tuc-plantilla-para { font-size: 12.5px; line-height: 1.45; color: var(--color-muted); margin: 0; }
-  .tuc-plantilla-sello { position: absolute; top: 10px; left: 10px; z-index: 3; display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px 0 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700;
-    color: #fff; background: var(--tuo-grad); box-shadow: 0 6px 16px rgba(37,99,235,0.45); opacity: 0; transform: translateY(-4px) scale(0.92); transition: opacity 200ms ease, transform 280ms var(--tuo-ease, ease); }
-  .tuc-plantilla[aria-checked='true'] { border-color: var(--color-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 24%, transparent), 0 22px 44px -22px color-mix(in srgb, var(--color-primary) 60%, transparent); }
-  .tuc-plantilla[aria-checked='true'] .tuc-plantilla-sello { opacity: 1; transform: none; }
-  .tuc-plantilla[aria-checked='true'] .tuc-plantilla-marco { border-color: color-mix(in srgb, var(--color-primary) 40%, var(--color-border)); }
+  .tuc-plantilla-sello { position: absolute; top: 10px; left: 10px; z-index: 3; display: none; align-items: center; gap: 5px; height: 26px; padding: 0 10px 0 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700;
+    color: var(--chip-primary-fg); background: var(--color-bg); border: 1px solid var(--color-primary); }
+  .tuc-plantilla[aria-checked='true'] { border-color: var(--color-primary); box-shadow: 0 0 0 1px var(--color-primary); }
+  .tuc-plantilla[aria-checked='true'] .tuc-plantilla-sello { display: inline-flex; }
   .tuc-plantilla:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
   .tuc-plantilla-aa { margin-left: auto; font-size: 12px; color: var(--color-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-  @media (hover: hover) {
-    .tuc-plantilla:hover { transform: translateY(-4px); box-shadow: var(--shadow-card-hover), 0 26px 50px -26px rgba(15,23,42,0.4); border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border)); }
-    .tuc-plantilla[aria-checked='true']:hover { border-color: var(--color-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 24%, transparent), 0 26px 50px -22px color-mix(in srgb, var(--color-primary) 60%, transparent); }
-    .tuc-plantilla:hover .tuc-mini-lienzo { transform: scale(1.06); }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .tuc-plantilla, .tuc-plantilla-sello { transition: none; }
-    .tuc-plantilla:hover { transform: none; }
-    .tuc-plantilla:hover .tuc-mini-lienzo { transform: none; }
-  }
+  @media (hover: hover) { .tuc-plantilla:not([aria-checked='true']):hover { border-color: var(--color-border-strong); } }
 `
 
 export function TarjetaPlantilla({ p, tema, datos, boton, activa, onClick, extra, i = 0 }: {
@@ -208,15 +191,15 @@ export function TarjetaPlantilla({ p, tema, datos, boton, activa, onClick, extra
 }) {
   const tipo = tipografiaPorId(p.tipo)
   return (
-    <button type="button" role="radio" aria-checked={activa} onClick={onClick} className="tuc-plantilla tuc-entra" style={{ ['--i' as string]: i }}
+    <button type="button" role="radio" aria-checked={activa} onClick={onClick} className="tuc-plantilla rv-entra" style={{ ['--i' as string]: i }}
       aria-label={`Plantilla ${p.nombre}, ${p.caracter.toLowerCase()}. ${p.para}${p.fabrica ? ' Es la de fábrica de tu rubro.' : ''}`}>
       <span className="tuc-plantilla-sello" aria-hidden><Check size={13} strokeWidth={3} />En uso</span>
       <span className="tuc-plantilla-marco"><MiniSitio tema={tema} datos={datos} boton={boton ?? p.boton} /></span>
       <span className="tuc-plantilla-cuerpo">
         <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span className="tuc-plantilla-nombre">{p.nombre}</span>
-          <span className="tuo-chip tuo-chip--borde" style={{ height: 22, fontSize: 11, padding: '0 8px' }}>{p.caracter}</span>
-          {p.fabrica && <span className="tuo-chip tuo-chip--primario" style={{ height: 22, fontSize: 11, padding: '0 8px' }}><Sparkles size={11} aria-hidden />De fábrica</span>}
+          <span className="rv-chip rv-chip--borde" style={{ height: 22, fontSize: 11, padding: '0 8px' }}>{p.caracter}</span>
+          {p.fabrica && <span className="rv-chip rv-chip--primario" style={{ height: 22, fontSize: 11, padding: '0 8px' }}><Sparkles size={11} aria-hidden />De fábrica</span>}
         </span>
         <span className="tuc-plantilla-para">{p.para}</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 'auto', paddingTop: 4, minWidth: 0 }}>

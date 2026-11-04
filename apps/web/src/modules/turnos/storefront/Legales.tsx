@@ -5,7 +5,7 @@
 // se simula: queda en memoria, no se envía a ningún lado.
 import { useEffect, useState } from 'react'
 import { AlertCircle, Check, Info } from 'lucide-react'
-import { politicaTxt, useNegocioDemo } from '@/modules/turnos/demo/negocioDemo'
+import { politicaTxt, useNegocioDemo } from '@/modules/turnos/datos/negocio'
 import { Dialogo } from './piezas'
 import { CODIGO_DEMO } from './reserva/acciones'
 import type { TemaNegocio } from './tema'

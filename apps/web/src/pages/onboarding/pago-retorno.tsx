@@ -3,7 +3,7 @@ import { useRouter } from 'next/router'
 import { Check, AlertTriangle, ArrowRight } from 'lucide-react'
 import { tenantUrl, sesionViajaASubdominios } from '@/lib/tenant'
 import { useOnboardingStore } from '@/modules/onboarding/useOnboardingStore'
-import { borrarAlta } from '@/modules/turnos/onboarding/estadoAlta'
+import { borrarAlta } from '@/modules/onboarding/alta/estadoAlta'
 
 // Pantalla a la que MercadoPago devuelve al dueño después de pagar (o no) el
 // beneficio de bienvenida — un Checkout Pro de pago único (ver

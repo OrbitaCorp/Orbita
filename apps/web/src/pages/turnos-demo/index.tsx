@@ -1,9 +1,9 @@
 // DEMO INTERNA — índice del vertical Turnos & Agenda (2026-09-26).
-// http://localhost:3001/turnos-demo — ver modules/turnos/datos.ts.
+// http://localhost:3001/turnos-demo — ver modules/turnos/datos/index.ts.
 //
 // Está pensado como un centro de control: arriba el día en órbita del rubro
 // elegido (la misma pieza que usa el panel), en el medio las pantallas de la
-// demo y abajo los 32 rubros. Cambiar de rubro acá cambia todas las pantallas,
+// demo y abajo los rubros. Cambiar de rubro acá cambia todas las pantallas,
 // porque el rubro viaja en ?rubro=.
 import { useMemo, useState } from 'react'
 import Head from 'next/head'
@@ -15,7 +15,6 @@ import { BarraDemo, SelectorRubro, useRubroDemo } from '@/modules/turnos/demo/Ba
 import { FAMILIAS, RUBROS_TURNOS, MODO_LABEL, pesos, duracionTxt, recursosDe, turnosDe, clientesDe, type FamiliaId } from '@/modules/turnos/datos'
 import { EstiloTurnos } from '@/modules/turnos/_shared/orbita/estilo'
 import { OrbitaDia } from '@/modules/turnos/_shared/orbita/OrbitaDia'
-import { Estrellas, Anillos } from '@/modules/turnos/_shared/orbita/Cielo'
 import { AHORA_DEMO, FECHA_DEMO } from '@/modules/turnos/_shared/components/ChipEstado'
 
 // Solo en localhost, igual que /propuestas: en producción no existe.
@@ -25,8 +24,8 @@ export const getServerSideProps: GetServerSideProps = async () =>
 type Boceto = 'onboarding' | 'panel' | 'sitio' | 'simple' | 'servicios' | 'reserva' | 'mis-turnos' | 'vacio' | 'landing'
 
 const PANTALLAS: { href: string; titulo: string; texto: string; Icon: LucideIcon; boceto: Boceto; para: string }[] = [
-  { href: '/turnos-demo/onboarding', titulo: 'Alta',             texto: 'El alta única, con los pasos en órbita: se elige el módulo (Tienda o Turnos) y pide lo que ese módulo necesita.', Icon: Rocket, boceto: 'onboarding', para: 'Dueño' },
-  { href: '/turnos-demo/panel',      titulo: 'Panel del negocio', texto: 'Resumen del día, agenda, clases, servicios, equipo y clientes.', Icon: LayoutDashboard, boceto: 'panel', para: 'Dueño' },
+  { href: '/turnos-demo/onboarding', titulo: 'Alta',             texto: 'El alta única de los cuatro módulos, con los pasos en órbita: se elige el módulo (Tienda, Turnos, Alquileres o Gimnasio) y pide lo que ese módulo necesita.', Icon: Rocket, boceto: 'onboarding', para: 'Dueño' },
+  { href: '/turnos-demo/panel',      titulo: 'Panel del negocio', texto: 'Resumen del día, agenda, clientes y la configuración del negocio: servicios, equipo y espacios.', Icon: LayoutDashboard, boceto: 'panel', para: 'Dueño' },
   { href: '/turnos-demo/negocio',    titulo: 'Sitio web',        texto: 'La forma completa: portada, servicios, equipo, nosotros, fotos y cómo llegar, con la marca del negocio.', Icon: Store, boceto: 'sitio', para: 'Cliente' },
   { href: '/turnos-demo/simple',     titulo: 'Página simple',    texto: 'La otra forma: una sola pantalla con la portada, el logo, el nombre, una descripción corta y el botón de reservar.', Icon: Smartphone, boceto: 'simple', para: 'Cliente' },
   { href: '/turnos-demo/negocio/servicios', titulo: 'Servicios y precios', texto: 'El catálogo del negocio, con buscador y reserva directa.', Icon: ListChecks, boceto: 'servicios', para: 'Cliente' },
@@ -36,7 +35,7 @@ const PANTALLAS: { href: string; titulo: string; texto: string; Icon: LucideIcon
   { href: '/turnos-demo/landing',    titulo: 'Landing',           texto: 'La sección de Turnos para orbita.site, como adelanto.', Icon: Megaphone, boceto: 'landing', para: 'Órbita' },
 ]
 
-const FAMILIA_CORTA: Record<FamiliaId, string> = { belleza: 'Belleza', salud: 'Salud', deporte: 'Deporte', clases: 'Clases' }
+const FAMILIA_CORTA: Record<FamiliaId, string> = { belleza: 'Belleza', salud: 'Salud', deporte: 'Bienestar', clases: 'Clases' }
 
 // Para buscar sin que importen los acentos ni las mayúsculas ("estetica" encuentra "Estética").
 const plano = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
@@ -49,9 +48,9 @@ const CSS_INDICE = `
   .tui-hero { padding: 56px 0 64px; border-bottom: 1px solid rgba(147,197,253,0.16); }
   .tui-hero-in { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); gap: 56px; align-items: center; }
   .tui-titulo { font-family: var(--tuo-fh); font-size: clamp(32px, 4.6vw, 56px); line-height: 1.04; font-weight: 700; letter-spacing: -0.04em; color: var(--color-text); margin: 18px 0 0; text-wrap: balance; }
-  .tui-titulo em { font-style: normal; background: linear-gradient(100deg, #60A5FA 0%, #818CF8 55%, #93C5FD 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .tui-titulo em { font-style: normal; color: var(--color-primary); }
   .tui-bajada { font-size: 15.5px; line-height: 1.6; color: var(--color-body); margin: 18px 0 0; max-width: 56ch; }
-  .tui-datos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin: 30px 0 0; padding: 0; list-style: none; max-width: 520px; border: 1px solid var(--color-border); border-radius: 14px; background: rgba(11,16,29,0.55); }
+  .tui-datos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin: 30px 0 0; padding: 0; list-style: none; max-width: 520px; border: 1px solid var(--color-border); border-radius: 14px; background: var(--color-surface); }
   .tui-datos li { padding: 14px 16px; border-left: 1px solid var(--color-border); min-width: 0; }
   .tui-datos li:first-child { border-left: none; }
   .tui-datos b { display: block; font-family: var(--tuo-fh); font-size: 26px; line-height: 1; font-weight: 700; letter-spacing: -0.03em; color: var(--color-text); font-variant-numeric: tabular-nums; }
@@ -59,9 +58,8 @@ const CSS_INDICE = `
   .tui-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 28px; }
   .tui-flecha { transition: transform 220ms var(--tuo-ease); }
 
-  /* Marco del dial: vidrio oscuro con resplandor, como una ventana del producto. */
-  .tui-marco { position: relative; border-radius: 24px; border: 1px solid var(--color-border); background: linear-gradient(180deg, rgba(21,29,49,0.72), rgba(11,16,29,0.72)); box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset, 0 30px 80px rgba(3,6,14,0.6), 0 0 90px rgba(59,130,246,0.16); padding: 18px 20px 20px; transition: box-shadow 300ms ease, border-color 300ms ease; }
-  .tui-marco::before { content: ''; position: absolute; left: 28px; right: 28px; top: -1px; height: 1px; background: linear-gradient(90deg, transparent, rgba(147,197,253,0.8), transparent); pointer-events: none; }
+  /* Marco del dial: una ventana del producto, con borde y nada más. */
+  .tui-marco { position: relative; border-radius: 20px; border: 1px solid var(--color-border); background: var(--color-surface); padding: 18px 20px 20px; }
   .tui-marco-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
   .tui-marco-dial { display: grid; place-items: center; padding: 22px 14px 12px; }
   .tui-leyenda { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 4px 0 0; padding: 0; list-style: none; }
@@ -77,12 +75,12 @@ const CSS_INDICE = `
   /* ── Tarjetas de pantalla ── */
   .tui-pantallas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
   .tui-pantalla { display: flex; flex-direction: column; text-decoration: none; overflow: hidden; }
-  .tui-boceto { position: relative; display: block; border-bottom: 1px solid var(--color-border); background: radial-gradient(260px 120px at 80% -10%, color-mix(in srgb, var(--color-primary) 14%, transparent), transparent 70%), var(--color-surface); color: var(--color-primary); border-radius: calc(var(--tuo-r) - 1px) calc(var(--tuo-r) - 1px) 0 0; overflow: hidden; }
+  .tui-boceto { position: relative; display: block; border-bottom: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-primary); border-radius: calc(var(--tuo-r) - 1px) calc(var(--tuo-r) - 1px) 0 0; overflow: hidden; }
   .tui-boceto svg { display: block; width: 100%; height: auto; transition: transform 420ms var(--tuo-ease); transform-origin: 50% 100%; }
   .tui-boceto .tui-luz { transition: opacity 260ms ease; opacity: 0.55; }
   .tui-para { position: absolute; top: 10px; right: 10px; }
   .tui-pantalla-cuerpo { display: flex; flex-direction: column; gap: 8px; padding: 16px 18px 18px; flex: 1; }
-  .tui-pantalla-icono { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; flex-shrink: 0; background: var(--tuo-grad-suave); border: 1px solid var(--tuo-anillo); color: var(--color-primary); transition: background 220ms ease, color 220ms ease, box-shadow 220ms ease; }
+  .tui-pantalla-icono { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; flex-shrink: 0; background: var(--color-primary-bg); color: var(--color-primary); }
   .tui-abrir { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 13px; font-weight: 600; color: var(--color-primary); }
 
   /* ── Rubros ── */
@@ -91,13 +89,13 @@ const CSS_INDICE = `
   .tui-seg-scroll::-webkit-scrollbar { display: none; }
   .tui-grupo + .tui-grupo { margin-top: 30px; }
   .tui-familia { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; }
-  .tui-familia::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--color-border), transparent); }
+  .tui-familia::after { content: ''; flex: 1; height: 1px; background: var(--color-border); }
   .tui-rubros { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
   .tui-rubro { display: block; width: 100%; padding: 16px; }
-  .tui-rubro-icono { width: 38px; height: 38px; border-radius: 11px; flex-shrink: 0; display: grid; place-items: center; background: var(--color-primary-bg); color: var(--color-primary); transition: background 220ms ease, color 220ms ease, transform 260ms var(--tuo-ease), box-shadow 220ms ease; }
-  .tui-rubro[aria-pressed='true'] { background: linear-gradient(180deg, color-mix(in srgb, var(--color-primary) 9%, var(--color-bg)), var(--color-bg)); }
-  .tui-rubro[aria-pressed='true'] .tui-rubro-icono { background: var(--tuo-grad); color: #fff; box-shadow: 0 6px 16px rgba(37,99,235,0.35); }
-  .tui-tilde { position: absolute; top: 12px; right: 12px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--tuo-grad); color: #fff; box-shadow: 0 0 0 3px var(--color-bg); animation: tuiTilde 320ms var(--tuo-ease) both; }
+  .tui-rubro-icono { width: 38px; height: 38px; border-radius: 11px; flex-shrink: 0; display: grid; place-items: center; background: var(--color-primary-bg); color: var(--color-primary); transition: background 220ms ease, color 220ms ease; }
+  .tui-rubro[aria-pressed='true'] { background: var(--color-surface); }
+  .tui-rubro[aria-pressed='true'] .tui-rubro-icono { background: var(--color-primary); color: var(--color-on-primary); }
+  .tui-tilde { position: absolute; top: 12px; right: 12px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--color-primary); color: var(--color-on-primary); animation: tuiTilde 320ms var(--tuo-ease) both; }
   @keyframes tuiTilde { from { transform: scale(0.4); opacity: 0 } to { transform: none; opacity: 1 } }
   /* Van como <span> y no como lista: adentro de un <button> solo entra contenido de frase. */
   .tui-servicios { display: block; margin: 12px 0 0; padding: 10px 0 0; border-top: 1px dashed var(--color-border); font-size: 12.5px; line-height: 1.75; color: var(--color-body); }
@@ -106,14 +104,10 @@ const CSS_INDICE = `
   .tui-vacio { display: grid; place-items: center; gap: 10px; padding: 48px 20px; text-align: center; border: 1px dashed var(--color-border-strong); border-radius: var(--tuo-r); color: var(--color-muted); }
 
   @media (hover: hover) {
-    .tui-pantalla:hover .tui-boceto svg { transform: scale(1.045); }
     .tui-pantalla:hover .tui-luz { opacity: 1; }
-    .tui-pantalla:hover .tui-pantalla-icono { background: var(--tuo-grad); color: #fff; box-shadow: 0 6px 16px rgba(37,99,235,0.35); }
     .tui-pantalla:hover .tui-flecha, .tuo-btn:hover .tui-flecha { transform: translateX(4px); }
-    .tui-rubro:hover { box-shadow: var(--shadow-card-hover), 0 0 0 1px color-mix(in srgb, var(--color-primary) 20%, transparent), 0 14px 34px color-mix(in srgb, var(--color-primary) 14%, transparent); }
-    .tui-rubro:hover .tui-rubro-icono { transform: rotate(-6deg) scale(1.06); }
-    .tui-marco:hover { border-color: var(--color-border-strong); box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset, 0 30px 80px rgba(3,6,14,0.6), 0 0 120px rgba(59,130,246,0.26); }
-    .tui-leyenda li:hover { border-color: var(--color-border-strong); background: rgba(147,197,253,0.06); }
+    .tui-rubro:hover { border-color: var(--color-border-strong); }
+    .tui-leyenda li:hover { border-color: var(--color-border-strong); }
   }
 
   @media (max-width: 1100px) { .tui-pantallas { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -140,7 +134,7 @@ const CSS_INDICE = `
     .tui-rubros { grid-template-columns: minmax(0, 1fr); }
   }
   @media (prefers-reduced-motion: reduce) {
-    .tui-boceto svg, .tui-luz, .tui-flecha, .tui-rubro-icono, .tui-pantalla-icono, .tui-marco, .tui-leyenda li { transition: none !important; transform: none !important; }
+    .tui-luz, .tui-flecha, .tui-rubro-icono, .tui-leyenda li { transition: none !important; transform: none !important; }
     .tui-tilde { animation: none; }
   }
 `
@@ -297,15 +291,13 @@ export default function TurnosDemoIndice() {
       <main className="tuo tui">
         {/* ── Hero: qué es esto + el día en órbita del rubro elegido ── */}
         <section className="tuo-espacio tui-hero" aria-labelledby="tui-titulo">
-          <Estrellas cantidad={60} />
-          <Anillos size={620} lado="izquierda" opacidad={0.55} />
           <div className="tui-ancho tui-hero-in">
             <div>
               <div className="tuo-eyebrow tuo-entra">Turnos &amp; Agenda · Centro de control</div>
               <h1 id="tui-titulo" className="tui-titulo tuo-entra" style={{ ['--i' as string]: 1 }}>Tu día, <em>en órbita.</em></h1>
               <p className="tui-bajada tuo-entra" style={{ ['--i' as string]: 2 }}>
-                Esta es la vista previa del vertical de turnos. Todo es visual y con datos de ejemplo: no llama a la API ni guarda nada.
-                Elegí un rubro y cada pantalla se arma con sus servicios y su forma de agendar.
+                Esta es la vista previa del módulo de turnos: agenda por profesional o por sala o cabina. Todo es visual y con datos de
+                ejemplo: no tiene servidor, y lo que cambiás queda guardado solo en este navegador. Elegí un rubro y cada pantalla se arma con sus servicios y su forma de agendar.
               </p>
               <ul className="tui-datos tuo-entra" style={{ ['--i' as string]: 3 }}>
                 <li><b>{RUBROS_TURNOS.length}</b><span className="tuo-rotulo">Rubros</span></li>
@@ -337,7 +329,7 @@ export default function TurnosDemoIndice() {
               <ul className="tui-leyenda" aria-label={`Anillos del dial: ${MODO_LABEL[rubro.modo].toLowerCase()}`}>
                 {recursos.map(r => (
                   <li key={r.id}>
-                    <i style={{ background: r.color, boxShadow: `0 0 8px ${r.color}` }} aria-hidden />
+                    <i style={{ background: r.color }} aria-hidden />
                     {r.nombre}
                     <span className="tuo-num" style={{ color: 'var(--color-muted)' }}>{activos.filter(t => t.recursoId === r.id).length}</span>
                   </li>

@@ -20,7 +20,6 @@ import { useContacto } from '@/modules/landing/components/v2/Contacto'
 import { FAMILIAS, RUBROS_TURNOS, MODO_LABEL, pesos, duracionTxt, recursosDe, turnosDe, clientesDe, rubroPorKey, type FamiliaId } from '@/modules/turnos/datos'
 import { EstiloTurnos } from '@/modules/turnos/_shared/orbita/estilo'
 import { OrbitaDia } from '@/modules/turnos/_shared/orbita/OrbitaDia'
-import { Estrellas } from '@/modules/turnos/_shared/orbita/Cielo'
 import { AHORA_DEMO } from '@/modules/turnos/_shared/components/ChipEstado'
 import { CSS_LANDING_TURNOS } from './estilo'
 
@@ -28,19 +27,19 @@ const QUE_TRAE: { titulo: string; texto: string; Icon: LucideIcon }[] = [
   { titulo: 'Reservas online las 24 h', texto: 'Tus clientes van a elegir servicio, con quién y a qué hora desde tu página, sin escribirte ni esperar que contestes.', Icon: Globe },
   { titulo: 'Recordatorios automáticos', texto: 'Un aviso antes del turno para que nadie se olvide. Menos ausencias y menos huecos en el día.', Icon: BellRing },
   { titulo: 'Seña con Mercado Pago', texto: 'Para los rubros donde faltar sale caro: el turno se confirma recién con la seña paga, en tu cuenta.', Icon: Coins },
-  { titulo: 'Agenda a tu medida', texto: 'Por persona, por sala, por cancha o por cupo: se arma según cómo trabaja tu rubro, no al revés.', Icon: CalendarRange },
+  { titulo: 'Agenda a tu medida', texto: 'Por persona o por sala: se arma según cómo trabaja tu rubro, no al revés.', Icon: CalendarRange },
 ]
 
 const PASOS = [
-  { n: '01', titulo: 'Elegís tu rubro', texto: 'Barbería, consultorio, canchas o clases. Con eso la agenda ya sabe si se reserva una persona, un espacio o un lugar en una clase.' },
+  { n: '01', titulo: 'Elegís tu rubro', texto: 'Barbería, consultorio, spa o clases particulares. Con eso la agenda ya sabe si se reserva con una persona o en un espacio.' },
   { n: '02', titulo: 'Cargás servicios y horarios', texto: 'Arrancás con los servicios típicos de tu rubro y ajustás duración, precio, seña y los días de cada uno.' },
   { n: '03', titulo: 'Compartís tu link', texto: 'Lo pegás en Instagram o WhatsApp. Tus clientes reservan solos y vos ves el día completo de un vistazo.' },
 ]
 
-const FAMILIA_CORTA: Record<FamiliaId, string> = { belleza: 'Belleza', salud: 'Salud', deporte: 'Deporte', clases: 'Clases' }
+const FAMILIA_CORTA: Record<FamiliaId, string> = { belleza: 'Belleza', salud: 'Salud', deporte: 'Bienestar', clases: 'Clases' }
 
 // Qué palabra usa cada modo para "lo que se reserva": la ficha lo muestra tal cual.
-const QUE_SE_RESERVA = { profesional: 'Una persona', recurso: 'Una sala o cabina', cancha: 'Una cancha', cupo: 'Un lugar en la clase' } as const
+const QUE_SE_RESERVA = { profesional: 'Una persona', recurso: 'Una sala o cabina' } as const
 
 interface Props {
   /** Solo en la demo: reemplaza al formulario de contacto de la landing, que
@@ -116,7 +115,6 @@ export default function RubrosTurnos({ onEscribir }: Props) {
               <span>Adelanto</span>
             </div>
             <div className="tuo-espacio tul-marco-cuerpo">
-              <Estrellas cantidad={34} />
               <div className="tul-marco-dial">
                 <OrbitaDia
                   recursos={recursos} turnos={turnos} ahora={AHORA_DEMO}
@@ -126,7 +124,7 @@ export default function RubrosTurnos({ onEscribir }: Props) {
               </div>
               <ul className="tul-leyenda" aria-label="Un anillo por cada uno">
                 {recursos.map(r => (
-                  <li key={r.id}><i style={{ background: r.color, boxShadow: `0 0 8px ${r.color}` }} aria-hidden /> {r.nombre}</li>
+                  <li key={r.id}><i style={{ background: r.color }} aria-hidden /> {r.nombre}</li>
                 ))}
               </ul>
             </div>
@@ -140,7 +138,7 @@ export default function RubrosTurnos({ onEscribir }: Props) {
               <span className="tul-ficha-icono"><rubro.Icon size={24} strokeWidth={1.7} aria-hidden /></span>
               <h3 className="tul-h3">{rubro.label}</h3>
             </div>
-            <p>{rubro.descripcion}. Cada anillo del dial es {rubro.modo === 'profesional' ? 'una persona del equipo' : rubro.modo === 'cancha' ? 'una cancha' : 'un espacio'}; cada tramo, un turno del día.</p>
+            <p>{rubro.descripcion}. Cada anillo del dial es {rubro.modo === 'profesional' ? 'una persona del equipo' : 'un espacio'}; cada tramo, un turno del día.</p>
             <dl className="tul-datos">
               <div className="tul-dato"><dt>Agenda</dt><dd>{MODO_LABEL[rubro.modo]}</dd></div>
               <div className="tul-dato"><dt>Se reserva</dt><dd>{QUE_SE_RESERVA[rubro.modo]}</dd></div>

@@ -1,7 +1,8 @@
-// Resumen del día: lo primero que ve el dueño al entrar al panel de Turnos.
-// Arriba, el día en órbita (el dial con todos los turnos y el satélite en
-// "ahora") junto a lo que está pasando en este momento. Abajo, los números
-// del día, lo que viene, la ocupación y los huecos para ofrecer.
+// Resumen del día: lo primero que ve el dueño al entrar al panel de Turnos,
+// con la forma del Dashboard de Tienda: el saludo con lo que hay que saber
+// hoy, los números del día (contra el mismo día de la semana pasada), lo que
+// está pasando ahora, los turnos que vienen, la ocupación y los huecos para
+// ofrecer.
 //
 // Cada hueco es un botón: abre "Nuevo turno" con esa hora y esa agenda ya
 // elegidas. "Compartir" arma el mensaje con los horarios libres para WhatsApp,
@@ -15,16 +16,47 @@
 import { useState } from 'react'
 import { CalendarCheck, Clock3, UserX, Wallet, ArrowRight, Plus, Send, BellRing, CalendarDays } from 'lucide-react'
 import { Avatar } from '@/design-system/components/Avatar'
-import { horaTxt, pesos, type Turno, type Cliente, type Recurso, type RubroTurnos } from '@/modules/turnos/datos'
-import { AHORA_DEMO, FECHA_DEMO, minutosAbiertos, type Tramo } from '@/modules/turnos/horario'
-import { OrbitaDia, Anillo } from '@/modules/turnos/_shared/orbita/OrbitaDia'
-import { Estrellas } from '@/modules/turnos/_shared/orbita/Cielo'
-import { Indicador } from '@/modules/turnos/_shared/orbita/piezas'
+import { Encabezado, Kpi } from '@/design-system/reservas/piezas'
+import { DIAS, horaTxt, type Turno, type Cliente, type Recurso, type RubroTurnos } from '@/modules/turnos/datos'
+import { AHORA_DEMO, FECHA_DEMO, HOY_SEMANA, minutosAbiertos, type Tramo } from '@/modules/turnos/horario'
+import { Barra } from './piezasPanel'
 import TurnosLista from './TurnosLista'
-import { SLOT, huecosDe, type MensajeWA, type NuevoTurnoPre } from './agendaDemo'
+import { SLOT, horariosLibres, huecosDe, type MensajeWA, type NuevoTurnoPre } from '../datos/agenda'
+import { plata } from '../datos/equipo'
 
 const saludo = (min: number) => (min < 12 * 60 ? 'Buen día' : min < 20 * 60 ? 'Buenas tardes' : 'Buenas noches')
 const faltan = (min: number) => (min < 60 ? `${min} min` : `${Math.floor(min / 60)} h${min % 60 ? ` ${min % 60} min` : ''}`)
+
+const CSS = `
+  .tu-res-aviso { width: 100%; align-items: center; margin-bottom: 16px; text-align: left; font: inherit; font-size: 13.5px; cursor: pointer; }
+  .tu-res-aviso > span { flex: 1; min-width: 0; }
+  .tu-res-aviso:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  .tu-res-ahora { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+  .tu-res-mini { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; }
+  .tu-res-mini-cab { display: flex; align-items: center; gap: 8px; }
+  .tu-res-mini-cab > .rv-num { margin-left: auto; font-size: 12px; color: var(--color-muted); }
+  .tu-res-mini-quien { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .tu-res-mini-quien > span { min-width: 0; }
+  .tu-res-mini-quien b { display: block; font-size: 14px; font-weight: 600; color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tu-res-mini-quien small { display: block; font-size: 12.5px; color: var(--color-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tu-res-hora { width: 54px; height: 34px; border-radius: 8px; flex-shrink: 0; display: grid; place-items: center; font-size: 13px; font-weight: 600; color: var(--chip-primary-fg); background: var(--color-primary-bg); }
+  .tu-res-cols { display: grid; grid-template-columns: minmax(0, 2fr) minmax(290px, 1fr); gap: 16px; align-items: start; margin-top: 16px; }
+  .tu-res-ocup { display: flex; flex-direction: column; gap: 14px; }
+  .tu-res-ocup > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; align-items: baseline; font-size: 13.5px; }
+  .tu-res-ocup b { color: var(--color-text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tu-res-ocup small { font-size: 12.5px; color: var(--color-muted); white-space: nowrap; }
+  .tu-res-ocup .tu-barra { grid-column: 1 / -1; }
+  .tu-res-huecos { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tu-res-agenda { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--color-body); margin: 14px 0 7px; }
+  .tu-res-agenda > i { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  @media (max-width: 1024px) { .tu-res-cols { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 768px) {
+    /* En celular cada hueco es un botón de 44 px en una grilla pareja. */
+    .tu-res-huecos { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 8px; }
+    .tu-res-huecos > .rv-chip { justify-content: center; }
+  }
+  @media (max-width: 640px) { .tu-res-ahora { grid-template-columns: minmax(0, 1fr); } }
+`
 
 interface Props {
   negocio: string
@@ -32,12 +64,14 @@ interface Props {
   saludo: string
   rubro: RubroTurnos
   turnos: Turno[]
+  /** Los turnos de otro día, contado desde hoy (-7 = el mismo día de la semana pasada): de ahí sale la variación. */
+  turnosDelDia: (dia: number) => Turno[]
   clientes: Cliente[]
   recursos: Recurso[]
   /** En qué tramos atiende hoy cada agenda. */
   jornada: (recursoId: string) => Tramo[]
-  /** De la primera apertura al último cierre de hoy: lo que abarca el dial. */
-  rango: Tramo
+  /** Cuánto dura cada servicio que se puede dar (los activos del panel): el más corto define qué hueco se puede ofrecer. */
+  duraciones: number[]
   /** Quien mira puede dar turnos. */
   puedeAgendar: boolean
   /** Quien mira puede ver los ingresos del negocio. */
@@ -50,15 +84,33 @@ interface Props {
 
 const A_LA_VISTA = 6
 
-export default function ResumenDia({ negocio, saludo: aQuien, rubro, turnos, clientes, recursos, jornada, rango, puedeAgendar, verNumeros, onAbrir, onIr, onNuevo, onCompartir }: Props) {
+export default function ResumenDia({ negocio, saludo: aQuien, rubro, turnos, turnosDelDia, clientes, recursos, jornada, duraciones, puedeAgendar, verNumeros, onAbrir, onIr, onNuevo, onCompartir }: Props) {
   const [desplegados, setDesplegados] = useState<string[]>([])
   const nombre = (id: string) => clientes.find(c => c.id === id)?.nombre ?? '—'
   const activos = turnos.filter(t => t.estado !== 'cancelado')
   const ausentes = turnos.filter(t => t.estado === 'ausente').length
   const ingresos = activos.filter(t => t.estado !== 'ausente').reduce((s, t) => s + t.precio, 0)
+  // La variación sale de la agenda (los días anteriores los arma el panel), no de números escritos a
+  // mano: un negocio que hoy no atiende ve 0, sin "+12,5%" inventado. Las ausencias no: los días
+  // pasados de la demo no las guardan, así que no hay con qué comparar.
+  const delDia = (lista: Turno[]) => {
+    const a = lista.filter(t => t.estado !== 'cancelado')
+    return { turnos: a.length, ingresos: a.filter(t => t.estado !== 'ausente').reduce((s, t) => s + t.precio, 0) }
+  }
+  const pasado = delDia(turnosDelDia(-7))
+  const contraDia = `vs. ${DIAS[HOY_SEMANA].toLowerCase()} pasado`
+  /** Porcentaje contra el mismo día de la semana pasada; si ese día no hubo nada, no hay variación. */
+  // La variación contra el mismo día de la semana pasada, para el chip del indicador: sin dato de antes, no hay chip.
+  const variacion = (hoy: number, antes: number) => (antes > 0 ? { valor: Math.round(((hoy - antes) / antes) * 1000) / 10 } : undefined)
   const proximos = turnos.filter(t => t.inicio + t.duracion > AHORA_DEMO && t.estado !== 'cancelado').sort((a, b) => a.inicio - b.inicio)
+  // El tiempo libre de acá al cierre, en bloques de media hora: es el número de "Huecos libres".
   const libresFuturos = recursos.map(r => ({ r, libres: huecosDe(turnos, jornada(r.id), r.id).filter(m => m >= AHORA_DEMO) }))
   const totalLibres = libresFuturos.reduce((s, x) => s + x.libres.length, 0)
+  // Lo que se ofrece son los horarios donde entra al menos el servicio más corto: los mismos que
+  // muestra "Nuevo turno". Media hora suelta no sirve si nada dura tan poco (la estética arranca en 40 min).
+  const masCorto = duraciones.length ? Math.min(...duraciones) : SLOT
+  const ofrecibles = recursos.map(r => ({ r, libres: horariosLibres(turnos, jornada(r.id), r.id, masCorto, 0) }))
+  const totalOfrecibles = ofrecibles.reduce((s, x) => s + x.libres.length, 0)
   const pendientes = turnos.filter(t => t.estado === 'pendiente').sort((a, b) => a.inicio - b.inicio)
   const sinConfirmar = pendientes.length
   const etiquetaRecurso = rubro.modo === 'profesional' ? rubro.profesional : 'Espacio'
@@ -67,7 +119,7 @@ export default function ResumenDia({ negocio, saludo: aQuien, rubro, turnos, cli
   const avance = enCurso ? Math.min(1, Math.max(0, (AHORA_DEMO - enCurso.inicio) / enCurso.duracion)) : 0
 
   const compartir = () => {
-    const conLugar = libresFuturos.filter(x => x.libres.length > 0)
+    const conLugar = ofrecibles.filter(x => x.libres.length > 0)
     const link = `${window.location.origin}/turnos-demo/reserva?rubro=${encodeURIComponent(rubro.key)}`
     onCompartir({
       titulo: 'Compartir los huecos de hoy',
@@ -76,188 +128,116 @@ export default function ResumenDia({ negocio, saludo: aQuien, rubro, turnos, cli
   }
 
   return (
-    <div className="panel-page">
-      <style>{`
-        .tu-res-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 400px); gap: 28px; align-items: center; padding: 30px 32px; border-radius: 24px; border: 1px solid rgba(147,197,253,0.16); box-shadow: 0 24px 60px rgba(5,8,15,0.28); margin-bottom: 18px; }
-        .tu-res-ahora { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 24px; }
-        .tu-res-mini { padding: 14px; border-radius: 14px; border: 1px solid rgba(147,197,253,0.14); background: rgba(255,255,255,0.035); backdrop-filter: blur(6px); text-align: left; font-family: inherit; color: inherit; cursor: pointer; transition: border-color 180ms ease, background 180ms ease, transform 220ms cubic-bezier(0.22, 1, 0.36, 1); }
-        @media (hover: hover) { .tu-res-mini:hover { border-color: rgba(147,197,253,0.42); background: rgba(96,165,250,0.08); transform: translateY(-2px); } }
-        .tu-res-mini:focus-visible { outline: 2px solid #93C5FD; outline-offset: 2px; }
-        .tu-res-kpis { display: grid; grid-template-columns: repeat(var(--tu-kpis, 4), minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
-        .tu-res-cols { display: grid; grid-template-columns: minmax(0, 2fr) minmax(290px, 1fr); gap: 18px; align-items: start; }
-        .tu-res-aviso { transition: border-color 180ms ease, transform 220ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 220ms ease; }
-        .tu-res-aviso svg:last-child { transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1); }
-        @media (hover: hover) {
-          .tu-res-aviso:hover { transform: translateY(-1px); box-shadow: 0 8px 22px color-mix(in srgb, var(--color-warning) 18%, transparent); }
-          .tu-res-aviso:hover svg:last-child { transform: translateX(4px); }
-        }
-        .tu-res-aviso:focus-visible { outline: 2px solid var(--color-warning); outline-offset: 2px; }
-        .tu-res-barra { transition: width 900ms cubic-bezier(0.22, 1, 0.36, 1); }
-        @media (max-width: 1180px) { .tu-res-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-        @media (max-width: 1024px) {
-          .tu-res-hero { grid-template-columns: minmax(0, 1fr); padding: 24px 20px; }
-          .tu-res-dial { max-width: 340px; margin: 0 auto; }
-          .tu-res-cols { grid-template-columns: minmax(0, 1fr); }
-        }
-        @media (max-width: 768px) {
-          /* El chip no crece: crece el área donde cae el dedo. */
-          button.tuo-chip.tu-res-toque { position: relative; }
-          button.tuo-chip.tu-res-toque::after { content: ''; position: absolute; inset: -9px -2px; }
-          .tuo-btn.tu-res-toque { height: 44px; }
-        }
-        @media (max-width: 560px) {
-          .tu-res-ahora { grid-template-columns: minmax(0, 1fr); }
-          .tu-res-kpis { gap: 10px; }
-          .tu-res-kpis .tuo-ind { padding: 14px; gap: 10px; }
-          .tu-res-kpis .tuo-ind-valor { font-size: 23px !important; }
-          .tu-res-kpis .tuo-ind-chispa { display: none; }
-        }
-        @media (prefers-reduced-motion: reduce) { .tu-res-mini, .tu-res-aviso, .tu-res-aviso svg:last-child, .tu-res-barra { transition: none; transform: none; } }
-      `}</style>
+    <div className="rv-pagina">
+      <style>{CSS}</style>
 
-      {/* El día en órbita */}
-      <section className="tuo-espacio tu-res-hero tuo-entra" aria-label="El día de hoy">
-        <Estrellas cantidad={38} />
-        <div style={{ minWidth: 0 }}>
-          <div className="tuo-eyebrow">{FECHA_DEMO}</div>
-          <h1 className="tuo-h1" style={{ fontSize: 'clamp(25px, 3vw, 34px)', marginTop: 12 }}>{saludo(AHORA_DEMO)}, {aQuien}</h1>
-          <p style={{ fontSize: 15, lineHeight: 1.6, color: 'var(--color-body)', margin: '10px 0 0', maxWidth: '52ch' }}>
-            Hoy tenés <b style={{ color: 'var(--color-text)' }}>{activos.length} turnos</b>. Quedan <b style={{ color: 'var(--color-text)' }}>{proximos.length} por delante</b>
-            {sigue ? <> y el próximo arranca en <b style={{ color: 'var(--color-text)' }}>{faltan(sigue.inicio - AHORA_DEMO)}</b>.</> : '.'}
-          </p>
-          <div style={{ display: 'flex', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
-            {puedeAgendar && <button onClick={() => onNuevo()} className="tuo-btn tuo-btn--primario"><Plus size={16} /> Nuevo turno</button>}
-            <button className={puedeAgendar ? 'tuo-btn' : 'tuo-btn tuo-btn--primario'} onClick={() => onIr('agenda')} style={puedeAgendar ? { background: 'rgba(255,255,255,0.05)' } : undefined}><CalendarDays size={16} /> Ver agenda</button>
-          </div>
-
-          <div className="tu-res-ahora">
-            {enCurso && (
-              <button className="tu-res-mini" onClick={() => onAbrir(enCurso)}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                  <span className="tuo-late" aria-hidden style={{ width: 7, height: 7, borderRadius: '50%', background: '#60A5FA' }} />
-                  <span className="tuo-rotulo" style={{ color: '#93C5FD' }}>En curso</span>
-                  <span className="tuo-num" style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--color-muted)' }}>hasta {horaTxt(enCurso.inicio + enCurso.duracion)}</span>
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
-                  <Avatar name={nombre(enCurso.clienteId)} size={34} />
-                  <span style={{ minWidth: 0 }}>
-                    <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{nombre(enCurso.clienteId)}</span>
-                    <span style={{ display: 'block', fontSize: 12, color: 'var(--color-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{enCurso.servicio}</span>
-                  </span>
-                </span>
-                <span role="progressbar" aria-label="Avance del turno" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(avance * 100)} style={{ display: 'block', height: 4, borderRadius: 999, background: 'rgba(147,197,253,0.16)', marginTop: 12, overflow: 'hidden' }}>
-                  <span className="tu-res-barra" style={{ display: 'block', width: `${avance * 100}%`, height: '100%', borderRadius: 999, background: 'linear-gradient(90deg, #3B82F6, #93C5FD)' }} />
-                </span>
-              </button>
-            )}
-            {sigue && (
-              <button className="tu-res-mini" onClick={() => onAbrir(sigue)}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                  <span className="tuo-rotulo">Sigue</span>
-                  <span className="tuo-num" style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--color-muted)' }}>en {faltan(sigue.inicio - AHORA_DEMO)}</span>
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
-                  <span className="tuo-num" style={{ width: 54, height: 34, borderRadius: 9, flexShrink: 0, display: 'grid', placeItems: 'center', fontSize: 13, fontWeight: 600, color: '#BFDBFE', background: 'rgba(96,165,250,0.14)', border: '1px solid rgba(147,197,253,0.2)' }}>{horaTxt(sigue.inicio)}</span>
-                  <span style={{ minWidth: 0 }}>
-                    <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{nombre(sigue.clienteId)}</span>
-                    <span style={{ display: 'block', fontSize: 12, color: 'var(--color-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sigue.servicio} · {recursos.find(r => r.id === sigue.recursoId)?.nombre}</span>
-                  </span>
-                </span>
-                <span style={{ display: 'block', height: 4, marginTop: 12 }} />
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="tu-res-dial" style={{ width: '100%', minWidth: 0 }}>
-          <OrbitaDia recursos={recursos} turnos={turnos} ahora={AHORA_DEMO} apertura={rango[0]} cierre={rango[1]} nombreCliente={nombre} onAbrir={onAbrir} pie={`${proximos.length} turnos por venir`} />
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 14, flexWrap: 'wrap', marginTop: -14 }}>
-            {recursos.map(r => (
-              <span key={r.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--color-body)' }}>
-                <span aria-hidden style={{ width: 14, height: 5, borderRadius: 999, background: r.color }} />{r.nombre}
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
+      <Encabezado
+        rotulo={FECHA_DEMO}
+        titulo={`${saludo(AHORA_DEMO)}, ${aQuien}`}
+        bajada={<>Hoy tenés <b style={{ color: 'var(--color-text)' }}>{activos.length} turno{activos.length === 1 ? '' : 's'}</b>. Quedan <b style={{ color: 'var(--color-text)' }}>{proximos.length} por delante</b>{sigue ? <> y el próximo arranca en <b style={{ color: 'var(--color-text)' }}>{faltan(sigue.inicio - AHORA_DEMO)}</b>.</> : '.'}</>}
+        acciones={<>
+          <button type="button" className="rv-btn" onClick={() => onIr('agenda')}><CalendarDays size={16} /> Ver agenda</button>
+          {puedeAgendar && <button type="button" className="rv-btn rv-btn--primario" onClick={() => onNuevo()}><Plus size={16} /> Nuevo turno</button>}
+        </>}
+      />
 
       {sinConfirmar > 0 && (
-        <button type="button" onClick={() => onAbrir(pendientes[0])} className="tu-res-aviso tuo-entra" style={{ ['--i' as string]: 1, display: 'flex', alignItems: 'center', gap: 12, width: '100%', marginBottom: 18, padding: '13px 16px', borderRadius: 14, border: '1px solid color-mix(in srgb, var(--color-warning) 35%, transparent)', background: 'var(--color-warning-bg)', color: 'var(--chip-warning-fg)', fontSize: 13.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
-          <BellRing size={17} style={{ flexShrink: 0 }} />
-          <span style={{ flex: 1 }}>
-            Tenés <b>{sinConfirmar} turno{sinConfirmar === 1 ? '' : 's'} sin confirmar</b> para hoy{sinConfirmar === 1 ? ':' : '. El primero:'} {nombre(pendientes[0].clienteId).split(' ')[0]} a las <span className="tuo-num">{horaTxt(pendientes[0].inicio)}</span>. {puedeAgendar ? 'Tocá para confirmarlo o mandarle un recordatorio.' : 'Tocá para verlo.'}
+        <button type="button" onClick={() => onAbrir(pendientes[0])} className="rv-nota rv-nota--aviso tu-res-aviso">
+          <BellRing size={17} aria-hidden />
+          <span>
+            Tenés <b>{sinConfirmar} turno{sinConfirmar === 1 ? '' : 's'} sin confirmar</b> para hoy{sinConfirmar === 1 ? ':' : '. El primero:'} {nombre(pendientes[0].clienteId).split(' ')[0]} a las <span className="rv-num">{horaTxt(pendientes[0].inicio)}</span>. {puedeAgendar ? 'Tocá para confirmarlo o mandarle un recordatorio.' : 'Tocá para verlo.'}
           </span>
-          <ArrowRight size={16} style={{ flexShrink: 0 }} />
+          <ArrowRight size={16} aria-hidden />
         </button>
       )}
 
-      <div className="tu-res-kpis" style={{ ['--tu-kpis' as string]: verNumeros ? 4 : 3 }}>
-        <Indicador i={1} label="Turnos hoy" valor={activos.length} Icon={CalendarCheck} color="#3B82F6" cambio="+12,5%" nota="vs. sábado pasado" tendencia={[8, 9, 7, 11, 10, 12, 13]} />
-        <Indicador i={2} label="Huecos libres" valor={`${(totalLibres * SLOT / 60).toLocaleString('es-AR', { maximumFractionDigits: 1 })} h`} Icon={Clock3} color="#8B5CF6" nota="de acá al cierre" tendencia={[14, 12, 13, 11, 12, 10.5, 10.5]} />
-        <Indicador i={3} label="Ausencias" valor={ausentes} Icon={UserX} color="#EF4444" cambio="−1" bueno="baja" nota="vs. sábado pasado" tendencia={[3, 2, 3, 2, 2, 2, 1]} />
-        {verNumeros && <Indicador i={4} label="Ingresos estimados" valor={pesos(ingresos)} Icon={Wallet} color="#10B981" cambio="+8,2%" nota="si vienen todos" tendencia={[98, 110, 104, 126, 131, 138, 149]} />}
+      <div className={`rv-kpis${verNumeros ? '' : ' rv-kpis--3'}`}>
+        <Kpi label="Turnos hoy" valor={activos.length} Icon={CalendarCheck} delta={variacion(activos.length, pasado.turnos)} nota={pasado.turnos > 0 ? contraDia : 'en todas las agendas'} />
+        <Kpi label="Huecos libres" valor={`${(totalLibres * SLOT / 60).toLocaleString('es-AR', { maximumFractionDigits: 1 })} h`} Icon={Clock3} nota="de acá al cierre" />
+        <Kpi label="Ausencias" valor={ausentes} Icon={UserX} nota="en lo que va del día" />
+        {verNumeros && <Kpi label="Ingresos estimados" valor={plata(ingresos)} Icon={Wallet} delta={variacion(ingresos, pasado.ingresos)} nota={pasado.ingresos > 0 ? contraDia : 'si vienen todos'} />}
       </div>
 
+      {(enCurso || sigue) && (
+        <div className="tu-res-ahora">
+          {enCurso && (
+            <button type="button" className="rv-card rv-card--accion tu-res-mini" onClick={() => onAbrir(enCurso)}>
+              <span className="tu-res-mini-cab"><span className="rv-rotulo" style={{ color: 'var(--chip-primary-fg)' }}>En curso</span><span className="rv-num">hasta {horaTxt(enCurso.inicio + enCurso.duracion)}</span></span>
+              <span className="tu-res-mini-quien">
+                <Avatar name={nombre(enCurso.clienteId)} size={34} />
+                <span><b>{nombre(enCurso.clienteId)}</b><small>{enCurso.servicio}</small></span>
+              </span>
+              <Barra valor={avance} label="Avance del turno" />
+            </button>
+          )}
+          {sigue && (
+            <button type="button" className="rv-card rv-card--accion tu-res-mini" onClick={() => onAbrir(sigue)}>
+              <span className="tu-res-mini-cab"><span className="rv-rotulo">Sigue</span><span className="rv-num">en {faltan(sigue.inicio - AHORA_DEMO)}</span></span>
+              <span className="tu-res-mini-quien">
+                <span className="tu-res-hora rv-num">{horaTxt(sigue.inicio)}</span>
+                <span><b>{nombre(sigue.clienteId)}</b><small>{sigue.servicio} · {recursos.find(r => r.id === sigue.recursoId)?.nombre}</small></span>
+              </span>
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="tu-res-cols">
-        <section className="tuo-entra" style={{ ['--i' as string]: 3, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
-            <h2 className="tuo-h2" style={{ flex: 1 }}>Próximos turnos</h2>
-            <button onClick={() => onIr('agenda')} className="tuo-btn tuo-btn--fantasma tuo-btn--sm" style={{ color: 'var(--color-primary)' }}>Ver agenda <ArrowRight size={14} /></button>
+        <section style={{ minWidth: 0 }}>
+          <div className="rv-entre" style={{ marginBottom: 10 }}>
+            <h2 className="rv-h2">Próximos turnos</h2>
+            <button type="button" onClick={() => onIr('agenda')} className="rv-btn rv-btn--sm rv-btn--fantasma" style={{ color: 'var(--rv-tinta-link, var(--chip-primary-fg))' }}>Ver agenda <ArrowRight size={14} /></button>
           </div>
           <TurnosLista turnos={proximos} clientes={clientes} recursos={recursos} onAbrir={onAbrir} etiquetaRecurso={etiquetaRecurso} />
         </section>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0 }}>
-          <section className="tuo-card tuo-card--pad tuo-card--luz tuo-entra" style={{ ['--i' as string]: 4 }}>
-            <h2 className="tuo-h2">Ocupación de hoy</h2>
-            <p style={{ fontSize: 12.5, color: 'var(--color-muted)', margin: '3px 0 16px' }}>Tiempo tomado sobre el horario de atención de cada uno.</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className="rv-pila" style={{ gap: 16 }}>
+          <section className="rv-card rv-card--pad">
+            <h2 className="rv-h2">Ocupación de hoy</h2>
+            <p className="rv-ayuda" style={{ margin: '3px 0 16px' }}>Tiempo tomado sobre el horario de atención de cada uno.</p>
+            <div className="tu-res-ocup">
               {recursos.map(r => {
                 const lista = activos.filter(t => t.recursoId === r.id)
                 const min = lista.reduce((s, t) => s + t.duracion, 0)
                 const abierto = minutosAbiertos(jornada(r.id))
                 const pct = abierto ? Math.min(1, min / abierto) : 0
                 return (
-                  <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <Anillo valor={pct} color={r.color} size={50} grosor={5} label={`Ocupación de ${r.nombre}: ${Math.round(pct * 100)}%`} />
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.nombre}</div>
-                      <div style={{ fontSize: 12, color: 'var(--color-muted)' }}>{abierto ? <>{lista.length} turno{lista.length === 1 ? '' : 's'} · {faltan(min)} de {faltan(abierto)}</> : rubro.modo === 'profesional' ? 'Hoy no atiende' : 'Hoy no se usa'}</div>
-                    </div>
+                  <div key={r.id}>
+                    <b>{r.nombre}</b>
+                    <small>{abierto ? <>{lista.length} turno{lista.length === 1 ? '' : 's'} · {faltan(min)} de {faltan(abierto)}</> : rubro.modo === 'profesional' ? 'Hoy no atiende' : 'Hoy no se usa'}</small>
+                    <Barra valor={pct} color={r.color} label={`Ocupación de ${r.nombre}: ${Math.round(pct * 100)}%`} />
                   </div>
                 )
               })}
             </div>
           </section>
 
-          <section className="tuo-card tuo-card--pad tuo-entra" style={{ ['--i' as string]: 5 }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <h2 className="tuo-h2">Huecos para ofrecer</h2>
-                <p style={{ fontSize: 12.5, color: 'var(--color-muted)', margin: '3px 0 0', lineHeight: 1.5 }}>{puedeAgendar ? 'Compartilos por WhatsApp o en redes para llenar el día.' : 'Los horarios que quedan libres de acá al cierre.'}</p>
+          <section className="rv-card rv-card--pad">
+            <div className="rv-entre" style={{ alignItems: 'flex-start' }}>
+              <div style={{ minWidth: 0 }}>
+                <h2 className="rv-h2">Huecos para ofrecer</h2>
+                <p className="rv-ayuda" style={{ margin: '3px 0 0' }}>{puedeAgendar ? 'Compartilos por WhatsApp o en redes para llenar el día.' : 'Los horarios que quedan libres de acá al cierre.'}</p>
               </div>
-              {puedeAgendar && <button onClick={compartir} disabled={totalLibres === 0} className="tuo-btn tuo-btn--sm tu-res-toque" aria-label="Compartir los huecos libres"><Send size={14} /> Compartir</button>}
+              {puedeAgendar && <button type="button" onClick={compartir} disabled={totalOfrecibles === 0} className="rv-btn rv-btn--sm" aria-label="Compartir los huecos libres"><Send size={14} /> Compartir</button>}
             </div>
-            {libresFuturos.map(({ r, libres }) => {
+            {ofrecibles.map(({ r, libres }) => {
               const todos = desplegados.includes(r.id)
               return (
-              <div key={r.id} style={{ marginTop: 14 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--color-body)', marginBottom: 7 }}>
-                  <span aria-hidden style={{ width: 7, height: 7, borderRadius: '50%', background: r.color }} />{r.nombre}
+                <div key={r.id}>
+                  <div className="tu-res-agenda"><i aria-hidden style={{ background: r.color }} />{r.nombre}</div>
+                  <div className="tu-res-huecos">
+                    {libres.length === 0
+                      ? <span className="rv-chip rv-chip--gris">Completo</span>
+                      : libres.slice(0, todos ? libres.length : A_LA_VISTA).map(m => puedeAgendar
+                        ? <button key={m} type="button" onClick={() => onNuevo({ recursoId: r.id, inicio: m, dia: 0 })} className="rv-chip rv-chip--borde rv-num" aria-label={`Agendar a las ${horaTxt(m)} con ${r.nombre}`}>{horaTxt(m)}</button>
+                        : <span key={m} className="rv-chip rv-chip--borde rv-num">{horaTxt(m)}</span>)}
+                    {libres.length > A_LA_VISTA && (
+                      <button type="button" onClick={() => setDesplegados(d => (todos ? d.filter(x => x !== r.id) : [...d, r.id]))} aria-expanded={todos} aria-label={todos ? `Ver menos horarios de ${r.nombre}` : `Ver los ${libres.length - A_LA_VISTA} horarios que faltan de ${r.nombre}`} className="rv-chip rv-chip--gris rv-num">
+                        {todos ? 'Ver menos' : `+${libres.length - A_LA_VISTA}`}
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {libres.length === 0
-                    ? <span className="tuo-chip">Completo</span>
-                    : libres.slice(0, todos ? libres.length : A_LA_VISTA).map(m => puedeAgendar
-                      ? <button key={m} onClick={() => onNuevo({ recursoId: r.id, inicio: m, dia: 0 })} className="tuo-chip tuo-chip--primario tuo-chip--hora tu-res-toque" aria-label={`Agendar a las ${horaTxt(m)} con ${r.nombre}`}>{horaTxt(m)}</button>
-                      : <span key={m} className="tuo-chip tuo-chip--primario tuo-chip--hora">{horaTxt(m)}</span>)}
-                  {libres.length > A_LA_VISTA && (
-                    <button onClick={() => setDesplegados(d => (todos ? d.filter(x => x !== r.id) : [...d, r.id]))} aria-expanded={todos} aria-label={todos ? `Ver menos horarios de ${r.nombre}` : `Ver los ${libres.length - A_LA_VISTA} horarios que faltan de ${r.nombre}`} className="tuo-chip tuo-chip--borde tuo-num tu-res-toque">
-                      {todos ? 'Ver menos' : `+${libres.length - A_LA_VISTA}`}
-                    </button>
-                  )}
-                </div>
-              </div>
               )
             })}
           </section>

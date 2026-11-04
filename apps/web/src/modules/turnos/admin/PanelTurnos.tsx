@@ -1,10 +1,25 @@
-// Panel del negocio de Turnos (demo): arma el menú según el rubro y cambia de
-// pantalla con ?vista=, igual que las sub-vistas del panel de Tienda.
+// Panel del negocio de Turnos (demo): el armazón compartido de los paneles de
+// reservas (design-system/reservas/LayoutPanel, el estándar de Tienda) con el
+// menú armado según quién mira, y cambia de pantalla con ?vista= (y ?tab= para
+// las sub-secciones de Configuración), igual que el panel de Tienda.
+//
+// Todo lo que se puede operar tiene su lugar en la barra lateral: Resumen y
+// Agenda (Hoy); Clientes, Servicios, Equipo, Espacios y Ganancias (Negocio);
+// Reglas de reserva, Recordatorios y mensajes y Pagos (Reservas); y
+// Configuración (datos, horarios, apariencia, dominio, suscripción) y
+// Avanzado. Los links viejos que apuntaban adentro de Configuración
+// (?vista=configuracion&tab=servicios) se redirigen a la sección nueva.
+//
+// Las pantallas de Reservas no son solo formularios: Pagos lista las señas
+// que faltan cobrar (y el menú las cuenta) y Recordatorios muestra cómo vino
+// la confirmación de hoy; las dos salen de la misma agenda que todo lo demás.
 //
 // Acá vive todo lo que se puede tocar en la demo (turnos, clientes, servicios,
-// equipo, roles, pagos, clases): son copias en memoria de los datos de ejemplo,
-// así lo que se agrega en una pantalla aparece en las otras. No hay backend: al
-// recargar, o al cambiar de rubro, vuelve todo a como estaba.
+// equipo, roles, pagos): son copias en memoria de los datos de ejemplo, así lo
+// que se agrega en una pantalla aparece en las otras. No hay backend: al
+// recargar, o al cambiar de rubro, vuelve todo a como estaba. La excepción son
+// los servicios pausados, que quedan en el navegador (datos/negocio.ts) porque
+// el sitio público tiene que dejar de ofrecerlos.
 //
 // El horario es uno solo para todo el panel: el del negocio (semanaDe) y,
 // adentro, los días y las horas de cada agenda. De ahí salen la grilla de la
@@ -14,51 +29,66 @@
 // equipo: el menú, la agenda, los clientes y las ganancias se recortan a lo que
 // su rol le permite. Es la forma de ver, sin cuentas de verdad, que cada
 // persona tiene su propio panel.
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { LayoutDashboard, CalendarDays, CalendarRange, Users, Contact, Settings, Sparkles, BellRing, UserX, Ban, CalendarClock, HandCoins, LayoutGrid, Eye } from 'lucide-react'
-import { Toast } from '@/design-system/components/Toast'
+import { LayoutDashboard, CalendarDays, Users, Contact, Settings, Sparkles, BellRing, UserX, Ban, CalendarClock, HandCoins, LayoutGrid, Eye, CalendarCog, Bell, Wallet } from 'lucide-react'
+import LayoutPanel, { type ItemNav, type AvisoNav, type ItemBusqueda } from '@/design-system/reservas/LayoutPanel'
+import { useAviso } from '@/design-system/reservas/piezas'
+import { SkeletonVista, useCargaSimulada, type FormaSkeleton } from '@/design-system/reservas/skeleton'
 import { temaDe } from '@/modules/turnos/storefront/tema'
-import LayoutTurnos, { type ItemNav, type AvisoNav, type ItemBusqueda } from '@/modules/turnos/layout/LayoutTurnos'
 import { useRubroDemo } from '@/modules/turnos/demo/BarraDemo'
-import { ESTADO_TURNO, recursosDe, clientesDe, clasesDe, semanaDe, tramosDeRecurso, esSalud, horaTxt, duracionTxt, pesos, type EstadoTurno, type Turno, type Cliente, type Recurso, type RubroTurnos } from '@/modules/turnos/datos'
+import { useNegocioDemo } from '@/modules/turnos/datos/negocio'
+import { ESTADO_TURNO, recursosDe, clientesDe, semanaDe, tramosDeRecurso, esSalud, horaTxt, duracionTxt, pesos, type EstadoTurno, type Turno, type Cliente, type Recurso, type RubroTurnos } from '@/modules/turnos/datos'
 import { AHORA_DEMO, HOY_SEMANA, extremos, tramosDelDia, type Tramo } from '@/modules/turnos/horario'
 import ResumenDia from './KPIs'
 import Agenda from './Agenda'
 import DetalleTurno from './Turnos'
 import Servicios from './Servicios'
-import Equipo, { CSS_EQUIPO } from './Equipo'
+import Equipo from './Equipo'
 import Espacios, { CSS_ESPACIOS, espaciosTxt } from './Espacios'
-import Ganancias, { CSS_GANANCIAS } from './Ganancias'
-import { CSS_ROLES } from './Roles'
+import Ganancias from './Ganancias'
 import { CSS_PAGO } from './PagoPersona'
 import Clientes, { pluralCliente } from './Clientes'
-import Clases from './Clases'
 import NuevoTurno from './NuevoTurno'
-import ConfiguracionTurnos from './configuracion/ConfiguracionTurnos'
+import Apariencia from './configuracion/Apariencia'
+import Negocio from './configuracion/Negocio'
+import Horarios from './configuracion/Horarios'
+import Reservas from './configuracion/Reservas'
+import Mensajes from './configuracion/Mensajes'
+import Pagos from './configuracion/Pagos'
+import { Dominio, Suscripcion } from './configuracion/Cuenta'
 import AvanzadoTurnos from './avanzado/AvanzadoTurnos'
 import { CSS_UI_CONFIG } from './configuracion/ui'
-import { subdominioDe } from './configuracion/datos'
+import { SUBS_CONFIG, TABS_VIEJAS, subdominioDe, type TabConfig } from './configuracion/datos'
 import { CSS_PIEZAS_PANEL, MensajeWhatsApp } from './piezasPanel'
-import { cuandoTxt, fechaLarga, indiceDia, libresPorTramo, tieneTelefono, turnosDelDia, type ClasePanel, type MensajeWA, type NuevoTurnoPre, type ServicioPanel, type TurnoAgenda } from './agendaDemo'
-import { clientesDeLaAgenda, pagadoHastaInicial, personasDe, plata, puedeDe, rolesDe, taparTelefono, type Pago, type Persona, type Rol, type VerComo } from './equipoDemo'
+import { cuandoTxt, fechaLarga, indiceDia, libresPorTramo, tieneTelefono, turnosDelDia, type MensajeWA, type NuevoTurnoPre, type ServicioPanel, type TurnoAgenda } from '../datos/agenda'
+import { clientesDeLaAgenda, pagadoHastaInicial, personasDe, plata, puedeDe, rolesDe, taparTelefono, type Pago, type Persona, type Rol, type VerComo } from '../datos/equipo'
 
-const CSS_PANEL = CSS_UI_CONFIG + CSS_PIEZAS_PANEL + CSS_ESPACIOS + CSS_EQUIPO + CSS_ROLES + CSS_PAGO + CSS_GANANCIAS + `
-  .tu-toast { position: fixed; right: 16px; bottom: 16px; left: auto; z-index: 400; max-width: calc(100vw - 32px); animation: tuToastIn 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
-  @keyframes tuToastIn { from { opacity: 0; transform: translateY(14px) scale(0.97); } to { opacity: 1; transform: none; } }
-  @media (max-width: 768px) { .tu-toast { left: 16px; } }
-  /* Con un modal abierto el aviso sube: abajo taparía los botones del modal. */
-  .tu-shell:has(.tuo-modal) .tu-toast { top: calc(var(--tuo-tope, 0px) + 14px); bottom: auto; }
+// Las hojas que comparten varias pantallas se montan una sola vez acá; lo propio de cada pantalla lo monta ella.
+const CSS_PANEL = CSS_UI_CONFIG + CSS_PIEZAS_PANEL + CSS_ESPACIOS + CSS_PAGO + `
   /* La franja de "estás viendo el panel de otra persona". */
-  .tu-como { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex-shrink: 0; padding: 8px 16px; font-size: 13px; line-height: 1.4; color: var(--chip-primary-fg); background: var(--color-primary-bg); border-bottom: 1px solid color-mix(in srgb, var(--color-primary) 26%, transparent); animation: tuoEntra 320ms var(--tuo-ease, ease) both; }
+  .tu-como { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex-shrink: 0; padding: 8px 16px; font-size: 13px; line-height: 1.4; color: var(--chip-primary-fg); background: var(--color-primary-bg); border-bottom: 1px solid var(--color-border); }
   .tu-como > svg { flex-shrink: 0; }
   .tu-como > span { flex: 1; min-width: 200px; }
   .tu-como b { font-weight: 600; }
-  @media (max-width: 768px) { .tu-como .tuo-btn { height: 40px; } }
-  @media (prefers-reduced-motion: reduce) { .tu-toast, .tu-como { animation: none; } }
 `
 
 type Agenda = { atiende: number[]; horario: string; dias: string }
+/** Las secciones del negocio que cada rol ve según sus permisos. */
+type SeccionNegocio = 'servicios' | 'equipo' | 'espacios' | 'ganancias'
+/** Un servicio en el estado del panel: el estado (activo o pausado) se deriva del almacén de la demo. */
+type ServicioBase = Omit<ServicioPanel, 'estado'>
+/** Las secciones del panel: lo que puede venir en ?vista=. */
+type Vista = 'resumen' | 'agenda' | 'clientes' | 'servicios' | 'equipo' | 'espacios' | 'ganancias' | 'reglas' | 'mensajes' | 'pagos' | 'configuracion' | 'avanzado'
+// La silueta de cada sección mientras llegan sus datos: la forma de la pantalla que viene
+// después. Resumen y Ganancias son indicadores con gráficos y listas; la Agenda, la grilla del
+// día; Clientes y Servicios, un buscador y una tabla; Equipo, Espacios y Avanzado, una grilla
+// de tarjetas; el resto, formularios de configuración (en Configuración, todas las pestañas).
+const FORMAS: Record<Vista, FormaSkeleton> = {
+  resumen: 'tablero', agenda: 'agenda', clientes: 'tabla', servicios: 'tabla', equipo: 'tarjetas-icono', espacios: 'tarjetas-icono', ganancias: 'tablero',
+  reglas: 'formulario', mensajes: 'formulario', pagos: 'formulario', configuracion: 'formulario', avanzado: 'tarjetas-icono',
+}
+const esVista = (v: string): v is Vista => v in FORMAS
 
 export default function PanelTurnos() {
   const [rubro] = useRubroDemo()
@@ -74,6 +104,10 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
   const negocio = temaDe(rubro).nombre
   // El horario del negocio. Cambia solo si se guarda otro en Configuración → Horarios.
   const semana = useMemo(() => semanaDe(rubro), [rubro])
+  const { demo, guardar: guardarDemo } = useNegocioDemo()
+  // La espera de la API, fingida (no hay backend). Como el panel se monta por rubro (la key en
+  // PanelTurnos), cambiar de rubro vuelve a mostrar la silueta: es cargar otro negocio.
+  const cargando = useCargaSimulada()
 
   const [recursos, setRecursos] = useState<Recurso[]>(() => {
     const base = recursosDe(rubro)
@@ -87,8 +121,11 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
     })
   })
   const [clientes, setClientes] = useState<Cliente[]>(() => clientesDe(rubro))
-  const [clases, setClases] = useState<ClasePanel[]>(() => clasesDe(rubro))
-  const [servicios, setServicios] = useState<ServicioPanel[]>(() => rubro.servicios.map((s, i) => ({ ...s, id: `s${i + 1}`, online: i !== 3 })))
+  const [serviciosBase, setServicios] = useState<ServicioBase[]>(() => rubro.servicios.map((s, i) => ({ ...s, id: `s${i + 1}`, online: i !== 3 })))
+  // Los pausados viven en el navegador (el sitio los lee de ahí): acá solo se les pone el estado.
+  const nombresPausados = useMemo(() => (demo.pausados?.rubro === rubro.key ? demo.pausados.nombres : []), [demo.pausados, rubro.key])
+  const servicios: ServicioPanel[] = useMemo(() => serviciosBase.map(s => ({ ...s, estado: nombresPausados.includes(s.nombre) ? 'pausado' : 'activo' })), [serviciosBase, nombresPausados])
+  const serviciosActivos = servicios.filter(s => s.estado === 'activo')
   const [roles, setRoles] = useState<Rol[]>(() => rolesDe(rubro))
   const [personas, setPersonas] = useState<Persona[]>(() => personasDe(rubro, recursosDe(rubro), `${subdominioDe(temaDe(rubro).nombre)}.com.ar`))
   // Hasta qué día se le pagó a cada uno (los que no figuran: el último cierre según cada cuánto cobran).
@@ -147,43 +184,66 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
   const [mensaje, setMensaje] = useState<MensajeWA | null>(null)
 
   // Aviso de la pantalla: confirma cada acción (nada se guarda, es la demo).
-  const [toast, setToast] = useState<{ id: number; titulo: string; descripcion?: string } | null>(null)
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // Numerador para lo que se crea en la demo (avisos, turnos, clientes). Arranca alto para no pisar los ids de ejemplo.
+  const [avisar, aviso] = useAviso()
+  // Numerador para lo que se crea en la demo (turnos, clientes). Arranca alto para no pisar los ids de ejemplo.
   const serie = useRef(1000)
-  const avisar = (titulo: string, descripcion?: string) => {
-    if (timer.current) clearTimeout(timer.current)
-    setToast({ id: ++serie.current, titulo, descripcion })
-    timer.current = setTimeout(() => setToast(null), 3200)
-  }
-  useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
 
   const pendientes = turnos.filter(t => t.estado === 'pendiente').length
+  // Señas por cobrar: los turnos de las próximas dos semanas que todavía no la pagaron. Solo si el
+  // negocio pide seña; es lo que Pagos lista para cobrar y lo que cuenta el badge del menú.
+  const senasPendientes: TurnoAgenda[] = rubro.sena > 0
+    ? Array.from({ length: 14 }, (_, d) => delDia(d).filter(t => !t.senaPagada && (t.estado === 'confirmado' || t.estado === 'pendiente') && (d > 0 || t.inicio > AHORA_DEMO)).sort((a, b) => a.inicio - b.inicio)).flat()
+    : []
   const conEspacios = rubro.modo !== 'profesional'
-  // El menú, según lo que puede quien mira. El dueño lo ve entero.
-  const negocioTxt = !como || puede('config.editar') !== 'no' ? 'Tu negocio' : puede('equipo.editar') !== 'no' || puede('clientes.ver') === 'todo' ? 'El negocio' : 'Lo tuyo'
+  // Quien puede configurar tiene todas las secciones; el resto del equipo ve las que su rol permite.
+  const enConfig = puede('config.editar') !== 'no'
+  const negocioTxt = enConfig ? 'Negocio' : puede('equipo.editar') !== 'no' || puede('clientes.ver') === 'todo' ? 'El negocio' : 'Lo tuyo'
+  const veSeccion = (s: SeccionNegocio) =>
+    s === 'servicios' ? puede('servicios.editar') !== 'no'
+      : s === 'equipo' ? puede('equipo.editar') !== 'no'
+        : s === 'espacios' ? conEspacios && puede('equipo.editar') !== 'no'
+          : puede('ganancias.ver') !== 'no'
   const items: ItemNav[] = [
-    { id: 'resumen', label: 'Resumen', Icon: LayoutDashboard, grupo: 'Día a día' },
-    ...(puede('agenda.ver') !== 'no' ? [{ id: 'agenda', label: rubro.modo === 'cancha' ? 'Reservas' : soloMiAgenda ? 'Mi agenda' : 'Agenda', Icon: CalendarDays, badge: pendientes || undefined, grupo: 'Día a día' }] : []),
-    ...(rubro.modo === 'cupo' && puede('agenda.ver') !== 'no' ? [{ id: 'clases', label: 'Clases', Icon: CalendarRange, grupo: 'Día a día' }] : []),
-    ...(puede('servicios.editar') !== 'no' ? [{ id: 'servicios', label: rubro.modo === 'cupo' ? 'Actividades' : 'Servicios', Icon: rubro.Icon, grupo: negocioTxt }] : []),
-    ...(puede('equipo.editar') !== 'no' ? [{ id: 'equipo', label: 'Equipo', Icon: Users, grupo: negocioTxt }] : []),
-    ...(conEspacios && puede('equipo.editar') !== 'no' ? [{ id: 'espacios', label: espaciosTxt(rubro), Icon: LayoutGrid, grupo: negocioTxt }] : []),
+    { id: 'resumen', label: 'Resumen', Icon: LayoutDashboard, grupo: 'Hoy' },
+    ...(puede('agenda.ver') !== 'no' ? [{ id: 'agenda', label: soloMiAgenda ? 'Mi agenda' : 'Agenda', Icon: CalendarDays, badge: pendientes || undefined, grupo: 'Hoy' }] : []),
     ...(puede('clientes.ver') !== 'no' ? [{ id: 'clientes', label: puede('clientes.ver') === 'propio' ? `Mis ${pluralCliente(rubro).toLowerCase()}` : pluralCliente(rubro), Icon: Contact, grupo: negocioTxt }] : []),
-    ...(puede('ganancias.ver') !== 'no' ? [{ id: 'ganancias', label: puede('ganancias.ver') === 'propio' ? 'Mis ganancias' : 'Ganancias', Icon: HandCoins, grupo: negocioTxt }] : []),
-    ...(puede('config.editar') !== 'no' ? [
-      { id: 'configuracion', label: 'Configuración', Icon: Settings, grupo: 'Ajustes' },
-      { id: 'avanzado', label: 'Avanzado', Icon: Sparkles, grupo: 'Ajustes' },
+    ...(veSeccion('servicios') ? [{ id: 'servicios', label: 'Servicios', Icon: rubro.Icon, grupo: negocioTxt }] : []),
+    ...(veSeccion('equipo') ? [{ id: 'equipo', label: 'Equipo', Icon: Users, grupo: negocioTxt }] : []),
+    ...(veSeccion('espacios') ? [{ id: 'espacios', label: espaciosTxt(rubro), Icon: LayoutGrid, grupo: negocioTxt }] : []),
+    ...(veSeccion('ganancias') ? [{ id: 'ganancias', label: puede('ganancias.ver') === 'propio' ? 'Mis ganancias' : 'Ganancias', Icon: HandCoins, grupo: negocioTxt }] : []),
+    ...(enConfig ? [
+      { id: 'reglas', label: 'Reglas de reserva', Icon: CalendarCog, grupo: 'Reservas' },
+      { id: 'mensajes', label: 'Recordatorios y mensajes', Icon: Bell, grupo: 'Reservas' },
+      { id: 'pagos', label: 'Pagos', Icon: Wallet, grupo: 'Reservas', badge: senasPendientes.length || undefined },
+      { id: 'configuracion', label: 'Configuración', Icon: Settings, subs: SUBS_CONFIG },
+      { id: 'avanzado', label: 'Avanzado', Icon: Sparkles },
     ] : []),
   ]
-  // Una vista que este rubro o este rol no tiene (?vista=clases en una barbería) cae en el resumen.
-  const pedida = typeof router.query.vista === 'string' ? router.query.vista : 'resumen'
-  const vista = items.some(i => i.id === pedida) ? pedida : 'resumen'
 
-  const ir = (v: string) => {
-    setClienteSel(null)
-    void router.replace({ pathname: router.pathname, query: { ...router.query, vista: v } }, undefined, { shallow: true })
+  // ── Qué pantalla se ve: ?vista= y, en Configuración, ?tab= ──
+  const vistaQuery = typeof router.query.vista === 'string' ? router.query.vista : 'resumen'
+  const tabQuery = typeof router.query.tab === 'string' ? router.query.tab : ''
+  // Los links viejos (?vista=configuracion&tab=servicios) abren la sección nueva y se corrigen en la barra.
+  const redirigida = vistaQuery === 'configuracion' && TABS_VIEJAS[tabQuery] ? TABS_VIEJAS[tabQuery] : null
+  const pedida = redirigida ?? vistaQuery
+  // Una vista que este rol no tiene (?vista=ganancias para quien no las ve) cae en el resumen.
+  const vista: Vista = esVista(pedida) && items.some(i => i.id === pedida) ? pedida : 'resumen'
+  const tab: TabConfig = SUBS_CONFIG.some(s => s.id === tabQuery) ? (tabQuery as TabConfig) : 'negocio'
+
+  // Cambia la URL (y nada más). La sub-sección de Configuración y la función abierta de Avanzado son
+  // de esa sección: al cambiar de sección se van. Si no, "Avanzado" en el menú no volvía al hub desde
+  // una función, y al volver más tarde se abría la última función en vez del hub.
+  const navegar = (v: string, t?: string) => {
+    const { tab: _t, funcion: _f, ...resto } = router.query
+    void _t; void _f
+    void router.replace({ pathname: router.pathname, query: { ...resto, vista: v, ...(t ? { tab: t } : {}) } }, undefined, { shallow: true })
   }
+  const ir = (v: string, t?: string) => { setClienteSel(null); navegar(v, t) }
+  // Un link viejo se corrige en la barra apenas carga. Solo toca la URL: cambiar estado acá adentro
+  // encadenaría otro render (y no hay ficha abierta todavía que cerrar).
+  const redirigir = useEffectEvent((v: string) => navegar(v))
+  useEffect(() => { if (redirigida) redirigir(redirigida) }, [redirigida])
+
   const nombreDe = (id: string) => clientes.find(c => c.id === id)?.nombre ?? '—'
   const pila = (id: string) => nombreDe(id).split(' ')[0]
   const abrir = (t: TurnoAgenda) => setAbiertoEn({ id: t.id, dia: t.dia ?? 0 })
@@ -259,18 +319,39 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
     }
     return null
   }
+  /** Lo que alguien ya tuvo: sus turnos atendidos (o a los que faltó) de los últimos dos meses, del más reciente al más viejo. Es la misma agenda, no una lista aparte. */
+  const historialDe = (clienteId: string): TurnoAgenda[] => {
+    const out: TurnoAgenda[] = []
+    for (let d = 0; d >= -62; d--) {
+      out.push(...delDiaVista(d).filter(x => x.clienteId === clienteId && (x.estado === 'completado' || x.estado === 'ausente')).sort((a, b) => b.inicio - a.inicio))
+    }
+    return out
+  }
 
   // ── Altas, cambios y bajas de lo demás ──
   const guardar = <T extends { id: string }>(lista: T[], item: T) => (lista.some(x => x.id === item.id) ? lista.map(x => (x.id === item.id ? item : x)) : [...lista, item])
+  // Los servicios pausados se llevan por nombre en el almacén de la demo: es lo que lee el sitio.
+  const setPausados = (nombres: string[]) => guardarDemo({ pausados: { rubro: rubro.key, nombres: [...new Set(nombres)] } })
   const guardarServicio = (s: ServicioPanel, silencio?: boolean) => {
-    const era = servicios.some(x => x.id === s.id)
-    setServicios(l => guardar(l, s))
-    if (!silencio) avisar(era ? 'Cambios guardados' : rubro.modo === 'cupo' ? 'Actividad creada' : 'Servicio creado', `${s.nombre} · ${duracionTxt(s.duracion)}`)
+    const antes = servicios.find(x => x.id === s.id)
+    setServicios(l => guardar(l, { id: s.id, nombre: s.nombre, duracion: s.duracion, precio: s.precio, online: s.online }))
+    // Un servicio pausado que cambia de nombre sigue pausado.
+    if (antes?.estado === 'pausado' && antes.nombre !== s.nombre) setPausados(nombresPausados.map(n => (n === antes.nombre ? s.nombre : n)))
+    if (!silencio) avisar(antes ? 'Cambios guardados' : 'Servicio creado', `${s.nombre} · ${duracionTxt(s.duracion)}`)
   }
   const borrarServicio = (id: string) => {
     const s = servicios.find(x => x.id === id)
     setServicios(l => l.filter(x => x.id !== id))
-    avisar(rubro.modo === 'cupo' ? 'Actividad eliminada' : 'Servicio eliminado', s?.nombre)
+    if (s?.estado === 'pausado') setPausados(nombresPausados.filter(n => n !== s.nombre))
+    avisar('Servicio eliminado', s?.nombre)
+  }
+  /** Pausar saca el servicio del sitio y de Nuevo turno sin borrarlo; reanudar lo devuelve. */
+  const pausarServicio = (id: string, pausado: boolean) => {
+    const s = servicios.find(x => x.id === id)
+    if (!s) return
+    if (pausado && serviciosActivos.length <= 1) { avisar('Es el único servicio activo', 'Sin él no habría nada para reservar. Creá otro antes de pausarlo.'); return }
+    setPausados(pausado ? [...nombresPausados, s.nombre] : nombresPausados.filter(n => n !== s.nombre))
+    avisar(pausado ? 'Servicio pausado' : 'Servicio reanudado', pausado ? `${s.nombre} ya no se ofrece en tu sitio ni al dar un turno. Lo reanudás cuando quieras.` : `${s.nombre} vuelve a tu sitio y a Nuevo turno.`)
   }
   const guardarRecurso = (r: Recurso) => {
     const era = recursos.some(x => x.id === r.id)
@@ -283,16 +364,6 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
     // Quien atendía ahí se queda sin espacio fijo.
     setPersonas(l => l.map(p => (p.recursoId === id ? { id: p.id, nombre: p.nombre, rolId: p.rolId, email: p.email, telefono: p.telefono, color: p.color, pago: p.pago, ...(p.pendiente ? { pendiente: true } : {}) } : p)))
     avisar('Eliminado de la agenda', r?.nombre)
-  }
-  const guardarClase = (c: ClasePanel, aviso?: string) => {
-    const era = clases.some(x => x.id === c.id)
-    setClases(l => guardar(l, c))
-    avisar(aviso ?? (era ? 'Cambios guardados' : 'Clase creada'), `${c.nombre} · ${horaTxt(c.inicio)}`)
-  }
-  const borrarClase = (id: string) => {
-    const c = clases.find(x => x.id === id)
-    setClases(l => l.filter(x => x.id !== id))
-    avisar('Clase eliminada', c ? `${c.nombre} · ${horaTxt(c.inicio)}` : undefined)
   }
   const agregarCliente = (c: Cliente) => {
     setClientes(l => [...l, c])
@@ -376,12 +447,13 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
     ...turnos.filter(t => t.estado === 'ausente').map(t => ({ id: `a-${t.id}`, Icon: UserX, tono: 'error' as const, titulo: `${nombreDe(t.clienteId)} no vino a su turno`, detalle: `${horaTxt(t.inicio)} · ${t.servicio}`, cuando: 'Hoy', onAbrir: () => abrir(t) })),
     ...turnos.filter(t => t.estado === 'cancelado').map(t => ({ id: `c-${t.id}`, Icon: Ban, tono: 'primario' as const, titulo: `Se canceló el turno de ${nombreDe(t.clienteId)}`, detalle: `${horaTxt(t.inicio)} · quedó libre`, cuando: 'Hoy', onAbrir: () => abrir(t) })),
   ]
-  const veSeccion = (id: string) => items.some(i => i.id === id)
   const busqueda: ItemBusqueda[] = [
-    ...items.map(i => ({ id: `ir-${i.id}`, grupo: 'Ir a', titulo: i.label, detalle: i.grupo, Icon: i.Icon, onElegir: () => ir(i.id) })),
+    ...items.flatMap(i => (i.subs?.length
+      ? i.subs.map(s => ({ id: `ir-${i.id}-${s.id}`, grupo: 'Ir a', titulo: s.label, detalle: i.label, Icon: i.Icon, onElegir: () => ir(i.id, s.id) }))
+      : [{ id: `ir-${i.id}`, grupo: 'Ir a', titulo: i.label, detalle: i.grupo, Icon: i.Icon, onElegir: () => ir(i.id) }])),
     ...turnos.map(t => ({ id: `t-${t.id}`, grupo: 'Turnos de hoy', titulo: `${horaTxt(t.inicio)} · ${nombreDe(t.clienteId)}`, detalle: `${t.servicio} · ${recursos.find(r => r.id === t.recursoId)?.nombre ?? ''} · ${ESTADO_TURNO[t.estado].label}`, Icon: CalendarDays, onElegir: () => abrir(t) })),
-    ...(veSeccion('clientes') ? clientesVista.map(c => ({ id: `c-${c.id}`, grupo: pluralCliente(rubro), titulo: c.nombre, detalle: `${telefonoDe(c)} · ${c.visitas} visita${c.visitas === 1 ? '' : 's'}`, Icon: Contact, onElegir: () => { ir('clientes'); setClienteSel(c.id) } })) : []),
-    ...(veSeccion('servicios') ? servicios.map(s => ({ id: `s-${s.id}`, grupo: rubro.modo === 'cupo' ? 'Actividades' : 'Servicios', titulo: s.nombre, detalle: duracionTxt(s.duracion), Icon: rubro.Icon, onElegir: () => ir('servicios') })) : []),
+    ...(puede('clientes.ver') !== 'no' ? clientesVista.map(c => ({ id: `c-${c.id}`, grupo: pluralCliente(rubro), titulo: c.nombre, detalle: `${telefonoDe(c)} · ${c.visitas} visita${c.visitas === 1 ? '' : 's'}`, Icon: Contact, onElegir: () => { ir('clientes'); setClienteSel(c.id) } })) : []),
+    ...(veSeccion('servicios') ? servicios.map(s => ({ id: `s-${s.id}`, grupo: 'Servicios', titulo: s.nombre, detalle: `${duracionTxt(s.duracion)}${s.estado === 'pausado' ? ' · pausado' : ''}`, Icon: rubro.Icon, onElegir: () => ir('servicios') })) : []),
     ...(veSeccion('equipo') ? personas.map(p => ({ id: `e-${p.id}`, grupo: 'Equipo', titulo: p.nombre, detalle: rolDe(p.rolId)?.nombre, Icon: Users, onElegir: () => ir('equipo') })) : []),
   ]
 
@@ -393,17 +465,22 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
       .map(g => ({ ...g, libres: g.libres.filter(m => !(d === (abierto.dia ?? 0) && m === abierto.inicio)) }))
   }
 
+  const config = { rubro, avisar }
+
   return (
-    <LayoutTurnos
+    <LayoutPanel
+      producto="Turnos"
       negocio={negocio}
       rubro={rubro.label}
       fecha="Sáb 26 sep · 10:40"
       items={items}
       activo={vista}
+      tab={vista === 'configuracion' ? tab : undefined}
       onIr={ir}
-      reservas={`/turnos-demo/negocio?rubro=${encodeURIComponent(rubro.key)}`}
+      sitio={`/turnos-demo/negocio?rubro=${encodeURIComponent(rubro.key)}`}
       avisos={avisos}
       busqueda={busqueda}
+      buscar="Buscar turno o cliente"
       usuario={usuario}
       cuentas={cuentas}
       viendoComo={como ? usuario.id : null}
@@ -412,54 +489,63 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
         <div className="tu-como" role="status">
           <Eye size={15} aria-hidden />
           <span>Estás viendo el panel como <b>{usuario.nombre}</b>{yo ? <> · {usuario.rol}</> : null}. Ve solo lo que su rol le permite.</span>
-          <button type="button" className="tuo-btn tuo-btn--sm" onClick={volverAMiPanel}>Volver a mi panel</button>
+          <button type="button" className="rv-btn rv-btn--sm" onClick={volverAMiPanel}>Volver a mi panel</button>
         </div>
       )}
+      cargando={cargando}
     >
       <style>{CSS_PANEL}</style>
 
-      {vista === 'resumen' && (
-        <ResumenDia
-          negocio={negocio} saludo={como ? (yo?.nombre.split(' ')[0] ?? rolComo?.nombre ?? negocio) : negocio} rubro={rubro} turnos={turnos} clientes={clientes} recursos={recursosVista}
-          jornada={id => jornada(id, 0)} rango={rangoHoy} puedeAgendar={puedeAgendar} verNumeros={verNumeros}
-          onAbrir={abrir} onIr={ir} onNuevo={agendar} onCompartir={setMensaje}
-        />
+      {/* Mientras llegan los datos, la silueta de la sección; las secciones recién se montan con ellos. */}
+      {cargando ? (
+        <SkeletonVista forma={FORMAS[vista]} nombre={vista === 'configuracion' ? SUBS_CONFIG.find(s => s.id === tab)?.label : items.find(i => i.id === vista)?.label} />
+      ) : (
+        <>
+          {vista === 'resumen' && (
+            <ResumenDia
+              negocio={negocio} saludo={como ? (yo?.nombre.split(' ')[0] ?? rolComo?.nombre ?? negocio) : negocio} rubro={rubro} turnos={turnos} turnosDelDia={delDiaVista} clientes={clientes} recursos={recursosVista}
+              jornada={id => jornada(id, 0)} duraciones={serviciosActivos.map(s => s.duracion)} puedeAgendar={puedeAgendar} verNumeros={verNumeros}
+              onAbrir={abrir} onIr={ir} onNuevo={agendar} onCompartir={setMensaje}
+            />
+          )}
+          {vista === 'agenda' && <Agenda rubro={rubro} semana={semana} recursos={recursosVista} turnosDelDia={delDiaVista} jornada={jornada} clientes={clientes} puedeAgendar={puedeAgendar} onAbrir={abrir} onNuevo={agendar} />}
+          {vista === 'clientes' && (
+            <Clientes
+              rubro={rubro} clientes={clientesVista} selId={clienteSel} onSel={setClienteSel}
+              proximo={proximoDe} historial={historialDe} onAbrirTurno={t => { setClienteSel(null); abrir(t) }}
+              onAgregar={agregarCliente} onAgendar={c => agendar({ clienteId: c.id })} onWhatsApp={escribirACliente}
+              verContacto={verContacto} verNumeros={verNumeros} puedeAgendar={puedeAgendar} soloLosSuyos={puede('clientes.ver') === 'propio'}
+            />
+          )}
+          {vista === 'servicios' && veSeccion('servicios') && <Servicios rubro={rubro} servicios={servicios} onGuardar={guardarServicio} onBorrar={borrarServicio} onPausar={pausarServicio} />}
+          {vista === 'equipo' && veSeccion('equipo') && (
+            <Equipo
+              rubro={rubro} semana={semana} personas={personas} roles={roles} recursos={recursos} turnos={delDia(0)} jornada={id => jornada(id, 0)} rango={rangoHoy}
+              onGuardar={guardarPersona} onBorrar={borrarPersona} onGuardarRol={guardarRol} onBorrarRol={borrarRol} onVerComo={verComo}
+            />
+          )}
+          {vista === 'espacios' && veSeccion('espacios') && (
+            <Espacios rubro={rubro} semana={semana} recursos={recursos} turnos={delDia(0)} jornada={id => jornada(id, 0)} rango={rangoHoy} personas={personas} onGuardar={guardarRecurso} onBorrar={borrarRecurso} />
+          )}
+          {vista === 'ganancias' && veSeccion('ganancias') && (
+            <Ganancias
+              rubro={rubro} personas={puede('ganancias.ver') === 'propio' ? (yo ? [yo] : []) : personas} roles={roles} clientes={clientes} turnosDelDia={delDia}
+              pagadoHasta={Object.fromEntries(personas.map(p => [p.id, pagadoHasta[p.id] ?? pagadoHastaInicial(p)]))}
+              alcance={puede('ganancias.ver') === 'propio' ? 'propio' : 'todo'} puedeLiquidar={puede('ganancias.liquidar') !== 'no'}
+              onPagar={registrarPago} onPago={guardarPago} onAvisar={setMensaje}
+            />
+          )}
+          {vista === 'reglas' && <Reservas {...config} />}
+          {vista === 'mensajes' && <Mensajes {...config} turnosHoy={turnos} nombreDe={nombreDe} onAbrir={abrir} />}
+          {vista === 'pagos' && <Pagos {...config} senas={senasPendientes} nombreDe={nombreDe} onAbrir={abrir} onRegistrar={registrarSena} onIr={ir} />}
+          {vista === 'configuracion' && tab === 'negocio' && <Negocio {...config} />}
+          {vista === 'configuracion' && tab === 'horarios' && <Horarios {...config} />}
+          {vista === 'configuracion' && tab === 'apariencia' && <Apariencia {...config} />}
+          {vista === 'configuracion' && tab === 'dominio' && <Dominio {...config} />}
+          {vista === 'configuracion' && tab === 'suscripcion' && <Suscripcion {...config} />}
+          {vista === 'avanzado' && <AvanzadoTurnos rubro={rubro} avisar={avisar} />}
+        </>
       )}
-      {vista === 'agenda' && <Agenda rubro={rubro} semana={semana} recursos={recursosVista} turnosDelDia={delDiaVista} jornada={jornada} clientes={clientes} puedeAgendar={puedeAgendar} onAbrir={abrir} onNuevo={agendar} />}
-      {vista === 'clases' && (
-        <Clases
-          rubro={rubro} clases={clases} actividades={servicios.map(s => s.nombre)} salas={recursos.map(r => r.nombre)} alumnos={clientes.map(c => c.nombre)}
-          profes={personas.filter(p => rolDe(p.rolId)?.atiende).map(p => p.nombre.split(' ')[0])} onGuardar={guardarClase} onBorrar={borrarClase}
-        />
-      )}
-      {vista === 'servicios' && <Servicios rubro={rubro} recursos={recursos} servicios={servicios} onGuardar={guardarServicio} onBorrar={borrarServicio} />}
-      {vista === 'equipo' && (
-        <Equipo
-          rubro={rubro} semana={semana} personas={personas} roles={roles} recursos={recursos} turnos={delDia(0)} jornada={id => jornada(id, 0)} rango={rangoHoy}
-          onGuardar={guardarPersona} onBorrar={borrarPersona} onGuardarRol={guardarRol} onBorrarRol={borrarRol} onVerComo={verComo}
-        />
-      )}
-      {vista === 'espacios' && (
-        <Espacios rubro={rubro} semana={semana} recursos={recursos} turnos={delDia(0)} jornada={id => jornada(id, 0)} rango={rangoHoy} personas={personas} onGuardar={guardarRecurso} onBorrar={borrarRecurso} />
-      )}
-      {vista === 'clientes' && (
-        <Clientes
-          rubro={rubro} clientes={clientesVista} servicios={servicios} selId={clienteSel} onSel={setClienteSel}
-          proximo={proximoDe} onAbrirTurno={t => { setClienteSel(null); abrir(t) }}
-          onAgregar={agregarCliente} onAgendar={c => agendar({ clienteId: c.id })} onWhatsApp={escribirACliente}
-          verContacto={verContacto} verNumeros={verNumeros} puedeAgendar={puedeAgendar} soloLosSuyos={puede('clientes.ver') === 'propio'}
-        />
-      )}
-      {vista === 'ganancias' && (
-        <Ganancias
-          rubro={rubro} personas={puede('ganancias.ver') === 'propio' ? (yo ? [yo] : []) : personas} roles={roles} clientes={clientes} clases={clases} turnosDelDia={delDia}
-          pagadoHasta={Object.fromEntries(personas.map(p => [p.id, pagadoHasta[p.id] ?? pagadoHastaInicial(p)]))}
-          alcance={puede('ganancias.ver') === 'propio' ? 'propio' : 'todo'} puedeLiquidar={puede('ganancias.liquidar') !== 'no'}
-          onPagar={registrarPago} onPago={guardarPago} onAvisar={setMensaje}
-        />
-      )}
-      {vista === 'configuracion' && <ConfiguracionTurnos rubro={rubro} equipo={{ roles, personas, onGuardarRol: guardarRol, onBorrarRol: borrarRol, onVerComo: verComo, onIrEquipo: () => ir('equipo') }} />}
-      {vista === 'avanzado' && <AvanzadoTurnos rubro={rubro} />}
 
       {/* key: cada turno abre su detalle con el estado interno (mover, cancelar) de cero */}
       {abierto && (
@@ -483,14 +569,9 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
         />
       )}
 
-      {nuevo && <NuevoTurno rubro={rubro} pre={nuevo} clientes={clientesVista.length ? clientesVista : clientes} recursos={recursosAgendables} servicios={servicios} turnosDelDia={delDia} jornada={jornada} verContacto={verContacto} onCerrar={() => setNuevo(null)} onCrear={crearTurno} />}
+      {nuevo && <NuevoTurno rubro={rubro} pre={nuevo} clientes={clientesVista.length ? clientesVista : clientes} recursos={recursosAgendables} servicios={serviciosActivos} turnosDelDia={delDia} jornada={jornada} verContacto={verContacto} onCerrar={() => setNuevo(null)} onCrear={crearTurno} />}
       {mensaje && <MensajeWhatsApp key={mensaje.texto} mensaje={mensaje} onCerrar={() => setMensaje(null)} avisar={avisar} />}
-
-      {toast && (
-        <div key={toast.id} className="tu-toast" aria-live="polite">
-          <Toast variant="success" title={toast.titulo} description={toast.descripcion} onClose={() => setToast(null)} />
-        </div>
-      )}
-    </LayoutTurnos>
+      {aviso}
+    </LayoutPanel>
   )
 }

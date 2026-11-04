@@ -106,6 +106,7 @@ export function crearTablas(d: NegocioDePrueba): Record<string, Fila[]> {
 const EQUIPO_PERMISOS = [
   'orders.view', 'customers.view', 'inventory.view', 'catalog.view', 'config.team.view',
   'messages.view', 'messages.manage',
+  'reservas.view', 'reservas.manage',
 ];
 
 export function crearPrismaEnMemoria(tablas: Record<string, Fila[]>, anotarFalta: (que: string) => void) {

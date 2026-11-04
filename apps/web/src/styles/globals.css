@@ -284,6 +284,57 @@ html.light body { background: #eef4ff; color: #0f172a; }
   html.dark body { background: #020617; }
 }
 
+/* ─── Cambio de tema con fundido ─────────────────────────────────────────
+   conFundidoDeTema (hooks/useDarkMode) cambia el tema adentro de una View
+   Transition y, mientras dura, <html> lleva data-tema-fundido con la
+   dirección. El navegador fotografía la pantalla vieja y pone encima la nueva;
+   acá se decide cómo se funden: la vieja queda quieta abajo y la nueva se
+   revela con una máscara degradada tan alta como la pantalla, así que nunca
+   hay un borde. Cuando anochece, la noche baja desde arriba; cuando amanece,
+   la luz sube desde el horizonte (donde está el planeta en los paneles de
+   reservas), arrancando y terminando suave. Con
+   prefers-reduced-motion es un fundido parejo y corto, sin dirección. Sin el
+   atributo nada de esto aplica, y sin la API el cambio es al instante. */
+html[data-tema-fundido]::view-transition-old(root),
+html[data-tema-fundido]::view-transition-new(root) { mix-blend-mode: normal; }
+html[data-tema-fundido]::view-transition-old(root) { animation: none; }
+html[data-tema-fundido]::view-transition-new(root) {
+  /* En longhands a propósito: el compilador de CSS colapsa un shorthand sin nombre a
+     "animation: none" y pierde la duración. */
+  animation-duration: 640ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  animation-fill-mode: both;
+  mask-repeat: no-repeat;
+  mask-size: 100% 300%;
+}
+html[data-tema-fundido='anochece']::view-transition-new(root) {
+  animation-name: temaAnochece;
+  mask-image: linear-gradient(to bottom, #000 0%, #000 33.4%, transparent 66.6%, transparent 100%);
+}
+html[data-tema-fundido='amanece']::view-transition-new(root) {
+  animation-name: temaAmanece;
+  mask-image: linear-gradient(to top, #000 0%, #000 33.4%, transparent 66.6%, transparent 100%);
+}
+/* La máscara mide tres pantallas: un tercio opaco, uno degradado y uno transparente. Al
+   100 % la pantalla ve el tercio transparente (nada de lo nuevo); al 0 %, el opaco (todo). */
+@keyframes temaAnochece { from { mask-position: 0 100%; } to { mask-position: 0 0%; } }
+@keyframes temaAmanece { from { mask-position: 0 0%; } to { mask-position: 0 100%; } }
+@keyframes temaFundido { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  html[data-tema-fundido]::view-transition-new(root) { animation: 220ms ease both temaFundido; mask-image: none; }
+}
+/* El botón que dispara el cambio va en su propia capa de la transición: el sol
+   y la luna se cruzan ahí mismo y el ícono nuevo entra girando, así el toque
+   responde en el acto aunque el resto tarde más. Uno solo por pantalla: dos
+   elementos pintados con el mismo nombre anulan la transición entera (los que
+   están en display: none no cuentan). Lo usan el Header del panel, el navbar de
+   la landing y la cabecera de la tienda; los paneles de reservas tienen el suyo
+   (.rvp-tema). */
+.tema-boton { view-transition-name: tema-boton; }
+@keyframes temaBotonIco { from { opacity: 0; transform: rotate(-45deg) scale(0.6); } }
+html[data-tema-fundido] .tema-boton > svg { animation: temaBotonIco 360ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+@media (prefers-reduced-motion: reduce) { html[data-tema-fundido] .tema-boton > svg { animation: none; } }
+
 /* ─── Interacción estándar (hover / active / focus) ──────────────────────
    El panel se estila inline, donde :hover de CSS no llega — este bloque es
    el estándar único de feedback para TODO elemento interactivo de la app.

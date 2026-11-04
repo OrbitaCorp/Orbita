@@ -61,8 +61,18 @@ export const TEMA_SCRIPT = `
             esTiendaPorSubdominio = !!sub && sub !== 'www';
           }
           var esStorefront = !esPanel && (esTiendaPorPath || esTiendaPorSubdominio);
+          // Las páginas de la landing (PaginaV2) tienen su propia clave (ThemeContext.tsx):
+          // oscuras salvo que el visitante haya elegido claro ahí. Sin esto, quien eligió
+          // claro veía el primer cuadro oscuro hasta que React hidrataba.
+          var esLanding = !esStorefront && (pathname === '/' || pathname === '/nosotros' || pathname === '/planes' || pathname === '/tiendas');
 
-          if (esStorefront) {
+          if (esLanding) {
+            if (localStorage.getItem('orbita-theme-landing') === 'light') {
+              document.documentElement.classList.add('light');
+            } else {
+              document.documentElement.classList.add('dark');
+            }
+          } else if (esStorefront) {
             var temaTienda = localStorage.getItem('orbita-theme-tienda');
             if (temaTienda === 'dark') {
               document.documentElement.classList.add('dark');

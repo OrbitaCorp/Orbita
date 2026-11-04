@@ -1,5 +1,5 @@
 // Cómo cobra una persona del equipo: la forma (comisión, sueldo fijo, las dos
-// cosas, alquiler del sillón o por clase), sus montos y cada cuánto se le
+// cosas o alquiler del sillón), sus montos y cada cuánto se le
 // liquida. Lo usan el formulario de la persona (Equipo) y el de Ganancias: es
 // el mismo dato en los dos lados.
 //
@@ -8,7 +8,7 @@
 import { Info } from 'lucide-react'
 import type { RubroTurnos } from '@/modules/turnos/datos'
 import { Campo, Dos, OpcionTarjeta, Segmentado } from './configuracion/ui'
-import { formasDe, lugarAlquiler, plata, type Cada, type Pago } from './equipoDemo'
+import { formasDe, lugarAlquiler, plata, type Cada, type Pago } from '../datos/equipo'
 
 export const CSS_PAGO = `
   .tu-pago-formas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 16px; }
@@ -35,8 +35,7 @@ export function CamposPago({ pago, onChange, rubro, nombre }: { pago: Pago; onCh
   const ejemplo = pago.forma === 'comision' ? <>De un turno de <b>{plata(turno)}</b>, {pila} se lleva <b>{plata(parte)}</b> y al negocio le quedan <b>{plata(turno - parte)}</b>.</>
     : pago.forma === 'sueldo' ? <>{pila} cobra <b>{plata(pago.sueldo)}</b> por mes, atienda lo que atienda. Todo lo que factura queda para el negocio.</>
       : pago.forma === 'mixto' ? <>{pila} cobra <b>{plata(pago.sueldo)}</b> fijos por mes y, de cada turno de <b>{plata(turno)}</b>, suma <b>{plata(parte)}</b>.</>
-        : pago.forma === 'alquiler' ? <>{pila} se queda con todo lo que factura y le paga al negocio <b>{plata(pago.alquiler)}</b> por mes por usar {lugarAlquiler(rubro)}.</>
-          : <>Si {pila} da 12 clases en el mes, cobra <b>{plata(pago.porClase * 12)}</b>.</>
+        : <>{pila} se queda con todo lo que factura y le paga al negocio <b>{plata(pago.alquiler)}</b> por mes por usar {lugarAlquiler(rubro)}.</>
 
   return (
     <>
@@ -53,14 +52,12 @@ export function CamposPago({ pago, onChange, rubro, nombre }: { pago: Pago; onCh
         <Campo label="Sueldo por mes" type="number" mono prefijo="$" value={campo(pago.sueldo)} onChange={v => set({ sueldo: numero(v) })} placeholder="0" />
       ) : conComision ? (
         <Campo label="Comisión" ayuda="El porcentaje de cada turno atendido que se lleva." type="number" mono sufijo="%" value={campo(pago.comision)} onChange={v => set({ comision: numero(v, 100) })} placeholder="0" />
-      ) : pago.forma === 'alquiler' ? (
-        <Campo label={`Alquiler de ${lugarAlquiler(rubro).replace(/^(el|la) /, '')} por mes`} type="number" mono prefijo="$" value={campo(pago.alquiler)} onChange={v => set({ alquiler: numero(v) })} placeholder="0" />
       ) : (
-        <Campo label="Por cada clase que da" type="number" mono prefijo="$" value={campo(pago.porClase)} onChange={v => set({ porClase: numero(v) })} placeholder="0" />
+        <Campo label={`Alquiler de ${lugarAlquiler(rubro).replace(/^(el|la) /, '')} por mes`} type="number" mono prefijo="$" value={campo(pago.alquiler)} onChange={v => set({ alquiler: numero(v) })} placeholder="0" />
       )}
       {conComision && (
         <div className="tu-pago-rapidos" role="group" aria-label="Porcentajes habituales">
-          {COMISIONES.map(c => <button key={c} type="button" className="tuc-pastilla tuo-num" aria-pressed={pago.comision === c} onClick={() => set({ comision: c })}>{c}%</button>)}
+          {COMISIONES.map(c => <button key={c} type="button" className="rv-chip rv-chip--borde rv-num" aria-pressed={pago.comision === c} onClick={() => set({ comision: c })}>{c}%</button>)}
         </div>
       )}
 
@@ -69,8 +66,8 @@ export function CamposPago({ pago, onChange, rubro, nombre }: { pago: Pago; onCh
         <Segmentado label={pago.forma === 'alquiler' ? 'Cada cuánto paga' : 'Cada cuánto se le liquida'} lleno valor={pago.cada} onChange={cada => set({ cada })} opciones={CADA} />
       </div>
 
-      <div className="tu-nota tu-nota--info" style={{ marginBottom: 0 }}>
-        <Info size={15} />
+      <div className="rv-nota rv-nota--info">
+        <Info size={15} aria-hidden />
         <span>{ejemplo}</span>
       </div>
     </>

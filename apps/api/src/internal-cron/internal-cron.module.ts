@@ -12,9 +12,10 @@ import { CostsModule } from '../platform/costs/costs.module';
 import { SearchConsoleModule } from '../search-console/search-console.module';
 import { TiktokModule } from '../marketing/tiktok/tiktok.module';
 import { InstagramModule } from '../instagram/instagram.module';
+import { ReservasModule } from '../reservas/reservas.module';
 
 @Module({
-  imports: [SubscriptionsModule, NotificationsModule, WizardAnalyticsModule, DomainsModule, MemberProfileModule, CostsModule, SearchConsoleModule, TiktokModule, InstagramModule],
+  imports: [SubscriptionsModule, NotificationsModule, WizardAnalyticsModule, DomainsModule, MemberProfileModule, CostsModule, SearchConsoleModule, TiktokModule, InstagramModule, ReservasModule],
   controllers: [InternalCronController],
   providers: [InternalCronSecretGuard, CronRunsService, RetencionLogsService],
 })

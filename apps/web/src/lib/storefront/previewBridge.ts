@@ -20,6 +20,7 @@
 
 import { useEffect, useState } from 'react'
 import { fontStack, googleFontsHref } from '@/lib/fonts'
+import { conFundidoDeTema } from '@/hooks/useDarkMode'
 import { cssPrimarioTienda } from './primarioTema'
 import { MSG_FOCO, enfocarSeccion, esObjetivoPreview } from './previewFoco'
 import type { StorefrontConfigResponse } from './api'
@@ -143,7 +144,10 @@ function aplicarTema(ov: AppearanceOverrides): void {
   if (ov.colorMode) {
     const oscuro = ov.colorMode === 'dark'
       || (ov.colorMode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-    document.documentElement.classList.toggle('dark', oscuro)
+    const html = document.documentElement
+    // Con el mismo fundido que el botón de la tienda, y solo cuando cambia de
+    // verdad: el borrador llega con cada tecla del editor.
+    if (html.classList.contains('dark') !== oscuro) conFundidoDeTema(oscuro, () => html.classList.toggle('dark', oscuro))
   }
 }
 

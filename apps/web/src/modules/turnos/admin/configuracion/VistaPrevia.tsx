@@ -18,7 +18,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Monitor, Smartphone, ExternalLink, Lock, RotateCw } from 'lucide-react'
 import type { RubroTurnos } from '@/modules/turnos/datos'
-import type { FormaSitio } from '@/modules/turnos/demo/negocioDemo'
+import type { FormaSitio } from '@/modules/turnos/datos/negocio'
 import { temaDe, variablesTema } from '@/modules/turnos/storefront/tema'
 import type { AjustesPlantilla, Paleta, PlantillaSitio } from './datos'
 
@@ -178,27 +178,25 @@ function hidratado(frame: HTMLIFrameElement | null): boolean {
 }
 
 export const CSS_VISTA_PREVIA = `
-  .tuc-vp { display: flex; flex-direction: column; min-height: 0; border-radius: 18px; overflow: hidden; border: 1px solid var(--color-border); background: var(--color-bg);
-    box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 24px 60px -24px rgba(15,23,42,0.35), 0 8px 24px -12px rgba(37,99,235,0.18); }
+  .tuc-vp { display: flex; flex-direction: column; min-height: 0; border-radius: var(--rv-r, 12px); overflow: hidden; border: 1px solid var(--color-border); background: var(--color-bg); }
   .tuc-vp-barra { min-height: 48px; flex-shrink: 0; border-bottom: 1px solid var(--color-border); display: flex; align-items: center; gap: 8px; padding: 7px 10px; flex-wrap: wrap; background: var(--color-surface); }
   .tuc-vp-luces { display: inline-flex; gap: 6px; padding: 0 4px 0 2px; flex-shrink: 0; }
   .tuc-vp-luces > span { width: 10px; height: 10px; border-radius: 50%; background: var(--color-border-strong); }
   .tuc-vp-url { flex: 1; min-width: 0; display: flex; justify-content: center; }
   .tuc-vp-url > span { height: 28px; padding: 0 12px; border-radius: 999px; background: var(--color-bg); border: 1px solid var(--color-border); display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px;
-    color: var(--color-muted); font-family: var(--tuo-mono, "Geist Mono", monospace); max-width: 100%; overflow: hidden; }
+    color: var(--color-muted); font-family: var(--rv-mono, "Geist Mono", monospace); max-width: 100%; overflow: hidden; }
   .tuc-vp-mini { display: inline-flex; padding: 2px; gap: 2px; border-radius: 10px; background: var(--color-surface-alt); border: 1px solid var(--color-border); flex-shrink: 0; }
   .tuc-vp-mini > button { height: 30px; min-width: 32px; padding: 0 11px; border-radius: 8px; border: none; cursor: pointer; font-family: inherit; display: grid; place-items: center; font-size: 12px; font-weight: 500;
-    background: transparent; color: var(--color-muted); transition: background 180ms ease, color 160ms ease, box-shadow 180ms ease; }
+    background: transparent; color: var(--color-body); transition: background 180ms ease, color 160ms ease, box-shadow 180ms ease; }
   .tuc-vp-mini > button[data-icono='true'] { padding: 0; }
-  .tuc-vp-mini > button[aria-checked='true'] { background: var(--color-bg); color: var(--color-text); font-weight: 600; box-shadow: 0 1px 3px rgba(15,23,42,0.16); }
+  .tuc-vp-mini > button[aria-checked='true'] { background: var(--color-bg); color: var(--color-text); font-weight: 600; box-shadow: 0 0 0 1px var(--color-border); }
   .tuc-vp-mini > button:focus-visible, .tuc-vp-accion:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
   .tuc-vp-accion { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; color: var(--color-muted); border: 1px solid var(--color-border); background: var(--color-bg); cursor: pointer; flex-shrink: 0;
     transition: color 150ms ease, border-color 150ms ease, background 150ms ease; }
   .tuc-vp-escena { position: relative; flex: 1; min-height: 0; overflow: clip; background: var(--color-bg); }
   .tuc-vp-escena--movil { display: grid; place-items: center;
-    background: radial-gradient(520px 320px at 50% 0%, color-mix(in srgb, var(--color-primary) 16%, transparent), transparent 70%), var(--color-surface-alt); }
-  .tuc-vp-tel { position: relative; flex-shrink: 0; box-sizing: content-box; overflow: hidden; background: #0B0F19; border-style: solid; border-color: #0B0F19;
-    box-shadow: 0 0 0 1.5px #2A3350, 0 0 0 3px #0B0F19, 0 30px 60px -18px rgba(3,6,14,0.55), 0 0 60px -10px color-mix(in srgb, var(--color-primary) 35%, transparent); }
+    background: var(--color-surface-alt); }
+  .tuc-vp-tel { position: relative; flex-shrink: 0; box-sizing: content-box; overflow: hidden; background: #0B0F19; border-style: solid; border-color: #0B0F19; box-shadow: 0 0 0 1px var(--color-border-strong); }
   .tuc-vp-isla { position: absolute; top: 0; left: 50%; transform: translateX(-50%); background: #0B0F19; z-index: 2; pointer-events: none; }
   .tuc-vp-carga { position: absolute; inset: 0; display: grid; place-items: center; background: var(--color-surface); }
   .tuc-spin { animation: tucSpin 800ms linear infinite; }
@@ -210,7 +208,7 @@ export const CSS_VISTA_PREVIA = `
   @media (max-width: 560px) {
     .tuc-vp-url, .tuc-vp-luces { display: none !important; }
     .tuc-vp-barra { justify-content: space-between; }
-    .tuc-vp-mini > button { height: 40px; min-width: 44px; }
+    .tuc-vp-mini > button { height: 44px; min-width: 44px; }
     .tuc-vp-accion { width: 44px; height: 44px; }
   }
   @media (prefers-reduced-motion: reduce) { .tuc-spin { animation-duration: 2.4s; } }
