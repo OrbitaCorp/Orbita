@@ -1,9 +1,9 @@
 import {
-  useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, type KeyboardEvent as TeclaEvent,
+  useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, type KeyboardEvent as TeclaEvent, type ReactNode,
 } from 'react'
 import { useRouter } from 'next/router'
 import {
-  AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, CircleDashed, Clock, FilePlus2, Folder, Laptop, Plus, Share2, Undo2, X,
+  AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, CircleDashed, Clock, Compass, Copy, FilePlus2, Folder, Laptop, Plus, Save, Share2, Undo2, X,
 } from 'lucide-react'
 import { Chip, Empty, ErrorBox, PageHeader, btnGhost, btnPrimary, inputStyle } from './ui'
 import { MarkdownInforme, MD_CSS, srcSeguro } from './MarkdownInforme'
@@ -11,6 +11,7 @@ import { CICLO, PERSONAS, PLANES, type ConPlan, type Persona, type PlanModulo, t
 import { AVISO_SESION, ENTRADAS, type Entrada, type TipoEntrada } from './modulos/entradas'
 import { DECISIONES } from './modulos/decisiones'
 import { CARPETAS_COMPARTIDAS, REGLAS_COMPARTIDO } from './modulos/compartido'
+import { AVISOS_MODULO, COMO_SE_TRABAJA } from './modulos/reglas'
 import { accionesModulos, idTarea, useEstadoModulos, type EstadoModulos, type Horizonte } from './modulos/estado'
 
 // Módulos (super admin → Interno → Módulos): el plan de trabajo de los módulos
@@ -381,6 +382,23 @@ const CSS = `
     .mo-compartido-item dl { grid-template-columns: minmax(0, 1fr); gap: 2px; }
     .mo-compartido-item dd + dt { margin-top: 6px; }
   }
+  /* Cómo se trabaja: las reglas del ciclo, con el aviso del módulo arriba. */
+  .mo-reglas { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .mo-regla { display: grid; gap: 4px; padding: 14px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-surface-alt); font-size: 13px; line-height: 1.5; color: var(--color-body); }
+  .mo-regla b { font-size: 14px; color: var(--color-text); }
+  .mo-aviso-modulo { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--chip-warning-fg); background: var(--color-warning-bg); color: var(--color-text); font-size: 13.5px; line-height: 1.5; }
+  .mo-aviso-modulo > svg { flex-shrink: 0; margin-top: 2px; color: var(--chip-warning-fg); }
+  @media (max-width: 960px) { .mo-reglas { grid-template-columns: minmax(0, 1fr); } }
+  /* La respuesta del responsable a una decisión abierta: arriba del informe, con su propio marco. */
+  .mo-respuesta { display: grid; gap: 10px; padding: 14px 16px; margin-bottom: 16px; border: 1px solid var(--color-border); border-left: 3px solid var(--chip-warning-fg); border-radius: 12px; background: var(--color-surface-alt); }
+  .mo-respuesta-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; }
+  .mo-respuesta-cab b { font-size: 14px; color: var(--color-text); }
+  .mo-respuesta-cab span { font-size: 12.5px; color: var(--color-muted); }
+  .mo-respuesta textarea { width: 100%; min-height: 110px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text); font: inherit; font-size: 13.5px; line-height: 1.5; resize: vertical; }
+  .mo-respuesta textarea:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+  .mo-respuesta-acc { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .mo-respuesta-acc .mo-aviso { font-size: 12.5px; color: var(--color-muted); }
+  @media (max-width: 640px) { .mo-respuesta { padding: 12px; } .mo-respuesta-acc > button { flex: 1 1 100%; } }
   @media (prefers-reduced-motion: reduce) { .mo-barra > span { transition: none; } .mo-compartido-ver > svg { transition: none; } }
 `
 
@@ -461,6 +479,7 @@ export function TabModulos() {
               <TarjetaModulo key={m.def.slug} modulo={m} hoy={hoy} onAbrir={esConPlan(m.def.slug) && m.plan ? () => { window.scrollTo({ top: 0 }); ir(m.def.slug as ConPlan) } : undefined} />
             ))}
           </div>
+          <ComoSeTrabaja />
           <Compartido />
         </>
       )}
@@ -478,56 +497,118 @@ function AvisoGuardado() {
   )
 }
 
-// ─── Lo compartido entre los tres módulos ─────────────────────────────────────
-// Pedido de Ale (04/11/2026): que en Módulos quede claro que lo de reservas es
-// compartido, en qué carpetas están las reglas y que si alguien actualiza algo
-// ahí lo actualiza para los tres, "a cada uno para que sepan". Los datos viven
-// en modulos/compartido.ts. En la lista de módulos va abierta; dentro de un
-// módulo, plegada, con la nota dirigida a su responsable.
-function Compartido({ modulo }: { modulo?: Modulo }) {
-  const [abierto, setAbierto] = useState(!modulo)
-  const otros = modulo ? PLANES.filter((p) => p.modulo !== modulo.def.slug).map((p) => `${p.nombre} (${p.responsable})`) : []
+// ─── Tarjetas plegables: cómo se trabaja y lo compartido ──────────────────────
+// Una tarjeta con la cabecera siempre a la vista y el cuerpo plegable. En la
+// lista de módulos van abiertas; dentro de un módulo, plegadas, con la nota
+// dirigida a su responsable a la vista.
+function Plegable({ id, Icono, titulo, chip, resumen, abiertoAlInicio, children }: {
+  id: string
+  Icono: typeof Share2
+  titulo: string
+  chip: string
+  resumen: ReactNode
+  abiertoAlInicio: boolean
+  children: ReactNode
+}) {
+  const [abierto, setAbierto] = useState(abiertoAlInicio)
   return (
-    <section className="mo-card mo-compartido" aria-labelledby="mo-compartido-titulo">
+    <section className="mo-card mo-compartido" aria-labelledby={`${id}-titulo`}>
       <div className="mo-compartido-cab">
         <div style={{ minWidth: 0, flex: '1 1 320px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <Share2 size={18} strokeWidth={2} aria-hidden style={{ color: 'var(--chip-warning-fg)', flexShrink: 0 }} />
-            <h3 id="mo-compartido-titulo" style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--color-text)' }}>Lo compartido entre Turnos, Alquileres y Gimnasio</h3>
-            <Chip text="Un cambio, los tres módulos" tone="amber" />
+            <Icono size={18} strokeWidth={2} aria-hidden style={{ color: 'var(--chip-warning-fg)', flexShrink: 0 }} />
+            <h3 id={`${id}-titulo`} style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--color-text)' }}>{titulo}</h3>
+            <Chip text={chip} tone="amber" />
           </div>
-          <p style={{ margin: '8px 0 0', fontSize: 13.5, lineHeight: 1.5, color: 'var(--color-body)' }}>
-            {modulo ? (
-              <><strong style={{ color: 'var(--color-text)' }}>{modulo.def.nombre} no vive solo:</strong> estas {CARPETAS_COMPARTIDAS.length} carpetas son también de {otros.join(' y ')}. Lo que cambiés ahí les cambia a ellos en el acto, y lo que ellos cambien te cambia a vos. Las reglas de cada carpeta están en su README; antes de tocar, avisá.</>
-            ) : (
-              <>Los tres módulos son independientes (ninguno importa de otro), pero el motor de reservas, el cliente de su API, las cuentas de calendario y de plata y el kit visual son uno solo, en estas {CARPETAS_COMPARTIDAS.length} carpetas. Lo que se actualiza ahí se actualiza para los tres. Las reglas de cada una están en su README; acá, lo que todos tienen que saber.</>
-            )}
-          </p>
+          <p style={{ margin: '8px 0 0', fontSize: 13.5, lineHeight: 1.5, color: 'var(--color-body)' }}>{resumen}</p>
         </div>
-        <button type="button" className="ds-hover mo-compartido-ver" aria-expanded={abierto} aria-controls="mo-compartido-cuerpo" onClick={() => setAbierto((a) => !a)}>
-          {abierto ? 'Ocultar' : 'Ver carpetas y reglas'} <ChevronDown size={16} strokeWidth={2.2} aria-hidden />
+        <button type="button" className="ds-hover mo-compartido-ver" aria-expanded={abierto} aria-controls={`${id}-cuerpo`} onClick={() => setAbierto((a) => !a)}>
+          {abierto ? 'Ocultar' : 'Ver todo'} <ChevronDown size={16} strokeWidth={2.2} aria-hidden />
         </button>
       </div>
-      <div id="mo-compartido-cuerpo" className="mo-compartido-cuerpo" hidden={!abierto}>
-        <ol className="mo-compartido-reglas" aria-label="Reglas para tocar lo compartido">
-          {REGLAS_COMPARTIDO.map((r) => <li key={r}>{r}</li>)}
-        </ol>
-        <div className="mo-compartido-lista">
-          {CARPETAS_COMPARTIDAS.map((c) => (
-            <article key={c.ruta} className="mo-compartido-item" aria-label={c.nombre}>
-              <div className="mo-compartido-ruta"><Folder size={15} strokeWidth={2} aria-hidden /><code>{c.ruta}</code></div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)' }}>{c.nombre}</div>
-              <p style={{ margin: 0 }}>{c.que}</p>
-              <dl>
-                <dt>Lo usan</dt><dd>{c.usan}</dd>
-                <dt>Reglas</dt><dd><code>{c.reglas}</code></dd>
-                <dt>Probar</dt><dd><code>{c.probar}</code></dd>
-              </dl>
-            </article>
-          ))}
-        </div>
+      <div id={`${id}-cuerpo`} className="mo-compartido-cuerpo" hidden={!abierto}>
+        {children}
       </div>
     </section>
+  )
+}
+
+// Cómo se trabaja en el ciclo (pedido de Ale, 04/11/2026: cada uno dueño de su
+// módulo, libre de cambiar y mejorar, con alcance y de forma profesional). Los
+// datos viven en modulos/reglas.ts; el aviso propio del módulo va arriba de todo.
+function ComoSeTrabaja({ modulo }: { modulo?: Modulo }) {
+  const aviso = modulo && esConPlan(modulo.def.slug) ? AVISOS_MODULO[modulo.def.slug] : null
+  return (
+    <Plegable
+      id="mo-como"
+      Icono={Compass}
+      titulo="Cómo se trabaja en el ciclo 2"
+      chip="Cada uno, dueño de su módulo"
+      abiertoAlInicio={!modulo}
+      resumen={modulo
+        ? <><strong style={{ color: 'var(--color-text)' }}>{modulo.plan?.responsable ?? modulo.def.persona} decide {modulo.def.nombre}</strong> como crea mejor, es libre de cambiar y mejorar lo que quiera de su módulo, y cada decisión abierta se responde en Auditoría. Lo que toca plata, producción de Tienda o a los tres módulos lo decide Ale.</>
+        : <>Cada responsable decide su módulo como crea mejor y es libre de cambiar, agregar o mejorar lo que quiera; el plan marca el camino y el ritmo. Las decisiones de cada módulo se responden en su Auditoría y Claude las registra; lo que toca plata, producción de Tienda o a los tres módulos lo decide Ale.</>}
+    >
+      {aviso && (
+        <div className="mo-aviso-modulo" role="note">
+          <AlertTriangle size={18} strokeWidth={2} aria-hidden />
+          <div><b>Antes de tocar {modulo!.def.nombre}: </b>{aviso}</div>
+        </div>
+      )}
+      <ol className="mo-reglas" aria-label="Reglas del ciclo">
+        {COMO_SE_TRABAJA.map((r) => (
+          <li key={r.titulo} className="mo-regla"><b>{r.titulo}</b><span>{r.texto}</span></li>
+        ))}
+      </ol>
+      {!modulo && (
+        <div style={{ display: 'grid', gap: 8 }}>
+          {(Object.keys(AVISOS_MODULO) as ConPlan[]).map((slug) => (
+            <div key={slug} className="mo-aviso-modulo" role="note">
+              <AlertTriangle size={18} strokeWidth={2} aria-hidden />
+              <div><b>{PLANES.find((p) => p.modulo === slug)?.nombre ?? slug}: </b>{AVISOS_MODULO[slug]}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Plegable>
+  )
+}
+
+// Lo compartido entre los tres módulos (pedido de Ale, 04/11/2026): qué
+// carpetas comparten Turnos, Alquileres y Gimnasio, dónde están las reglas y
+// que si alguien actualiza algo ahí lo actualiza para los tres, "a cada uno
+// para que sepan". Los datos viven en modulos/compartido.ts.
+function Compartido({ modulo }: { modulo?: Modulo }) {
+  const otros = modulo ? PLANES.filter((p) => p.modulo !== modulo.def.slug).map((p) => `${p.nombre} (${p.responsable})`) : []
+  return (
+    <Plegable
+      id="mo-compartido"
+      Icono={Share2}
+      titulo="Lo compartido entre Turnos, Alquileres y Gimnasio"
+      chip="Un cambio, los tres módulos"
+      abiertoAlInicio={!modulo}
+      resumen={modulo
+        ? <><strong style={{ color: 'var(--color-text)' }}>{modulo.def.nombre} no vive solo:</strong> estas {CARPETAS_COMPARTIDAS.length} carpetas son también de {otros.join(' y ')}. Lo que cambiés ahí les cambia a ellos en el acto, y lo que ellos cambien te cambia a vos. Las reglas de cada carpeta están en su README; antes de tocar, avisá.</>
+        : <>Los tres módulos son independientes (ninguno importa de otro), pero el motor de reservas, el cliente de su API, las cuentas de calendario y de plata y el kit visual son uno solo, en estas {CARPETAS_COMPARTIDAS.length} carpetas. Lo que se actualiza ahí se actualiza para los tres. Las reglas de cada una están en su README; acá, lo que todos tienen que saber.</>}
+    >
+      <ol className="mo-compartido-reglas" aria-label="Reglas para tocar lo compartido">
+        {REGLAS_COMPARTIDO.map((r) => <li key={r}>{r}</li>)}
+      </ol>
+      <div className="mo-compartido-lista">
+        {CARPETAS_COMPARTIDAS.map((c) => (
+          <article key={c.ruta} className="mo-compartido-item" aria-label={c.nombre}>
+            <div className="mo-compartido-ruta"><Folder size={15} strokeWidth={2} aria-hidden /><code>{c.ruta}</code></div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)' }}>{c.nombre}</div>
+            <p style={{ margin: 0 }}>{c.que}</p>
+            <dl>
+              <dt>Lo usan</dt><dd>{c.usan}</dd>
+              <dt>Reglas</dt><dd><code>{c.reglas}</code></dd>
+              <dt>Probar</dt><dd><code>{c.probar}</code></dd>
+            </dl>
+          </article>
+        ))}
+      </div>
+    </Plegable>
   )
 }
 
@@ -706,6 +787,7 @@ function VistaModulo(p: PropsVista) {
 
       <AvisoGuardado />
 
+      <ComoSeTrabaja modulo={m} />
       <Compartido modulo={m} />
 
       {!m.plan ? (
@@ -964,23 +1046,45 @@ function PanelAuditoria({ modulo: m, estado, enfocar, onConfirmar, onDesconfirma
           confirmacion={confirmacionDe(e, estado)}
           tareas={tareasDe(e.key)}
           enfocar={enfocar === e.key}
+          respuesta={estado.respuestas[e.key] ?? null}
           onConfirmar={() => onConfirmar(e)}
           onDesconfirmar={() => onDesconfirmar(e)}
+          onResponder={(texto) => accionesModulos.responder(e.key, texto, hoyLocal())}
         />
       ))}
     </>
   )
 }
 
-function TarjetaEntrada({ entrada: e, confirmacion, tareas, enfocar, onConfirmar, onDesconfirmar }: {
+function TarjetaEntrada({ entrada: e, confirmacion, tareas, enfocar, respuesta, onConfirmar, onDesconfirmar, onResponder }: {
   entrada: Entrada
   confirmacion: Confirmacion | null
   tareas: Tarea[]
   enfocar: boolean
+  /** La respuesta a una decisión abierta guardada en este navegador. */
+  respuesta: { texto: string; dia: string } | null
   onConfirmar: () => void
   onDesconfirmar: () => void
+  onResponder: (texto: string) => void
 }) {
   const [abierta, setAbierta] = useState(enfocar)
+  // Lo que se está escribiendo; null = lo guardado (así lo que llega del navegador al hidratar se ve sin un efecto).
+  const [borrador, setBorrador] = useState<string | null>(null)
+  const texto = borrador ?? respuesta?.texto ?? ''
+  const [copiado, setCopiado] = useState(false)
+  const copiar = () => {
+    const cuerpo = [
+      `Decisión de Módulos (superadmin) · ${e.modulo} · "${e.titulo}"`,
+      `Key: ${e.key}`,
+      `Decide: ${e.quien}`,
+      `Respuesta de ${e.quien}${respuesta ? ` (${larga(respuesta.dia)})` : ''}:`,
+      texto.trim() || '(sin respuesta todavía)',
+      '',
+      'Claude: registrala en Auditoría como decisión tomada (entradas.ts, tipo decisión, con su porqué) y cerrala en decisiones.ts.',
+    ].join('\n')
+    const listo = () => { setCopiado(true); window.setTimeout(() => setCopiado(false), 2500) }
+    navigator.clipboard?.writeText(cuerpo).then(listo, () => window.prompt('Copiá este texto para Claude:', cuerpo))
+  }
   const ref = useRef<HTMLElement>(null)
   // "Ver entrada" desde el plan: la tarjeta llega abierta y se muestra.
   useEffect(() => {
@@ -1003,7 +1107,7 @@ function TarjetaEntrada({ entrada: e, confirmacion, tareas, enfocar, onConfirmar
               ? <span className="mo-etiqueta">{tipo.label}</span>
               : <Chip text={tipo.label} tone={tipo.id === 'decisión' ? 'violet' : 'blue'} />}
             {e.abierta
-              ? <Chip text={`Abierta · la decide ${e.quien}`} tone="amber" />
+              ? <><Chip text={`Abierta · la decide ${e.quien}`} tone="amber" />{respuesta && <Chip text="Respondida en este navegador" tone="blue" />}</>
               : confirmacion
                 ? <Chip text="Confirmada" tone="green" />
                 : <Chip text="Pendiente de confirmación" tone="amber" />}
@@ -1039,6 +1143,30 @@ function TarjetaEntrada({ entrada: e, confirmacion, tareas, enfocar, onConfirmar
       </div>
       {abierta && (
         <div id={idCuerpo} className="mo-entrada-cuerpo">
+          {e.abierta && (
+            <div className="mo-respuesta">
+              <div className="mo-respuesta-cab">
+                <b>Tu respuesta ({e.quien})</b>
+                <span>{respuesta ? `Guardada el ${larga(respuesta.dia)} en este navegador` : 'Se guarda en este navegador; copiala para que Claude la registre en Auditoría.'}</span>
+              </div>
+              <label className="rv-sr" htmlFor={`${idCuerpo}-respuesta`}>Tu respuesta a esta decisión</label>
+              <textarea
+                id={`${idCuerpo}-respuesta`}
+                value={texto}
+                onChange={(ev) => setBorrador(ev.target.value)}
+                placeholder="Qué decidís y por qué. Si es con condiciones o para otro ciclo, decilo acá."
+              />
+              <div className="mo-respuesta-acc">
+                <button type="button" className="ds-hover mo-boton" style={btnPrimary} onClick={() => { onResponder(texto); setBorrador(null) }} disabled={borrador === null || borrador.trim() === (respuesta?.texto ?? '')}>
+                  <Save size={15} strokeWidth={2} aria-hidden /> Guardar
+                </button>
+                <button type="button" className="ds-hover mo-boton" style={btnGhost} onClick={copiar} disabled={!texto.trim()}>
+                  <Copy size={15} strokeWidth={2} aria-hidden /> {copiado ? 'Copiado' : 'Copiar para Claude'}
+                </button>
+                <span className="mo-aviso" aria-live="polite">{copiado ? 'Pegalo en tu sesión de Claude Code.' : ''}</span>
+              </div>
+            </div>
+          )}
           <MarkdownInforme texto={informeVisible(e.informe, !!confirmacion)} />
         </div>
       )}

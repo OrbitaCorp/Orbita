@@ -187,14 +187,16 @@ describe('Módulos — entradas y decisiones', () => {
       expect(e.abierta).toBe(true)
       expect(e.confirmada).toBeNull()
       expect(e.informe.startsWith(avisoAbierta(e.quien))).toBe(true)
-      for (const s of ['## Propuesta', '## Por qué está abierta', '## De dónde sale', '## Archivos']) expect(e.informe).toContain(s)
+      for (const s of ['## Qué hay que decidir', '## Alcance', '## Propuesta', '## Por qué está abierta', '## De dónde sale', '## Archivos']) expect(e.informe).toContain(s)
       expect(e.informe).not.toContain('## Decisión y porqué')
       expect(e.informe).not.toContain(AVISO_SESION)
       for (const a of archivosDe(e.informe)) expect(a).toMatch(RE_ARCHIVO)
       expect(e.informe.length).toBeLessThanOrEqual(80_000)
     }
-    // Las de Mateo van en Turnos; las de Ale que cruzan módulos, en Gimnasio.
+    // Cada uno decide su módulo (Ale, 04/11): Turnos Mateo, Alquileres Alan; lo transversal y Gimnasio, Ale.
     expect(DECISIONES.filter((e) => e.modulo === 'turnos').every((e) => e.quien === 'Mateo')).toBe(true)
+    expect(DECISIONES.filter((e) => e.modulo === 'alquileres').every((e) => e.quien === 'Alan')).toBe(true)
+    expect(DECISIONES.filter((e) => e.modulo === 'gimnasio').every((e) => e.quien === 'Ale')).toBe(true)
   })
 
   it('toda captura de un informe existe en apps/web/public y dice su ancho', () => {

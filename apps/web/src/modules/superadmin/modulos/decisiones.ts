@@ -1,15 +1,23 @@
 // Decisiones abiertas que dejó el trabajo de Módulos (Turnos sin backend,
 // Alquileres, Gimnasio, el alta única y la sección Módulos, 26/10/2026): cosas
 // que no se destraban escribiendo código porque cambian algo de Tienda en
-// producción, el color de marca o una cuenta. Las decide una persona (Ale o
-// Mateo) y por eso no se "confirman": quedan abiertas hasta que se decidan, y
-// entonces se pasan a entradas.ts como decisión tomada, con su porqué.
+// producción, el color de marca, una cuenta o el alcance de un módulo. No se
+// "confirman": quedan abiertas hasta que se decidan, y entonces se pasan a
+// entradas.ts como decisión tomada, con su porqué.
+//
+// Quién decide (pedido de Ale, 04/11/2026: "cada uno decide su módulo como
+// piense"): el responsable del módulo (Mateo en Turnos, Alan en Alquileres, Ale
+// en Gimnasio); lo que toca plata, producción de Tienda o a los tres módulos a
+// la vez, Ale. El responsable escribe su respuesta en la tarjeta de Auditoría
+// (queda en su navegador) y la copia para Claude, que la registra acá como
+// decisión tomada.
 //
 // Van en el módulo que tocan; lo que cruza módulos, en Gimnasio (el módulo de
 // Ale), con el título "Transversal: …", como el resto de lo transversal.
 //
-// Formato del informe: el aviso de quién la decide, Propuesta, Por qué está
-// abierta, De dónde sale y Archivos (`ruta:línea` desde la raíz del repo).
+// Formato del informe: el aviso de quién la decide, Qué hay que decidir (en
+// simple), Alcance (hasta dónde llega), Propuesta, Por qué está abierta, De
+// dónde sale y Archivos (`ruta:línea` desde la raíz del repo).
 
 import type { ConPlan, Persona } from './plan'
 import type { Entrada } from './entradas'
@@ -25,18 +33,24 @@ interface DatosDecision {
   titulo: string
   /** Qué pasa, en una línea. */
   foco: string
+  /** Qué hay que decidir, en dos o tres frases simples. */
+  simple: string
+  /** Hasta dónde llega lo que se decide: qué toca y qué queda afuera, y quién lo decide. */
+  alcance: string
   propuesta: string
   abierta: string
   origen: string
   archivos: string[]
 }
 
-export const avisoAbierta = (quien: Persona) => `> **Decisión abierta: la decide ${quien}.**`
+export const avisoAbierta = (quien: Persona) => `> **Decisión abierta: la decide ${quien}.** Escribí tu respuesta en la tarjeta y copiala para Claude: queda registrada en Auditoría como decisión tomada.`
 
 function decisionAbierta(d: DatosDecision): Entrada {
   const fecha = d.fecha ?? '2026-10-26'
   const informe = [
     avisoAbierta(d.decide),
+    '## Qué hay que decidir', d.simple.trim(),
+    '## Alcance', d.alcance.trim(),
     '## Propuesta', d.propuesta.trim(),
     '## Por qué está abierta', d.abierta.trim(),
     '## De dónde sale', d.origen.trim(),
@@ -62,6 +76,8 @@ export const DECISIONES: Entrada[] = [
   decisionAbierta({
     modulo: 'turnos', slug: 'turnos-depende-de-tienda', decide: 'Mateo',
     titulo: 'Turnos todavía usa piezas de Tienda y de la landing',
+    simple: 'Turnos todavía usa `cargarFuentes` de Tienda en su sitio público y piezas de la landing en su sección de marketing. Hay que decidir si `cargarFuentes` se mueve al design system (y Tienda lo importa de ahí) o se deja como está, y si la landing de Turnos puede seguir usando la landing.',
+    alcance: 'Solo Turnos y una función de Tienda (`cargarFuentes`, las fuentes de las plantillas). Moverla toca las plantillas de Tienda en producción: se coordina con Ale. No toca Alquileres ni Gimnasio. La decide Mateo.',
     foco: 'Al 26/10 Turnos importaba de Tienda el botón Volver, cargarFuentes y los campos del formulario de equipo (con los roles de Tienda), y su sección de rubros usa Reveal y Contacto de la landing. El rediseño del 27/10 sacó del panel los imports de Tienda (Avanzado e Invitar usan el kit y los roles propios de Turnos); queda cargarFuentes en el sitio público y la landing. Ale pidió que cada módulo sea independiente.',
     propuesta: 'Lo que queda: mover cargarFuentes (las fuentes de las plantillas) al design system y que Tienda y el sitio de Turnos lo importen de ahí. La landing de Turnos puede seguir usando la landing: es marketing, no un módulo. Después, sumar `ventas` a la regla de eslint de Turnos (`apps/web/eslint.config.mjs`), como ya tienen Alquileres y Gimnasio.',
     abierta: 'Mover cargarFuentes toca las plantillas de Tienda, que están en producción.',
@@ -76,6 +92,8 @@ export const DECISIONES: Entrada[] = [
   decisionAbierta({
     modulo: 'gimnasio', slug: 'alta-estados-planos', decide: 'Ale', transversal: true,
     titulo: 'Transversal: alta real, ¿se aplanan los estados elegidos de los pasos?',
+    simple: 'Dentro de los pasos del alta, lo elegido (rubro, días, estaciones del arco) tiene degradado y brillo; el resto del alta ya es plano. ¿Se aplana todo o se deja como está?',
+    alcance: 'El alta real de los cuatro módulos, incluida la de Tienda que hoy cobra: es diseño de producción. Un cambio aparte, con QA a 390, 768 y 1280. La decide Ale.',
     foco: 'Las tarjetas de módulo y el kit de reservas ya son planos, pero dentro de los pasos del alta lo elegido (rubro, días, estaciones del arco) sigue con degradado y brillo, también en el alta de Tienda que está en producción.',
     propuesta: 'Aplanarlos con el acento, igual que las tarjetas de módulo: borde y velo del color, ícono lleno, sin degradado ni brillo. Hacerlo en un cambio aparte del alta real, con su QA a 390, 768 y 1280.',
     abierta: 'Cambia cómo se ve el alta real de Tienda, que hoy cobra: es una decisión de diseño de producción, no un arreglo.',
@@ -91,6 +109,8 @@ export const DECISIONES: Entrada[] = [
   decisionAbierta({
     modulo: 'gimnasio', slug: 'primario-contraste', decide: 'Ale', transversal: true,
     titulo: 'Transversal: azul primario, el texto blanco sobre él no llega a AA (3,68:1)',
+    simple: 'El azul de marca del modo claro (#3B82F6) con texto blanco no llega a AA. ¿Se oscurece a #2563EB en toda la app o se deja como está?',
+    alcance: 'Todos los botones primarios del panel (Tienda incluida), la landing y los módulos: es el color de marca. La decide Ale.',
     foco: 'El primario del modo claro (#3B82F6) con texto blanco da 3,68:1 y la norma pide 4,5:1. Lo usan todos los botones primarios del panel, Tienda incluida, y los de Módulos.',
     propuesta: 'Oscurecer el primario del modo claro a #2563EB (5,17:1 con blanco) y su hover a #1D4ED8, en `apps/web/src/styles/globals.css`, y revisar en la misma tanda el panel de Tienda, la landing y los módulos. El modo oscuro ya usa texto oscuro sobre el primario.',
     abierta: 'Es el color de marca y cambia el aspecto de toda la app: lo decide Ale.',
@@ -104,6 +124,8 @@ export const DECISIONES: Entrada[] = [
   decisionAbierta({
     modulo: 'gimnasio', slug: 'csp-mapa-osm', decide: 'Ale', transversal: true,
     titulo: 'Transversal: la CSP bloquearía el mapa de OpenStreetMap de los sitios de reservas',
+    simple: 'Cuando la CSP pase a bloquear, el mapa de OpenStreetMap (un iframe) de los sitios de Alquileres y Gimnasio dejaría de verse. ¿Se autoriza el iframe o se cambia por el mapa de Leaflet que ya usa el alta?',
+    alcance: 'Los sitios de Alquileres y Gimnasio (Cómo llegar) y la política de seguridad de toda la web. La decide Ale cuando la CSP se vuelva bloqueante; Alan y Ale pueden adelantar el cambio a Leaflet en sus sitios cuando quieran.',
     foco: 'La CSP tiene `frame-src \'self\'` en modo solo reporte, y los sitios de Alquileres y Gimnasio muestran la ubicación con un iframe de openstreetmap.org. Hoy solo avisa en la consola.',
     propuesta: 'Antes de pasar la CSP a bloqueante, sumar `https://www.openstreetmap.org` a `frame-src`, o cambiar el iframe por el mapa de Leaflet que ya usa el alta, que no necesita iframe. No apura: hoy las demos dan 404 en producción.',
     abierta: 'Depende de cuándo se pase la CSP a bloqueante y de si esos sitios salen a producción.',
@@ -118,6 +140,8 @@ export const DECISIONES: Entrada[] = [
   decisionAbierta({
     modulo: 'gimnasio', slug: 'toques-44-compartidos', decide: 'Ale', transversal: true,
     titulo: 'Transversal: tira de chips y botón Volver de 38 y 42 px en celular (compartidos con Tienda)',
+    simple: 'Dos piezas compartidas con Tienda miden menos de 44 px para tocar en celular (la tira de chips, 38; el botón Volver, 42). ¿Se suben a 44 en globals.css?',
+    alcance: 'Pantallas del panel de Tienda en producción, además de los paneles de reservas. La decide Ale; mientras tanto cada módulo puede usar sus propias clases de 44 px (como hace Gimnasio).',
     foco: 'Las pautas de la QA piden 44 px para tocar. `.ds-tira-chip` mide 38 px y el botón Volver (`.ds-volver`) 42 px; los dos son del estándar de celular que comparten el panel de Tienda y Turnos. Los botones de zoom del mapa del alta (MapPicker, también de Tienda) miden 30 px.',
     propuesta: 'Subir los tres a 44 px en celular (en `apps/web/src/styles/globals.css` y en el MapPicker) y revisar el panel de Tienda a 390 en la misma tanda.',
     abierta: 'Cambia pantallas de Tienda que están en producción.',
@@ -131,6 +155,8 @@ export const DECISIONES: Entrada[] = [
   decisionAbierta({
     modulo: 'gimnasio', slug: 'cuenta-superadmin-mateo', decide: 'Ale', transversal: true,
     titulo: 'Transversal: Mateo no tiene cuenta personal en el superadmin',
+    simple: 'Mateo entra al superadmin con la cuenta del cargo (CEO) porque no tiene cuenta propia. ¿Se le crea?',
+    alcance: 'Solo cuentas del superadmin (Admins). No afecta a Módulos, que va por nombre. La decide Ale.',
     foco: 'En la base de desarrollo están Alan Vega y las cuentas por cargo (CEO, CTO, CPO, RM), pero Mateo no tiene cuenta propia. Módulos ya no la necesita (los responsables van por nombre), pero para el resto del superadmin entra con la cuenta CEO.',
     propuesta: 'Crearle la cuenta desde Superadmin → Admins → "Nuevo admin" con su email de Google: entra con Google, le llega el código por mail y no hace falta contraseña.',
     abierta: 'Crear cuentas lo decide Ale; el pedido fue avisar y no crearlas. Producción no se revisó.',
@@ -144,6 +170,8 @@ export const DECISIONES: Entrada[] = [
   decisionAbierta({
     modulo: 'gimnasio', slug: 'pedidos-del-kit-sin-tomar', decide: 'Ale', transversal: true, fecha: '2026-10-27',
     titulo: 'Transversal: pedidos del kit que quedaron sin tomar',
+    simple: 'Quedan cinco pedidos de los módulos al kit compartido: el toque de 44 de la llave, la tira de chips de 38 px, la vista previa de mensajes (WhatsApp o chat neutro), el gris sobre primary-bg y un celular de vista previa común. Para cada uno: ¿va al kit, se resuelve en cada módulo o se descarta?',
+    alcance: 'El kit `design-system/reservas` (les cambia a los tres) y, en dos puntos, globals.css de Tienda. La decide Ale; cada responsable dice en su respuesta qué prefiere para su módulo.',
     foco: 'Lo que Alquileres, Gimnasio y Turnos le pidieron al kit design-system/reservas y el 27/10 no se tomó. El 03/11 se tomaron el Kpi, la barra de guardar y la cabecera del Modal (puntos 1, 2 y 6, ver la entrada "el kit toma el Kpi…"); quedan el toque de 44 de la llave en el medidor común, la tira de chips de 38 px de globals.css, la vista previa de mensajes (WhatsApp o chat neutro), el gris sobre primary-bg y el celular de vista previa.',
     propuesta: `1. ~~**\`Kpi\` con ícono y variación** en el kit~~ **Hecho el 03/11** (entrada "Transversal: el kit toma el Kpi con variación…"): \`Kpi\` con \`Icon?\`, \`tono?\` y \`delta?\` en \`piezas.tsx\`; se borraron \`Kpi\` de Alquileres, \`KpiGym\` de Gimnasio e \`Indicador\` de Turnos.
 2. ~~**Barra de guardar y borrador** en el kit~~ **Hecho el 03/11:** \`useBorrador\` y \`BarraGuardar\` con \`motivo\` (la versión de Gimnasio) en el kit; Alquileres y Turnos migraron.
@@ -174,6 +202,8 @@ export const DECISIONES: Entrada[] = [
   decisionAbierta({
     modulo: 'gimnasio', slug: 'backend-compartido-pendientes', decide: 'Ale', transversal: true, fecha: '2026-11-03',
     titulo: 'Transversal: lo que el backend compartido de reservas deja para decidir',
+    simple: 'El motor de reservas ya está en producción. Quedan cinco cosas por decidir: cobrar la seña online con Mercado Pago, devolverla sola al cancelar, avisar por WhatsApp, cuándo mandar el recordatorio y cuándo habilitar cada módulo en el alta real.',
+    alcance: 'El backend compartido (`apps/api/src/reservas`) y los tres módulos a la vez; las dos primeras mueven plata de los clientes. La decide Ale; cada responsable dice en su respuesta qué necesita su módulo y cuándo.',
     foco: 'El motor de reservas está hecho y probado, pero cinco cosas tocan plata o el alta real y las decide Ale: cobrar la seña online, devolverla sola, avisar por WhatsApp, cuándo mandar el recordatorio y habilitar los módulos en el alta real. La sexta, desplegar, se decidió el 04/11.',
     propuesta: `1. **Cobro online de la seña con Mercado Pago.** Hoy el panel registra pagos a mano (\`POST /reservas/:id/pago\`). Propuesta: al confirmar desde el sitio, si el negocio tiene MP conectado y \`senaPorcentaje > 0\`, crear una preferencia por la seña y dejar la reserva PENDIENTE hasta el webhook, como hace el checkout de Tienda; sin MP conectado, como hoy.
 2. **Devolución automática al cancelar a tiempo.** Hoy "DEVUELTA" es un aviso al negocio (lo devuelve a mano). Propuesta: reembolso por la API de MP como hace Cancelaciones de Tienda, solo para lo cobrado por MP.
@@ -195,6 +225,8 @@ export const DECISIONES: Entrada[] = [
   decisionAbierta({
     modulo: 'gimnasio', slug: 'fondo-claro-ajustes', decide: 'Ale', transversal: true, fecha: '2026-11-03',
     titulo: 'Transversal: fondo claro de los paneles, ajustes que quedan a gusto de Ale',
+    simple: 'El fondo claro de los paneles ya está (el planeta de la landing). Quedan cinco ajustes de gusto: los cometas detrás del texto, la altura del horizonte, qué tan presentes van las estrellas, las bandas del resplandor y la franja de 40 px de la demo de Turnos.',
+    alcance: 'El armazón compartido de los tres paneles (`LayoutPanel` y `EscenaEspacial`): un ajuste se ve en los tres. La decide Ale mirándolos en vivo.',
     foco: 'El planeta como la landing ya está en los tres paneles en claro (entrada "el fondo claro de los paneles es el planeta…"); cinco detalles de gusto quedan para mirarlos en vivo: los cometas detrás del texto, la altura del horizonte, qué tan presentes van las estrellas, las bandas del resplandor y la franja de 40 px de la demo de Turnos. El sexto, el fundido al cambiar de tema, se decidió el 04/11: va en todo Órbita.',
     propuesta: `1. **Cometas detrás del texto suelto.** Cruzan un instante por detrás del encabezado (como ya pasa en oscuro). Si molesta: apagarlos cerca del encabezado o acotarlos al tercio superior del cielo.
 2. **Altura del horizonte.** Quedó como en la landing: el ápice al 72 % de la caja de \`<main>\` (86 % en celular). Alternativa: más abajo (~80 %) para ver más cielo y menos planeta.
@@ -214,8 +246,10 @@ export const DECISIONES: Entrada[] = [
   }),
 
   decisionAbierta({
-    modulo: 'alquileres', slug: 'cosas-con-stock', decide: 'Ale', fecha: '2026-11-03',
+    modulo: 'alquileres', slug: 'cosas-con-stock', decide: 'Alan', fecha: '2026-11-03',
     titulo: 'Alquileres: ¿un cuarto modo para alquilar cosas con stock (vehículos, equipos, mobiliario, disfraces)?',
+    simple: 'Alquileres alquila lugares (canchas, salones, alojamiento). ¿Suma un cuarto modo para alquilar cosas con cantidad (kayaks, sillas, disfraces, vehículos), con stock y fechas de retiro y devolución, o queda para otro ciclo?',
+    alcance: 'Solo Alquileres: datos, lib, panel, sitio y alta del módulo. El motor compartido ya tiene cupo por recurso, así que no hace falta tocar lo compartido. La decide Alan dentro de su ciclo.',
     foco: 'Hoy el módulo alquila lugares: por hora, por bloque (uno o varios salones) y por período (por noche o por mes). Lo que se alquila por unidad y con cantidad (10 kayaks, 50 sillas, 3 inflables, un vestido) no entra: necesita un artículo con stock, una reserva con cantidad y fechas de retiro y devolución.',
     propuesta: `**Modo "cosas":** un artículo con stock (cuántos hay), precio por día o por evento, depósito y retiro en el lugar o entrega; la reserva pide fecha de retiro, fecha de devolución y cantidad, y la disponibilidad es "cuántos quedan ese día" (stock menos lo reservado), no "libre u ocupado". El backend compartido ya tiene cupo por recurso (las clases de Gimnasio lo usan) y una reserva ocupa lugares del cupo: un artículo es un recurso con cupo igual al stock y la reserva de 3 kayaks ocupa 3, así que el motor no cambia; faltan la tarifa por día o por evento (como la mensual) y las pantallas: Artículos, Entregas y devoluciones del día, y el sitio con cantidad. Rubros que entrarían: autos, motos y bicis; kayaks y tablas; inflables, mobiliario y vajilla para eventos; sonido y luces; vestidos y disfraces; herramientas y máquinas; equipos de fotografía.
 

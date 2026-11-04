@@ -29,9 +29,11 @@ export interface EstadoModulos {
   nuevas: Entrada[]
   /** El horizonte elegido de cada módulo; sin elegir, 2 meses. */
   horizonte: Partial<Record<ConPlan, Horizonte>>
+  /** Respuestas a decisiones abiertas escritas en este navegador: key de la decisión → texto y día. */
+  respuestas: Record<string, { texto: string; dia: string }>
 }
 
-export const ESTADO_VACIO: EstadoModulos = { tildadas: {}, vinculos: {}, confirmadas: {}, nuevas: [], horizonte: {} }
+export const ESTADO_VACIO: EstadoModulos = { tildadas: {}, vinculos: {}, confirmadas: {}, nuevas: [], horizonte: {}, respuestas: {} }
 // Una clave por ciclo: los ids de las tareas son por posición y el ciclo 2
 // (05/11/2026) arrancó limpio, así que lo tildado en el ciclo 1 no se lee.
 const CLAVE = 'orbita_superadmin_modulos_c2'
@@ -71,12 +73,19 @@ export function sanear(g: unknown): EstadoModulos {
   if (esObjeto(g.tildadas)) for (const [k, v] of Object.entries(g.tildadas)) if (v === true) tildadas[k] = true
   const horizonte: Partial<Record<ConPlan, Horizonte>> = {}
   if (esObjeto(g.horizonte)) for (const [m, h] of Object.entries(g.horizonte)) if (esModulo(m) && (h === '1m' || h === '2m')) horizonte[m] = h
+  const respuestas: EstadoModulos['respuestas'] = {}
+  if (esObjeto(g.respuestas)) {
+    for (const [k, v] of Object.entries(g.respuestas)) {
+      if (k.startsWith('auditoria.') && esObjeto(v) && typeof v.texto === 'string' && v.texto.trim() && typeof v.dia === 'string' && RE_ISO.test(v.dia)) respuestas[k] = { texto: v.texto, dia: v.dia }
+    }
+  }
   return {
     tildadas,
     vinculos: textos(g.vinculos, (x) => x.startsWith('auditoria.')),
     confirmadas: textos(g.confirmadas, (x) => RE_ISO.test(x)),
     nuevas: Array.isArray(g.nuevas) ? g.nuevas.map(entradaGuardada).filter((e): e is Entrada => e !== null) : [],
     horizonte,
+    respuestas,
   }
 }
 
@@ -135,6 +144,15 @@ export const accionesModulos = {
   },
   horizonte(modulo: ConPlan, h: Horizonte) {
     cambiar((e) => ({ ...e, horizonte: { ...e.horizonte, [modulo]: h } }))
+  },
+  /** La respuesta del responsable a una decisión abierta (el día `dia`); vacía, la borra. */
+  responder(key: string, texto: string, dia: string) {
+    cambiar((e) => {
+      const respuestas = { ...e.respuestas }
+      if (texto.trim()) respuestas[key] = { texto: texto.trim(), dia }
+      else delete respuestas[key]
+      return { ...e, respuestas }
+    })
   },
   /** Una entrada cargada desde la hoja, con la tarea que documenta si vino de una. Nace pendiente. */
   agregar(entrada: Entrada, tarea?: { modulo: ConPlan; id: string }) {

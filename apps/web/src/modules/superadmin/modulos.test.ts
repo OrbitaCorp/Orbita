@@ -236,7 +236,9 @@ describe('Modulos — lo guardado en el navegador', () => {
       confirmadas: { 'auditoria.turnos.x': '2026-10-27', 'auditoria.turnos.y': 'ayer' },
       nuevas: [{ key: 'auditoria.turnos.2026-10-27-a', modulo: 'turnos', tipo: 'tarea', titulo: 'A', foco: 'Foco de A', quien: 'Mateo', fecha: '2026-10-27', informe: 'x' }, { key: 'otra', modulo: 'tienda' }],
       horizonte: { turnos: '1m', tienda: '1m', gimnasio: '3m' },
+      respuestas: { 'auditoria.turnos.x': { texto: 'Va, con una condición', dia: '2026-11-05' }, 'auditoria.turnos.y': { texto: '   ', dia: '2026-11-05' }, 'otra': { texto: 'no', dia: 'ayer' } },
     })
+    expect(s.respuestas).toEqual({ 'auditoria.turnos.x': { texto: 'Va, con una condición', dia: '2026-11-05' } })
     expect(s.tildadas).toEqual({ 'turnos.t1': true })
     expect(s.vinculos).toEqual({ 'turnos.t3': 'auditoria.turnos.x' })
     expect(s.confirmadas).toEqual({ 'auditoria.turnos.x': '2026-10-27' })
@@ -254,6 +256,11 @@ describe('Modulos — lo guardado en el navegador', () => {
     expect(estadoGuardado().confirmadas).toEqual({})
     accionesModulos.horizonte('alquileres', '1m')
     expect(estadoGuardado().horizonte).toEqual({ alquileres: '1m' })
+    // La respuesta a una decisión: se guarda recortada y vacía se borra.
+    accionesModulos.responder('auditoria.turnos.2026-10-26-turnos-depende-de-tienda', '  Se mueve cargarFuentes al design system.  ', '2026-11-06')
+    expect(estadoGuardado().respuestas).toEqual({ 'auditoria.turnos.2026-10-26-turnos-depende-de-tienda': { texto: 'Se mueve cargarFuentes al design system.', dia: '2026-11-06' } })
+    accionesModulos.responder('auditoria.turnos.2026-10-26-turnos-depende-de-tienda', '', '2026-11-06')
+    expect(estadoGuardado().respuestas).toEqual({})
     const nueva: Entrada = { ...ENTRADAS[0], key: 'auditoria.turnos.2026-11-05-rubros', modulo: 'turnos', origen: 'codigo', confirmada: '2026-11-05' }
     accionesModulos.agregar(nueva, { modulo: 'turnos', id: 't9' })
     expect(estadoGuardado().vinculos).toEqual({ 'turnos.t9': nueva.key })
@@ -278,13 +285,17 @@ describe('Modulos — se pinta en el servidor', () => {
   it('lo compartido entre los tres módulos: abierto en la lista, plegado y con la nota al responsable dentro de un módulo', () => {
     const lista = pintar({})
     expect(lista).toContain('Lo compartido entre Turnos, Alquileres y Gimnasio')
+    expect(lista).toContain('Cómo se trabaja en el ciclo 2')
+    expect(lista).toContain('Cuidado con los rubros')
     expect(lista).toContain('aria-expanded="true"')
     expect(lista).toContain('apps/api/src/reservas/')
     const turnos = pintar({ modulo: 'turnos' })
     expect(turnos).toContain('Turnos no vive solo:')
+    expect(turnos).toContain('Mateo decide Turnos')
+    expect(turnos).toContain('Antes de tocar Turnos:')
     expect(turnos).toContain('Alquileres (Alan) y Gimnasio (Ale)')
     expect(turnos).toContain('aria-expanded="false"')
-    expect(turnos).toContain('Ver carpetas y reglas')
+    expect(turnos).toContain('Ver todo')
   })
 
   it('el plan, la auditoría y el resumen de un módulo', () => {
