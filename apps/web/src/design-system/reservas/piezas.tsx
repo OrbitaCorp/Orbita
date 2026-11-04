@@ -57,10 +57,12 @@ function NotaCampo({ id, error, ayuda }: { id: string; error?: string; ayuda?: s
 export function Campo({ label, ayuda, error, prefijo, ...resto }: {
   label: string; ayuda?: string; error?: string; prefijo?: string; value: string; onChange: (v: string) => void
   type?: string; placeholder?: string; maxLength?: number; inputMode?: 'text' | 'numeric' | 'tel' | 'email' | 'decimal'; autoComplete?: string; disabled?: boolean; readOnly?: boolean; children?: never
+  /** Para un campo de fecha: desde y hasta qué día deja elegir el navegador. */
+  min?: string; max?: string
 }) {
   const id = useId()
-  const { value, onChange, type = 'text', placeholder, maxLength, inputMode, autoComplete, disabled, readOnly } = resto
-  const input = <input id={id} className="rv-input" type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} maxLength={maxLength} inputMode={inputMode} autoComplete={autoComplete} disabled={disabled} readOnly={readOnly} aria-invalid={error ? true : undefined} aria-describedby={idNota(id, error, ayuda)} />
+  const { value, onChange, type = 'text', placeholder, maxLength, inputMode, autoComplete, disabled, readOnly, min, max } = resto
+  const input = <input id={id} className="rv-input" type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} maxLength={maxLength} inputMode={inputMode} autoComplete={autoComplete} disabled={disabled} readOnly={readOnly} min={min} max={max} aria-invalid={error ? true : undefined} aria-describedby={idNota(id, error, ayuda)} />
   return (
     <div className="rv-campo">
       <label htmlFor={id}>{label}</label>

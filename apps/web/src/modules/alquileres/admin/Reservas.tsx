@@ -1,21 +1,22 @@
 // La agenda del panel de Alquileres, una por modo:
 //   canchas:  el día, cancha por cancha, hora por hora; en celular, una lista por cancha
-//   salón:    el mes con los días que tienen evento, y los eventos del día elegido
-//   estadía:  la ocupación de cada propiedad en el mes, con llegadas y salidas
+//   salones:  el mes con los días que tienen evento y los eventos del día elegido, salón por salón
+//   estadía:  la ocupación de cada propiedad en el mes, con llegadas y salidas (por noche o por mes)
 // Desde cualquiera se abre el detalle (registrar seña, saldo o depósito,
 // cancelar, marcar realizada) y se agenda a mano. Los bloqueos (del dueño o
 // de un calendario externo) cierran la cancha, el salón o la propiedad ese
 // día; los modales para bloquear están en Bloquear.tsx (los usa también la
 // sección Días bloqueados). La reserva abierta en el detalle viaja en
-// ?reserva=: así la campanita, el buscador e Ingresos la abren desde
-// cualquier parte del panel.
+// ?reserva=: así la campanita, el buscador, Ingresos y Qué hay libre la abren
+// desde cualquier parte del panel. El modal de agendar a mano (NuevaReserva)
+// también lo abre Qué hay libre, con lo elegido ya puesto.
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { ArrowRight, Ban, Check, ChevronLeft, ChevronRight, Lock, Plus, Wallet } from 'lucide-react'
 import { MESES, diasDelMes, duracionTxt, fechaCorta, fechaLarga, fechaRelativa, hhmm, mesTxt, moverMes, partes, rangoTxt, sumarDias, diaSemana, diasEntre, type ISO } from '@/lib/reservas/fechas'
 import { consecutivasDesde, franjasDelDia } from '@/lib/reservas/disponibilidad'
 import { pesos, precioBloque, precioTurnosSeguidos } from '@/lib/reservas/precio'
-import { motivoNoReservable, nochesEntre, nochesOcupadas, precioEstadia, salidaMaxima } from '@/lib/reservas/estadia'
-import { AHORA, ESTADO_RESERVA, HOY, TIPOS, aperturaDe, bloqueoEn, bloquesDe, bloquesLibresEn, clientePorId, cuenta, fechaDeReserva, nochesTxt, ocupadoDelDia, rangosOcupados, reservasDelDia, senaPara, tituloEvento, unidadPorId, type Bloqueo, type Cliente, type NegocioAlquiler, type Reserva } from '../datos'
+import { motivoNoReservable, motivoNoReservableMes, nochesOcupadas, precioEstadia, precioMensual, salidaMaxima } from '@/lib/reservas/estadia'
+import { AHORA, ESTADO_RESERVA, HOY, aperturaDe, bloqueoEn, bloquesDe, bloquesLibresEn, capital, clientePorId, cuenta, duracionEstadiaTxt, esMensual, fechaDeReserva, mesesTxt, ocupadoDelDia, palabrasDe, rangosOcupados, reservasDelDia, salonDe, senaPara, tituloEvento, unidadPorId, type Bloqueo, type Cliente, type NegocioAlquiler, type Reserva } from '../datos'
 import { CalendarioDia, CalendarioRango, type Rango } from '@/design-system/reservas/Calendario'
 import { Area, Campo, Chip, Encabezado, Modal, Nota, Selector, Sigla, Vacio } from '@/design-system/reservas/piezas'
 import { BloquearDia, BloquearFechas } from './Bloquear'
@@ -36,7 +37,8 @@ interface P {
 /** Id para lo que se agenda a mano. Se llama solo desde handlers: Date.now no va en el render. */
 const idNuevo = (prefijo: string) => `${prefijo}${Date.now().toString(36)}`
 
-const CSS = `
+/** La tira de siete días con sus flechas: la usan la agenda de canchas y Qué hay libre. */
+export const CSS_TIRA = `
   .alg-tira { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
   /* Las flechas y "Hoy" no se encogen: lo que no entra lo absorbe la tira de días, que scrollea (si no, a 390 las flechas quedaban en 32 px). */
   .alg-tira > .rv-btn { flex-shrink: 0; }
@@ -49,6 +51,9 @@ const CSS = `
   .alg-dia[aria-pressed='true'] { background: var(--color-primary-bg); border-color: var(--color-primary); color: var(--chip-primary-fg); }
   .alg-dia[aria-pressed='true'] b { color: inherit; }
   .alg-dia:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+`
+
+const CSS = CSS_TIRA + `
   .alg-grilla { display: grid; grid-template-columns: 56px repeat(var(--n), minmax(120px, 1fr)); border: 1px solid var(--color-border); border-radius: var(--rv-r); overflow: auto; background: var(--color-bg); }
   .alg-cab { position: sticky; top: 0; z-index: 1; padding: 10px 8px; font-size: 13px; font-weight: 600; color: var(--color-text); background: var(--color-surface); border-bottom: 1px solid var(--color-border); border-left: 1px solid var(--color-border); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .alg-cab small { display: block; font-size: 11.5px; font-weight: 500; color: var(--color-muted); overflow: hidden; text-overflow: ellipsis; }
@@ -94,6 +99,8 @@ const CSS = `
   /* La hora elegida (data-elegido: la franja es un radio nativo) y, con dos o tres turnos seguidos, las que quedan adentro. */
   .alg-nueva .rv-franja[data-elegido='true'] { background: var(--color-primary); color: var(--color-on-primary); border-color: transparent; }
   .alg-nueva .rv-franja[data-en-rango='true'] { background: var(--color-primary-bg); border-color: var(--color-primary); color: var(--chip-primary-fg); }
+  /* El selector de salón o de propiedad arriba del calendario: scrollea adentro si no entra. */
+  .alg-unidades { margin-bottom: 16px; max-width: 100%; overflow-x: auto; }
   @media (max-width: 900px) { .alg-dos { grid-template-columns: minmax(0, 1fr); } }
   @media (max-width: 768px) {
     .alg-grilla { display: none; }
@@ -119,10 +126,10 @@ export default function Reservas(p: P) {
           <button type="button" className="rv-btn rv-btn--primario" onClick={() => setNueva({})}><Plus size={16} aria-hidden /> {tipo === 'bloque' ? 'Nuevo evento' : 'Nueva reserva'}</button>
         </>} />
       {tipo === 'cancha' && <AgendaCanchas {...p} onAbrir={p.onAbrirReserva} onNueva={setNueva} />}
-      {tipo === 'bloque' && <AgendaSalon {...p} onAbrir={p.onAbrirReserva} onNueva={setNueva} />}
+      {tipo === 'bloque' && <AgendaSalones {...p} onAbrir={p.onAbrirReserva} onNueva={setNueva} />}
       {tipo === 'estadia' && <Ocupacion {...p} onAbrir={p.onAbrirReserva} onNueva={setNueva} />}
       {reserva && <Detalle negocio={p.negocio} reserva={reserva} cliente={clientePorId(reserva.clienteId, p.clientes)} onCerrar={() => p.onAbrirReserva(null)} onCambiar={p.onCambiar} />}
-      {nueva && <Nueva negocio={p.negocio} reservas={p.reservas} clientes={p.clientes} pre={nueva} onCerrar={() => setNueva(null)} onReservar={(r, c) => { p.onReservar(r, c); setNueva(null) }} />}
+      {nueva && <NuevaReserva negocio={p.negocio} reservas={p.reservas} clientes={p.clientes} pre={nueva} onCerrar={() => setNueva(null)} onReservar={(r, c) => { p.onReservar(r, c); setNueva(null) }} />}
       {bloquear && (tipo === 'estadia'
         ? <BloquearFechas negocio={p.negocio} reservas={p.reservas} onCerrar={() => setBloquear(false)} onBloqueo={b => { p.onBloqueo(b); setBloquear(false) }} />
         : <BloquearDia negocio={p.negocio} reservas={p.reservas} onCerrar={() => setBloquear(false)} onBloqueos={bs => { bs.forEach(b => p.onBloqueo(b)); setBloquear(false) }} />)}
@@ -134,7 +141,7 @@ type Sub = P & { onAbrir: (id: string) => void; onNueva: (pre: Partial<Reserva>)
 
 // ─── Canchas: el día, hora por hora ──────────────────────────────────────────
 
-function TiraDias({ dia, onDia }: { dia: ISO; onDia: (f: ISO) => void }) {
+export function TiraDias({ dia, onDia }: { dia: ISO; onDia: (f: ISO) => void }) {
   const desde = sumarDias(dia, -3)
   const tira = useRef<HTMLDivElement>(null)
   // En celular no entran los siete días: la tira se corre sola para que el elegido quede a la vista.
@@ -162,6 +169,7 @@ function TiraDias({ dia, onDia }: { dia: ISO; onDia: (f: ISO) => void }) {
 
 function AgendaCanchas({ negocio, reservas, clientes, onAbrir, onNueva, onQuitarBloqueo }: Sub) {
   const [dia, setDia] = useState<ISO>(HOY)
+  const palabras = palabrasDe(negocio)
   const apertura = aperturaDe(negocio, dia)
   const horas = apertura.length ? Array.from({ length: Math.ceil((apertura[0][1] - apertura[0][0]) / negocio.pasoMin) }, (_, i) => apertura[0][0] + i * negocio.pasoMin) : []
   const delDia = reservasDelDia(reservas, dia)
@@ -185,13 +193,13 @@ function AgendaCanchas({ negocio, reservas, clientes, onAbrir, onNueva, onQuitar
         <div className="rv-pila" style={{ gap: 8, marginBottom: 12 }}>
           {bloqueadas.map(g => (
             <Nota key={g.ids.join()} tono="aviso">
-              <span style={{ flex: 1, minWidth: 0 }}><b>{g.nombres.length === negocio.unidades.length ? 'Todas las canchas' : g.nombres.join(', ')}</b>: no se puede reservar este día ({g.motivo}).{g.dueno ? '' : ' Vino de un calendario externo: se quita en Configuración.'}</span>
+              <span style={{ flex: 1, minWidth: 0 }}><b>{g.nombres.length === negocio.unidades.length ? `Todas las ${palabras.unidades}` : g.nombres.join(', ')}</b>: no se puede reservar este día ({g.motivo}).{g.dueno ? '' : ' Vino de un calendario externo: se quita en Configuración.'}</span>
               {g.dueno && <button type="button" className="rv-btn rv-btn--sm" onClick={() => g.ids.forEach(id => onQuitarBloqueo(id))}>Quitar</button>}
             </Nota>
           ))}
         </div>
       )}
-      {!apertura.length ? <Vacio titulo="Cerrado" texto={`${fechaLarga(dia)}: el complejo no abre.`} /> : (
+      {!apertura.length ? <Vacio titulo="Cerrado" texto={`${fechaLarga(dia)}: no se abre.`} /> : (
         <>
           <div className="alg-grilla" style={{ ['--n' as string]: negocio.unidades.length } as CSSProperties} role="grid" aria-label={`Agenda del ${fechaLarga(dia)}`}>
             <div className="alg-cab" style={{ borderLeft: 'none' }} />
@@ -248,82 +256,100 @@ function AgendaCanchas({ negocio, reservas, clientes, onAbrir, onNueva, onQuitar
   )
 }
 
-// ─── Salón: el mes y los eventos del día ─────────────────────────────────────
+// ─── Salones: el mes y los eventos del día, salón por salón ──────────────────
 
-function AgendaSalon({ negocio, reservas, clientes, onAbrir, onNueva, onQuitarBloqueo }: Sub) {
-  const s = negocio.salon
-  const [dia, setDia] = useState<ISO>(HOY)
-  const [mes, setMes] = useState<ISO>(HOY)
-  if (!s) return null
-  const bloques = bloquesDe(negocio)
-  const delDia = reservasDelDia(reservas, dia)
-  const libres = bloquesLibresEn(negocio, reservas, bloques, dia)
-  const bloqueoDia = bloqueoEn(negocio, 'salon', dia)
-  const cuantos = (f: ISO) => reservasDelDia(reservas, f).length
+/** El selector de unidad arriba de un calendario (salón, propiedad): con una sola, no se muestra. */
+export function SelectorUnidad({ opciones, valor, onChange, label }: { opciones: { id: string; nombre: string }[]; valor: string; onChange: (id: string) => void; label: string }) {
+  if (opciones.length < 2) return null
   return (
-    <div className="alg-dos">
-      <div className="rv-card rv-card--pad">
-        <CalendarioDia className="alg-cal-salon" mes={mes} onMes={setMes} hoy={HOY} elegido={dia} onElegir={setDia}
-          estadoDe={f => {
-            const n = cuantos(f)
-            const b = bloqueoEn(negocio, 'salon', f)
-            return { deshabilitado: !negocio.apertura.dias.includes(diaSemana(f)), ocupado: n >= bloques.length || !!b, aria: b ? `bloqueado, ${b.motivo}` : n ? `${n} ${n === 1 ? 'evento' : 'eventos'}` : undefined }
-          }} />
-        <div className="alg-leyenda"><span><i style={{ background: 'var(--color-surface-alt)' }} />Completo o bloqueado</span><span><i style={{ background: 'var(--color-primary)' }} />Elegido</span></div>
-      </div>
-      <div>
-        <div className="rv-entre" style={{ marginBottom: 10 }}>
-          <h2 className="rv-h2">{dia === HOY ? 'Hoy' : fechaLarga(dia)}</h2>
-          <span className="rv-ayuda">{delDia.length} de {bloques.length} bloques tomados</span>
-        </div>
-        {bloqueoDia && (
-          <div style={{ marginBottom: 10 }}>
-            <Nota tono="aviso">
-              <span style={{ flex: 1, minWidth: 0 }}>Día bloqueado: {bloqueoDia.motivo}. Nadie puede reservar el salón ese día.{bloqueoDia.origen === 'ical' ? ' Vino de un calendario externo: se quita en Configuración.' : ''}</span>
-              {bloqueoDia.origen === 'dueno' && <button type="button" className="rv-btn rv-btn--sm" onClick={() => onQuitarBloqueo(bloqueoDia.id)}>Quitar</button>}
-            </Nota>
-          </div>
-        )}
-        <div className="rv-pila">
-          {bloques.map(b => {
-            const r = delDia.find(x => x.bloqueId === b.id)
-            const libre = libres.some(x => x.id === b.id)
-            if (r) {
-              const c = clientePorId(r.clienteId, clientes)
-              return (
-                <button key={b.id} type="button" className="rv-card rv-card--pad rv-card--accion" onClick={() => onAbrir(r.id)}>
-                  <div className="rv-entre">
-                    <div style={{ minWidth: 0 }}>
-                      <span className="rv-rotulo">{b.nombre} · {hhmm(b.inicio)}–{hhmm(b.fin)}</span>
-                      <div className="rv-h2" style={{ marginTop: 4 }}>{tituloEvento(r.evento)}</div>
-                      <div className="rv-ayuda">{c?.nombre ?? '—'} · {r.evento?.invitados ?? 0} invitados · {s.paquetes.find(x => x.id === r.paqueteId)?.nombre ?? ''}{r.extras.length ? ` · ${cuenta(r.extras.length, 'extra', 'extras')}` : ''}</div>
-                    </div>
-                    <Chip tono={ESTADO_RESERVA[r.estado].tono}>{ESTADO_RESERVA[r.estado].label}</Chip>
-                  </div>
-                </button>
-              )
-            }
-            return (
-              <div key={b.id} className="rv-card rv-card--pad rv-entre" style={{ borderStyle: 'dashed' }}>
-                <div style={{ minWidth: 0 }}><span className="rv-rotulo">{b.nombre} · {hhmm(b.inicio)}–{hhmm(b.fin)}</span><div className="rv-ayuda" style={{ marginTop: 4 }}>{libre ? 'Libre' : bloqueoDia ? 'Bloqueado' : 'No se puede reservar: queda pegado a otro evento sin tiempo de limpieza.'}</div></div>
-                {libre && dia >= HOY && <button type="button" className="rv-btn rv-btn--sm" onClick={() => onNueva({ fecha: dia, bloqueId: b.id })}><Plus size={15} aria-hidden /> Agendar</button>}
-              </div>
-            )
-          })}
-        </div>
-      </div>
+    <div className="rv-seg alg-unidades" role="group" aria-label={label}>
+      {opciones.map(o => <button key={o.id} type="button" aria-pressed={o.id === valor} onClick={() => onChange(o.id)}>{o.nombre}</button>)}
     </div>
   )
 }
 
-// ─── Estadía: ocupación por propiedad ────────────────────────────────────────
+function AgendaSalones({ negocio, reservas, clientes, onAbrir, onNueva, onQuitarBloqueo }: Sub) {
+  const palabras = palabrasDe(negocio)
+  const [salonId, setSalonId] = useState(negocio.salones[0]?.id ?? '')
+  const [dia, setDia] = useState<ISO>(HOY)
+  const [mes, setMes] = useState<ISO>(HOY)
+  const s = salonDe(negocio, salonId) ?? negocio.salones[0]
+  if (!s) return <Vacio titulo={`Sin ${palabras.unidades}`} texto={`Cargá ${palabras.unidad === 'salón' ? 'el primero' : 'el primero'} en ${capital(palabras.unidades)}.`} />
+  const bloques = bloquesDe(negocio, s)
+  const delDia = reservasDelDia(reservas, dia).filter(r => r.unidadId === s.id)
+  const libres = bloquesLibresEn(negocio, reservas, s, dia)
+  const bloqueoDia = bloqueoEn(negocio, s.id, dia)
+  const cuantos = (f: ISO) => reservasDelDia(reservas, f).filter(r => r.unidadId === s.id).length
+  const varios = negocio.salones.length > 1
+  return (
+    <>
+      <SelectorUnidad opciones={negocio.salones} valor={s.id} onChange={setSalonId} label={capital(palabras.unidad)} />
+      <div className="alg-dos">
+        <div className="rv-card rv-card--pad">
+          <CalendarioDia className="alg-cal-salon" mes={mes} onMes={setMes} hoy={HOY} elegido={dia} onElegir={setDia}
+            estadoDe={f => {
+              const n = cuantos(f)
+              const b = bloqueoEn(negocio, s.id, f)
+              return { deshabilitado: !negocio.apertura.dias.includes(diaSemana(f)), ocupado: n >= bloques.length || !!b, aria: b ? `bloqueado, ${b.motivo}` : n ? `${n} ${n === 1 ? 'evento' : 'eventos'}` : undefined }
+            }} />
+          <div className="alg-leyenda"><span><i style={{ background: 'var(--color-surface-alt)' }} />Completo o bloqueado</span><span><i style={{ background: 'var(--color-primary)' }} />Elegido</span></div>
+        </div>
+        <div>
+          <div className="rv-entre" style={{ marginBottom: 10 }}>
+            <h2 className="rv-h2">{dia === HOY ? 'Hoy' : fechaLarga(dia)}{varios ? ` · ${s.nombre}` : ''}</h2>
+            <span className="rv-ayuda">{delDia.length} de {bloques.length} bloques tomados</span>
+          </div>
+          {bloqueoDia && (
+            <div style={{ marginBottom: 10 }}>
+              <Nota tono="aviso">
+                <span style={{ flex: 1, minWidth: 0 }}>Día bloqueado: {bloqueoDia.motivo}. Nadie puede reservar {varios ? s.nombre : `el ${palabras.unidad}`} ese día.{bloqueoDia.origen === 'ical' ? ' Vino de un calendario externo: se quita en Configuración.' : ''}</span>
+                {bloqueoDia.origen === 'dueno' && <button type="button" className="rv-btn rv-btn--sm" onClick={() => onQuitarBloqueo(bloqueoDia.id)}>Quitar</button>}
+              </Nota>
+            </div>
+          )}
+          <div className="rv-pila">
+            {bloques.map(b => {
+              const r = delDia.find(x => x.bloqueId === b.id)
+              const libre = libres.some(x => x.id === b.id)
+              if (r) {
+                const c = clientePorId(r.clienteId, clientes)
+                return (
+                  <button key={b.id} type="button" className="rv-card rv-card--pad rv-card--accion" onClick={() => onAbrir(r.id)}>
+                    <div className="rv-entre">
+                      <div style={{ minWidth: 0 }}>
+                        <span className="rv-rotulo">{b.nombre} · {hhmm(b.inicio)}–{hhmm(b.fin)}</span>
+                        <div className="rv-h2" style={{ marginTop: 4 }}>{tituloEvento(r.evento)}</div>
+                        <div className="rv-ayuda">{c?.nombre ?? '—'} · {r.evento?.invitados ?? 0} invitados · {s.paquetes.find(x => x.id === r.paqueteId)?.nombre ?? ''}{r.extras.length ? ` · ${cuenta(r.extras.length, 'extra', 'extras')}` : ''}</div>
+                      </div>
+                      <Chip tono={ESTADO_RESERVA[r.estado].tono}>{ESTADO_RESERVA[r.estado].label}</Chip>
+                    </div>
+                  </button>
+                )
+              }
+              return (
+                <div key={b.id} className="rv-card rv-card--pad rv-entre" style={{ borderStyle: 'dashed' }}>
+                  <div style={{ minWidth: 0 }}><span className="rv-rotulo">{b.nombre} · {hhmm(b.inicio)}–{hhmm(b.fin)}</span><div className="rv-ayuda" style={{ marginTop: 4 }}>{libre ? 'Libre' : bloqueoDia ? 'Bloqueado' : 'No se puede reservar: queda pegado a otro evento sin tiempo de limpieza.'}</div></div>
+                  {libre && dia >= HOY && <button type="button" className="rv-btn rv-btn--sm" onClick={() => onNueva({ unidadId: s.id, fecha: dia, bloqueId: b.id })}><Plus size={15} aria-hidden /> Agendar</button>}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ─── Estadía: ocupación por propiedad (por noche o por mes) ──────────────────
 
 function Ocupacion({ negocio, reservas, clientes, onAbrir, onNueva, onQuitarBloqueo }: Sub) {
+  const palabras = palabrasDe(negocio)
   const [propId, setPropId] = useState(negocio.propiedades[0]?.id ?? '')
   const [mes, setMes] = useState<ISO>(HOY)
   const [bloqueoAbierto, setBloqueoAbierto] = useState<string | null>(null)
   const prop = negocio.propiedades.find(p => p.id === propId) ?? negocio.propiedades[0]
-  if (!prop) return <Vacio titulo="Sin propiedades" texto="Cargá la primera en Configuración." />
+  if (!prop) return <Vacio titulo={`Sin ${palabras.unidades}`} texto="Cargá la primera en Configuración." />
+  const mensual = esMensual(prop)
   const suyas = reservas.filter(r => r.unidadId === prop.id && r.estado !== 'cancelada' && r.entrada && r.salida)
   const bloqueos = negocio.bloqueos.filter(b => b.unidadId === prop.id)
   const { anio, mes: m } = partes(mes)
@@ -339,7 +365,7 @@ function Ocupacion({ negocio, reservas, clientes, onAbrir, onNueva, onQuitarBloq
     if (b) return { estado: 'bloqueo', id: b.id, titulo: `${b.motivo} · ${rangoTxt(b.desde, b.hasta)}` }
     return null
   }
-  // Ocupación del mes que se mira: noches reservadas sobre las noches del mes (los bloqueos aparte).
+  // Ocupación del mes que se mira: noches (o días del contrato) reservadas sobre las del mes (los bloqueos aparte).
   const nochesMes = Array.from({ length: diasDelMes(anio, m) }, (_, i) => sumarDias(primero, i))
   const reservadas = nochesMes.filter(f => reservaDe(f)).length
   const bloqueadas = nochesMes.filter(f => !reservaDe(f) && bloqueoDe(f)).length
@@ -348,11 +374,10 @@ function Ocupacion({ negocio, reservas, clientes, onAbrir, onNueva, onQuitarBloq
   const proximas = suyas.filter(r => r.salida! > HOY).sort((a, b) => a.entrada!.localeCompare(b.entrada!)).slice(0, 8)
   const enSemana = (f: ISO) => { const n = diasEntre(HOY, f); return n >= 0 && n < 7 }
   const semana = suyas.filter(r => enSemana(r.entrada!) || enSemana(r.salida!))
+  const quien = (r: Reserva) => clientePorId(r.clienteId, clientes)?.nombre
   return (
     <>
-      <div className="rv-seg" role="group" aria-label="Propiedad" style={{ marginBottom: 16, maxWidth: '100%', overflowX: 'auto' }}>
-        {negocio.propiedades.map(p => <button key={p.id} type="button" aria-pressed={p.id === prop.id} onClick={() => setPropId(p.id)}>{p.nombre}</button>)}
-      </div>
+      <SelectorUnidad opciones={negocio.propiedades} valor={prop.id} onChange={setPropId} label={capital(palabras.unidad)} />
       <div className="alg-dos">
         <div className="rv-card rv-card--pad">
           <div className="rv-cal-cab">
@@ -373,28 +398,29 @@ function Ocupacion({ negocio, reservas, clientes, onAbrir, onNueva, onQuitarBloq
             })}
           </div>
           <div className="alg-leyenda">
-            <span><i style={{ background: 'var(--color-primary-bg)' }} />Reservada</span>
+            <span><i style={{ background: 'var(--color-primary-bg)' }} />{mensual ? 'Alquilada' : 'Reservada'}</span>
             <span><i style={{ background: 'var(--color-warning-bg)' }} />Seña pendiente</span>
             <span><i style={{ background: 'repeating-linear-gradient(135deg, var(--color-surface-alt) 0 3px, transparent 3px 6px)' }} />Bloqueada</span>
           </div>
           <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--color-border)' }}>
             <div className="rv-entre"><span className="rv-rotulo">Ocupación de {MESES[m - 1]}</span><b style={{ fontSize: 15, color: 'var(--color-text)' }}>{pct}%</b></div>
             <div className="alg-medidor" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={`Ocupación de ${prop.nombre} en ${mesTxt(primero)}`}><i style={{ width: `${pct}%` }} /></div>
-            <p className="rv-ayuda" style={{ margin: 0 }}>{reservadas} de {nochesMes.length} noches reservadas{bloqueadas ? ` · ${cuenta(bloqueadas, 'bloqueada', 'bloqueadas')}` : ''}.</p>
+            <p className="rv-ayuda" style={{ margin: 0 }}>{reservadas} de {nochesMes.length} {mensual ? 'días alquilados' : 'noches reservadas'}{bloqueadas ? ` · ${cuenta(bloqueadas, 'bloqueada', 'bloqueadas')}` : ''}.</p>
           </div>
+          {mensual && prop.mensual && <p className="rv-ayuda" style={{ margin: '10px 0 0' }}>Se alquila por mes: {pesos(prop.mensual.precioMes)} el mes, de {prop.mensual.minMeses} a {prop.mensual.maxMeses} meses.</p>}
           <button type="button" className="rv-btn rv-btn--sm" style={{ marginTop: 12 }} onClick={() => onNueva({ unidadId: prop.id })}><Plus size={15} aria-hidden /> Agendar a mano</button>
         </div>
         <div className="rv-pila">
           <section className="rv-card rv-card--pad">
             <h2 className="rv-h2" style={{ marginBottom: 8 }}>Esta semana en {prop.nombre}</h2>
-            {semana.length === 0 ? <p className="rv-ayuda" style={{ margin: 0 }}>Sin llegadas ni salidas en los próximos 7 días.</p> : (
+            {semana.length === 0 ? <p className="rv-ayuda" style={{ margin: 0 }}>Sin {mensual ? 'entradas ni salidas' : 'llegadas ni salidas'} en los próximos 7 días.</p> : (
               <div className="rv-lista">
                 {semana.map(r => {
                   const llega = enSemana(r.entrada!)
                   return (
                     <button key={r.id} type="button" className="rv-item" onClick={() => onAbrir(r.id)}>
-                      <Chip tono={llega ? 'ok' : 'gris'}>{llega ? `Llega ${fechaRelativa(r.entrada!, HOY).toLowerCase()}` : `Sale ${fechaRelativa(r.salida!, HOY).toLowerCase()}`}</Chip>
-                      <span className="rv-item-cuerpo"><span className="rv-item-titulo">{clientePorId(r.clienteId, clientes)?.nombre}</span><span className="rv-item-sub">{rangoTxt(r.entrada!, r.salida!)} · {cuenta(r.huespedes ?? 1, 'huésped', 'huéspedes')} · {hhmm(llega ? prop.checkIn : prop.checkOut)}</span></span>
+                      <Chip tono={llega ? 'ok' : 'gris'}>{llega ? `${mensual ? 'Entra' : 'Llega'} ${fechaRelativa(r.entrada!, HOY).toLowerCase()}` : `Sale ${fechaRelativa(r.salida!, HOY).toLowerCase()}`}</Chip>
+                      <span className="rv-item-cuerpo"><span className="rv-item-titulo">{quien(r)}</span><span className="rv-item-sub">{rangoTxt(r.entrada!, r.salida!)} · {mensual ? duracionEstadiaTxt(r) : cuenta(r.huespedes ?? 1, 'huésped', 'huéspedes')} · {hhmm(llega ? prop.checkIn : prop.checkOut)}</span></span>
                       <ArrowRight size={16} aria-hidden style={{ color: 'var(--color-subtle)', flexShrink: 0 }} />
                     </button>
                   )
@@ -403,15 +429,15 @@ function Ocupacion({ negocio, reservas, clientes, onAbrir, onNueva, onQuitarBloq
             )}
           </section>
           <section className="rv-card rv-card--pad">
-            <h2 className="rv-h2" style={{ marginBottom: 8 }}>Próximas reservas</h2>
+            <h2 className="rv-h2" style={{ marginBottom: 8 }}>{mensual ? 'Contratos' : 'Próximas reservas'}</h2>
             <div className="rv-lista">
               {proximas.map(r => (
                 <button key={r.id} type="button" className="rv-item" onClick={() => onAbrir(r.id)}>
-                  <span className="rv-item-cuerpo"><span className="rv-item-titulo">{clientePorId(r.clienteId, clientes)?.nombre}</span><span className="rv-item-sub">{rangoTxt(r.entrada!, r.salida!)} · {nochesTxt(nochesEntre(r.entrada!, r.salida!))} · {pesos(r.total)}</span></span>
+                  <span className="rv-item-cuerpo"><span className="rv-item-titulo">{quien(r)}</span><span className="rv-item-sub">{rangoTxt(r.entrada!, r.salida!)} · {duracionEstadiaTxt(r)} · {pesos(r.total)}</span></span>
                   <Chip tono={ESTADO_RESERVA[r.estado].tono}>{ESTADO_RESERVA[r.estado].label}</Chip>
                 </button>
               ))}
-              {proximas.length === 0 && <p className="rv-ayuda" style={{ margin: '6px 0' }}>Nada reservado todavía.</p>}
+              {proximas.length === 0 && <p className="rv-ayuda" style={{ margin: '6px 0' }}>{mensual ? 'Sin contratos en curso ni por venir.' : 'Nada reservado todavía.'}</p>}
             </div>
           </section>
         </div>
@@ -421,7 +447,7 @@ function Ocupacion({ negocio, reservas, clientes, onAbrir, onNueva, onQuitarBloq
           pie={<><button type="button" className="rv-btn" onClick={() => setBloqueoAbierto(null)}>Cerrar</button>{bloqueo.origen === 'dueno' && <button type="button" className="rv-btn rv-btn--peligro" onClick={() => { onQuitarBloqueo(bloqueo.id); setBloqueoAbierto(null) }}>Quitar el bloqueo</button>}</>}>
           <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>{rangoTxt(bloqueo.desde, bloqueo.hasta)}</p>
           <p style={{ margin: '6px 0 0', fontSize: 14 }}>{bloqueo.motivo}</p>
-          <p className="rv-ayuda" style={{ marginTop: 8 }}>{bloqueo.origen === 'ical' ? 'Vino de un calendario externo: se quita desconectando el calendario en Configuración.' : 'Lo pusiste vos. Mientras esté, nadie puede reservar esas noches.'}</p>
+          <p className="rv-ayuda" style={{ marginTop: 8 }}>{bloqueo.origen === 'ical' ? 'Vino de un calendario externo: se quita desconectando el calendario en Configuración.' : 'Lo pusiste vos. Mientras esté, nadie puede reservar esas fechas.'}</p>
         </Modal>
       )}
     </>
@@ -436,26 +462,31 @@ const Fila = ({ k, v }: { k: string; v: ReactNode }) => <div className="rv-entre
 /**
  * El detalle de una reserva, con lo que se registra a mano (seña, saldo,
  * depósito). En un salón es la ficha del evento: quién cumple, edad,
- * invitados, paquete, extras, notas y lo que falta cobrar. Lo usa también la
- * lista de Eventos.
+ * invitados, paquete, extras, notas y lo que falta cobrar. En un alquiler por
+ * mes, el contrato: desde cuándo, cuántos meses y el depósito. Lo usan también
+ * las listas de Eventos y de Qué hay libre.
  */
 export function Detalle({ negocio, reserva: r, cliente, onCerrar, onCambiar }: { negocio: NegocioAlquiler; reserva: Reserva; cliente?: Cliente; onCerrar: () => void; onCambiar: P['onCambiar'] }) {
   const u = unidadPorId(negocio, r.unidadId)
-  const cuando = r.entrada && r.salida ? `${rangoTxt(r.entrada, r.salida)} · ${nochesTxt(nochesEntre(r.entrada, r.salida))}` : r.fecha ? `${fechaLarga(r.fecha)} · ${hhmm(r.inicio ?? 0)} a ${hhmm(r.fin ?? 0)}` : ''
+  const mensual = !!r.meses
+  const cuando = r.entrada && r.salida ? `${rangoTxt(r.entrada, r.salida)} · ${duracionEstadiaTxt(r)}` : r.fecha ? `${fechaLarga(r.fecha)} · ${hhmm(r.inicio ?? 0)} a ${hhmm(r.fin ?? 0)}` : ''
   const saldo = r.total - r.sena
   const activa = r.estado === 'pendiente' || r.estado === 'confirmada'
-  const paquete = negocio.salon?.paquetes.find(p => p.id === r.paqueteId)
-  const extras = (negocio.tipo === 'cancha' ? negocio.extras : negocio.salon?.extras ?? []).filter(e => r.extras.includes(e.id))
+  const salon = negocio.tipo === 'bloque' ? salonDe(negocio, r.unidadId) : undefined
+  const paquete = salon?.paquetes.find(p => p.id === r.paqueteId)
+  const extras = negocio.extras.filter(e => r.extras.includes(e.id))
   const ev = r.evento
   const notas = ev?.notas ?? r.nota
+  // En el salón el título es el evento y el salón va en la bajada, para saber en cuál es.
+  const bajada = ev && negocio.salones.length > 1 && u ? `${u.nombre} · ${cuando}` : cuando
   return (
-    <Modal titulo={ev ? tituloEvento(ev) : u?.nombre ?? negocio.nombre} bajada={cuando} onCerrar={onCerrar} ancho={560}
+    <Modal titulo={ev ? tituloEvento(ev) : u?.nombre ?? negocio.nombre} bajada={bajada} onCerrar={onCerrar} ancho={560}
       pie={<>
-        {activa && <button type="button" className="rv-btn rv-btn--peligro rv-modal-izq" onClick={() => { onCambiar(r.id, { estado: 'cancelada' }, 'Reserva cancelada. El lugar quedó libre.'); onCerrar() }}><Ban size={15} aria-hidden /> Cancelar reserva</button>}
+        {activa && <button type="button" className="rv-btn rv-btn--peligro rv-modal-izq" onClick={() => { onCambiar(r.id, { estado: 'cancelada' }, 'Reserva cancelada. El lugar quedó libre.'); onCerrar() }}><Ban size={15} aria-hidden /> Cancelar {mensual ? 'contrato' : 'reserva'}</button>}
         {r.estado === 'pendiente' && <button type="button" className="rv-btn rv-btn--primario" onClick={() => onCambiar(r.id, { estado: 'confirmada', senaPagada: true }, `Seña de ${pesos(r.sena)} registrada. Reserva confirmada.`)}><Wallet size={15} aria-hidden /> Registrar seña {pesos(r.sena)}</button>}
         {r.estado === 'confirmada' && !r.saldoPagado && saldo > 0 && <button type="button" className="rv-btn" onClick={() => onCambiar(r.id, { saldoPagado: true }, `Saldo de ${pesos(saldo)} registrado.`)}><Wallet size={15} aria-hidden /> Registrar saldo {pesos(saldo)}</button>}
         {r.estado === 'confirmada' && r.deposito && !r.depositoRegistrado ? <button type="button" className="rv-btn" onClick={() => onCambiar(r.id, { depositoRegistrado: true }, `Depósito de ${pesos(r.deposito ?? 0)} registrado.`)}><Lock size={15} aria-hidden /> Registrar depósito</button> : null}
-        {r.estado === 'confirmada' && <button type="button" className="rv-btn rv-btn--primario" onClick={() => { onCambiar(r.id, { estado: 'completada', saldoPagado: true }, 'Marcada como realizada.'); onCerrar() }}><Check size={15} aria-hidden /> Marcar realizada</button>}
+        {r.estado === 'confirmada' && <button type="button" className="rv-btn rv-btn--primario" onClick={() => { onCambiar(r.id, { estado: 'completada', saldoPagado: true }, mensual ? 'Contrato terminado.' : 'Marcada como realizada.'); onCerrar() }}><Check size={15} aria-hidden /> {mensual ? 'Terminar contrato' : 'Marcar realizada'}</button>}
         {!activa && <button type="button" className="rv-btn" onClick={onCerrar}>Cerrar</button>}
       </>}>
       <div className="rv-fila" style={{ marginBottom: 12 }}>
@@ -469,6 +500,7 @@ export function Detalle({ negocio, reserva: r, cliente, onCerrar, onCambiar }: {
       {ev ? (
         <>
           <div className="rv-rotulo" style={{ margin: '14px 0 2px' }}>Ficha del evento</div>
+          {negocio.salones.length > 1 && <Fila k={capital(palabrasDe(negocio).unidad)} v={u?.nombre ?? '—'} />}
           <Fila k="Cumpleañero/a" v={ev.agasajado || '—'} />
           <Fila k="Edad" v={ev.edad ? `${ev.edad} años` : '—'} />
           <Fila k="Invitados" v={paquete ? `${ev.invitados} (el paquete es hasta ${paquete.hastaInvitados})` : ev.invitados} />
@@ -479,14 +511,15 @@ export function Detalle({ negocio, reserva: r, cliente, onCerrar, onCambiar }: {
         </>
       ) : (
         <>
-          {r.huespedes && <Fila k="Huéspedes" v={r.huespedes} />}
+          {mensual && r.meses && <Fila k="Contrato" v={`${mesesTxt(r.meses)} · desde el ${fechaCorta(r.entrada ?? HOY)}`} />}
+          {r.huespedes && <Fila k={mensual ? 'Personas' : 'Huéspedes'} v={r.huespedes} />}
           {extras.length > 0 && <Fila k="Extras" v={extras.map(e => `${e.nombre} (${pesos(e.precio)})`).join(', ')} />}
           {notas && <Fila k="Nota" v={notas} />}
         </>
       )}
       <Fila k="Total" v={<b className="rv-num">{pesos(r.total)}</b>} />
       {r.sena > 0 && <Fila k="Seña" v={<span className="rv-num">{pesos(r.sena)} · {r.senaPagada ? 'pagada' : 'pendiente'}</span>} />}
-      {saldo > 0 && <Fila k="Saldo" v={<span className="rv-num">{pesos(saldo)} · {r.saldoPagado ? 'pagado' : 'se paga en el lugar'}</span>} />}
+      {saldo > 0 && <Fila k="Saldo" v={<span className="rv-num">{pesos(saldo)} · {r.saldoPagado ? 'pagado' : mensual ? 'mes a mes' : 'se paga en el lugar'}</span>} />}
       {r.deposito ? <Fila k="Depósito de garantía" v={`${pesos(r.deposito)} · ${r.depositoRegistrado ? 'registrado' : 'pendiente'} (no se cobra desde Órbita)`} /> : null}
       <Fila k="Reservada el" v={fechaCorta(r.creada)} />
     </Modal>
@@ -495,58 +528,68 @@ export function Detalle({ negocio, reserva: r, cliente, onCerrar, onCambiar }: {
 
 // ─── Nueva reserva, a mano ───────────────────────────────────────────────────
 
-function Nueva({ negocio, reservas, clientes, pre, onCerrar, onReservar }: { negocio: NegocioAlquiler; reservas: Reserva[]; clientes: Cliente[]; pre: Partial<Reserva>; onCerrar: () => void; onReservar: (r: Reserva, c: Cliente) => void }) {
+/**
+ * Agendar a mano: lo que llega por teléfono o en el mostrador. `pre` trae lo
+ * ya elegido (la cancha y la hora de la celda, el salón y el bloque, la
+ * propiedad y la entrada desde Qué hay libre). Lo usan la agenda y Qué hay libre.
+ */
+export function NuevaReserva({ negocio, reservas, clientes, pre, onCerrar, onReservar }: { negocio: NegocioAlquiler; reservas: Reserva[]; clientes: Cliente[]; pre: Partial<Reserva>; onCerrar: () => void; onReservar: (r: Reserva, c: Cliente) => void }) {
   const tipo = negocio.tipo
-  const s = negocio.salon
+  const palabras = palabrasDe(negocio)
   // Nombre del grupo de radios de los horarios.
   const prefijo = useId()
   const [clienteId, setClienteId] = useState(clientes[0]?.id ?? '')
   const [nuevoNombre, setNuevoNombre] = useState('')
   const [nuevoTel, setNuevoTel] = useState('')
-  const [unidadId, setUnidadId] = useState(pre.unidadId ?? (tipo === 'cancha' ? negocio.unidades[0]?.id : tipo === 'estadia' ? negocio.propiedades[0]?.id : 'salon') ?? '')
-  const [fecha, setFecha] = useState<ISO>(pre.fecha ?? HOY)
+  const [unidadId, setUnidadId] = useState(pre.unidadId ?? (tipo === 'cancha' ? negocio.unidades[0]?.id : tipo === 'estadia' ? negocio.propiedades[0]?.id : negocio.salones[0]?.id) ?? '')
+  const [fecha, setFecha] = useState<ISO>(pre.fecha ?? pre.entrada ?? HOY)
   const [hora, setHora] = useState<number | ''>(pre.inicio ?? '')
   const [horas, setHoras] = useState(1)
   const [bloqueId, setBloqueId] = useState(pre.bloqueId ?? '')
-  const [paqueteId, setPaqueteId] = useState(s?.paquetes[0]?.id ?? '')
+  const [paqueteId, setPaqueteId] = useState(salonDe(negocio, pre.unidadId ?? negocio.salones[0]?.id)?.paquetes[0]?.id ?? '')
   const [agasajado, setAgasajado] = useState('')
   const [edad, setEdad] = useState('')
   const [invitados, setInvitados] = useState('')
   const [extrasElegidos, setExtrasElegidos] = useState<string[]>([])
   const [notas, setNotas] = useState('')
-  const [rango, setRango] = useState<Rango>({ entrada: null, salida: null })
-  const [mes, setMes] = useState<ISO>(HOY)
+  const [rango, setRango] = useState<Rango>({ entrada: pre.entrada ?? null, salida: pre.salida ?? null })
+  const [mes, setMes] = useState<ISO>(pre.entrada ?? HOY)
+  const [meses, setMeses] = useState(pre.meses ?? 0)
   const [huespedes, setHuespedes] = useState('2')
   const [error, setError] = useState('')
 
   const unidad = negocio.unidades.find(u => u.id === unidadId)
+  const s = tipo === 'bloque' ? salonDe(negocio, unidadId) : undefined
   const prop = negocio.propiedades.find(p => p.id === unidadId)
+  const mensual = !!prop && esMensual(prop) && !!prop.mensual
   const bloqueoDia = bloqueoEn(negocio, unidadId, fecha)
   const franjas = tipo === 'cancha' && unidad ? franjasDelDia(aperturaDe(negocio, fecha), ocupadoDelDia(negocio, reservas, unidad.id, fecha), { paso: negocio.pasoMin, duracion: negocio.duracionMin }) : []
   // Como en el sitio: desde la hora elegida, solo las franjas seguidas que siguen libres; si no, se pisaría otra reserva.
   const maxSeguidas = hora === '' ? negocio.maxFranjas : Math.max(1, consecutivasDesde(franjas, hora, negocio.maxFranjas))
   const seguidas = Math.min(horas, maxSeguidas)
-  const bloques = bloquesDe(negocio)
-  const libresDelDia = bloquesLibresEn(negocio, reservas, bloques, fecha)
+  const bloques = bloquesDe(negocio, s)
+  const libresDelDia = bloquesLibresEn(negocio, reservas, s, fecha)
   const paquete = s?.paquetes.find(p => p.id === paqueteId)
   const ocupadas = prop ? rangosOcupados(negocio, reservas, prop.id) : []
   const tomadas = nochesOcupadas(ocupadas)
+  const mesesElegidos = mensual && prop.mensual ? (meses || prop.mensual.minMeses) : 0
 
-  // Como en el sitio: cada turno con el ajuste de su franja. La base (la cancha, el paquete o las
-  // noches, sin extras ni limpieza) es sobre lo que puede calcularse la seña, según Pagos y señas.
+  // Como en el sitio: cada turno con el ajuste de su franja. La base (la cancha, el paquete, las
+  // noches o el primer mes, sin extras ni limpieza) es sobre lo que puede calcularse la seña, según Pagos y señas.
   const precioCancha = tipo === 'cancha' && unidad && hora !== '' ? precioTurnosSeguidos(unidad.tarifaHora, negocio.duracionMin, seguidas, diaSemana(fecha), hora, negocio.reglasPrecio).final : 0
-  const precioNoches = tipo === 'estadia' && prop && rango.entrada && rango.salida ? precioEstadia(rango.entrada, rango.salida, prop.tarifa) : null
-  const base = tipo === 'cancha' ? precioCancha : tipo === 'bloque' ? paquete?.precio ?? 0 : precioNoches?.subtotal ?? 0
+  const precioNoches = tipo === 'estadia' && prop && !mensual && rango.entrada && rango.salida ? precioEstadia(rango.entrada, rango.salida, prop.tarifa) : null
+  const precioMes = mensual && prop.mensual ? precioMensual(fecha, mesesElegidos, prop.mensual) : null
+  const base = tipo === 'cancha' ? precioCancha : tipo === 'bloque' ? paquete?.precio ?? 0 : mensual ? precioMes?.precioMes ?? 0 : precioNoches?.subtotal ?? 0
   const total = tipo === 'cancha' ? (precioCancha ? precioBloque(precioCancha, negocio.extras, extrasElegidos).total : 0)
-    : tipo === 'bloque' && s ? precioBloque(paquete?.precio ?? 0, s.extras, extrasElegidos).total
-      : precioNoches?.total ?? 0
+    : tipo === 'bloque' && s ? precioBloque(paquete?.precio ?? 0, negocio.extras, extrasElegidos).total
+      : mensual ? precioMes?.total ?? 0 : precioNoches?.total ?? 0
   const sena = senaPara(negocio, base, total)
-  const listaExtras = tipo === 'cancha' ? negocio.extras : tipo === 'bloque' ? s?.extras ?? [] : []
+  const listaExtras = tipo === 'estadia' ? [] : negocio.extras
 
   const guardar = () => {
     const cliente: Cliente | undefined = clienteId === 'nuevo' ? { id: idNuevo('ka'), nombre: nuevoNombre.trim(), telefono: nuevoTel.trim() } : clientePorId(clienteId, clientes)
-    if (!cliente) { setError('Elegí a quién es la reserva.'); return }
-    if (clienteId === 'nuevo' && cliente.nombre.length < 3) { setError('Escribí el nombre del cliente.'); return }
+    if (!cliente) { setError(`Elegí a quién es la reserva.`); return }
+    if (clienteId === 'nuevo' && cliente.nombre.length < 3) { setError(`Escribí el nombre del ${palabras.cliente}.`); return }
     const base = { id: idNuevo('n'), unidadId, clienteId: cliente.id, creada: HOY, extras: extrasElegidos, total, sena, senaPagada: false, saldoPagado: false, estado: (sena > 0 ? 'pendiente' : 'confirmada') as Reserva['estado'], nota: notas.trim() || undefined }
     if (tipo === 'cancha') {
       if (hora === '') { setError('Elegí un horario.'); return }
@@ -555,14 +598,20 @@ function Nueva({ negocio, reservas, clientes, pre, onCerrar, onReservar }: { neg
     } else if (tipo === 'bloque') {
       const b = bloques.find(x => x.id === bloqueId)
       const n = Number(invitados)
-      if (!aperturaDe(negocio, fecha).length) { setError('Ese día el salón no abre.'); return }
+      if (!s) { setError(`Elegí un ${palabras.unidad}.`); return }
+      if (!aperturaDe(negocio, fecha).length) { setError('Ese día no se abre.'); return }
       if (bloqueoDia) { setError(`Ese día está bloqueado: ${bloqueoDia.motivo}.`); return }
       if (!b) { setError('Elegí un bloque.'); return }
       if (!libresDelDia.some(x => x.id === b.id)) { setError('Ese bloque ya está tomado, o queda pegado a otro evento sin tiempo de limpieza.'); return }
       if (agasajado.trim().length < 2 || !n) { setError('Completá quién cumple y cuántos vienen.'); return }
       if (paquete && n > paquete.hastaInvitados) { setError(`Ese paquete es hasta ${paquete.hastaInvitados} invitados.`); return }
-      if (s && n > s.capacidad) { setError(`El salón tiene lugar para ${s.capacidad} personas.`); return }
-      onReservar({ ...base, nota: undefined, fecha, inicio: b.inicio, fin: b.fin, bloqueId: b.id, paqueteId, evento: { agasajado: agasajado.trim(), edad: Number(edad) || undefined, invitados: n, notas: notas.trim() || undefined }, deposito: s?.deposito || undefined, depositoRegistrado: false }, cliente)
+      if (n > s.capacidad) { setError(`${s.nombre} tiene lugar para ${s.capacidad} personas.`); return }
+      onReservar({ ...base, nota: undefined, fecha, inicio: b.inicio, fin: b.fin, bloqueId: b.id, paqueteId, evento: { agasajado: agasajado.trim(), edad: Number(edad) || undefined, invitados: n, notas: notas.trim() || undefined }, deposito: s.deposito || undefined, depositoRegistrado: false }, cliente)
+    } else if (mensual && prop.mensual && precioMes) {
+      if (fecha < HOY) { setError('La entrada no puede ser un día que ya pasó.'); return }
+      const motivo = motivoNoReservableMes(fecha, mesesElegidos, prop.mensual, ocupadas)
+      if (motivo) { setError(motivo); return }
+      onReservar({ ...base, entrada: fecha, salida: precioMes.salida, meses: mesesElegidos, huespedes: Number(huespedes) || 1, deposito: prop.mensual.deposito || undefined, depositoRegistrado: false }, cliente)
     } else {
       if (!prop || !rango.entrada || !rango.salida) { setError('Elegí entrada y salida.'); return }
       const motivo = motivoNoReservable(rango.entrada, rango.salida, prop.tarifa, ocupadas)
@@ -572,19 +621,19 @@ function Nueva({ negocio, reservas, clientes, pre, onCerrar, onReservar }: { neg
   }
 
   return (
-    <Modal titulo={tipo === 'bloque' ? 'Nuevo evento' : 'Nueva reserva'} bajada="Para reservas que llegan por teléfono o en el mostrador." onCerrar={onCerrar} ancho={620}
+    <Modal titulo={tipo === 'bloque' ? 'Nuevo evento' : mensual ? 'Nuevo contrato' : 'Nueva reserva'} bajada="Para reservas que llegan por teléfono o en el mostrador." onCerrar={onCerrar} ancho={620}
       pie={<>
         <span className="rv-modal-izq rv-ayuda">{total ? <>Total <b className="rv-num" style={{ color: 'var(--color-text)' }}>{pesos(total)}</b>{sena ? ` · seña ${pesos(sena)}` : ''}</> : ''}</span>
         <button type="button" className="rv-btn" onClick={onCerrar}>Cancelar</button>
         <button type="button" className="rv-btn rv-btn--primario" onClick={guardar}><Check size={15} aria-hidden /> Agendar</button>
       </>}>
       <div className="rv-pila alg-nueva">
-        <Selector label={TIPOS[tipo].cliente === 'huésped' ? 'Huésped' : 'Cliente'} valor={clienteId} onChange={setClienteId} opciones={[...clientes.map(c => ({ id: c.id, label: `${c.nombre} · ${c.telefono}` })), { id: 'nuevo', label: '+ Alguien nuevo' }]} />
+        <Selector label={capital(palabras.cliente)} valor={clienteId} onChange={setClienteId} opciones={[...clientes.map(c => ({ id: c.id, label: `${c.nombre} · ${c.telefono}` })), { id: 'nuevo', label: '+ Alguien nuevo' }]} />
         {clienteId === 'nuevo' && <div className="rv-dos"><Campo label="Nombre" value={nuevoNombre} onChange={setNuevoNombre} /><Campo label="Celular" value={nuevoTel} onChange={setNuevoTel} inputMode="tel" /></div>}
         {tipo === 'cancha' && (
           <>
             <div className="rv-dos">
-              <Selector label="Cancha" valor={unidadId} onChange={v => { setUnidadId(v); setHora('') }} opciones={negocio.unidades.map(u => ({ id: u.id, label: u.nombre }))} />
+              <Selector label={capital(palabras.unidad)} valor={unidadId} onChange={v => { setUnidadId(v); setHora('') }} opciones={negocio.unidades.map(u => ({ id: u.id, label: u.nombre }))} />
               <Campo label="Día" type="date" value={fecha} onChange={v => { if (v) { setFecha(v); setHora('') } }} />
             </div>
             <div>
@@ -609,6 +658,9 @@ function Nueva({ negocio, reservas, clientes, pre, onCerrar, onReservar }: { neg
         )}
         {tipo === 'bloque' && s && (
           <>
+            {negocio.salones.length > 1 && (
+              <Selector label={capital(palabras.unidad)} valor={s.id} onChange={v => { setUnidadId(v); setBloqueId(''); setPaqueteId(salonDe(negocio, v)?.paquetes[0]?.id ?? '') }} opciones={negocio.salones.map(x => ({ id: x.id, label: `${x.nombre} · hasta ${x.capacidad}` }))} />
+            )}
             <div className="rv-dos">
               <Campo label="Día" type="date" value={fecha} onChange={v => { if (v) { setFecha(v); setBloqueId('') } }} />
               <Selector label="Bloque" valor={bloqueId} onChange={setBloqueId} opciones={[{ id: '', label: 'Elegí uno' }, ...bloques.map(b => ({ id: b.id, label: `${b.nombre} · ${hhmm(b.inicio)}–${hhmm(b.fin)}${libresDelDia.some(x => x.id === b.id) ? '' : ' (no disponible)'}` }))]} />
@@ -619,7 +671,7 @@ function Nueva({ negocio, reservas, clientes, pre, onCerrar, onReservar }: { neg
               <Campo label="Edad (opcional)" value={edad} onChange={v => setEdad(v.replace(/\D/g, ''))} inputMode="numeric" maxLength={3} />
             </div>
             <div className="rv-dos">
-              <Campo label="Invitados" value={invitados} onChange={v => setInvitados(v.replace(/\D/g, ''))} inputMode="numeric" maxLength={3} ayuda={`El salón tiene lugar para ${s.capacidad}.`} />
+              <Campo label="Invitados" value={invitados} onChange={v => setInvitados(v.replace(/\D/g, ''))} inputMode="numeric" maxLength={3} ayuda={`${s.nombre} tiene lugar para ${s.capacidad}.`} />
               <Selector label="Paquete" valor={paqueteId} onChange={setPaqueteId} opciones={s.paquetes.map(p => ({ id: p.id, label: `${p.nombre} · ${pesos(p.precio)}` }))} />
             </div>
           </>
@@ -638,12 +690,24 @@ function Nueva({ negocio, reservas, clientes, pre, onCerrar, onReservar }: { neg
         {tipo === 'estadia' && prop && (
           <>
             <div className="rv-dos">
-              <Selector label="Propiedad" valor={unidadId} onChange={v => { setUnidadId(v); setRango({ entrada: null, salida: null }) }} opciones={negocio.propiedades.map(p => ({ id: p.id, label: p.nombre }))} />
-              <Selector label="Huéspedes" valor={huespedes} onChange={setHuespedes} opciones={Array.from({ length: prop.huespedes }, (_, i) => ({ id: String(i + 1), label: String(i + 1) }))} />
+              <Selector label={capital(palabras.unidad)} valor={unidadId} onChange={v => { setUnidadId(v); setRango({ entrada: null, salida: null }); setMeses(0) }} opciones={negocio.propiedades.map(p => ({ id: p.id, label: `${p.nombre}${esMensual(p) ? ' · por mes' : ''}` }))} />
+              <Selector label={mensual ? 'Personas' : 'Huéspedes'} valor={huespedes} onChange={setHuespedes} opciones={Array.from({ length: prop.huespedes }, (_, i) => ({ id: String(i + 1), label: String(i + 1) }))} />
             </div>
-            <CalendarioRango mes={mes} onMes={setMes} hoy={HOY} rango={rango} onRango={setRango} minMes={HOY}
-              estadoDe={f => ({ deshabilitado: f < HOY, ocupado: tomadas.has(f) })} salidaMaxima={e => salidaMaxima(e, ocupadas)} />
-            {rango.entrada && rango.salida && <p className="rv-ayuda" style={{ margin: 0 }}>{rangoTxt(rango.entrada, rango.salida)} · {nochesTxt(nochesEntre(rango.entrada, rango.salida))}</p>}
+            {mensual && prop.mensual ? (
+              <>
+                <div className="rv-dos">
+                  <Campo label="Entra el" type="date" value={fecha} onChange={v => { if (v) setFecha(v) }} min={HOY} />
+                  <Selector label="Cuántos meses" valor={mesesElegidos} onChange={setMeses} opciones={Array.from({ length: prop.mensual.maxMeses - prop.mensual.minMeses + 1 }, (_, i) => prop.mensual!.minMeses + i).map(n => ({ id: n, label: mesesTxt(n) }))} />
+                </div>
+                <p className="rv-ayuda" style={{ margin: 0 }}>{precioMes ? `Hasta el ${fechaCorta(precioMes.salida)} · ${pesos(prop.mensual.precioMes)} por mes${prop.mensual.deposito ? ` · depósito de ${pesos(prop.mensual.deposito)} aparte` : ''}.` : ''}</p>
+              </>
+            ) : (
+              <>
+                <CalendarioRango mes={mes} onMes={setMes} hoy={HOY} rango={rango} onRango={setRango} minMes={HOY}
+                  estadoDe={f => ({ deshabilitado: f < HOY, ocupado: tomadas.has(f) })} salidaMaxima={e => salidaMaxima(e, ocupadas)} />
+                {rango.entrada && rango.salida && <p className="rv-ayuda" style={{ margin: 0 }}>{rangoTxt(rango.entrada, rango.salida)} · {duracionEstadiaTxt({ entrada: rango.entrada, salida: rango.salida })}</p>}
+              </>
+            )}
           </>
         )}
         <Area label={tipo === 'bloque' ? 'Notas del evento (opcional)' : 'Nota (opcional)'} value={notas} onChange={setNotas} maxLength={300} placeholder={tipo === 'bloque' ? 'Temática, alergias, horario de la torta…' : ''} />

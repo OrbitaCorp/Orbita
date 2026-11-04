@@ -3,19 +3,30 @@ import { resolverRuta, seccionesDe } from './navegacion'
 import { TIPOS_ORDEN } from '../datos'
 
 describe('seccionesDe', () => {
-  it('cada modo tiene ids únicos y termina en Calendarios y Configuración', () => {
+  it('cada modo tiene ids únicos, arranca con lo de hoy y termina en Calendarios y Configuración', () => {
     for (const tipo of TIPOS_ORDEN) {
       const ids = seccionesDe(tipo).map(s => s.id)
       expect(new Set(ids).size).toBe(ids.length)
       expect(ids.slice(-2)).toEqual(['calendarios', 'configuracion'])
-      expect(ids.slice(0, 3)).toContain('ingresos')
+      expect(ids.slice(0, 4)).toContain('ingresos')
+      expect(ids[1]).toBe('disponibilidad')
     }
   })
 
-  it('lo que se alquila va en su propio grupo: canchas, salón o propiedades', () => {
+  it('lo que se alquila va en su propio grupo: canchas, salones o propiedades', () => {
     expect(seccionesDe('cancha').filter(s => s.grupo === 'Canchas').map(s => s.id)).toEqual(['unidades', 'extras', 'precios'])
-    expect(seccionesDe('bloque').filter(s => s.grupo === 'Salón').map(s => s.id)).toEqual(['salon', 'paquetes', 'extras'])
+    expect(seccionesDe('bloque').filter(s => s.grupo === 'Salones').map(s => s.id)).toEqual(['salones', 'paquetes', 'extras'])
     expect(seccionesDe('estadia').filter(s => s.grupo === 'Propiedades').map(s => s.id)).toEqual(['propiedades', 'temporadas', 'bloqueos'])
+  })
+
+  it('las palabras del rubro cambian el grupo y la gente: salas en vez de canchas, inquilinos en vez de huéspedes', () => {
+    const salas = seccionesDe('cancha', { unidades: 'salas', clientes: 'clientes' })
+    expect(salas.find(s => s.id === 'unidades')).toMatchObject({ label: 'Salas', grupo: 'Salas' })
+    expect(salas.filter(s => s.grupo === 'Salas').map(s => s.id)).toEqual(['unidades', 'extras', 'precios'])
+    const deptos = seccionesDe('estadia', { unidades: 'deptos', clientes: 'inquilinos' })
+    expect(deptos.find(s => s.id === 'clientes')?.label).toBe('Inquilinos')
+    expect(deptos.find(s => s.id === 'propiedades')).toMatchObject({ label: 'Deptos', grupo: 'Deptos' })
+    expect(seccionesDe('bloque').find(s => s.id === 'eventos')?.label).toBe('Eventos')
   })
 
   it('la estadía no tiene Horarios en Configuración (se entra y se sale a la hora de cada propiedad)', () => {
@@ -35,13 +46,20 @@ describe('resolverRuta', () => {
     expect(resolverRuta({ vista: 'configuracion', tab: 'reglas' }, 'cancha')).toEqual({ vista: 'reglas', corregir: true })
     expect(resolverRuta({ vista: 'configuracion', tab: 'unidades' }, 'cancha')).toEqual({ vista: 'unidades', corregir: true })
     expect(resolverRuta({ vista: 'configuracion', tab: 'precios' }, 'cancha')).toEqual({ vista: 'precios', corregir: true })
-    expect(resolverRuta({ vista: 'configuracion', tab: 'salon' }, 'bloque')).toEqual({ vista: 'salon', corregir: true })
+    expect(resolverRuta({ vista: 'configuracion', tab: 'salon' }, 'bloque')).toEqual({ vista: 'salones', corregir: true })
     expect(resolverRuta({ vista: 'configuracion', tab: 'propiedades' }, 'estadia')).toEqual({ vista: 'propiedades', corregir: true })
     expect(resolverRuta({ vista: 'configuracion', tab: 'calendarios' }, 'estadia')).toEqual({ vista: 'calendarios', corregir: true })
   })
 
+  it('el link al salón único de antes abre Salones y corrige la URL', () => {
+    expect(resolverRuta({ vista: 'salon' }, 'bloque')).toEqual({ vista: 'salones', corregir: true })
+    expect(resolverRuta({ vista: 'salones' }, 'bloque')).toEqual({ vista: 'salones', corregir: false })
+    expect(resolverRuta({ vista: 'disponibilidad' }, 'estadia')).toEqual({ vista: 'disponibilidad', corregir: false })
+  })
+
   it('un link viejo a algo que este modo no tiene vuelve a la agenda', () => {
     expect(resolverRuta({ vista: 'configuracion', tab: 'salon' }, 'cancha')).toEqual({ vista: 'reservas', corregir: true })
+    expect(resolverRuta({ vista: 'salon' }, 'cancha')).toEqual({ vista: 'reservas', corregir: true })
   })
 
   it('Datos del negocio y Horarios siguen adentro de Configuración', () => {

@@ -79,13 +79,13 @@ const POR_TIPO: Record<TipoAlquiler, { seccion: string; color: string; fotos: (n
   },
   bloque: {
     seccion: 'Paquetes', color: '#DB2777',
-    fotos: n => n.salon?.fotos ?? [],
-    items: n => (n.salon?.paquetes ?? []).map(p => ({ nombre: p.nombre || 'Sin nombre', detalle: `Hasta ${p.hastaInvitados} invitados`, precio: pesos(p.precio) })),
+    fotos: n => n.salones.flatMap(s => s.fotos),
+    items: n => n.salones.flatMap(s => s.paquetes.map(p => ({ nombre: p.nombre || 'Sin nombre', detalle: `${n.salones.length > 1 ? `${s.nombre} · ` : ''}Hasta ${p.hastaInvitados} invitados`, precio: pesos(p.precio) }))),
   },
   estadia: {
     seccion: 'La propiedad', color: '#B45309',
     fotos: n => n.propiedades.flatMap(p => p.fotos),
-    items: n => n.propiedades.map(p => ({ nombre: p.nombre || p.tipo, detalle: `${p.tipo} · hasta ${p.huespedes} huéspedes`, precio: `${pesos(p.tarifa.precioNoche)}/noche` })),
+    items: n => n.propiedades.map(p => ({ nombre: p.nombre || p.tipo, detalle: `${p.tipo} · hasta ${p.huespedes} ${p.modalidad === 'mes' ? 'personas' : 'huéspedes'}`, precio: p.modalidad === 'mes' && p.mensual ? `${pesos(p.mensual.precioMes)}/mes` : `${pesos(p.tarifa.precioNoche)}/noche` })),
   },
 }
 
@@ -126,8 +126,8 @@ export function resumenAlquiler(a: AltaAlquiler): string {
     const precios = a.unidades.map(u => u.tarifaHora).filter(p => p > 0)
     return `${cuantos(a.unidades.length, 'cancha o espacio', 'canchas o espacios')}${precios.length ? ` · desde ${pesos(Math.min(...precios))} la hora` : ''}`
   }
-  if (a.tipo === 'bloque') return `Hasta ${a.salon.capacidad} personas · ${cuantos(a.salon.paquetes.length, 'paquete', 'paquetes')}`
-  if (a.tipo === 'estadia') return `${a.propiedad.nombre.trim() || a.propiedad.tipo} · ${pesos(a.propiedad.precioNoche)} la noche`
+  if (a.tipo === 'bloque') return `${a.salon.nombre.trim() || 'Salón'} · hasta ${a.salon.capacidad} personas · ${cuantos(a.salon.paquetes.length, 'paquete', 'paquetes')}`
+  if (a.tipo === 'estadia') return `${a.propiedad.nombre.trim() || a.propiedad.tipo} · ${a.propiedad.modalidad === 'mes' ? `${pesos(a.propiedad.precioMes)} el mes` : `${pesos(a.propiedad.precioNoche)} la noche`}`
   return ''
 }
 

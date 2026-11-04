@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { agruparNoches, chocaRango, cumpleMinimo, motivoNoReservable, nocheDeFinDeSemana, nochesDe, nochesEntre, precioEstadia, salidaMaxima, temporadaDe, type TarifaEstadia } from '../estadia'
+import { agruparNoches, chocaRango, cumpleMinimo, motivoNoReservable, motivoNoReservableMes, nocheDeFinDeSemana, nochesDe, nochesEntre, precioEstadia, precioMensual, primeraEntradaLibre, salidaDeMeses, salidaMaxima, temporadaDe, type TarifaEstadia, type TarifaMensual } from '../estadia'
 
 const tarifa: TarifaEstadia = {
   precioNoche: 60000,
@@ -87,5 +87,35 @@ describe('estadía', () => {
     expect(motivoNoReservable('2026-11-14', '2026-11-15', tarifa, ocupadas)).toMatch(/mínima es de 2 noches/)
     expect(motivoNoReservable('2026-11-15', '2026-11-18', tarifa, ocupadas)).toMatch(/no están disponibles/)
     expect(motivoNoReservable('2026-11-16', '2026-11-14', tarifa, ocupadas)).toMatch(/después de la entrada/)
+  })
+})
+
+describe('alquiler por mes', () => {
+  const mensual: TarifaMensual = { precioMes: 520000, minMeses: 3, maxMeses: 12, deposito: 520000 }
+
+  it('la salida es la misma fecha unos meses después, y el precio son los meses por el precio del mes', () => {
+    expect(salidaDeMeses('2026-12-01', 3)).toBe('2027-03-01')
+    const p = precioMensual('2026-12-01', 3, mensual)
+    expect(p).toEqual({ meses: 3, precioMes: 520000, total: 1560000, deposito: 520000, entrada: '2026-12-01', salida: '2027-03-01' })
+    // El depósito va aparte: no entra en el total.
+    expect(p.total).toBe(3 * 520000)
+  })
+
+  it('respeta el mínimo y el máximo de meses y no pisa lo ocupado', () => {
+    const ocupadas = [{ entrada: '2027-02-01', salida: '2027-05-01', id: 'r1', tipo: 'reserva' as const }]
+    expect(motivoNoReservableMes('2026-12-01', 2, mensual, ocupadas)).toMatch(/mínimo es de 3 meses/)
+    expect(motivoNoReservableMes('2026-12-01', 13, mensual, ocupadas)).toMatch(/máximo es de 12 meses/)
+    expect(motivoNoReservableMes('2026-12-01', 3, mensual, ocupadas)).toMatch(/ya está alquilada/)
+    // Dos alquileres pueden tocarse: uno sale el 1 de mayo y el otro entra ese día.
+    expect(motivoNoReservableMes('2027-05-01', 3, mensual, ocupadas)).toBeNull()
+    expect(motivoNoReservableMes('2026-11-01', 3, mensual, ocupadas)).toBeNull()
+    expect(motivoNoReservableMes('2026-12-01', 3, mensual, [{ entrada: '2027-01-10', salida: '2027-01-20', tipo: 'bloqueo' }])).toMatch(/no está disponible/)
+  })
+
+  it('encuentra desde cuándo entra un alquiler entero', () => {
+    const ocupadas = [{ entrada: '2026-11-01', salida: '2027-02-01' }]
+    expect(primeraEntradaLibre('2026-11-14', 3, ocupadas)).toBe('2027-02-01')
+    expect(primeraEntradaLibre('2027-03-01', 3, ocupadas)).toBe('2027-03-01')
+    expect(primeraEntradaLibre('2026-11-14', 3, ocupadas, 30)).toBeNull()
   })
 })

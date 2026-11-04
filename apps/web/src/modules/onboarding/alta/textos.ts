@@ -109,8 +109,8 @@ export const TEXTOS: Record<Modulo, TextosModulo> = {
 // el título y también el nombre de la estación en el arco.
 const QUE_ALQUILAS: Record<TipoAlquiler, Titulo & { rotulo: string }> = {
   cancha: { rotulo: 'Tus canchas', titulo: '¿Qué canchas o', resalte: 'espacios tenés?', bajada: 'Cargá cada cancha, sala o box con su precio por hora. Después podés cambiar todo.' },
-  bloque: { rotulo: 'Tu salón', titulo: 'Contanos de', resalte: 'tu salón.', bajada: 'Cuánta gente entra, cuánto dura cada bloque y los paquetes por cantidad de invitados.' },
-  estadia: { rotulo: 'Tu propiedad', titulo: 'Contanos de', resalte: 'tu propiedad.', bajada: 'Lo mínimo para empezar a recibir reservas. Después podés cambiar todo.' },
+  bloque: { rotulo: 'Tu salón', titulo: 'Contanos de', resalte: 'tu salón.', bajada: 'Cómo se llama, cuánta gente entra, cuánto dura cada bloque y los paquetes por cantidad de invitados. Si tenés más de uno, los demás van después.' },
+  estadia: { rotulo: 'Tu propiedad', titulo: 'Contanos de', resalte: 'tu propiedad.', bajada: 'Por noche o por mes: lo mínimo para empezar a recibir reservas. Después podés cambiar todo.' },
 }
 
 /** El nombre de la estación "qué alquilás" en el arco, una vez elegido el tipo. */
@@ -124,7 +124,7 @@ export const TITULOS: Record<PasoId, (m: Modulo | null, tipo: TipoAlquiler | nul
   tipo: () => ({ titulo: '¿Qué tipo de', resalte: 'productos vendés?', bajada: 'Podés elegir más de uno. Adaptamos tu catálogo según lo que vendas.' }),
   rubro: () => ({ titulo: '¿Qué tipo de', resalte: 'negocio tenés?', bajada: 'Elegí tu rubro y armamos la agenda con los servicios típicos. Después podés cambiar todo.' }),
   servicios: () => ({ titulo: '¿Qué', resalte: 'servicios ofrecés?', bajada: 'Te dejamos cargados los más comunes. Ajustá nombre, duración y precio, y sacá los que no uses.' }),
-  'tipo-alquiler': () => ({ titulo: '¿Qué', resalte: 'alquilás?', bajada: 'De esto depende cómo te reservan: por hora, por evento o por noches. Lo que sigue (tu negocio, tu página, tu cuenta y el pago) es igual para los tres.' }),
+  'tipo-alquiler': () => ({ titulo: '¿Qué', resalte: 'alquilás?', bajada: 'De esto depende cómo te reservan: por hora, por evento, por noche o por mes. Lo que sigue (tu negocio, tu página, tu cuenta y el pago) es igual para los tres.' }),
   'que-alquilas': (_, tipo) => QUE_ALQUILAS[tipo ?? 'cancha'],
   'rubro-gym': () => ({ titulo: '¿Qué clases', resalte: 'das?', bajada: 'Elegí tu rubro y te dejamos cargadas las actividades y los precios típicos. Después podés cambiar todo.' }),
   actividades: () => ({ titulo: '¿Qué', resalte: 'actividades tenés?', bajada: 'Cada una con su duración y su cupo por clase. La grilla de la semana la armás después, en el panel.' }),

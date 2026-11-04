@@ -1,9 +1,10 @@
 // Reserva pública de Alquileres: el flujo que usa el cliente final.
 //   canchas:  cancha → día y horario (una o varias franjas seguidas) → extras → datos → seña → listo
-//   salón:    fecha y bloque → paquete e invitados → extras → datos del evento → seña → listo
-//   estadía:  propiedad → entrada, salida y huéspedes → datos → seña → listo
-// Se puede entrar con algo ya elegido desde la portada (?unidad=, ?fecha=,
-// ?hora=, ?paquete=, ?propiedad=, ?entrada=, ?salida=).
+//   salones:  salón (si hay más de uno) → fecha y bloque → paquete e invitados → extras → datos del evento → seña → listo
+//   por noche: propiedad → entrada, salida y huéspedes → datos → seña → listo
+//   por mes:   propiedad → desde cuándo y cuántos meses → datos → seña → listo
+// Se puede entrar con algo ya elegido desde la portada (?unidad=, ?salon=,
+// ?fecha=, ?hora=, ?paquete=, ?propiedad=, ?entrada=, ?salida=, ?meses=).
 //
 // Se reserva sin registrarse: nombre y celular alcanzan. El "pago" de la seña
 // es simulado. Al confirmar, la reserva queda guardada en el navegador y
@@ -16,9 +17,9 @@ import { ArrowRight, CalendarPlus, Check, ChevronLeft, Lock, MessageCircle, User
 import { duracionTxt, esISO, fechaLarga, hhmm, rangoTxt, sumarDias, diaSemana, fechaCorta, type ISO } from '@/lib/reservas/fechas'
 import { consecutivasDesde, franjasDelDia } from '@/lib/reservas/disponibilidad'
 import { pesos, precioBloque, precioPorHora, precioTurnosSeguidos } from '@/lib/reservas/precio'
-import { agruparNoches, motivoNoReservable, nochesEntre, precioEstadia, salidaMaxima, nochesOcupadas } from '@/lib/reservas/estadia'
+import { agruparNoches, motivoNoReservable, motivoNoReservableMes, nochesEntre, precioEstadia, precioMensual, primeraEntradaLibre, salidaMaxima, nochesOcupadas } from '@/lib/reservas/estadia'
 import { descargarICS, generarICS } from '@/lib/reservas/ics'
-import { AHORA, HOY, aperturaDe, bloqueoEn, bloquesDe, bloquesLibresEn, cuenta, nochesTxt, ocupadoDelDia, rangosOcupados, senaPara, type Cliente, type NegocioAlquiler, type Reserva as ReservaT } from '../datos'
+import { AHORA, HOY, aperturaDe, bloqueoEn, bloquesDe, bloquesLibresEn, capital, cuenta, duracionEstadiaTxt, esMensual, mesesTxt, nochesTxt, ocupadoDelDia, palabrasDe, rangosOcupados, salonDe, senaPara, type Cliente, type NegocioAlquiler, type Reserva as ReservaT } from '../datos'
 import { CalendarioDia, CalendarioRango, type Rango } from '@/design-system/reservas/Calendario'
 import { Campo, Area, Selector } from '@/design-system/reservas/piezas'
 import Sitio, { lineaNoches, ruta } from './Sitio'
@@ -39,13 +40,14 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
   // Nombre de cada grupo de radios y prefijo de los ids que los nombran y describen.
   const prefijo = useId()
   const tipo = negocio.tipo
-  const salon = negocio.salon
+  const palabras = palabrasDe(negocio)
+  const unSalon = tipo === 'bloque' && negocio.salones.length === 1
 
   // ── Lo que ya viene elegido por la URL (nada en el pasado) ──
   const q = router.query
-  const unidadInicial = tipo === 'estadia' ? q1(q.propiedad) : tipo === 'bloque' ? 'salon' : q1(q.unidad)
+  const unidadInicial = tipo === 'estadia' ? q1(q.propiedad) : tipo === 'bloque' ? (q1(q.salon) || (unSalon ? negocio.salones[0].id : '')) : q1(q.unidad)
   const fechaQ = (k: string) => { const v = q1(q[k]); return esISO(v) && v >= HOY ? v : null }
-  const [unidadId, setUnidadId] = useState<string | null>(unidadInicial || (tipo === 'bloque' ? 'salon' : null))
+  const [unidadId, setUnidadId] = useState<string | null>(unidadInicial || null)
   const [fecha, setFecha] = useState<ISO | null>(fechaQ('fecha'))
   const [horaPedida, setHora] = useState<number | null>(q1(q.hora) ? Number(q1(q.hora)) : null)
   const [franjas, setFranjas] = useState(1)
@@ -54,6 +56,10 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
   const [extras, setExtras] = useState<string[]>([])
   const [rango, setRango] = useState<Rango>(() => { const entrada = fechaQ('entrada'); const salida = fechaQ('salida'); return { entrada, salida: entrada ? salida : null } })
   const [mes, setMes] = useState<ISO>(fecha ?? rango.entrada ?? HOY)
+  // Por mes: desde cuándo y cuántos meses (lo que vino por la URL; si no, la primera fecha libre para el mínimo de la propiedad).
+  const primeraLibre = (id: string | null) => { const p = negocio.propiedades.find(x => x.id === id); return p && esMensual(p) && p.mensual ? primeraEntradaLibre(HOY, p.mensual.minMeses, rangosOcupados(negocio, reservas, p.id)) ?? HOY : HOY }
+  const [entradaMes, setEntradaMes] = useState<ISO>(() => fechaQ('entrada') ?? primeraLibre(unidadInicial || null))
+  const [meses, setMeses] = useState(Number(q1(q.meses)) || 0)
   // Dos huéspedes de entrada, o menos si la propiedad que vino por la URL no los admite.
   const [datos, setDatos] = useState<Datos>(() => {
     const p = tipo === 'estadia' ? negocio.propiedades.find(x => x.id === unidadInicial) : undefined
@@ -66,9 +72,11 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
   // ── Lo elegido ──
   // Sin useMemo: react-compiler memoiza solo, y a mano no se podía (las listas se arman en cada render).
   const unidad = tipo === 'cancha' ? negocio.unidades.find(u => u.id === unidadId) ?? null : null
+  const salon = tipo === 'bloque' ? salonDe(negocio, unidadId ?? undefined) ?? null : null
   const propiedad = tipo === 'estadia' ? negocio.propiedades.find(p => p.id === unidadId) ?? null : null
+  const mensual = !!propiedad && esMensual(propiedad) && !!propiedad.mensual
   const paquete = salon?.paquetes.find(p => p.id === paqueteId) ?? null
-  const listaExtras = tipo === 'cancha' ? negocio.extras : salon?.extras ?? []
+  const listaExtras = tipo === 'estadia' ? [] : negocio.extras
 
   const franjasDia = fecha && unidad ? franjasDelDia(aperturaDe(negocio, fecha), ocupadoDelDia(negocio, reservas, unidad.id, fecha), { paso: negocio.pasoMin, duracion: negocio.duracionMin, desde: fecha === HOY ? AHORA : undefined }) : []
   // La hora cuenta solo si esa franja está libre: la que viene por la URL (?hora=) pudo haberse tomado.
@@ -76,18 +84,21 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
   const hora = horaLibre ? horaPedida : null
   const maxSeguidas = hora !== null ? Math.min(negocio.maxFranjas, consecutivasDesde(franjasDia, hora, negocio.maxFranjas)) : 0
   const seguidas = Math.min(franjas, Math.max(1, maxSeguidas))
-  const bloques = bloquesDe(negocio)
-  const bloquesDelDia = fecha ? bloquesLibresEn(negocio, reservas, bloques, fecha).map(b => b.id) : []
+  const bloques = bloquesDe(negocio, salon ?? undefined)
+  const bloquesDelDia = fecha && salon ? bloquesLibresEn(negocio, reservas, salon, fecha).map(b => b.id) : []
   const bloque = bloques.find(b => b.id === bloqueId) ?? null
   const ocupadasProp = propiedad ? rangosOcupados(negocio, reservas, propiedad.id) : []
   const tomadas = nochesOcupadas(ocupadasProp)
   const rangoCompleto = !!(rango.entrada && rango.salida)
-  const motivoRango = propiedad && rangoCompleto ? motivoNoReservable(rango.entrada!, rango.salida!, propiedad.tarifa, ocupadasProp) : null
+  const motivoRango = propiedad && !mensual && rangoCompleto ? motivoNoReservable(rango.entrada!, rango.salida!, propiedad.tarifa, ocupadasProp) : null
+  const mesesElegidos = mensual ? (meses || propiedad.mensual!.minMeses) : 0
+  const motivoMes = mensual ? (entradaMes < HOY ? 'La entrada no puede ser un día que ya pasó.' : motivoNoReservableMes(entradaMes, mesesElegidos, propiedad.mensual!, ocupadasProp)) : null
+  const precioMes = mensual && !motivoMes ? precioMensual(entradaMes, mesesElegidos, propiedad.mensual!) : null
   const invitados = Number(datos.invitados || 0)
   const pasaCapacidad = !!salon && invitados > salon.capacidad
 
   // ── Precio ──
-  // `base` es lo principal (la cancha, el paquete o las noches, sin extras ni limpieza): el negocio elige si la seña se calcula sobre eso o sobre el total.
+  // `base` es lo principal (la cancha, el paquete, las noches o el primer mes, sin extras ni limpieza): el negocio elige si la seña se calcula sobre eso o sobre el total.
   function calcularPrecio(): { total: number; base: number; detalle: [string, number][] } | null {
     const elegidos = listaExtras.filter(e => extras.includes(e.id)).map(e => [e.nombre, e.precio] as [string, number])
     if (tipo === 'cancha' && unidad && fecha && hora !== null) {
@@ -97,7 +108,8 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
       return { total: precioBloque(p.final, listaExtras, extras).total, base: p.final, detalle: [...lineas, ...elegidos] }
     }
     if (tipo === 'bloque' && paquete) return { total: precioBloque(paquete.precio, listaExtras, extras).total, base: paquete.precio, detalle: [[paquete.nombre, paquete.precio], ...elegidos] }
-    if (tipo === 'estadia' && propiedad && rangoCompleto && !motivoRango) {
+    if (mensual && precioMes) return { total: precioMes.total, base: precioMes.precioMes, detalle: [[`${mesesTxt(precioMes.meses)} × ${pesos(precioMes.precioMes)}`, precioMes.total]] }
+    if (tipo === 'estadia' && propiedad && !mensual && rangoCompleto && !motivoRango) {
       const p = precioEstadia(rango.entrada!, rango.salida!, propiedad.tarifa)
       // Una línea por precio: con temporada o fin de semana, un subtotal solo no explicaba el total.
       return { total: p.total, base: p.subtotal, detalle: [...agruparNoches(p.noches).map(lineaNoches), ['Limpieza', p.limpieza]] }
@@ -112,12 +124,12 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
   // La Seña figura desde el principio si el negocio la cobra: antes aparecía recién al tener un total y la barra de pasos crecía en el medio.
   const conSena = negocio.senaPct > 0 && (!precio || sena > 0)
   const pasos: PasoId[] = tipo === 'cancha' ? ['unidad', 'cuando', ...(listaExtras.length ? ['extras' as PasoId] : []), 'datos', ...(conSena ? ['pago' as PasoId] : [])]
-    : tipo === 'bloque' ? ['cuando', 'paquete', 'extras', 'datos', ...(conSena ? ['pago' as PasoId] : [])]
+    : tipo === 'bloque' ? [...(unSalon ? [] : ['unidad' as PasoId]), 'cuando', 'paquete', ...(listaExtras.length ? ['extras' as PasoId] : []), 'datos', ...(conSena ? ['pago' as PasoId] : [])]
       : ['unidad', 'cuando', 'datos', ...(conSena ? ['pago' as PasoId] : [])]
   // Lo que vino por la URL también se revisa: una hora tomada o un bloque ocupado no dejan seguir.
   const listo: Record<PasoId, boolean> = {
-    unidad: tipo === 'cancha' ? !!unidad : !!propiedad,
-    cuando: tipo === 'cancha' ? !!fecha && horaLibre : tipo === 'bloque' ? !!fecha && !!bloque && bloquesDelDia.includes(bloque.id) : rangoCompleto && !motivoRango,
+    unidad: tipo === 'cancha' ? !!unidad : tipo === 'bloque' ? !!salon : !!propiedad,
+    cuando: tipo === 'cancha' ? !!fecha && horaLibre : tipo === 'bloque' ? !!fecha && !!bloque && bloquesDelDia.includes(bloque.id) : mensual ? !!precioMes : rangoCompleto && !motivoRango,
     paquete: !!paquete && invitados > 0 && invitados <= paquete.hastaInvitados && !pasaCapacidad,
     extras: true, datos: true, pago: true,
   }
@@ -155,12 +167,14 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
       const id = `n${Date.now().toString(36)}`
       const clienteId = `k${id}`
       const cliente: Cliente = { id: clienteId, nombre: datos.nombre.trim(), telefono: datos.telefono.trim(), email: datos.email.trim() || undefined }
-      const base = { id, unidadId: unidadId ?? 'salon', clienteId, creada: HOY, extras, total, sena, senaPagada: sena > 0, saldoPagado: false, estado: 'confirmada' as const, nota: datos.notas.trim() || undefined }
+      const base = { id, unidadId: unidadId ?? '', clienteId, creada: HOY, extras, total, sena, senaPagada: sena > 0, saldoPagado: false, estado: 'confirmada' as const, nota: datos.notas.trim() || undefined }
       const r: ReservaT = tipo === 'cancha' && fecha && hora !== null
         ? { ...base, fecha, inicio: hora, fin: hora + negocio.duracionMin * seguidas }
         : tipo === 'bloque' && fecha && bloque
           ? { ...base, fecha, inicio: bloque.inicio, fin: bloque.fin, bloqueId: bloque.id, paqueteId: paquete?.id, evento: { agasajado: datos.agasajado.trim(), edad: datos.edad ? Number(datos.edad) : undefined, invitados: Number(datos.invitados), notas: datos.notas.trim() || undefined }, deposito: salon?.deposito || undefined, depositoRegistrado: false }
-          : { ...base, entrada: rango.entrada ?? HOY, salida: rango.salida ?? sumarDias(HOY, 1), huespedes: Number(datos.huespedes || 1) }
+          : mensual && precioMes
+            ? { ...base, entrada: precioMes.entrada, salida: precioMes.salida, meses: precioMes.meses, huespedes: Number(datos.huespedes || 1), deposito: propiedad.mensual!.deposito || undefined, depositoRegistrado: false }
+            : { ...base, entrada: rango.entrada ?? HOY, salida: rango.salida ?? sumarDias(HOY, 1), huespedes: Number(datos.huespedes || 1) }
       onReservar(r, cliente)
       setHecha(r)
       setEnviando(false)
@@ -172,14 +186,16 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
   // ── Textos ──
   const cuando = tipo === 'cancha' && fecha && hora !== null ? `${fechaLarga(fecha)} · ${hhmm(hora)} a ${hhmm(hora + negocio.duracionMin * seguidas)}`
     : tipo === 'bloque' && fecha && bloque ? `${fechaLarga(fecha)} · ${bloque.nombre}, ${hhmm(bloque.inicio)} a ${hhmm(bloque.fin)}`
-      : tipo === 'estadia' && rangoCompleto ? `${rangoTxt(rango.entrada!, rango.salida!)} · ${nochesTxt(nochesEntre(rango.entrada!, rango.salida!))}` : null
-  const que = unidad?.nombre ?? propiedad?.nombre ?? (tipo === 'bloque' ? negocio.nombre : null)
+      : mensual && precioMes ? `Desde el ${fechaLarga(precioMes.entrada).toLowerCase()} · ${mesesTxt(precioMes.meses)}`
+        : tipo === 'estadia' && rangoCompleto ? `${rangoTxt(rango.entrada!, rango.salida!)} · ${nochesTxt(nochesEntre(rango.entrada!, rango.salida!))}` : null
+  const que = unidad?.nombre ?? propiedad?.nombre ?? salon?.nombre ?? null
+  const un = palabras.genero === 'm' ? 'un' : 'una'
   const falta: Record<PasoId, string> = {
-    unidad: tipo === 'estadia' ? 'Elegí una propiedad para seguir' : 'Elegí una cancha para seguir',
-    cuando: tipo === 'estadia' ? 'Elegí entrada y salida para seguir' : tipo === 'bloque' ? 'Elegí fecha y bloque para seguir' : 'Elegí día y horario para seguir',
+    unidad: `Elegí ${un} ${palabras.unidad} para seguir`,
+    cuando: mensual ? 'Elegí desde cuándo y cuántos meses' : tipo === 'estadia' ? 'Elegí entrada y salida para seguir' : tipo === 'bloque' ? 'Elegí fecha y bloque para seguir' : 'Elegí día y horario para seguir',
     paquete: 'Elegí un paquete y cuántos invitados vienen', extras: '', datos: '', pago: '',
   }
-  const textoBoton = actual === 'pago' ? `Pagar ${pesos(sena)}` : ultimo ? 'Confirmar reserva' : pasos[paso + 1] === 'pago' ? 'Ir a pagar la seña' : 'Continuar'
+  const textoBoton = actual === 'pago' ? `Pagar ${pesos(sena)}` : ultimo ? (mensual ? 'Confirmar alquiler' : 'Confirmar reserva') : pasos[paso + 1] === 'pago' ? 'Ir a pagar la seña' : 'Continuar'
 
   return (
     // En la barra del pie: lo que falta mientras no se pueda seguir (en el salón el nombre ya venía elegido y tapaba el aviso), y si no, el resumen.
@@ -198,8 +214,8 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
                 opción y se describe con lo demás; lo que no se puede elegir va disabled. Con botones
                 role=radio cada opción era una parada y las flechas no hacían nada. */}
             {actual === 'unidad' && tipo === 'cancha' && (
-              <Bloque refTitulo={titulo} titulo="¿Qué cancha querés?" sub="Cada una tiene su precio por hora. Después elegís el día y el horario.">
-                <div className="alr-opciones" role="radiogroup" aria-label="Canchas">
+              <Bloque refTitulo={titulo} titulo={`¿Qué ${palabras.unidad} querés?`} sub="Cada una tiene su precio por hora. Después elegís el día y el horario.">
+                <div className="alr-opciones" role="radiogroup" aria-label={capital(palabras.unidades)}>
                   {negocio.unidades.map(u => {
                     const sel = unidadId === u.id
                     const op = `${prefijo}-cancha-${u.id}`
@@ -215,17 +231,36 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
                 </div>
               </Bloque>
             )}
+            {actual === 'unidad' && tipo === 'bloque' && (
+              <Bloque refTitulo={titulo} titulo={`¿En qué ${palabras.unidad}?`} sub="Cada uno tiene su capacidad y sus paquetes. Después elegís la fecha y el bloque.">
+                <div className="alr-opciones" role="radiogroup" aria-label={capital(palabras.unidades)}>
+                  {negocio.salones.map(s => {
+                    const sel = unidadId === s.id
+                    const op = `${prefijo}-salon-${s.id}`
+                    return (
+                      <div key={s.id} className="alr-op rv-card--radio" data-elegido={sel}>
+                        <input type="radio" name={`${prefijo}-salon`} value={s.id} checked={sel} onChange={() => { setUnidadId(s.id); setBloqueId(null); setPaqueteId(null) }} aria-labelledby={op} aria-describedby={`${op}-d ${op}-p`} />
+                        <img src={s.fotos[0] ?? negocio.fotoPortada} alt="" loading="lazy" />
+                        <span><b id={op}>{s.nombre}</b><small id={`${op}-d`}>{s.detalle || `Hasta ${s.capacidad} personas`}</small><span id={`${op}-p`} className="als-precio">{pesos(Math.min(...s.paquetes.map(p => p.precio)))} <small>el paquete, desde</small></span></span>
+                        {sel && <Check size={18} aria-hidden className="alr-tilde" />}
+                      </div>
+                    )
+                  })}
+                </div>
+              </Bloque>
+            )}
             {actual === 'unidad' && tipo === 'estadia' && (
-              <Bloque refTitulo={titulo} titulo="¿Dónde te querés quedar?" sub="Elegí la propiedad. Después las fechas y cuántos vienen.">
-                <div className="alr-opciones" role="radiogroup" aria-label="Propiedades">
+              <Bloque refTitulo={titulo} titulo="¿Dónde te querés quedar?" sub={`Elegí ${palabras.genero === 'm' ? 'el' : 'la'} ${palabras.unidad}. Después las fechas y cuántos vienen.`}>
+                <div className="alr-opciones" role="radiogroup" aria-label={capital(palabras.unidades)}>
                   {negocio.propiedades.map(p => {
                     const sel = unidadId === p.id
                     const op = `${prefijo}-propiedad-${p.id}`
+                    const porMes = esMensual(p) && p.mensual
                     return (
                       <div key={p.id} className="alr-op rv-card--radio" data-elegido={sel}>
-                        <input type="radio" name={`${prefijo}-propiedad`} value={p.id} checked={sel} onChange={() => { setUnidadId(p.id); setRango({ entrada: null, salida: null }); setDatos({ ...datos, huespedes: String(Math.min(Number(datos.huespedes) || 1, p.huespedes)) }) }} aria-labelledby={op} aria-describedby={`${op}-d ${op}-p`} />
+                        <input type="radio" name={`${prefijo}-propiedad`} value={p.id} checked={sel} onChange={() => { setUnidadId(p.id); setRango({ entrada: null, salida: null }); setMeses(0); setEntradaMes(primeraLibre(p.id)); setDatos({ ...datos, huespedes: String(Math.min(Number(datos.huespedes) || 1, p.huespedes)) }) }} aria-labelledby={op} aria-describedby={`${op}-d ${op}-p`} />
                         <img src={p.fotos[0]} alt="" loading="lazy" />
-                        <span><b id={op}>{p.nombre}</b><small id={`${op}-d`}>{p.tipo} · hasta {cuenta(p.huespedes, 'huésped', 'huéspedes')} · mínimo {p.tarifa.minNoches} {p.tarifa.minNoches === 1 ? 'noche' : 'noches'}</small><span id={`${op}-p`} className="als-precio">{pesos(p.tarifa.precioNoche)} <small>la noche</small></span></span>
+                        <span><b id={op}>{p.nombre}</b><small id={`${op}-d`}>{p.tipo} · hasta {cuenta(p.huespedes, porMes ? 'persona' : 'huésped', porMes ? 'personas' : 'huéspedes')} · mínimo {porMes ? mesesTxt(p.mensual!.minMeses) : `${p.tarifa.minNoches} ${p.tarifa.minNoches === 1 ? 'noche' : 'noches'}`}</small><span id={`${op}-p`} className="als-precio">{porMes ? <>{pesos(p.mensual!.precioMes)} <small>el mes</small></> : <>{pesos(p.tarifa.precioNoche)} <small>la noche</small></>}</span></span>
                         {sel && <Check size={18} aria-hidden className="alr-tilde" />}
                       </div>
                     )
@@ -246,7 +281,7 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
                   <div>
                     <div className="rv-rotulo" style={{ marginBottom: 8 }}>{fecha ? fechaLarga(fecha) : 'Elegí un día'}</div>
                     {fecha && (
-                      franjasDia.length === 0 ? <p className="rv-ayuda">Ese día está cerrado.</p> : bloqueoEn(negocio, unidad.id, fecha) ? <p className="rv-ayuda">{unidad.nombre} no está disponible ese día. Probá con otro día o con otra cancha.</p> : (
+                      franjasDia.length === 0 ? <p className="rv-ayuda">Ese día está cerrado.</p> : bloqueoEn(negocio, unidad.id, fecha) ? <p className="rv-ayuda">{unidad.nombre} no está disponible ese día. Probá con otro día o con {palabras.genero === 'm' ? 'otro' : 'otra'} {palabras.unidad}.</p> : (
                         <div className="rv-franjas" role="radiogroup" aria-label="Horarios">
                           {/* Se elige una sola hora de inicio: los turnos seguidos se eligen aparte, en "¿Cuánto tiempo?". */}
                           {franjasDia.map(f => {
@@ -276,12 +311,12 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
               </Bloque>
             )}
             {actual === 'cuando' && tipo === 'bloque' && salon && (
-              <Bloque refTitulo={titulo} titulo="¿Qué día y qué bloque?" sub={`Cada bloque dura ${salon.duracionBloque / 60} horas. Entre uno y otro hay ${salon.limpieza} minutos de limpieza.`}>
+              <Bloque refTitulo={titulo} titulo="¿Qué día y qué bloque?" sub={`${unSalon ? '' : `${salon.nombre} · `}Cada bloque dura ${salon.duracionBloque / 60} horas. Entre uno y otro hay ${salon.limpieza} minutos de limpieza.`}>
                 <div className="alr-dos">
                   <CalendarioDia mes={mes} onMes={setMes} hoy={HOY} elegido={fecha} onElegir={f => { setFecha(f); setBloqueId(null) }} minMes={HOY}
                     estadoDe={f => {
                       const cerrado = f <= HOY || !negocio.apertura.dias.includes(diaSemana(f))
-                      const lleno = !cerrado && bloquesLibresEn(negocio, reservas, bloques, f).length === 0
+                      const lleno = !cerrado && bloquesLibresEn(negocio, reservas, salon, f).length === 0
                       return { deshabilitado: cerrado || lleno, ocupado: lleno, aria: cerrado ? 'cerrado' : lleno ? 'completo' : undefined }
                     }} />
                   <div>
@@ -304,7 +339,20 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
                 </div>
               </Bloque>
             )}
-            {actual === 'cuando' && tipo === 'estadia' && propiedad && (
+            {actual === 'cuando' && tipo === 'estadia' && propiedad && mensual && (
+              <Bloque refTitulo={titulo} titulo="¿Desde cuándo y por cuánto?" sub={`${propiedad.nombre} · de ${propiedad.mensual!.minMeses} a ${propiedad.mensual!.maxMeses} meses, a ${pesos(propiedad.mensual!.precioMes)} el mes. Se entra desde las ${hhmm(propiedad.checkIn)}.`}>
+                <div className="rv-pila" style={{ maxWidth: 420 }}>
+                  <div className="rv-dos">
+                    <Campo label="Entrada" type="date" value={entradaMes} onChange={v => { if (v) setEntradaMes(v) }} min={HOY} />
+                    <Selector label="Cuántos meses" valor={mesesElegidos} onChange={setMeses} opciones={Array.from({ length: propiedad.mensual!.maxMeses - propiedad.mensual!.minMeses + 1 }, (_, i) => propiedad.mensual!.minMeses + i).map(n => ({ id: n, label: mesesTxt(n) }))} />
+                  </div>
+                  {motivoMes && <p className="rv-error" role="alert" style={{ margin: 0 }}>{motivoMes}</p>}
+                  {precioMes && <p style={{ margin: 0, fontSize: 14 }}><b>{mesesTxt(precioMes.meses)}</b> · del {rangoTxt(precioMes.entrada, precioMes.salida)}{propiedad.mensual!.deposito ? ` · depósito de ${pesos(propiedad.mensual!.deposito)} aparte, que se devuelve al salir` : ''}.</p>}
+                  <Selector label="¿Cuántos van a vivir?" valor={datos.huespedes} onChange={v => setDatos({ ...datos, huespedes: v })} opciones={Array.from({ length: propiedad.huespedes }, (_, i) => ({ id: String(i + 1), label: `${i + 1} ${i === 0 ? 'persona' : 'personas'}` }))} />
+                </div>
+              </Bloque>
+            )}
+            {actual === 'cuando' && tipo === 'estadia' && propiedad && !mensual && (
               <Bloque refTitulo={titulo} titulo="¿Cuándo?" sub={`${propiedad.nombre} · entrada desde las ${hhmm(propiedad.checkIn)}, salida hasta las ${hhmm(propiedad.checkOut)}. Tocá el día de entrada y después el de salida.`}>
                 <div className="alr-dos">
                   <CalendarioRango mes={mes} onMes={setMes} hoy={HOY} rango={rango} onRango={setRango} minMes={HOY}
@@ -325,7 +373,7 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
               <Bloque refTitulo={titulo} titulo="¿Cuántos vienen?" sub="El paquete incluye mesas, sillas y vajilla para esa cantidad. Si son más, elegí el siguiente.">
                 {/* Pasarse del paquete elegido también se dice acá: antes solo se apagaba la tarjeta y el botón, sin explicar por qué. */}
                 <Campo label="Invitados" value={datos.invitados} onChange={v => setDatos({ ...datos, invitados: v.replace(/\D/g, '') })} inputMode="numeric" maxLength={3} placeholder="Ej.: 25"
-                  error={pasaCapacidad ? `El salón tiene lugar para ${salon.capacidad} personas como máximo.` : paquete && invitados > paquete.hastaInvitados ? `El paquete que elegiste es hasta ${paquete.hastaInvitados} invitados: elegí uno más grande.` : intento && errores.invitados ? errores.invitados : undefined} ayuda={`Hasta ${salon.capacidad} en total.`} />
+                  error={pasaCapacidad ? `${salon.nombre} tiene lugar para ${salon.capacidad} personas como máximo.` : paquete && invitados > paquete.hastaInvitados ? `El paquete que elegiste es hasta ${paquete.hastaInvitados} invitados: elegí uno más grande.` : intento && errores.invitados ? errores.invitados : undefined} ayuda={`Hasta ${salon.capacidad} en total.`} />
                 <div className="alr-bloques alr-bloques--lista" role="radiogroup" aria-label="Paquetes" style={{ marginTop: 14 }}>
                   {salon.paquetes.map(p => {
                     const chico = invitados > p.hastaInvitados
@@ -377,7 +425,7 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
             )}
 
             {actual === 'pago' && (
-              <Bloque refTitulo={titulo} titulo="Confirmá con la seña" sub={`Pagás ${pesos(sena)} ahora y ${pesos(total - sena)} en el lugar. Si cancelás ${negocio.cancelaHastaHoras >= 24 ? `hasta ${negocio.cancelaHastaHoras / 24} ${negocio.cancelaHastaHoras / 24 === 1 ? 'día' : 'días'}` : `hasta ${negocio.cancelaHastaHoras} h`} antes, se devuelve.`}>
+              <Bloque refTitulo={titulo} titulo="Confirmá con la seña" sub={`Pagás ${pesos(sena)} ahora y ${pesos(total - sena)} ${mensual ? 'mes a mes' : 'en el lugar'}. Si cancelás ${negocio.cancelaHastaHoras >= 24 ? `hasta ${negocio.cancelaHastaHoras / 24} ${negocio.cancelaHastaHoras / 24 === 1 ? 'día' : 'días'}` : `hasta ${negocio.cancelaHastaHoras} h`} antes, se devuelve.`}>
                 <div className="rv-card rv-card--pad" style={{ background: 'var(--color-surface)' }}>
                   <div className="rv-rotulo">Vista previa: no se cobra nada</div>
                   <p style={{ margin: '8px 0 14px', fontSize: 14 }}>En el producto real, acá se abre Mercado Pago con el monto de la seña.</p>
@@ -389,13 +437,14 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
 
           <aside className="alr-lateral">
             <div className="rv-card rv-card--pad">
-              <div className="rv-rotulo" style={{ marginBottom: 10 }}>Tu reserva</div>
+              <div className="rv-rotulo" style={{ marginBottom: 10 }}>{mensual ? 'Tu alquiler' : 'Tu reserva'}</div>
               <dl className="alr-ticket">
-                <div><dt>{tipo === 'estadia' ? 'Propiedad' : tipo === 'bloque' ? 'Salón' : 'Cancha'}</dt><dd>{que ?? <i>Falta elegir</i>}</dd></div>
+                <div><dt>{capital(palabras.unidad)}</dt><dd>{que ?? <i>Falta elegir</i>}</dd></div>
                 <div><dt>Cuándo</dt><dd>{cuando ?? <i>Falta elegir</i>}</dd></div>
                 {tipo === 'bloque' && <div><dt>Paquete</dt><dd>{paquete ? `${paquete.nombre}${datos.invitados ? ` · ${datos.invitados} invitados` : ''}` : <i>Falta elegir</i>}</dd></div>}
-                {tipo === 'estadia' && rangoCompleto && <div><dt>Huéspedes</dt><dd>{datos.huespedes}</dd></div>}
+                {tipo === 'estadia' && (rangoCompleto || precioMes) && <div><dt>{mensual ? 'Personas' : 'Huéspedes'}</dt><dd>{datos.huespedes}</dd></div>}
                 {precio?.detalle.map(([k, v]) => <div key={k}><dt>{k}</dt><dd className="rv-num">{pesos(v)}</dd></div>)}
+                {mensual && precioMes && propiedad.mensual!.deposito > 0 && <div><dt>Depósito, aparte</dt><dd className="rv-num">{pesos(propiedad.mensual!.deposito)}</dd></div>}
               </dl>
               <div className="alr-total"><span>Total</span><b className="rv-num">{precio ? pesos(total) : '—'}</b></div>
               {sena > 0 && <div className="alr-total" style={{ fontWeight: 500, color: 'var(--color-muted)' }}><span>Seña ahora</span><span className="rv-num">{pesos(sena)}</span></div>}
@@ -458,9 +507,10 @@ function validar(d: Datos, tipo: NegocioAlquiler['tipo'], hasta: number, maxHues
 
 function Confirmacion({ negocio, reserva: r, datos }: { negocio: NegocioAlquiler; reserva: ReservaT; datos: Datos }) {
   const tipo = negocio.tipo
+  const palabras = palabrasDe(negocio)
   const codigo = r.id.slice(-6).toUpperCase()
-  const unidad = tipo === 'cancha' ? negocio.unidades.find(u => u.id === r.unidadId) : tipo === 'estadia' ? negocio.propiedades.find(p => p.id === r.unidadId) : null
-  const cuando = r.entrada && r.salida ? `${rangoTxt(r.entrada, r.salida)} · ${nochesTxt(nochesEntre(r.entrada, r.salida))}` : r.fecha && r.inicio !== undefined && r.fin !== undefined ? `${fechaLarga(r.fecha)} · ${hhmm(r.inicio)} a ${hhmm(r.fin)}` : ''
+  const unidad = tipo === 'cancha' ? negocio.unidades.find(u => u.id === r.unidadId) : tipo === 'estadia' ? negocio.propiedades.find(p => p.id === r.unidadId) : salonDe(negocio, r.unidadId)
+  const cuando = r.entrada && r.salida ? `${rangoTxt(r.entrada, r.salida)} · ${duracionEstadiaTxt(r)}` : r.fecha && r.inicio !== undefined && r.fin !== undefined ? `${fechaLarga(r.fecha)} · ${hhmm(r.inicio)} a ${hhmm(r.fin)}` : ''
   const calendario = () => {
     const titulo = `${unidad?.nombre ?? negocio.nombre} · ${negocio.nombre}`
     const ev = r.entrada && r.salida ? { uid: `${r.id}@orbita`, titulo, fecha: r.entrada, hasta: r.salida, lugar: `${negocio.direccion}, ${negocio.ciudad}` }
@@ -474,17 +524,17 @@ function Confirmacion({ negocio, reserva: r, datos }: { negocio: NegocioAlquiler
       <div className="als-cont" style={{ maxWidth: 640, paddingTop: 32 }}>
         <div className="rv-card rv-card--pad rv-entra" style={{ textAlign: 'center', padding: 28 }}>
           <span className="alr-ok" aria-hidden><Check size={26} strokeWidth={3} /></span>
-          <h1 className="rv-h1" style={{ marginTop: 14 }}>{r.sena ? 'Seña recibida: tu reserva está confirmada' : 'Tu reserva está confirmada'}</h1>
+          <h1 className="rv-h1" style={{ marginTop: 14 }}>{r.sena ? `Seña recibida: tu ${r.meses ? 'alquiler está confirmado' : 'reserva está confirmada'}` : `Tu ${r.meses ? 'alquiler está confirmado' : 'reserva está confirmada'}`}</h1>
           <p className="rv-bajada" style={{ margin: '10px auto 0' }}>Te mandamos la confirmación por WhatsApp{datos.email ? ' y por email' : ''}. Guardá el código por si tenés que cambiar algo.</p>
           <div className="alr-codigo"><span className="rv-rotulo">Código</span><b className="rv-num">{codigo}</b></div>
           <dl className="alr-ticket" style={{ textAlign: 'left', marginTop: 20 }}>
-            <div><dt>{tipo === 'estadia' ? 'Propiedad' : tipo === 'bloque' ? 'Salón' : 'Cancha'}</dt><dd>{unidad?.nombre ?? negocio.nombre}</dd></div>
+            <div><dt>{capital(palabras.unidad)}</dt><dd>{unidad?.nombre ?? negocio.nombre}</dd></div>
             <div><dt>Cuándo</dt><dd>{cuando}</dd></div>
             {r.evento && <div><dt>Evento</dt><dd>{r.evento.agasajado}{r.evento.edad ? ` · ${r.evento.edad} años` : ''} · {cuenta(r.evento.invitados, 'invitado', 'invitados')}</dd></div>}
-            {r.huespedes && <div><dt>Huéspedes</dt><dd>{r.huespedes}</dd></div>}
+            {r.huespedes && <div><dt>{r.meses ? 'Personas' : 'Huéspedes'}</dt><dd>{r.huespedes}</dd></div>}
             <div><dt>Total</dt><dd className="rv-num">{pesos(r.total)}</dd></div>
-            {r.sena > 0 && <div><dt>Pagado ahora</dt><dd className="rv-num">{pesos(r.sena)} · queda {pesos(r.total - r.sena)} en el lugar</dd></div>}
-            {r.deposito ? <div><dt>Depósito</dt><dd>{pesos(r.deposito)} de garantía, se entrega el día del evento y se devuelve al terminar.</dd></div> : null}
+            {r.sena > 0 && <div><dt>Pagado ahora</dt><dd className="rv-num">{pesos(r.sena)} · queda {pesos(r.total - r.sena)} {r.meses ? 'mes a mes' : 'en el lugar'}</dd></div>}
+            {r.deposito ? <div><dt>Depósito</dt><dd>{pesos(r.deposito)} de garantía, {r.meses ? 'se entrega al entrar y se devuelve al salir' : 'se entrega el día del evento y se devuelve al terminar'}.</dd></div> : null}
             <div><dt>Dónde</dt><dd>{negocio.direccion}, {negocio.ciudad}</dd></div>
           </dl>
           <div className="rv-fila" style={{ justifyContent: 'center', marginTop: 20 }}>
@@ -513,7 +563,7 @@ export const CSS_RESERVA = `
   .alr-lateral { position: sticky; top: calc(var(--rv-tope, 0px) + 80px); }
   .alr-dos { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 24px; align-items: start; }
   .alr-opciones { display: flex; flex-direction: column; gap: 10px; }
-  /* Las canchas, las propiedades, los bloques, los paquetes y las franjas son radios nativos (rv-card--radio):
+  /* Las canchas, los salones, las propiedades, los bloques, los paquetes y las franjas son radios nativos (rv-card--radio):
      el estado va en data-elegido y data-deshabilitado, y el anillo de foco lo pone el kit. Los extras siguen
      siendo botones (aria-pressed): se eligen de a varios. */
   .alr-op { position: relative; display: flex; align-items: center; gap: 14px; padding: 10px; border-radius: 14px; border: 1px solid var(--color-border); background: var(--color-bg); text-align: left; font: inherit; color: inherit; cursor: pointer; width: 100%; }

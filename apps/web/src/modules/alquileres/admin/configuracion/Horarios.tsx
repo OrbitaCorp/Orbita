@@ -13,10 +13,12 @@ export default function Horarios({ negocio, onGuardar }: Form) {
   const [v, setV] = useState(negocio.apertura)
   const cambiado = !igual(v, negocio.apertura)
   const toggle = (d: number) => setV({ ...v, dias: v.dias.includes(d) ? v.dias.filter(x => x !== d) : [...v.dias, d].sort() })
-  const bloques = negocio.tipo === 'bloque' && negocio.salon ? armarBloques([v.desde, v.hasta], negocio.salon.duracionBloque, negocio.salon.limpieza) : []
+  // Con varios salones la nota mira el primero: los bloques de cada uno se ven en Salones.
+  const s0 = negocio.salones[0]
+  const bloques = negocio.tipo === 'bloque' && s0 ? armarBloques([v.desde, v.hasta], s0.duracionBloque, s0.limpieza) : []
   const horasPorDia = (v.hasta - v.desde) / 60
   return (
-    <PaginaForm rotulo={TIPOS[negocio.tipo].label} titulo="Horarios" bajada={negocio.tipo === 'bloque' ? 'Los días que abre el salón y el horario dentro del que se arman los bloques.' : 'Los días y el horario en que se puede reservar.'}>
+    <PaginaForm rotulo={TIPOS[negocio.tipo].label} titulo="Horarios" bajada={negocio.tipo === 'bloque' ? 'Los días que se abre y el horario dentro del que se arman los bloques de cada salón.' : 'Los días y el horario en que se puede reservar.'}>
       <div className="rv-pila">
         <Seccion titulo="Días y horario" bajada="Un solo tramo por día. Fuera de esto, el sitio no ofrece nada.">
           <div className="rv-rotulo" style={{ marginBottom: 8 }}>Días</div>
@@ -42,8 +44,8 @@ export default function Horarios({ negocio, onGuardar }: Form) {
           </div>
         </Seccion>
         {negocio.tipo === 'bloque' && (bloques.length
-          ? <Nota tono="info"><span>Con este horario quedan {bloques.length === 1 ? 'un bloque fijo' : `${bloques.length} bloques fijos`}: {bloques.map(b => `${b.nombre.toLowerCase()} de ${hhmm(b.inicio)} a ${hhmm(b.fin)}`).join(', ')}. Cuánto dura cada uno y la limpieza del medio se cambian en Salón.</span></Nota>
-          : <Nota tono="aviso"><span>Con este horario no entra ningún bloque: abrí más horas o acortá los bloques en Salón.</span></Nota>)}
+          ? <Nota tono="info"><span>Con este horario quedan {bloques.length === 1 ? 'un bloque fijo' : `${bloques.length} bloques fijos`}: {bloques.map(b => `${b.nombre.toLowerCase()} de ${hhmm(b.inicio)} a ${hhmm(b.fin)}`).join(', ')}. Cuánto dura cada uno y la limpieza del medio se cambian en Salones.</span></Nota>
+          : <Nota tono="aviso"><span>Con este horario no entra ningún bloque: abrí más horas o acortá los bloques en Salones.</span></Nota>)}
       </div>
       <BarraGuardar cambiado={cambiado} motivo={v.dias.length === 0 ? 'Marcá al menos un día.' : undefined} onDescartar={() => setV(negocio.apertura)} onGuardar={() => onGuardar({ apertura: v })} />
     </PaginaForm>

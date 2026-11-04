@@ -1,7 +1,8 @@
-// Eventos del salón: todos los cumpleaños y fiestas en una lista, cada uno con
-// su ficha (quién cumple, edad, invitados, paquete, extras, saldo y notas).
-// En el modo bloque ocupa el lugar de Clientes: lo que el dueño busca es el
-// evento, no la persona que lo reservó (que igual figura en la ficha).
+// Eventos de los salones: todos los cumpleaños y fiestas en una lista, cada uno
+// con su ficha (quién cumple, edad, invitados, en qué salón, paquete, extras,
+// saldo y notas). En el modo bloque ocupa el lugar de Clientes: lo que el
+// dueño busca es el evento, no la persona que lo reservó (que igual figura en
+// la ficha). Con más de un salón, se puede mirar uno solo.
 //
 // En celular la tabla pasa a tarjetas (rv-tabla) y los filtros quedan
 // guardados detrás de un botón (Filtros del kit), con el buscador siempre a mano.
@@ -10,7 +11,7 @@ import { useState } from 'react'
 import { ArrowRight, Search } from 'lucide-react'
 import { fechaCorta, hhmm } from '@/lib/reservas/fechas'
 import { pesos } from '@/lib/reservas/precio'
-import { ESTADO_RESERVA, HOY, bloquesDe, clientePorId, tituloEvento, type Cliente, type NegocioAlquiler, type Reserva } from '../datos'
+import { ESTADO_RESERVA, HOY, bloquesDe, capital, clientePorId, palabrasDe, salonDe, tituloEvento, type Cliente, type NegocioAlquiler, type Reserva } from '../datos'
 import { Chip, Encabezado, Filtros, Vacio } from '@/design-system/reservas/piezas'
 import { Detalle } from './Reservas'
 
@@ -43,34 +44,37 @@ const CSS = `
   @media (max-width: 768px) { .ale-buscar { max-width: none; flex-basis: 100%; } }
 `
 
-const plano = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+const plano = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
 export default function Eventos({ negocio, reservas, clientes, abierta, onAbrir, onCambiar }: P) {
   const [filtro, setFiltro] = useState<Filtro>('proximos')
+  const [salonId, setSalonId] = useState('todos')
   const [q, setQ] = useState('')
-  const s = negocio.salon
-  const bloques = bloquesDe(negocio)
+  const palabras = palabrasDe(negocio)
+  const varios = negocio.salones.length > 1
   const eventos = reservas.filter(r => r.bloqueId && r.fecha)
   const elegido = FILTROS.find(f => f.id === filtro) ?? FILTROS[0]
   const nombre = (r: Reserva) => clientePorId(r.clienteId, clientes)?.nombre ?? ''
   const visibles = eventos
     .filter(elegido.cumple)
+    .filter(r => salonId === 'todos' || r.unidadId === salonId)
     .filter(r => !q.trim() || plano(`${r.evento?.agasajado ?? ''} ${nombre(r)}`).includes(plano(q.trim())))
     // Los próximos, del más cercano al más lejano; el resto, del último para atrás.
     .sort((a, b) => (filtro === 'proximos' ? 1 : -1) * ((a.fecha ?? '').localeCompare(b.fecha ?? '') || (a.inicio ?? 0) - (b.inicio ?? 0)))
   const reserva = abierta ? reservas.find(r => r.id === abierta) ?? null : null
   const proximos = eventos.filter(FILTROS[0].cumple).length
+  const resumen = [elegido.label, salonId !== 'todos' ? salonDe(negocio, salonId)?.nombre : null].filter(Boolean).join(' · ')
 
   return (
     <div className="rv-pagina">
       <style>{CSS}</style>
-      <Encabezado rotulo={`${proximos} ${proximos === 1 ? 'evento próximo' : 'eventos próximos'}`} titulo="Eventos" bajada="La ficha de cada cumpleaños o fiesta: quién cumple, invitados, paquete, extras, lo que falta cobrar y las notas." />
+      <Encabezado rotulo={`${proximos} ${proximos === 1 ? 'evento próximo' : 'eventos próximos'}`} titulo="Eventos" bajada={`La ficha de cada cumpleaños o fiesta: quién cumple, invitados, ${varios ? `en qué ${palabras.unidad}, ` : ''}paquete, extras, lo que falta cobrar y las notas.`} />
       <div className="ale-barra">
         <label className="rv-campo ale-buscar">
           <span className="rv-sr">Buscar</span>
           <span className="rv-con-prefijo"><i><Search size={15} aria-hidden /></i><input className="rv-input" value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar por quién cumple o por cliente" style={{ paddingLeft: 36 }} /></span>
         </label>
-        <Filtros resumen={elegido.label}>
+        <Filtros resumen={resumen}>
           <div className="ale-filtros" role="group" aria-label="Qué eventos mostrar">
             {FILTROS.map(f => (
               <button key={f.id} type="button" className="rv-chip rv-chip--borde" aria-pressed={f.id === filtro} onClick={() => setFiltro(f.id)}>
@@ -78,22 +82,30 @@ export default function Eventos({ negocio, reservas, clientes, abierta, onAbrir,
               </button>
             ))}
           </div>
+          {varios && (
+            <div className="ale-filtros" role="group" aria-label={`En qué ${palabras.unidad}`}>
+              <button type="button" className="rv-chip rv-chip--borde" aria-pressed={salonId === 'todos'} onClick={() => setSalonId('todos')}>Todos los {palabras.unidades}</button>
+              {negocio.salones.map(s => <button key={s.id} type="button" className="rv-chip rv-chip--borde" aria-pressed={salonId === s.id} onClick={() => setSalonId(s.id)}>{s.nombre}</button>)}
+            </div>
+          )}
         </Filtros>
       </div>
       {visibles.length === 0 ? <Vacio titulo={q.trim() ? `Nada coincide con “${q.trim()}”` : 'No hay eventos acá'} texto={q.trim() ? undefined : 'Probá con otro filtro.'} /> : (
         // Entre 769 y 1024 (con la barra lateral) la tabla puede no entrar: corre adentro de su tarjeta, nunca la página.
         <div className="rv-card" style={{ padding: '0 16px', overflowX: 'auto' }}>
           <table className="rv-tabla">
-            <thead><tr><th>Evento</th><th>Cuándo</th><th>Invitados</th><th>Paquete y extras</th><th>Saldo</th><th>Estado</th><th><span className="rv-sr">Abrir</span></th></tr></thead>
+            <thead><tr><th>Evento</th><th>Cuándo</th>{varios && <th>{capital(palabras.unidad)}</th>}<th>Invitados</th><th>Paquete y extras</th><th>Saldo</th><th>Estado</th><th><span className="rv-sr">Abrir</span></th></tr></thead>
             <tbody>
               {visibles.map(r => {
-                const b = bloques.find(x => x.id === r.bloqueId)
+                const s = salonDe(negocio, r.unidadId)
+                const b = bloquesDe(negocio, s).find(x => x.id === r.bloqueId)
                 const paquete = s?.paquetes.find(p => p.id === r.paqueteId)
                 const saldo = r.total - r.sena
                 return (
                   <tr key={r.id}>
                     <td data-label="Evento"><span className="ale-evento">{tituloEvento(r.evento)}<small>{nombre(r) || '—'}</small></span></td>
                     <td data-label="Cuándo">{fechaCorta(r.fecha!)} · {b ? b.nombre.toLowerCase() : hhmm(r.inicio ?? 0)}</td>
+                    {varios && <td data-label={capital(palabras.unidad)}>{s?.nombre ?? '—'}</td>}
                     <td data-label="Invitados" className="rv-num">{r.evento?.invitados ?? '—'}</td>
                     <td data-label="Paquete y extras">{paquete ? paquete.nombre : '—'}{r.extras.length ? ` · ${r.extras.length} ${r.extras.length === 1 ? 'extra' : 'extras'}` : ''}</td>
                     <td data-label="Saldo" className="rv-num">{r.estado === 'cancelada' ? '—' : saldo > 0 && !r.saldoPagado ? pesos(saldo) : 'Pagado'}</td>

@@ -83,6 +83,19 @@ export function grillaMes(anio: number, mes: number): CeldaMes[] {
   })
 }
 
+/**
+ * La misma fecha `n` meses después (o antes, con n negativo), con el mismo día del
+ * mes: del 15 de enero al 15 de abril. Si ese mes no tiene ese día, el último que
+ * tenga: del 31 de enero al 28 de febrero. Es como se cuenta un alquiler por mes.
+ */
+export function sumarMeses(f: ISO, n: number): ISO {
+  const { anio, mes, dia } = partes(f)
+  const total = anio * 12 + (mes - 1) + n
+  const a = Math.floor(total / 12)
+  const m = ((total % 12) + 12) % 12 + 1
+  return iso(a, m, Math.min(dia, diasDelMes(a, m)))
+}
+
 /** Primer día del mes siguiente o anterior a `f`. */
 export function moverMes(f: ISO, pasos: number): ISO {
   const { anio, mes } = partes(f)

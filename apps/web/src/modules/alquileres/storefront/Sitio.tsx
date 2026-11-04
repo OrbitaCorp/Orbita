@@ -19,7 +19,7 @@ import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 import { hhmm, DIAS_CORTOS } from '@/lib/reservas/fechas'
 import { pesos } from '@/lib/reservas/precio'
 import type { GrupoNoches } from '@/lib/reservas/estadia'
-import { TIPOS, type NegocioAlquiler, type TipoAlquiler } from '../datos'
+import { palabrasDe, type NegocioAlquiler, type TipoAlquiler } from '../datos'
 import { EstiloReservas } from '@/design-system/reservas/estilo'
 
 export type PaginaSitio = 'inicio' | 'reserva' | 'mis-reservas'
@@ -201,7 +201,7 @@ export default function Sitio({ negocio, pagina, cta, children }: Props) {
   const sigla = negocio.nombre.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase()
   const nav: { id: PaginaSitio; label: string; fijo?: boolean }[] = [
     { id: 'inicio', label: 'Inicio' },
-    { id: 'reserva', label: TIPOS[tipo].verbo, fijo: true },
+    { id: 'reserva', label: palabrasDe(negocio).verbo, fijo: true },
     { id: 'mis-reservas', label: 'Mis reservas', fijo: true },
   ]
   const ctaAncho = { flex: cta?.sub ? '0 0 auto' : 1 }

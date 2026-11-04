@@ -27,7 +27,8 @@ export interface DemoAlquiler {
 }
 
 const INICIAL: DemoAlquiler = { negocios: {}, reservas: {}, cambios: {}, clientes: [], alta: null }
-const CLAVE = 'orbita_alquileres_demo'
+// v2 desde que el salón pasó a ser una lista (salones) y las propiedades tienen modalidad: lo guardado con el esquema viejo no se lee.
+const CLAVE = 'orbita_alquileres_demo_v2'
 
 let cache: DemoAlquiler = INICIAL
 let leido = false
@@ -71,7 +72,7 @@ export function reservasDelDemo(demo: DemoAlquiler, tipo: TipoAlquiler): Reserva
 }
 
 const unidadExiste = (n: NegocioAlquiler, id: string) =>
-  n.tipo === 'bloque' ? id === 'salon' : n.tipo === 'cancha' ? n.unidades.some(u => u.id === id) : n.propiedades.some(p => p.id === id)
+  n.tipo === 'bloque' ? n.salones.some(s => s.id === id) : n.tipo === 'cancha' ? n.unidades.some(u => u.id === id) : n.propiedades.some(p => p.id === id)
 
 export const clientesDelDemo = (demo: DemoAlquiler): Cliente[] => [...CLIENTES, ...demo.clientes]
 

@@ -7,8 +7,7 @@ import { useState } from 'react'
 import { ArrowRight, CalendarCheck, Contact, Search, UserPlus } from 'lucide-react'
 import { MESES, fechaCorta, hhmm, moverMes, partes, rangoTxt } from '@/lib/reservas/fechas'
 import { pesos } from '@/lib/reservas/precio'
-import { nochesEntre } from '@/lib/reservas/estadia'
-import { ESTADO_RESERVA, HOY, TIPOS, fechaDeReserva, nochesTxt, unidadPorId, type Cliente, type NegocioAlquiler, type Reserva } from '../datos'
+import { ESTADO_RESERVA, HOY, capital, duracionEstadiaTxt, fechaDeReserva, palabrasDe, unidadPorId, type Cliente, type NegocioAlquiler, type Reserva } from '../datos'
 import { Chip, Encabezado, Kpi, Modal, Sigla, Vacio } from '@/design-system/reservas/piezas'
 
 interface P {
@@ -35,7 +34,7 @@ const esNuevo = (c: Cliente) => c.id.startsWith('kn') || c.id.startsWith('ka')
 
 export default function Clientes({ negocio, reservas, clientes, abierto, onAbrir }: P) {
   const [q, setQ] = useState('')
-  const t = TIPOS[negocio.tipo]
+  const palabras = palabrasDe(negocio)
   const filas = clientes.map(c => {
     const suyas = reservas.filter(r => r.clienteId === c.id && r.estado !== 'cancelada').sort((a, b) => fechaDeReserva(b).localeCompare(fechaDeReserva(a)))
     const gastado = suyas.filter(r => r.estado === 'completada' || r.estado === 'confirmada').reduce((s, r) => s + r.total, 0)
@@ -45,8 +44,8 @@ export default function Clientes({ negocio, reservas, clientes, abierto, onAbrir
   }).filter(f => f.cuantas > 0 || esNuevo(f.c)).sort((a, b) => (b.reciente ?? '').localeCompare(a.reciente ?? ''))
   const visibles = filas.filter(f => !q.trim() || plano(`${f.c.nombre} ${f.c.telefono} ${f.c.email ?? ''}`).includes(plano(q.trim())))
   const fila = abierto ? filas.find(f => f.c.id === abierto) ?? null : null
-  const cuando = (r: Reserva) => r.entrada && r.salida ? `${rangoTxt(r.entrada, r.salida)} · ${nochesTxt(nochesEntre(r.entrada, r.salida))}` : r.fecha ? `${fechaCorta(r.fecha)} · ${hhmm(r.inicio ?? 0)}` : ''
-  const plural = t.cliente === 'huésped' ? 'Huéspedes' : 'Clientes'
+  const cuando = (r: Reserva) => r.entrada && r.salida ? `${rangoTxt(r.entrada, r.salida)} · ${duracionEstadiaTxt(r)}` : r.fecha ? `${fechaCorta(r.fecha)} · ${hhmm(r.inicio ?? 0)}` : ''
+  const plural = capital(palabras.clientes)
   // Nuevo este mes: su primera reserva es de este mes (o llegó con la demo y todavía no tiene ninguna).
   const primerDia = moverMes(HOY, 0)
   const nuevos = filas.filter(f => (f.primera ? f.primera >= primerDia : true)).length
@@ -68,7 +67,7 @@ export default function Clientes({ negocio, reservas, clientes, abierto, onAbrir
         // Entre 769 y 1024 (con la barra lateral) la tabla puede no entrar: corre adentro de su tarjeta, nunca la página.
         <div className="rv-card" style={{ padding: '0 16px', overflowX: 'auto' }}>
           <table className="rv-tabla">
-            <thead><tr><th>{t.cliente === 'huésped' ? 'Huésped' : 'Cliente'}</th><th>Reservas</th><th>Última</th><th>Próxima</th><th>Gastado</th><th><span className="rv-sr">Abrir</span></th></tr></thead>
+            <thead><tr><th>{capital(palabras.cliente)}</th><th>Reservas</th><th>Última</th><th>Próxima</th><th>Gastado</th><th><span className="rv-sr">Abrir</span></th></tr></thead>
             <tbody>
               {visibles.map(f => (
                 <tr key={f.c.id}>

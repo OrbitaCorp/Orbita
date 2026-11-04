@@ -9,7 +9,7 @@ import { CheckCheck, ChevronDown, RotateCcw, Send } from 'lucide-react'
 import { fechaCorta, hhmm } from '@/lib/reservas/fechas'
 import { pesos } from '@/lib/reservas/precio'
 import { BarraGuardar, Chip, EtiquetaDemo, Seccion, Sigla } from '@/design-system/reservas/piezas'
-import { HOY, MENSAJES, TIPOS, VARIABLES_MENSAJE, clientePorId, fechaDeReserva, mensajesDeFabrica, rellenarMensaje, unidadPorId, type Cliente, type InfoMensaje, type MensajeAuto, type NegocioAlquiler, type Reserva, type VariableMensaje } from '../../datos'
+import { HOY, MENSAJES, TIPOS, VARIABLES_MENSAJE, clientePorId, fechaDeReserva, mensajesDeFabrica, palabrasDe, rellenarMensaje, unidadPorId, type Cliente, type InfoMensaje, type MensajeAuto, type NegocioAlquiler, type Reserva, type VariableMensaje } from '../../datos'
 import { PaginaForm, igual, type Form } from './comun'
 
 const CSS = `
@@ -33,6 +33,7 @@ export default function Mensajes({ negocio, reservas, clientes, onGuardar, onAvi
   const cambiado = !igual(lista, negocio.mensajes)
   const editar = (id: string, c: Partial<MensajeAuto>) => setLista(lista.map(m => (m.id === id ? { ...m, ...c } : m)))
   const fabrica = mensajesDeFabrica(negocio.tipo)
+  const palabras = palabrasDe(negocio)
   const prendidos = lista.filter(m => m.on).length
 
   // La reserva de ejemplo: la próxima confirmada de la agenda (o la primera que haya).
@@ -43,7 +44,7 @@ export default function Mensajes({ negocio, reservas, clientes, onGuardar, onAvi
   const datos: Record<VariableMensaje, string> = {
     nombre: cliente?.nombre.split(' ')[0] ?? 'Sofía',
     negocio: negocio.nombre,
-    unidad: unidad?.nombre ?? TIPOS[negocio.tipo].unidad,
+    unidad: unidad?.nombre ?? palabras.unidad,
     fecha: ejemplo ? fechaCorta(fechaDeReserva(ejemplo)) : fechaCorta(HOY),
     hora: hhmm(ejemplo?.inicio ?? prop?.checkIn ?? 15 * 60),
     total: pesos(ejemplo?.total ?? 45000),
@@ -53,7 +54,7 @@ export default function Mensajes({ negocio, reservas, clientes, onGuardar, onAvi
   }
 
   return (
-    <PaginaForm rotulo={TIPOS[negocio.tipo].label} titulo="Recordatorios y mensajes" bajada={`Lo que les llega a tus ${TIPOS[negocio.tipo].clientes === 'eventos' ? 'clientes' : TIPOS[negocio.tipo].clientes} por WhatsApp sin que muevas un dedo. ${prendidos} de ${lista.length} prendidos.`} acciones={<EtiquetaDemo>Demo: no se manda nada</EtiquetaDemo>}>
+    <PaginaForm rotulo={TIPOS[negocio.tipo].label} titulo="Recordatorios y mensajes" bajada={`Lo que les llega a tus ${palabras.clientes === 'eventos' ? 'clientes' : palabras.clientes} por WhatsApp sin que muevas un dedo. ${prendidos} de ${lista.length} prendidos.`} acciones={<EtiquetaDemo>Demo: no se manda nada</EtiquetaDemo>}>
       <style>{CSS}</style>
       <div className="rv-pila">
         {MENSAJES.map(meta => {

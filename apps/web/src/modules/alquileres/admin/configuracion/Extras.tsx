@@ -1,6 +1,6 @@
-// Extras: lo que se suma al total si el cliente lo marca al reservar. En las
-// canchas (iluminación, pelotas, pecheras) viven en el negocio; en el salón
-// (DJ, inflables, animador…) en la configuración del salón. Cada uno dice
+// Extras: lo que se suma al total si el cliente lo marca al reservar. Son del
+// negocio, no de cada cancha ni de cada salón: la iluminación o las pelotas en
+// las canchas; el DJ, los inflables, el animador en los salones. Cada uno dice
 // cuántas veces lo pidieron, así se ve cuál conviene mantener.
 import { useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
@@ -12,7 +12,7 @@ import { PaginaForm, idNuevo, igual, num, type Form } from './comun'
 
 export default function Extras({ negocio, reservas, onGuardar }: Form & { reservas: Reserva[] }) {
   const enSalon = negocio.tipo === 'bloque'
-  const origen = enSalon ? negocio.salon?.extras ?? [] : negocio.extras
+  const origen = negocio.extras
   const [lista, setLista] = useState<Extra[]>(origen)
   const cambiado = !igual(lista, origen)
   const editar = (id: string, c: Partial<Extra>) => setLista(lista.map(e => (e.id === id ? { ...e, ...c } : e)))
@@ -21,12 +21,9 @@ export default function Extras({ negocio, reservas, onGuardar }: Form & { reserv
   const mes = HOY.slice(0, 7)
   const delMes = activas.filter(r => (r.fecha ?? '').startsWith(mes) && r.extras.length)
   const sumaMes = delMes.reduce((s, r) => s + origen.filter(e => r.extras.includes(e.id)).reduce((a, e) => a + e.precio, 0), 0)
-  const guardar = () => {
-    const limpios = lista.map(e => ({ ...e, nombre: e.nombre.trim() || 'Extra' }))
-    onGuardar(enSalon ? { salon: { ...negocio.salon!, extras: limpios } } : { extras: limpios })
-  }
+  const guardar = () => onGuardar({ extras: lista.map(e => ({ ...e, nombre: e.nombre.trim() || 'Extra' })) })
   return (
-    <PaginaForm rotulo={TIPOS[negocio.tipo].label} titulo="Extras" bajada={enSalon ? 'DJ, inflables, animador, mozo, torta, decoración: lo que se suma al paquete.' : 'Iluminación, pelotas, pecheras: se suman al total si el cliente los marca.'}
+    <PaginaForm rotulo={TIPOS[negocio.tipo].label} titulo="Extras" bajada={enSalon ? `DJ, inflables, animador, mozo, torta, decoración: lo que se suma al paquete${negocio.salones.length > 1 ? ', en cualquiera de los salones' : ''}.` : 'Iluminación, pelotas, pecheras: se suman al total si el cliente los marca.'}
       acciones={<button type="button" className="rv-btn rv-btn--sm" onClick={() => setLista([...lista, { id: idNuevo('e'), nombre: 'Nuevo extra', precio: enSalon ? 20000 : 2000 }])}><Plus size={15} aria-hidden /> Agregar extra</button>}>
       <div className="rv-pila">
         {lista.length === 0 ? <Vacio titulo="Sin extras" texto="El paso de extras se saltea al reservar." /> : (

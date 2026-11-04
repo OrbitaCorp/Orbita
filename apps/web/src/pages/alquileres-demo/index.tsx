@@ -14,7 +14,7 @@ export const getServerSideProps: GetServerSideProps = async () =>
 
 const PANTALLAS = [
   { href: '/alquileres-demo/onboarding', label: 'Alta', Icon: Rocket, texto: 'El alta única de Órbita con Alquileres elegido: qué alquilás, lo que alquilás, tu negocio y tu página.' },
-  { href: '/alquileres-demo/panel', label: 'Panel', Icon: LayoutDashboard, texto: 'Agenda, clientes (eventos en el salón, huéspedes en la estadía), ingresos y configuración.' },
+  { href: '/alquileres-demo/panel', label: 'Panel', Icon: LayoutDashboard, texto: 'Agenda, qué hay libre, clientes (eventos en los salones, huéspedes o inquilinos en el alojamiento), ingresos y configuración.' },
   { href: '/alquileres-demo/negocio', label: 'Sitio', Icon: Store, texto: 'Lo que ven los clientes: portada, unidades, paquetes o propiedades.' },
   { href: '/alquileres-demo/reserva', label: 'Reserva', Icon: CalendarCheck, texto: 'El flujo completo, sin registrarse, con seña simulada.' },
   { href: '/alquileres-demo/mis-reservas', label: 'Mis reservas', Icon: Users, texto: 'Lo que reservó el cliente, con cancelación dentro del plazo.' },
@@ -30,7 +30,7 @@ export default function AlquileresDemo() {
         <div className="rv-pagina" style={{ maxWidth: 1040 }}>
           <span className="rv-rotulo">Alquileres · Vista previa local</span>
           <h1 className="rv-h1" style={{ fontSize: 32, marginTop: 8 }}>Tres formas de alquilar, un solo módulo</h1>
-          <p className="rv-bajada" style={{ fontSize: 15 }}>Por hora, por bloque o por noches. Todo es visual y con datos de ejemplo: no llama a la API ni guarda nada fuera de este navegador. Elegí un negocio y recorré sus pantallas.</p>
+          <p className="rv-bajada" style={{ fontSize: 15 }}>Por hora, por bloque (uno o varios salones) o por período, por noche o por mes. Todo es visual y con datos de ejemplo: no llama a la API ni guarda nada fuera de este navegador. Elegí un negocio y recorré sus pantallas.</p>
           <div className="rv-grid rv-grid--3" style={{ marginTop: 24 }}>
             {TIPOS_ORDEN.map((t, i) => {
               const n = NEGOCIOS_DEMO[t]

@@ -7,9 +7,8 @@ import Link from 'next/link'
 import { ArrowRight, CalendarPlus, Check, Clock, MapPin, X } from 'lucide-react'
 import { diasEntre, fechaLarga, hhmm, rangoTxt } from '@/lib/reservas/fechas'
 import { pesos } from '@/lib/reservas/precio'
-import { nochesEntre } from '@/lib/reservas/estadia'
 import { descargarICS, generarICS } from '@/lib/reservas/ics'
-import { AHORA, ESTADO_RESERVA, HOY, TIPOS, cuenta, fechaDeReserva, nochesTxt, unidadPorId, type NegocioAlquiler, type Reserva } from '../datos'
+import { AHORA, ESTADO_RESERVA, HOY, cuenta, duracionEstadiaTxt, fechaDeReserva, palabrasDe, unidadPorId, type NegocioAlquiler, type Reserva } from '../datos'
 import { Modal, Chip, useAviso } from '@/design-system/reservas/piezas'
 import Sitio, { ruta } from './Sitio'
 import { CSS_RESERVA } from './Reserva'
@@ -28,6 +27,7 @@ interface P { negocio: NegocioAlquiler; reservas: Reserva[]; onCancelar: (id: st
 
 export default function MisReservas({ negocio, reservas, onCancelar }: P) {
   const tipo = negocio.tipo
+  const palabras = palabrasDe(negocio)
   const esPasada = (r: Reserva) => {
     if (r.entrada && r.salida) return r.salida <= HOY
     if (!r.fecha) return false
@@ -53,7 +53,7 @@ export default function MisReservas({ negocio, reservas, onCancelar }: P) {
   const aTiempo = (r: Reserva) => horasHasta(r) >= negocio.cancelaHastaHoras
   const plazo = negocio.cancelaHastaHoras >= 24 ? `${negocio.cancelaHastaHoras / 24} ${negocio.cancelaHastaHoras / 24 === 1 ? 'día' : 'días'}` : `${negocio.cancelaHastaHoras} horas`
 
-  const cuando = (r: Reserva) => r.entrada && r.salida ? `${rangoTxt(r.entrada, r.salida)} · ${nochesTxt(nochesEntre(r.entrada, r.salida))}`
+  const cuando = (r: Reserva) => r.entrada && r.salida ? `${rangoTxt(r.entrada, r.salida)} · ${duracionEstadiaTxt(r)}`
     : r.fecha && r.inicio !== undefined && r.fin !== undefined ? `${fechaLarga(r.fecha)} · ${hhmm(r.inicio)} a ${hhmm(r.fin)}` : ''
   const faltan = (r: Reserva) => {
     const n = diasEntre(HOY, fechaDeReserva(r))
@@ -67,7 +67,7 @@ export default function MisReservas({ negocio, reservas, onCancelar }: P) {
   }
 
   return (
-    <Sitio negocio={negocio} pagina="mis-reservas" cta={{ texto: TIPOS[tipo].verbo, href: ruta('reserva', tipo) }}>
+    <Sitio negocio={negocio} pagina="mis-reservas" cta={{ texto: palabras.verbo, href: ruta('reserva', tipo) }}>
       {/* Un solo texto: con dos hijos, el servidor mete un separador adentro del <style> y la hidratación falla. */}
       <style>{CSS_RESERVA + CSS_MIS}</style>
       <div className="als-cont" style={{ maxWidth: 760, paddingTop: 28 }}>
@@ -76,7 +76,7 @@ export default function MisReservas({ negocio, reservas, onCancelar }: P) {
             <h1 className="rv-h1">Mis reservas</h1>
             <p className="rv-bajada">Cancelás sin cargo hasta {plazo} antes{negocio.senaPct ? ': la seña se devuelve.' : '.'}</p>
           </div>
-          <Link href={ruta('reserva', tipo)} className="rv-btn rv-btn--primario">{TIPOS[tipo].verbo} <ArrowRight size={16} aria-hidden /></Link>
+          <Link href={ruta('reserva', tipo)} className="rv-btn rv-btn--primario">{palabras.verbo} <ArrowRight size={16} aria-hidden /></Link>
         </div>
 
         {proximas.length === 0 ? (
@@ -123,7 +123,7 @@ export default function MisReservas({ negocio, reservas, onCancelar }: P) {
                     <span className="rv-item-sub">{cuando(r)} · {pesos(r.total)}</span>
                   </div>
                   <Chip tono={ESTADO_RESERVA[r.estado].tono}>{ESTADO_RESERVA[r.estado].label}</Chip>
-                  {r.estado !== 'cancelada' && <Link href={ruta('reserva', tipo, tipo === 'estadia' ? { propiedad: r.unidadId } : tipo === 'cancha' ? { unidad: r.unidadId } : {})} className="rv-btn rv-btn--sm">Repetir</Link>}
+                  {r.estado !== 'cancelada' && <Link href={ruta('reserva', tipo, tipo === 'estadia' ? { propiedad: r.unidadId } : tipo === 'cancha' ? { unidad: r.unidadId } : { salon: r.unidadId })} className="rv-btn rv-btn--sm">Repetir</Link>}
                 </div>
               ))}
             </div>

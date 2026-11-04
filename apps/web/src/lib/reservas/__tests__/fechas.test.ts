@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { aDias, deDias, diaSemana, diasDelMes, diasEntre, esFinDeSemana, esISO, grillaMes, moverMes, rango, rangoTxt, sumarDias, fechaCorta, fechaLarga, hhmm, aMinutos, fechaRelativa } from '../fechas'
+import { aDias, deDias, diaSemana, diasDelMes, diasEntre, esFinDeSemana, esISO, grillaMes, moverMes, rango, rangoTxt, sumarDias, sumarMeses, fechaCorta, fechaLarga, hhmm, aMinutos, fechaRelativa } from '../fechas'
 
 describe('fechas', () => {
+  it('suma meses conservando el día, o el último del mes si no existe', () => {
+    expect(sumarMeses('2026-01-15', 3)).toBe('2026-04-15')
+    expect(sumarMeses('2026-01-31', 1)).toBe('2026-02-28')
+    expect(sumarMeses('2028-01-31', 1)).toBe('2028-02-29') // bisiesto
+    expect(sumarMeses('2026-11-14', 2)).toBe('2027-01-14') // cruza el año
+    expect(sumarMeses('2026-03-31', -1)).toBe('2026-02-28')
+    expect(sumarMeses('2026-12-01', 12)).toBe('2027-12-01')
+  })
+
   it('suma y resta días sin zona horaria', () => {
     expect(sumarDias('2026-10-26', 7)).toBe('2026-11-02')
     expect(sumarDias('2026-03-01', -1)).toBe('2026-02-28')

@@ -1,13 +1,13 @@
-// Días bloqueados (canchas y salón) o Bloqueos (estadía): todo lo que el dueño
-// cerró y lo que trajo un calendario externo, en una lista: los que vienen y
-// los que ya pasaron. Desde acá se agregan (el mismo modal que usa la agenda) y
-// se quitan los propios; los de un calendario externo se quitan desconectando
-// el calendario en Calendarios (.ics).
+// Días bloqueados (canchas y salones) o Bloqueos (alojamiento): todo lo que el
+// dueño cerró y lo que trajo un calendario externo, en una lista: los que
+// vienen y los que ya pasaron. Desde acá se agregan (el mismo modal que usa la
+// agenda) y se quitan los propios; los de un calendario externo se quitan
+// desconectando el calendario en Calendarios (.ics).
 import { useState } from 'react'
 import { ArrowRight, Ban, Link2, Trash2 } from 'lucide-react'
 import { diasEntre, fechaCorta, rangoTxt } from '@/lib/reservas/fechas'
 import { Chip, Nota, Seccion, Vacio } from '@/design-system/reservas/piezas'
-import { HOY, TIPOS, cuenta, unidadesDe, type Bloqueo, type NegocioAlquiler, type Reserva } from '../../datos'
+import { HOY, TIPOS, capital, cuenta, palabrasDe, todasLasUnidades, unidadesDe, type Bloqueo, type NegocioAlquiler, type Reserva } from '../../datos'
 import { BloquearDia, BloquearFechas } from '../Bloquear'
 import type { Vista } from '../navegacion'
 import { PaginaForm } from './comun'
@@ -20,7 +20,7 @@ interface P {
   onIr: (vista: Vista) => void
 }
 
-/** Varios bloqueos iguales (el torneo que cierra las cuatro canchas) se muestran como uno solo, con el nombre de lo que cierran ya armado. */
+/** Varios bloqueos iguales (el torneo que cierra las cuatro canchas, el feriado de los dos salones) se muestran como uno solo, con el nombre de lo que cierran ya armado. */
 interface Grupo { clave: string; ids: string[]; que: string; desde: string; hasta: string; motivo: string; origen: Bloqueo['origen'] }
 
 // Afuera de Bloqueos: definida adentro sería un componente nuevo en cada render y React la remontaría.
@@ -39,6 +39,7 @@ function Fila({ g, onQuitar }: { g: Grupo; onQuitar: (ids: string[]) => void }) 
 export default function Bloqueos({ negocio, reservas, onBloqueo, onQuitarBloqueo, onIr }: P) {
   const [abrir, setAbrir] = useState(false)
   const tipo = negocio.tipo
+  const palabras = palabrasDe(negocio)
   const unidades = unidadesDe(negocio)
   const nombre = (id: string) => unidades.find(u => u.id === id)?.nombre ?? id
   const crudos: (Omit<Grupo, 'que'> & { unidades: string[] })[] = []
@@ -47,18 +48,18 @@ export default function Bloqueos({ negocio, reservas, onBloqueo, onQuitarBloqueo
     const g = crudos.find(x => x.clave === clave)
     if (g) { g.ids.push(b.id); g.unidades.push(nombre(b.unidadId)) } else crudos.push({ clave, ids: [b.id], unidades: [nombre(b.unidadId)], desde: b.desde, hasta: b.hasta, motivo: b.motivo, origen: b.origen })
   }
-  const grupos: Grupo[] = crudos.map(g => ({ ...g, que: tipo === 'bloque' ? 'El salón' : tipo === 'cancha' && g.unidades.length === negocio.unidades.length && negocio.unidades.length > 1 ? 'Todas las canchas' : g.unidades.join(', ') }))
+  const grupos: Grupo[] = crudos.map(g => ({ ...g, que: g.unidades.length === unidades.length && unidades.length > 1 ? capital(todasLasUnidades(palabras)) : g.unidades.join(', ') }))
   const proximos = grupos.filter(g => g.hasta > HOY).sort((a, b) => a.desde.localeCompare(b.desde))
   const pasados = grupos.filter(g => g.hasta <= HOY).sort((a, b) => b.desde.localeCompare(a.desde))
   const deDias = tipo !== 'estadia'
   const quitar = (ids: string[]) => ids.forEach(id => onQuitarBloqueo(id))
   return (
     <PaginaForm rotulo={TIPOS[tipo].label} titulo={deDias ? 'Días bloqueados' : 'Bloqueos'}
-      bajada={tipo === 'cancha' ? 'Mantenimiento, torneos, feriados: los días en que una cancha (o todas) no se puede reservar.' : tipo === 'bloque' ? 'Feriados, eventos propios, arreglos: los días en que nadie puede reservar el salón.' : 'Mantenimiento, uso propio o lo que se alquiló por otro lado: las noches que no se pueden reservar.'}
+      bajada={tipo === 'cancha' ? `Mantenimiento, torneos, feriados: los días en que ${palabras.genero === 'm' ? 'un' : 'una'} ${palabras.unidad} (o ${todasLasUnidades(palabras)}) no se puede reservar.` : tipo === 'bloque' ? `Feriados, eventos propios, arreglos: los días en que nadie puede reservar ${negocio.salones.length > 1 ? `un ${palabras.unidad} o ${todasLasUnidades(palabras)}` : `el ${palabras.unidad}`}.` : 'Mantenimiento, uso propio o lo que se alquiló por otro lado: las fechas que no se pueden reservar.'}
       acciones={<button type="button" className="rv-btn rv-btn--primario" onClick={() => setAbrir(true)}><Ban size={15} aria-hidden /> {deDias ? 'Bloquear un día' : 'Bloquear fechas'}</button>}>
       <div className="rv-pila">
         <Seccion titulo="Próximos" bajada={proximos.length ? `${cuenta(proximos.length, 'bloqueo', 'bloqueos')} por delante.` : 'Nada bloqueado por delante.'}>
-          {proximos.length ? <div className="rv-lista">{proximos.map(g => <Fila key={g.clave} g={g} onQuitar={quitar} />)}</div> : <Vacio titulo={deDias ? 'Ningún día bloqueado' : 'Ninguna noche bloqueada'} texto="Todo lo que abre se puede reservar." />}
+          {proximos.length ? <div className="rv-lista">{proximos.map(g => <Fila key={g.clave} g={g} onQuitar={quitar} />)}</div> : <Vacio titulo={deDias ? 'Ningún día bloqueado' : 'Ninguna fecha bloqueada'} texto="Todo lo que abre se puede reservar." />}
         </Seccion>
         {pasados.length > 0 && (
           <Seccion titulo="Pasados" bajada="Quedan como historial.">

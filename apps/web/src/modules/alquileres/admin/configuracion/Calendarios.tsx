@@ -9,7 +9,7 @@ import { Download, Link2, Trash2, Upload } from 'lucide-react'
 import { fechaCorta, rangoTxt, sumarDias } from '@/lib/reservas/fechas'
 import { descargarICS, generarICS, leerICS, type EventoICS } from '@/lib/reservas/ics'
 import { EtiquetaDemo, Campo, Nota, Seccion, Selector } from '@/design-system/reservas/piezas'
-import { HOY, TIPOS, cuenta, unidadesDe, type Bloqueo, type CalendarioExterno, type NegocioAlquiler, type Reserva } from '../../datos'
+import { HOY, TIPOS, cuenta, palabrasDe, unidadesDe, type Bloqueo, type CalendarioExterno, type NegocioAlquiler, type Reserva } from '../../datos'
 import { deCalendario } from '../../datos/negocio'
 import { PaginaForm, idNuevo } from './comun'
 
@@ -61,7 +61,7 @@ export default function Calendarios({ negocio, reservas, onCalendario, onQuitarC
     <PaginaForm rotulo={TIPOS[negocio.tipo].label} titulo="Calendarios (.ics)" bajada="Exportá tus reservas a Google Calendar, Airbnb o Booking, e importá lo que tengas reservado por otro lado para que acá quede bloqueado.">
       <div className="rv-pila">
         <Nota tono="info"><span>Sin sincronización en vivo con Airbnb, Booking ni Google: eso necesita las APIs de cada uno y un servidor. Se resuelve con iCal (.ics), el formato que esos servicios ya usan.</span></Nota>
-        <Seccion titulo="Exportar" bajada={`Descargá el calendario de cada ${TIPOS[negocio.tipo].unidad} con sus reservas y cargalo en Google Calendar, Airbnb o Booking.`}>
+        <Seccion titulo="Exportar" bajada={`Descargá el calendario de cada ${palabrasDe(negocio).unidad} con sus reservas y cargalo en Google Calendar, Airbnb o Booking.`}>
           <div className="rv-lista">
             {unidades.map(u => (
               <div key={u.id} className="rv-item" style={{ flexWrap: 'wrap' }}>

@@ -1,12 +1,13 @@
 // Reglas de reserva: hasta cuándo se cancela sin cargo y, según el modo, cómo
 // se arma un turno (duración, saltos, turnos seguidos) o cómo se entra y se
-// sale de cada propiedad (noches mínimas, check-in y check-out). La seña y las
-// formas de pago viven en Pagos y señas.
+// sale de cada propiedad (noches mínimas, o meses mínimos y máximos si se
+// alquila por mes, y check-in y check-out). La seña y las formas de pago viven
+// en Pagos y señas.
 import { useState } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { duracionTxt } from '@/lib/reservas/fechas'
 import { BarraGuardar, Nota, Seccion, Selector } from '@/design-system/reservas/piezas'
-import { TIPOS, type NegocioAlquiler, type Propiedad } from '../../datos'
+import { TIPOS, esMensual, mesesTxt, palabrasDe, type NegocioAlquiler, type Propiedad } from '../../datos'
 import type { Vista } from '../navegacion'
 import { HORAS, PaginaForm, igual, type Form } from './comun'
 
@@ -14,19 +15,23 @@ import { HORAS, PaginaForm, igual, type Form } from './comun'
 export const PLAZOS = [2, 6, 12, 24, 48, 72, 168].map(h => ({ id: h, label: h < 24 ? `${h} horas antes` : `${h / 24} ${h / 24 === 1 ? 'día' : 'días'} antes` }))
 export const plazoTxt = (h: number) => (h < 24 ? `${h} horas` : `${h / 24} ${h / 24 === 1 ? 'día' : 'días'}`)
 
+const MESES_OPCIONES = [1, 2, 3, 6, 12, 24]
+
 const de = (n: NegocioAlquiler) => ({ cancelaHastaHoras: n.cancelaHastaHoras, pasoMin: n.pasoMin, duracionMin: n.duracionMin, maxFranjas: n.maxFranjas, propiedades: n.propiedades })
 
 export default function Reglas({ negocio, onGuardar, onIr }: Form & { onIr: (vista: Vista) => void }) {
   const [v, setV] = useState(de(negocio))
   const cambiado = !igual(v, de(negocio))
   const tipo = negocio.tipo
+  const palabras = palabrasDe(negocio)
   const editarProp = (id: string, c: Partial<Propiedad>) => setV({ ...v, propiedades: v.propiedades.map(p => (p.id === id ? { ...p, ...c } : p)) })
   const guardar = () => {
     const { propiedades, ...resto } = v
     onGuardar(tipo === 'estadia' ? { ...resto, propiedades } : resto)
   }
+  const unaPorMes = v.propiedades.some(esMensual)
   return (
-    <PaginaForm rotulo={TIPOS[tipo].label} titulo="Reglas de reserva" bajada={tipo === 'cancha' ? 'Cómo se arma un turno y hasta cuándo se puede cancelar.' : tipo === 'bloque' ? 'Hasta cuándo se puede cancelar un evento.' : 'Noches mínimas, horarios de entrada y salida, y hasta cuándo se puede cancelar.'}>
+    <PaginaForm rotulo={TIPOS[tipo].label} titulo="Reglas de reserva" bajada={tipo === 'cancha' ? 'Cómo se arma un turno y hasta cuándo se puede cancelar.' : tipo === 'bloque' ? 'Hasta cuándo se puede cancelar un evento.' : `${unaPorMes ? 'Noches o meses mínimos' : 'Noches mínimas'}, horarios de entrada y salida, y hasta cuándo se puede cancelar.`}>
       <div className="rv-pila">
         <Seccion titulo="Cancelación" bajada="Hasta cuánto antes se cancela sin cargo. Lo que pasa con la seña se define en Pagos y señas.">
           <div className="rv-dos">
@@ -45,18 +50,25 @@ export default function Reglas({ negocio, onGuardar, onIr }: Form & { onIr: (vis
           </Seccion>
         )}
         {tipo === 'bloque' && (
-          <Nota><span style={{ flex: 1, minWidth: 0 }}>El salón se reserva por bloques fijos (tarde, noche): cuánto dura cada uno y la limpieza del medio se cambian en Salón; los días y el horario, en Horarios.</span><button type="button" className="rv-btn rv-btn--sm" onClick={() => onIr('salon')}>Ir a Salón <ArrowRight size={14} aria-hidden /></button></Nota>
+          <Nota><span style={{ flex: 1, minWidth: 0 }}>{negocio.salones.length > 1 ? `Los ${palabras.unidades}` : `El ${palabras.unidad}`} se reserva por bloques fijos (tarde, noche): cuánto dura cada uno y la limpieza del medio se cambian en {negocio.salones.length > 1 ? `cada ${palabras.unidad}` : capital(palabras.unidades)}; los días y el horario, en Horarios.</span><button type="button" className="rv-btn rv-btn--sm" onClick={() => onIr('salones')}>Ir a {capital(palabras.unidades)} <ArrowRight size={14} aria-hidden /></button></Nota>
         )}
         {tipo === 'estadia' && (
-          <Seccion titulo="Entrada, salida y noches mínimas" bajada="Por propiedad: el Depto Centro puede admitir una sola noche y las cabañas pedir dos.">
+          <Seccion titulo={unaPorMes ? 'Entrada, salida y mínimos' : 'Entrada, salida y noches mínimas'} bajada={`Por ${palabras.unidad}: una cabaña puede pedir dos noches, y un depto por mes, tres meses como mínimo.`}>
             <div className="rv-pila">
               {v.propiedades.map(p => (
                 <div key={p.id} className="rv-card rv-card--pad" style={{ background: 'var(--color-surface)' }}>
-                  <div className="rv-h3" style={{ marginBottom: 10 }}>{p.nombre}</div>
+                  <div className="rv-h3" style={{ marginBottom: 10 }}>{p.nombre}{esMensual(p) ? <span className="rv-muted" style={{ fontWeight: 400 }}> · por mes</span> : ''}</div>
                   <div className="rv-grid rv-grid--3">
-                    <Selector label="Mínimo de noches" valor={p.tarifa.minNoches} onChange={x => editarProp(p.id, { tarifa: { ...p.tarifa, minNoches: x } })} opciones={[1, 2, 3, 5, 7].map(n => ({ id: n, label: n === 1 ? '1 noche' : `${n} noches` }))} />
-                    <Selector label="Entrada desde" valor={p.checkIn} onChange={x => editarProp(p.id, { checkIn: x })} opciones={HORAS.slice(10, 22)} />
-                    <Selector label="Salida hasta" valor={p.checkOut} onChange={x => editarProp(p.id, { checkOut: x })} opciones={HORAS.slice(7, 14)} />
+                    {esMensual(p) && p.mensual ? (
+                      <>
+                        <Selector label="Mínimo de meses" valor={p.mensual.minMeses} onChange={x => editarProp(p.id, { mensual: { ...p.mensual!, minMeses: x, maxMeses: Math.max(x, p.mensual!.maxMeses) } })} opciones={MESES_OPCIONES.map(n => ({ id: n, label: mesesTxt(n) }))} />
+                        <Selector label="Máximo de meses" valor={p.mensual.maxMeses} onChange={x => editarProp(p.id, { mensual: { ...p.mensual!, maxMeses: x } })} opciones={MESES_OPCIONES.filter(n => n >= p.mensual!.minMeses).map(n => ({ id: n, label: mesesTxt(n) }))} />
+                      </>
+                    ) : (
+                      <Selector label="Mínimo de noches" valor={p.tarifa.minNoches} onChange={x => editarProp(p.id, { tarifa: { ...p.tarifa, minNoches: x } })} opciones={[1, 2, 3, 5, 7].map(n => ({ id: n, label: n === 1 ? '1 noche' : `${n} noches` }))} />
+                    )}
+                    <Selector label="Entrada desde" valor={p.checkIn} onChange={x => editarProp(p.id, { checkIn: x })} opciones={HORAS.slice(8, 22)} />
+                    <Selector label="Salida hasta" valor={p.checkOut} onChange={x => editarProp(p.id, { checkOut: x })} opciones={HORAS.slice(7, 20)} />
                   </div>
                 </div>
               ))}
@@ -69,3 +81,5 @@ export default function Reglas({ negocio, onGuardar, onIr }: Form & { onIr: (vis
     </PaginaForm>
   )
 }
+
+const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)

@@ -14,7 +14,7 @@ import { CalendarCheck, Gauge, HandCoins, LogIn, LogOut, Wallet } from 'lucide-r
 import { diaSemana, diasEntre, fechaCorta, fechaRelativa, hhmm, moverMes, rangoTxt, sumarDias, type ISO } from '@/lib/reservas/fechas'
 import { pesos } from '@/lib/reservas/precio'
 import { Barras, Chip, Encabezado, Filtros, Kpi, Segmentado } from '@/design-system/reservas/piezas'
-import { HOY, bloquesDe, clientePorId, cuenta, fechaDeReserva, tituloEvento, unidadPorId, unidadesDe, type Cliente, type NegocioAlquiler, type Reserva } from '../datos'
+import { HOY, bloquesDe, cadaUna, clientePorId, cuenta, duracionEstadiaTxt, fechaDeReserva, lasUnidades, palabrasDe, tituloEvento, unidadPorId, unidadesDe, type Cliente, type NegocioAlquiler, type Reserva } from '../datos'
 
 type Periodo = 'mes' | 'anterior' | 'trimestre'
 const PERIODOS: { id: Periodo; label: string }[] = [{ id: 'mes', label: 'Este mes' }, { id: 'anterior', label: 'Mes pasado' }, { id: 'trimestre', label: 'Últimos 3 meses' }]
@@ -52,6 +52,8 @@ export default function Ingresos({ negocio, reservas, clientes, onAbrirReserva }
   const ahora = resumir(negocio, reservas, desde, hasta)
   const antes = resumir(negocio, reservas, desdeAntes, hastaAntes)
   const tipo = negocio.tipo
+  const palabras = palabrasDe(negocio)
+  const unSalon = tipo === 'bloque' && negocio.salones.length === 1
   const nombre = (r: Reserva) => clientePorId(r.clienteId, clientes)?.nombre ?? '—'
   const donde = (r: Reserva) => unidadPorId(negocio, r.unidadId)?.nombre ?? negocio.nombre
   const cuando = (r: Reserva) => (r.entrada && r.salida ? rangoTxt(r.entrada, r.salida) : `${fechaCorta(r.fecha ?? HOY)} ${hhmm(r.inicio ?? 0)}`)
@@ -70,9 +72,9 @@ export default function Ingresos({ negocio, reservas, clientes, onAbrirReserva }
     semanas.push({ rotulo: fechaCorta(lunes).slice(4), valor: ahora.cobradas.filter(r => fechaDeReserva(r) >= lunes && fechaDeReserva(r) < fin).reduce((s, r) => s + r.total, 0) })
   }
   const suma = (lista: Reserva[]) => lista.reduce((s, r) => s + r.total, 0)
-  // En el salón, por bloque (tarde, noche…) con los nombres que salen de su configuración.
-  const porParte = tipo === 'bloque'
-    ? bloquesDe(negocio).map(b => ({ rotulo: b.nombre, valor: suma(ahora.cobradas.filter(r => r.bloqueId === b.id)) }))
+  // Con un solo salón, por bloque (tarde, noche…) con los nombres que salen de su configuración; con varios, por salón.
+  const porParte = unSalon
+    ? bloquesDe(negocio, negocio.salones[0]).map(b => ({ rotulo: b.nombre, valor: suma(ahora.cobradas.filter(r => r.bloqueId === b.id)) }))
     : unidadesDe(negocio).map(u => ({ rotulo: u.nombre, valor: suma(ahora.cobradas.filter(r => r.unidadId === u.id)) }))
   // Canchas: horas reservadas por franja de tres horas (para afinar Precios por horario). Salón: cuántos eventos por paquete.
   const franjas: { rotulo: string; valor: number }[] = []
@@ -83,7 +85,8 @@ export default function Ingresos({ negocio, reservas, clientes, onAbrirReserva }
       franjas.push({ rotulo: `${h / 60}–${fin / 60}`, valor: Math.round(minutos / 60) })
     }
   }
-  const paquetes = tipo === 'bloque' ? (negocio.salon?.paquetes ?? []).map(p => ({ rotulo: p.nombre.replace('Hasta ', 'Hasta '), valor: ahora.cobradas.filter(r => r.paqueteId === p.id).length })) : []
+  // Los paquetes de cada salón; con varios, el rótulo lleva el salón ("Jardín · 30").
+  const paquetes = tipo === 'bloque' ? negocio.salones.flatMap(s => s.paquetes.map(p => ({ rotulo: unSalon ? p.nombre : `${s.nombre.split(' ').pop()} · ${p.hastaInvitados}`, valor: ahora.cobradas.filter(r => r.paqueteId === p.id).length }))) : []
   // Estadía: llegadas y salidas de los próximos siete días.
   const enSemana = (f: ISO) => { const d = diasEntre(HOY, f); return d >= 0 && d < 7 }
   const movimientos = tipo === 'estadia'
@@ -112,9 +115,9 @@ export default function Ingresos({ negocio, reservas, clientes, onAbrirReserva }
           <Barras datos={semanas} formato={pesos} label="Facturado por semana" />
         </section>
         <section className="rv-card rv-card--pad">
-          <h2 className="rv-h2" style={{ marginBottom: 4 }}>Por {tipo === 'estadia' ? 'propiedad' : tipo === 'bloque' ? 'bloque' : 'cancha'}</h2>
-          <p className="rv-ayuda" style={{ marginBottom: 10 }}>Qué parte del total aporta cada {tipo === 'estadia' ? 'una' : tipo === 'bloque' ? 'uno' : 'una'}.</p>
-          <Barras datos={porParte} formato={pesos} label={tipo === 'bloque' ? 'Facturado por bloque' : 'Facturado por unidad'} />
+          <h2 className="rv-h2" style={{ marginBottom: 4 }}>Por {unSalon ? 'bloque' : palabras.unidad}</h2>
+          <p className="rv-ayuda" style={{ marginBottom: 10 }}>Qué parte del total aporta {unSalon ? 'cada uno' : cadaUna(palabras)}.</p>
+          <Barras datos={porParte} formato={pesos} label={unSalon ? 'Facturado por bloque' : `Facturado por ${palabras.unidad}`} />
         </section>
       </div>
       <div className="rv-grid rv-grid--2">
@@ -139,7 +142,7 @@ export default function Ingresos({ negocio, reservas, clientes, onAbrirReserva }
         {tipo === 'cancha' && (
           <section className="rv-card rv-card--pad">
             <h2 className="rv-h2" style={{ marginBottom: 4 }}>Horas reservadas por franja</h2>
-            <p className="rv-ayuda" style={{ marginBottom: 10 }}>En qué horarios se llenan las canchas: sirve para armar Precios por horario.</p>
+            <p className="rv-ayuda" style={{ marginBottom: 10 }}>En qué horarios se llenan {lasUnidades(palabras)}: sirve para armar Precios por horario.</p>
             <Barras datos={franjas} formato={v => cuenta(v, 'hora', 'horas')} label="Horas reservadas por franja horaria" />
           </section>
         )}
@@ -158,8 +161,8 @@ export default function Ingresos({ negocio, reservas, clientes, onAbrirReserva }
                 {movimientos.slice(0, 10).map(({ r, llega, f }) => (
                   <button key={`${llega ? 'in' : 'out'}-${r.id}`} type="button" className="rv-item" onClick={() => onAbrirReserva(r.id)}>
                     <span className="rv-kpi-ico" aria-hidden style={{ width: 30, height: 30, ...(llega ? {} : { background: 'var(--color-surface-alt)', color: 'var(--color-muted)' }) }}>{llega ? <LogIn size={15} strokeWidth={1.7} /> : <LogOut size={15} strokeWidth={1.7} />}</span>
-                    <span className="rv-item-cuerpo"><span className="rv-item-titulo">{nombre(r)}</span><span className="rv-item-sub">{donde(r)} · {cuenta(r.huespedes ?? 1, 'huésped', 'huéspedes')} · {horaDe(r, llega)}</span></span>
-                    <Chip tono={llega ? 'ok' : 'gris'}>{llega ? 'Llega' : 'Sale'} {fechaRelativa(f, HOY).toLowerCase()}</Chip>
+                    <span className="rv-item-cuerpo"><span className="rv-item-titulo">{nombre(r)}</span><span className="rv-item-sub">{donde(r)} · {r.meses ? duracionEstadiaTxt(r) : cuenta(r.huespedes ?? 1, 'huésped', 'huéspedes')} · {horaDe(r, llega)}</span></span>
+                    <Chip tono={llega ? 'ok' : 'gris'}>{llega ? (r.meses ? 'Entra' : 'Llega') : 'Sale'} {fechaRelativa(f, HOY).toLowerCase()}</Chip>
                   </button>
                 ))}
               </div>
@@ -184,8 +187,8 @@ function calcularOcupacion(n: NegocioAlquiler, cobradas: Reserva[], desde: ISO, 
     return disponibles ? Math.min(1, ocupadas / disponibles) : 0
   }
   const abiertos = Array.from({ length: dias }, (_, i) => sumarDias(desde, i)).filter(f => n.apertura.dias.includes(diaSemana(f))).length
-  if (n.tipo === 'bloque' && n.salon) {
-    const disponibles = abiertos * bloquesDe(n).length
+  if (n.tipo === 'bloque') {
+    const disponibles = abiertos * n.salones.reduce((s, x) => s + bloquesDe(n, x).length, 0)
     return disponibles ? Math.min(1, cobradas.filter(r => (r.fecha ?? '') <= fin).length / disponibles) : 0
   }
   const horasDisponibles = (abiertos * (n.apertura.hasta - n.apertura.desde) * n.unidades.length) / 60

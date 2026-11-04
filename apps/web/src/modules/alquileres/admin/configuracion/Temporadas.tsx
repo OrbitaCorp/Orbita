@@ -7,9 +7,9 @@ import { useState, type CSSProperties } from 'react'
 import { ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react'
 import { DIAS_CORTOS, fechaLarga, grillaMes, mesTxt, moverMes, partes, sumarDias, type ISO } from '@/lib/reservas/fechas'
 import { pesos } from '@/lib/reservas/precio'
-import { precioNoche, temporadaDe, type TarifaEstadia, type Temporada } from '@/lib/reservas/estadia'
+import { precioNoche, temporadaDe, type TarifaEstadia, type TarifaMensual, type Temporada } from '@/lib/reservas/estadia'
 import { BarraGuardar, Campo, Seccion, Selector } from '@/design-system/reservas/piezas'
-import { HOY, TIPOS, type Propiedad } from '../../datos'
+import { HOY, TIPOS, capital, esMensual, palabrasDe, type Propiedad } from '../../datos'
 import { PaginaForm, idNuevo, igual, num, type Form } from './comun'
 
 /**
@@ -32,16 +32,28 @@ export default function Temporadas({ negocio, onGuardar }: Form) {
   const [mes, setMes] = useState<ISO>(HOY)
   const cambiado = !igual(lista, negocio.propiedades)
   const p = lista.find(x => x.id === abierta)
+  const palabras = palabrasDe(negocio)
   const tarifa = (c: Partial<TarifaEstadia>) => p && setLista(lista.map(x => (x.id === abierta ? { ...x, tarifa: { ...x.tarifa, ...c } } : x)))
+  const mensual = (c: Partial<TarifaMensual>) => p && p.mensual && setLista(lista.map(x => (x.id === abierta ? { ...x, mensual: { ...x.mensual!, ...c } } : x)))
   const temporada = (id: string, c: Partial<Temporada>) => p && tarifa({ temporadas: p.tarifa.temporadas.map(t => (t.id === id ? { ...t, ...c } : t)) })
   const nuevaTemporada = (nombre: string, factor: number) => p && tarifa({ temporadas: [...p.tarifa.temporadas, { id: idNuevo('t'), nombre, desde: sumarDias(HOY, 30), hasta: sumarDias(HOY, 90), precioNoche: Math.round((p.tarifa.precioNoche * factor) / 1000) * 1000 }] })
   const celdas = grillaMes(partes(mes).anio, partes(mes).mes)
   return (
-    <PaginaForm rotulo={TIPOS.estadia.label} titulo="Temporadas y precios" bajada="Por propiedad: el precio base por noche, el recargo del fin de semana, la limpieza y las temporadas. El calendario muestra qué rige cada día.">
-      <div className="rv-seg" role="group" aria-label="Propiedad" style={{ marginBottom: 14, maxWidth: '100%', overflowX: 'auto' }}>
+    <PaginaForm rotulo={TIPOS.estadia.label} titulo="Temporadas y precios" bajada={`Por ${palabras.unidad}: el precio base por noche, el recargo del fin de semana, la limpieza y las temporadas, o el precio por mes y el depósito. El calendario muestra qué rige cada día.`}>
+      <div className="rv-seg" role="group" aria-label={capital(palabras.unidad)} style={{ marginBottom: 14, maxWidth: '100%', overflowX: 'auto' }}>
         {lista.map(x => <button key={x.id} type="button" aria-pressed={x.id === abierta} onClick={() => setAbierta(x.id)}>{x.nombre}</button>)}
       </div>
-      {p && (
+      {p && esMensual(p) && p.mensual && (
+        <div className="rv-pila">
+          <Seccion titulo="Precio por mes" bajada={`${p.nombre} se alquila por mes: un precio fijo por mes y un depósito que se entrega al entrar. Sin temporadas ni limpieza. Los meses mínimos y máximos están en Reglas de reserva.`}>
+            <div className="rv-dos">
+              <Campo label="Precio por mes" prefijo="$" value={String(p.mensual.precioMes)} onChange={x => mensual({ precioMes: num(x) })} inputMode="numeric" />
+              <Campo label="Depósito de garantía" prefijo="$" value={String(p.mensual.deposito)} onChange={x => mensual({ deposito: num(x) })} inputMode="numeric" ayuda="Se registra, no se cobra desde Órbita. 0 = no se pide." />
+            </div>
+          </Seccion>
+        </div>
+      )}
+      {p && !esMensual(p) && (
         <div className="rv-pila">
           <Seccion titulo="Precio base" bajada="Lo que vale una noche fuera de temporada.">
             <div className="rv-grid rv-grid--3">

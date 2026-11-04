@@ -1,8 +1,10 @@
 // Lo que el alta única le pide a quien elige Alquileres: qué alquila (por
-// hora, por bloque o por noches) y lo mínimo para arrancar en ese modo (las
-// canchas, el salón con sus paquetes, o la primera propiedad). El resto del
-// alta (negocio, ubicación, página, cuenta, pago) es el mismo para todos los
-// módulos y vive en modules/onboarding/alta.
+// hora, por bloque, o por noche o por mes) y lo mínimo para arrancar en ese
+// modo (las canchas, el primer salón con sus paquetes, o la primera propiedad
+// con su precio por noche o por mes). El resto del alta (negocio, ubicación,
+// página, cuenta, pago) es el mismo para todos los módulos y vive en
+// modules/onboarding/alta. Más salones o propiedades se cargan después, en
+// Configuración.
 //
 // Pinta con el kit rv- del design system y con los tokens del lugar donde se
 // monta: adentro del alta oscura sale oscuro, sin hacer nada.
@@ -11,20 +13,20 @@ import { Check, Plus, Trash2 } from 'lucide-react'
 import { pesos } from '@/lib/reservas/precio'
 import { EstiloReservas } from '@/design-system/reservas/estilo'
 import { Campo, Selector } from '@/design-system/reservas/piezas'
-import { NEGOCIOS_DEMO, TIPOS, TIPOS_ORDEN, type NegocioAlquiler, type Propiedad, type TipoAlquiler } from '../datos'
+import { NEGOCIOS_DEMO, TIPOS, TIPOS_ORDEN, TIPOS_PROPIEDAD, type Modalidad, type NegocioAlquiler, type Propiedad, type TipoAlquiler } from '../datos'
 
 export interface AltaAlquiler {
   tipo: TipoAlquiler | null
   unidades: { id: string; nombre: string; detalle: string; tarifaHora: number }[]
-  salon: { capacidad: number; duracionBloque: number; limpieza: number; deposito: number; paquetes: { id: string; nombre: string; hastaInvitados: number; precio: number }[] }
-  propiedad: { nombre: string; tipo: Propiedad['tipo']; huespedes: number; ambientes: number; precioNoche: number; minNoches: number; limpieza: number }
+  salon: { nombre: string; capacidad: number; duracionBloque: number; limpieza: number; deposito: number; paquetes: { id: string; nombre: string; hastaInvitados: number; precio: number }[] }
+  propiedad: { nombre: string; tipo: Propiedad['tipo']; modalidad: Modalidad; huespedes: number; ambientes: number; precioNoche: number; minNoches: number; limpieza: number; precioMes: number; minMeses: number }
 }
 
 export const ALTA_ALQUILER_INICIAL: AltaAlquiler = {
   tipo: null,
   unidades: [{ id: 'u1', nombre: 'Cancha 1', detalle: 'Fútbol 5', tarifaHora: 45000 }, { id: 'u2', nombre: 'Cancha 2', detalle: 'Pádel', tarifaHora: 36000 }],
-  salon: { capacidad: 60, duracionBloque: 240, limpieza: 90, deposito: 50000, paquetes: [{ id: 'p30', nombre: 'Hasta 30 invitados', hastaInvitados: 30, precio: 280000 }, { id: 'p60', nombre: 'Hasta 60 invitados', hastaInvitados: 60, precio: 420000 }] },
-  propiedad: { nombre: 'Cabaña 1', tipo: 'Cabaña', huespedes: 4, ambientes: 2, precioNoche: 68000, minNoches: 2, limpieza: 25000 },
+  salon: { nombre: 'Salón principal', capacidad: 60, duracionBloque: 240, limpieza: 90, deposito: 50000, paquetes: [{ id: 'p30', nombre: 'Hasta 30 invitados', hastaInvitados: 30, precio: 280000 }, { id: 'p60', nombre: 'Hasta 60 invitados', hastaInvitados: 60, precio: 420000 }] },
+  propiedad: { nombre: 'Cabaña 1', tipo: 'Cabaña', modalidad: 'noche', huespedes: 4, ambientes: 2, precioNoche: 68000, minNoches: 2, limpieza: 25000, precioMes: 520000, minMeses: 3 },
 }
 
 export type Errores = Record<string, string>
@@ -39,12 +41,13 @@ export function validarAlquiler(paso: 'tipo-alquiler' | 'que-alquilas', a: AltaA
       a.unidades.forEach(u => { if (!u.nombre.trim()) e[`unidad-${u.id}`] = 'Ponele un nombre.' })
     }
     if (a.tipo === 'bloque') {
+      if (a.salon.nombre.trim().length < 2) e.salon = 'Ponele un nombre al salón.'
       if (a.salon.paquetes.length === 0) e.paquetes = 'Armá al menos un paquete.'
       if (a.salon.capacidad < 1) e.capacidad = 'Decinos cuánta gente entra.'
     }
     if (a.tipo === 'estadia') {
       if (a.propiedad.nombre.trim().length < 2) e.propiedad = 'Ponele un nombre a la propiedad.'
-      if (a.propiedad.precioNoche < 1) e.precioNoche = 'Cargá el precio por noche.'
+      if (a.propiedad.modalidad === 'mes' ? a.propiedad.precioMes < 1 : a.propiedad.precioNoche < 1) e.precio = a.propiedad.modalidad === 'mes' ? 'Cargá el precio por mes.' : 'Cargá el precio por noche.'
     }
   }
   return e
@@ -56,12 +59,17 @@ export function negocioDesdeAlta(a: AltaAlquiler, base: { nombre: string; descri
   const ejemplo = NEGOCIOS_DEMO[tipo]
   const comun = { ...ejemplo, ...base, nombre: base.nombre.trim() || ejemplo.nombre, descripcion: base.descripcion.trim() || ejemplo.descripcion, bloqueos: [], calendariosExternos: [] }
   if (tipo === 'cancha') return { ...comun, unidades: a.unidades.map((u, i) => ({ ...u, nombre: u.nombre.trim(), foto: ejemplo.unidades[i % ejemplo.unidades.length].foto })) }
-  if (tipo === 'bloque') return { ...comun, salon: { ...ejemplo.salon!, ...a.salon, paquetes: a.salon.paquetes.map(p => ({ ...p, incluye: ['Mesas, sillas y vajilla'] })) } }
+  if (tipo === 'bloque') {
+    const s0 = ejemplo.salones[0]
+    return { ...comun, salones: [{ id: 's1', nombre: a.salon.nombre.trim() || 'Salón', detalle: `Hasta ${a.salon.capacidad} personas`, capacidad: a.salon.capacidad, duracionBloque: a.salon.duracionBloque, limpieza: a.salon.limpieza, deposito: a.salon.deposito, fotos: s0?.fotos ?? [ejemplo.fotoPortada], paquetes: a.salon.paquetes.map(p => ({ ...p, incluye: ['Mesas, sillas y vajilla'] })) }] }
+  }
   const p0 = ejemplo.propiedades[0]
+  const porMes = a.propiedad.modalidad === 'mes'
   return {
     ...comun,
-    propiedades: [{ ...p0, id: 'c1', nombre: a.propiedad.nombre.trim(), tipo: a.propiedad.tipo, huespedes: a.propiedad.huespedes, ambientes: a.propiedad.ambientes, descripcion: '', direccion: base.direccion || p0.direccion, ciudad: base.ciudad || p0.ciudad, latLng: base.latLng,
-      tarifa: { ...p0.tarifa, precioNoche: a.propiedad.precioNoche, minNoches: a.propiedad.minNoches, limpieza: a.propiedad.limpieza, temporadas: [] } }],
+    propiedades: [{ ...p0, id: 'c1', nombre: a.propiedad.nombre.trim(), tipo: a.propiedad.tipo, modalidad: a.propiedad.modalidad, huespedes: a.propiedad.huespedes, ambientes: a.propiedad.ambientes, descripcion: '', direccion: base.direccion || p0.direccion, ciudad: base.ciudad || p0.ciudad, latLng: base.latLng,
+      tarifa: { ...p0.tarifa, precioNoche: a.propiedad.precioNoche, minNoches: a.propiedad.minNoches, limpieza: a.propiedad.limpieza, temporadas: [] },
+      mensual: porMes ? { precioMes: a.propiedad.precioMes, minMeses: a.propiedad.minMeses, maxMeses: 12, deposito: a.propiedad.precioMes } : undefined }],
   }
 }
 
@@ -111,6 +119,8 @@ const CSS_PASOS = `
 export function PasoQueAlquilas({ a, onChange, errores, intentado }: { a: AltaAlquiler; onChange: (cambio: Partial<AltaAlquiler>) => void; errores: Errores; intentado: boolean }) {
   const num = (s: string) => Math.max(0, Math.round(Number(s.replace(/\D/g, '')) || 0))
   const err = (k: string) => (intentado ? errores[k] : undefined)
+  const prop = (c: Partial<AltaAlquiler['propiedad']>) => onChange({ propiedad: { ...a.propiedad, ...c } })
+  const porMes = a.propiedad.modalidad === 'mes'
   return (
     <div className="rv" style={{ maxWidth: 640, margin: '0 auto' }}>
       <EstiloReservas />
@@ -135,11 +145,14 @@ export function PasoQueAlquilas({ a, onChange, errores, intentado }: { a: AltaAl
         <div className="rv-pila">
           <div className="rv-card rv-card--pad rv-entra">
             <div className="rv-dos">
+              <Campo label="Nombre del salón" value={a.salon.nombre} onChange={v => onChange({ salon: { ...a.salon, nombre: v } })} error={err('salon')} maxLength={40} placeholder="Salón Jardín" />
               <Campo label="¿Cuánta gente entra?" value={String(a.salon.capacidad)} onChange={v => onChange({ salon: { ...a.salon, capacidad: num(v) } })} inputMode="numeric" error={err('capacidad')} />
-              <Selector label="Cada bloque dura" valor={a.salon.duracionBloque} onChange={v => onChange({ salon: { ...a.salon, duracionBloque: v } })} opciones={[180, 240, 300].map(m => ({ id: m, label: `${m / 60} horas` }))} />
             </div>
             <div className="rv-dos" style={{ marginTop: 10 }}>
+              <Selector label="Cada bloque dura" valor={a.salon.duracionBloque} onChange={v => onChange({ salon: { ...a.salon, duracionBloque: v } })} opciones={[180, 240, 300].map(m => ({ id: m, label: `${m / 60} horas` }))} />
               <Selector label="Limpieza entre bloques" valor={a.salon.limpieza} onChange={v => onChange({ salon: { ...a.salon, limpieza: v } })} opciones={[30, 60, 90, 120].map(m => ({ id: m, label: `${m} minutos` }))} />
+            </div>
+            <div className="rv-dos" style={{ marginTop: 10 }}>
               <Campo label="Depósito de garantía (opcional)" prefijo="$" value={String(a.salon.deposito)} onChange={v => onChange({ salon: { ...a.salon, deposito: num(v) } })} inputMode="numeric" ayuda="Se registra, no se cobra desde Órbita." />
             </div>
           </div>
@@ -156,26 +169,39 @@ export function PasoQueAlquilas({ a, onChange, errores, intentado }: { a: AltaAl
           ))}
           <button type="button" className="rv-btn" style={{ alignSelf: 'flex-start' }} onClick={() => onChange({ salon: { ...a.salon, paquetes: [...a.salon.paquetes, { id: `p${Date.now().toString(36)}`, nombre: 'Hasta 100 invitados', hastaInvitados: 100, precio: 620000 }] } })}><Plus size={15} aria-hidden /> Otro paquete</button>
           {err('paquetes') && <p className="rv-error" role="alert">{errores.paquetes}</p>}
-          <p className="rv-ayuda">Los extras (DJ, inflables, animador, torta…) se cargan después, en Configuración.</p>
+          <p className="rv-ayuda">Los extras (DJ, inflables, animador, torta…) y los demás salones, si tenés más de uno, se cargan después, en Configuración.</p>
         </div>
       )}
       {a.tipo === 'estadia' && (
         <div className="rv-card rv-card--pad rv-entra">
           <div className="rv-pila">
             <div className="rv-dos">
-              <Campo label="Nombre de la propiedad" value={a.propiedad.nombre} onChange={v => onChange({ propiedad: { ...a.propiedad, nombre: v } })} error={err('propiedad')} maxLength={40} placeholder="Cabaña Arrayán" />
-              <Selector label="Qué es" valor={a.propiedad.tipo} onChange={v => onChange({ propiedad: { ...a.propiedad, tipo: v } })} opciones={(['Casa', 'Departamento', 'Cabaña', 'Quinta'] as const).map(t => ({ id: t, label: t }))} />
+              <Campo label="Nombre de la propiedad" value={a.propiedad.nombre} onChange={v => prop({ nombre: v })} error={err('propiedad')} maxLength={40} placeholder="Cabaña Arrayán" />
+              <Selector label="Qué es" valor={a.propiedad.tipo} onChange={v => prop({ tipo: v })} opciones={TIPOS_PROPIEDAD.map(t => ({ id: t, label: t }))} />
             </div>
             <div className="rv-dos">
-              <Selector label="Huéspedes" valor={a.propiedad.huespedes} onChange={v => onChange({ propiedad: { ...a.propiedad, huespedes: v } })} opciones={[1, 2, 3, 4, 5, 6, 8, 10, 12].map(n => ({ id: n, label: `Hasta ${n}` }))} />
-              <Selector label="Ambientes" valor={a.propiedad.ambientes} onChange={v => onChange({ propiedad: { ...a.propiedad, ambientes: v } })} opciones={[1, 2, 3, 4, 5].map(n => ({ id: n, label: String(n) }))} />
+              <Selector label="Se alquila" valor={a.propiedad.modalidad} onChange={v => prop({ modalidad: v })} opciones={[{ id: 'noche' as const, label: 'Por noche' }, { id: 'mes' as const, label: 'Por mes' }]} ayuda={porMes ? 'Una fecha de entrada y cuántos meses, con depósito.' : 'Entrada y salida, con temporadas si querés.'} />
+              <Selector label={porMes ? 'Personas' : 'Huéspedes'} valor={a.propiedad.huespedes} onChange={v => prop({ huespedes: v })} opciones={[1, 2, 3, 4, 5, 6, 8, 10, 12].map(n => ({ id: n, label: `Hasta ${n}` }))} />
             </div>
-            <div className="rv-grid rv-grid--3">
-              <Campo label="Precio por noche" prefijo="$" value={String(a.propiedad.precioNoche)} onChange={v => onChange({ propiedad: { ...a.propiedad, precioNoche: num(v) } })} inputMode="numeric" error={err('precioNoche')} />
-              <Selector label="Mínimo de noches" valor={a.propiedad.minNoches} onChange={v => onChange({ propiedad: { ...a.propiedad, minNoches: v } })} opciones={[1, 2, 3, 5, 7].map(n => ({ id: n, label: String(n) }))} />
-              <Campo label="Limpieza por estadía" prefijo="$" value={String(a.propiedad.limpieza)} onChange={v => onChange({ propiedad: { ...a.propiedad, limpieza: num(v) } })} inputMode="numeric" />
-            </div>
-            <p className="rv-ayuda" style={{ margin: 0 }}>Con esto ya se puede reservar desde {pesos(a.propiedad.precioNoche)} la noche. Más propiedades, fotos, temporadas y bloqueos van después, en Configuración.</p>
+            {porMes ? (
+              <div className="rv-grid rv-grid--3">
+                <Campo label="Precio por mes" prefijo="$" value={String(a.propiedad.precioMes)} onChange={v => prop({ precioMes: num(v) })} inputMode="numeric" error={err('precio')} />
+                <Selector label="Mínimo de meses" valor={a.propiedad.minMeses} onChange={v => prop({ minMeses: v })} opciones={[1, 2, 3, 6, 12].map(n => ({ id: n, label: n === 1 ? '1 mes' : `${n} meses` }))} />
+                <Selector label="Ambientes" valor={a.propiedad.ambientes} onChange={v => prop({ ambientes: v })} opciones={[1, 2, 3, 4, 5].map(n => ({ id: n, label: String(n) }))} />
+              </div>
+            ) : (
+              <>
+                <div className="rv-dos">
+                  <Selector label="Ambientes" valor={a.propiedad.ambientes} onChange={v => prop({ ambientes: v })} opciones={[1, 2, 3, 4, 5].map(n => ({ id: n, label: String(n) }))} />
+                  <Selector label="Mínimo de noches" valor={a.propiedad.minNoches} onChange={v => prop({ minNoches: v })} opciones={[1, 2, 3, 5, 7].map(n => ({ id: n, label: String(n) }))} />
+                </div>
+                <div className="rv-dos">
+                  <Campo label="Precio por noche" prefijo="$" value={String(a.propiedad.precioNoche)} onChange={v => prop({ precioNoche: num(v) })} inputMode="numeric" error={err('precio')} />
+                  <Campo label="Limpieza por estadía" prefijo="$" value={String(a.propiedad.limpieza)} onChange={v => prop({ limpieza: num(v) })} inputMode="numeric" />
+                </div>
+              </>
+            )}
+            <p className="rv-ayuda" style={{ margin: 0 }}>Con esto ya se puede reservar desde {porMes ? `${pesos(a.propiedad.precioMes)} el mes (un mes de depósito)` : `${pesos(a.propiedad.precioNoche)} la noche`}. Más propiedades, fotos, temporadas y bloqueos van después, en Configuración.</p>
           </div>
         </div>
       )}

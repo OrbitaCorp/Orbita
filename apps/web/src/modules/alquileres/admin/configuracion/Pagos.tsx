@@ -6,12 +6,12 @@ import { useState } from 'react'
 import { ArrowRight, CircleCheck, PlugZap, Unplug, Wallet } from 'lucide-react'
 import { pesos, senaDe } from '@/lib/reservas/precio'
 import { BarraGuardar, Campo, Chip, FilaSwitch, Nota, Seccion, Selector } from '@/design-system/reservas/piezas'
-import { FORMAS_PAGO, TIPOS, type FormaPago, type NegocioAlquiler } from '../../datos'
+import { FORMAS_PAGO, TIPOS, palabrasDe, type FormaPago, type NegocioAlquiler } from '../../datos'
 import type { Vista } from '../navegacion'
 import { PaginaForm, igual, num, type Form } from './comun'
 import { plazoTxt } from './Reglas'
 
-const de = (n: NegocioAlquiler) => ({ senaPct: n.senaPct, pagos: n.pagos, deposito: n.salon?.deposito ?? 0 })
+const de = (n: NegocioAlquiler) => ({ senaPct: n.senaPct, pagos: n.pagos, depositos: Object.fromEntries(n.salones.map(s => [s.id, s.deposito])) as Record<string, number> })
 
 const A_TIEMPO = { devolver: 'se devuelve la seña entera', credito: 'la seña queda como crédito para otra reserva' }
 const TARDE = { pierde: 'se pierde la seña', mitad: 'se devuelve la mitad de la seña', credito: 'la seña queda como crédito para otra reserva' }
@@ -20,6 +20,7 @@ export default function Pagos({ negocio, onGuardar, onIr }: Form & { onIr: (vist
   const [v, setV] = useState(de(negocio))
   const cambiado = !igual(v, de(negocio))
   const tipo = negocio.tipo
+  const palabras = palabrasDe(negocio)
   const setPagos = (c: Partial<NegocioAlquiler['pagos']>) => setV({ ...v, pagos: { ...v.pagos, ...c } })
   const forma = (f: FormaPago, on: boolean) => setPagos({ formas: on ? [...v.pagos.formas.filter(x => x !== f), f] : v.pagos.formas.filter(x => x !== f) })
   const tiene = (f: FormaPago) => v.pagos.formas.includes(f)
@@ -34,12 +35,12 @@ export default function Pagos({ negocio, onGuardar, onIr }: Form & { onIr: (vist
   const ejemplo = tipo === 'cancha'
     ? { que: `una hora de ${negocio.unidades[0]?.nombre ?? 'cancha'} con ${negocio.extras[0]?.nombre.toLowerCase() ?? 'un extra'}`, base: negocio.unidades[0]?.tarifaHora ?? 0, total: (negocio.unidades[0]?.tarifaHora ?? 0) + (negocio.extras[0]?.precio ?? 0) }
     : tipo === 'bloque'
-      ? { que: `${negocio.salon?.paquetes[0]?.nombre.toLowerCase() ?? 'un paquete'} con ${negocio.salon?.extras[0]?.nombre ?? 'un extra'}`, base: negocio.salon?.paquetes[0]?.precio ?? 0, total: (negocio.salon?.paquetes[0]?.precio ?? 0) + (negocio.salon?.extras[0]?.precio ?? 0) }
+      ? { que: `${negocio.salones[0]?.paquetes[0]?.nombre.toLowerCase() ?? 'un paquete'} con ${negocio.extras[0]?.nombre ?? 'un extra'}`, base: negocio.salones[0]?.paquetes[0]?.precio ?? 0, total: (negocio.salones[0]?.paquetes[0]?.precio ?? 0) + (negocio.extras[0]?.precio ?? 0) }
       : { que: `dos noches en ${negocio.propiedades[0]?.nombre ?? 'una propiedad'} más la limpieza`, base: (negocio.propiedades[0]?.tarifa.precioNoche ?? 0) * 2, total: (negocio.propiedades[0]?.tarifa.precioNoche ?? 0) * 2 + (negocio.propiedades[0]?.tarifa.limpieza ?? 0) }
   const senaEjemplo = senaDe(v.pagos.senaSobre === 'base' ? ejemplo.base : ejemplo.total, v.senaPct)
-  const baseTxt = tipo === 'cancha' ? 'Solo la cancha (sin extras)' : tipo === 'bloque' ? 'Solo el paquete (sin extras)' : 'Solo las noches (sin limpieza)'
+  const baseTxt = tipo === 'cancha' ? `Solo ${palabras.genero === 'm' ? 'el' : 'la'} ${palabras.unidad} (sin extras)` : tipo === 'bloque' ? 'Solo el paquete (sin extras)' : negocio.propiedades.some(x => x.modalidad === 'mes') ? 'Solo las noches o el primer mes' : 'Solo las noches (sin limpieza)'
 
-  const guardar = () => onGuardar({ senaPct: v.senaPct, pagos: v.pagos, ...(tipo === 'bloque' && negocio.salon ? { salon: { ...negocio.salon, deposito: v.deposito } } : {}) }, 'Pagos guardados')
+  const guardar = () => onGuardar({ senaPct: v.senaPct, pagos: v.pagos, ...(tipo === 'bloque' ? { salones: negocio.salones.map(s => ({ ...s, deposito: v.depositos[s.id] ?? s.deposito })) } : {}) }, 'Pagos guardados')
 
   return (
     <PaginaForm rotulo={TIPOS[tipo].label} titulo="Pagos y señas" bajada="Cuánto se paga al reservar, cómo te pagan y qué pasa con la seña si cancelan.">
@@ -78,9 +79,9 @@ export default function Pagos({ negocio, onGuardar, onIr }: Form & { onIr: (vist
         </Seccion>
 
         {tipo === 'bloque' && (
-          <Seccion titulo="Depósito de garantía" bajada="Se entrega el día del evento y se devuelve al terminar. Solo se registra: no se cobra desde Órbita.">
+          <Seccion titulo="Depósito de garantía" bajada={`Se entrega el día del evento y se devuelve al terminar. Solo se registra: no se cobra desde Órbita.${negocio.salones.length > 1 ? ` Cada ${palabras.unidad} tiene el suyo.` : ''}`}>
             <div className="rv-dos">
-              <Campo label="Depósito" prefijo="$" value={String(v.deposito)} onChange={x => setV({ ...v, deposito: num(x) })} inputMode="numeric" ayuda="0 = no se pide." />
+              {negocio.salones.map(s => <Campo key={s.id} label={negocio.salones.length > 1 ? s.nombre : 'Depósito'} prefijo="$" value={String(v.depositos[s.id] ?? 0)} onChange={x => setV({ ...v, depositos: { ...v.depositos, [s.id]: num(x) } })} inputMode="numeric" ayuda="0 = no se pide." />)}
             </div>
           </Seccion>
         )}
