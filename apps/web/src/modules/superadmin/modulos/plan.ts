@@ -107,6 +107,7 @@ const TUR27 = (slug: string) => `auditoria.turnos.2026-10-27-${slug}`
 const GIM27 = (slug: string) => `auditoria.gimnasio.2026-10-27-${slug}`
 // Las del backend compartido de reservas (03/11).
 const GIM3 = (slug: string) => `auditoria.gimnasio.2026-11-03-${slug}`
+const ALQ3 = (slug: string) => `auditoria.alquileres.2026-11-03-${slug}`
 
 // ─── Turnos · Mateo ───────────────────────────────────────────────────────────
 const TURNOS = plan('turnos', 'Turnos', 'Mateo',
@@ -206,6 +207,7 @@ const ALQUILERES = plan('alquileres', 'Alquileres', 'Alan',
     documentada(t('2026-11-05', 'Alan', 'Modo cancha: reserva desde la tienda con confirmación', 'Se reserva una cancha a una hora y aparece en Mis reservas'), ALQ('modo-cancha')),
     documentada(t('2026-11-06', 'Alan', 'Modo cancha: pasada a 390 px y entrada de auditoría', 'Sin scroll horizontal a 390 px; entrada tipo tarea con capturas'), ALQ('qa-responsive-alquileres')),
     // Semana 3 · modo bloque
+    documentada(t('2026-11-09', 'Ale', 'Alquileres: varios salones por negocio, alojamiento por mes, la sección Qué hay libre y 19 rubros con sus palabras', 'Burbujas Eventos tiene dos salones con sus paquetes; el Depto Centro se alquila por mes con depósito; Qué hay libre responde por cancha, salón o propiedad; tests de la lib y de la navegación en verde; capturas a 1280 y 390'), ALQ3('salones-por-mes-y-que-hay-libre')),
     documentada(t('2026-11-09', 'Alan', 'Modo bloque: el salón como recurso con bloques de horas y precio', 'Un salón con bloques de mañana, tarde y noche, cada uno con su precio'), ALQ('modo-bloque')),
     documentada(t('2026-11-10', 'Alan', 'Modo bloque: calendario mensual con bloques libres y ocupados', 'El calendario marca el día con bloques libres y no deja elegir un ocupado'), ALQ('modo-bloque')),
     documentada(t('2026-11-11', 'Alan', 'Modo bloque: reserva con seña y datos del evento', 'La reserva guarda fecha, bloque, seña y datos del festejo, y aparece en Mis reservas'), ALQ('modo-bloque')),
@@ -330,6 +332,7 @@ const GIMNASIO = plan('gimnasio', 'Gimnasio', 'Ale',
     documentada(t('2026-11-04', 'Ale', 'Transversal: el kit toma el Kpi con variación, useBorrador + BarraGuardar y la cabecera del Modal; las copias de los tres módulos se borran', 'Un solo Kpi, una sola barra y un solo Modal en design-system/reservas; eslint sin imports cruzados; las pantallas se ven igual (capturas antes y después)'), GIM3('kit-kpi-guardar-modal')),
     documentada(t('2026-11-05', 'Ale', 'Transversal: el fondo claro de los paneles es el planeta de la landing fijo abajo, con cielo claro, estrellas y meteoritos, sin la banda del encabezado', 'Los tres paneles en claro muestran el planeta con su línea, anillos y satélite; contraste AA de todo texto suelto sobre el cielo (medido); oscuro igual que antes'), GIM3('fondo-claro-planeta')),
     documentada(t('2026-11-05', 'Ale', 'Transversal: el cambio de tema se funde en vez de cortar (View Transitions): la noche baja desde arriba, el día sube desde el horizonte y el botón responde en el acto', 'Al tocar la luna o el sol los tres paneles se funden en 640 ms sin borde visible; con prefers-reduced-motion un fundido parejo; sin la API cambia al instante; los tests del helper en verde'), GIM3('fundido-de-tema')),
+    documentada(t('2026-11-06', 'Ale', 'Transversal: siluetas de carga (skeleton) en las secciones de los tres paneles, con la forma de la pantalla que viene', 'Cada sección muestra su silueta mientras llegan sus datos (en las demos, 700 ms fingidos; ?cargando=1 la deja fija), con aria-busy y anuncio al lector de pantalla; sin desbordes a 390; capturas en claro y en oscuro'), GIM3('siluetas-de-carga')),
   ])
 
 export const PLANES: PlanModulo[] = [TURNOS, ALQUILERES, GIMNASIO]

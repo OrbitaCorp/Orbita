@@ -2201,4 +2201,82 @@ Lo que queda a gusto de Ale (punto 6 de la decisión "Fondo claro: ajustes"): la
       'apps/web/src/hooks/__tests__/useDarkMode.test.ts:1',
     ],
   }),
+
+  entrada({
+    modulo: 'gimnasio', fecha: F3, slug: 'siluetas-de-carga', tipo: 'diseño', quien: 'Ale', transversal: true,
+    titulo: 'Transversal: cada sección de los tres paneles muestra su silueta mientras llegan los datos (skeleton)',
+    foco: 'Pedido de Ale del 03/11 ("falta cargar el skeleton para todo"). Un kit compartido de siluetas con ocho formas (tablero, agenda, calendario, lista, tabla, tarjetas con foto, tarjetas con ícono y formulario) y cada panel dice cuál va en cada sección: mientras cargan los datos se ve la forma de la pantalla que viene, no un rectángulo gris ni una pantalla en blanco.',
+    que: `Antes, al entrar a un panel el contenido aparecía de golpe (las demos tienen los datos en memoria) y Gimnasio mostraba un encabezado "Cargando" pelado hasta leer lo guardado. Con el backend compartido ya en la API, cada sección va a esperar su pedido: ahora esa espera tiene forma. Las capturas de "antes" son el Resumen de Turnos tal como aparecía (de golpe, sin estado de carga); las de "después", su silueta.
+
+1. **El kit.** \`design-system/reservas/skeleton.tsx\`: \`SkeletonVista({ forma })\` con ocho formas que calzan con las pantallas del kit rv- (la fila de indicadores, la tira de días y la grilla por horas, el mes con su lista al lado, el buscador y la tabla, las tarjetas, las tarjetas de configuración con sus campos). Usa la misma clase \`.skel\` de Tienda (barrido de luz, modo oscuro y corte por prefers-reduced-motion resueltos en globals.css) y las clases rv- para que el ancho, el aire y los bordes sean los de la pantalla real: al llegar el contenido nada salta. Se anuncia como "Cargando" al lector de pantalla y las piezas quedan fuera del árbol de accesibilidad.
+2. **El armazón.** \`LayoutPanel\` recibe \`cargando\`: marca el \`<main>\` con aria-busy y, al terminar, remonta la vista con el mismo fundido que al cambiar de sección.
+3. **Los paneles.** Cada Panel tiene un mapa \`FORMAS\` de sección a forma (Turnos 12 secciones, Gimnasio 12, Alquileres 18) y mientras \`cargando\` renderiza la silueta en lugar de la sección; las secciones reales no se montan hasta tener los datos. En las demos la espera es fingida (\`useCargaSimulada\`, 700 ms en la primera carga, lo que tarda Cloud Run en responder) y \`?cargando=1\` deja la silueta fija para revisarla. Gimnasio también la muestra hasta leer lo guardado del navegador.
+4. **Lo que se verificó.** Capturas con \`?cargando=1\` de las secciones principales de los tres paneles a 1280 y 390, en claro y en oscuro, y sin \`?cargando=1\` a los 1500 ms (el contenido real, sin aria-busy). Dos tropiezos que quedaron arreglados: la tira de días desbordaba a 390 (ahora recorta como la real) y en claro la silueta suelta sobre el cielo del panel casi no se veía (la base va un punto más oscura y el barrido en blanco). Turnos y Gimnasio los conectó un agente con el kit ya escrito; Alquileres, en la misma sesión.
+
+Cuatro formas a 1280 y a 390, y el panel en oscuro:
+
+![Cuatro formas · 1280](/auditoria/modulos/gimnasio/skeleton-formas-despues-1280.webp)
+![Cuatro formas · 390](/auditoria/modulos/gimnasio/skeleton-formas-despues-390.webp)
+![En oscuro · 1280](/auditoria/modulos/gimnasio/skeleton-oscuro-despues-1280.webp)
+
+Quedan a criterio de cada responsable: una forma con cuatro indicadores para Alumnos y Resumen (la de lista dibuja tres), y que en Gimnasio cambiar de rubro desde la tira de la demo vuelva a mostrar la silueta, como en Turnos.`,
+    antes: { 1280: 'skeleton-antes-1280.webp', 390: 'skeleton-antes-390.webp' },
+    despues: { 1280: 'skeleton-despues-1280.webp', 390: 'skeleton-despues-390.webp' },
+    archivos: [
+      'apps/web/src/design-system/reservas/skeleton.tsx:24',
+      'apps/web/src/design-system/reservas/skeleton.tsx:34',
+      'apps/web/src/design-system/reservas/skeleton.tsx:354',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:258',
+      'apps/web/src/design-system/reservas/LayoutPanel.tsx:543',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:87',
+      'apps/web/src/modules/gimnasio/admin/Panel.tsx:48',
+      'apps/web/src/modules/alquileres/admin/Panel.tsx:59',
+    ],
+  }),
+
+  entrada({
+    modulo: 'alquileres', fecha: F3, slug: 'salones-por-mes-y-que-hay-libre', tipo: 'diseño', quien: 'Ale',
+    titulo: 'Alquileres: varios salones por negocio, alojamiento por mes, la sección Qué hay libre y 19 rubros con sus palabras',
+    foco: 'Pedido de Ale del 03/11 ("lo de alquileres no solo son canchas, son alquileres de salones, cumpleaños… alojamiento por noche, por mes, qué tiene disponible, qué salón si tiene más de uno"). El modo salón admite varios salones con sus paquetes, el alojamiento se alquila por noche o por mes, Qué hay libre responde en el acto qué cancha, salón o propiedad está libre, y el catálogo pasa de 11 a 19 rubros, cada uno con sus palabras (salas, boxes, quinchos, deptos, inquilinos).',
+    que: `El módulo ya reservaba de tres formas (por hora, por bloque, por noches), pero el salón era uno solo, el alojamiento solo por noche y no había dónde mirar qué está libre sin recorrer la agenda. Burbujas Eventos tiene ahora dos salones (Jardín, hasta 60, y Arcoíris, hasta 120) y Cabañas del Bosque alquila el Depto Centro por mes. Las capturas de antes y después son la portada del sitio (un salón, dos salones) y el primer paso de la reserva (antes la fecha; ahora, en qué salón).
+
+1. **Varios salones.** \`salones: Salon[]\` en vez de un salón: cada uno con nombre, detalle, capacidad, duración de los bloques, limpieza, depósito, fotos y sus propios paquetes; los extras son del negocio. Lo entienden el calendario (un selector de salón arriba), Eventos (columna y filtro por salón), Ingresos (por salón, o por bloque si hay uno solo), los bloqueos ("todos los salones"), Salones (reemplaza a Salón: se suman y se quitan), Paquetes (por salón), Pagos (un depósito por salón) y el sitio (tarjetas de salones, paquetes por salón, fechas libres por salón). La reserva pública pregunta primero en qué salón cuando hay más de uno (\`?salon=\` desde la portada); el link viejo \`?vista=salon\` abre Salones.
+2. **Por mes.** Cada propiedad dice cómo se alquila: por noche (entrada y salida, temporadas, limpieza) o por mes (una fecha de entrada, cuántos meses, precio por mes, mínimo y máximo de meses y un depósito que se registra y no se cobra desde Órbita). \`lib/reservas/estadia\` suma \`TarifaMensual\`, \`precioMensual\`, \`motivoNoReservableMes\` y \`primeraEntradaLibre\`, y \`fechas\` suma \`sumarMeses\` (del 31 de enero al 28 de febrero), con tests. La ficha del sitio, la reserva, Mis reservas, el calendario del panel (contratos), el detalle (contrato, depósito, "Terminar contrato"), Temporadas y precios (precio por mes y depósito) y Reglas (meses mínimos y máximos) distinguen las dos modalidades. La seña se calcula sobre el primer mes; el sitio arranca en la primera fecha desde la que entra el alquiler mínimo.
+3. **Qué hay libre.** Sección nueva en Hoy, para responder al toque cuando preguntan si hay lugar: en canchas, los horarios libres de cada cancha del día elegido (y cuántas tienen lugar ahora mismo y mañana); en salones, los bloques libres de cada salón, el fin de semana y el próximo día con lugar; en alojamiento, qué propiedad está libre para una entrada y tantas noches, o desde cuándo entra un alquiler de tantos meses, con quién la ocupa y hasta cuándo. Todo lo libre se toca y abre Agendar a mano con eso ya elegido; lo ocupado abre la reserva.
+4. **Rubros y palabras.** El catálogo del alta pasa de 11 a 19 rubros: salas de ensayo, boxes y consultorios, estudios de foto o grabación, coworking y salas de reunión por hora; salones de cumpleaños y de fiestas, peloteros, quinchos y auditorios por bloque; casas, deptos, cabañas, quintas, hostels y campings por noche; deptos, cocheras y oficinas por mes. Cada rubro trae sus palabras (\`palabrasDe\`: unidad, plural, género, verbo, cliente): el panel de un estudio de ensayo dice Salas, uno de deptos por mes dice Inquilinos. El alta pide el nombre del salón y si la propiedad va por noche o por mes.
+5. **Lo que se verificó.** 69 capturas a 1280 y 390 (panel, sitio, reserva, alta) sin desbordes ni errores nuevos de consola (queda el aviso conocido del mapa y la CSP); typecheck y eslint en cero; la suite de la web en verde (1103 tests, con los nuevos de la lib y de la navegación). Lo guardado en el navegador con el esquema viejo no se lee (clave \`orbita_alquileres_demo_v2\`).
+
+El calendario con dos salones, Qué hay libre en salones y en alojamiento, Eventos, el contrato por mes y la reserva por mes:
+
+![Calendario con dos salones · 1280](/auditoria/modulos/alquileres/calendario-salones-despues-1280.webp)
+![Qué hay libre en salones · 1280](/auditoria/modulos/alquileres/libre-salones-despues-1280.webp)
+![Qué hay libre en alojamiento · 1280](/auditoria/modulos/alquileres/libre-alojamiento-despues-1280.webp)
+![Eventos con la columna del salón · 1280](/auditoria/modulos/alquileres/eventos-salones-despues-1280.webp)
+![El contrato de un depto por mes · 1280](/auditoria/modulos/alquileres/contrato-mes-despues-1280.webp)
+![Alquilar por mes desde el sitio · 1280](/auditoria/modulos/alquileres/reserva-mes-despues-1280.webp)
+![Qué hay libre en canchas · 390](/auditoria/modulos/alquileres/libre-canchas-despues-390.webp)
+
+Lo que no entró y queda como decisión abierta ("cosas con stock"): alquilar objetos (vehículos, equipos, mobiliario, disfraces) con cantidad.`,
+    antes: { 1280: 'salones-antes-1280.webp', 390: 'salones-antes-390.webp' },
+    despues: { 1280: 'salones-despues-1280.webp', 390: 'salones-despues-390.webp' },
+    archivos: [
+      'apps/web/src/modules/alquileres/datos/index.ts:78',
+      'apps/web/src/modules/alquileres/datos/index.ts:108',
+      'apps/web/src/modules/alquileres/datos/index.ts:147',
+      'apps/web/src/modules/alquileres/datos/index.ts:167',
+      'apps/web/src/modules/alquileres/datos/index.ts:509',
+      'apps/web/src/lib/reservas/estadia.ts:161',
+      'apps/web/src/lib/reservas/estadia.ts:189',
+      'apps/web/src/lib/reservas/fechas.ts:91',
+      'apps/web/src/modules/alquileres/admin/navegacion.ts:41',
+      'apps/web/src/modules/alquileres/admin/Disponibilidad.tsx:46',
+      'apps/web/src/modules/alquileres/admin/Reservas.tsx:271',
+      'apps/web/src/modules/alquileres/admin/Reservas.tsx:536',
+      'apps/web/src/modules/alquileres/admin/configuracion/Salones.tsx:1',
+      'apps/web/src/modules/alquileres/storefront/Reserva.tsx:234',
+      'apps/web/src/modules/alquileres/storefront/Reserva.tsx:342',
+      'apps/web/src/modules/alquileres/storefront/Home.tsx:282',
+      'apps/web/src/modules/alquileres/onboarding/pasos.tsx:1',
+    ],
+  }),
 ]

@@ -212,4 +212,20 @@ export const DECISIONES: Entrada[] = [
       'apps/web/src/hooks/useDarkMode.ts:71',
     ],
   }),
+
+  decisionAbierta({
+    modulo: 'alquileres', slug: 'cosas-con-stock', decide: 'Ale', fecha: '2026-11-03',
+    titulo: 'Alquileres: ¿un cuarto modo para alquilar cosas con stock (vehículos, equipos, mobiliario, disfraces)?',
+    foco: 'Hoy el módulo alquila lugares: por hora, por bloque (uno o varios salones) y por período (por noche o por mes). Lo que se alquila por unidad y con cantidad (10 kayaks, 50 sillas, 3 inflables, un vestido) no entra: necesita un artículo con stock, una reserva con cantidad y fechas de retiro y devolución.',
+    propuesta: `**Modo "cosas":** un artículo con stock (cuántos hay), precio por día o por evento, depósito y retiro en el lugar o entrega; la reserva pide fecha de retiro, fecha de devolución y cantidad, y la disponibilidad es "cuántos quedan ese día" (stock menos lo reservado), no "libre u ocupado". El backend compartido ya tiene cupo por recurso (las clases de Gimnasio lo usan) y una reserva ocupa lugares del cupo: un artículo es un recurso con cupo igual al stock y la reserva de 3 kayaks ocupa 3, así que el motor no cambia; faltan la tarifa por día o por evento (como la mensual) y las pantallas: Artículos, Entregas y devoluciones del día, y el sitio con cantidad. Rubros que entrarían: autos, motos y bicis; kayaks y tablas; inflables, mobiliario y vajilla para eventos; sonido y luces; vestidos y disfraces; herramientas y máquinas; equipos de fotografía.
+
+Alternativas: dejarlo para después del ciclo (los 19 rubros ya cubren lugares y alojamiento), o entrar solo con "por día y con stock", sin entrega a domicilio.`,
+    abierta: 'Es alcance: un modo nuevo cruza datos, lib, panel, sitio, alta y backend (unos cuatro o cinco días de trabajo), y Alan tiene el ciclo lleno con los tres modos.',
+    origen: 'Pedido de Ale del 03/11/2026 ("un montón de cosas") al revisar las demos; la sesión resolvió salones múltiples, por mes y Qué hay libre (entrada "varios salones por negocio, alojamiento por mes…") y dejó esto abierto.',
+    archivos: [
+      'apps/web/src/modules/alquileres/datos/index.ts:40',
+      'apps/web/src/lib/reservas/estadia.ts:161',
+      'apps/api/prisma/schema.prisma:3901',
+    ],
+  }),
 ]
