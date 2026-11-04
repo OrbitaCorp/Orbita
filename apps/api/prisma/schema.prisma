@@ -3732,7 +3732,8 @@ model MarketingVideo {
 // ─── Marketing de Órbita: lista de tutoriales (qué hay y qué falta) ───────────────
 // La lista de tutoriales del panel y de la tienda que el equipo va a ir produciendo. La actualiza el Claude de cada
 // persona por el conector (tutoriales_listar / tutoriales_actualizar) y también se puede corregir desde el panel.
-// `estado`: FALTA | EN_PROCESO | EN_REVISION (hay un video en la cola esperando) | HECHO.
+// `estado`: FALTA | EN_PROCESO | EN_REVISION (de antes: los tutoriales ya no esperan aprobación) | HECHO.
+// Los videos viven en YouTube (`youtubeId`) y el panel los ofrece en "Ver tutorial" según `pantallas`.
 model MarketingTutorial {
   id             String   @id @default(uuid())
   grupo          String
@@ -3745,6 +3746,10 @@ model MarketingTutorial {
   opcional       Boolean  @default(false)
   prioridadAlta  Boolean  @default(false) @map("prioridad_alta")
   notas          String?
+  /// El id del video en YouTube (no listado). Lo carga el Claude de cada persona por el conector; con el link, el tutorial está HECHO.
+  youtubeId      String?  @map("youtube_id")
+  /// Las pantallas del panel donde se ofrece (las claves de "Ver tutorial": 'pedidos', 'configuracion/apariencia'…).
+  pantallas      String[] @default([])
   actualizadoPor String?  @map("actualizado_por")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")

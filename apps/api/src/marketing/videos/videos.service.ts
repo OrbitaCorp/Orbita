@@ -26,11 +26,12 @@ import { VideosAvisoService } from './videos-aviso.service';
 //   PENDIENTE → listo para revisar. Si nadie lo revisa a tiempo se borra solo (7 días marketing, 30 tutoriales).
 //   APROBADO  → queda como registro, con su archivo: se descarga y, si es de marketing, se pasa a borrador.
 //   PUBLICADO → ya se pasó a un borrador de TikTok y/o Instagram (queda igual como registro).
-//   (rechazado) → se borra el archivo y el registro.
+//   RECHAZADO → se rechazó estando pendiente, o se DESAPROBÓ estando aprobado o pasado a borrador. No se borra: queda con su
+//               archivo y sus comentarios en «Rechazados», no vence y no se puede pasar a borrador.
 // Nada se publica solo: pasar a TikTok o Instagram es siempre una acción de una persona (videos-publicar.service.ts).
 // Quién aprobó es interno: nada de lo que sale de acá lo muestra.
 
-export const ESTADOS_VIDEO = ['SUBIENDO', 'PENDIENTE', 'APROBADO', 'PUBLICADO'] as const;
+export const ESTADOS_VIDEO = ['SUBIENDO', 'PENDIENTE', 'APROBADO', 'PUBLICADO', 'RECHAZADO'] as const;
 export type EstadoVideo = (typeof ESTADOS_VIDEO)[number];
 
 export const FORMATOS_VIDEO = ['REEL_9_16', 'CUADRADO', 'HORIZONTAL_16_9'] as const;
@@ -41,7 +42,6 @@ const maxSegundosDe = (tipo: TipoVideo) => (tipo === 'TUTORIAL' ? 3600 : 600);
 /** Tope de videos esperando revisión de cada tipo: evita llenar el almacenamiento si algo se descontrola. */
 export const MAX_EN_COLA = 20;
 export const DIAS_PENDIENTE = 7;
-export const DIAS_PENDIENTE_TUTORIAL = 30;
 const MINUTOS_SUBIENDO = 60;
 const MAX_CONTROLES = 20;
 
@@ -142,7 +142,11 @@ export class VideosService {
     return t as TipoVideo;
   }
 
-  /** Paso 2 de Claude: confirmar la subida y dejar el video en la cola con su guion, su texto y sus controles. */
+  /**
+   * Paso 2 de Claude: confirmar la subida y dejar el video en la cola con su guion, su texto y sus controles.
+   * Marketing queda PENDIENTE (lo aprueba la dirección) y avisa por correo. Un tutorial es interno: entra APROBADO, su
+   * tutorial de la lista queda HECHO y no manda correo (lo normal igual es cargar su link de YouTube, sin subir el archivo).
+   */
   async registrar(adminId: string, e: EntradaVideo) {
     const video = await this.prisma.marketingVideo.findUnique({ where: { id: String(e.videoId ?? '') } });
     if (!video || video.estado !== 'SUBIENDO' || video.creadoPor !== adminId) throw new NotFoundException('No hay una subida pendiente con ese id (¿ya la registraste o venció?)');
@@ -187,14 +191,15 @@ export class VideosService {
         tutorialId,
         mejoraDeId,
         controles: this.controles(e.controles) as unknown as Prisma.InputJsonValue,
-        estado: 'PENDIENTE',
-        expiraAt: dias(tipo === 'TUTORIAL' ? DIAS_PENDIENTE_TUTORIAL : DIAS_PENDIENTE),
+        ...(tipo === 'TUTORIAL'
+          ? { estado: 'APROBADO', aprobaciones: [{ adminId, fecha: new Date().toISOString() }] as unknown as Prisma.InputJsonValue, aprobadoPor: adminId, aprobadoAt: new Date(), expiraAt: null }
+          : { estado: 'PENDIENTE', expiraAt: dias(DIAS_PENDIENTE) }),
       },
     });
-    if (tutorialId) await this.prisma.marketingTutorial.update({ where: { id: tutorialId }, data: { estado: 'EN_REVISION', actualizadoPor: adminId } });
+    if (tutorialId) await this.prisma.marketingTutorial.update({ where: { id: tutorialId }, data: { estado: 'HECHO', actualizadoPor: adminId } });
     await this.registrarLog(adminId, 'video_registrar', actualizado.id, { titulo, tipo, formato, bytes: tam, mejoraDe: mejoraDeId });
-    // Un correo (mejor esfuerzo, uno por tanda): hay un video para revisar.
-    await this.aviso.avisar(adminId, 'registro', tipo);
+    // Un correo (mejor esfuerzo, uno por tanda): hay un video de marketing para revisar.
+    if (tipo === 'MARKETING') await this.aviso.avisar(adminId, 'registro', tipo);
     return this.vista(actualizado);
   }
 
@@ -207,9 +212,11 @@ export class VideosService {
     return item.id;
   }
 
-  /** Al terminar de subir una tanda: avisa por correo si quedó algún video pendiente sin anunciar. */
-  avisarTanda(adminId: string, tipo: unknown = 'MARKETING') {
-    return this.aviso.avisar(adminId, 'tanda', this.tipoValido(tipo));
+  /** Al terminar de subir una tanda: avisa por correo si quedó algún video pendiente sin anunciar. Los tutoriales no avisan. */
+  async avisarTanda(adminId: string, tipo: unknown = 'MARKETING') {
+    const t = this.tipoValido(tipo);
+    if (t === 'TUTORIAL') return { enviados: 0, pendientes: 0 };
+    return this.aviso.avisar(adminId, 'tanda', t);
   }
 
   private controles(crudo: unknown): ControlDeCalidad[] {
@@ -261,9 +268,12 @@ export class VideosService {
   private permisos(f: Fila, quien: Mirando, personas: Map<string, Persona>) {
     const ctx = this.contexto(f, personas);
     const pendiente = f.estado === 'PENDIENTE';
+    const aprobado = f.estado === 'APROBADO' || f.estado === 'PUBLICADO';
     return {
       puedeAprobar: pendiente && puedeAprobar(ctx, quien),
       puedeRechazar: pendiente && puedeRechazar(ctx, quien),
+      // Desaprobar lo decide la misma regla que rechazar: quien lo subió, o la dirección si no lo subió un socio.
+      puedeDesaprobar: aprobado && puedeRechazar(ctx, quien),
       yaAprobaste: pendiente && ctx.aprobaron.some((p) => p.id === quien.id),
       esTuyo: ctx.creador?.id === quien.id,
     };
@@ -355,16 +365,30 @@ export class VideosService {
     return this.vista(r, this.permisos(r, quien, nuevas), await this.prisma.marketingVideoComentario.count({ where: { videoId: id } }));
   }
 
-  /** Rechazar borra el archivo de R2 y el registro. Si el borrado del archivo falla, el registro se queda para reintentar. */
+  /** Rechazar un pendiente: pasa a RECHAZADO con su archivo y sus comentarios (no se borra). Si cubría un tutorial, vuelve a FALTA. */
   async rechazar(adminId: string, id: string) {
     const v = await this.obtener(id);
-    if (v.estado !== 'PENDIENTE') throw new ConflictException('Solo se puede rechazar un video pendiente (lo aprobado queda como registro)');
+    if (v.estado !== 'PENDIENTE') throw new ConflictException('Solo se puede rechazar un video pendiente (uno aprobado se desaprueba)');
+    return this.aRechazados(adminId, v, 'rechazar', 'EN_REVISION');
+  }
+
+  /** Desaprobar uno aprobado (o ya pasado a borrador): pasa a RECHAZADO. Lo que ya está en TikTok o Instagram no se toca. */
+  async desaprobar(adminId: string, id: string) {
+    const v = await this.obtener(id);
+    if (v.estado !== 'APROBADO' && v.estado !== 'PUBLICADO') throw new ConflictException('Solo se puede desaprobar un video aprobado');
+    return this.aRechazados(adminId, v, 'desaprobar', 'HECHO');
+  }
+
+  private async aRechazados(adminId: string, v: Fila, accion: 'rechazar' | 'desaprobar', estadoTutorial: 'EN_REVISION' | 'HECHO') {
     const quien = await this.persona(adminId);
     const personas = await this.personas([v.creadoPor, ...this.idsAprobaron(v)]);
-    if (!puedeRechazar(this.contexto(v, personas), quien)) throw new ForbiddenException('No podés rechazar este video');
-    await this.descartar(v.id, v.ruta, v.tutorialId);
-    await this.registrarLog(adminId, 'video_rechazar', id, { titulo: v.titulo, tipo: v.tipo });
-    return { ok: true as const };
+    if (!puedeRechazar(this.contexto(v, personas), quien)) throw new ForbiddenException(`No podés ${accion} este video`);
+    const r = await this.prisma.marketingVideo.update({ where: { id: v.id }, data: { estado: 'RECHAZADO', expiraAt: null } });
+    // El tutorial de la lista vuelve a «falta» si lo cubría justo este video.
+    if (v.tutorialId) await this.prisma.marketingTutorial.updateMany({ where: { id: v.tutorialId, estado: estadoTutorial }, data: { estado: 'FALTA', actualizadoPor: adminId } }).catch(() => undefined);
+    await this.registrarLog(adminId, `video_${accion}`, v.id, { titulo: v.titulo, tipo: v.tipo });
+    const nuevas = await this.personas([r.creadoPor, ...this.idsAprobaron(r)]);
+    return this.vista(r, this.permisos(r, quien, nuevas), await this.prisma.marketingVideoComentario.count({ where: { videoId: v.id } }));
   }
 
   /** Dirección para bajar el mp4 (vale 10 minutos). */
@@ -392,7 +416,7 @@ export class VideosService {
   }
 
   /** Lo que ven el panel y Claude: sin la clave interna del archivo y sin quién aprobó. */
-  vista(v: Fila, permisos?: { puedeAprobar: boolean; puedeRechazar: boolean; yaAprobaste: boolean; esTuyo: boolean }, comentarios = 0) {
+  vista(v: Fila, permisos?: { puedeAprobar: boolean; puedeRechazar: boolean; puedeDesaprobar: boolean; yaAprobaste: boolean; esTuyo: boolean }, comentarios = 0) {
     return {
       id: v.id,
       tipo: v.tipo as TipoVideo,

@@ -52,7 +52,7 @@ describe('armarCspReportOnly', () => {
     expect(directiva('img-src')).toBe("img-src 'self' data: blob: https:")
     expect(directiva('style-src')).toBe("style-src 'self' 'unsafe-inline' https://fonts.googleapis.com")
     expect(directiva('font-src')).toBe("font-src 'self' data: https://fonts.gstatic.com")
-    expect(directiva('frame-src')).toBe("frame-src 'self' https://*.facebook.com")
+    expect(directiva('frame-src')).toBe("frame-src 'self' https://*.facebook.com https://www.youtube-nocookie.com")
     expect(directiva('report-uri')).toBe(`report-uri ${CSP_REPORT_PATH}`)
     expect(CSP_REPORT_PATH).toBe('/api/csp-report')
   })

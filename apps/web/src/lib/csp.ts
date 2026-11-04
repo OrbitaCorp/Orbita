@@ -143,8 +143,9 @@ export interface OpcionesCsp {
 //   font:     fonts.gstatic.com (+ data: por fuentes embebidas en CSS).
 //   frame:    el iframe srcDoc de la previsualización de mails del
 //             superadmin, las vistas de celular del mismo origen y Facebook
-//             (la ventana de la conexión de WhatsApp de Mensajes). Mercado
-//             Pago no se embebe y YouTube no se usa.
+//             (la ventana de la conexión de WhatsApp de Mensajes), y
+//             YouTube sin cookies (los videos de "Ver tutorial" del panel).
+//             Mercado Pago no se embebe.
 // Sin nonce, sin 'unsafe-inline' ni 'unsafe-eval' en script-src: eso es lo
 // que la política va a medir durante la semana de reportes.
 export function armarCspReportOnly({ hashTema, apiOrigin }: OpcionesCsp): string {
@@ -157,7 +158,7 @@ export function armarCspReportOnly({ hashTema, apiOrigin }: OpcionesCsp): string
     "img-src 'self' data: blob: https:",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' data: https://fonts.gstatic.com",
-    "frame-src 'self' https://*.facebook.com",
+    "frame-src 'self' https://*.facebook.com https://www.youtube-nocookie.com",
     "object-src 'none'",
     "base-uri 'self'",
     `report-uri ${CSP_REPORT_PATH}`,

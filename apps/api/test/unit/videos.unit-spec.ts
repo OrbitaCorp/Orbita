@@ -107,7 +107,7 @@ describe('subir y registrar', () => {
     for (const tipo of ['MARKETING', 'TUTORIAL'] as const) {
       const id = await reservado(ctx, 'cto', tipo);
       const v = await ctx.svc.registrar('cto', { videoId: id, titulo: `Grande ${tipo}` });
-      expect(v.estado).toBe('PENDIENTE');
+      expect(v.estado).toBe(tipo === 'TUTORIAL' ? 'APROBADO' : 'PENDIENTE');
       expect(v.bytes).toBe(2_147_483_647);
     }
     expect(ctx.r2.eliminar).not.toHaveBeenCalled();
@@ -131,7 +131,7 @@ describe('subir y registrar', () => {
     await expect(ctx.svc.pedirSubida('ceo', 1000, 'TUTORIAL')).resolves.toBeDefined();
   });
 
-  it('registrar confirma el archivo, lo pasa a PENDIENTE con vencimiento a 7 días (30 si es tutorial) y limpia los textos', async () => {
+  it('registrar confirma el archivo, lo pasa a PENDIENTE con vencimiento a 7 días (un tutorial entra APROBADO, sin vencer) y limpia los textos', async () => {
     const ctx = armar();
     const id = await reservado(ctx);
     const v = await ctx.svc.registrar('ceo', { videoId: id, titulo: ' Reel\u0000 ', guion: 'hola', caption: 'texto', duracionSeg: 31, controles: [{ nombre: 'audio', ok: true, detalle: '-17' }, { nombre: '', ok: true }, 'basura'] });
@@ -139,21 +139,23 @@ describe('subir y registrar', () => {
     expect(v.controles).toEqual([{ nombre: 'audio', ok: true, detalle: '-17' }]);
     expect((ctx.filas[0].expiraAt.getTime() - Date.now()) / 86_400_000).toBeCloseTo(7, 0);
     const t = await nuevo(ctx, 'cto', { tipo: 'TUTORIAL' });
-    expect((ctx.filas.find((f) => f.id === t)!.expiraAt.getTime() - Date.now()) / 86_400_000).toBeCloseTo(30, 0);
+    expect(ctx.filas.find((f) => f.id === t)).toMatchObject({ estado: 'APROBADO', expiraAt: null, aprobadoPor: 'cto' });
   });
 
-  it('registrar avisa al equipo con el tipo del video; si no se registra, no avisa', async () => {
+  it('registrar un video de marketing avisa al equipo; un tutorial no avisa; si no se registra, no avisa', async () => {
     const ctx = armar();
     await nuevo(ctx, 'ceo');
     expect(ctx.aviso.avisar).toHaveBeenLastCalledWith('ceo', 'registro', 'MARKETING');
     await nuevo(ctx, 'cto', { tipo: 'TUTORIAL' });
-    expect(ctx.aviso.avisar).toHaveBeenLastCalledWith('cto', 'registro', 'TUTORIAL');
+    expect(ctx.aviso.avisar).toHaveBeenCalledTimes(1);
     const sin = armar({ tamanio: null });
     const id = await reservado(sin);
     await expect(sin.svc.registrar('ceo', { videoId: id, titulo: 'x' })).rejects.toBeInstanceOf(BadRequestException);
     expect(sin.aviso.avisar).not.toHaveBeenCalled();
-    await ctx.svc.avisarTanda('cto', 'TUTORIAL');
-    expect(ctx.aviso.avisar).toHaveBeenLastCalledWith('cto', 'tanda', 'TUTORIAL');
+    await expect(ctx.svc.avisarTanda('cto', 'TUTORIAL')).resolves.toEqual({ enviados: 0, pendientes: 0 });
+    expect(ctx.aviso.avisar).toHaveBeenCalledTimes(1);
+    await ctx.svc.avisarTanda('ceo');
+    expect(ctx.aviso.avisar).toHaveBeenLastCalledWith('ceo', 'tanda', 'MARKETING');
   });
 
   it('un archivo vacío se descarta (archivo y registro)', async () => {
@@ -179,7 +181,7 @@ describe('subir y registrar', () => {
     await expect(ctx.svc.registrar('ceo', { videoId: id, titulo: 'x', formato: 'VERTICAL' })).rejects.toBeInstanceOf(BadRequestException);
     await expect(ctx.svc.registrar('ceo', { videoId: id, titulo: 'x', duracionSeg: 9999 })).rejects.toBeInstanceOf(BadRequestException);
     const t = await reservado(ctx, 'cto', 'TUTORIAL');
-    await expect(ctx.svc.registrar('cto', { videoId: t, titulo: 'Tutorial largo', duracionSeg: 1500 })).resolves.toMatchObject({ estado: 'PENDIENTE' });
+    await expect(ctx.svc.registrar('cto', { videoId: t, titulo: 'Tutorial largo', duracionSeg: 1500 })).resolves.toMatchObject({ estado: 'APROBADO' });
   });
 });
 
@@ -268,36 +270,63 @@ describe('aprobación: depende de quién subió el video', () => {
   });
 });
 
-describe('rechazar', () => {
-  it('quien lo subió descarta el suyo: se borra el archivo y el registro', async () => {
+describe('rechazar y desaprobar', () => {
+  it('quien lo subió descarta el suyo: pasa a RECHAZADO sin borrar el archivo ni los comentarios, y no vence', async () => {
     const ctx = armar();
     const id = await nuevo(ctx, 'mili');
-    const ruta = ctx.filas[0].ruta;
-    await ctx.svc.rechazar('mili', id);
-    expect(ctx.r2.eliminar).toHaveBeenCalledWith(ruta);
-    expect(ctx.filas).toHaveLength(0);
+    await ctx.svc.comentar('ceo', id, 'No me convence');
+    const v = await ctx.svc.rechazar('mili', id);
+    expect(v.estado).toBe('RECHAZADO');
+    expect(ctx.r2.eliminar).not.toHaveBeenCalled();
+    expect(ctx.filas[0]).toMatchObject({ estado: 'RECHAZADO', expiraAt: null });
+    expect(ctx.comentarios).toHaveLength(1);
+    expect((await ctx.svc.listar('RECHAZADO')).map((x) => x.id)).toEqual([id]);
   });
 
   it('lo de Milagros lo puede rechazar la dirección', async () => {
     const ctx = armar();
     await ctx.svc.rechazar('cpo', await nuevo(ctx, 'mili'));
-    expect(ctx.filas).toHaveLength(0);
+    expect(ctx.filas[0].estado).toBe('RECHAZADO');
   });
 
-  it('lo aprobado queda como registro: no se rechaza', async () => {
+  it('lo aprobado no se rechaza: se desaprueba, y vuelve a RECHAZADO (también si ya se pasó a borrador)', async () => {
     const ctx = armar();
     const id = await nuevo(ctx, 'cto');
     await ctx.svc.aprobar('cto', id);
     await expect(ctx.svc.rechazar('cto', id)).rejects.toBeInstanceOf(ConflictException);
-    expect(ctx.filas).toHaveLength(1);
+    expect((await ctx.svc.desaprobar('cto', id)).estado).toBe('RECHAZADO');
+    const otro = await nuevo(ctx, 'cto');
+    await ctx.svc.aprobar('cto', otro);
+    await ctx.svc.anotarPublicacion('cto', otro, 'tiktok', 'tt-1');
+    expect((await ctx.svc.desaprobar('cto', otro)).estado).toBe('RECHAZADO');
+    expect(ctx.r2.eliminar).not.toHaveBeenCalled();
   });
 
-  it('si R2 falla al borrar, el registro se queda para poder reintentar', async () => {
+  it('un pendiente o un rechazado no se desaprueba; otro socio no desaprueba lo de un socio', async () => {
     const ctx = armar();
     const id = await nuevo(ctx, 'cto');
-    ctx.r2.eliminar.mockRejectedValueOnce(new Error('R2 caído'));
-    await expect(ctx.svc.rechazar('cto', id)).rejects.toThrow('R2 caído');
-    expect(ctx.filas).toHaveLength(1);
+    await expect(ctx.svc.desaprobar('cto', id)).rejects.toBeInstanceOf(ConflictException);
+    await ctx.svc.aprobar('cto', id);
+    await expect(ctx.svc.desaprobar('ceo', id)).rejects.toBeInstanceOf(ForbiddenException);
+    await ctx.svc.desaprobar('cto', id);
+    await expect(ctx.svc.desaprobar('cto', id)).rejects.toBeInstanceOf(ConflictException);
+    await expect(ctx.svc.aprobar('cto', id)).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('el panel ofrece desaprobar solo en lo aprobado y a quien puede', async () => {
+    const ctx = armar();
+    const id = await nuevo(ctx, 'mili');
+    expect((await ctx.svc.listar(undefined, undefined, quien('ceo')))[0].puedeDesaprobar).toBe(false);
+    await ctx.svc.aprobar('ceo', id);
+    const flag = async (p: string) => (await ctx.svc.listar(undefined, undefined, quien(p)))[0].puedeDesaprobar;
+    expect([await flag('ceo'), await flag('cto'), await flag('mili'), await flag('otro')]).toEqual([true, true, true, false]);
+  });
+
+  it('un rechazado no ocupa lugar en la cola', async () => {
+    const ctx = armar();
+    const id = await nuevo(ctx, 'cto');
+    await ctx.svc.rechazar('cto', id);
+    expect(await ctx.prisma.marketingVideo.count({ where: { estado: { in: ['SUBIENDO', 'PENDIENTE'] } } })).toBe(0);
   });
 });
 
@@ -377,24 +406,20 @@ describe('mejorar un video', () => {
 describe('tutoriales: vínculo con la lista', () => {
   const CARGAR = '11111111-1111-4111-8111-111111111111';
 
-  it('registrar un tutorial lo deja EN_REVISION; aprobarlo lo marca HECHO', async () => {
+  it('registrar un tutorial no espera aprobación: el video entra APROBADO y el tutorial queda HECHO', async () => {
     const ctx = armar();
     const id = await nuevo(ctx, 'cto', { tipo: 'TUTORIAL', tutorial: 'Cargar un producto' }); // por título, sin importar mayúsculas
     expect(ctx.filas[0].tutorialId).toBe(CARGAR);
-    expect(ctx.tutoriales[0].estado).toBe('EN_REVISION');
-    await ctx.svc.aprobar('cto', id);
+    expect(ctx.filas.find((f) => f.id === id)!.estado).toBe('APROBADO');
     expect(ctx.tutoriales[0].estado).toBe('HECHO');
+    await expect(ctx.svc.aprobar('cto', id)).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('si el video se rechaza, el tutorial vuelve a FALTA; y también si vence', async () => {
+  it('un tutorial no vence', async () => {
     const ctx = armar();
-    const id = await nuevo(ctx, 'cto', { tipo: 'TUTORIAL', tutorial: CARGAR });
-    await ctx.svc.rechazar('cto', id);
-    expect(ctx.tutoriales[0].estado).toBe('FALTA');
     await nuevo(ctx, 'cto', { tipo: 'TUTORIAL', tutorial: CARGAR });
-    ctx.filas[0].expiraAt = new Date(Date.now() - 1000);
-    await ctx.svc.listar();
-    expect(ctx.tutoriales[0].estado).toBe('FALTA');
+    expect(await ctx.svc.purgarVencidos()).toBe(0);
+    expect(ctx.tutoriales[0].estado).toBe('HECHO');
   });
 
   it('un tutorial que no existe en la lista, o un video de marketing que quiere cubrir uno, se rechazan', async () => {
@@ -403,6 +428,16 @@ describe('tutoriales: vínculo con la lista', () => {
     await expect(ctx.svc.registrar('cto', { videoId: t, titulo: 'x', tutorial: 'No está en la lista' })).rejects.toBeInstanceOf(BadRequestException);
     const m = await reservado(ctx, 'cto');
     await expect(ctx.svc.registrar('cto', { videoId: m, titulo: 'x', tutorial: CARGAR })).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
+describe('tutoriales: desaprobar', () => {
+  it('si se desaprueba el video que lo había dejado HECHO, el tutorial vuelve a FALTA', async () => {
+    const ctx = armar();
+    const id = await nuevo(ctx, 'cto', { tipo: 'TUTORIAL', tutorial: '11111111-1111-4111-8111-111111111111' });
+    expect(ctx.tutoriales[0].estado).toBe('HECHO');
+    await ctx.svc.desaprobar('cto', id);
+    expect(ctx.tutoriales[0].estado).toBe('FALTA');
   });
 });
 

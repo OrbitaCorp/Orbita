@@ -57,7 +57,17 @@ export type StoreMetaSSR = {
 // el catch de abajo). Antes cualquier subdominio sin negocio caía en el
 // storefront normal, mostrando un catálogo vacío/roto en vez de avisar que
 // ahí no hay ninguna tienda.
-export type StoreStatusSSR = 'ok' | 'paused' | 'inactive' | 'not_found'
+//
+// 'maintenance' (2026-11-01): la API contestó un error de servidor (5xx, o el
+// 429 "Rate exceeded" que da Google cuando Cloud Run no tiene instancias, como
+// cuando se cortó la facturación) o ni siquiera contestó (error de red). Antes
+// eso caía en 'ok' y la tienda salía como un cascarón vacío: header, footer y
+// nada en el medio. Un timeout sigue siendo 'ok': lento no es caído.
+export type StoreStatusSSR = 'ok' | 'paused' | 'inactive' | 'not_found' | 'maintenance'
+
+// Respuestas que dicen "la API está caída", no "esta tienda tiene un problema".
+const API_CAIDA = new Set([429, 500, 502, 503, 504])
+const apiCaida = (e: unknown) => e instanceof StorefrontApiError ? API_CAIDA.has(e.status) : true
 
 // Cuánto se espera a la config del backend ANTES de renderizar la página. Si
 // tarda más (cold start de Railway), se sigue sin ella y el cliente la pide
@@ -153,6 +163,16 @@ async function armarSeo(ctx: Parameters<GetServerSideProps>[0], d: DatosSeo): Pr
   if (estado === 'not_found') {
     ctx.res.statusCode = 404
     return seoNoIndexable(nombre, 'Tienda no encontrada')
+  }
+  // 503 + Retry-After: Google entiende "volvé más tarde" y no saca la tienda
+  // del índice. Solo en la carga completa: en una navegación (/_next/data/…)
+  // un 503 haría que Next recargue la página entera, que va a dar lo mismo.
+  if (estado === 'maintenance') {
+    if (!esNavegacion) {
+      ctx.res.statusCode = 503
+      ctx.res.setHeader('Retry-After', '300')
+    }
+    return seoNoIndexable(nombre, 'En mantenimiento')
   }
   // Sin tipo (carrito, checkout, perfil…), tienda pausada o sin config: no se indexa.
   if (!tipo || estado !== 'ok' || !cfg) return seoNoIndexable(nombre, titulo)
@@ -294,6 +314,7 @@ export function crearGetServerSideProps(tipo: TipoPagina | null = null): GetServ
       // un error de red/backend caído, que sigue sin branding optimistamente
       // y el cliente reintenta. Nunca rompe el render de la página.
       if (err instanceof StorefrontApiError && err.status === 404) storeStatus = 'not_found'
+      else if (apiCaida(err)) storeStatus = 'maintenance'
     }
   }
 

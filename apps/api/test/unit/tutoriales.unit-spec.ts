@@ -1,5 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { TutorialesService } from '../../src/marketing/videos/tutoriales.service';
+import { idDeYoutube } from '../../src/marketing/videos/youtube';
 
 // La lista de tutoriales (qué hay y qué falta): se lee agrupada con un resumen y se actualiza por id o por título, con el
 // estado EN_REVISION reservado para el sistema. Base simulada.
@@ -77,4 +78,46 @@ describe('lista de tutoriales', () => {
     await expect(svc.actualizar('admin-1', { tutorial: 'No está', estado: 'HECHO' })).rejects.toBeInstanceOf(NotFoundException);
     await expect(svc.actualizar('admin-1', { tutorial: '  ', estado: 'HECHO' })).rejects.toBeInstanceOf(BadRequestException);
   });
+});
+
+describe('tutoriales en YouTube', () => {
+  it('cargar el link lo deja HECHO con el id del video; vacío lo quita y el estado no cambia', async () => {
+    const { svc, filas } = armar();
+    const r = await svc.actualizar('admin-1', { tutorial: ID_B, youtube: 'https://youtu.be/dQw4w9WgXcQ?si=abc' });
+    expect(r).toMatchObject({ estado: 'HECHO', youtubeId: 'dQw4w9WgXcQ' });
+    await svc.actualizar('admin-1', { tutorial: ID_B, youtube: '' });
+    expect(filas[1]).toMatchObject({ estado: 'HECHO', youtubeId: null });
+  });
+
+  it('con el link se puede mandar otro estado, y un link que no es de YouTube se rechaza', async () => {
+    const { svc, filas } = armar();
+    await svc.actualizar('admin-1', { tutorial: ID_B, youtube: 'dQw4w9WgXcQ', estado: 'EN_PROCESO' });
+    expect(filas[1]).toMatchObject({ estado: 'EN_PROCESO', youtubeId: 'dQw4w9WgXcQ' });
+    await expect(svc.actualizar('admin-1', { tutorial: ID_B, youtube: 'https://vimeo.com/123' })).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('las pantallas se reemplazan enteras, sin repetidas, y se validan', async () => {
+    const { svc, filas } = armar();
+    await svc.actualizar('admin-1', { tutorial: ID_B, pantallas: ['pedidos', ' Pedidos ', 'configuracion/apariencia'] });
+    expect(filas[1].pantallas).toEqual(['pedidos', 'configuracion/apariencia']);
+    await expect(svc.actualizar('admin-1', { tutorial: ID_B, pantallas: 'pedidos' })).rejects.toBeInstanceOf(BadRequestException);
+    await expect(svc.actualizar('admin-1', { tutorial: ID_B, pantallas: ['../admin'] })).rejects.toBeInstanceOf(BadRequestException);
+    await expect(svc.actualizar('admin-1', { tutorial: ID_B, pantallas: ['a', 'b', 'c', 'd', 'e', 'f', 'g'] })).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('el panel recibe los que tienen link y pantalla', async () => {
+    const { svc, prisma } = armar();
+    prisma.marketingTutorial.findMany.mockResolvedValueOnce([{ titulo: 'Atender un pedido', youtubeId: 'dQw4w9WgXcQ', pantallas: ['pedidos'] }]);
+    await expect(svc.videosDelPanel()).resolves.toEqual({ videos: [{ titulo: 'Atender un pedido', youtubeId: 'dQw4w9WgXcQ', pantallas: ['pedidos'] }] });
+    expect(prisma.marketingTutorial.findMany).toHaveBeenLastCalledWith(expect.objectContaining({ where: { youtubeId: { not: null }, NOT: { pantallas: { isEmpty: true } } } }));
+  });
+});
+
+describe('idDeYoutube', () => {
+  const id = 'dQw4w9WgXcQ';
+  it.each([
+    id, `https://youtu.be/${id}`, `https://www.youtube.com/watch?v=${id}&t=3`, `youtube.com/watch?v=${id}`, `https://m.youtube.com/watch?v=${id}`,
+    `https://www.youtube.com/shorts/${id}`, `https://www.youtube.com/embed/${id}`, `https://www.youtube-nocookie.com/embed/${id}`,
+  ])('reconoce %s', (link) => expect(idDeYoutube(link)).toBe(id));
+  it.each(['', 'hola', 'https://vimeo.com/123456', `https://evil.com/watch?v=${id}`, 'https://youtu.be/corto'])('rechaza «%s»', (malo) => expect(idDeYoutube(malo)).toBeNull());
 });

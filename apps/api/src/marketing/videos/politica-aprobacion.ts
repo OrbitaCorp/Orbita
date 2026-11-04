@@ -94,7 +94,7 @@ export function aprobacionCompleta(c: Contexto): boolean {
   return porElCeo || porLosOtrosDos;
 }
 
-/** ¿Puede rechazar (y por lo tanto borrar) este video? El creador siempre puede descartar el suyo. */
+/** ¿Puede rechazar (si está pendiente) o desaprobar (si ya está aprobado) este video? El creador siempre puede descartar el suyo. */
 export function puedeRechazar(c: Contexto, quien: Persona): boolean {
   if (esElCreador(c, quien)) return true;
   if (loSubioUnSocio(c)) return false;

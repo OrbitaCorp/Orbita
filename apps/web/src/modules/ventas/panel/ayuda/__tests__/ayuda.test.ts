@@ -6,6 +6,7 @@ import { decidirPrimerosPasos, pasoInicial } from '../primerosPasos'
 import { ESTADO_AYUDA_VACIO, parsear } from '../almacen'
 import { puedeUsarModoPrueba, comandoDeQuery, cumplidasSimuladas, siguientePasoDePrueba } from '../acceso'
 import { INTERVALO_MS, SUGERENCIAS, claveDeSugerencia, elegirSugerencia } from '../sugerencias'
+import { agruparPorPantalla } from '../videos'
 
 describe('recorrido por módulo', () => {
     it('las claves son secciones del panel o una vista de Configuración', () => {
@@ -222,5 +223,18 @@ describe('quién puede usar el modo prueba', () => {
         expect(parsear('{"prueba":"listo"}').pruebaElegida).toBe(false)
         expect(parsear('{"pruebaElegida":true}').pruebaElegida).toBe(true)
         expect(parsear('{"descartadasSeguidas":2,"silenciadoHasta":"x"}')).toMatchObject({ descartadasSeguidas: 2, silenciadoHasta: 0 })
+    })
+})
+
+describe('videos tutoriales', () => {
+    it('agrupa los videos por pantalla, en el orden de la lista, y descarta ids que no son de YouTube', () => {
+        const m = agruparPorPantalla([
+            { titulo: 'Cargar una venta a mano', youtubeId: 'aaaaaaaaaaa', pantallas: ['pedidos', 'pedidos/nuevo'] },
+            { titulo: 'Pedidos en lote', youtubeId: 'bbbbbbbbbbb', pantallas: ['pedidos'] },
+            { titulo: 'Roto', youtubeId: 'x"><script>', pantallas: ['pedidos'] },
+        ])
+        expect(m.get('pedidos')).toEqual([{ titulo: 'Cargar una venta a mano', id: 'aaaaaaaaaaa' }, { titulo: 'Pedidos en lote', id: 'bbbbbbbbbbb' }])
+        expect(m.get('pedidos/nuevo')).toEqual([{ titulo: 'Cargar una venta a mano', id: 'aaaaaaaaaaa' }])
+        expect(m.get('clientes')).toBeUndefined()
     })
 })

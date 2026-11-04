@@ -3,7 +3,7 @@
 // El aviso "¿Querés ver cómo funciona…?" aparece una sola vez por módulo en cada
 // dispositivo. Este botón es la forma de volver a verlo cuando quieras: aparece
 // solo en pantallas que tienen recorrido y le avisa al AyudaHost (montado en
-// AdminLayout) que lo abra.
+// AdminLayout), que pregunta cómo verlo (EleccionTutorial).
 
 import { HelpCircle } from 'lucide-react'
 import { useRouter } from 'next/router'

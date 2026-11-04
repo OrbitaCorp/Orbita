@@ -81,8 +81,11 @@ Cualquiera puede cortar sus propias conexiones desde Marketing → Prospección 
      Sirve también para videos ya aprobados.
 7. **Aprobar:** cada video lo aprueba quien lo subió, para verificar lo que hizo su Claude (los socios no aprueban el video de otro
    socio). Lo que sube Milagros, de marketing, lo aprueba la dirección. El panel solo muestra «Aprobar» a quien corresponde.
-   - **Rechazar** borra el archivo, el registro y sus comentarios. Un pendiente que **nadie aprueba se borra solo** (7 días los de
-     marketing, 30 los tutoriales).
+   - **Rechazar** (un pendiente) o **desaprobar** (uno aprobado o ya pasado a borrador) no borra nada: el video pasa a la pestaña
+     **Rechazados** con su archivo y sus comentarios. Desaprobar no toca lo que ya está en TikTok o Instagram. Si el video cubría un
+     tutorial de la lista, el tutorial vuelve a «falta». Un pendiente que **nadie aprueba se borra solo** (7 días).
+   - **Los tutoriales no se aprueban ni avisan por correo:** si alguno se sube a la cola, entra aprobado y su tutorial queda
+     «hecho». Lo normal igual es no subir el archivo y cargar su link de YouTube (ver abajo).
    - Un video de marketing **aprobado** queda como **registro** (con su archivo) y habilita **descargarlo** o **pasarlo como borrador**
      a TikTok (a los borradores de la cuenta) o a Instagram (como borrador en Publicaciones, donde se programa o se publica).
    - Los **tutoriales** son internos: no se pasan a redes.
@@ -92,8 +95,16 @@ Cualquiera puede cortar sus propias conexiones desde Marketing → Prospección 
 
 Hay una lista de los tutoriales del panel y la tienda con **qué hay y qué falta** (39 en total, agrupados: Arrancar, Catálogo, Vender día
 a día, Vender más, Que tu tienda se vea bien, Equipo y cuenta, Paquete Avanzado y los opcionales para mostrarle al cliente). La
-actualiza el Claude de cada persona por el conector: marca «en proceso» al empezar uno, y al registrar su video queda «en revisión»
-y, cuando se aprueba, «hecho». También se corrige a mano desde el panel (Marketing → Videos → Tutoriales).
+actualiza el Claude de cada persona por el conector: marca «en proceso» al empezar uno y, cuando el video está listo, **la persona lo
+sube a YouTube como «No listado»** (no «Privado»: un privado no se puede ver desde el panel) **y su Claude carga el link** con
+`tutoriales_actualizar` (campo `youtube`). Con el link queda «hecho» al instante: sin cola, sin aprobación y sin correo. Los links no
+se cargan desde el panel, solo por el conector.
+
+Cada tutorial dice en qué **pantallas del panel** se ofrece (`pantallas`, ya cargadas para casi todos; se cambian con el mismo
+`tutoriales_actualizar`). En esas pantallas, el botón «Ver tutorial» del panel de cada tienda pregunta **¿Video o Recorrido
+guiado?** y el video se reproduce ahí mismo (YouTube sin cookies). Aparece apenas se carga el link, sin deploy.
+
+En Marketing → Videos → Tutoriales se sigue el progreso: cuántos están hechos y cuántos tienen video, y «Ver video» en cada uno.
 
 ## Controles y límites (lo que lo hace seguro)
 
@@ -123,7 +134,7 @@ El principio: **se aprovecha lo que ya se paga**. No hay clave de API de Anthrop
 
 **Ejemplo de escala (hipotético, para dimensionar):** 10 videos por día, todos aprobados y conservados = 400 MB por día ≈
 12 GB al mes ≈ **menos de US$ 0,20 al mes** de almacenamiento, más ~US$ 0,20–0,50 por día de voz con Gemini TTS. El
-almacenamiento crece solo con los **aprobados** (los rechazados y vencidos se borran).
+almacenamiento crece con los **aprobados y los rechazados** (se conservan); solo los pendientes vencidos se borran.
 
 ## Cómo se puede explotar (hacia dónde crece)
 

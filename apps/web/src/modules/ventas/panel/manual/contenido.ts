@@ -1059,7 +1059,8 @@ export const CAPITULOS: Capitulo[] = [
         {
             id: 'tutorial', titulo: 'Los tutoriales de cada módulo',
             bloques: [
-                { tipo: 'parrafo', texto: 'La primera vez que entrás a un módulo (Productos, Pedidos, Clientes…) te preguntamos si querés ver cómo funciona. Si tocás "Ver tutorial", te lo mostramos sobre la pantalla misma: un paso por vez, con la parte señalada nítida y el resto difuminado, y una explicación de dos renglones de qué es y cómo se hace. Con "Ahora no" o "Omitir" lo salteás sin perder nada.' },
+                { tipo: 'parrafo', texto: 'La primera vez que entrás a un módulo (Productos, Pedidos, Clientes…) te preguntamos si querés ver cómo funciona. Si tocás "Ver tutorial", elegís cómo verlo: "Video" (un video corto con voz, en YouTube; si la pantalla tiene varios, elegís cuál) o "Recorrido guiado", sobre la pantalla misma: un paso por vez, con la parte señalada nítida y el resto difuminado, y una explicación de dos renglones de qué es y cómo se hace. Con "Ahora no" o "Omitir" lo salteás sin perder nada.' },
+                { tipo: 'parrafo', texto: 'El botón "Ver tutorial" está siempre arriba a la derecha (en el celular, arriba del contenido de la pantalla), así que podés volver a verlo cuando quieras. Las pantallas que todavía no tienen video muestran la opción "Video" apagada.' },
                 { tipo: 'parrafo', texto: 'El tutorial no te mueve de pantalla ni hace nada por vos: solo señala y explica. Cada módulo lo ofrece una sola vez en cada dispositivo, y el detalle completo de todo está en este manual.' },
                 { tipo: 'parrafo', texto: 'De vez en cuando, además, te preguntamos si ya sabés hacer algo que todavía no hiciste (por ejemplo, crear un descuento). Si contestás que sí, no te lo volvemos a preguntar; si contestás que no, te mostramos el tutorial. Lo que ya hiciste nunca se sugiere.' },
             ],
