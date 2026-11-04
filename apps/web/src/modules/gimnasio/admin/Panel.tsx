@@ -17,7 +17,8 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { BellRing, CalendarDays, CalendarOff, CalendarRange, HandCoins, Hourglass, MessageCircle, Settings, Shapes, SlidersHorizontal, Tag, UserRound, UserX, Users, Wallet } from 'lucide-react'
 import LayoutPanel, { type AvisoNav, type ItemBusqueda, type ItemNav } from '@/design-system/reservas/LayoutPanel'
-import { Encabezado, useAviso } from '@/design-system/reservas/piezas'
+import { useAviso } from '@/design-system/reservas/piezas'
+import { SkeletonVista, useCargaSimulada, type FormaSkeleton } from '@/design-system/reservas/skeleton'
 import { DIAS_CORTOS, MESES_CORTOS, diaSemana, diasEntre, fechaCorta, hhmm, partes } from '@/lib/reservas/fechas'
 import { AHORA, ESTADO_PLAN, HOY, clasesDelDia, clasesSinProfe, cupoDe, estadoPlanDe, planDe, rubroPorKey } from '../datos'
 import { useNegocio } from '../demo/useNegocio'
@@ -38,8 +39,19 @@ import Negocio from './configuracion/Negocio'
 import Horarios from './configuracion/Horarios'
 
 const SUBS_CONFIG = [{ id: 'negocio', label: 'Datos del negocio' }, { id: 'horarios', label: 'Horarios' }]
+/** Las secciones del panel: lo que puede venir en ?vista=. */
+type Vista = 'clases' | 'socios' | 'ingresos' | 'equipo' | 'actividades' | 'planes' | 'reglas' | 'bloqueos' | 'mensajes' | 'pagos' | 'calendarios' | 'configuracion'
+// La silueta de cada sección mientras llegan sus datos: la forma de la pantalla que viene
+// después. Clases es la tira de días con lo del día (y la grilla semanal, columnas por día);
+// Alumnos, indicadores, buscador y tabla; Ingresos, indicadores y gráficos; Equipo, tarjetas;
+// el resto son formularios de 880 px (Planes también: una tarjeta con sus campos por plan).
+const FORMAS: Record<Vista, FormaSkeleton> = {
+  clases: 'agenda', socios: 'lista', ingresos: 'tablero', equipo: 'tarjetas-icono', actividades: 'formulario', planes: 'formulario',
+  reglas: 'formulario', bloqueos: 'formulario', mensajes: 'formulario', pagos: 'formulario', calendarios: 'formulario', configuracion: 'formulario',
+}
+const esVista = (v: string): v is Vista => v in FORMAS
 /** Las pestañas que Configuración tenía antes y hoy son secciones propias: el link viejo abre la nueva. */
-const PESTANA_VIEJA: Record<string, string> = { actividades: 'actividades', planes: 'planes', reglas: 'reglas', bloqueos: 'bloqueos', calendarios: 'calendarios' }
+const PESTANA_VIEJA: Record<string, Vista> = { actividades: 'actividades', planes: 'planes', reglas: 'reglas', bloqueos: 'bloqueos', calendarios: 'calendarios' }
 const q1 = (v: unknown) => (typeof v === 'string' ? v : '')
 /** "Sáb 14 nov · 10:40": el ahora fijo de la demo, en el header. */
 const FECHA_DEMO = `${DIAS_CORTOS[diaSemana(HOY)]} ${partes(HOY).dia} ${MESES_CORTOS[partes(HOY).mes - 1]} · ${hhmm(AHORA)}`
@@ -50,6 +62,8 @@ export default function Panel() {
   const { rubro, negocio, inscripciones, socios } = n
   const [avisar, aviso] = useAviso()
   const r = rubroPorKey(negocio.rubro)
+  // La espera de la API, fingida (no hay backend): la primera carga del panel muestra la silueta.
+  const simulada = useCargaSimulada()
 
   // Lo que más conviene mirar al entrar: las clases de hoy con gente esperando
   // o ya completas, los planes que vencen en 7 días y las clases que quedaron sin profe.
@@ -76,7 +90,7 @@ export default function Panel() {
   const pedida = q1(router.query.vista) || 'clases'
   const tabQ = q1(router.query.tab)
   const viejo = pedida === 'configuracion' ? PESTANA_VIEJA[tabQ] : undefined
-  const vista = viejo ?? (items.some(i => i.id === pedida) ? pedida : 'clases')
+  const vista: Vista = viejo ?? (esVista(pedida) && items.some(i => i.id === pedida) ? pedida : 'clases')
   const tab = vista === 'configuracion' ? (SUBS_CONFIG.some(s => s.id === tabQ) ? tabQ : 'negocio') : undefined
   // La query se arma de cero: lo que abrió una sección (?clase=, ?socio=) no viaja a la siguiente.
   const ir = (id: string, t?: string, extra: Record<string, string> = {}) => {
@@ -143,24 +157,31 @@ export default function Panel() {
     sitio: ruta('inicio', rubro.key), sitioDetalle: `Lo que ven tus ${r.socios.toLowerCase()} para reservar`,
   }
 
+  // Lo que el armazón muestra del negocio: el nombre, quién mira y el buscador. Antes de
+  // hidratar, nada: sería el de ejemplo.
+  const delNegocio = n.hidratado
+    ? { negocio: negocio.nombre, usuario: { id: 'dueno', nombre: negocio.dueno.nombre, rol: negocio.dueno.rol, color: '#1D4ED8' }, busqueda, buscar: `Buscar ${r.socios.toLowerCase()}, clases o secciones` }
+    : { negocio: '' }
+
   // En una carga completa el primer render todavía tiene el negocio de ejemplo (ver
   // useHidratado): las secciones esperan a lo guardado. Si no, los formularios
-  // arrancaban con el ejemplo y al guardar pisaban lo del dueño. Mientras tanto,
-  // el armazón sin datos del negocio (ni nombre ni contadores): nada que después cambie.
-  if (!n.hidratado) {
+  // arrancaban con el ejemplo y al guardar pisaban lo del dueño. Mientras carga (eso, y
+  // la espera fingida de la API), en el lugar de la sección va su silueta y el menú va
+  // sin contadores ni avisos: llegan con los datos. Nada que después cambie.
+  const cargando = !n.hidratado || simulada
+  if (cargando) {
     return (
-      <LayoutPanel {...armazon} negocio="" items={items.map(i => ({ ...i, badge: undefined }))}>
+      <LayoutPanel {...armazon} {...delNegocio} items={items.map(i => ({ ...i, badge: undefined }))} cargando>
         <style>{CSS_PANEL}</style>
-        <div className="rv-pagina" aria-busy="true"><Encabezado rotulo="Cargando" titulo={items.find(i => i.id === vista)?.label ?? ''} /></div>
+        <SkeletonVista forma={FORMAS[vista]} nombre={tab ? SUBS_CONFIG.find(s => s.id === tab)?.label : items.find(i => i.id === vista)?.label} />
       </LayoutPanel>
     )
   }
 
   const onGuardar = (cambio: Parameters<typeof n.configurar>[1], msj = 'Cambios guardados', detalle?: string) => { n.configurar(rubro.key, cambio); avisar(msj, detalle) }
-  const usuario = { id: 'dueno', nombre: negocio.dueno.nombre, rol: negocio.dueno.rol, color: '#1D4ED8' }
 
   return (
-    <LayoutPanel {...armazon} negocio={negocio.nombre} items={items} avisos={avisos} busqueda={busqueda} buscar={`Buscar ${r.socios.toLowerCase()}, clases o secciones`} usuario={usuario}>
+    <LayoutPanel {...armazon} {...delNegocio} items={items} avisos={avisos}>
       <style>{CSS_PANEL}</style>
       {vista === 'clases' && (
         <Clases key={rubro.key} negocio={negocio} inscripciones={inscripciones} socios={socios}

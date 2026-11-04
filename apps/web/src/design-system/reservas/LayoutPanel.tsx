@@ -250,10 +250,16 @@ interface Props {
   onCuenta?: (id: string | null) => void
   /** Franja entre el header y la pantalla (avisa que se está mirando el panel de otro). */
   franja?: ReactNode
+  /**
+   * La sección todavía no tiene sus datos: `children` es su silueta (SkeletonVista). El
+   * contenido se marca ocupado para el lector de pantalla y, al llegar, entra con el mismo
+   * fundido que al cambiar de sección.
+   */
+  cargando?: boolean
   children: ReactNode
 }
 
-export default function LayoutPanel({ producto = '', negocio, rubro, fecha, items, activo, tab, onIr, sitio, sitioDetalle, avisos = [], busqueda = [], buscar, usuario, cuentas = [], viendoComo = null, onCuenta, franja, children }: Props) {
+export default function LayoutPanel({ producto = '', negocio, rubro, fecha, items, activo, tab, onIr, sitio, sitioDetalle, avisos = [], busqueda = [], buscar, usuario, cuentas = [], viendoComo = null, onCuenta, franja, cargando = false, children }: Props) {
   const { isDark, setTema } = useDarkMode()
   const idLateral = useId()
   const idBusqueda = useId()
@@ -534,9 +540,9 @@ export default function LayoutPanel({ producto = '', negocio, rubro, fecha, item
               ? <EscenaEspacial planeta={false} oscuro contenedor />
               : <EscenaEspacial planeta oscuro={false} paleta="panelClaro" contenedor satelite />}
           </div>
-          <main ref={principal} className="rvp-main admin-main">
-            {/* key: cada sección vuelve a montar el envoltorio y dispara la entrada. */}
-            <div key={`${activo}:${subActual?.id ?? ''}`} className="rvp-vista">{children}</div>
+          <main ref={principal} className="rvp-main admin-main" aria-busy={cargando || undefined}>
+            {/* key: cada sección (y el paso de la silueta al contenido) vuelve a montar el envoltorio y dispara la entrada. */}
+            <div key={`${activo}:${subActual?.id ?? ''}:${cargando ? 'carga' : 'listo'}`} className="rvp-vista">{children}</div>
           </main>
         </div>
 
