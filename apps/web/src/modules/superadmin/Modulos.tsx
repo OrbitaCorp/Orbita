@@ -1149,7 +1149,7 @@ function TarjetaEntrada({ entrada: e, confirmacion, tareas, enfocar, respuesta, 
                 <b>Tu respuesta ({e.quien})</b>
                 <span>{respuesta ? `Guardada el ${larga(respuesta.dia)} en este navegador` : 'Se guarda en este navegador; copiala para que Claude la registre en Auditoría.'}</span>
               </div>
-              <label className="rv-sr" htmlFor={`${idCuerpo}-respuesta`}>Tu respuesta a esta decisión</label>
+              <label className="sr-only" htmlFor={`${idCuerpo}-respuesta`}>Tu respuesta a esta decisión</label>
               <textarea
                 id={`${idCuerpo}-respuesta`}
                 value={texto}
