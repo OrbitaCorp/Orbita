@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { ArrowLeft, Check, Printer } from 'lucide-react'
+import { montoEsAr } from '@/lib/storefront/utils'
 
 // ─── Tipos públicos ──────────────────────────────────────────────────────────
 
@@ -59,7 +60,7 @@ function OrbitaIcon() {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function fmtMonto(n: number) {
-  return `$${Math.abs(n).toLocaleString('es-AR')}`
+  return `$${montoEsAr(Math.abs(n))}`
 }
 
 // ─── Componente ──────────────────────────────────────────────────────────────

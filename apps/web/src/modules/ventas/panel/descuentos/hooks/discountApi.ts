@@ -136,7 +136,8 @@ export function detalleApiADescuento(d: ApiDiscountDetail): Descuento {
     alcanceResumen: d.alcanceResumen,
     linkActive: d.linkActive,
     countdown: d.countdown,
-    creadoPor: d.createdBy,
+    // El nombre, nunca el id: si no viene, el detalle no muestra «por …».
+    creadoPor: d.createdByName ?? '',
     createdAt: d.createdAt,
     updatedAt: d.updatedAt,
   }

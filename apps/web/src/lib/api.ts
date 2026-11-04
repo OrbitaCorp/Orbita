@@ -2803,6 +2803,8 @@ export type ApiDiscountDetail = ApiDiscountRow & {
   productIds: string[]
   categoryIds: string[]
   createdBy: string
+  /** Nombre de quien lo creó (null si esa cuenta ya no existe, o con una API anterior). */
+  createdByName?: string | null
   updatedAt: string
   linkActive: boolean
 }

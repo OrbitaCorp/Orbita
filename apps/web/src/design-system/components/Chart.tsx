@@ -14,6 +14,16 @@ interface LineChartProps {
     formatValue?:  (v: number) => string
 }
 
+// El eje Y tiene lugar para 4 o 5 caracteres: con montos de siete cifras ("3459996") el número se cortaba por la
+// izquierda y se leía otro ("459996"). Se abrevia: 3,5 M · 865 k · 950.
+export function abreviarEje(n: number): string {
+  const v = Math.round(n);
+  const abs = Math.abs(v);
+  if (abs >= 1_000_000) return `${(v / 1_000_000).toLocaleString('es-AR', { maximumFractionDigits: abs >= 10_000_000 ? 0 : 1 })} M`;
+  if (abs >= 1_000) return `${Math.round(v / 1_000).toLocaleString('es-AR')} k`;
+  return String(v);
+}
+
 export function LineChart({ data, labels, color = 'var(--color-primary)', height = 140, max, formatValue }: LineChartProps) {
   const [hovered, setHovered] = useState<number | null>(null);
   const w       = 600;
@@ -65,7 +75,7 @@ export function LineChart({ data, labels, color = 'var(--color-primary)', height
               stroke="var(--color-border)" strokeWidth="1" />
             <text x={pad.l - 4} y={pad.t + innerH * p + 3} fontSize="9"
               fontFamily='"Geist Mono", monospace' fill="var(--color-muted)" textAnchor="end">
-              {Math.round(maxVal - maxVal * p)}
+              {abreviarEje(maxVal - maxVal * p)}
             </text>
           </g>
         ))}
