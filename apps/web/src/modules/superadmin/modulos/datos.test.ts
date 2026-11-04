@@ -106,19 +106,26 @@ describe('Módulos — plan', () => {
 
   it('toda tarea documentada apunta a una entrada de su mismo módulo, que no es una decisión abierta', () => {
     const porKey = new Map(TODAS.map((e) => [e.key, e]))
-    let documentadas = 0
     for (const p of PLANES) {
       for (const t of p.tareas.filter((x) => x.auditoria)) {
-        documentadas += 1
         const e = porKey.get(t.auditoria!)
         expect(e, `${p.modulo} ${t.id} → ${t.auditoria}`).toBeDefined()
         expect(e!.modulo).toBe(p.modulo)
         expect(e!.abierta).toBe(false)
       }
     }
-    expect(documentadas).toBeGreaterThan(0)
-    const gim = PLANES.find((p) => p.modulo === 'gimnasio')!
-    expect(gim.tareas.find((t) => t.auditoria === 'auditoria.gimnasio.2026-10-26-seccion-modulos')?.texto).toMatch(/sección Módulos/)
+  })
+
+  it('el ciclo 2 arranca limpio: el jueves 05/11, sin tareas documentadas ni antes del inicio, y sin feriados', () => {
+    expect(CICLO).toEqual({ inicio: '2026-11-05', lunes: '2026-11-02', fin2m: '2026-12-23', fin1m: '2026-11-27' })
+    expect(semanaDelCiclo(CICLO.inicio)).toBe(1)
+    expect(semanaDelCiclo(CICLO.fin2m)).toBe(8)
+    for (const p of PLANES) {
+      expect(p.tareas.every((t) => !t.auditoria)).toBe(true)
+      expect(p.tareas[0].dia).toBe('2026-11-05')
+      for (const t of p.tareas) expect(['2026-11-20', '2026-12-08', '2026-12-24', '2026-12-25']).not.toContain(t.dia)
+      expect(p.foco).toMatch(/Ciclo 2/)
+    }
   })
 })
 

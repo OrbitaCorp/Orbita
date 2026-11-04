@@ -189,7 +189,7 @@ function vistaDeTarea(base: Tarea, modulo: ConPlan, horizonte: Horizonte, porKey
   if (horizonte === '1m') {
     // En 1 mes la tarea va a su semana1m, el mismo día de la semana.
     semana = base.semana1m
-    dia = semana === null ? null : sumarDias(lunesDe(CICLO.inicio, semana), indiceDia(base.dia))
+    dia = semana === null ? null : sumarDias(lunesDe(CICLO.lunes, semana), indiceDia(base.dia))
   }
   // Atrasada = sin hacer ni documentar y con la fecha ya pasada. Lo
   // documentado en sesión ya está hecho: le falta la firma, no el trabajo.
@@ -207,11 +207,11 @@ export function armarModulo(def: DefModulo, datos: DatosModulos, hoy: string | n
     .sort((a, b) => b.fecha.localeCompare(a.fecha) || a.titulo.localeCompare(b.titulo))
   const todas = plan ? plan.tareas.map((t) => vistaDeTarea(t, plan.modulo, horizonte, porKey, datos.estado, hoy)) : []
   const tareas = todas.filter((t) => t.semana !== null)
-  const cantidad = Math.max(1, Math.ceil((diasEntre(CICLO.inicio, fin) + 1) / 7))
+  const cantidad = Math.max(1, Math.ceil((diasEntre(CICLO.lunes, fin) + 1) / 7))
   const titulos = plan ? (horizonte === '1m' ? plan.semanas1m : plan.semanas) : []
   const semanas: Semana[] = []
   for (let n = 1; n <= cantidad; n++) {
-    const desde = lunesDe(CICLO.inicio, n)
+    const desde = lunesDe(CICLO.lunes, n)
     const deLaSemana = tareas
       .filter((t) => t.semana === n)
       .sort((a, b) => (a.dia ?? '').localeCompare(b.dia ?? '') || a.tarea.dia.localeCompare(b.tarea.dia))
@@ -230,10 +230,13 @@ export function armarModulo(def: DefModulo, datos: DatosModulos, hoy: string | n
 }
 
 type EstadoSemana = 'hecha' | 'atrasada' | 'en-curso' | 'pendiente'
+// El primer día visible de una semana: la primera del ciclo arranca un jueves
+// (CICLO.inicio) aunque se cuente desde su lunes.
+const primerDia = (s: Semana) => (s.desde < CICLO.inicio ? CICLO.inicio : s.desde)
 export function estadoSemana(s: Semana, hoy: string | null): EstadoSemana {
   if (s.tareas.length > 0 && s.tareas.every((t) => t.estado === 'hecha')) return 'hecha'
   if (s.tareas.some((t) => t.atraso > 0)) return 'atrasada'
-  if (s.tareas.some((t) => t.estado !== 'pendiente') || (hoy !== null && hoy >= s.desde && hoy <= s.hasta)) return 'en-curso'
+  if (s.tareas.some((t) => t.estado !== 'pendiente') || (hoy !== null && hoy >= primerDia(s) && hoy <= s.hasta)) return 'en-curso'
   return 'pendiente'
 }
 const ESTADO_SEMANA: Record<EstadoSemana, { label: string; tone: 'green' | 'amber' | 'blue' | 'gray' }> = {
@@ -802,7 +805,7 @@ function PanelPlan({ modulo: m, hoy, onTildar, onRegistrar, onVerEntrada }: {
                   Semana {s.n} · {s.titulo}
                 </h3>
                 <div className="mo-rotulo" style={{ fontWeight: 500, marginTop: 3 }}>
-                  {corta(s.desde)} al {corta(s.hasta)}
+                  {corta(primerDia(s))} al {corta(s.hasta)}
                   {s.comprimidas.length > 0 && <> · suma lo de las semanas {s.comprimidas.join(', ')} del plan de 2 meses</>}
                 </div>
               </div>
@@ -814,6 +817,8 @@ function PanelPlan({ modulo: m, hoy, onTildar, onRegistrar, onVerEntrada }: {
             <div>
               {[0, 1, 2, 3, 4].map((i) => {
                 const dia = sumarDias(s.desde, i)
+                // Antes del inicio del ciclo no hay días que mostrar (la semana 1 arranca un jueves).
+                if (dia < CICLO.inicio) return null
                 const deHoy = s.tareas.filter((t) => t.dia === dia)
                 return (
                   <div key={dia} className="mo-dia">

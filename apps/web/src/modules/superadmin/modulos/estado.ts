@@ -32,7 +32,9 @@ export interface EstadoModulos {
 }
 
 export const ESTADO_VACIO: EstadoModulos = { tildadas: {}, vinculos: {}, confirmadas: {}, nuevas: [], horizonte: {} }
-const CLAVE = 'orbita_superadmin_modulos'
+// Una clave por ciclo: los ids de las tareas son por posición y el ciclo 2
+// (05/11/2026) arrancó limpio, así que lo tildado en el ciclo 1 no se lee.
+const CLAVE = 'orbita_superadmin_modulos_c2'
 
 export const idTarea = (modulo: ConPlan, id: string) => `${modulo}.${id}`
 
