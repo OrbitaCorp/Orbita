@@ -277,7 +277,12 @@ export function Card({ p, t, sangre, alto = 300, onClick }: { p: Producto; t: Te
 }
 
 // `onClick` solo lo pasa la tienda real; en el panel el botón es decorativo.
-export function Boton({ t, children, grande, secundario, ancho, onClick }: { t: Tema; children: React.ReactNode; grande?: boolean; secundario?: boolean; ancho?: boolean; onClick?: () => void }) {
+// `sobreFoto`: el botón va encima de una foto (el hero a sangre). El
+// secundario no puede usar el texto del tema, que en una tienda con primario
+// casi negro queda negro sobre una foto oscura: va en blanco, con un velo
+// oscuro detrás para que se lea también sobre una foto clara.
+export function Boton({ t, children, grande, secundario, ancho, sobreFoto, onClick }: { t: Tema; children: React.ReactNode; grande?: boolean; secundario?: boolean; ancho?: boolean; sobreFoto?: boolean; onClick?: () => void }) {
+  const secFoto = secundario && sobreFoto
   return (
     <span
       className="pl-cta"
@@ -286,9 +291,11 @@ export function Boton({ t, children, grande, secundario, ancho, onClick }: { t: 
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         padding: grande ? '15px 34px' : '11px 22px',
         borderRadius: t.radio === 0 ? 0 : 999,
-        background: secundario ? 'transparent' : t.primary,
-        color: secundario ? t.text : t.onPrimary,
-        border: secundario ? `1px solid ${t.border}` : 'none',
+        background: secFoto ? 'rgba(0,0,0,0.28)' : secundario ? 'transparent' : t.primary,
+        color: secFoto ? '#fff' : secundario ? t.text : t.onPrimary,
+        border: secFoto ? '1px solid rgba(255,255,255,0.75)' : secundario ? `1px solid ${t.border}` : 'none',
+        backdropFilter: secFoto ? 'blur(6px)' : undefined,
+        WebkitBackdropFilter: secFoto ? 'blur(6px)' : undefined,
         fontSize: grande ? 14.5 : 13.5, fontWeight: 700, fontFamily: t.fb, whiteSpace: 'nowrap',
         boxShadow: secundario ? 'none' : t.sombra,
         width: ancho ? '100%' : undefined, cursor: 'pointer',

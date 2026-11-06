@@ -162,26 +162,33 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
   // Flechas + puntos, pintados con el tema de la plantilla. Solo se dibujan
   // con más de un slide: con uno no hay a dónde ir. El `data-pl-hero-nav` es
   // la marca con la que `Home` encuentra el bloque del hero (ver regionDelHero).
-  const navHero = (estilo?: React.CSSProperties) => nSlides < 2 ? null : (
-    <div data-pl-hero-nav="" style={{ display: 'flex', alignItems: 'center', gap: 14, ...estilo }}>
-      <button
-        onClick={() => irASlide(iActual - 1)} aria-label="Anterior"
-        style={{ width: 34, height: 34, borderRadius: t.radio === 0 ? 0 : '50%', border: `1px solid ${t.primary}`, background: 'transparent', color: t.primary, cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 15, lineHeight: 1 }}
-      >‹</button>
-      <div style={{ display: 'flex', gap: 7 }}>
-        {p.slides.map((_, k) => (
-          <button
-            key={k} onClick={() => irASlide(k)} aria-label={`Ir al ${k + 1}`}
-            style={{ width: k === iActual ? 22 : 8, height: 8, borderRadius: 999, border: 'none', padding: 0, cursor: 'pointer', background: k === iActual ? t.primary : `${t.primary}59`, transition: 'width .35s, background .35s' }}
-          />
-        ))}
+  // `sobreFoto`: el hero a sangre. Ahí el primario del tema (en muchas
+  // tiendas, casi negro) se pierde contra la foto, así que flechas y puntos
+  // van en blanco, con un velo oscuro detrás de las flechas.
+  const navHero = (estilo?: React.CSSProperties, sobreFoto?: boolean) => {
+    if (nSlides < 2) return null
+    const color = sobreFoto ? '#fff' : t.primary
+    const flecha: React.CSSProperties = {
+      width: 34, height: 34, borderRadius: t.radio === 0 ? 0 : '50%',
+      border: `1px solid ${sobreFoto ? 'rgba(255,255,255,0.75)' : t.primary}`,
+      background: sobreFoto ? 'rgba(0,0,0,0.28)' : 'transparent',
+      color, cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 15, lineHeight: 1,
+    }
+    return (
+      <div data-pl-hero-nav="" style={{ display: 'flex', alignItems: 'center', gap: 14, ...estilo }}>
+        <button onClick={() => irASlide(iActual - 1)} aria-label="Anterior" style={flecha}>‹</button>
+        <div style={{ display: 'flex', gap: 7 }}>
+          {p.slides.map((_, k) => (
+            <button
+              key={k} onClick={() => irASlide(k)} aria-label={`Ir al ${k + 1}`}
+              style={{ width: k === iActual ? 22 : 8, height: 8, borderRadius: 999, border: 'none', padding: 0, cursor: 'pointer', background: k === iActual ? color : sobreFoto ? 'rgba(255,255,255,0.45)' : `${t.primary}59`, transition: 'width .35s, background .35s' }}
+            />
+          ))}
+        </div>
+        <button onClick={() => irASlide(iActual + 1)} aria-label="Siguiente" style={flecha}>›</button>
       </div>
-      <button
-        onClick={() => irASlide(iActual + 1)} aria-label="Siguiente"
-        style={{ width: 34, height: 34, borderRadius: t.radio === 0 ? 0 : '50%', border: `1px solid ${t.primary}`, background: 'transparent', color: t.primary, cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 15, lineHeight: 1 }}
-      >›</button>
-    </div>
-  )
+    )
+  }
   const cols = (d: number, m = 2) => `repeat(${movil ? m : d}, 1fr)`
   // Cuántos entran en UNA fila de esa grilla. Va siempre de a pares con
   // `cols()`: si no coinciden, la fila queda con un hueco a la derecha o con
@@ -459,9 +466,9 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
         <p style={{ fontSize: movil ? 15 : 17, lineHeight: 1.6, margin: '16px 0 26px', color: claro ? 'rgba(255,255,255,0.88)' : t.muted }}>{s?.bajada}</p>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: alineado === 'centro' ? 'center' : undefined }}>
           <Boton t={t} grande={!movil} onClick={s?.link && acciones?.irALink ? () => acciones.irALink!(s.link!) : acciones?.irACatalogo}>{s?.cta}</Boton>
-          {txt('hero', 'cta2') && !(acciones && (!acciones.abrirWhatsapp || p.ocultarWhatsapp)) && <Boton t={t} grande={!movil} secundario onClick={acciones?.abrirWhatsapp}>{txt('hero', 'cta2')}</Boton>}
+          {txt('hero', 'cta2') && !(acciones && (!acciones.abrirWhatsapp || p.ocultarWhatsapp)) && <Boton t={t} grande={!movil} secundario sobreFoto={claro} onClick={acciones?.abrirWhatsapp}>{txt('hero', 'cta2')}</Boton>}
         </div>
-        {navHero({ marginTop: 22, justifyContent: alineado === 'centro' ? 'center' : undefined })}
+        {navHero({ marginTop: 22, justifyContent: alineado === 'centro' ? 'center' : undefined }, claro)}
       </div>
     )
 
