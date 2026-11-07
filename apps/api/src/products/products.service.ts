@@ -179,7 +179,7 @@ export class ProductsService {
   async create(businessId: string, dto: CreateProductDto) {
     if (dto.categoryId) await this.validateCategory(businessId, dto.categoryId);
     if (dto.tagIds?.length) await this.validateTags(businessId, dto.tagIds);
-    await this.validateUniqueName(businessId, dto.name);
+    await this.validateUniqueName(businessId, dto.name, dto.categoryId);
     this.validateVariantShape(dto);
     this.validateVisualOption(dto);
     this.validateNoDuplicateVariants(dto);
@@ -307,7 +307,7 @@ export class ProductsService {
     const existing = await this.findOneRaw(businessId, id);
     if (dto.categoryId) await this.validateCategory(businessId, dto.categoryId);
     if (dto.tagIds?.length) await this.validateTags(businessId, dto.tagIds);
-    await this.validateUniqueName(businessId, dto.name, id);
+    await this.validateUniqueName(businessId, dto.name, dto.categoryId, id);
     this.validateVariantOwnership(dto, existing);
     this.validateVariantShape(dto);
     this.validateVisualOption(dto);
@@ -1210,16 +1210,22 @@ export class ProductsService {
   // idénticos — pasó en producción con "Remera Oversize negra" x5. Comparación
   // insensible a mayúsculas y a espacios al borde, como el resto de los checks
   // de unicidad del proyecto (ver OnboardingService.checkEmail).
-  private async validateUniqueName(businessId: string, name: string, excludeId?: string) {
+  //
+  // El nombre es único DENTRO DE CADA CATEGORÍA, no en toda la tienda (07/11,
+  // pedido explícito): una perfumería tiene "CK IN2U EDT 100ML" en Femeninos y
+  // en Masculinos, con precios distintos, y la categoría ya dice cuál es cuál.
+  // El doble click de arriba sigue frenado: el reintento manda la misma categoría.
+  private async validateUniqueName(businessId: string, name: string, categoryId: string | null | undefined, excludeId?: string) {
     const existente = await this.prisma.product.findFirst({
       where: {
         businessId,
         deletedAt: null,
+        categoryId: categoryId ?? null,
         name: { equals: name.trim(), mode: 'insensitive' },
         ...(excludeId ? { id: { not: excludeId } } : {}),
       },
     });
-    if (existente) throw new ConflictException('Ya existe un producto con este nombre');
+    if (existente) throw new ConflictException('Ya existe un producto con este nombre en esta categoría');
   }
 
   private async validateTags(businessId: string, tagIds: string[]) {
