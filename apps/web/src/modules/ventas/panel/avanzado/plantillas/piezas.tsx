@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { esPreview } from '@/lib/storefront/previewBridge'
 import { User, ShoppingBag } from 'lucide-react'
 import { CreditoOrbita } from '@/components/storefront/CreditoOrbita'
+import { VariantesTexto } from '@/components/storefront/VariantesTexto'
 import { abrirPreferenciasDeCookies } from '@/lib/cookies/consentimiento'
 import type { AccionesHome, ItemPie, Producto, Slide, Tema } from './tipos'
 
@@ -257,7 +258,7 @@ export function Card({ p, t, sangre, alto = 300, onClick }: { p: Producto; t: Te
             la tarjeta real (ProductCard con `tema`) tampoco las tiene.
             Los campos `estrellas`/`resenas` siguen en los datos de muestra,
             sin usarse, para no tocar las dieciséis plantillas de una. */}
-        <div style={{ fontSize: 14.5, fontWeight: 700 }}>{p.nombre}</div>
+        <div style={{ fontSize: 14.5, fontWeight: 700 }}>{p.nombre}<VariantesTexto de={p} t={t} /></div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
           {p.antes && <span style={{ fontSize: 12.5, color: t.muted, textDecoration: 'line-through' }}>{p.antes}</span>}
           <span style={{ fontSize: 18, fontWeight: 800 }}>{p.precio}</span>

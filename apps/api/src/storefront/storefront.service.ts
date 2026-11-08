@@ -67,6 +67,19 @@ const MAX_URLS_SITEMAP = 10_000;
 // Cuántas tiendas lista cada página del directorio público (orbita.site/tiendas).
 const TIENDAS_POR_PAGINA = 48;
 
+// La marca de un producto es su característica "Marca" (Product.specs, la
+// tabla de "Características" de la ficha) — no hay un campo aparte. De acá
+// sale el filtro "Marca" del catálogo (ver listProducts → availableBrands).
+export function marcaDeSpecs(specs: Prisma.JsonValue | null | undefined): string | null {
+  if (!Array.isArray(specs)) return null;
+  for (const s of specs) {
+    if (!s || typeof s !== 'object' || Array.isArray(s)) continue;
+    const { label, value } = s as Record<string, unknown>;
+    if (typeof label === 'string' && label.trim().toLowerCase() === 'marca' && typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return null;
+}
+
 // Lo que pide el directorio para mostrar una tienda (ver getDirectory).
 const DIRECTORIO_MIN_PRODUCTOS = 3;
 const DIRECTORIO_ESPERA_HORAS = 48;
@@ -707,6 +720,32 @@ export class StorefrontService {
       filtrados = filtrados.filter((p) => p.variants.some((v) => v.stock.some((s) => s.quantity > 0)));
     }
 
+    // Filtro por marca (característica "Marca", ver marcaDeSpecs). Las marcas
+    // disponibles se arman ANTES de aplicarlo, con el mismo criterio que las
+    // facetas de variantes de abajo: elegir "Creed" no hace desaparecer el
+    // resto de las marcas del costado. Se aplica antes que las variantes, así
+    // los conteos de "Contenido"/"Talle" ya son los de esa marca.
+    const normalizarMarca = (s: string) => s.trim().toLowerCase();
+    const marcasDisponibles = new Map<string, { value: string; count: number }>();
+    for (const p of filtrados) {
+      const marca = marcaDeSpecs(p.specs);
+      if (!marca) continue;
+      const k = normalizarMarca(marca);
+      const e = marcasDisponibles.get(k);
+      if (e) e.count++;
+      else marcasDisponibles.set(k, { value: marca, count: 1 });
+    }
+    const availableBrands = [...marcasDisponibles.values()].sort((a, b) => a.value.localeCompare(b.value, 'es'));
+    if (query.brand) {
+      const elegidas = new Set(query.brand.split(',').map(normalizarMarca).filter(Boolean));
+      if (elegidas.size > 0) {
+        filtrados = filtrados.filter((p) => {
+          const marca = marcaDeSpecs(p.specs);
+          return !!marca && elegidas.has(normalizarMarca(marca));
+        });
+      }
+    }
+
     // Filtro genérico por variación (talle, color, o cualquier otra que el
     // negocio haya definido — ver optionValues del DTO). optionValueIds que
     // trae ALGUNA variante con stock del producto — de ahí sale tanto el
@@ -912,6 +951,7 @@ export class StorefrontService {
       page,
       limit,
       availableOptions,
+      availableBrands,
     };
   }
 

@@ -27,6 +27,12 @@ export class StorefrontProductsQueryDto {
     message: 'optionValues debe ser un UUID o una lista de UUIDs separados por coma',
   })
   optionValues?: string;
+  // Una o varias marcas separadas por coma ("Creed,Xerjoff"): filtro por la
+  // característica "Marca" del producto (Product.specs, la tabla de
+  // "Características"). No es un campo aparte: la tienda que carga "Marca" en
+  // las características de sus productos ya tiene el filtro. Las marcas
+  // elegidas son un OR entre sí; con categoría/variantes es un AND.
+  @IsOptional() @IsString() @MaxLength(1000) brand?: string;
   // Filtra a los productos alcanzados por ESE cupón (alcance producto o
   // categoría) — usado por la pantalla del link exclusivo
   // (/tienda/:slug/descuentos/:codigo) para mostrar solo lo que el link

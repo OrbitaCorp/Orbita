@@ -9,6 +9,7 @@ import {
   Reveal, Foto, Estrellas, Card, Boton, Titulo, Marquee,
   HeaderCentrado, Carrusel, Pie, TONOS, AccionesTienda, navDe, navHover, MenuMovil,
 } from './piezas'
+import { VariantesTexto } from '@/components/storefront/VariantesTexto'
 import { esAfirmacion, estanteDeSeccion, porDefectoDe, TITULOS_ESTANTE } from './secciones'
 
 // ─── Los seis homes ──────────────────────────────────────────────────────────
@@ -1194,6 +1195,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
                   </div>
                   <div style={{ padding: '11px 12px 14px' }}>
                     <div style={{ fontSize: 12.5, lineHeight: 1.35, height: 34, overflow: 'hidden' }}>{x.nombre}</div>
+                    <VariantesTexto de={x} t={t} />
                     <div style={{ fontSize: 15.5, fontWeight: 800, marginTop: 6 }}>{x.precio}</div>
                     {x.antes && <div style={{ fontSize: 11.5, color: t.muted, textDecoration: 'line-through' }}>{x.antes}</div>}
                     {x.transfer && <div style={{ fontSize: 11.5, color: t.muted, marginTop: 3 }}>{x.transfer}</div>}
@@ -1343,7 +1345,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
                     {x.badge && <span style={{ position: 'absolute', top: 12, left: 12, background: TONOS[x.badgeTono ?? 'azul'], color: '#fff', fontSize: 10.5, fontWeight: 700, padding: '4px 10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{x.badge}</span>}
                   </div>
                   <div style={{ paddingTop: 12 }}>
-                    <div style={{ fontSize: 13.5, fontWeight: 700 }}>{x.nombre}</div>
+                    <div style={{ fontSize: 13.5, fontWeight: 700 }}>{x.nombre}<VariantesTexto de={x} t={t} /></div>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 5 }}>
                       {x.antes && <span style={{ fontSize: 12, color: t.muted, textDecoration: 'line-through' }}>{x.antes}</span>}
                       <span style={{ fontSize: 16, fontWeight: 800 }}>{x.precio}</span>
@@ -1392,7 +1394,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
                     <span style={{ width: 26, height: 26, borderRadius: '50%', background: t.primary, color: t.onPrimary, display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 800, flexShrink: 0 }}>{i + 1}</span>
                     <div style={{ width: 62, flexShrink: 0 }}><Foto src={x.img} alto={72} radio={t.radio} /></div>
                     <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontSize: 13.5, fontWeight: 700 }}>{x.nombre}</div>
+                      <div style={{ fontSize: 13.5, fontWeight: 700 }}>{x.nombre}<VariantesTexto de={x} t={t} /></div>
                       <div style={{ fontSize: 15, fontWeight: 800, marginTop: 3 }}>{x.precio}</div>
                       {x.transfer && <div style={{ fontSize: 11.5, color: t.muted, marginTop: 3 }}>{x.transfer}</div>}
                     </div>
@@ -1611,7 +1613,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
                       <span style={{ position: 'absolute', top: 14, left: 14, border: `1px solid ${t.primary}`, color: t.primary, fontSize: 9.5, fontWeight: 700, padding: '5px 11px', letterSpacing: '0.16em', textTransform: 'uppercase', background: 'rgba(12,10,9,0.74)' }}>{x.badge}</span>
                     )}
                   </div>
-                  <div style={{ fontFamily: t.fh, fontSize: movil ? 21 : 26, marginTop: 20 }}>{x.nombre}</div>
+                  <div style={{ fontFamily: t.fh, fontSize: movil ? 21 : 26, marginTop: 20 }}>{x.nombre}<VariantesTexto de={x} t={t} /></div>
                   {x.estrellas && (
                     <div style={{ marginTop: 8, color: t.muted }}><Estrellas n={x.estrellas} resenas={x.resenas} color={t.primary} /></div>
                   )}
@@ -1810,7 +1812,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
                     {x.badge && <span style={{ position: 'absolute', top: 10, left: 10, background: TONOS[x.badgeTono ?? 'azul'], color: '#fff', fontSize: 10.5, fontWeight: 700, padding: '4px 9px', borderRadius: 6, fontFamily: 'ui-monospace, monospace', letterSpacing: '0.04em' }}>{x.badge}</span>}
                   </div>
                   <div style={{ padding: '13px 14px 15px' }}>
-                    <div style={{ fontSize: 14, fontWeight: 700 }}>{x.nombre}</div>
+                    <div style={{ fontSize: 14, fontWeight: 700 }}>{x.nombre}<VariantesTexto de={x} t={t} /></div>
                     <div style={{ marginTop: 8, borderTop: `1px solid ${t.border}` }}>
                       {([
                         [txt('ficha', 'f1l'), txt('ficha', 'f1v')],
@@ -2027,7 +2029,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
                       style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0', borderBottom: `1px solid ${t.border}`, cursor: x.ir ? 'pointer' : undefined }}
                     >
                       <span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: t.primary }} />
-                      <span style={{ fontSize: 13.5, flex: 1, color: t.text }}>{x.nombre}</span>
+                      <span style={{ fontSize: 13.5, flex: 1, color: t.text }}>{x.nombre}<VariantesTexto de={x.producto} t={t} /></span>
                       {/* El precio sale del producto: una categoría no tiene. */}
                       <span style={{ fontSize: 13.5, fontWeight: 700 }}>{x.producto?.precio}</span>
                     </div>
@@ -2220,7 +2222,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
                   <div style={{ borderRadius: t.radio, overflow: 'hidden' }}><Foto src={x.img} src2={x.img2} alto={movil ? 96 : 120} /></div>
                   <div style={{ minWidth: 0 }}>
                     {x.badge && <span style={{ display: 'inline-block', background: t.accent, color: t.primary, fontSize: 10, fontWeight: 900, padding: '3px 9px', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 7 }}>{x.badge}</span>}
-                    <div style={{ fontSize: movil ? 14 : 16, fontWeight: 800, letterSpacing: '-0.015em' }}>{x.nombre}</div>
+                    <div style={{ fontSize: movil ? 14 : 16, fontWeight: 800, letterSpacing: '-0.015em' }}>{x.nombre}<VariantesTexto de={x} t={t} /></div>
                     <div style={{ fontSize: 12, color: t.muted, marginTop: 5, fontFamily: 'ui-monospace, monospace' }}>{x.tag}</div>
                     {x.estrellas && <div style={{ marginTop: 7 }}><Estrellas n={x.estrellas} resenas={x.resenas} color={t.text} /></div>}
                     {movil && <div style={{ fontSize: 18, fontWeight: 900, marginTop: 8 }}>{x.precio}</div>}
@@ -2373,7 +2375,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
                     {x.stock && <span style={{ position: 'absolute', bottom: 10, right: 10, background: t.accent, color: '#0A0A0A', fontSize: 10, fontWeight: 800, padding: '4px 9px' }}>{x.stock}</span>}
                   </div>
                   <div style={{ padding: movil ? 12 : 15 }}>
-                    <div style={{ fontFamily: t.fh, fontSize: movil ? 14 : 16.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.01em', lineHeight: 1.2 }}>{x.nombre}</div>
+                    <div style={{ fontFamily: t.fh, fontSize: movil ? 14 : 16.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.01em', lineHeight: 1.2 }}>{x.nombre}<VariantesTexto de={x} t={t} /></div>
                     <div style={{ fontSize: 11, color: t.muted, marginTop: 6, fontFamily: 'ui-monospace, monospace' }}>{x.tag}</div>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 10 }}>
                       <span style={{ fontSize: movil ? 16 : 19, fontWeight: 800, color: t.primary, fontFamily: t.fh }}>{x.precio}</span>
@@ -2625,7 +2627,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
                   <div style={{ margin: '0 auto', maxWidth: movil ? 200 : 230 }}>
                     <Foto src={x.img} src2={x.img2} alto={movil ? 300 : 380} />
                   </div>
-                  <div style={{ fontFamily: t.fh, fontSize: movil ? 21 : 25, marginTop: 18 }}>{x.nombre}</div>
+                  <div style={{ fontFamily: t.fh, fontSize: movil ? 21 : 25, marginTop: 18 }}>{x.nombre}<VariantesTexto de={x} t={t} /></div>
                   <div style={{ fontSize: 11.5, color: '#7A6355', marginTop: 6, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{x.tag}</div>
                   {x.estrellas && <div style={{ marginTop: 10, color: '#7A6355' }}><Estrellas n={x.estrellas} resenas={x.resenas} color={t.accent} /></div>}
                   <div style={{ fontSize: 19, marginTop: 10, fontWeight: 700 }}>{x.precio}</div>
@@ -2895,7 +2897,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
                       <Foto src={x.img} src2={x.img2} alto={movil ? 132 : 186} />
                       <div style={{ padding: movil ? '13px 14px' : '20px 24px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 7 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: movil ? 14.5 : 17, fontWeight: 700 }}>{x.nombre}</span>
+                          <span style={{ fontSize: movil ? 14.5 : 17, fontWeight: 700 }}>{x.nombre}<VariantesTexto de={x} t={t} /></span>
                           {x.badge && <span style={{ background: TONOS[x.badgeTono ?? 'azul'], color: '#fff', fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 6 }}>{x.badge}</span>}
                         </div>
                         {x.tag && <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: movil ? 11 : 12.5, color: t.muted }}>{x.tag}</div>}
@@ -3056,7 +3058,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
                   <span style={{ fontFamily: t.fh, fontSize: movil ? 15 : 22, color: t.accent }}>{String(i + 1).padStart(2, '0')}</span>
                   <div className="pl-tile"><Foto src={x.img} src2={x.img2} alto={movil ? 84 : 132} /></div>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontFamily: t.fh, fontSize: movil ? 15 : 21, lineHeight: 1.25 }}>{x.nombre}</div>
+                    <div style={{ fontFamily: t.fh, fontSize: movil ? 15 : 21, lineHeight: 1.25 }}>{x.nombre}<VariantesTexto de={x} t={t} /></div>
                     {x.estrellas && <div style={{ marginTop: 7, color: t.muted }}><Estrellas n={x.estrellas} resenas={x.resenas} color={t.primary} /></div>}
                     {x.badge && <div style={{ marginTop: 8, display: 'inline-block', border: `1px solid ${t.primary}`, color: t.primary, fontSize: 9.5, fontWeight: 700, padding: '3px 9px', letterSpacing: '0.14em', textTransform: 'uppercase' }}>{x.badge}</div>}
                     {movil && <div style={{ fontSize: 16, fontWeight: 700, color: t.primary, marginTop: 9 }}>{x.precio}</div>}
@@ -3203,7 +3205,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
                       <div key={x.nombre} className="pl-card" data-link={abrir(x) ? '1' : undefined} onClick={abrir(x)} style={{ background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden' }}>
                         <Foto src={x.img} src2={x.img2} alto={movil ? 108 : 132} />
                         <div style={{ padding: '11px 13px 14px' }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.35 }}>{x.nombre}</div>
+                          <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.35 }}>{x.nombre}<VariantesTexto de={x} t={t} /></div>
                           <div style={{ fontSize: 15.5, fontWeight: 800, marginTop: 6 }}>{x.precio}</div>
                           {x.transfer && <div style={{ fontSize: 11.5, color: t.muted, marginTop: 3 }}>{x.transfer}</div>}
                           {x.cuotas && <div style={{ fontSize: 11, color: t.muted, marginTop: 3 }}>{x.cuotas}</div>}
@@ -3337,7 +3339,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
                   <Foto src={x.img} src2={x.img2} alto={movil ? 132 : 168} />
                   <div style={{ padding: movil ? '13px 14px' : '18px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 6 }}>
                     {x.badge && <span style={{ alignSelf: 'flex-start', background: TONOS[x.badgeTono ?? 'verde'], color: '#fff', fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 999 }}>{x.badge}</span>}
-                    <div style={{ fontSize: movil ? 14 : 16, fontWeight: 700, lineHeight: 1.3 }}>{x.nombre}</div>
+                    <div style={{ fontSize: movil ? 14 : 16, fontWeight: 700, lineHeight: 1.3 }}>{x.nombre}<VariantesTexto de={x} t={t} /></div>
                     {x.estrellas && <Estrellas n={x.estrellas} resenas={x.resenas} color={t.accent} />}
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 9 }}>
                       {x.antes && <span style={{ fontSize: 12, color: t.muted, textDecoration: 'line-through' }}>{x.antes}</span>}
@@ -3506,7 +3508,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
                 </div>
                 <div style={{ padding: '15px 16px 18px' }}>
                   <div style={{ fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: t.primary, fontWeight: 800 }}>{txt('rutina', `paso${i + 1}`)}</div>
-                  <div style={{ fontSize: 16, fontWeight: 700, marginTop: 6 }}>{x.nombre}</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, marginTop: 6 }}>{x.nombre}<VariantesTexto de={x.producto} t={t} /></div>
                   {x.producto && (
                     <>
                       <div style={{ marginTop: 6 }}><Estrellas n={x.producto.estrellas ?? 5} resenas={x.producto.resenas} color={t.accent} /></div>
@@ -3541,7 +3543,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
                 </div>
                 <div style={{ padding: '13px 14px 16px' }}>
                   <Estrellas n={x.estrellas ?? 5} resenas={x.resenas} color={t.accent} />
-                  <div style={{ fontSize: 14, fontWeight: 700, marginTop: 6 }}>{x.nombre}</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, marginTop: 6 }}>{x.nombre}<VariantesTexto de={x} t={t} /></div>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 6 }}>
                     {x.antes && <span style={{ fontSize: 12, color: t.muted, textDecoration: 'line-through' }}>{x.antes}</span>}
                     <span style={{ fontSize: 17, fontWeight: 800 }}>{x.precio}</span>

@@ -384,6 +384,9 @@ export type StorefrontProductsFilters = {
   // mismo formato CSV. Valores del MISMO tipo de opción son OR entre sí,
   // tipos distintos son AND (se resuelve en el backend).
   optionValues?: string | string[]
+  // Una o varias marcas (la característica "Marca" de los productos, ver
+  // marcaDeSpecs en storefront.service.ts) — OR entre sí, AND con lo demás.
+  brand?: string | string[]
   // Filtra a los productos alcanzados por un CUPÓN puntual (alcance producto
   // o categoría) — lo usa DescuentoExclusivo.tsx. Mutuamente excluyente con
   // discountId (uno es cupón por código, el otro descuento por id).
@@ -409,6 +412,7 @@ export function getStorefrontProducts(slug: string, filters: StorefrontProductsF
   const qs = new URLSearchParams()
   if (filters.categoryId) qs.set('categoryId', Array.isArray(filters.categoryId) ? filters.categoryId.join(',') : filters.categoryId)
   if (filters.optionValues) qs.set('optionValues', Array.isArray(filters.optionValues) ? filters.optionValues.join(',') : filters.optionValues)
+  if (filters.brand && filters.brand.length > 0) qs.set('brand', Array.isArray(filters.brand) ? filters.brand.join(',') : filters.brand)
   if (filters.discountCode) qs.set('discountCode', filters.discountCode)
   if (filters.discountId) qs.set('discountId', filters.discountId)
   if (filters.search) qs.set('search', filters.search)
@@ -422,7 +426,8 @@ export function getStorefrontProducts(slug: string, filters: StorefrontProductsF
   if (filters.page) qs.set('page', String(filters.page))
   if (filters.limit) qs.set('limit', String(filters.limit))
   const query = qs.toString()
-  return storefrontRequest<{ data: StorefrontProductItem[]; total: number; page: number; limit: number; availableOptions: StorefrontFacet[] }>(
+  // availableBrands: opcional — una API anterior al filtro de marca no lo manda.
+  return storefrontRequest<{ data: StorefrontProductItem[]; total: number; page: number; limit: number; availableOptions: StorefrontFacet[]; availableBrands?: { value: string; count: number }[] }>(
     `/${slug}/products${query ? `?${query}` : ''}`,
   )
 }
