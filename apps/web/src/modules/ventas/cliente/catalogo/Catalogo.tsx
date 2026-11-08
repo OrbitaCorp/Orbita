@@ -156,6 +156,28 @@ export default function Catalogo() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady])
 
+  // ?search= que llega DESPUÉS de abrir el catálogo: el buscador del header
+  // (BuscadorPlantilla, StorefrontHeader) hace router.push al mismo catálogo,
+  // así que la página no se vuelve a montar y el efecto de arriba —que lee la
+  // URL una sola vez— no se enteraba: buscar estando en el catálogo no hacía
+  // nada (reportado con captura en Cruzyparfums). El header busca en TODA la
+  // tienda, por eso además se saca el filtro de categoría si la URL no trae uno.
+  // `ultimaQuerySearchRef` lo actualiza también el efecto "URL <- estado", así
+  // lo que escribe este mismo componente no se toma como búsqueda nueva.
+  const ultimaQuerySearchRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!router.isReady || !urlListo) return
+    const crudo = router.query.search
+    const s = (typeof crudo === 'string' ? crudo : '').trim()
+    if (ultimaQuerySearchRef.current === null) { ultimaQuerySearchRef.current = s; return }
+    if (s === ultimaQuerySearchRef.current) return
+    ultimaQuerySearchRef.current = s
+    setBusqueda(s)
+    setPage(1)
+    if (!router.query.cat) setCatsActivas([])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady, urlListo, router.query.search])
+
   // ?cat=<slug> — lo mandan los mosaicos de categoría del home con plantilla
   // (ver AccionesHome#irACategoria) y los enlaces de categoría del header
   // (headerLinks con id `cat:<slug>`). Va en un efecto aparte del de arriba
@@ -329,6 +351,7 @@ export default function Catalogo() {
     if (orden !== 'relevancia') q.set('sort', orden)
     if (soloOferta) q.set('onSale', '1')
     if (busqueda.trim()) q.set('search', busqueda.trim())
+    ultimaQuerySearchRef.current = busqueda.trim()
     if (precioMin) q.set('min', precioMin)
     if (precioMax) q.set('max', precioMax)
     const vistaDefault = config?.appearance?.gridLayout === 'list' ? 'list' : 'grid'

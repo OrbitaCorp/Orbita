@@ -163,8 +163,14 @@ export function StorefrontChrome({ tienda, config, anuncio = false, homeTemplate
           de Apariencia (StorePreview.tsx: "Announcement bar" antes de
           "Header"). Quedó al revés acá siendo la única pieza de la tienda
           real que dibujaba primero el header — bug reportado con captura
-          (Escaparate aplicada vs. la maqueta original). */}
-      {anuncio && (
+          (Escaparate aplicada vs. la maqueta original).
+
+          Con una plantilla que dibuja su propio header (`usaHeaderPropio`) el
+          anuncio ya viene adentro de ese header (`anuncio: anuncioReal(...)`
+          más abajo): dibujar también este salía DOBLE en el catálogo y en las
+          categorías — la franja de la plantilla y, debajo, la barra clásica
+          (reportado con captura en Cruzyparfums, plantilla Sobrio). */}
+      {anuncio && !usaHeaderPropio && (
         <AnnouncementBar
           text={config?.appearance?.shippingText}
           visible={config?.appearance?.showAnnouncementBar ?? true}

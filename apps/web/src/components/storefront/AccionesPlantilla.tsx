@@ -193,7 +193,9 @@ export function BuscadorPlantilla({ t, placeholder = 'Buscar productos…', anch
         }}
       />
       <button onClick={buscar} aria-label="Buscar" style={{ display: 'inline-flex', background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: t.muted }}>
-        {valor ? <X size={14} strokeWidth={2} onClick={() => setValor('')} /> : <Search size={14} strokeWidth={2} />}
+        {/* La cruz solo borra: sin stopPropagation el click subía al botón y
+            además disparaba la búsqueda con el texto que se estaba borrando. */}
+        {valor ? <X size={14} strokeWidth={2} onClick={(e) => { e.stopPropagation(); setValor('') }} /> : <Search size={14} strokeWidth={2} />}
       </button>
     </span>
   )
