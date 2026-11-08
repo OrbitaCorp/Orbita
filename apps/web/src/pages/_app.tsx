@@ -371,6 +371,7 @@ export default function App({ Component, pageProps }: AppProps) {
       <script
         data-root-domain={process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'orbita.local'}
         data-color-mode={isStorefront ? (ssrColorMode ?? 'light') : 'light'}
+        data-storefront={isStorefront ? '1' : undefined}
         dangerouslySetInnerHTML={{ __html: TEMA_SCRIPT }}
       />
       <AuthProvider>
