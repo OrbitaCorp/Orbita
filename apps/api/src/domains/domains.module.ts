@@ -15,6 +15,7 @@ import { SearchConsoleModule } from '../search-console/search-console.module';
   controllers: [DomainsController, DomainPurchaseWebhookController],
   providers: [DomainsService, VercelDomainsService, DomainPurchaseService, DomainExpiryService],
   // DomainExpiryService lo consume el mantenimiento nocturno (InternalCronModule).
-  exports: [DomainExpiryService],
+  // DomainsService: la verificación automática (disparo de cada 5 minutos y CORS en main.ts).
+  exports: [DomainExpiryService, DomainsService],
 })
 export class DomainsModule {}

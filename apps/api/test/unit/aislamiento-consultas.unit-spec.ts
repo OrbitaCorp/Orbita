@@ -46,6 +46,7 @@ const EXCEPCIONES: Record<string, { max: number; motivo: string }> = {
   'src/storefront/storefront.service.ts': { max: 1, motivo: 'Helper que recibe el where ya armado por quien lo llama' },
   'src/search-console/search-console.service.ts': { max: 8, motivo: 'Verificación en Google de los dominios propios: se busca/actualiza cada dominio por su id (que sale de la fila, no de una URL) y la corrida nocturna recorre los dominios de TODAS las tiendas para reintentar; los datos que se leen y escriben son del propio dominio (token de Google, estado, fecha del sitemap). Los endpoints del superadmin que la usan están detrás de PlatformAdminGuard' },
   'src/platform/costs/costs.service.ts': { max: 4, motivo: 'Uso mensual de Groq, envíos de email (email_logs) y consumo de IA por función (getAiUsageByFeature) agregados desde usage_events para el Super Admin: cross-tenant por diseño, detrás de PlatformAdminGuard en costs.controller' },
+  'src/main.ts': { max: 1, motivo: 'CORS de los dominios propios: se busca el dominio por el host del Origin (custom_domains.domain es único global) y solo se devuelve si existe y está activo, para dejar pasar o no la request; no se lee ni se escribe nada de ningún negocio' },
   'src/platform/costs/adapters/internal.adapter.ts': { max: 1, motivo: 'Agrega usage_events por proveedor para el Super Admin: cross-tenant por diseño, detrás de PlatformAdminGuard en costs.controller' },
 };
 
