@@ -68,6 +68,16 @@ function idsDelNodo(arbol: ArbolCategorias, c: StorefrontCategoryItem): string[]
 // que pide los productos.
 const cacheConsultas = new Map<string, Awaited<ReturnType<typeof getStorefrontProducts>>>()
 
+// Valores de una faceta en el orden en que conviene leerlos. La API los manda
+// en el orden en que los encontró ("60 ml, 90 ml, 100 ml, 50 ml…"): si TODOS
+// empiezan con un número (ml, gramos, talles numéricos) se ordenan de menor a
+// mayor; si no (S/M/L, colores) quedan como vienen, que es el orden del dueño.
+export function ordenarValoresFaceta<V extends { value: string }>(valores: V[]): V[] {
+  const num = (s: string) => parseFloat(s.replace(',', '.'))
+  if (!valores.every(v => /^\s*\d/.test(v.value))) return valores
+  return [...valores].sort((a, b) => num(a.value) - num(b.value))
+}
+
 const ORDENES: StorefrontSort[] =['relevancia', 'precio-asc', 'precio-desc', 'bestselling', 'recommended']
 
 export default function Catalogo() {
@@ -712,7 +722,7 @@ export default function Catalogo() {
             {facetas.map(f => (
               <FilterSection key={f.id} title={f.name} open={facetasAbiertas.has(f.id)} onToggle={() => alternarFaceta(f.id)}>
                 <div>
-                  {f.values.map(v => {
+                  {ordenarValoresFaceta(f.values).map(v => {
                     const activa = opcionesActivas.includes(v.id)
                     return (
                       <div key={v.id} className="sf-catrow" onClick={() => alternarOpcion(v.id)}>
