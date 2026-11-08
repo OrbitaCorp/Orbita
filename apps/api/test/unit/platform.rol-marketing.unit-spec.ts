@@ -20,6 +20,7 @@ import { OrbiSaludController } from '../../src/platform/orbi-salud.controller';
 import { ConversacionesPlataformaController } from '../../src/platform/orbi-uso/conversaciones.controller';
 import { OrbiUsoPlataformaController } from '../../src/platform/orbi-uso/orbi-uso.controller';
 import { PlatformController } from '../../src/platform/platform.controller';
+import { SeguimientoController } from '../../src/platform/seguimiento/seguimiento.controller';
 import { SupportAdminController } from '../../src/support/support-admin.controller';
 
 // Rol MARKETING (por ejemplo, Milagros): ve y usa SOLO lo que se le habilitó a propósito. Lo que no la nombra le queda cerrado,
@@ -30,6 +31,7 @@ const CONTROLADORES = [
   InstagramAdminController, InstagramBandejaController, InstagramContenidoController, MarketingController, McpConsentimientoController,
   ProspeccionController, TiktokController, VideosController, TutorialesController, PlatformAuditController, CorreoPlataformaController,
   CostsController, OrbiSaludController, ConversacionesPlataformaController, OrbiUsoPlataformaController, PlatformController, SupportAdminController,
+  SeguimientoController,
 ];
 
 type Clase = { name: string; prototype: object };

@@ -433,7 +433,7 @@ export function TabCorreo({ puedeEnviar, puedeEditarCasillas, adminEmail }: { pu
 
 // ─── Casillas y firmas ───────────────────────────────────────────────────────
 
-const VACIA: CasillaCorreoInput = { email: '', name: '', jobTitle: '', phone: '', signatureImageUrl: null, signatureBanner: false }
+const VACIA: CasillaCorreoInput = { email: '', name: '', jobTitle: '', phone: '', whatsapp: '', signatureImageUrl: null, signatureBanner: false }
 
 function ModalCasillas({ casillas, puedeEditar, onClose, onCambio }: {
   casillas: CasillaCorreo[]
@@ -523,13 +523,13 @@ function esApaisada(file: File): Promise<boolean> {
 
 function FormCasilla({ casilla, onVolver, onGuardada }: { casilla: CasillaCorreo | null; onVolver: () => void; onGuardada: () => void }) {
   const [v, setV] = useState<CasillaCorreoInput>(() => casilla
-    ? { email: casilla.email, name: casilla.name, jobTitle: casilla.jobTitle ?? '', phone: casilla.phone ?? '', signatureImageUrl: casilla.signatureImageUrl, signatureBanner: casilla.signatureBanner }
+    ? { email: casilla.email, name: casilla.name, jobTitle: casilla.jobTitle ?? '', phone: casilla.phone ?? '', whatsapp: casilla.whatsapp ?? '', signatureImageUrl: casilla.signatureImageUrl, signatureBanner: casilla.signatureBanner }
     : VACIA)
   const [error, setError] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [subiendo, setSubiendo] = useState(false)
   const archivo = useRef<HTMLInputElement>(null)
-  const campo = (k: 'email' | 'name' | 'jobTitle' | 'phone') => (e: React.ChangeEvent<HTMLInputElement>) => setV((x) => ({ ...x, [k]: e.target.value }))
+  const campo = (k: 'email' | 'name' | 'jobTitle' | 'phone' | 'whatsapp') => (e: React.ChangeEvent<HTMLInputElement>) => setV((x) => ({ ...x, [k]: e.target.value }))
 
   async function subir(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -582,6 +582,9 @@ function FormCasilla({ casilla, onVolver, onGuardada }: { casilla: CasillaCorreo
           <input value={v.phone ?? ''} onChange={campo('phone')} maxLength={40} className="ds-field" style={{ ...inputStyle, width: '100%' }} />
         </Field>
       </div>
+      <Field label="WhatsApp (opcional)" hint="Con código de país, por ejemplo +54 9 3757 123456. Es el número del botón «Escribime por WhatsApp» de los correos de Seguimiento.">
+        <input value={v.whatsapp ?? ''} onChange={campo('whatsapp')} maxLength={25} inputMode="tel" placeholder="+54 9 3757 123456" className="ds-field" style={inputStyle} />
+      </Field>
 
       <div>
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 7 }}>Imagen de la firma (opcional)</div>

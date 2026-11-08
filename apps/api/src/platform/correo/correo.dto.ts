@@ -18,6 +18,13 @@ export class UpsertCasillaDto {
   @Length(0, 40)
   phone?: string | null;
 
+  // Número del botón de WhatsApp de los correos de seguimiento. Se guarda solo
+  // con dígitos; el servicio rechaza uno sin código de país.
+  @IsOptional()
+  @IsString()
+  @Matches(/^[\d\s+().-]{0,25}$/, { message: 'El WhatsApp tiene que ser un número, con código de país (ej. +54 9 3757 123456)' })
+  whatsapp?: string | null;
+
   // La URL que devolvió POST /platform/correo/firma-imagen. Solo https: termina
   // como <img> en un correo que lee un tercero.
   @IsOptional()

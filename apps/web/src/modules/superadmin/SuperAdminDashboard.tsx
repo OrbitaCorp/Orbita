@@ -11,7 +11,7 @@ import {
 } from '@/lib/platform/api'
 import {
   LayoutDashboard, Store, Globe, Users, ShieldCheck, ScrollText, Mail, Ticket, Tag, Wand2, ClipboardCheck, LifeBuoy,
-  Search, Plus, DollarSign, Bot, Send, Blocks, Megaphone, MessageCircle,
+  Search, Plus, DollarSign, Bot, Send, Blocks, Megaphone, MessageCircle, HeartHandshake,
 } from 'lucide-react'
 import { SuperAdminShell, type ItemNav } from './Shell'
 import { TabDescuentos } from './Descuentos'
@@ -25,6 +25,7 @@ import { TabOrbi } from './Orbi'
 import { TabCorreo } from './Correo'
 import { TabMarketing } from './Marketing'
 import { TabInstagram } from './InstagramAccesos'
+import { TabSeguimiento } from './Seguimiento'
 import {
   useFetch, Grid, Row2, Kpi, Card, Table, StatusBadge, SubBadge, Pill, Chip,
   Loader, ErrorBox, Empty, ModalShell, Field, ConfirmModal, PageHeader,
@@ -116,6 +117,7 @@ export function SuperAdminDashboard() {
       {tab === 'resumen' && <TabResumen sinFacturacion={user.admin.role === 'MARKETING'} />}
       {tab === 'wizard' && <TabWizard />}
       {tab === 'negocios' && <TabNegocios />}
+      {tab === 'seguimiento' && <TabSeguimiento puedeEnviar={user.admin.role === 'SUPERADMIN'} adminEmail={user.admin.email} />}
       {tab === 'soporte' && <TabSoporte currentAdminId={user.admin.id} onCambio={refrescarSoporte} />}
       {tab === 'dominios' && <TabDominios />}
       {tab === 'duenos' && <TabDuenos />}
@@ -135,7 +137,7 @@ export function SuperAdminDashboard() {
   )
 }
 
-export type Tab = 'resumen' | 'wizard' | 'negocios' | 'soporte' | 'dominios' | 'duenos' | 'descuentos' | 'campanias' | 'modulos' | 'auditoria' | 'admins' | 'logs' | 'testeo' | 'costos' | 'orbi' | 'correo' | 'marketing' | 'instagram'
+export type Tab = 'resumen' | 'wizard' | 'negocios' | 'seguimiento' | 'soporte' | 'dominios' | 'duenos' | 'descuentos' | 'campanias' | 'modulos' | 'auditoria' | 'admins' | 'logs' | 'testeo' | 'costos' | 'orbi' | 'correo' | 'marketing' | 'instagram'
 // Mismos 7 destinos de siempre, en el mismo orden, ahora agrupados en el
 // sidebar: primero la foto general, después lo que es de los clientes y al
 // final lo de puertas adentro de Órbita.
@@ -146,6 +148,9 @@ export const NAV: ItemNav<Tab>[] = [
   // gestión de clientes que ya entraron.
   { id: 'wizard', label: 'Wizard', Icono: Wand2, grupo: 'General' },
   { id: 'negocios', label: 'Negocios', Icono: Store, grupo: 'Clientes' },
+  // Pegado a Negocios: en qué etapa está cada tienda y el correo de
+  // seguimiento de esa etapa, con botón de WhatsApp al número de la casilla.
+  { id: 'seguimiento', label: 'Seguimiento', Icono: HeartHandshake, grupo: 'Clientes' },
   // Pegado a Negocios: las consultas son de los clientes y se responden
   // mirando su ficha. La pastilla con las abiertas la pone el dashboard.
   { id: 'soporte', label: 'Soporte', Icono: LifeBuoy, grupo: 'Clientes' },

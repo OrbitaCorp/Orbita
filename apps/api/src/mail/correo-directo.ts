@@ -87,6 +87,35 @@ export function remitenteParaFrom(name: string, email: string): string {
   return `"${limpio || 'Órbita'}" <${email}>`;
 }
 
+// Botón de WhatsApp de los correos de seguimiento a clientes: abre un chat con
+// el número de la casilla y un mensaje ya escrito. Verde de WhatsApp oscurecido
+// (#15803d) para que el texto blanco se lea: el #25d366 de la marca no llega al
+// contraste mínimo. Abajo va el número a la vista, por si el cliente de correo
+// no abre el link.
+export type BotonWhatsapp = { numero: string; texto: string; mensaje: string };
+
+// Solo dígitos, con código de país: es lo que pide wa.me. null si no alcanza
+// para ser un número internacional.
+export function normalizarWhatsapp(raw: string | null | undefined): string | null {
+  const digitos = (raw ?? '').replace(/\D/g, '');
+  return digitos.length >= 10 && digitos.length <= 15 ? digitos : null;
+}
+
+export function linkDeWhatsapp(numero: string, mensaje: string): string {
+  return `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
+}
+
+export function botonWhatsappAHtml(b: BotonWhatsapp): string {
+  const url = linkDeWhatsapp(b.numero, b.mensaje);
+  return (
+    '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:4px 0 8px;"><tr>' +
+    '<td style="background:#15803d; border-radius:6px;">' +
+    `<a href="${escaparHtml(url)}" style="display:inline-block; padding:11px 22px; color:#ffffff; font-size:14px; font-weight:600; text-decoration:none;">${escaparHtml(b.texto)}</a>` +
+    '</td></tr></table>' +
+    `<p style="margin:0; color:#8792a2; font-size:12px; line-height:1.6;">O escribime al +${escaparHtml(b.numero)}</p>`
+  );
+}
+
 export const MAX_DESTINATARIOS_DIRECTO = 20;
 
 // Separa uno o varios emails por coma o punto y coma, los pasa a minúscula y

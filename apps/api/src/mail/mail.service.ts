@@ -10,7 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UsageMeteringService } from '../platform/costs/usage-metering.service';
 import { escaparHtml } from '../common/utils/html';
 import { FIXTURE_BUSINESS_BRANDING, MAIL_PREVIEW_FIXTURES } from './mail-preview.fixtures';
-import { cuerpoAHtml, extraerDestinatarios, firmaAHtml, MAX_DESTINATARIOS_DIRECTO, remitenteParaFrom, type FirmaCorreo } from './correo-directo';
+import { botonWhatsappAHtml, cuerpoAHtml, extraerDestinatarios, firmaAHtml, MAX_DESTINATARIOS_DIRECTO, remitenteParaFrom, type BotonWhatsapp, type FirmaCorreo } from './correo-directo';
 
 // Referencias opcionales para el registro de envíos: a qué negocio pertenece
 // el mail y a qué cliente/miembro le llegó. Todo opcional para que los flujos
@@ -1324,15 +1324,17 @@ export class MailService {
   // hotel, un posible cliente): la plantilla de Órbita, el cuerpo tal cual se
   // escribió y la firma de la casilla. Sin título adentro de la tarjeta: es
   // una carta, no un aviso.
-  directoHtml(cuerpo: string, firma: FirmaCorreo): string {
-    return this.envolverEnLayout(cuerpoAHtml(cuerpo) + firmaAHtml(firma), this.DEFAULT_BRANDING, true, '', true);
+  // `whatsapp`: el botón de los correos de seguimiento, entre el cuerpo y la firma.
+  directoHtml(cuerpo: string, firma: FirmaCorreo, whatsapp?: BotonWhatsapp): string {
+    const boton = whatsapp ? botonWhatsappAHtml(whatsapp) : '';
+    return this.envolverEnLayout(cuerpoAHtml(cuerpo) + boton + firmaAHtml(firma), this.DEFAULT_BRANDING, true, '', true);
   }
 
   // Sale DESDE la casilla elegida (no desde no-reply) y con Reply-To a ella:
   // la respuesta le llega a esa persona. El dominio de la casilla tiene que
   // estar verificado en Resend; si no, Resend lo rechaza y el motivo vuelve en
   // `error` para mostrarlo en el panel.
-  async sendDirecto(e: { to: string | string[]; subject: string; cuerpo: string; firma: FirmaCorreo }): Promise<{ status: EmailSendStatus; error?: string }> {
+  async sendDirecto(e: { to: string | string[]; subject: string; cuerpo: string; firma: FirmaCorreo; whatsapp?: BotonWhatsapp }): Promise<{ status: EmailSendStatus; error?: string }> {
     const subject = limpiarAsunto(e.subject);
     const template = 'platform-direct';
     const destinatarios = Array.isArray(e.to) ? e.to : extraerDestinatarios(e.to);
@@ -1351,7 +1353,7 @@ export class MailService {
         from: remitenteParaFrom(e.firma.name, e.firma.email),
         to: destinatarios.length === 1 ? destinatarios[0] : destinatarios,
         subject,
-        html: this.directoHtml(e.cuerpo, e.firma),
+        html: this.directoHtml(e.cuerpo, e.firma, e.whatsapp),
         replyTo: e.firma.email,
       });
       if (error) {
