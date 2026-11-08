@@ -552,7 +552,10 @@ export function HeaderCentrado({ t, marca, links, conBuscador, movil, acciones }
               </div>
             )
         ) : <span />}
-        <span style={{ fontFamily: t.fh, fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', color: t.text }}>{marca}</span>
+        <span
+          onClick={acciones?.irAInicio}
+          style={{ fontFamily: t.fh, fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', color: t.text, cursor: acciones?.irAInicio ? 'pointer' : undefined }}
+        >{marca}</span>
         <span style={{ justifySelf: 'end' }}><AccionesTienda t={t} acciones={acciones} /></span>
       </div>
       <div style={{ display: 'flex', justifyContent: 'center', gap: 26, padding: '0 28px 14px', fontSize: 13.5, color: t.text }}>
@@ -574,14 +577,20 @@ export function HeaderLateral({ t, marca, links, conBuscador, movil, acciones }:
     return (
       <div style={{ borderBottom: `1px solid ${t.border}`, background: t.surf, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontSize: 18 }}>☰</span>
-        <span style={{ fontFamily: t.fh, fontSize: 18, fontWeight: 800, color: t.text }}>{marca}</span>
+        <span
+          onClick={acciones?.irAInicio}
+          style={{ fontFamily: t.fh, fontSize: 18, fontWeight: 800, color: t.text, cursor: acciones?.irAInicio ? 'pointer' : undefined }}
+        >{marca}</span>
         <AccionesTienda t={t} movil acciones={acciones} />
       </div>
     )
   }
   return (
     <div style={{ padding: '16px 32px', borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', gap: 28, background: t.surf }}>
-      <span style={{ fontFamily: t.fh, fontSize: 21, fontWeight: 800, color: t.text, letterSpacing: '-0.015em' }}>{marca}</span>
+      <span
+        onClick={acciones?.irAInicio}
+        style={{ fontFamily: t.fh, fontSize: 21, fontWeight: 800, color: t.text, letterSpacing: '-0.015em', cursor: acciones?.irAInicio ? 'pointer' : undefined }}
+      >{marca}</span>
       <div style={{ display: 'flex', gap: 22, fontSize: 13.5, color: t.muted }}>
         {nav.map((l) => (
           <span key={l.label} onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined, color: l.activo ? t.text : undefined }}>{l.label}</span>

@@ -852,6 +852,48 @@ describe('el header suelto, para el resto de la tienda', () => {
 
 const sinLinksYEstilos = (h: string) => h.replace(/<style[\s\S]*?<\/style>/g, '').replace(/<link\b[^>]*>/g, '')
 
+// ─── El logo vuelve al inicio ───────────────────────────────────────────────
+//
+// Tocar el nombre/logo de la tienda en el header lleva a la portada, en TODAS
+// las plantillas y en todas las vistas (catálogo, ficha…). Reportado con
+// captura en Cruzyparfums (Sobrio): en el catálogo el logo no hacía nada.
+// El HTML estático no trae los `onClick`, así que se mira la otra mitad del
+// patrón, que siempre va junto: `onClick={acciones?.irAInicio}` +
+// `cursor: acciones?.irAInicio ? 'pointer' : undefined`. Se busca el nombre de
+// la tienda y se pide que él o un elemento que lo envuelve (hasta 3 niveles
+// arriba) tenga el cursor de mano.
+
+/** ¿El primer lugar donde aparece `texto` cuelga de un elemento con cursor de mano? null = el texto no está. */
+function textoClickeable(htmlCompleto: string, texto: string): boolean | null {
+  const html = sinLinksYEstilos(htmlCompleto)
+  const donde = html.indexOf(texto)
+  if (donde < 0) return null
+  const VACIAS = new Set(['img', 'input', 'br', 'hr', 'meta', 'link', 'source', 'wbr', 'area', 'col', 'embed', 'track', 'base', 'param', 'path', 'circle', 'rect', 'line', 'polyline'])
+  const pila: string[] = []
+  for (const m of html.slice(0, donde).matchAll(/<(\/?)([a-zA-Z][\w-]*)([^>]*?)(\/?)>/g)) {
+    const [, cierra, nombre, attrs, autocierre] = m
+    if (cierra) { pila.pop(); continue }
+    if (!autocierre && !VACIAS.has(nombre.toLowerCase())) pila.push(attrs)
+  }
+  return pila.slice(-4).some(attrs => /cursor:\s*pointer/.test(attrs))
+}
+
+describe('el logo del header vuelve al inicio', () => {
+  for (const p of PLANTILLAS.filter(x => x.headerPropio)) {
+    it(p.id, () => {
+      const mal: string[] = []
+      for (const movil of [false, true]) {
+        const html = dibujar({ p: plantillaReal({ base: p, ...TIENDAS.completa }), movil, acciones: ACCIONES, soloHeader: true })
+        const donde = movil ? 'celular' : 'escritorio'
+        const ok = textoClickeable(html, 'Negocio Check')
+        if (ok === null) mal.push(`[${donde}] el header no muestra el nombre de la tienda`)
+        else if (!ok) mal.push(`[${donde}] el logo no lleva al inicio: falta onClick={acciones?.irAInicio} con su cursor de mano`)
+      }
+      sinProblemas(`logo > ${p.id}`, mal)
+    })
+  }
+})
+
 /**
  * El bloque del hero dentro del HTML de la portada, resuelto igual que
  * `regionDelHero` en el navegador: el hijo directo de la raíz que contiene la

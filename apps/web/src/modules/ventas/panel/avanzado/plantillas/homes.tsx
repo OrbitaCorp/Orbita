@@ -1277,7 +1277,10 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
               Envío gratis en compras desde $90.000 · 3 cuotas sin interés
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 26, padding: movil ? '13px 16px' : '17px 34px', borderBottom: `1px solid ${t.border}` }}>
-              <span style={{ fontFamily: t.fh, fontSize: movil ? 19 : 23, fontWeight: 800, letterSpacing: '-0.04em', textTransform: 'uppercase' }}>{p.marca}</span>
+              <span
+                onClick={acciones?.irAInicio}
+                style={{ fontFamily: t.fh, fontSize: movil ? 19 : 23, fontWeight: 800, letterSpacing: '-0.04em', textTransform: 'uppercase', cursor: acciones?.irAInicio ? 'pointer' : undefined }}
+              >{p.marca}</span>
               {!movil && <div style={{ display: 'flex', gap: 22, fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{['Mujer', 'Hombre', 'Calzado', 'Sale'].map((l) => <span key={l} style={{ color: l === 'Sale' ? t.accent : t.text }}>{l}</span>)}</div>}
               <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 14, fontSize: 12.5, color: t.muted, alignItems: 'center' }}>
                 {!movil && <span style={{ border: `1px solid ${t.border}`, borderRadius: 4, padding: '7px 14px' }}>Buscar</span>}
