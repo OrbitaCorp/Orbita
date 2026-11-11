@@ -102,7 +102,7 @@ export class SeguimientoService {
     if (!to) throw new BadRequestException('Este negocio no tiene un dueño con email: no hay a quién escribirle');
     const whatsapp = this.boton(casilla, dto.etapa, this.variables(negocio, casilla));
     if (!whatsapp) {
-      throw new BadRequestException(`La casilla ${casilla.email} no tiene número de WhatsApp: cargalo en Correo → Casillas para que el correo lleve el botón`);
+      throw new BadRequestException(`La casilla ${casilla.email} no tiene un número de WhatsApp ni un teléfono con código de país: cargalo en Correo → Casillas para que el correo lleve el botón`);
     }
     return this.correo.enviarDesde(adminId, casilla, {
       to, subject: dto.subject, body: dto.body, whatsapp, businessId: negocio.id, followUpStage: dto.etapa,
@@ -163,7 +163,9 @@ export class SeguimientoService {
   }
 
   private boton(casilla: PlatformMailSender, etapa: Etapa, v: VariablesSeguimiento): BotonWhatsapp | null {
-    const numero = normalizarWhatsapp(casilla.whatsapp);
+    // Sin WhatsApp propio, el teléfono de la firma (si tiene código de país):
+    // casi siempre es el mismo número y es el campo que se completa primero.
+    const numero = normalizarWhatsapp(casilla.whatsapp) ?? normalizarWhatsapp(casilla.phone);
     if (!numero) return null;
     const p = PLANTILLAS[etapa];
     return { numero, texto: p.botonWhatsapp, mensaje: rellenar(p.mensajeWhatsapp, v) };

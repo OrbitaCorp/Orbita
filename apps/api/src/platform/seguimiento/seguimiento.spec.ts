@@ -84,3 +84,35 @@ describe('botón de WhatsApp', () => {
     expect(html).toContain('+5493757123456');
   });
 });
+
+describe('SeguimientoService: número del botón', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { SeguimientoService } = require('./seguimiento.service');
+  const negocio = {
+    id: 'b1', name: 'Euge joyas', subdomain: 'euge', createdAt: new Date(), isActive: true, isPaused: false, cancelledAt: null,
+    subscription: null, members: [{ name: 'Eugenia', email: 'euge@example.com', lastAccessAt: new Date() }],
+    _count: { products: 3, orders: 0 },
+  };
+  const armar = (casilla: Record<string, unknown>) =>
+    new SeguimientoService(
+      { business: { findMany: jest.fn().mockResolvedValue([negocio]) } },
+      {},
+      { casilla: jest.fn().mockResolvedValue({ email: 'ceo@orbita.site', name: 'Mateo Rojas', ...casilla }), firma: () => ({}) },
+    );
+  const dto = { businessId: 'b1', etapa: 'sin_ventas', senderId: 's1' };
+
+  it('sin WhatsApp cargado usa el teléfono de la casilla', async () => {
+    const b = await armar({ whatsapp: null, phone: '+5493757673226' }).borrador(dto);
+    expect(b.whatsapp?.numero).toBe('5493757673226');
+  });
+
+  it('el WhatsApp propio gana sobre el teléfono', async () => {
+    const b = await armar({ whatsapp: '+54 9 11 5555 5555', phone: '+5493757673226' }).borrador(dto);
+    expect(b.whatsapp?.numero).toBe('5491155555555');
+  });
+
+  it('un teléfono sin código de país no alcanza', async () => {
+    const b = await armar({ whatsapp: null, phone: '3757' }).borrador(dto);
+    expect(b.whatsapp).toBeNull();
+  });
+});

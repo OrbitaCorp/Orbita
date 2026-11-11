@@ -582,7 +582,7 @@ function FormCasilla({ casilla, onVolver, onGuardada }: { casilla: CasillaCorreo
           <input value={v.phone ?? ''} onChange={campo('phone')} maxLength={40} className="ds-field" style={{ ...inputStyle, width: '100%' }} />
         </Field>
       </div>
-      <Field label="WhatsApp (opcional)" hint="Con código de país, por ejemplo +54 9 3757 123456. Es el número del botón «Escribime por WhatsApp» de los correos de Seguimiento.">
+      <Field label="WhatsApp (opcional)" hint="Con código de país, por ejemplo +54 9 3757 123456. Es el número del botón «Escribime por WhatsApp» de los correos de Seguimiento. Si lo dejás vacío, se usa el teléfono.">
         <input value={v.whatsapp ?? ''} onChange={campo('whatsapp')} maxLength={25} inputMode="tel" placeholder="+54 9 3757 123456" className="ds-field" style={inputStyle} />
       </Field>
 

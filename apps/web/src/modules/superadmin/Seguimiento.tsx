@@ -309,7 +309,7 @@ function EscribirSeguimiento({ fila, plantillas, casillas, adminEmail, puedeEnvi
               </p>
             )}
             {sinWhatsapp && (
-              <ErrorBox msg="Esta casilla no tiene número de WhatsApp, así que el correo no llevaría el botón. Cargalo en Correo → Casillas o elegí otra casilla." />
+              <ErrorBox msg="Esta casilla no tiene un número de WhatsApp ni un teléfono con código de país (por ejemplo +54 9 3757 123456), así que el correo no llevaría el botón. Cargalo en Correo → Casillas o elegí otra casilla." />
             )}
             {!puedeEnviar && (
               <p style={{ margin: 0, fontSize: 12.5, color: 'var(--color-muted)' }}>Podés ver el correo, pero enviarlo es de un superadmin.</p>
