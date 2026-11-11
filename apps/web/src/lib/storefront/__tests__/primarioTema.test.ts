@@ -40,3 +40,13 @@ describe('primarioTema', () => {
     })
   })
 })
+
+describe('contraste', () => {
+  it('casi negro sobre casi negro no alcanza; blanco sobre negro, el máximo', async () => {
+    const { contraste } = await import('../primarioTema')
+    expect(contraste('#1C1412', '#1C1412')).toBeCloseTo(1)
+    expect(contraste('#FFFFFF', '#000000')).toBeCloseTo(21)
+    expect(contraste('#5B3DF5', '#1E1452')!).toBeGreaterThan(2)
+    expect(contraste('nada', '#000')).toBeNull()
+  })
+})

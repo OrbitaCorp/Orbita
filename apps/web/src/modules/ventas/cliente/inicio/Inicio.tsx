@@ -42,6 +42,7 @@ import { CATEGORY_LAYOUT_MAX, type CategoryLayout } from '@/modules/ventas/panel
 // plantilla nueva no necesita tocar este archivo.
 import { Home as PlantillaHome } from '@/modules/ventas/panel/avanzado/plantillas/homes'
 import { definicionPlantilla, plantillaReal, slidesPorDefecto, degradeAutomatico } from './plantillaReal'
+import { contraste } from '@/lib/storefront/primarioTema'
 import { EsqueletoPlantilla } from '@/modules/ventas/panel/avanzado/plantillas/esqueleto'
 
 // Fallback si el negocio nunca guardó su propia barra de stats (Apariencia →
@@ -786,7 +787,7 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
                 (ver plantillaReal.ts): el HeroCarousel genérico solo sabe
                 dibujar UN slide rotando a pantalla completa, no dos campañas
                 partidas — dibujar los dos sería un hero duplicado. */}
-            {heroSlides.length > 0 && !plantilla?.heroPropio && <HeroCarousel slides={heroSlides} go={go} vidriera={plantilla?.heroGrande ?? false} />}
+            {heroSlides.length > 0 && !plantilla?.heroPropio && <HeroCarousel slides={heroSlides} go={go} vidriera={plantilla?.heroGrande ?? false} primario={plantilla ? null : config?.appearance?.colorPrimary} />}
 
             {/* ══ CUERPO ══
                 Con plantilla elegida lo dibuja el render compartido con el
@@ -1359,7 +1360,7 @@ const HERO_GRADS = [
     'linear-gradient(120deg, #052E2B 0%, #0A6638 45%, #10B981 100%)',
 ]
 
-function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHeroSlide[]; go: (p: string) => void; vidriera?: boolean }) {
+function HeroCarousel({ slides, go, vidriera = false, primario = null }: { slides: StorefrontHeroSlide[]; go: (p: string) => void; vidriera?: boolean; primario?: string | null }) {
     const [idx, setIdx] = useState(0)
     const [paused, setPaused] = useState(false)
     const n = slides.length
@@ -1399,6 +1400,12 @@ function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHero
             <div style={{ display: 'flex', alignItems: 'stretch', width: `${n * 100}%`, transform: `translateX(-${idx * (100 / n)}%)`, transition: 'transform 680ms cubic-bezier(0.4,0,0.2,1)' }}>
                 {slides.map((s, i) => {
                     const centrada = s.imageStyle === 'centered'
+                    // Slide con fondo de color propio (imagen centrada) de un tono
+                    // parecido al primario: el botón en el primario se perdía en
+                    // el fondo (reportado en la demo de ropa: casi negro sobre
+                    // casi negro). Ahí el botón va blanco, como el del slide
+                    // automático. 3:1 = contraste mínimo de un componente (WCAG).
+                    const ctaBlanco = s.automatico || (centrada && !!s.bgColor && !!primario && (contraste(primario, s.bgColor) ?? 21) < 3)
                     // Único overlay que pide texto OSCURO en vez de blanco:
                     // 'blanco' es un velo CLARO (ver overlayGradient más
                     // abajo) — el título/subtítulo/CTA blancos de siempre
@@ -1449,7 +1456,7 @@ function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHero
                                         // El slide por defecto no tiene foto, solo un degradé
                                         // del primario: el botón en el mismo primario no se
                                         // distinguiría, así que va blanco.
-                                        <button className="ds-hover" onClick={() => irACta(s.ctaLink)} style={{ height: 54, padding: '0 28px', borderRadius: 11, background: s.automatico ? '#fff' : 'var(--color-primary)', color: s.automatico ? '#0F172A' : 'var(--color-on-primary)', fontSize: 15.5, fontWeight: 700, border: textoOscuro ? '1px solid rgba(15,23,42,0.12)' : 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 22px rgba(0,0,0,0.22)', transition: 'background 150ms, color 150ms, transform 150ms' }}>
+                                        <button className="ds-hover" onClick={() => irACta(s.ctaLink)} style={{ height: 54, padding: '0 28px', borderRadius: 11, background: ctaBlanco ? '#fff' : 'var(--color-primary)', color: ctaBlanco ? '#0F172A' : 'var(--color-on-primary)', fontSize: 15.5, fontWeight: 700, border: textoOscuro ? '1px solid rgba(15,23,42,0.12)' : 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 22px rgba(0,0,0,0.22)', transition: 'background 150ms, color 150ms, transform 150ms' }}>
                                             {s.cta || 'Ver catálogo'} <ArrowRight size={16} />
                                         </button>
                                     )}
