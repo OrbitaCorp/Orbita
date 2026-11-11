@@ -2,11 +2,14 @@
 // hero trae acá, a una vista propia a pantalla completa, en vez de bajar a la
 // sección #demo del home (que sigue existiendo, pedido 29/09).
 //
-// El visitante elige desde dónde mirar Órbita —como cliente (la tienda Nébula
-// Tech) o como dueño (el panel)— y el fondo le muestra esa perspectiva,
-// borrosa: capturas reales de la demo en public/demo/ (tienda-desk.webp,
-// panel-desk.webp y sus versiones de celular). Para regenerarlas: Chrome
-// headless contra demo.orbita.site a 1440×900 y 390×844, pasadas a webp.
+// El visitante elige desde dónde mirar Órbita —como cliente (la tienda de
+// ropa, Nébula Moda; desde ahí pasa a la de tecnología) o como dueño (el
+// panel de Nébula Tech)— y el fondo le muestra esa perspectiva, borrosa:
+// capturas reales de la demo en public/demo/ (tienda-desk.webp, panel-desk.webp
+// y sus versiones de celular). Para regenerarlas: Chrome headless contra
+// demo-moda.orbita.site (tienda) y demo.orbita.site/panel a 1440×900 y
+// 390×844 ×2, con el consentimiento de cookies ya cargado en localStorage
+// (si no, el banner sale en la foto), pasadas a webp.
 //
 // Al ingresar, en vez de saltar directo, hay una pantalla de carga: el fondo
 // se va enfocando (se "entra" a la perspectiva) mientras un anillo de
