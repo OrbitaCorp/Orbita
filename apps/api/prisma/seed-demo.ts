@@ -143,7 +143,10 @@ async function negocioBase() {
     }, { timeout: 30000 });
     console.log(`Negocio demo creado: ${negocio.id}`);
   } else if (!negocio.isDemo) {
-    negocio = await prisma.business.update({ where: { id: negocio.id }, data: { isDemo: true } });
+    // El subdominio está reservado (common/utils/subdominio.ts), pero la
+    // reserva corre al elegir uno: una tienda real que ya lo tuviera de antes
+    // quedaría marcada como demo (y borrada al sembrar). Se corta acá.
+    throw new Error(`El subdominio ${SLUG} ya es de un negocio que no es demo (${negocio.id}). No se toca.`);
   }
   if (process.env.DEMO_OWNER_PASSWORD && !creadoAhora) {
     const passwordHash = await argon2.hash(process.env.DEMO_OWNER_PASSWORD, { type: argon2.argon2id });
