@@ -9,3 +9,10 @@ export class GrantCompDto {
   @IsString() @MaxLength(40) currentPeriodEnd!: string;
   @IsString() @MaxLength(300) grantReason!: string;
 }
+
+// Modificar una cortesía que ya existe: correr la fecha de fin (más tarde o
+// más temprano, hasta hoy) y, si se quiere, cambiar el motivo.
+export class UpdateCompDto {
+  @IsString() @MaxLength(40) currentPeriodEnd!: string;
+  @IsOptional() @IsString() @MaxLength(300) grantReason?: string;
+}

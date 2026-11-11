@@ -8,7 +8,7 @@ import { WizardAnalyticsService } from '../wizard-analytics/wizard-analytics.ser
 import { SearchConsoleService } from '../search-console/search-console.service';
 import { ListBusinessesQueryDto } from './dto/list-businesses-query.dto';
 import { SuspendBusinessDto } from './dto/suspend-business.dto';
-import { GrantCompDto } from './dto/grant-comp.dto';
+import { GrantCompDto, UpdateCompDto } from './dto/grant-comp.dto';
 import { UpsertPlatformAdminDto } from './dto/upsert-platform-admin.dto';
 import { ResetAdminPasswordDto } from './dto/reset-admin-password.dto';
 import { ChangeOwnPasswordDto } from './dto/change-own-password.dto';
@@ -213,6 +213,17 @@ export class PlatformController {
     @Body() dto: GrantCompDto,
   ) {
     return this.platformService.grantComp(req.user.adminId, businessId, dto);
+  }
+
+  // Extender o acortar una cortesía ya cedida (fecha de fin y motivo).
+  @Put('subscriptions/:businessId/comp')
+  @SoloSuperadmin()
+  updateComp(
+    @Req() req: RequestWithAdmin,
+    @Param('businessId') businessId: string,
+    @Body() dto: UpdateCompDto,
+  ) {
+    return this.platformService.updateComp(req.user.adminId, businessId, dto);
   }
 
   // ── Admins de plataforma ──────────────────────────────────────────────────

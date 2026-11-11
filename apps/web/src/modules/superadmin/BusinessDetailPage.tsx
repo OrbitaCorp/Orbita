@@ -59,6 +59,7 @@ function Detalle({ businessId }: { businessId: string }) {
   const [ocultando, setOcultando] = useState(false)
   const [mostrando, setMostrando] = useState(false)
   const [cediendo, setCediendo] = useState(false)
+  const [modificando, setModificando] = useState(false)
   const [range, setRange] = useRange(30)
 
   const { data: d, error } = useFetch(() => platformApi.business(businessId), [businessId, reloadKey])
@@ -164,7 +165,11 @@ function Detalle({ businessId }: { businessId: string }) {
         title="Suscripción"
         subtitle="El plan que paga el negocio para usar Órbita"
         action={
-          <button onClick={() => setCediendo(true)} className="ds-hover" style={btnGhostSm}>Ceder licencia de cortesía</button>
+          // Con una cortesía en curso, el botón la modifica (fecha y motivo);
+          // si no, cede una nueva.
+          d.subscription?.origin === 'COMP'
+            ? <button onClick={() => setModificando(true)} className="ds-hover" style={btnGhostSm}>Modificar cortesía</button>
+            : <button onClick={() => setCediendo(true)} className="ds-hover" style={btnGhostSm}>Ceder licencia de cortesía</button>
         }
       >
         {d.subscription ? (
@@ -177,7 +182,8 @@ function Detalle({ businessId }: { businessId: string }) {
               <span style={{ color: 'var(--color-muted)' }}>por mes</span>
             </div>
             <div style={{ color: 'var(--color-body)' }}>
-              Pago al día hasta el <strong style={{ color: 'var(--color-text)' }}>{date(d.subscription.currentPeriodEnd)}</strong>
+              {d.subscription.origin === 'COMP' ? 'Cortesía vigente hasta el' : 'Pago al día hasta el'}{' '}
+              <strong style={{ color: 'var(--color-text)' }}>{date(d.subscription.currentPeriodEnd)}</strong>
             </div>
             {d.subscription.grantReason && (
               <div style={{ padding: '10px 12px', borderRadius: 10, background: 'var(--color-violet-bg)', color: 'var(--color-body)', fontSize: 13 }}>
@@ -360,6 +366,20 @@ function Detalle({ businessId }: { businessId: string }) {
           }}
         />
       )}
+      {modificando && d.subscription && (
+        <EditCompModal
+          businessName={d.name}
+          finActual={d.subscription.currentPeriodEnd}
+          estado={d.subscription.status}
+          motivoActual={d.subscription.grantReason ?? ''}
+          onCancel={() => setModificando(false)}
+          onConfirm={async (input) => {
+            await platformApi.updateComp(d.id, input)
+            setModificando(false)
+            onChanged()
+          }}
+        />
+      )}
       {cediendo && (
         <GrantCompModal
           businessName={d.name}
@@ -372,6 +392,85 @@ function Detalle({ businessId }: { businessId: string }) {
         />
       )}
     </div>
+  )
+}
+
+// Fecha (YYYY-MM-DD) de hoy y de un instante, en la hora de Argentina: es la
+// que ve el equipo en el calendario y la de los avisos al negocio.
+const hoyAr = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' })
+const diaAr = (iso: string) => new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' })
+
+// Extender o acortar una cortesía que ya existe. Hasta hoy, no antes: si se
+// termina hoy, el negocio pasa por los mismos 7 días de gracia (con sus avisos)
+// que cuando una cortesía vence sola, y después se suspende.
+function EditCompModal({ businessName, finActual, estado, motivoActual, onCancel, onConfirm }: {
+  businessName: string
+  finActual: string
+  estado: string
+  motivoActual: string
+  onCancel: () => void
+  onConfirm: (input: { currentPeriodEnd: string; grantReason?: string }) => Promise<void>
+}) {
+  const hoy = hoyAr()
+  const actual = diaAr(finActual)
+  const [fecha, setFecha] = useState(actual < hoy ? hoy : actual)
+  const [motivo, setMotivo] = useState(motivoActual)
+  const [enviando, setEnviando] = useState(false)
+  const [error, setError] = useState('')
+
+  const dias = Math.round((Date.parse(fecha) - Date.parse(actual)) / 86_400_000)
+  const terminaHoy = fecha === hoy
+  const sinCambios = dias === 0 && !terminaHoy && motivo.trim() === motivoActual.trim()
+  const resumen = terminaHoy
+    ? 'Termina hoy: el negocio entra en 7 días de gracia (le llegan los avisos) y después se suspende, igual que cuando una cortesía vence sola.'
+    : dias === 0
+      ? 'La fecha queda igual.'
+      : dias > 0
+        ? `Se extiende ${dias === 1 ? '1 día' : `${dias} días`}.${estado !== 'ACTIVE' ? ' Vuelve a quedar activa y, si estaba suspendida, la tienda se reactiva.' : ''}`
+        : `Se acorta ${-dias === 1 ? '1 día' : `${-dias} días`}.`
+
+  async function guardar() {
+    setError('')
+    if (!fecha || fecha < hoy) { setError('Elegí una fecha de hoy en adelante.'); return }
+    if (!motivo.trim()) { setError('Completá el motivo.'); return }
+    setEnviando(true)
+    try {
+      await onConfirm({
+        // Hoy = ahora mismo; otro día = hasta el final de ese día en Argentina.
+        currentPeriodEnd: terminaHoy ? new Date().toISOString() : new Date(`${fecha}T23:59:59-03:00`).toISOString(),
+        grantReason: motivo.trim(),
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo modificar la cortesía.')
+      setEnviando(false)
+    }
+  }
+
+  return (
+    <ModalShell onClose={onCancel} title={`Modificar la cortesía de ${businessName}`}>
+      <p style={{ margin: '0 0 12px', fontSize: 13.5, color: 'var(--color-body)' }}>
+        Ahora vence el <strong style={{ color: 'var(--color-text)' }}>{date(finActual)}</strong>. Elegí otra fecha para extenderla o acortarla.
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <Field label="Vigente hasta">
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <input type="date" value={fecha} min={hoy} onChange={(e) => setFecha(e.target.value)} className="ds-field" style={{ ...inputStyle, flex: 1, minWidth: 160 }} />
+            <button type="button" onClick={() => setFecha(hoy)} className="ds-hover" style={btnGhost}>Terminar hoy</button>
+          </div>
+        </Field>
+        <p role="status" style={{ margin: 0, fontSize: 13, color: terminaHoy ? 'var(--color-warning)' : 'var(--color-muted)', lineHeight: 1.5 }}>{resumen}</p>
+        <Field label="Motivo (queda en el log de auditoría)">
+          <input value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={300} className="ds-field" style={inputStyle} />
+        </Field>
+      </div>
+      {error && <div style={{ marginTop: 12 }}><ErrorBox msg={error} /></div>}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+        <button type="button" onClick={onCancel} className="ds-hover" style={btnGhost}>Cancelar</button>
+        <button type="button" onClick={guardar} disabled={enviando || sinCambios} className="ds-hover" style={{ ...btnPrimary, opacity: sinCambios ? 0.55 : 1 }}>
+          {enviando ? 'Guardando…' : terminaHoy ? 'Terminar la cortesía hoy' : 'Guardar cambios'}
+        </button>
+      </div>
+    </ModalShell>
   )
 }
 
