@@ -14,7 +14,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { ListBusinessesQueryDto } from './dto/list-businesses-query.dto';
 import { SuspendBusinessDto } from './dto/suspend-business.dto';
-import { GrantCompDto } from './dto/grant-comp.dto';
+import { GrantCompDto, UpdateCompDto } from './dto/grant-comp.dto';
 import { UpsertPlatformAdminDto } from './dto/upsert-platform-admin.dto';
 import { ResetAdminPasswordDto } from './dto/reset-admin-password.dto';
 import { ChangeOwnPasswordDto } from './dto/change-own-password.dto';
@@ -670,6 +670,71 @@ export class PlatformService {
       currentPeriodStart: sub.currentPeriodStart,
       currentPeriodEnd: sub.currentPeriodEnd,
       grantReason: sub.grantReason,
+    };
+  }
+
+  // Modificar una cortesía ya cedida: extenderla o acortarla. La fecha nueva
+  // puede ser hasta hoy, no antes: terminarla "hoy" deja que el barrido
+  // nocturno (reconcileOverdueSubscriptions) la lleve por el mismo camino que
+  // una cortesía que vence sola, con sus 7 días de gracia y sus avisos. Una
+  // fecha en el pasado se saltearía la gracia sin que nadie lo decida.
+  // Extenderla saca a la suscripción de la gracia o de la suspensión: si el
+  // barrido había pausado la tienda por la suspensión, se reactiva (mismo
+  // criterio que reactivateBusiness).
+  async updateComp(adminId: string, businessId: string, dto: UpdateCompDto) {
+    const sub = await this.prisma.subscription.findUnique({ where: { businessId } });
+    if (!sub) throw new NotFoundException('Este negocio no tiene suscripción');
+    if (sub.origin !== 'COMP') {
+      throw new BadRequestException('Este negocio no tiene una cortesía: paga su suscripción. Para cederle una, usá «Ceder licencia de cortesía»');
+    }
+
+    const pedida = new Date(dto.currentPeriodEnd);
+    if (Number.isNaN(pedida.getTime())) throw new BadRequestException('currentPeriodEnd inválido (usar ISO 8601)');
+    const now = new Date();
+    const inicioDeHoy = new Date(now);
+    inicioDeHoy.setUTCHours(0, 0, 0, 0);
+    if (pedida < inicioDeHoy) throw new BadRequestException('La cortesía no puede terminar antes de hoy');
+    // "Hoy" (o una hora de hoy que ya pasó) es ahora mismo.
+    const periodEnd = pedida < now ? now : pedida;
+    const extendida = periodEnd > now;
+    const grantReason = dto.grantReason?.trim() || sub.grantReason;
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const u = await tx.subscription.update({
+        where: { businessId },
+        data: {
+          currentPeriodEnd: periodEnd,
+          grantReason,
+          ...(extendida && sub.status !== 'ACTIVE' ? { status: 'ACTIVE' as const } : {}),
+        },
+      });
+      if (extendida && sub.status === 'SUSPENDED') {
+        await tx.business.update({ where: { id: businessId }, data: { isPaused: false } });
+      }
+      await tx.platformAdminLog.create({
+        data: {
+          adminId,
+          action: 'update_comp',
+          targetType: 'subscription',
+          targetId: businessId,
+          details: {
+            antes: sub.currentPeriodEnd.toISOString(),
+            currentPeriodEnd: periodEnd.toISOString(),
+            ...(grantReason !== sub.grantReason ? { grantReason } : {}),
+            ...(extendida && sub.status !== 'ACTIVE' ? { status: 'ACTIVE' } : {}),
+          },
+        },
+      });
+      return u;
+    });
+
+    return {
+      businessId: updated.businessId,
+      status: updated.status,
+      origin: updated.origin,
+      currentPeriodStart: updated.currentPeriodStart,
+      currentPeriodEnd: updated.currentPeriodEnd,
+      grantReason: updated.grantReason,
     };
   }
 

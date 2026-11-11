@@ -1269,6 +1269,9 @@ export const platformApi = {
   // ¿Tengo un Claude conectado? Decide si «Mejorar con Claude» abre Claude o pide conectarlo primero.
   mcpEstado: () => getJSONConMensaje<{ conectado: boolean }>('/platform/mcp/estado'),
   grantComp: (businessId: string, input: GrantCompInput) => sendJSON<SubscriptionRow>(`/platform/subscriptions/${businessId}/grant-comp`, 'POST', input),
+  // Extender o acortar una cortesía ya cedida (hasta hoy, no antes).
+  updateComp: (businessId: string, input: { currentPeriodEnd: string; grantReason?: string }) =>
+    sendJSON<{ status: string; currentPeriodEnd: string; grantReason: string | null }>(`/platform/subscriptions/${businessId}/comp`, 'PUT', input),
   domains: () => getJSON<DomainsList>('/platform/domains'),
   owners: () => getJSON<OwnerRow[]>('/platform/owners'),
   subscriptions: () => getJSON<SubscriptionListRow[]>('/platform/subscriptions'),

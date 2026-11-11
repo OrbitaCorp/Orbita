@@ -94,7 +94,7 @@ describe('Rol MARKETING — acceso por lista cerrada', () => {
 
   it('nunca le abre lo que toca plata, accesos o cuentas de la empresa', () => {
     const cerrado: [Clase, string][] = [
-      [PlatformController, 'suspend'], [PlatformController, 'grantComp'], [PlatformController, 'createAdmin'], [PlatformController, 'updateAdmin'], [PlatformController, 'removeAdmin'],
+      [PlatformController, 'suspend'], [PlatformController, 'grantComp'], [PlatformController, 'updateComp'], [PlatformController, 'createAdmin'], [PlatformController, 'updateAdmin'], [PlatformController, 'removeAdmin'],
       [PlatformController, 'revenueSeries'], [PlatformController, 'listSubscriptions'], [PlatformController, 'listBusinesses'], [PlatformController, 'listAdmins'], [PlatformController, 'listLogs'],
       [CostsController, 'overview'], [InstagramAdminController, 'pedidos'],
       [CorreoPlataformaController, 'crearCasilla'], [CorreoPlataformaController, 'borrarCasilla'],
