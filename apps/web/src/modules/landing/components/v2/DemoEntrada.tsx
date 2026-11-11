@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo';
 import { ROOT_DOMAIN, tenantUrl } from '@/lib/tenant';
-import { DEMO_SLUG } from '@/lib/demo/modo';
+import { DEMO_SLUG, DEMO_SLUG_TIENDA } from '@/lib/demo/modo';
 
 type Rol = 'tienda' | 'panel';
 
@@ -32,11 +32,11 @@ const ROLES: Record<Rol, {
     tienda: {
         rol: 'Como cliente',
         titulo: 'La tienda',
-        texto: 'Recorré Nébula Tech: catálogo, fichas con video, descuentos, carrito y checkout con pago simulado.',
+        texto: 'Recorré Nébula Moda: ropa, zapatillas y accesorios con talles, descuentos, carrito y checkout con pago simulado.',
         cta: 'Ingresar como cliente',
         path: '/',
         fondo: { desk: '/demo/tienda-desk.webp', movil: '/demo/tienda-movil.webp' },
-        pasos: ['Cargando el catálogo de Nébula Tech', 'Preparando tu carrito', 'Abriendo la tienda'],
+        pasos: ['Cargando el catálogo de Nébula Moda', 'Preparando tu carrito', 'Abriendo la tienda'],
     },
     panel: {
         rol: 'Como dueño',
@@ -56,8 +56,9 @@ const DURACION_CARGA = 2400;
 
 // En el server no hay window para saber protocolo y puerto: arranca con la
 // URL de producción y se corrige al montar (dev: http y :3001). Mismo
-// criterio que Demo.tsx.
-const urlInicial = (path: string) => `https://${DEMO_SLUG}.${ROOT_DOMAIN}${path}`;
+// criterio que Demo.tsx. La tienda arranca en la de ropa; el panel es el de
+// Nébula Tech (ver lib/demo/modo.ts).
+const urlInicial = (slug: string, path: string) => `https://${slug}.${ROOT_DOMAIN}${path}`;
 
 function prefiereMenosMovimiento() {
     return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -71,11 +72,11 @@ export function DemoEntrada({ rolInicial }: { rolInicial?: Rol | null }) {
     const [alterna, setAlterna] = useState<Rol>('tienda');
     const [cargando, setCargando] = useState(false);
     const [progreso, setProgreso] = useState(0);
-    const [urls, setUrls] = useState<Record<Rol, string>>({ tienda: urlInicial('/'), panel: urlInicial('/panel') });
+    const [urls, setUrls] = useState<Record<Rol, string>>({ tienda: urlInicial(DEMO_SLUG_TIENDA, '/'), panel: urlInicial(DEMO_SLUG, '/panel') });
     const rafRef = useRef<number | null>(null);
 
     useEffect(() => {
-        setUrls({ tienda: tenantUrl(DEMO_SLUG, '/'), panel: tenantUrl(DEMO_SLUG, '/panel') });
+        setUrls({ tienda: tenantUrl(DEMO_SLUG_TIENDA, '/'), panel: tenantUrl(DEMO_SLUG, '/panel') });
     }, []);
 
     useEffect(() => {

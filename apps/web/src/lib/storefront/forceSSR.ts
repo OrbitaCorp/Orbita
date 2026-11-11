@@ -5,7 +5,7 @@ import {
   type ContextoSeo, type SeoPagina, type TipoPagina,
 } from './seo'
 import { ROOT_DOMAIN } from '@/lib/tenant'
-import { DEMO_SLUG } from '@/lib/demo/modo'
+import { esSlugDemo } from '@/lib/demo/modo'
 import { temaDePlantilla } from '@/modules/ventas/cliente/inicio/plantillaReal'
 import type { Tema } from '@/modules/ventas/panel/avanzado/plantillas/tipos'
 import { esNavegadorMovil } from '@/hooks/useMovilPlantilla'
@@ -185,7 +185,7 @@ async function armarSeo(ctx: Parameters<GetServerSideProps>[0], d: DatosSeo): Pr
   // ¿Corresponde mostrarla en Google, y con qué dominio? Si la API no contesta
   // (o es una versión anterior sin este dato), se decide con lo que ya se sabe.
   const seoApi = await conTimeout(seoConMemoria(slug, () => getStorefrontSeo(slug)))
-  const indexable = seoApi ? seoApi.indexable : cfg.business.isActive && !cfg.business.isPaused && slug !== DEMO_SLUG
+  const indexable = seoApi ? seoApi.indexable : cfg.business.isActive && !cfg.business.isPaused && !esSlugDemo(slug)
   const contexto: ContextoSeo = {
     slug,
     nombre,

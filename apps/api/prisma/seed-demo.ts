@@ -13,6 +13,12 @@
 // Uso (desde apps/api):
 //   DEMO_OWNER_PASSWORD='...' pnpm seed:demo            (negocio + contenido)
 //   pnpm seed:demo -- --solo-base                       (solo el negocio)
+//   pnpm seed:demo -- --tienda moda                     (Nébula Moda en vez de Nébula Tech)
+//
+// Hay dos tiendas (ver demo/tienda.ts): Nébula Tech (`demo`, la de siempre y
+// la del panel de la demo) y Nébula Moda (`demo-moda`, ropa y accesorios, la
+// que abre "Probá la demo"). Cada una es su propio negocio, con su dueño.
+// Solo Nébula Tech tiene el miembro visitante: el panel de la demo es el suyo.
 //
 // DEMO_OWNER_PASSWORD es la contraseña del dueño de la demo: la cuenta con la
 // que se cura la tienda desde el panel real (login con EMAIL_DUENO). Hace
@@ -26,16 +32,34 @@ import { PrismaClient } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { sembrarContenido } from './demo/sembrar';
 import { sembrarApariencia } from './demo/apariencia';
-import { sembrarAvanzado } from './demo/avanzado';
+import { sembrarAvanzado, MODAL_TECH } from './demo/avanzado';
+import { NEBULA_TECH } from './demo/tienda';
+import { NEBULA_MODA } from './demo/moda/tienda';
+import { MODAL_MODA, sembrarAparienciaModa } from './demo/moda/apariencia';
 
 const prisma = new PrismaClient();
 
-const SLUG = 'demo';
-const NOMBRE = 'Nébula Tech';
-// Solo sirve para loguearse: no es una casilla real (dominio .invalid, RFC
-// 2606 — ningún mail sale). Tiene que ser propio de la demo porque el email
-// de un member es único en TODA la plataforma (ver registerBusiness).
-const EMAIL_DUENO = 'dueno@demo.invalid';
+const TIENDAS = {
+  tech: {
+    slug: 'demo', nombre: 'Nébula Tech', industria: 'Tecnología', subrubros: ['electronica', 'informatica', 'celulares'],
+    equipo: 'Equipo Nébula', contenido: NEBULA_TECH, apariencia: sembrarApariencia, modal: MODAL_TECH, conVisitante: true,
+    // Solo sirve para loguearse: no es una casilla real (dominio .invalid, RFC
+    // 2606 — ningún mail sale). Tiene que ser propio de cada tienda porque el
+    // email de un member es único en TODA la plataforma (ver registerBusiness).
+    emailDueno: 'dueno@demo.invalid',
+  },
+  moda: {
+    slug: 'demo-moda', nombre: 'Nébula Moda', industria: 'Indumentaria', subrubros: ['ropa', 'calzado', 'accesorios'],
+    equipo: 'Equipo Nébula Moda', contenido: NEBULA_MODA, apariencia: sembrarAparienciaModa, modal: MODAL_MODA, conVisitante: false,
+    emailDueno: 'dueno@demo-moda.invalid',
+  },
+};
+const argTienda = process.argv[process.argv.indexOf('--tienda') + 1];
+if (process.argv.includes('--tienda') && !(argTienda in TIENDAS)) throw new Error(`--tienda: ${Object.keys(TIENDAS).join(' | ')}`);
+const TIENDA = TIENDAS[process.argv.includes('--tienda') ? (argTienda as keyof typeof TIENDAS) : 'tech'];
+const SLUG = TIENDA.slug;
+const NOMBRE = TIENDA.nombre;
+const EMAIL_DUENO = TIENDA.emailDueno;
 // El visitante no tiene contraseña: nunca loguea, solo recibe tokens de
 // AuthService.demoSession. Dominio .invalid (RFC 2606): ningún mail sale.
 const EMAIL_VISITANTE = 'visitante@demo.invalid';
@@ -89,7 +113,7 @@ async function negocioBase() {
 
     negocio = await prisma.$transaction(async (tx) => {
       const b = await tx.business.create({
-        data: { name: NOMBRE, industry: 'Tecnología', subdomain: SLUG, mode: 'FULL', isActive: true, isDemo: true, subrubros: ['electronica', 'informatica', 'celulares'], operatesOnline: true },
+        data: { name: NOMBRE, industry: TIENDA.industria, subdomain: SLUG, mode: 'FULL', isActive: true, isDemo: true, subrubros: TIENDA.subrubros, operatesOnline: true },
       });
       await tx.branch.create({ data: { businessId: b.id, name: 'Principal', isDefault: true } });
       const roles: Record<string, string> = {};
@@ -104,7 +128,7 @@ async function negocioBase() {
         });
       }
       await tx.member.create({
-        data: { businessId: b.id, name: 'Equipo Nébula', email: EMAIL_DUENO, roleId: roles.owner, status: 'ACTIVE', passwordHash, emailVerified: true },
+        data: { businessId: b.id, name: TIENDA.equipo, email: EMAIL_DUENO, roleId: roles.owner, status: 'ACTIVE', passwordHash, emailVerified: true },
       });
       await tx.businessConfig.create({
         data: { businessId: b.id, acceptsMercadopago: true, acceptsCash: true, acceptsTransfer: true, acceptsPickup: true },
@@ -131,9 +155,9 @@ async function negocioBase() {
   }
 
   // Visitante anónimo: dueño en permisos (ve todo), readOnly (DemoGuard le
-  // corta toda escritura). Sin contraseña.
+  // corta toda escritura). Sin contraseña. Solo en la tienda del panel.
   const owner = await prisma.role.findFirstOrThrow({ where: { businessId: negocio.id, name: 'owner' } });
-  await prisma.member.upsert({
+  if (TIENDA.conVisitante) await prisma.member.upsert({
     where: { businessId_email: { businessId: negocio.id, email: EMAIL_VISITANTE } },
     // Tema claro: el panel de la demo arranca en blanco, sea cual sea el del sistema.
     update: { readOnly: true, roleId: owner.id, status: 'ACTIVE', themePreference: 'LIGHT' },
@@ -192,10 +216,10 @@ async function main() {
   // para iterar el diseño). Sin banderas, borra y vuelve a sembrar catálogo,
   // ventas y todo el panel (ver prisma/demo/sembrar.ts) y la apariencia.
   const soloApariencia = process.argv.includes('--solo-apariencia');
-  if (!process.argv.includes('--solo-base') && !soloApariencia) await sembrarContenido(prisma, negocio.id);
+  if (!process.argv.includes('--solo-base') && !soloApariencia) await sembrarContenido(prisma, negocio.id, TIENDA.contenido);
   if (!process.argv.includes('--solo-base')) {
-    await sembrarApariencia(prisma, negocio.id);
-    await sembrarAvanzado(prisma, negocio.id);
+    await TIENDA.apariencia(prisma, negocio.id);
+    await sembrarAvanzado(prisma, negocio.id, TIENDA.modal, TIENDA.contenido.prefijoIds);
   }
   console.log(`Demo lista: ${negocio.subdomain} (${negocio.id})`);
 }

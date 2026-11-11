@@ -14,7 +14,7 @@ import type { StorefrontConfigResponse } from '@/lib/storefront/api'
 import { apiReal, json, leerJson, registrar } from '../interceptor'
 import { validarCarritoDemo } from './juegos'
 import { crear, esIdLocal, leerCapa, aplicarARegistro, nuevoId } from '../almacen'
-import { DEMO_SLUG } from '../modo'
+import { slugTiendaDemo } from '../modo'
 
 export const PEDIDOS_TIENDA = 'pedidos-tienda'
 
@@ -25,9 +25,10 @@ async function apiJson<T>(ruta: string, init?: RequestInit): Promise<T | null> {
   return res ? leerJson<T>(res) : null
 }
 
-/** Lo que muestra la tienda en la URL: /tienda/demo en dev sin subdominio, nada en demo.orbita.site. */
+/** Lo que muestra la tienda en la URL: /tienda/<slug> en dev sin subdominio, nada en demo.orbita.site. */
 export function baseTiendaDemo(): string {
-  return window.location.pathname.startsWith(`/tienda/${DEMO_SLUG}`) ? `/tienda/${DEMO_SLUG}` : ''
+  const slug = slugTiendaDemo()
+  return slug && window.location.pathname.startsWith(`/tienda/${slug}`) ? `/tienda/${slug}` : ''
 }
 
 const redondear = (n: number) => Math.round(n * 100) / 100

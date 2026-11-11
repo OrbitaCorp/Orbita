@@ -20,7 +20,17 @@ const JUEGOS: { type: string; name: string; percentPerWin: number; maxAttempts: 
   { type: 'CUT', name: 'Cortá y ganá', percentPerWin: 5, maxAttempts: 4 },
 ];
 
-export async function sembrarAvanzado(prisma: PrismaClient, businessId: string) {
+// El mismo texto que el primer anuncio del menú de la demo (ANUNCIOS_DEMO en
+// MenuDemoTienda.tsx, uno por tienda).
+export const MODAL_TECH = {
+  title: '2x1 en accesorios para el celu',
+  message: 'Llevá dos fundas, cargadores o soportes para auto y pagá uno. El descuento se aplica solo en el carrito.',
+  badge: '2x1',
+  ctaText: 'Ver accesorios',
+  ctaLink: '/catalogo?cat=celulares-y-accesorios',
+};
+
+export async function sembrarAvanzado(prisma: PrismaClient, businessId: string, anuncio = MODAL_TECH, prefijoIds = '') {
   console.log('Juegos con premio y modal de anuncio…');
   for (const [i, j] of JUEGOS.entries()) {
     const datos = {
@@ -36,26 +46,21 @@ export async function sembrarAvanzado(prisma: PrismaClient, businessId: string) 
     await prisma.game.upsert({
       where: { businessId_type: { businessId, type: j.type } },
       // createdAt escalonado: /games/active los ordena por fecha de creación.
-      create: { id: idDemo(`juego:${j.type}`), businessId, type: j.type, ...datos, createdAt: new Date(Date.UTC(2026, 8, 1, 12, i)) },
+      create: { id: idDemo(`${prefijoIds}juego:${j.type}`), businessId, type: j.type, ...datos, createdAt: new Date(Date.UTC(2026, 8, 1, 12, i)) },
       update: datos,
     });
   }
 
-  // El mismo texto que el primer anuncio del menú de la demo (ANUNCIOS_DEMO).
   const modal = {
     isActive: true,
-    title: '2x1 en accesorios para el celu',
-    message: 'Llevá dos fundas, cargadores o soportes para auto y pagá uno. El descuento se aplica solo en el carrito.',
-    badge: '2x1',
+    ...anuncio,
     code: null,
-    ctaText: 'Ver accesorios',
-    ctaLink: '/catalogo?cat=celulares-y-accesorios',
     startDate: null,
     endDate: null,
   };
   await prisma.promoModal.upsert({
     where: { businessId },
-    create: { id: idDemo('modal-anuncio'), businessId, ...modal },
+    create: { id: idDemo(`${prefijoIds}modal-anuncio`), businessId, ...modal },
     update: modal,
   });
 }

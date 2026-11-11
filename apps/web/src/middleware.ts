@@ -31,6 +31,9 @@ import { TEMA_SCRIPT, armarCspReportOnly, origenDeUrl, sha256Base64 } from '@/li
 
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'orbita.local'
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'
+// Mismos valores que lib/demo/modo.ts (acá no se importa: corre en el edge).
+const DEMO_SLUG_PANEL = process.env.NEXT_PUBLIC_DEMO_SLUG ?? 'demo'
+const DEMO_SLUG_MODA = process.env.NEXT_PUBLIC_DEMO_SLUG_MODA ?? 'demo-moda'
 
 // Paths que en un subdominio de tienda NO se reescriben al storefront:
 // se sirven tal cual (área de dueño, o rutas internas).
@@ -125,6 +128,16 @@ export async function middleware(request: NextRequest) {
   if (!slug) return conCsp(NextResponse.next())
 
   const { pathname } = request.nextUrl
+
+  // Demo pública: el panel es uno solo, el de Nébula Tech (DEMO_SLUG en
+  // lib/demo/modo.ts). Desde la tienda de ropa, /panel y /admin llevan ahí:
+  // si no, el visitante entraría al panel de Nébula Tech parado en el
+  // subdominio de la otra tienda.
+  if (slug === DEMO_SLUG_MODA && (pathname === '/panel' || pathname.startsWith('/panel/') || pathname.startsWith('/admin'))) {
+    const destino = request.nextUrl.clone()
+    destino.host = `${DEMO_SLUG_PANEL}.${ROOT_DOMAIN}${destino.port ? `:${destino.port}` : ''}`
+    return NextResponse.redirect(destino)
+  }
 
   // En un subdominio de tienda, el área de dueño y las rutas internas pasan
   // sin reescribir; el resto se mapea al storefront `/tienda/[slug]/...`.

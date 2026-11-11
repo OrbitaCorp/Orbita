@@ -21,7 +21,7 @@ import {
   type MeProfile, type MeOrderRow, type MeSession,
 } from '@/lib/api'
 import { SkeletonText, SkeletonChip } from '@/design-system/components/Skeleton'
-import { DEMO_SLUG } from '@/lib/demo/modo'
+import { esSlugDemo } from '@/lib/demo/modo'
 
 type Tab = 'pedidos' | 'mensajes' | 'direcciones' | 'datos' | 'seguridad'
 
@@ -119,7 +119,7 @@ export default function Perfil() {
   // Tienda demo: el Invitado no tiene contraseña ni sesiones propias, y no
   // "sale" de ningún lado (ver lib/auth/authClient.ts): sin Seguridad ni
   // Cerrar sesión.
-  const enDemo = slug === DEMO_SLUG
+  const enDemo = esSlugDemo(slug)
   const tabsVisibles = TABS.filter(t => !(esVidriera && t.id === 'mensajes') && !(enDemo && t.id === 'seguridad'))
 
   // La pestaña inicial puede venir del query (?tab=), para el deep-link del menú

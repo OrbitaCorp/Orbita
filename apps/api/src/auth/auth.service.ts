@@ -20,7 +20,7 @@ import { AcceptInvitationDto } from './dto/accept-invitation.dto';
 import { DemoCustomerSessionResponse, DemoSessionResponse, LoginResponse, PlatformAdminAuthResponse, PlatformAdminMfaChallenge } from './auth.types';
 import { errorDemo } from '../common/guards/demo.guard';
 import { DemoFechasService } from '../demo/demo-fechas.service';
-import { EMAIL_INVITADO_DEMO } from '../demo/demo.constants';
+import { DEMO_SLUG_PANEL, DEMO_SLUGS, EMAIL_INVITADO_DEMO } from '../demo/demo.constants';
 import { GoogleIdentity } from './google-auth.service';
 import * as argon2 from 'argon2';
 import * as jwt from 'jsonwebtoken';
@@ -1035,10 +1035,17 @@ export class AuthService implements OnModuleInit {
   // refresh del panel (vive en todo .orbita.site): si un dueño real prueba la
   // demo, su propia sesión queda intacta. Cuando el token vence, el frontend
   // vuelve a pedir uno acá. Todo lo que no sea lectura lo corta DemoGuard.
-  async demoSession(canal: 'panel' | 'customer' = 'panel'): Promise<DemoSessionResponse | DemoCustomerSessionResponse> {
-    if (canal === 'customer') return this.demoSessionCliente();
+  //
+  // La demo tiene varias tiendas (DEMO_SLUGS): el Invitado es el de la tienda
+  // que pide (`slug`); sin slug o con uno que no es de la demo, el de
+  // DEMO_SLUG_PANEL (lo que mandaba el frontend antes de que hubiera dos). El
+  // panel es siempre el de DEMO_SLUG_PANEL.
+  async demoSession(canal: 'panel' | 'customer' = 'panel', slug?: string): Promise<DemoSessionResponse | DemoCustomerSessionResponse> {
+    if (canal === 'customer') {
+      return this.demoSessionCliente((DEMO_SLUGS as readonly string[]).includes(slug ?? '') ? slug! : DEMO_SLUG_PANEL);
+    }
     const member = await this.prisma.member.findFirst({
-      where: { readOnly: true, business: { isDemo: true, deletedAt: null } },
+      where: { readOnly: true, business: { isDemo: true, deletedAt: null, subdomain: DEMO_SLUG_PANEL } },
       include: {
         role: { include: { rolePermissions: { include: { permission: true } } } },
         business: { select: { id: true, name: true, subdomain: true, mode: true } },
@@ -1066,9 +1073,9 @@ export class AuthService implements OnModuleInit {
   // (sembrado, con pedidos), sin contraseña ni refresh token. Solo lectura:
   // AuthGuard marca readOnly a todo cliente de un negocio demo y DemoGuard le
   // corta las escrituras; lo que "compra" vive en su navegador.
-  private async demoSessionCliente(): Promise<DemoCustomerSessionResponse> {
+  private async demoSessionCliente(slug: string): Promise<DemoCustomerSessionResponse> {
     const customer = await this.prisma.customer.findFirst({
-      where: { email: EMAIL_INVITADO_DEMO, deletedAt: null, business: { isDemo: true, deletedAt: null } },
+      where: { email: EMAIL_INVITADO_DEMO, deletedAt: null, business: { isDemo: true, deletedAt: null, subdomain: slug } },
       include: { business: { select: { id: true, name: true, subdomain: true, mode: true } } },
     });
     if (!customer) throw new NotFoundException('La demo no está disponible');

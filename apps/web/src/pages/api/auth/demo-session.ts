@@ -11,7 +11,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!origenPermitido(req)) return res.status(403).json({ error: 'ORIGEN_NO_PERMITIDO' })
 
   // channel 'customer' = el cliente Invitado de la tienda demo; si no, el panel.
-  const channel = (req.body as { channel?: string } | undefined)?.channel === 'customer' ? 'customer' : 'panel'
-  const { status, body } = await callBackend('/auth/demo-session', { req, method: 'POST', body: { channel } })
+  const pedido = req.body as { channel?: string; slug?: unknown } | undefined
+  const channel = pedido?.channel === 'customer' ? 'customer' : 'panel'
+  // De qué tienda de la demo es el Invitado; la API solo acepta las de la demo.
+  const slug = typeof pedido?.slug === 'string' ? pedido.slug.slice(0, 63) : undefined
+  const { status, body } = await callBackend('/auth/demo-session', { req, method: 'POST', body: { channel, slug } })
   return res.status(status).json(body ?? { error: 'DEMO_NO_DISPONIBLE' })
 }

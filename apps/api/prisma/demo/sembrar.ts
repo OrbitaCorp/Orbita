@@ -20,8 +20,8 @@ import { Prisma, PrismaClient } from '@prisma/client';
 import { createClient } from '@supabase/supabase-js';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import WebSocket from 'ws';
-import { CATEGORIAS, ETIQUETAS, PRODUCTOS, ProductoDemo } from './catalogo';
-import { APELLIDOS, CALLES, CIUDADES, CONVERSACIONES, NOMBRES, RESENAS, TRANSPORTES } from './datos';
+import { APELLIDOS, CALLES, CIUDADES, NOMBRES, TRANSPORTES } from './datos';
+import type { TiendaDemo } from './tienda';
 
 const MEDIA = join(__dirname, 'media');
 const DIAS_DE_HISTORIA = 90;
@@ -35,6 +35,10 @@ export const EMAIL_INVITADO = 'invitado@demo.invalid';
 
 /** UUID estable a partir de una clave (formato v4 válido). */
 export function idDemo(clave: string): string {
+  return idDemoGlobal(clave);
+}
+
+function idDemoGlobal(clave: string): string {
   const h = createHash('sha256').update(`orbita-demo:${clave}`).digest('hex');
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}`;
 }
@@ -160,13 +164,16 @@ async function borrarContenido(prisma: PrismaClient, businessId: string) {
 
 type Variante = { id: string; productoClave: string; productoNombre: string; categoria: string; etiqueta: string | null; precio: number; stockFinal: number };
 
-export async function sembrarContenido(prisma: PrismaClient, businessId: string) {
+export async function sembrarContenido(prisma: PrismaClient, businessId: string, t: TiendaDemo) {
+  // Ids determinísticos de ESTA tienda (ver prefijoIds en tienda.ts).
+  const idDemo = (clave: string) => idDemoGlobal(`${t.prefijoIds}${clave}`);
+  const { categorias: CATEGORIAS, etiquetas: ETIQUETAS, productos: PRODUCTOS, resenas: RESENAS, conversaciones: CONVERSACIONES } = t;
   const negocio = await prisma.business.findUniqueOrThrow({ where: { id: businessId } });
   if (!negocio.isDemo) throw new Error('sembrarContenido solo corre sobre el negocio demo (isDemo).');
 
   const ahora = new Date();
   const hace = (ms: number) => new Date(ahora.getTime() - ms);
-  const r = azar(20260928);
+  const r = azar(t.semilla);
   const sucursal = await prisma.branch.findFirstOrThrow({ where: { businessId, isDefault: true } });
   const dueno = await prisma.member.findFirstOrThrow({ where: { businessId, readOnly: false, role: { name: 'owner' } } });
   const subir = almacenamiento(businessId);
@@ -237,13 +244,13 @@ export async function sembrarContenido(prisma: PrismaClient, businessId: string)
         data: {
           id: idDemo(`foto:${p.clave}:${i}`), productId: productoId, url: await subir.imagen(foto, 'product-images'),
           position: i, isPrimary: i === 0, optionValueId: valorDeFoto.get(i) ?? null,
-          backgroundRemoved: i === 0, createdAt: creado,
+          backgroundRemoved: t.fondoQuitadoEnPrincipal && i === 0, createdAt: creado,
         },
       });
     }
 
     // Variantes y stock.
-    const lista = p.variantes ?? [{ valores: [], precio: p.precio, precioAnterior: p.precioAnterior, stock: p.stock ?? 0, sku: `NB-${p.clave.toUpperCase()}` }];
+    const lista = p.variantes ?? [{ valores: [], precio: p.precio, precioAnterior: p.precioAnterior, stock: p.stock ?? 0, sku: `${t.skuPrefijo}-${p.clave.toUpperCase()}` }];
     for (const v of lista) {
       const varianteId = idDemo(`variante:${p.clave}:${v.valores.join('|') || 'default'}`);
       await prisma.productVariant.create({
@@ -264,7 +271,7 @@ export async function sembrarContenido(prisma: PrismaClient, businessId: string)
   const semanaGamer = idDemo('descuento:semana-gamer');
   const cupones = {
     bienvenida: idDemo('cupon:BIENVENIDA10'),
-    nebula15: idDemo('cupon:NEBULA15'),
+    nebula15: idDemo(`cupon:${t.cupon15}`),
     hotsale: idDemo('cupon:HOTSALE'),
     vip: idDemo('cupon:VIP-LUCIA'),
   };
@@ -276,19 +283,19 @@ export async function sembrarContenido(prisma: PrismaClient, businessId: string)
   // nunca, ni el cartel "3x2" en el catálogo.
   await prisma.discount.createMany({
     data: [
-      { id: semanaGamer, businessId, name: 'Semana Gamer: 15 % en Gaming', type: 'PERCENT_PRODUCT', value: dec(15), scope: 'CATEGORY', application: 'AUTOMATIC', startDate: hace(10 * DIA), endDate: new Date(ahora.getTime() + 11 * DIA), activeDays: [], priority: 1, createdBy: dueno.id, createdAt: hace(11 * DIA) },
+      { id: semanaGamer, businessId, name: t.semana.nombre, type: 'PERCENT_PRODUCT', value: dec(15), scope: 'CATEGORY', application: 'AUTOMATIC', startDate: hace(10 * DIA), endDate: new Date(ahora.getTime() + 11 * DIA), activeDays: [], priority: 1, createdBy: dueno.id, createdAt: hace(11 * DIA) },
       { id: lamparas3x2, businessId, name: '3x2', type: 'BUY_X_PAY_Y', value: dec(2), minQuantity: 3, scope: 'PRODUCT', productLevel: 'padre', application: 'AUTOMATIC', startDate: hace(40 * DIA), endDate: null, activeDays: [], createdBy: dueno.id, createdAt: hace(40 * DIA) },
       { id: accesorios2x1, businessId, name: '2x1', type: 'BUY_X_PAY_Y', value: dec(1), minQuantity: 2, scope: 'PRODUCT', productLevel: 'padre', application: 'AUTOMATIC', startDate: hace(6 * DIA), endDate: null, activeDays: [], createdBy: dueno.id, createdAt: hace(6 * DIA) },
       { id: cupones.bienvenida, businessId, name: 'Bienvenida: 10 % en tu primera compra', code: 'BIENVENIDA10', type: 'PERCENT_TICKET', value: dec(10), scope: 'TICKET', application: 'MANUAL', startDate: hace(95 * DIA), activeDays: [], maxUsesPerCustomer: 1, createdBy: dueno.id, createdAt: hace(95 * DIA) },
-      { id: cupones.nebula15, businessId, name: '15 % en compras desde $150.000', code: 'NEBULA15', type: 'PERCENT_TICKET', value: dec(15), minAmount: dec(150000), scope: 'TICKET', application: 'MANUAL', startDate: hace(20 * DIA), endDate: new Date(ahora.getTime() + 25 * DIA), activeDays: [], maxUsesTotal: 200, linkActive: true, createdBy: dueno.id, createdAt: hace(20 * DIA) },
+      { id: cupones.nebula15, businessId, name: '15 % en compras desde $150.000', code: t.cupon15, type: 'PERCENT_TICKET', value: dec(15), minAmount: dec(150000), scope: 'TICKET', application: 'MANUAL', startDate: hace(20 * DIA), endDate: new Date(ahora.getTime() + 25 * DIA), activeDays: [], maxUsesTotal: 200, linkActive: true, createdBy: dueno.id, createdAt: hace(20 * DIA) },
       { id: cupones.hotsale, businessId, name: 'Hot Sale: $20.000 de descuento', code: 'HOTSALE', type: 'AMOUNT_TICKET', value: dec(20000), minAmount: dec(100000), scope: 'TICKET', application: 'MANUAL', startDate: hace(70 * DIA), endDate: hace(63 * DIA), activeDays: [], createdBy: dueno.id, createdAt: hace(72 * DIA) },
     ],
   });
-  await prisma.discountCategory.create({ data: { discountId: semanaGamer, categoryId: categoriaId.gaming } });
+  await prisma.discountCategory.create({ data: { discountId: semanaGamer, categoryId: categoriaId[t.semana.categoria] } });
   await prisma.discountProduct.createMany({
     data: [
-      ...['lampara', 'tira-led', 'enchufe'].map((c) => ({ discountId: lamparas3x2, productId: idDemo(`producto:${c}`) })),
-      ...['funda', 'cargador', 'soporte-auto'].map((c) => ({ discountId: accesorios2x1, productId: idDemo(`producto:${c}`) })),
+      ...t.tresPorDos.productos.map((c) => ({ discountId: lamparas3x2, productId: idDemo(`producto:${c}`) })),
+      ...t.dosPorUno.map((c) => ({ discountId: accesorios2x1, productId: idDemo(`producto:${c}`) })),
     ],
   });
   await prisma.twoForOnePromo.createMany({
@@ -313,12 +320,12 @@ export async function sembrarContenido(prisma: PrismaClient, businessId: string)
   // mucho más que el día entre corridas nocturnas: si una falla, no vence.
   const relampago = idDemo('descuento:relampago');
   const finRelampago = new Date(ahora.getTime() + 2 * DIA + 20 * HORA);
-  const nombreRelampago = 'Favoritos de Nébula';
+  const nombreRelampago = t.relampago.nombre;
   await prisma.discount.create({
     data: { id: relampago, businessId, name: nombreRelampago, type: 'PERCENT_PRODUCT', value: dec(25), scope: 'PRODUCT', productLevel: 'padre', application: 'AUTOMATIC', startDate: hace(DIA), endDate: finRelampago, activeDays: [], priority: 2, createdBy: dueno.id, createdAt: hace(DIA) },
   });
   await prisma.discountProduct.createMany({
-    data: ['auriculares-anc', 'smartwatch-gps', 'parlante-redondo', 'tablet', 'drone', 'robot-aspiradora'].map((c) => ({ discountId: relampago, productId: idDemo(`producto:${c}`) })),
+    data: t.relampago.productos.map((c) => ({ discountId: relampago, productId: idDemo(`producto:${c}`) })),
   });
   const cuentaRegresiva = {
     title: nombreRelampago, subtitle: null, endDate: finRelampago, finishedMessage: null, ctaText: null, ctaLink: null,
@@ -389,7 +396,7 @@ export async function sembrarContenido(prisma: PrismaClient, businessId: string)
         const producto = r.pesado(PRODUCTOS.filter((p) => !usados.has(p.clave) && (p.stock ?? 1) > 0), (p) => p.popularidad);
         usados.add(producto.clave);
         const v = r.uno(variantes.filter((x) => x.productoClave === producto.clave));
-        const cant = producto.clave === 'lampara' && r.si(0.3) ? 3 : r.si(0.1) ? 2 : 1;
+        const cant = producto.clave === t.tresPorDos.deATres && r.si(0.3) ? 3 : r.si(0.1) ? 2 : 1;
         items.push({ id: idDemo(`item:${numero}:${j}`), varianteId: v.id, productoClave: producto.clave, categoria: v.categoria, cantidad: cant, precio: v.precio });
       }
 
@@ -411,12 +418,12 @@ export async function sembrarContenido(prisma: PrismaClient, businessId: string)
       const redenciones: Prisma.DiscountRedemptionCreateManyInput[] = [];
       const descuentoItem = new Map<string, number>();
       for (const it of items) {
-        if (it.categoria === 'gaming' && edad <= 10) {
+        if (it.categoria === t.semana.categoria && edad <= 10) {
           const monto = Math.round(it.precio * it.cantidad * 0.15);
           descuentoItem.set(it.id, monto);
           redenciones.push({ id: idDemo(`redencion:${numero}:${it.id}`), businessId, orderId: pedidoId, orderItemId: it.id, customerId: cliente?.id ?? null, discountId: semanaGamer, channel: 'STOREFRONT', amount: dec(monto), createdAt: creado });
         }
-        if (it.productoClave === 'lampara' && it.cantidad >= 3 && edad <= 40) {
+        if (it.productoClave === t.tresPorDos.deATres && it.cantidad >= 3 && edad <= 40) {
           descuentoItem.set(it.id, it.precio);
           redenciones.push({ id: idDemo(`redencion:${numero}:${it.id}`), businessId, orderId: pedidoId, orderItemId: it.id, customerId: cliente?.id ?? null, discountId: lamparas3x2, channel: 'STOREFRONT', amount: dec(it.precio), createdAt: creado });
         }
@@ -598,7 +605,7 @@ export async function sembrarContenido(prisma: PrismaClient, businessId: string)
     await prisma.return.create({
       data: {
         id: idDemo(`devolucion:${p.numero}`), businessId, orderId: p.id, orderItemId: it.id, quantity: 1, amount: dec(it.precio),
-        reason: i === 0 ? 'Llegó con un rayón en la parte de atrás.' : 'No era compatible con mi equipo.',
+        reason: t.motivosDevolucion[i],
         status: i === 0 ? 'PENDING' : 'APPROVED', refundMethod: 'REFUND', createdAt: cuando, updatedAt: cuando,
       },
     });
@@ -606,7 +613,7 @@ export async function sembrarContenido(prisma: PrismaClient, businessId: string)
   const paraCancelar = conCliente(['CONFIRMED', 'PENDING'], 0, 1).slice(0, 1);
   for (const p of paraCancelar) {
     await prisma.cancellationRequest.create({
-      data: { id: idDemo(`cancelacion:${p.numero}`), businessId, orderId: p.id, customerId: clientes[p.clienteIdx!].id, reason: 'Me equivoqué de modelo, quiero cambiarlo por otro.', status: 'PENDING', createdAt: new Date(p.creado.getTime() + 20 * 60000) },
+      data: { id: idDemo(`cancelacion:${p.numero}`), businessId, orderId: p.id, customerId: clientes[p.clienteIdx!].id, reason: t.motivoCancelacion, status: 'PENDING', createdAt: new Date(p.creado.getTime() + 20 * 60000) },
     });
   }
   const cancelado = pedidos.find((p) => p.estado === 'CANCELLED' && p.clienteIdx != null);
@@ -618,7 +625,7 @@ export async function sembrarContenido(prisma: PrismaClient, businessId: string)
 
   // ── Visitas a la tienda (embudo de conversión) ────────────────────────────
   const visitas: Prisma.StoreVisitCreateManyInput[] = [];
-  const rutas = ['/', '/', '/', '/catalogo', '/catalogo/audio', '/catalogo/gaming', '/catalogo/wearables', ...PRODUCTOS.slice(0, 10).map((p) => `/producto/${idDemo(`producto:${p.clave}`)}`)];
+  const rutas = ['/', '/', '/', '/catalogo', ...t.categoriasVisitadas.map((c) => `/catalogo/${t.categorias.find((x) => x.clave === c)!.slug}`), ...PRODUCTOS.slice(0, 10).map((p) => `/producto/${idDemo(`producto:${p.clave}`)}`)];
   for (let dia = DIAS_DE_HISTORIA; dia >= 0; dia--) {
     const fecha = hace(dia * DIA);
     const n = Math.round((60 + 170 * (1 - dia / DIAS_DE_HISTORIA)) * ([0, 6].includes(fecha.getDay()) ? 1.25 : 1) * (0.85 + r.n() * 0.3) * (dia === 0 ? 0.6 : 1));
@@ -638,7 +645,7 @@ export async function sembrarContenido(prisma: PrismaClient, businessId: string)
     body: `${p.clienteIdx != null ? `${clientes[p.clienteIdx].nombre} ${clientes[p.clienteIdx].apellido}` : 'Un comprador'}: $${p.total.toFixed(2)}`,
     level: 'INFO', isRead: i > 1, resourceType: 'order', resourceId: p.id, createdAt: p.creado,
   }));
-  for (const clave of ['drone', 'parlante-asistente']) {
+  for (const clave of t.stockCritico) {
     const v = variantes.find((x) => x.productoClave === clave)!;
     notificaciones.push({ id: idDemo(`notificacion:stock:${clave}`), businessId, event: 'stock_critico', title: `Stock crítico: ${v.productoNombre}`, body: `Quedan ${v.stockFinal} unidades.`, level: 'DANGER', isRead: false, resourceType: 'variant', resourceId: v.id, createdAt: hace(r.entre(3, 20) * HORA) });
   }

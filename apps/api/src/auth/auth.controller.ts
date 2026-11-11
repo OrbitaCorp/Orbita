@@ -48,13 +48,13 @@ export class AuthController {
   // Sesión anónima de la demo pública (ver AuthService.demoSession): la del
   // panel (visitante de solo lectura) o, con channel 'customer', la del
   // cliente Invitado de la tienda. Throttle generoso: cada visitante pide una
-  // cada 15 minutos de uso.
+  // cada 15 minutos de uso. `slug`: de qué tienda de la demo es el Invitado.
   @Post('demo-session')
   @Public()
   @HttpCode(200)
   @Throttle({ default: { limit: 30, ttl: 60000 } })
-  demoSession(@Body('channel') channel?: string) {
-    return this.authService.demoSession(channel === 'customer' ? 'customer' : 'panel');
+  demoSession(@Body('channel') channel?: string, @Body('slug') slug?: unknown) {
+    return this.authService.demoSession(channel === 'customer' ? 'customer' : 'panel', typeof slug === 'string' ? slug : undefined);
   }
 
   @Post('refresh')

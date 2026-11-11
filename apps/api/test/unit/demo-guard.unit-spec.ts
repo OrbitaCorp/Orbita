@@ -122,11 +122,26 @@ describe('AuthService.demoSession', () => {
     });
     const res = await svc.demoSession();
     expect(prisma.member.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { readOnly: true, business: { isDemo: true, deletedAt: null } } }),
+      expect.objectContaining({ where: { readOnly: true, business: { isDemo: true, deletedAt: null, subdomain: 'demo' } } }),
     );
     expect(res).toMatchObject({ type: 'member', demo: true, permissions: ['catalog.view'] });
     expect(typeof res.token).toBe('string');
     expect(res).not.toHaveProperty('refreshToken');
+  });
+
+  it('el Invitado es el de la tienda que pide, y solo de una tienda de la demo', async () => {
+    const customer = jest.fn().mockResolvedValue({
+      id: 'c1', businessId: 'b2', firstName: 'Invitado', lastName: 'Demo', email: 'invitado@demo.invalid', avatarUrl: null,
+      business: { id: 'b2', name: 'Nébula Moda', subdomain: 'demo-moda', mode: 'FULL' },
+    });
+    const prisma = { customer: { findFirst: customer } };
+    const config = { getOrThrow: () => 'x'.repeat(32), get: () => undefined };
+    const svc = new AuthService(prisma as never, {} as never, config as never);
+    await svc.demoSession('customer', 'demo-moda');
+    await svc.demoSession('customer', 'tienda-real');
+    await svc.demoSession('customer');
+    const subdominios = customer.mock.calls.map(([q]) => q.where.business.subdomain);
+    expect(subdominios).toEqual(['demo-moda', 'demo', 'demo']);
   });
 
   it('sin negocio demo sembrado responde 404', async () => {

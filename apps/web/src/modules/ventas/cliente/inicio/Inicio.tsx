@@ -13,7 +13,7 @@ import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { ReturnRequestModal } from '@/components/storefront/ReturnRequestModal'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { WhatsappBanner } from '@/components/storefront/WhatsappBanner'
-import { DEMO_SLUG } from '@/lib/demo/modo'
+import { esSlugDemo } from '@/lib/demo/modo'
 import { DEMO_WHATSAPP, MENSAJE_WHATSAPP_DEMO, TEXTOS_WHATSAPP_DEMO } from '@/lib/demo/whatsapp'
 import { MenuDemoTienda } from '@/modules/demo/MenuDemoTienda'
 import { MenuPromociones } from '@/components/storefront/MenuPromociones'
@@ -144,7 +144,7 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
     // Tienda demo: los juegos y anuncios NO se abren solos al entrar; se
     // abren a mano desde el menú flotante (MenuDemoTienda), siempre como si
     // fuera la primera visita. `vez` remonta el juego en cada apertura.
-    const enDemo = slug === DEMO_SLUG
+    const enDemo = esSlugDemo(slug)
     const [juegoDemo, setJuegoDemo] = useState<{ juego: ActiveGame; vez: number } | null>(null)
     const [anuncioDemo, setAnuncioDemo] = useState<ActivePromoModal | null>(null)
     function abrirJuegoDemo(juego: ActiveGame) {
@@ -1077,7 +1077,7 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
             {/* Tienda demo: el banner invita a tener la tienda propia y le
                 escribe a Órbita (ver lib/demo/whatsapp.ts). Por slug y no por
                 window, así sale igual en el render del servidor. */}
-            {config?.business?.subdomain === DEMO_SLUG ? (DEMO_WHATSAPP && (
+            {esSlugDemo(config?.business?.subdomain) ? (DEMO_WHATSAPP && (
                 <WhatsappBanner
                     layout="clasico"
                     wpp={DEMO_WHATSAPP}
@@ -1152,7 +1152,7 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
                 />
             )}
             {enDemo && (
-                <MenuDemoTienda juegos={juegosActivos} onJugar={abrirJuegoDemo} onAnuncio={a => { setJuegoDemo(null); setAnuncioDemo(a) }} />
+                <MenuDemoTienda slug={slug} juegos={juegosActivos} onJugar={abrirJuegoDemo} onAnuncio={a => { setJuegoDemo(null); setAnuncioDemo(a) }} />
             )}
             {juegoDemo && (
                 <ModalJuego

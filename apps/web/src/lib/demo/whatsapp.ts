@@ -19,7 +19,7 @@ export const TEXTOS_WHATSAPP_DEMO: TextosWpp = {
   boton: 'Quiero mi tienda',
   stats: [],
   chat: [
-    'Hola! Vi la demo de Nébula Tech 👀 ¿Puedo tener una tienda así?',
+    'Hola! Vi la demo de Órbita 👀 ¿Puedo tener una tienda así?',
     '¡Claro! Te ayudamos a armarla y después la manejás vos desde tu panel.',
     '¡Genial, arranquemos! 🚀',
   ],

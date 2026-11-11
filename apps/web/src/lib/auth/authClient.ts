@@ -8,7 +8,7 @@
 // directo — así se evita CORS bajo subdominios y el refresh token queda httpOnly.
 
 import { currentSlug, authChannel } from '@/lib/tenant'
-import { esTiendaDemo, marcarVisitanteDemo } from '@/lib/demo/modo'
+import { esTiendaDemo, marcarVisitanteDemo, slugTiendaDemo } from '@/lib/demo/modo'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'
 
@@ -152,7 +152,8 @@ async function pedirSesionDemo(canal: 'panel' | 'customer'): Promise<boolean> {
   const res = await fetch('/api/auth/demo-session', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ channel: canal }),
+    // slug: el Invitado es el de esta tienda de la demo (hay una por rubro).
+    body: JSON.stringify({ channel: canal, slug: slugTiendaDemo() }),
   }).catch(() => null)
   const data = res?.ok ? ((await res.json().catch(() => null)) as { token?: string } | null) : null
   accessToken = data?.token ?? null
