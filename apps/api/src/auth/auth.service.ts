@@ -28,8 +28,7 @@ import { createHash, randomBytes, randomInt } from 'crypto';
 import { contrasenaTemporalVencida } from '../common/utils/contrasena-temporal';
 import { PlatformAdminLogService } from '../platform/platform-admin-log.service';
 
-const LOCKOUT_THRESHOLD = 5;
-const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutos
+import { trasIntentoFallido } from './bloqueo-login';
 const MEMBER_REFRESH_DAYS = 7;
 const CUSTOMER_REFRESH_DAYS = 30;
 // Código de recuperación: 6 dígitos, 15 minutos, máximo 5 intentos fallidos
@@ -266,7 +265,7 @@ export class AuthService implements OnModuleInit {
 
         const valid = await argon2.verify(member.passwordHash, dto.password);
         if (!valid) {
-          await this.handleFailedLogin('member', member.id, member.failedLoginAttempts);
+          await this.handleFailedLogin('member', member.id, member.failedLoginAttempts, member.lockedUntil);
           throw new UnauthorizedException('Credenciales inválidas');
         }
         this.assertInvitacionVigente(member);
@@ -362,7 +361,7 @@ export class AuthService implements OnModuleInit {
 
       const valid = await argon2.verify(customer.passwordHash, dto.password);
       if (!valid) {
-        await this.handleFailedLogin('customer', customer.id, customer.failedLoginAttempts);
+        await this.handleFailedLogin('customer', customer.id, customer.failedLoginAttempts, customer.lockedUntil);
         throw new UnauthorizedException('Credenciales inválidas');
       }
 
@@ -410,7 +409,7 @@ export class AuthService implements OnModuleInit {
 
       const valid = await argon2.verify(admin.passwordHash, dto.password);
       if (!valid) {
-        await this.handleFailedLogin('platform_admin', admin.id, admin.failedLoginAttempts);
+        await this.handleFailedLogin('platform_admin', admin.id, admin.failedLoginAttempts, admin.lockedUntil);
         await this.adminLog?.loginFallido({ adminId: admin.id, email: dto.email, motivo: 'password', ...deviceInfo });
         throw new UnauthorizedException('Credenciales inválidas');
       }
@@ -465,7 +464,7 @@ export class AuthService implements OnModuleInit {
       // Un intento fallido cuenta contra CADA negocio de ese email — no hay
       // forma de saber cuál de los dos quiso, así que los dos acumulan.
       await Promise.all(
-        conPassword.map((c) => this.handleFailedLogin('member', c.id, c.failedLoginAttempts)),
+        conPassword.map((c) => this.handleFailedLogin('member', c.id, c.failedLoginAttempts, c.lockedUntil)),
       );
       throw new UnauthorizedException('Credenciales inválidas');
     }
@@ -1471,13 +1470,10 @@ export class AuthService implements OnModuleInit {
     type: 'member' | 'customer' | 'platform_admin',
     id: string,
     currentAttempts: number,
+    lockedUntil: Date | null,
   ): Promise<void> {
-    const newAttempts = currentAttempts + 1;
-    const data: { failedLoginAttempts: number; lockedUntil?: Date } = { failedLoginAttempts: newAttempts };
-
-    if (newAttempts >= LOCKOUT_THRESHOLD) {
-      data.lockedUntil = new Date(Date.now() + LOCKOUT_DURATION_MS);
-    }
+    // Si el bloqueo anterior ya venció, el contador arranca de nuevo (ver bloqueo-login.ts).
+    const data = trasIntentoFallido(currentAttempts, lockedUntil);
 
     if (type === 'member') {
       await this.prisma.member.update({ where: { id }, data });
