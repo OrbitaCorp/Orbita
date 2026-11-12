@@ -13,6 +13,8 @@ import * as argon2 from 'argon2';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { ListBusinessesQueryDto } from './dto/list-businesses-query.dto';
+import { ListBusinessContactsQueryDto } from './dto/list-business-contacts-query.dto';
+import { SELECT_CONTACTO_DE_NEGOCIO, aContactoDeNegocio, filtroContactos } from './contactos-negocios';
 import { SuspendBusinessDto } from './dto/suspend-business.dto';
 import { GrantCompDto, UpdateCompDto } from './dto/grant-comp.dto';
 import { UpsertPlatformAdminDto } from './dto/upsert-platform-admin.dto';
@@ -214,6 +216,25 @@ export class PlatformService {
       page,
       limit,
     };
+  }
+
+  // ── Contactos de negocios (rol MARKETING) ──────────────────────────────────
+  // Solo contacto y dirección de la tienda: ver contactos-negocios.ts.
+  async listBusinessContacts(q: ListBusinessContactsQueryDto) {
+    const page = q.page ?? 1;
+    const limit = q.limit ?? 50;
+    const where = filtroContactos(q.search);
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.business.findMany({
+        where,
+        orderBy: { name: 'asc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        select: SELECT_CONTACTO_DE_NEGOCIO,
+      }),
+      this.prisma.business.count({ where }),
+    ]);
+    return { data: rows.map(aContactoDeNegocio), total, page, limit };
   }
 
   // ── Detalle de un negocio ───────────────────────────────────────────────────

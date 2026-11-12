@@ -7,6 +7,7 @@ import { PlatformService } from './platform.service';
 import { WizardAnalyticsService } from '../wizard-analytics/wizard-analytics.service';
 import { SearchConsoleService } from '../search-console/search-console.service';
 import { ListBusinessesQueryDto } from './dto/list-businesses-query.dto';
+import { ListBusinessContactsQueryDto } from './dto/list-business-contacts-query.dto';
 import { SuspendBusinessDto } from './dto/suspend-business.dto';
 import { GrantCompDto, UpdateCompDto } from './dto/grant-comp.dto';
 import { UpsertPlatformAdminDto } from './dto/upsert-platform-admin.dto';
@@ -95,6 +96,15 @@ export class PlatformController {
   @Get('revenue-series')
   revenueSeries(@Query() query: SeriesQueryDto) {
     return this.platformService.revenueSeries(query);
+  }
+
+  // Lo único de los negocios que ve el rol MARKETING: contacto y dirección de la tienda, sin ventas, pedidos,
+  // suscripción ni estado (ver contactos-negocios.ts). La lista completa y la ficha de abajo le siguen cerradas: no
+  // llevan decorador de rol, y el guard deja afuera a MARKETING de todo lo que no lo nombra.
+  @Get('business-contacts')
+  @TodoElEquipo()
+  listBusinessContacts(@Query() query: ListBusinessContactsQueryDto) {
+    return this.platformService.listBusinessContacts(query);
   }
 
   @Get('businesses')

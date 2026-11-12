@@ -495,7 +495,9 @@ Es para quien lleva las redes y los videos (por ejemplo, Milagros). A diferencia
 solo entra a lo que lo nombra a propósito (`PlatformAdminGuard`: sin `@SuperadminYMarketing()` / `@TodoElEquipo()` lo rechaza, también en lectura).
 Hoy puede: Resumen (sin facturación: `overview` le saca el MRR y las suscripciones), Marketing completo (TikTok, Instagram con mensajes directos y
 contenido, videos, tutoriales, prospección y el conector de Claude), y Correo (ver, vista previa y enviar; las casillas siguen siendo de SUPERADMIN).
-No ve Negocios, Soporte, Costos, Admins, Actividad, Auditoría ni campañas. La lista exacta está fijada en `test/unit/platform.rol-marketing.unit-spec.ts`.
+De Negocios ve solo el contacto (dueño/a, email, WhatsApp y redes de la tienda) y la dirección de la tienda (subdominio y dominios
+propios activos), por un endpoint aparte (`GET /platform/business-contacts`, `contactos-negocios.ts`) cuyo `select` no lee nada más: sin ventas,
+pedidos, suscripción, estado ni ficha (desde el 12/11). No ve Soporte, Costos, Admins, Actividad, Auditoría ni campañas. La lista exacta está fijada en `test/unit/platform.rol-marketing.unit-spec.ts`.
 Dar el rol: Super panel → Admins → editar → Rol «Marketing». Ahí mismo se le saca el acceso total a quien lo tenga como SUPERADMIN.
 Sus videos los aprueba la dirección (`politica-aprobacion.ts` sigue mandando por quién subió); los avisos por correo de videos también le llegan.
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { RequireAuth } from '@/lib/auth/RequireAuth'
 import { platformApi } from '@/lib/platform/api'
@@ -27,6 +27,11 @@ export function BusinessDetailPage() {
   const router = useRouter()
   const { user, logout } = useAuth()
   const id = typeof router.query.id === 'string' ? router.query.id : null
+  // El rol de marketing no tiene ficha de negocio (el servidor se la niega): vuelve a Negocios, donde ve el contacto.
+  const esMarketing = user?.type === 'platform_admin' && user.admin.role === 'MARKETING'
+  useEffect(() => {
+    if (esMarketing) void router.replace('/superadmin?seccion=negocios')
+  }, [esMarketing, router])
   const cerrarSesion = () => void logout().then(() => (window.location.href = apexUrl('/login')))
 
   return (
@@ -46,7 +51,7 @@ export function BusinessDetailPage() {
             <ArrowLeft size={14} strokeWidth={1.75} /> Volver a Negocios
           </button>
         </div>
-        {id ? <Detalle businessId={id} /> : <Loader />}
+        {id && !esMarketing ? <Detalle businessId={id} /> : <Loader />}
       </SuperAdminShell>
     </RequireAuth>
   )

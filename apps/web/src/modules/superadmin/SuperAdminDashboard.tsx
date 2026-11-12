@@ -26,6 +26,7 @@ import { TabCorreo } from './Correo'
 import { TabMarketing } from './Marketing'
 import { TabInstagram } from './InstagramAccesos'
 import { TabSeguimiento } from './Seguimiento'
+import { TabNegociosContacto } from './NegociosContacto'
 import {
   useFetch, Grid, Row2, Kpi, Card, Table, StatusBadge, SubBadge, Pill, Chip,
   Loader, ErrorBox, Empty, ModalShell, Field, ConfirmModal, PageHeader,
@@ -41,7 +42,8 @@ import { LineSeriesChart, AreaSeriesChart, BarDistribution, ChartSkeleton, Range
 const ES_TAB = (v: unknown): v is Tab => typeof v === 'string' && NAV.some((n) => n.id === v)
 
 // El rol de marketing ve solo estas secciones (el servidor además le cierra todo lo demás, aunque llame a la API a mano).
-const SECCIONES_DE_MARKETING: Tab[] = ['resumen', 'marketing', 'correo']
+// En Negocios ve otra pantalla: solo contacto y dirección de la tienda (NegociosContacto.tsx).
+const SECCIONES_DE_MARKETING: Tab[] = ['resumen', 'negocios', 'marketing', 'correo']
 export const navDelRol = (rol: string | undefined) => (rol === 'MARKETING' ? NAV.filter((n) => SECCIONES_DE_MARKETING.includes(n.id)) : NAV)
 
 export function SuperAdminDashboard() {
@@ -116,7 +118,7 @@ export function SuperAdminDashboard() {
     >
       {tab === 'resumen' && <TabResumen sinFacturacion={user.admin.role === 'MARKETING'} />}
       {tab === 'wizard' && <TabWizard />}
-      {tab === 'negocios' && <TabNegocios />}
+      {tab === 'negocios' && (user.admin.role === 'MARKETING' ? <TabNegociosContacto /> : <TabNegocios />)}
       {tab === 'seguimiento' && <TabSeguimiento puedeEnviar={user.admin.role === 'SUPERADMIN'} adminEmail={user.admin.email} />}
       {tab === 'soporte' && <TabSoporte currentAdminId={user.admin.id} onCambio={refrescarSoporte} />}
       {tab === 'dominios' && <TabDominios />}
@@ -689,7 +691,7 @@ function AdminFormModal({ admin, onClose, onSaved }: { admin: AdminRow | null; o
         <Field label="Rol">
           <select value={role} onChange={(e) => setRole(e.target.value as PlatformAdminRole)} className="ds-field" style={inputStyle}>
             <option value="OPERATOR">Operador</option>
-            <option value="MARKETING">Marketing (solo Marketing, Correo y Resumen)</option>
+            <option value="MARKETING">Marketing (Marketing, Correo, Resumen y el contacto de los negocios)</option>
             <option value="SUPERADMIN">Super administrador</option>
           </select>
         </Field>

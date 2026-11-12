@@ -435,6 +435,17 @@ export interface UpdateDiscountCodeInput {
 
 export type BusinessStatus = 'draft' | 'active' | 'paused'
 
+// Lo único de los negocios que ve el rol MARKETING (GET /platform/business-contacts): contacto y dirección de la tienda.
+export interface BusinessContactRow {
+  id: string
+  name: string
+  industry: string
+  owner: { name: string; email: string } | null
+  contact: { email: string | null; whatsapp: string | null; instagram: string | null; tiktok: string | null; facebook: string | null }
+  store: { subdomain: string; customDomains: string[] }
+}
+export interface BusinessContactList { data: BusinessContactRow[]; total: number; page: number; limit: number }
+
 export interface Overview {
   businesses: {
     total: number
@@ -1174,6 +1185,8 @@ export const platformApi = {
     return getJSON<BusinessList>(`/platform/businesses${q ? `?${q}` : ''}`)
   },
   business: (id: string) => getJSON<BusinessDetail>(`/platform/businesses/${id}`),
+  businessContacts: (params: { search?: string; page?: number; limit?: number } = {}) =>
+    getJSON<BusinessContactList>(`/platform/business-contacts${toQuery(params)}`),
   // Pedidos de acceso anticipado a Instagram (apps/api/src/instagram/instagram-admin.controller.ts).
   instagramPedidos: () => getJSON<InstagramPedido[]>('/platform/instagram/acceso'),
   // `avisado`: salió el correo "tu acceso está listo" al dueño (false si ya estaba habilitado o falló el envío).
