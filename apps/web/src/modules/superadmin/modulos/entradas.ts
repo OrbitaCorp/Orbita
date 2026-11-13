@@ -153,6 +153,8 @@ const F27 = '2026-10-27'
 const F3 = '2026-11-03'
 // Lo que Ale decidió el 04/11/2026: a producción.
 const F4 = '2026-11-04'
+// Ciclo 2: la conexión de Turnos al backend (sesión del 13/11/2026).
+const F13 = '2026-11-13'
 
 export const ENTRADAS: Entrada[] = [
   // ─── Transversal · la sección Módulos ───────────────────────────────────────
@@ -2311,6 +2313,96 @@ Lo que no entró y queda como decisión abierta ("cosas con stock"): alquilar ob
       'apps/web/src/lib/storefront/previewBridge.ts:150',
       'apps/web/src/lib/csp.ts:67',
       'apps/web/src/styles/globals.css:333',
+    ],
+  }),
+
+  // ─── Ciclo 2 · Turnos (Mateo) ───────────────────────────────────────────────
+  entrada({
+    modulo: 'turnos', fecha: F13, slug: 'mapa-sobre-el-backend', tipo: 'tarea', quien: 'Mateo',
+    titulo: 'El mapa de Turnos sobre el backend compartido: cada pantalla con su ruta y lo que falta',
+    foco: 'Cada pantalla del panel y cada página del sitio de Turnos con la ruta de /reservas que la cubre. Lo que el backend no tiene (el rubro del negocio, varias reglas, mensajes, roles por alcance, cobro del equipo, clientes, Mis turnos con sesión, Avanzado) y lo que falta del lado del front (las rutas de producción y el "hoy" fijo de la demo).',
+    que: `Tareas del 05/11 y del 06/11 del plan: leer el contrato del backend compartido (\`apps/api/src/reservas\`, su README y \`lib/reservasApi\`) y dejar el mapa de Turnos, con lo que no cubre marcado. Se hizo el 13/11, una semana tarde contra el plan. El front de Turnos estaba entero como demo (panel, sitio, reserva, Mis turnos, alta, 23 rubros), pero sin ninguna llamada a la API.
+
+**Panel** (rutas \`/api/v1/reservas/...\`, con la sesión del panel):
+
+| Pantalla | Lee | Escribe | Estado |
+|---|---|---|---|
+| Resumen | \`GET /reservas\` (hoy) y \`GET /reservas/resumen\` | — | Cubre |
+| Agenda y detalle del turno | \`GET /reservas?desde&hasta\`, \`GET /:id\` con historial | \`POST /:id/confirmar\`, \`completar\`, \`ausente\`, \`cancelar\`, \`reprogramar\`, \`PATCH /:id/nota\` | Cubre |
+| Nuevo turno | \`GET /disponibilidad\` por agenda y servicio | \`POST /reservas\` | Cubre. "Cualquiera" se arma en el front pidiendo cada agenda |
+| Pagos (señas por cobrar) | Reservas con seña sin pagar | \`POST /:id/pago\` | Parcial: sin cobro online ni medios de pago del local |
+| Servicios | \`GET /servicios?inactivos\` | \`POST\`, \`PUT\` y \`DELETE /servicios\`; pausar es \`activo: false\` | Cubre |
+| Equipo | \`GET /recursos\` (PROFESIONAL) | \`POST\`, \`PUT\` y \`DELETE /recursos\` | Parcial: roles, invitación y cómo cobra cada uno |
+| Espacios | \`GET /recursos\` (ESPACIO) | Ídem | Cubre |
+| Clientes | Las reservas, agrupadas por persona | — | Parcial: sin lista ni ficha de Turnos |
+| Ganancias | Las reservas: lo cobrado por agenda se suma en el front | — | Parcial: sin liquidaciones ni pagos al equipo |
+| Reglas de reserva | \`GET /config\` | \`PUT /config\` | Parcial: ver faltante 2 |
+| Recordatorios y mensajes | — | — | Falta: faltante 3 |
+| Configuración → Horarios | \`config.horario\`, \`GET /bloqueos\` (feriados) | \`PUT /config\`, \`POST\` y \`DELETE /bloqueos\` | Cubre |
+| Configuración → Negocio, Apariencia, Mini sitio, Dominio, Suscripción | — | — | No es de reservas: datos del negocio y de su sitio, por revisar con Ale |
+| Avanzado (paquetes, membresías, precios por horario) | — | — | Falta: faltante 7 |
+| Lista de espera | \`GET /espera\` | \`DELETE /espera/:id\` | Cubre. El panel no tiene pantalla: se suma |
+
+**Sitio** (rutas \`/api/v1/storefront/:slug/reservas/...\`, sin sesión):
+
+| Página | Rutas | Estado |
+|---|---|---|
+| Inicio y Servicios | \`GET /config\`, \`/servicios\`, \`/recursos\` | Cubre |
+| Reserva (pasos) | \`GET /disponibilidad\` y \`/disponibilidad/rango\`; \`POST /retener\` y \`/mi/:token/confirmar\` (o \`/reservar\` en un paso) | Cubre |
+| Confirmación y ticket | La respuesta de \`confirmar\`, con el token | Cubre |
+| Mi turno (enlace del email) | \`GET /mi/:token\`, \`POST /mi/:token/cancelar\` y \`/reprogramar\` | Cubre. Es una página nueva |
+| Lista de espera | \`POST /espera\`, \`GET\` y \`DELETE /espera/:token\` | Cubre |
+| Mis turnos con sesión | — | Falta: faltante 6 |
+
+**Lo que el backend no cubre** (tarea del 06/11). Lo que toca lo compartido hay que hablarlo con Ale antes:
+
+1. **El rubro del negocio.** Ni \`Business\` ni \`ReservaConfig\` guardan si es barbería, clínica o spa, y de eso salen los nombres, el modo de agenda (por profesional o por sala) y las secciones del sidebar. Propuesta: un \`datos\` JSON libre en \`ReservaConfig\`, como el que ya tienen los recursos. Toca lo compartido.
+2. **Reglas que la config no tiene:** horarios cada X minutos para todo el negocio (hoy es \`pasoMinutos\` de cada recurso, se puede aplicar a todos), seña de monto fijo (solo hay porcentaje), seña a quien faltó, tolerancia de llegada tarde, tiempo para aceptar el lugar de la lista de espera, qué datos pedir (obra social, DNI, motivo) y la cuenta opcional con beneficios. Todo cabría en el mismo \`datos\` del punto 1.
+3. **Mensajes:** no hay dónde guardar las plantillas por evento ni un recordatorio antes del turno. Los avisos por email son confirmada, pendiente, cancelada, reprogramada y lugar tomado. El recordatorio ya está abierto como decisión de Ale.
+4. **Equipo:** los permisos del backend son \`reservas.view\`, \`reservas.manage\` y \`reservas.config\`, sin "solo lo suyo". Los roles de Turnos (ver la agenda propia, los clientes propios, las ganancias propias) no se pueden aplicar del lado de la API. Tampoco existe cómo cobra cada uno (comisión, sueldo, alquiler) ni sus liquidaciones.
+5. **Clientes:** \`clienteId\` apunta a la ficha de cliente de Tienda (\`Customer\`). No hay una lista de clientes de Turnos ni dónde guardar la nota o la obra social. Mientras tanto, los clientes salen de las reservas.
+6. **Mis turnos con sesión:** no hay ruta que liste las reservas de un cliente logueado (el sitio solo abre una por token).
+7. **Avanzado:** paquetes, membresías y precios por horario no existen.
+8. **Cobro online de la seña con Mercado Pago:** ya está abierto como decisión de Ale.
+
+**Lo que falta del lado del front:**
+
+- **Rutas de producción:** \`pages/panel\` y \`pages/tienda/[slug]\` son de Tienda. Un negocio de Turnos todavía no tiene dónde abrir su panel ni su sitio fuera de \`/turnos-demo\`.
+- **El "hoy" de la demo:** las pantallas cuentan los días desde el sábado 26/09 a las 10:40 (\`AHORA_DEMO\`, \`HOY_SEMANA\`, \`fechaDe\`, en 14 archivos). Con la API hay que pasarles el hoy real; va con la agenda (semana 3).
+- **Equipo en los rubros por sala:** el aviso del módulo dice que en cabina se ve "Espacios y no Equipo", pero el panel muestra Equipo en los dos modos (en cabina lista a quien atiende, sin agenda propia). Se decide en la tabla rubro → sidebar.`,
+    archivos: [
+      'apps/api/src/reservas/reservas-panel.controller.ts:22',
+      'apps/api/src/reservas/reservas-publico.controller.ts:29',
+      'apps/api/src/reservas/reservas-publico.controller.ts:144',
+      'apps/api/src/reservas/reservas-avisos.service.ts:79',
+      'apps/api/src/common/permisos/catalogo.ts:44',
+      'apps/api/prisma/schema.prisma:3866',
+      'apps/web/src/lib/reservasApi/cliente.ts:1',
+      'apps/web/src/modules/turnos/horario.ts:29',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:212',
+    ],
+  }),
+  entrada({
+    modulo: 'turnos', fecha: F13, slug: 'capa-de-datos-por-origen', tipo: 'tarea', quien: 'Mateo',
+    titulo: 'El panel de Turnos lee de un origen: la demo o la API de reservas, una función por sección',
+    foco: 'PanelTurnos ya no arma los datos de ejemplo por su cuenta: se los pide a un origen (datos/origen). Por defecto es la demo, así /turnos-demo queda igual, y hay un origen de la API listo para el panel de un negocio real. Las pantallas no se tocaron. Por ahora solo lee: las escrituras se conectan sección por sección.',
+    que: `Tarea del 06/11 del plan, hecha el 13/11: separar la capa de datos del panel sin tocar las pantallas.
+
+- **Un origen por sección** (\`datos/origen/index.ts\`): catálogo (agendas y servicios), clientes, equipo (personas y roles) y agenda (la semana del negocio y los turnos de cada día). Cada origen implementa las cuatro y \`cargar\` las junta. El panel toma el origen del contexto (\`useOrigenTurnos\`): por defecto la demo; el panel real de un negocio va a montar \`<OrigenTurnosProvider origen={origenApi}>\`.
+- **La demo** (\`demo.ts\`) da exactamente lo que el panel armaba antes, y hay un test que lo compara rubro por rubro. La espera fingida (\`useCargaSimulada\`, \`?cargando=1\`) solo corre en la demo. Si se cambia el horario de alguien, sus turnos de ejemplo se siguen acomodando, porque la agenda es una función y no una lista.
+- **La API** (\`api.ts\`): la semana sale de la config de Turnos (sin config, el panel avisa que el negocio no tiene Turnos configurado). Las agendas son los recursos PROFESIONAL o ESPACIO según el rubro, con los servicios pausados incluidos. Los turnos son las reservas de 62 días para cada lado, todas las páginas. Los clientes salen de esas reservas y el equipo es quien atiende. Si algo falla, el panel muestra el mensaje de la API y un botón para reintentar.
+- **Las traducciones** (\`mapear.ts\`, con sus tests): fechas a días desde hoy, el domingo en 0 de la API al lunes en 0 del panel, el horario semanal a la semana del panel y de vuelta, y los estados. VENCIDA no se muestra, RETENIDA y PENDIENTE van como "Sin confirmar" y una confirmada que está pasando va "En curso". También el cliente: si no hay ficha, se toma su teléfono o su email, y una agenda con horarios distintos por día se muestra con el horario del primero (el panel tiene uno solo por agenda).
+- **Lo que no cambió:** las escrituras (dar un turno, pausar, sumar a alguien) siguen en el estado del panel. Se conectan con las tareas de Servicios, Equipo, Espacios, reglas y agenda (semanas 2 y 3). Configuración y Avanzado siguen leyendo adentro de cada pantalla hasta las tareas de horarios y reglas.
+- **Verificado:** typecheck y eslint de \`apps/web\` sin errores y los tests de Turnos en verde (21). La demo no se probó a mano en el navegador.`,
+    archivos: [
+      'apps/web/src/modules/turnos/datos/origen/index.ts:1',
+      'apps/web/src/modules/turnos/datos/origen/demo.ts:1',
+      'apps/web/src/modules/turnos/datos/origen/api.ts:1',
+      'apps/web/src/modules/turnos/datos/origen/mapear.ts:1',
+      'apps/web/src/modules/turnos/datos/origen/__tests__/mapear.test.ts:1',
+      'apps/web/src/modules/turnos/datos/agenda.ts:25',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:111',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:126',
     ],
   }),
 ]

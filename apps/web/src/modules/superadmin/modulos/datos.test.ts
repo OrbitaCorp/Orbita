@@ -116,12 +116,14 @@ describe('Módulos — plan', () => {
     }
   })
 
-  it('el ciclo 2 arranca limpio: el jueves 05/11, sin tareas documentadas ni antes del inicio, y sin feriados', () => {
+  it('el ciclo 2 arranca limpio: el jueves 05/11, sin tareas documentadas con trabajo de antes del inicio, y sin feriados', () => {
     expect(CICLO).toEqual({ inicio: '2026-11-05', lunes: '2026-11-02', fin2m: '2026-12-23', fin1m: '2026-11-27' })
     expect(semanaDelCiclo(CICLO.inicio)).toBe(1)
     expect(semanaDelCiclo(CICLO.fin2m)).toBe(8)
+    const porKey = new Map(TODAS.map((e) => [e.key, e]))
     for (const p of PLANES) {
-      expect(p.tareas.every((t) => !t.auditoria)).toBe(true)
+      // Lo del ciclo 1 queda como historial: una tarea del 2 solo se documenta con una entrada del 2.
+      for (const t of p.tareas.filter((x) => x.auditoria)) expect(porKey.get(t.auditoria!)!.fecha >= CICLO.inicio, `${p.modulo} ${t.id}`).toBe(true)
       expect(p.tareas[0].dia).toBe('2026-11-05')
       for (const t of p.tareas) expect(['2026-11-20', '2026-12-08', '2026-12-24', '2026-12-25']).not.toContain(t.dia)
       expect(p.foco).toMatch(/Ciclo 2/)

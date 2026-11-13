@@ -17,6 +17,12 @@ export type TurnoAgenda = Turno & { dia?: number }
  * no se ofrece en el sitio ni al dar un turno nuevo; se reanuda cuando se quiera.
  */
 export type ServicioPanel = ServicioTipo & { id: string; online: boolean; estado: 'activo' | 'pausado' }
+/**
+ * Un servicio como llega del origen de datos (datos/origen), antes de ponerle
+ * el estado. En la demo los pausados viven en el navegador (datos/negocio.ts);
+ * en la API, un servicio inactivo llega con `pausado`.
+ */
+export type ServicioBase = Omit<ServicioPanel, 'estado'> & { pausado?: boolean }
 
 /** Con qué arranca el formulario de "Nuevo turno" según desde dónde se abre. */
 export interface NuevoTurnoPre { clienteId?: string; recursoId?: string; inicio?: number; dia?: number }
