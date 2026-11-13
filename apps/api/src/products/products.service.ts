@@ -737,6 +737,36 @@ export class ProductsService {
 
   // ── Imágenes ─────────────────────────────────────────────────────────────
 
+  /**
+   * Lo que hace falta para buscarle una foto en la web a un producto ya
+   * guardado (Importar Excel → paso Fotos): nombre, categoría, rubro del
+   * negocio y, si se buscan las fotos de un color, el valor de esa variante.
+   */
+  async datosParaFotoWeb(businessId: string, productId: string, optionValueId?: string) {
+    const producto = await this.prisma.product.findFirst({
+      where: { id: productId, businessId, deletedAt: null },
+      select: { name: true, category: { select: { name: true } }, business: { select: { industry: true } } },
+    });
+    if (!producto) throw new NotFoundException('Producto no encontrado');
+
+    let variant: string | null = null;
+    if (optionValueId) {
+      const valor = await this.prisma.productOptionValue.findFirst({
+        where: { id: optionValueId, option: { productId, isVisual: true } },
+        select: { value: true },
+      });
+      if (!valor) throw new BadRequestException('optionValueId inválido para este producto');
+      variant = valor.value;
+    }
+
+    return {
+      name: producto.name,
+      category: producto.category?.name ?? null,
+      industry: producto.business.industry ?? null,
+      variant,
+    };
+  }
+
   async addImage(
     businessId: string,
     productId: string,

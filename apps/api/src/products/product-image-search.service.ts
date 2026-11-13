@@ -1,4 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { lookup } from 'node:dns/promises';
+import { isIP } from 'node:net';
 import { ConfigService } from '@nestjs/config';
 import { UsageMeteringService } from '../platform/costs/usage-metering.service';
 import { CostsService } from '../platform/costs/costs.service';
@@ -12,6 +14,144 @@ export interface SuggestedImage {
   sourceUrl?: string;
   domain?: string;
   provider: 'serper' | 'tavily' | 'duckduckgo';
+  /** Miniatura de Google (gstatic), para mostrar opciones en el panel sin pedirle la foto al sitio de origen. Solo Serper. */
+  thumbnailUrl?: string;
+  width?: number;
+  height?: number;
+}
+
+/** Lo que se sabe de un producto cargado por nombre (Importar Excel → paso Fotos). */
+export interface ProductoParaFotoWeb {
+  name: string;
+  category?: string | null;
+  /** Rubro del negocio ("Indumentaria"). */
+  industry?: string | null;
+  /** Valor de la variante visual cuando se buscan las fotos de un color ("Negro"). */
+  variant?: string | null;
+}
+
+// Opciones que se le muestran a la persona por producto: la sugerida y hasta 5
+// más para "Ver otras". Salen de UNA búsqueda (Serper devuelve 15), así que
+// mostrar más no cuesta más.
+export const MAX_FOTOS_CATALOGO = 6;
+const MIN_LADO_PX = 250;
+const MAX_REDIRECCIONES = 3;
+const MAX_BYTES_FOTO = 10 * 1024 * 1024;
+// SVG no: no es una foto y sharp lo renderiza (otro intérprete más).
+const TIPOS_FOTO = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/avif', 'image/gif']);
+const NAVEGADOR_UA =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+// Palabras que no ayudan a encontrar ni a reconocer la foto.
+const PALABRAS_VACIAS = new Set([
+  'con', 'sin', 'para', 'por', 'del', 'los', 'las', 'una', 'uno', 'unos', 'unas', 'que', 'and', 'the', 'for', 'with',
+]);
+// Categorías y rubros que no dicen qué es el producto.
+const CATEGORIAS_VACIAS = new Set(['general', 'otros', 'otro', 'otra', 'varios', 'sin categoria', 'productos', 'producto', 'todo']);
+
+/** Minúsculas, sin acentos y sin signos: "Remera Básica!" → "remera basica". */
+export function textoPlano(str: string): string {
+  return str
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function palabrasClave(str: string): string[] {
+  return [...new Set(textoPlano(str).split(' ').filter((t) => t.length >= 3 && !PALABRAS_VACIAS.has(t)))];
+}
+
+/**
+ * La frase que se busca en Google Imágenes para un producto del que solo se
+ * sabe el nombre. El nombre manda; la variante ("Negro") se suma si no está, y
+ * la categoría y el rubro solo cuando el nombre es corto y puede ser ambiguo
+ * ("Bandolera" sola trae de todo; "Bandolera Carteras" ya no).
+ */
+export function fraseParaCatalogo(p: ProductoParaFotoWeb): string {
+  const nombre = (p.name || '').trim().replace(/\s+/g, ' ');
+  if (!nombre) return '';
+  const plano = ` ${textoPlano(nombre)} `;
+  const sirve = (t?: string | null): t is string =>
+    !!t && !!textoPlano(t) && !CATEGORIAS_VACIAS.has(textoPlano(t)) && !plano.includes(` ${textoPlano(t)} `);
+
+  const partes = [nombre];
+  if (sirve(p.variant)) partes.push(p.variant.trim());
+  const palabras = nombre.split(' ').length;
+  // El rubro es más vago que la categoría: entra solo si no hay una que sirva.
+  if (palabras <= 4 && sirve(p.category)) partes.push(p.category.trim());
+  else if (palabras < 3 && sirve(p.industry)) partes.push(p.industry.trim());
+  return partes.join(' ').slice(0, 200);
+}
+
+/**
+ * Ordena los resultados de una búsqueda por nombre. A diferencia del filtro
+ * estricto del escaneo (que exige el modelo), acá no se descarta por falta de
+ * coincidencia: la persona mira cada foto antes de guardarla. Se descartan las
+ * que no sirven como foto de producto (chicas, muy apaisadas, SVG) y se suben
+ * las que nombran el producto y la variante.
+ */
+export function ordenarParaCatalogo(candidatos: SuggestedImage[], p: ProductoParaFotoWeb): SuggestedImage[] {
+  const claves = palabrasClave(p.name || '');
+  const variante = p.variant ? palabrasClave(p.variant) : [];
+  const vistas = new Set<string>();
+  const puntuados: Array<{ item: SuggestedImage; puntaje: number; orden: number }> = [];
+
+  candidatos.forEach((item, orden) => {
+    if (!item.url || !/^https?:\/\//i.test(item.url) || vistas.has(item.url)) return;
+    if (/\.svg(\?|$)/i.test(item.url)) return;
+    if (item.width && item.height) {
+      if (item.width < MIN_LADO_PX || item.height < MIN_LADO_PX) return;
+      const proporcion = item.width / item.height;
+      if (proporcion > 2.2 || proporcion < 0.45) return; // banners y tiras
+    }
+    vistas.add(item.url);
+    const texto = ` ${textoPlano(`${item.title || ''} ${item.sourceUrl || ''} ${item.url}`)} `;
+    let puntaje = 0;
+    for (const t of claves) if (texto.includes(t)) puntaje += 2;
+    for (const t of variante) if (texto.includes(t)) puntaje += 3;
+    if (item.width && item.height && Math.min(item.width, item.height) >= 600) puntaje += 1;
+    puntuados.push({ item, puntaje, orden });
+  });
+
+  // Mayor puntaje primero; a igual puntaje, el orden de Google.
+  puntuados.sort((a, b) => b.puntaje - a.puntaje || a.orden - b.orden);
+
+  // Como mucho dos por sitio, para que "Ver otras" muestre opciones distintas.
+  const porDominio = new Map<string, number>();
+  const resultado: SuggestedImage[] = [];
+  for (const { item } of puntuados) {
+    const dominio = item.domain || extractDomain(item.url);
+    const n = porDominio.get(dominio) ?? 0;
+    if (dominio && n >= 2) continue;
+    porDominio.set(dominio, n + 1);
+    resultado.push(item);
+    if (resultado.length >= MAX_FOTOS_CATALOGO) break;
+  }
+  return resultado;
+}
+
+/** IP privada, de loopback, link-local, CGNAT o reservada (v4 o v6). Lo que no es una IP cuenta como privado. */
+export function esIpPrivada(ip: string): boolean {
+  const v = isIP(ip);
+  if (v === 4) {
+    const [a, b] = ip.split('.').map(Number);
+    return (
+      a === 0 || a === 10 || a === 127 || a >= 224 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168)
+    );
+  }
+  if (v === 6) {
+    const x = ip.toLowerCase();
+    const mapeada = x.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+    if (mapeada) return esIpPrivada(mapeada[1]);
+    return x === '::' || x === '::1' || /^f[cd]/.test(x) || /^fe[89ab]/.test(x) || x.startsWith('ff');
+  }
+  return true;
 }
 
 function normalizeAlphaNum(str: string): string {
@@ -113,15 +253,41 @@ export class ProductImageSearchService {
       searchQuery = `${params.brand || ''} ${params.model} ${cleanQuery}`.trim();
     }
 
-    // ─── Prioridad 1: Serper.dev (Google Images) ──────────────────────────
+    return this.buscarEnProveedores(
+      searchQuery,
+      params.businessId,
+      (candidatos) => this.filterStrict(candidatos, targetModel, params.color),
+      3,
+    );
+  }
+
+  /**
+   * Fotos para un producto del que solo se sabe el nombre (Importar Excel →
+   * paso Fotos). Sin el filtro estricto del escaneo, que exige un modelo o
+   * SKU: "Remera oversize negra" no tiene, y la persona confirma cada foto
+   * antes de que se guarde. Una sola búsqueda por llamada.
+   */
+  async searchCatalogImages(p: ProductoParaFotoWeb & { businessId?: string }): Promise<SuggestedImage[]> {
+    const frase = fraseParaCatalogo(p);
+    if (!frase) return [];
+    return this.buscarEnProveedores(frase, p.businessId, (candidatos) => ordenarParaCatalogo(candidatos, p), MAX_FOTOS_CATALOGO);
+  }
+
+  // Serper (Google Imágenes) → Tavily → DuckDuckGo ($0, sin key). Pasa al
+  // siguiente si el proveedor falla o si `filtrar` no deja ninguna foto.
+  private async buscarEnProveedores(
+    query: string,
+    businessId: string | undefined,
+    filtrar: (candidatos: SuggestedImage[]) => SuggestedImage[],
+    max: number,
+  ): Promise<SuggestedImage[]> {
     const serperKey = this.config.get<string>('SERPER_API_KEY');
     if (serperKey) {
       try {
-        const serperResults = await this.searchSerper(searchQuery, serperKey, params.businessId);
-        const filtered = this.filterStrict(serperResults, targetModel, params.color);
-        if (filtered.length > 0) {
-          this.logger.log(`Serper devolvió ${filtered.length} fotos con coincidencia estricta para "${targetModel}"`);
-          return filtered.slice(0, 3);
+        const filtradas = filtrar(await this.searchSerper(query, serperKey, businessId));
+        if (filtradas.length > 0) {
+          this.logger.log(`Serper devolvió ${filtradas.length} fotos para "${query}"`);
+          return filtradas.slice(0, max);
         }
       } catch (err) {
         this.logger.warn(`Error en búsqueda Serper, continuando con siguiente proveedor: ${err}`);
@@ -129,15 +295,13 @@ export class ProductImageSearchService {
       }
     }
 
-    // ─── Prioridad 2: Tavily Search ───────────────────────────────────────
     const tavilyKey = this.config.get<string>('TAVILY_API_KEY');
     if (tavilyKey) {
       try {
-        const tavilyResults = await this.searchTavily(searchQuery, tavilyKey, params.businessId);
-        const filtered = this.filterStrict(tavilyResults, targetModel, params.color);
-        if (filtered.length > 0) {
-          this.logger.log(`Tavily devolvió ${filtered.length} fotos con coincidencia estricta para "${targetModel}"`);
-          return filtered.slice(0, 3);
+        const filtradas = filtrar(await this.searchTavily(query, tavilyKey, businessId));
+        if (filtradas.length > 0) {
+          this.logger.log(`Tavily devolvió ${filtradas.length} fotos para "${query}"`);
+          return filtradas.slice(0, max);
         }
       } catch (err) {
         this.logger.warn(`Error en búsqueda Tavily, continuando con fallback gratuito: ${err}`);
@@ -145,13 +309,11 @@ export class ProductImageSearchService {
       }
     }
 
-    // ─── Prioridad 3: DuckDuckGo Fallback ($0, sin key) ───────────────────
     try {
-      const ddgResults = await this.searchDuckDuckGo(searchQuery);
-      const filtered = this.filterStrict(ddgResults, targetModel, params.color);
-      if (filtered.length > 0) {
-        this.logger.log(`DuckDuckGo devolvió ${filtered.length} fotos con coincidencia estricta para "${targetModel}"`);
-        return filtered.slice(0, 3);
+      const filtradas = filtrar(await this.searchDuckDuckGo(query));
+      if (filtradas.length > 0) {
+        this.logger.log(`DuckDuckGo devolvió ${filtradas.length} fotos para "${query}"`);
+        return filtradas.slice(0, max);
       }
     } catch (err) {
       this.logger.warn(`Error en búsqueda DuckDuckGo fallback: ${err}`);
@@ -353,6 +515,9 @@ export class ProductImageSearchService {
           imageUrl?: string;
           link?: string;
           domain?: string;
+          thumbnailUrl?: string;
+          imageWidth?: number;
+          imageHeight?: number;
         }>;
       };
 
@@ -366,6 +531,8 @@ export class ProductImageSearchService {
           sourceUrl: img.link || '',
           domain: img.domain || extractDomain(img.link || img.imageUrl!),
           provider: 'serper' as const,
+          ...(img.thumbnailUrl ? { thumbnailUrl: img.thumbnailUrl } : {}),
+          ...(img.imageWidth && img.imageHeight ? { width: img.imageWidth, height: img.imageHeight } : {}),
         }));
     } catch (err) {
       clearTimeout(timeout);
@@ -537,70 +704,111 @@ export class ProductImageSearchService {
     }
   }
 
-  async proxyImage(imageUrl: string): Promise<{
-    dataUrl: string;
-    mimeType: string;
-    size: number;
-    originalUrl: string;
-  }> {
+  /**
+   * Baja una foto de la web desde el servidor (para el "proxy" del alta y para
+   * guardar una sugerida como foto del producto). La URL la elige el panel, así
+   * que se cuida que no sirva para llegar a la red interna de Cloud Run (el
+   * servidor de metadatos, por ejemplo): se rechazan los hosts locales, la IP a
+   * la que resuelve el nombre y cada redirección, que se sigue a mano.
+   */
+  async descargarImagen(imageUrl: string): Promise<{ buffer: Buffer; mimeType: string }> {
     if (!imageUrl || typeof imageUrl !== 'string') {
       throw new BadRequestException('Falta la URL de la imagen');
-    }
-
-    if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
-      throw new BadRequestException('URL inválida, debe comenzar con http:// o https://');
-    }
-
-    if (isPrivateIpOrLocal(imageUrl)) {
-      throw new BadRequestException('No se permite descargar imágenes de redes privadas o locales');
     }
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
 
     try {
-      const res = await fetch(imageUrl, {
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          Accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-        },
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeout);
-
-      if (!res.ok) {
-        throw new BadRequestException(`No se pudo descargar la imagen (${res.status})`);
+      let url = imageUrl;
+      let res: Response | null = null;
+      for (let salto = 0; salto <= MAX_REDIRECCIONES; salto++) {
+        await this.validarDestino(url);
+        res = await fetch(url, {
+          headers: {
+            'User-Agent': NAVEGADOR_UA,
+            Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+          },
+          redirect: 'manual',
+          signal: controller.signal,
+        });
+        const destino = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
+        if (!destino) break;
+        if (salto === MAX_REDIRECCIONES) throw new BadRequestException('La imagen redirige demasiadas veces');
+        url = new URL(destino, url).toString();
       }
 
-      const contentType = res.headers.get('content-type')?.split(';')[0]?.toLowerCase() || '';
-      if (!contentType.startsWith('image/')) {
-        throw new BadRequestException(`El recurso descargado no es una imagen válida (${contentType || 'desconocido'})`);
+      if (!res || !res.ok) {
+        throw new BadRequestException(`No se pudo descargar la imagen (${res?.status ?? 'sin respuesta'})`);
       }
 
-      const arrayBuffer = await res.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-
-      // Límite de 10MB
-      if (buffer.length > 10 * 1024 * 1024) {
+      const contentType = res.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() || '';
+      if (contentType !== 'image/*' && !TIPOS_FOTO.has(contentType)) {
+        throw new BadRequestException(`El recurso descargado no es una foto válida (${contentType || 'desconocido'})`);
+      }
+      const declarado = Number(res.headers.get('content-length') || 0);
+      if (declarado > MAX_BYTES_FOTO) {
         throw new BadRequestException('La imagen supera el límite permitido de 10MB');
       }
 
-      const mimeType = contentType === 'image/*' ? 'image/jpeg' : contentType;
-      const base64 = buffer.toString('base64');
-      const dataUrl = `data:${mimeType};base64,${base64}`;
+      const buffer = Buffer.from(await res.arrayBuffer());
+      if (buffer.length > MAX_BYTES_FOTO) {
+        throw new BadRequestException('La imagen supera el límite permitido de 10MB');
+      }
+      if (buffer.length === 0) throw new BadRequestException('La imagen descargada está vacía');
 
-      return {
-        dataUrl,
-        mimeType,
-        size: buffer.length,
-        originalUrl: imageUrl,
-      };
+      const mimeType = contentType === 'image/*' || contentType === 'image/jpg' ? 'image/jpeg' : contentType;
+      return { buffer, mimeType };
     } catch (err) {
-      clearTimeout(timeout);
       if (err instanceof BadRequestException) throw err;
       throw new BadRequestException(`Error al obtener la imagen externa: ${(err as Error).message}`);
+    } finally {
+      clearTimeout(timeout);
     }
+  }
+
+  private async validarDestino(rawUrl: string): Promise<void> {
+    let u: URL;
+    try {
+      u = new URL(rawUrl);
+    } catch {
+      throw new BadRequestException('URL inválida');
+    }
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+      throw new BadRequestException('URL inválida, debe comenzar con http:// o https://');
+    }
+    if (isPrivateIpOrLocal(rawUrl)) {
+      throw new BadRequestException('No se permite descargar imágenes de redes privadas o locales');
+    }
+    const host = u.hostname.replace(/^\[|\]$/g, '');
+    const ips = await this.resolverHost(host);
+    if (ips.length === 0 || ips.some(esIpPrivada)) {
+      throw new BadRequestException('No se permite descargar imágenes de redes privadas o locales');
+    }
+  }
+
+  // Aparte para que los tests no dependan del DNS.
+  protected async resolverHost(host: string): Promise<string[]> {
+    if (isIP(host)) return [host];
+    try {
+      return (await lookup(host, { all: true })).map((r) => r.address);
+    } catch {
+      throw new BadRequestException('No se encontró el sitio de la imagen');
+    }
+  }
+
+  async proxyImage(imageUrl: string): Promise<{
+    dataUrl: string;
+    mimeType: string;
+    size: number;
+    originalUrl: string;
+  }> {
+    const { buffer, mimeType } = await this.descargarImagen(imageUrl);
+    return {
+      dataUrl: `data:${mimeType};base64,${buffer.toString('base64')}`,
+      mimeType,
+      size: buffer.length,
+      originalUrl: imageUrl,
+    };
   }
 }

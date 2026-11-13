@@ -2079,6 +2079,10 @@ export type SuggestedProductImage = {
   sourceUrl?: string
   domain?: string
   provider: 'serper' | 'tavily' | 'duckduckgo'
+  /** Miniatura de Google: carga rápido y no depende del sitio de origen. Solo con Serper. */
+  thumbnailUrl?: string
+  width?: number
+  height?: number
 }
 
 export async function panelAiScanProduct(file: Blob, filename = 'scan.jpg'): Promise<AiScanProductResult> {
@@ -2116,6 +2120,28 @@ export function panelGetSuggestedImages(query: string, model?: string, brand?: s
   return panelRequest<SuggestedProductImage[]>('/products/suggested-images', {
     method: 'POST',
     body: JSON.stringify({ query, model, brand, color }),
+  })
+}
+
+// Importar Excel → paso Fotos. La búsqueda la arma el servidor con el nombre,
+// la categoría y el rubro del producto ya importado (con `optionValueId`, para
+// las fotos de ese color). Responde 429 al llegar al tope diario del negocio.
+export function panelGetWebImageSuggestions(productId: string, optionValueId?: string) {
+  return panelRequest<SuggestedProductImage[]>(`/products/${productId}/web-image-suggestions`, {
+    method: 'POST',
+    body: JSON.stringify(optionValueId ? { optionValueId } : {}),
+  })
+}
+
+// Guarda una foto sugerida: el servidor la baja y la sube a nuestro storage
+// como cualquier otra foto del producto (la URL externa no queda en ningún lado).
+export function panelAddProductImageFromWeb(
+  productId: string,
+  input: { url: string; isPrimary?: boolean; optionValueId?: string },
+) {
+  return panelRequest<ApiProductImage>(`/products/${productId}/images/from-web`, {
+    method: 'POST',
+    body: JSON.stringify(input),
   })
 }
 
