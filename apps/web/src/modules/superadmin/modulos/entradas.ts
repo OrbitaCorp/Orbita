@@ -155,6 +155,8 @@ const F3 = '2026-11-03'
 const F4 = '2026-11-04'
 // Ciclo 2: la conexión de Turnos al backend (sesión del 13/11/2026).
 const F13 = '2026-11-13'
+// El rubro en subrubros y el alcance en salud (15/11/2026).
+const F15 = '2026-11-15'
 
 export const ENTRADAS: Entrada[] = [
   // ─── Transversal · la sección Módulos ───────────────────────────────────────
@@ -2320,7 +2322,7 @@ Lo que no entró y queda como decisión abierta ("cosas con stock"): alquilar ob
   entrada({
     modulo: 'turnos', fecha: F13, slug: 'mapa-sobre-el-backend', tipo: 'tarea', quien: 'Mateo',
     titulo: 'El mapa de Turnos sobre el backend compartido: cada pantalla con su ruta y lo que falta',
-    foco: 'Cada pantalla del panel y cada página del sitio de Turnos con la ruta de /reservas que la cubre. Lo que el backend no tiene (el rubro del negocio, varias reglas, mensajes, roles por alcance, cobro del equipo, clientes, Mis turnos con sesión, Avanzado) y lo que falta del lado del front (las rutas de producción y el "hoy" fijo de la demo).',
+    foco: 'Cada pantalla del panel y cada página del sitio de Turnos con la ruta de /reservas que la cubre. Lo que el backend no tiene (varias reglas, mensajes, roles por alcance, cobro del equipo, clientes, Mis turnos con sesión, Avanzado; el rubro sí tiene lugar: industry y subrubros del negocio) y lo que falta del lado del front (las rutas de producción y el "hoy" fijo de la demo).',
     que: `Tareas del 05/11 y del 06/11 del plan: leer el contrato del backend compartido (\`apps/api/src/reservas\`, su README y \`lib/reservasApi\`) y dejar el mapa de Turnos, con lo que no cubre marcado. Se hizo el 13/11, una semana tarde contra el plan. El front de Turnos estaba entero como demo (panel, sitio, reserva, Mis turnos, alta, 23 rubros), pero sin ninguna llamada a la API.
 
 **Panel** (rutas \`/api/v1/reservas/...\`, con la sesión del panel):
@@ -2356,8 +2358,8 @@ Lo que no entró y queda como decisión abierta ("cosas con stock"): alquilar ob
 
 **Lo que el backend no cubre** (tarea del 06/11). Lo que toca lo compartido hay que hablarlo con Ale antes:
 
-1. **El rubro del negocio.** Ni \`Business\` ni \`ReservaConfig\` guardan si es barbería, clínica o spa, y de eso salen los nombres, el modo de agenda (por profesional o por sala) y las secciones del sidebar. Propuesta: un \`datos\` JSON libre en \`ReservaConfig\`, como el que ya tienen los recursos. Toca lo compartido.
-2. **Reglas que la config no tiene:** horarios cada X minutos para todo el negocio (hoy es \`pasoMinutos\` de cada recurso, se puede aplicar a todos), seña de monto fijo (solo hay porcentaje), seña a quien faltó, tolerancia de llegada tarde, tiempo para aceptar el lugar de la lista de espera, qué datos pedir (obra social, DNI, motivo) y la cuenta opcional con beneficios. Todo cabría en el mismo \`datos\` del punto 1.
+1. **El rubro del negocio: ya tiene lugar, se usa lo que existe** (corregido el 15/11; la primera versión decía que no había dónde guardarlo). \`Business\` tiene \`industry\` (el rubro principal: el alta real de Tienda guarda \`"tienda"\`) y \`subrubros\` (las claves: \`["indumentaria", "calzado"]\`). Turnos es un rubro principal con sus subrubros, igual que Tienda: un negocio de Turnos guarda \`industry: "turnos"\` y \`subrubros: ["barberia"]\` con la clave de \`RUBROS_TURNOS\`. De ahí salen los nombres, el modo de agenda y el sidebar. No hace falta migración ni tocar lo compartido. Queda para la tarea del alta real (30/11): que el alta de Turnos lo guarde así y sumar los subrubros de Turnos al catálogo del alta en la API, que hoy tiene una lista vieja de rubros "Próximamente" (barbería, estética, clínica…) con la clínica descripta como "Historias clínicas", algo que queda afuera del alcance en salud.
+2. **Reglas que la config no tiene:** horarios cada X minutos para todo el negocio (hoy es \`pasoMinutos\` de cada recurso, se puede aplicar a todos), seña de monto fijo (solo hay porcentaje), seña a quien faltó, tolerancia de llegada tarde, tiempo para aceptar el lugar de la lista de espera, qué datos pedir (obra social, DNI) y la cuenta opcional con beneficios. Propuesta: un \`datos\` JSON libre en \`ReservaConfig\`, como el que ya tienen los recursos. Toca lo compartido: lo decide Ale.
 3. **Mensajes:** no hay dónde guardar las plantillas por evento ni un recordatorio antes del turno. Los avisos por email son confirmada, pendiente, cancelada, reprogramada y lugar tomado. El recordatorio ya está abierto como decisión de Ale.
 4. **Equipo:** los permisos del backend son \`reservas.view\`, \`reservas.manage\` y \`reservas.config\`, sin "solo lo suyo". Los roles de Turnos (ver la agenda propia, los clientes propios, las ganancias propias) no se pueden aplicar del lado de la API. Tampoco existe cómo cobra cada uno (comisión, sueldo, alquiler) ni sus liquidaciones.
 5. **Clientes:** \`clienteId\` apunta a la ficha de cliente de Tienda (\`Customer\`). No hay una lista de clientes de Turnos ni dónde guardar la nota o la obra social. Mientras tanto, los clientes salen de las reservas.
@@ -2377,6 +2379,11 @@ Lo que no entró y queda como decisión abierta ("cosas con stock"): alquilar ob
       'apps/api/src/reservas/reservas-avisos.service.ts:79',
       'apps/api/src/common/permisos/catalogo.ts:44',
       'apps/api/prisma/schema.prisma:3866',
+      'apps/api/prisma/schema.prisma:18',
+      'apps/api/prisma/schema.prisma:65',
+      'apps/api/src/onboarding/onboarding.service.ts:95',
+      'apps/web/src/lib/api.ts:203',
+      'apps/web/src/modules/onboarding/alta/Alta.tsx:368',
       'apps/web/src/lib/reservasApi/cliente.ts:1',
       'apps/web/src/modules/turnos/horario.ts:29',
       'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:212',
@@ -2403,6 +2410,45 @@ Lo que no entró y queda como decisión abierta ("cosas con stock"): alquilar ob
       'apps/web/src/modules/turnos/datos/agenda.ts:25',
       'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:111',
       'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:126',
+    ],
+  }),
+  entrada({
+    modulo: 'turnos', fecha: F15, slug: 'alcance-en-salud', tipo: 'decisión', quien: 'Mateo',
+    titulo: 'Turnos en salud es la agenda del consultorio, no un sistema clínico',
+    foco: 'En los 11 subrubros de salud, Turnos resuelve quién viene, cuándo, con quién, con qué cobertura y si pagó; nunca qué tiene el paciente. Quedan afuera la historia clínica, las recetas y órdenes, la facturación a obras sociales y la videollamada. Y aunque sean solo turnos, los datos de salud son sensibles: el motivo de la consulta va apagado, los avisos no dicen la especialidad y cada profesional ve solo a sus pacientes.',
+    que: `Mateo definió hasta dónde llega Turnos en los subrubros de salud: consulta médica particular, centro médico, clínica (por consultorio), odontología, medicina estética, kinesiología, psicología, nutrición, podología, fonoaudiología y medicina alternativa. Son 11 de los 23 subrubros de Turnos.
+
+**Adentro del alcance** (la mayoría ya está en la demo):
+
+- Agenda por profesional o por consultorio, con varios profesionales, horario propio de cada uno, feriados y licencias como bloqueos, y sobreturnos (la API ya acepta \`fueraDeHorario\`).
+- Prestaciones con su duración (primera consulta, control, sesión): son los servicios.
+- La ficha administrativa del paciente: nombre, DNI, teléfono, email, obra social o prepaga con número de afiliado, o particular.
+- Confirmación, recordatorio, ausentes y lista de espera.
+- Cobro de la seña o de la consulta particular, y el coseguro en el consultorio.
+- El enlace del turno para cancelar o reprogramar según la política del consultorio.
+
+**Afuera del alcance:**
+
+- La historia clínica: evoluciones, diagnósticos y adjuntos de estudios.
+- Las recetas y órdenes. La receta electrónica tiene su propia ley (27.553) y exige plataformas registradas ante el Ministerio de Salud.
+- La facturación a obras sociales: nomencladores, autorizaciones, liquidaciones y validación del padrón en línea.
+- La telemedicina como plataforma de video. Como mucho, un campo para el link de Meet o Zoom del profesional.
+
+**Lo que se cuida aunque sean solo turnos.** Para la Ley 25.326 los datos de salud son sensibles, y el turno en sí puede serlo: tener turno con una psicóloga ya dice algo de esa persona.
+
+- **"Motivo de la consulta"** va apagado por defecto, con un aviso de que no se escriba un diagnóstico. Hoy la demo lo prende en salud salvo en psicología (\`Reservas.tsx\`); se cambia con la tarea de las reglas de reserva.
+- **Los recordatorios y emails** dicen el profesional, la fecha y el lugar, no la especialidad. En psicología, tampoco el nombre del servicio.
+- **En un centro médico,** recepción ve la agenda y el contacto, y cada profesional solo a sus pacientes. Necesita los roles con alcance "lo propio", que el backend no tiene (faltante 4 del mapa).
+- **Los Términos** dicen que el consultorio es el responsable de los datos y Órbita los trata por cuenta de él. El paciente puede pedir que se borren.
+
+**Lo que le pide al backend** (ya está en el mapa): dónde guardar el DNI y la obra social con número de afiliado (faltante 5), qué datos pedir según el consultorio (faltante 2) y los roles por alcance (faltante 4).`,
+    decision: 'Turnos en salud es la agenda administrativa del consultorio: agenda, prestaciones, ficha administrativa del paciente con su cobertura, confirmaciones, recordatorios, ausentes, lista de espera y cobro. No guarda nada clínico: ni historia clínica, ni recetas u órdenes, ni facturación a obras sociales, ni videollamada. El motivo de la consulta va apagado por defecto, los avisos no dicen la especialidad y cada profesional ve solo a sus pacientes.',
+    porque: 'Confirmado por Mateo el 15/11/2026. La línea mantiene el producto simple para el que más lo usa (el consultorio que hoy agenda por WhatsApp o en un cuaderno) y lo deja afuera de las exigencias legales más pesadas: la historia clínica (Ley 26.529) y la receta electrónica (Ley 27.553) piden sistemas registrados y otro nivel de cuidado de los datos. Los datos sensibles que igual pasan por un turno se cuidan con lo mínimo: no pedir lo que no hace falta, no mostrarlo en los avisos y que cada profesional vea lo suyo. Dejarlo escrito evita que la historia clínica entre por el costado más adelante.',
+    archivos: [
+      'apps/web/src/modules/turnos/datos/index.ts:245',
+      'apps/web/src/modules/turnos/admin/configuracion/Reservas.tsx:74',
+      'apps/web/src/modules/turnos/admin/configuracion/Reservas.tsx:227',
+      'apps/web/src/modules/superadmin/modulos/reglas.ts:46',
     ],
   }),
 ]
