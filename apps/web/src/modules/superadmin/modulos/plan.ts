@@ -137,7 +137,7 @@ const TURNOS = plan('turnos', 'Turnos', 'Mateo',
   [
     // Semana 1 · arranque (jueves y viernes)
     documentada(t('2026-11-05', 'Mateo', 'Leer el contrato del backend compartido y armar el mapa pantalla → ruta de Turnos', 'Tabla pantalla → ruta (panel y sitio) en una entrada de auditoría, con lo que el backend no cubre marcado'), 'auditoria.turnos.2026-11-13-mapa-sobre-el-backend'),
-    t('2026-11-05', 'Mateo', 'Crear el negocio de prueba de Turnos en dev con su ReservaConfig (PUT /reservas/config)', 'El negocio existe en la base de dev con config de Turnos: horario semanal, retención y política de cancelación'),
+    documentada(t('2026-11-05', 'Mateo', 'Crear el negocio de prueba de Turnos en dev con su ReservaConfig (PUT /reservas/config)', 'El negocio existe en la base de dev con config de Turnos: horario semanal, retención y política de cancelación'), 'auditoria.turnos.2026-11-16-negocio-de-prueba'),
     documentada(t('2026-11-06', 'Mateo', 'Separar en el panel de Turnos la capa de datos: un origen (demo o API) por sección, sin tocar las pantallas', 'Cada sección lee de una función de datos propia; la demo sigue igual en /turnos-demo'), 'auditoria.turnos.2026-11-13-capa-de-datos-por-origen'),
     documentada(t('2026-11-06', 'Mateo', 'Registrar en Auditoría qué necesita Turnos del backend que hoy no existe (o la constancia de que no falta nada)', 'Entrada con la lista de faltantes, avisada a Ale si hay algo que tocar en lo compartido'), 'auditoria.turnos.2026-11-13-mapa-sobre-el-backend'),
     // Semana 2 · catálogo
