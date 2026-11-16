@@ -1,8 +1,8 @@
-// Panel del gimnasio (demo), con el armazón del panel de Tienda (LayoutPanel):
-// la barra lateral con todas las secciones a la vista, agrupadas en Hoy
-// (Clases, Alumnos, Ingresos), Negocio (Equipo, Actividades y salas, Planes y
-// precios) y Reservas (Reglas, Días sin clases, Recordatorios y mensajes,
-// Pagos), más Calendarios y Configuración (Datos del negocio, Horarios).
+// Panel del gimnasio, con el armazón del panel de Tienda (LayoutPanel): la
+// barra lateral con todas las secciones a la vista, agrupadas en Hoy (Clases,
+// Alumnos, Ingresos), Negocio (Equipo, Actividades y salas, Planes y precios)
+// y Reservas (Reglas, Días sin clases, Recordatorios y mensajes, Pagos), más
+// Calendarios y Configuración (Datos del negocio, Horarios).
 //
 // La URL dice dónde se está: ?rubro=&vista=&tab= y, dentro de una sección, lo
 // que abrió (?clase=, ?dia=, ?ver=, ?socio=): un aviso de la campanita o el
@@ -10,18 +10,22 @@
 // links viejos (?vista=configuracion&tab=planes) siguen abriendo lo correcto:
 // se redirigen a la sección nueva.
 //
-// Todo lo que se toca acá vive en el almacén de la demo (datos/negocio.ts): un
-// check-in hecho acá se ve en "Mis clases", y una reserva desde el sitio
-// aparece en la clase. No hay backend.
-import { useEffect } from 'react'
+// Los datos y las acciones salen del origen (datos/origen): la demo, con todo
+// en el navegador (un check-in hecho acá se ve en "Mis clases"), o la API de
+// reservas con la sesión del panel. Con la API, el día y la hora son los de
+// verdad, lo que la API rechaza se avisa con su mensaje, y las secciones que
+// todavía no guardan allá lo dicen en la franja de arriba.
+import { useEffect, useEffectEvent } from 'react'
 import { useRouter } from 'next/router'
-import { BellRing, CalendarDays, CalendarOff, CalendarRange, HandCoins, Hourglass, MessageCircle, Settings, Shapes, SlidersHorizontal, Tag, UserRound, UserX, Users, Wallet } from 'lucide-react'
+import { BellRing, CalendarDays, CalendarOff, CalendarRange, CloudOff, HandCoins, Hourglass, MessageCircle, Settings, Shapes, SlidersHorizontal, Tag, UserRound, UserX, Users, Wallet } from 'lucide-react'
 import LayoutPanel, { type AvisoNav, type ItemBusqueda, type ItemNav } from '@/design-system/reservas/LayoutPanel'
-import { useAviso } from '@/design-system/reservas/piezas'
+import { Vacio, useAviso } from '@/design-system/reservas/piezas'
 import { SkeletonVista, useCargaSimulada, type FormaSkeleton } from '@/design-system/reservas/skeleton'
-import { DIAS_CORTOS, MESES_CORTOS, diaSemana, diasEntre, fechaCorta, hhmm, partes } from '@/lib/reservas/fechas'
-import { AHORA, ESTADO_PLAN, HOY, clasesDelDia, clasesSinProfe, cupoDe, estadoPlanDe, planDe, rubroPorKey } from '../datos'
-import { useNegocio } from '../demo/useNegocio'
+import { DIAS_CORTOS, MESES_CORTOS, diaSemana, diasEntre, esISO, fechaCorta, hhmm, partes } from '@/lib/reservas/fechas'
+import { ESTADO_PLAN, clasesDelDia, clasesSinProfe, cupoDe, estadoPlanDe, planDe, type NegocioGym } from '../datos'
+import { useGimnasio, type Resultado, type SeccionGimnasio } from '../datos/origen'
+import { RelojProvider, type Reloj } from '../datos/reloj'
+import { useRubroDemo } from '../demo/BarraDemo'
 import { ruta } from '../storefront/Sitio'
 import { CSS_PANEL } from './piezas'
 import Clases from './Clases'
@@ -39,37 +43,38 @@ import Negocio from './configuracion/Negocio'
 import Horarios from './configuracion/Horarios'
 
 const SUBS_CONFIG = [{ id: 'negocio', label: 'Datos del negocio' }, { id: 'horarios', label: 'Horarios' }]
-/** Las secciones del panel: lo que puede venir en ?vista=. */
-type Vista = 'clases' | 'socios' | 'ingresos' | 'equipo' | 'actividades' | 'planes' | 'reglas' | 'bloqueos' | 'mensajes' | 'pagos' | 'calendarios' | 'configuracion'
 // La silueta de cada sección mientras llegan sus datos: la forma de la pantalla que viene
 // después. Clases es la tira de días con lo del día (y la grilla semanal, columnas por día);
 // Alumnos, indicadores, buscador y tabla; Ingresos, indicadores y gráficos; Equipo, tarjetas;
 // el resto son formularios de 880 px (Planes también: una tarjeta con sus campos por plan).
-const FORMAS: Record<Vista, FormaSkeleton> = {
+const FORMAS: Record<SeccionGimnasio, FormaSkeleton> = {
   clases: 'agenda', socios: 'lista', ingresos: 'tablero', equipo: 'tarjetas-icono', actividades: 'formulario', planes: 'formulario',
   reglas: 'formulario', bloqueos: 'formulario', mensajes: 'formulario', pagos: 'formulario', calendarios: 'formulario', configuracion: 'formulario',
 }
-const esVista = (v: string): v is Vista => v in FORMAS
+const esVista = (v: string): v is SeccionGimnasio => v in FORMAS
 /** Las pestañas que Configuración tenía antes y hoy son secciones propias: el link viejo abre la nueva. */
-const PESTANA_VIEJA: Record<string, Vista> = { actividades: 'actividades', planes: 'planes', reglas: 'reglas', bloqueos: 'bloqueos', calendarios: 'calendarios' }
+const PESTANA_VIEJA: Record<string, SeccionGimnasio> = { actividades: 'actividades', planes: 'planes', reglas: 'reglas', bloqueos: 'bloqueos', calendarios: 'calendarios' }
 const q1 = (v: unknown) => (typeof v === 'string' ? v : '')
-/** "Sáb 14 nov · 10:40": el ahora fijo de la demo, en el header. */
-const FECHA_DEMO = `${DIAS_CORTOS[diaSemana(HOY)]} ${partes(HOY).dia} ${MESES_CORTOS[partes(HOY).mes - 1]} · ${hhmm(AHORA)}`
+/** "Sáb 14 nov · 10:40": el día y la hora del panel, en el header. */
+const fechaDelHeader = ({ hoy, ahora }: Reloj) => `${DIAS_CORTOS[diaSemana(hoy)]} ${partes(hoy).dia} ${MESES_CORTOS[partes(hoy).mes - 1]} · ${hhmm(ahora)}`
+const mensajeDe = (e: unknown) => (e instanceof Error && e.message ? e.message : 'No se pudo guardar. Probá de nuevo.')
 
 export default function Panel() {
   const router = useRouter()
-  const n = useNegocio()
-  const { rubro, negocio, inscripciones, socios } = n
+  const [rubro] = useRubroDemo()
+  const g = useGimnasio(rubro)
+  const { negocio, inscripciones, socios, reloj, acciones } = g
+  const { hoy, ahora } = reloj
   const [avisar, aviso] = useAviso()
-  const r = rubroPorKey(negocio.rubro)
-  // La espera de la API, fingida (no hay backend): la primera carga del panel muestra la silueta.
+  // La espera fingida de la demo (la de la API es de verdad): la primera carga muestra la silueta.
   const simulada = useCargaSimulada()
+  const r = rubro
 
   // Lo que más conviene mirar al entrar: las clases de hoy con gente esperando
   // o ya completas, los planes que vencen en 7 días y las clases que quedaron sin profe.
-  const hoy = clasesDelDia(negocio, HOY).map(c => ({ ...c, k: cupoDe(c, HOY, inscripciones) }))
-  const esperando = hoy.reduce((s, c) => s + c.k.espera, 0)
-  const porVencer = socios.filter(s => estadoPlanDe(s) === 'por-vencer').sort((a, b) => (a.vence ?? '').localeCompare(b.vence ?? ''))
+  const deHoy = clasesDelDia(negocio, hoy).map(c => ({ ...c, k: cupoDe(c, hoy, inscripciones) }))
+  const esperando = deHoy.reduce((s, c) => s + c.k.espera, 0)
+  const porVencer = socios.filter(s => estadoPlanDe(s, hoy) === 'por-vencer').sort((a, b) => (a.vence ?? '').localeCompare(b.vence ?? ''))
   const sinProfe = clasesSinProfe(negocio)
 
   const items: ItemNav[] = [
@@ -90,31 +95,38 @@ export default function Panel() {
   const pedida = q1(router.query.vista) || 'clases'
   const tabQ = q1(router.query.tab)
   const viejo = pedida === 'configuracion' ? PESTANA_VIEJA[tabQ] : undefined
-  const vista: Vista = viejo ?? (esVista(pedida) && items.some(i => i.id === pedida) ? pedida : 'clases')
+  const vista: SeccionGimnasio = viejo ?? (esVista(pedida) && items.some(i => i.id === pedida) ? pedida : 'clases')
   const tab = vista === 'configuracion' ? (SUBS_CONFIG.some(s => s.id === tabQ) ? tabQ : 'negocio') : undefined
   // La query se arma de cero: lo que abrió una sección (?clase=, ?socio=) no viaja a la siguiente.
+  // El origen viaja siempre: con ?origen=api, todas las secciones siguen sobre la API.
+  const origenQ = q1(router.query.origen)
   const ir = (id: string, t?: string, extra: Record<string, string> = {}) => {
-    void router.replace({ pathname: router.pathname, query: { rubro: rubro.key, vista: id, ...(t ? { tab: t } : {}), ...extra } }, undefined, { shallow: true, scroll: false })
+    void router.replace({ pathname: router.pathname, query: { rubro: rubro.key, ...(origenQ ? { origen: origenQ } : {}), vista: id, ...(t ? { tab: t } : {}), ...extra } }, undefined, { shallow: true, scroll: false })
   }
   // El link viejo se corrige en la barra de direcciones, para que lo que se copie ya sea el nuevo.
   useEffect(() => {
-    if (viejo) void router.replace({ pathname: router.pathname, query: { rubro: rubro.key, vista: viejo } }, undefined, { shallow: true, scroll: false })
-  }, [viejo, router, rubro.key])
+    if (viejo) void router.replace({ pathname: router.pathname, query: { rubro: rubro.key, ...(origenQ ? { origen: origenQ } : {}), vista: viejo } }, undefined, { shallow: true, scroll: false })
+  }, [viejo, router, rubro.key, origenQ])
+
+  // Con la API, el día que se mira en Clases tiene que estar leído: si cae fuera de la ventana, el origen la agranda.
+  const diaQ = q1(router.query.dia)
+  const verFecha = useEffectEvent((f: string) => g.verFecha(f))
+  useEffect(() => { if (esISO(diaQ)) verFecha(diaQ) }, [diaQ])
 
   const avisos: AvisoNav[] = [
-    ...hoy.filter(c => c.k.espera > 0).map(c => ({
+    ...deHoy.filter(c => c.k.espera > 0).map(c => ({
       id: `espera-${c.id}`, Icon: Hourglass, tono: 'aviso' as const, nueva: true, cuando: `Hoy ${hhmm(c.inicio)}`,
       titulo: `${c.k.espera} ${c.k.espera === 1 ? 'persona espera' : 'personas esperan'} lugar en ${c.actividad?.nombre ?? 'una clase'}`,
       detalle: 'Si alguien cancela, pasa solo. También podés subirle el cupo a la clase.',
       onAbrir: () => ir('clases', undefined, { clase: c.id }),
     })),
     ...porVencer.slice(0, 5).map(s => ({
-      id: `vence-${s.id}`, Icon: BellRing, tono: 'primario' as const, nueva: !!s.vence && diasEntre(HOY, s.vence) <= 3, cuando: s.vence ? `Vence el ${fechaCorta(s.vence)}` : '',
-      titulo: `El plan de ${s.nombre} vence en ${s.vence ? diasEntre(HOY, s.vence) : 0} días`,
+      id: `vence-${s.id}`, Icon: BellRing, tono: 'primario' as const, nueva: !!s.vence && diasEntre(hoy, s.vence) <= 3, cuando: s.vence ? `Vence el ${fechaCorta(s.vence)}` : '',
+      titulo: `El plan de ${s.nombre} vence en ${s.vence ? diasEntre(hoy, s.vence) : 0} días`,
       detalle: `${planDe(negocio, s.planId)?.nombre ?? 'Plan'} · avisale para que renueve`,
       onAbrir: () => ir('socios', undefined, { socio: s.id }),
     })),
-    ...hoy.filter(c => c.k.lleno && c.k.espera === 0 && c.inicio > AHORA).map(c => ({
+    ...deHoy.filter(c => c.k.lleno && c.k.espera === 0 && c.inicio > ahora).map(c => ({
       id: `llena-${c.id}`, Icon: Users, tono: 'ok' as const, cuando: `Hoy ${hhmm(c.inicio)}`,
       titulo: `${c.actividad?.nombre ?? 'La clase'} de las ${hhmm(c.inicio)} está completa`,
       detalle: `${c.k.cupo} de ${c.k.cupo} lugares tomados.`,
@@ -132,9 +144,9 @@ export default function Panel() {
     ...items.flatMap(i => (i.subs
       ? i.subs.map(s => ({ id: `ir-${i.id}-${s.id}`, grupo: 'Ir a', titulo: s.label, detalle: i.label, Icon: i.Icon, onElegir: () => ir(i.id, s.id) }))
       : [{ id: `ir-${i.id}`, grupo: 'Ir a', titulo: i.label, detalle: i.grupo, Icon: i.Icon, onElegir: () => ir(i.id) }])),
-    ...hoy.map(c => ({
+    ...deHoy.map(c => ({
       id: `clase-${c.id}`, grupo: 'Clases de hoy', titulo: `${c.actividad?.nombre ?? 'Clase'} · ${hhmm(c.inicio)}`, Icon: CalendarDays,
-      detalle: `${c.profe?.nombre ?? 'Sin profe'} · ${c.sala} · ${c.k.anotados} de ${c.k.cupo}${c.k.espera ? ` · ${c.k.espera} en espera` : ''}`,
+      detalle: `${c.profe?.nombre ?? 'Sin profe'}${c.sala ? ` · ${c.sala}` : ''} · ${c.k.anotados} de ${c.k.cupo}${c.k.espera ? ` · ${c.k.espera} en espera` : ''}`,
       onElegir: () => ir('clases', undefined, { clase: c.id }),
     })),
     ...negocio.profes.map(p => ({
@@ -143,76 +155,104 @@ export default function Panel() {
       onElegir: () => ir('equipo'),
     })),
     ...socios.map(s => {
-      const estado = estadoPlanDe(s)
+      const estado = estadoPlanDe(s, hoy)
       return {
         id: `socio-${s.id}`, grupo: r.socios, titulo: s.nombre, Icon: Users,
-        detalle: `${s.telefono} · ${ESTADO_PLAN[estado].label}${s.planId ? ` · ${planDe(negocio, s.planId)?.nombre ?? ''}` : ''}`,
+        detalle: `${s.telefono || 'Sin celular'} · ${ESTADO_PLAN[estado].label}${s.planId ? ` · ${planDe(negocio, s.planId)?.nombre ?? ''}` : ''}`,
         onElegir: () => ir('socios', undefined, { socio: s.id }),
       }
     }),
   ]
 
   const armazon = {
-    producto: 'Gimnasio', rubro: r.label, fecha: FECHA_DEMO, activo: vista, tab, onIr: ir,
+    producto: 'Gimnasio', rubro: r.label, fecha: fechaDelHeader(reloj), activo: vista, tab, onIr: ir,
     sitio: ruta('inicio', rubro.key), sitioDetalle: `Lo que ven tus ${r.socios.toLowerCase()} para reservar`,
   }
 
   // Lo que el armazón muestra del negocio: el nombre, quién mira y el buscador. Antes de
-  // hidratar, nada: sería el de ejemplo.
-  const delNegocio = n.hidratado
-    ? { negocio: negocio.nombre, usuario: { id: 'dueno', nombre: negocio.dueno.nombre, rol: negocio.dueno.rol, color: '#1D4ED8' }, busqueda, buscar: `Buscar ${r.socios.toLowerCase()}, clases o secciones` }
+  // tener los datos, nada: sería el de ejemplo.
+  const delNegocio = g.listo
+    ? { negocio: negocio.nombre, usuario: { id: 'yo', nombre: g.usuario.nombre, rol: g.usuario.rol, color: '#1D4ED8' }, busqueda, buscar: `Buscar ${r.socios.toLowerCase()}, clases o secciones` }
     : { negocio: '' }
 
-  // En una carga completa el primer render todavía tiene el negocio de ejemplo (ver
-  // useHidratado): las secciones esperan a lo guardado. Si no, los formularios
-  // arrancaban con el ejemplo y al guardar pisaban lo del dueño. Mientras carga (eso, y
-  // la espera fingida de la API), en el lugar de la sección va su silueta y el menú va
-  // sin contadores ni avisos: llegan con los datos. Nada que después cambie.
-  const cargando = !n.hidratado || simulada
+  // Con la API, una franja dice que el panel es el de un negocio real y si la sección
+  // que se mira todavía no guarda allá (se ve con lo que se puede armar de las reservas).
+  const franja = g.tipo === 'api' && g.listo ? (
+    <div className="gip-franja" role="status">
+      {g.guarda(vista)
+        ? <span><b>{negocio.nombre}</b> · conectado a la API de reservas: lo que cambies acá queda guardado.</span>
+        : <><CloudOff size={15} aria-hidden /><span><b>Esta sección todavía no guarda en la API.</b> Muestra lo que se puede armar con las reservas o datos de ejemplo; lo que cambies no queda guardado. Clases y Días sin clases ya guardan.</span></>}
+    </div>
+  ) : undefined
+
+  // En una carga completa de la demo el primer render todavía tiene el negocio de ejemplo
+  // (ver useHidratado), y con la API los datos todavía no llegaron: las secciones esperan.
+  // Si no, los formularios arrancaban con el ejemplo y al guardar pisaban lo del dueño.
+  // Mientras tanto, en el lugar de la sección va su silueta y el menú va sin contadores ni
+  // avisos: llegan con los datos. Nada que después cambie.
+  const cargando = !g.listo || (g.tipo === 'demo' && simulada)
   if (cargando) {
+    const sinMenu = items.map(i => ({ ...i, badge: undefined }))
     return (
-      <LayoutPanel {...armazon} {...delNegocio} items={items.map(i => ({ ...i, badge: undefined }))} cargando>
+      <LayoutPanel {...armazon} {...delNegocio} items={sinMenu} cargando={!g.error}>
         <style>{CSS_PANEL}</style>
-        <SkeletonVista forma={FORMAS[vista]} nombre={tab ? SUBS_CONFIG.find(s => s.id === tab)?.label : items.find(i => i.id === vista)?.label} />
+        {g.error
+          ? <div className="rv-pagina"><Vacio titulo="No pudimos abrir el panel" texto={g.error} accion={<button type="button" className="rv-btn rv-btn--primario" onClick={g.reintentar}>Reintentar</button>} /></div>
+          : <SkeletonVista forma={FORMAS[vista]} nombre={tab ? SUBS_CONFIG.find(s => s.id === tab)?.label : items.find(i => i.id === vista)?.label} />}
       </LayoutPanel>
     )
   }
 
-  const onGuardar = (cambio: Parameters<typeof n.configurar>[1], msj = 'Cambios guardados', detalle?: string) => { n.configurar(rubro.key, cambio); avisar(msj, detalle) }
+  /**
+   * Corre una acción del origen y avisa cómo salió: el mensaje de éxito con lo
+   * que contó el origen ("El primero de la lista ya tiene su lugar."), o el
+   * error tal como lo dijo la API.
+   */
+  const hacer = (accion: Promise<Resultado>, exito?: string, detalle?: string) => {
+    accion.then(
+      res => { if (exito) avisar(exito, res.detalle ?? detalle) },
+      (e: unknown) => avisar(mensajeDe(e), undefined, 'error'),
+    )
+  }
+  const noGuarda = () => avisar('Todavía no se guarda en la API', 'Esta sección no está conectada: lo que cambiaste no quedó guardado.', 'error')
+  /** Guardar desde una sección: si con este origen todavía no guarda, se avisa y no se manda nada. */
+  const guardarDesde = (seccion: SeccionGimnasio) => (cambio: Partial<NegocioGym>, msj = 'Cambios guardados', detalle?: string) => {
+    if (g.guarda(seccion)) hacer(acciones.configurar(cambio), msj, detalle)
+    else noGuarda()
+  }
 
   return (
-    <LayoutPanel {...armazon} {...delNegocio} items={items} avisos={avisos}>
+    <LayoutPanel {...armazon} {...delNegocio} items={items} avisos={avisos} franja={franja}>
       <style>{CSS_PANEL}</style>
-      {vista === 'clases' && (
-        <Clases key={rubro.key} negocio={negocio} inscripciones={inscripciones} socios={socios}
-          onCambiar={(id, cambio, msj) => { n.cambiarInscripcion(id, cambio); if (msj) avisar(msj) }}
-          onCancelar={(id, msj) => {
-            // Si se libera un lugar de una clase con lista de espera, el aviso dice que el primero ya pasó.
-            const la = inscripciones.find(i => i.id === id)
-            const pasa = la?.estado === 'reservada' && inscripciones.some(i => i.claseId === la.claseId && i.fecha === la.fecha && i.estado === 'espera')
-            n.cancelar(rubro.key, id)
-            avisar(msj ?? 'Lugar liberado', pasa ? 'El primero de la lista de espera ya tiene su lugar.' : undefined)
-          }}
-          onInscribir={(i, msj) => { n.inscribir(rubro.key, i); avisar(msj ?? 'Anotado') }}
-          onGuardarGrilla={(clases, msj) => onGuardar({ clases }, msj ?? 'Grilla guardada')} />
-      )}
-      {vista === 'socios' && (
-        <Socios key={rubro.key} negocio={negocio} inscripciones={inscripciones} socios={socios}
-          onAgregar={s => { n.agregarSocio(rubro.key, s); avisar('Sumado', `${s.nombre} ya puede reservar.`) }}
-          onCambiar={(id, cambio, msj, detalle) => { n.cambiarSocio(id, cambio); if (msj) avisar(msj, detalle) }}
-          onAvisar={avisar} />
-      )}
-      {vista === 'ingresos' && <Ingresos key={rubro.key} negocio={negocio} inscripciones={inscripciones} socios={socios} />}
-      {vista === 'equipo' && <Equipo key={rubro.key} negocio={negocio} onGuardar={onGuardar} />}
-      {vista === 'actividades' && <Actividades key={rubro.key} negocio={negocio} onGuardar={onGuardar} onIrEquipo={() => ir('equipo')} />}
-      {vista === 'planes' && <Planes key={rubro.key} negocio={negocio} socios={socios} onGuardar={onGuardar} />}
-      {vista === 'reglas' && <Reglas key={rubro.key} negocio={negocio} onGuardar={onGuardar} />}
-      {vista === 'bloqueos' && <Bloqueos key={rubro.key} negocio={negocio} onGuardar={onGuardar} />}
-      {vista === 'mensajes' && <Mensajes key={rubro.key} negocio={negocio} socios={socios} onGuardar={onGuardar} onAvisar={avisar} />}
-      {vista === 'pagos' && <Pagos key={rubro.key} negocio={negocio} socios={socios} onGuardar={onGuardar} onIrMensajes={() => ir('mensajes')} />}
-      {vista === 'calendarios' && <Calendarios key={rubro.key} negocio={negocio} onGuardar={onGuardar} />}
-      {vista === 'configuracion' && tab === 'negocio' && <Negocio key={rubro.key} negocio={negocio} onGuardar={onGuardar} />}
-      {vista === 'configuracion' && tab === 'horarios' && <Horarios key={rubro.key} negocio={negocio} onGuardar={onGuardar} />}
+      <RelojProvider reloj={reloj}>
+        {/* Con la API, mientras se guarda y se vuelve a leer, la sección no se toca: lo que se ve puede estar viejo. */}
+        <div className="gip-seccion" data-ocupado={g.ocupado || undefined} aria-busy={g.ocupado || undefined}>
+        {vista === 'clases' && (
+          <Clases key={rubro.key} negocio={negocio} inscripciones={inscripciones} socios={socios} corregirAsistencia={g.puede.corregirAsistencia}
+            onCambiar={(id, cambio, msj) => hacer(acciones.cambiarInscripcion(id, cambio), msj)}
+            onCancelar={(id, msj) => hacer(acciones.cancelar(id), msj ?? 'Lugar liberado')}
+            onInscribir={(i, msj, nuevo) => hacer(acciones.inscribir(i, nuevo), msj ?? 'Anotado')}
+            onGuardarGrilla={(clases, msj) => hacer(acciones.configurar({ clases }), msj ?? 'Grilla guardada')} />
+        )}
+        {vista === 'socios' && (
+          <Socios key={rubro.key} negocio={negocio} inscripciones={inscripciones} socios={socios}
+            onAgregar={s => (g.guarda('socios') ? hacer(acciones.agregarSocio(s), 'Sumado', `${s.nombre} ya puede reservar.`) : noGuarda())}
+            onCambiar={(id, cambio, msj, detalle) => (g.guarda('socios') ? hacer(acciones.cambiarSocio(id, cambio), msj, detalle) : noGuarda())}
+            onAvisar={avisar} />
+        )}
+        {vista === 'ingresos' && <Ingresos key={rubro.key} negocio={negocio} inscripciones={inscripciones} socios={socios} />}
+        {vista === 'equipo' && <Equipo key={rubro.key} negocio={negocio} onGuardar={guardarDesde('equipo')} />}
+        {vista === 'actividades' && <Actividades key={rubro.key} negocio={negocio} onGuardar={guardarDesde('actividades')} onIrEquipo={() => ir('equipo')} />}
+        {vista === 'planes' && <Planes key={rubro.key} negocio={negocio} socios={socios} onGuardar={guardarDesde('planes')} />}
+        {vista === 'reglas' && <Reglas key={rubro.key} negocio={negocio} onGuardar={guardarDesde('reglas')} />}
+        {vista === 'bloqueos' && <Bloqueos key={rubro.key} negocio={negocio} onGuardar={guardarDesde('bloqueos')} />}
+        {vista === 'mensajes' && <Mensajes key={rubro.key} negocio={negocio} socios={socios} onGuardar={guardarDesde('mensajes')} onAvisar={avisar} />}
+        {vista === 'pagos' && <Pagos key={rubro.key} negocio={negocio} socios={socios} onGuardar={guardarDesde('pagos')} onIrMensajes={() => ir('mensajes')} />}
+        {vista === 'calendarios' && <Calendarios key={rubro.key} negocio={negocio} onGuardar={guardarDesde('calendarios')} />}
+        {vista === 'configuracion' && tab === 'negocio' && <Negocio key={rubro.key} negocio={negocio} onGuardar={guardarDesde('configuracion')} />}
+        {vista === 'configuracion' && tab === 'horarios' && <Horarios key={rubro.key} negocio={negocio} onGuardar={guardarDesde('configuracion')} />}
+        </div>
+      </RelojProvider>
       {aviso}
     </LayoutPanel>
   )

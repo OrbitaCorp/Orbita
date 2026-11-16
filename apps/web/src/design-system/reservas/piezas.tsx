@@ -237,19 +237,20 @@ export function Modal({ titulo, rotulo, bajada, icono, onCerrar, onEnviar, child
 }
 
 /** Un aviso que se va solo. Devuelve la función para avisar y el elemento a montar. */
-export function useAviso(): [(titulo: string, descripcion?: string) => void, ReactNode] {
-  const [toast, setToast] = useState<{ id: number; titulo: string; descripcion?: string } | null>(null)
+export function useAviso(): [(titulo: string, descripcion?: string, variante?: 'success' | 'error') => void, ReactNode] {
+  const [toast, setToast] = useState<{ id: number; titulo: string; descripcion?: string; variante: 'success' | 'error' } | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const serie = useRef(0)
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
-  const avisar = (titulo: string, descripcion?: string) => {
+  // Un error (lo que contestó la API: "No queda lugar en ese horario.") queda más tiempo: hay que poder leerlo.
+  const avisar = (titulo: string, descripcion?: string, variante: 'success' | 'error' = 'success') => {
     if (timer.current) clearTimeout(timer.current)
-    setToast({ id: ++serie.current, titulo, descripcion })
-    timer.current = setTimeout(() => setToast(null), 3200)
+    setToast({ id: ++serie.current, titulo, descripcion, variante })
+    timer.current = setTimeout(() => setToast(null), variante === 'error' ? 6000 : 3200)
   }
   const nodo = toast ? (
-    <div key={toast.id} className="rv-toast" aria-live="polite">
-      <Toast variant="success" title={toast.titulo} description={toast.descripcion} onClose={() => setToast(null)} />
+    <div key={toast.id} className="rv-toast" role={toast.variante === 'error' ? 'alert' : undefined} aria-live={toast.variante === 'error' ? 'assertive' : 'polite'}>
+      <Toast variant={toast.variante} title={toast.titulo} description={toast.descripcion} onClose={() => setToast(null)} />
     </div>
   ) : null
   return [avisar, nodo]

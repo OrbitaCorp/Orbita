@@ -290,10 +290,16 @@ export interface Inscripcion {
   fecha: ISO
   socioId: string
   estado: EstadoInscripcion
+  /** Cuándo se anotó: el día (demo) o el instante ISO (API). Ordena la lista de espera. */
   creada: ISO
   /** Con qué se pagó: el plan del socio o una clase suelta. */
   planId: string | null
+  /** Lugares que ocupa (alguien que viene con una amiga ocupa dos). Sin el dato, uno. */
+  cantidad?: number
 }
+
+/** Los lugares que ocupa una inscripción. */
+export const lugaresDe = (i: Pick<Inscripcion, 'cantidad'>) => i.cantidad ?? 1
 
 // ─── Negocio de ejemplo de cada rubro ────────────────────────────────────────
 
@@ -563,12 +569,37 @@ export function clasesDelDia(n: NegocioGym, fecha: ISO) {
 
 export interface Cupo { anotados: number; cupo: number; libres: number; espera: number; lleno: boolean }
 
-/** Cuánto se llenó una clase en una fecha: anotados (reservados y asistidos), lugares libres y cuántos esperan. */
+/** Cuánto se llenó una clase en una fecha: lugares tomados (reservados y asistidos), libres y cuántos esperan. */
 export function cupoDe(clase: ClaseSemanal, fecha: ISO, inscripciones: Inscripcion[]): Cupo {
   const suyas = inscripciones.filter(i => i.claseId === clase.id && i.fecha === fecha)
-  const anotados = suyas.filter(i => i.estado === 'reservada' || i.estado === 'asistio' || i.estado === 'ausente').length
+  const anotados = suyas.filter(i => i.estado === 'reservada' || i.estado === 'asistio' || i.estado === 'ausente').reduce((s, i) => s + lugaresDe(i), 0)
   const espera = suyas.filter(i => i.estado === 'espera').length
   return { anotados, cupo: clase.cupo, libres: Math.max(0, clase.cupo - anotados), espera, lleno: anotados >= clase.cupo }
+}
+
+/**
+ * Cuántas reservas caen en los días [desde, hasta): lo que el panel avisa al
+ * cargar días sin clases (no se cancelan solas: hay que avisarles). Cuenta
+ * reservas y no lugares, igual que la API (`afectadas` de POST /bloqueos).
+ */
+export function reservadasEntre(inscripciones: Inscripcion[], desde: ISO, hasta: ISO): number {
+  return inscripciones.filter(i => i.estado === 'reservada' && i.fecha >= desde && i.fecha < hasta).length
+}
+
+/** El aviso de los días sin clases recién cargados: cuántas reservas quedaron adentro. */
+export const avisoDeAfectadas = (n: number): string | undefined =>
+  n > 0 ? `${n} ${n === 1 ? 'reserva queda' : 'reservas quedan'} adentro: no se cancelan solas, avisales.` : undefined
+
+/** El máximo de lugares tomados en una clase desde un día (incluido): el cupo no puede bajar de ahí. */
+export function maximoTomadoDesde(claseId: string, desde: ISO, inscripciones: Inscripcion[]): { lugares: number; fecha: ISO | null } {
+  const porFecha = new Map<ISO, number>()
+  for (const i of inscripciones) {
+    if (i.claseId !== claseId || i.fecha < desde || i.estado !== 'reservada') continue
+    porFecha.set(i.fecha, (porFecha.get(i.fecha) ?? 0) + lugaresDe(i))
+  }
+  let max = { lugares: 0, fecha: null as ISO | null }
+  for (const [fecha, lugares] of porFecha) if (lugares > max.lugares) max = { lugares, fecha }
+  return max
 }
 
 /** El plan del socio hoy: vigente, por vencer (7 días), vencido, pack agotado o sin plan. */

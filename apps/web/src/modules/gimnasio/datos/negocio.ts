@@ -11,7 +11,7 @@
 //   una; si se cancela a tiempo (antes del plazo del negocio), vuelve. Quien
 //   pasa de la lista de espera a reservado también la descuenta.
 import { useSyncExternalStore } from 'react'
-import { AHORA, COLORES_EQUIPO, HOY, cupoDe, inscripcionesDe, negocioDe, planDe, rubroPorKey, sociosDe, type ClaseSemanal, type Inscripcion, type NegocioGym, type Profe, type Socio } from './index'
+import { AHORA, COLORES_EQUIPO, HOY, cupoDe, inscripcionesDe, lugaresDe, negocioDe, planDe, rubroPorKey, sociosDe, type ClaseSemanal, type Inscripcion, type NegocioGym, type Profe, type Socio } from './index'
 import { diaSemana, diasEntre, sumarDias } from '@/lib/reservas/fechas'
 
 export interface DemoGym {
@@ -78,15 +78,16 @@ export function inscripcionesDelDemo(demo: DemoGym, rubro: string): Inscripcion[
 // ─── El pack ─────────────────────────────────────────────────────────────────
 
 /**
- * Suma `delta` a las clases que le quedan al socio de la inscripción, si la
- * pagó con su pack. Devuelve los cambios de socio a guardar (o los mismos si
- * no aplica). Nunca baja de 0 ni pasa lo que trae el pack.
+ * Suma `delta` clases por cada lugar de la inscripción a las que le quedan al
+ * socio, si la pagó con su pack (quien viene con una amiga usa dos). Devuelve
+ * los cambios de socio a guardar (o los mismos si no aplica). Nunca baja de 0
+ * ni pasa lo que trae el pack.
  */
 function ajustarPack(d: DemoGym, rubro: string, i: Inscripcion, delta: number): Record<string, Partial<Socio>> {
   const socio = sociosDelDemo(d, rubro).find(s => s.id === i.socioId)
   const plan = planDe(negocioDelDemo(d, rubro), i.planId)
   if (!socio || plan?.tipo !== 'pack' || socio.planId !== plan.id || socio.clasesRestantes === null) return d.cambiosSocio
-  const restantes = Math.min(plan.clases ?? Infinity, Math.max(0, socio.clasesRestantes + delta))
+  const restantes = Math.min(plan.clases ?? Infinity, Math.max(0, socio.clasesRestantes + delta * lugaresDe(i)))
   return { ...d.cambiosSocio, [socio.id]: { ...d.cambiosSocio[socio.id], clasesRestantes: restantes } }
 }
 
@@ -99,7 +100,7 @@ function aTiempo(n: NegocioGym, i: Inscripcion): boolean {
 }
 
 /** La lista de espera de una clase en una fecha, en orden de llegada. */
-const enEspera = (todas: Inscripcion[], claseId: string, fecha: string) =>
+export const enEspera = (todas: Inscripcion[], claseId: string, fecha: string) =>
   todas.filter(i => i.claseId === claseId && i.fecha === fecha && i.estado === 'espera').sort((a, b) => a.creada.localeCompare(b.creada) || a.id.localeCompare(b.id))
 
 /**
