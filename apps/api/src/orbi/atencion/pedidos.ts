@@ -1,14 +1,15 @@
 import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
-import { StorefrontService } from '../storefront/storefront.service';
-import { OrdersService } from '../orders/orders.service';
-import { NotificationsService } from '../notifications/notifications.service';
-import { describeError } from '../common/utils/describe-error.util';
-import type { ContextoDelBot, ResultadoDeHerramienta } from './whatsapp-bot-tools';
+import { PrismaService } from '../../prisma/prisma.service';
+import { StorefrontService } from '../../storefront/storefront.service';
+import { OrdersService } from '../../orders/orders.service';
+import { NotificationsService } from '../../notifications/notifications.service';
+import { describeError } from '../../common/utils/describe-error.util';
+import { NOMBRE_DEL_CANAL, type CanalDeOrbi } from './estado';
+import type { ContextoDelBot, ResultadoDeHerramienta } from './herramientas';
 
-// Orbi toma pedidos por WhatsApp (función que el dueño enciende). El cliente dice qué quiere; Orbi arma un BORRADOR con los
-// datos reales de la tienda (precio con descuentos y stock, nunca lo que diga el modelo), se lo muestra con botones para
+// Orbi toma pedidos por el chat, en WhatsApp o en Instagram (función que el dueño enciende en cada canal). El cliente dice
+// qué quiere; Orbi arma un BORRADOR con los datos reales de la tienda (precio con descuentos y stock, nunca lo que diga el modelo), se lo muestra con botones para
 // confirmar y recién cuando el cliente confirma se crea el pedido: PENDIENTE y con "coordinar por WhatsApp" como medio de
 // pago, igual que el checkout de la tienda. Orbi no cobra ni toma datos de pago; el pedido lo cierra una persona.
 
@@ -41,18 +42,21 @@ export interface TopesDelPedido {
 
 const plata = (n: number) => `$${Math.round(n).toLocaleString('es-AR')}`;
 
+/** En WhatsApp *esto* es negrita; Instagram muestra los asteriscos, así que ahí va sin marcas. */
+const negrita = (t: string, canal: CanalDeOrbi) => (canal === 'INSTAGRAM' ? t : `*${t}*`);
+
 /** El resumen que ve el cliente. Lo arma el sistema (no el modelo): los números son los de la base. */
-export function textoDelResumen(b: Borrador): string {
+export function textoDelResumen(b: Borrador, canal: CanalDeOrbi = 'WHATSAPP'): string {
   const lineas = b.lineas.slice(0, MAX_LINEAS_EN_EL_RESUMEN).map((l) => `• ${l.cantidad} × ${l.nombre}${l.variante ? ` (${l.variante})` : ''} — ${plata(l.precio * l.cantidad)}`);
   const resto = b.lineas.length - MAX_LINEAS_EN_EL_RESUMEN;
   return [
-    '*Resumen de tu pedido*',
+    negrita('Resumen de tu pedido', canal),
     '',
     ...lineas,
     ...(resto > 0 ? [`…y ${resto} producto${resto === 1 ? '' : 's'} más`] : []),
     '',
     ...(b.descuento > 0 ? [`Subtotal: ${plata(b.subtotal)}`, `Descuento: -${plata(b.descuento)}`] : []),
-    `*Total estimado: ${plata(b.total)}*`,
+    negrita(`Total estimado: ${plata(b.total)}`, canal),
     '',
     'La entrega (retiro o envío) y el pago se coordinan con el equipo por este chat. El monto final te lo confirman ellos.',
     '¿Confirmo el pedido?',
@@ -84,8 +88,8 @@ export type ResultadoDeConfirmar =
   | { ok: false; texto: string; derivar: string };
 
 @Injectable()
-export class WhatsappBotPedidosService {
-  private readonly logger = new Logger(WhatsappBotPedidosService.name);
+export class PedidosPorChatService {
+  private readonly logger = new Logger(PedidosPorChatService.name);
 
   constructor(
     private readonly prisma: PrismaService,
@@ -203,7 +207,14 @@ export class WhatsappBotPedidosService {
    * El cliente confirmó. Se "reclama" el borrador (así tocar dos veces el botón no crea dos pedidos), se vuelve a validar contra
    * la tienda y se crea el pedido pendiente. Avisa al dueño por el motor de notificaciones.
    */
-  async confirmar(p: { businessId: string; conversationId: string; customerId: string; waId: string; slug: string; tienda: string; borrador: unknown }): Promise<ResultadoDeConfirmar> {
+  async confirmar(p: {
+    businessId: string; conversationId: string; customerId: string; slug: string; tienda: string; borrador: unknown;
+    /** El número de WhatsApp, por si el cliente no tiene teléfono cargado. En Instagram no hay: se lo contacta por el chat. */
+    telefono?: string;
+    canal?: CanalDeOrbi;
+  }): Promise<ResultadoDeConfirmar> {
+    const canal = p.canal ?? 'WHATSAPP';
+    const nombreCanal = NOMBRE_DEL_CANAL[canal];
     const borrador = borradorVigente(p.borrador);
     if (!borrador) {
       await this.descartar(p.businessId, p.conversationId);
@@ -225,26 +236,27 @@ export class WhatsappBotPedidosService {
       const metodo = coordinarDespues ? 'COORDINATE_LATER' : 'TRANSFER';
       const descuento = !coordinarDespues && pago.acceptsTransfer && pago.transferDiscountPercent != null ? Number(pago.transferDiscountPercent) : undefined;
       const nombre = `${cliente.firstName}${cliente.lastName ? ` ${cliente.lastName}` : ''}`;
+      const telefono = cliente.phone ?? p.telefono;
       const creado = await this.orders.create(
         p.businessId,
         {
           channel: 'ONLINE',
           customerId: p.customerId,
           items: borrador.lineas.map((l) => ({ variantId: l.variantId, quantity: l.cantidad })),
-          buyer: { name: nombre, phone: cliente.phone ?? p.waId, ...(cliente.email ? { email: cliente.email } : {}) },
+          buyer: { name: nombre, ...(telefono ? { phone: telefono } : {}), ...(cliente.email ? { email: cliente.email } : {}) },
           ...(!coordinarDespues ? { paymentMethod: 'TRANSFER' as const } : {}),
           ...(descuento !== undefined ? { manualDiscountPercent: descuento } : {}),
-          notes: `Pedido tomado por Orbi por WhatsApp. Método de pago: ${metodo === 'TRANSFER' ? 'Coordinar por WhatsApp' : 'A coordinar con el vendedor'}. Entrega: a coordinar con el equipo (retiro o envío).`,
+          notes: `Pedido tomado por Orbi por ${nombreCanal}. Método de pago: ${metodo === 'TRANSFER' ? `Coordinar por ${nombreCanal}` : 'A coordinar con el vendedor'}. Entrega: a coordinar con el equipo (retiro o envío).`,
         },
-        { publicCheckout: true, paymentMethodChosen: true, porWhatsapp: true },
+        { publicCheckout: true, paymentMethodChosen: true, porChat: true },
       );
       const numero = Number(creado.orderNumber);
       const total = Number(creado.total);
-      await this.avisarPedidoPendiente({ businessId: p.businessId, orderId: creado.id, numero, total, cliente: nombre, lineas: borrador.lineas });
+      await this.avisarPedidoPendiente({ businessId: p.businessId, orderId: creado.id, numero, total, cliente: nombre, lineas: borrador.lineas, canal });
       return {
         ok: true,
         pedido: { id: creado.id, numero, total },
-        texto: `¡Listo, ${cliente.firstName}! Tu pedido *#${numero}* quedó registrado ✅\n\nTotal: ${plata(total)}\n\nEl equipo de ${p.tienda} te escribe por acá para coordinar el pago y la entrega.`,
+        texto: `¡Listo, ${cliente.firstName}! Tu pedido ${negrita(`#${numero}`, canal)} quedó registrado ✅\n\nTotal: ${plata(total)}\n\nEl equipo de ${p.tienda} te escribe por acá para coordinar el pago y la entrega.`,
       };
     } catch (e) {
       this.logger.warn(`Orbi no pudo crear el pedido del chat ${p.conversationId}: ${describeError(e)}`);
@@ -254,7 +266,10 @@ export class WhatsappBotPedidosService {
     }
   }
 
-  private async avisarPedidoPendiente(p: { businessId: string; orderId: string; numero: number; total: number; cliente: string; lineas: LineaBorrador[] }): Promise<void> {
+  private async avisarPedidoPendiente(p: { businessId: string; orderId: string; numero: number; total: number; cliente: string; lineas: LineaBorrador[]; canal: CanalDeOrbi }): Promise<void> {
+    const nombreCanal = NOMBRE_DEL_CANAL[p.canal];
+    // Instagram solo deja escribirle al cliente dentro de las 24 h de su último mensaje: el dueño tiene que saberlo.
+    const plazo = p.canal === 'INSTAGRAM' ? '\n\nOjo: Instagram solo te deja escribirle dentro de las 24 horas de su último mensaje.' : '';
     const frontend = process.env.FRONTEND_URL ?? 'http://localhost:3001';
     const link = `${frontend}/admin/${p.businessId}/ventas/pedidos?vista=detalle&id=${p.orderId}`;
     const detalle = p.lineas.map((l) => `· ${l.cantidad} × ${l.nombre}${l.variante ? ` (${l.variante})` : ''}`).join('\n');
@@ -262,8 +277,8 @@ export class WhatsappBotPedidosService {
       await this.notificaciones.dispatch('orbi_pedido_pendiente', p.businessId, {
         title: `Orbi tomó el pedido #${p.numero}`,
         body: `${p.cliente}: ${plata(p.total)}. Falta coordinar el pago y la entrega.`,
-        emailSubject: `Orbi tomó un pedido por WhatsApp (#${p.numero}): falta coordinar el pago`,
-        emailBody: `Orbi tomó un pedido por WhatsApp. Quedó pendiente: hay que coordinar el pago y la entrega con el cliente.\n\nCliente: ${p.cliente}\nPedido #${p.numero} — total estimado ${plata(p.total)}\n\n${detalle}\n\nVer el pedido: ${link}`,
+        emailSubject: `Orbi tomó un pedido por ${nombreCanal} (#${p.numero}): falta coordinar el pago`,
+        emailBody: `Orbi tomó un pedido por ${nombreCanal}. Quedó pendiente: hay que coordinar el pago y la entrega con el cliente por ese chat.${plazo}\n\nCliente: ${p.cliente}\nPedido #${p.numero} — total estimado ${plata(p.total)}\n\n${detalle}\n\nVer el pedido: ${link}`,
         resourceType: 'order',
         resourceId: p.orderId,
       });

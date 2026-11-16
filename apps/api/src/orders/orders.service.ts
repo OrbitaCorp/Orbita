@@ -579,9 +579,9 @@ export class OrdersService {
     // aviso al equipo del negocio, "primera venta" — NO salen acá: salen cuando el
     // pago se aprueba (ver avisarPedidoPagado, lo llama el webhook de MP). Si el
     // comprador abandona en Mercado Pago, no le llega nada a nadie.
-    // `porWhatsapp`: lo tomó Orbi por el chat de WhatsApp. El cliente de WhatsApp no tiene email cargado (llega solo con su
-    // número), así que acá no se exige: se lo contacta por el mismo chat.
-    opts?: { publicCheckout?: boolean; paymentMethodChosen?: boolean; memberId?: string; pagoPendiente?: boolean; porWhatsapp?: boolean },
+    // `porChat`: lo tomó Orbi por el chat de WhatsApp o de Instagram. Ese cliente no tiene email cargado (llega solo con su
+    // número o su cuenta de Instagram), así que acá no se exige: se lo contacta por el mismo chat.
+    opts?: { publicCheckout?: boolean; paymentMethodChosen?: boolean; memberId?: string; pagoPendiente?: boolean; porChat?: boolean },
   ) {
     const esPresencial = dto.channel === 'POS';
     if (esPresencial && opts?.publicCheckout) {
@@ -690,7 +690,7 @@ export class OrdersService {
     // con el nombre. Si el pedido es de un cliente YA registrado, en cambio,
     // necesitamos poder contactarlo más adelante -- ahí el email sigue siendo
     // obligatorio (y tiene que venir cargado en la ficha del cliente).
-    if (dto.customerId && !buyerEmail && !opts?.porWhatsapp) {
+    if (dto.customerId && !buyerEmail && !opts?.porChat) {
       throw new BadRequestException(
         'Ese cliente no tiene email cargado, agregaselo o elegí otro.',
       );

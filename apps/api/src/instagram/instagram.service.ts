@@ -19,6 +19,7 @@ import { MailService } from '../mail/mail.service';
 import { PANTALLAS_DE_RETORNO, type PantallaDeRetorno } from './dto/conectar-instagram.dto';
 import { InstagramAjustesService } from './instagram-ajustes.service';
 import { InstagramMediosService } from './instagram-medios.service';
+import { orbiAtiendeAhora, pausarSiAtendiaOrbi, type MensajeDeCliente } from '../orbi/atencion/estado';
 
 // Instagram (mensajes directos) dentro de la bandeja de Mensajes.
 //
@@ -42,6 +43,12 @@ const RENOVAR_CON_ANTICIPACION_MS = 15 * 24 * 60 * 60 * 1000;
 // Límite de la API de Instagram para un mensaje de texto.
 const MAX_BYTES_TEXTO = 1000;
 const SCOPES_BASE = 'instagram_business_basic,instagram_business_manage_messages';
+// Instagram manda un eco de TODO lo que sale de la cuenta, también de lo que manda Orbi, a veces antes de que Orbi termine
+// de guardarlo. Un eco desconocido en un chat que atiende Orbi espera esto antes de darse por escrito por una persona.
+const ESPERA_ECO_MS = 3000;
+// Respuestas rápidas (botones bajo el mensaje) que entran en uno, y el largo de su título.
+const MAX_RESPUESTAS_RAPIDAS = 13;
+const MAX_TITULO_RESPUESTA_RAPIDA = 20;
 // Kit de difusión: publicar, comentarios y estadísticas. Se piden cuando la persona se conecta desde Difusión (o
 // autoriza el kit desde ahí), para que quien solo quiere mensajes no vea en Instagram una pantalla que pide más
 // de lo que usa.
@@ -84,6 +91,8 @@ interface IgAttachment {
 interface IgMessage {
   mid?: string;
   text?: string;
+  /** El cliente tocó una respuesta rápida (por ejemplo "Confirmar pedido"): su payload. */
+  quick_reply?: { payload?: string };
   is_echo?: boolean;
   is_deleted?: boolean;
   attachments?: IgAttachment[];
@@ -656,18 +665,22 @@ export class InstagramService {
 
   // ── Webhook: eventos ───────────────────────────────────────────────────────
 
-  async procesarWebhook(body: IgWebhookBody): Promise<void> {
-    if (body.object !== 'instagram') return;
+  /** Guarda lo que llegó y devuelve los mensajes nuevos de clientes (para que los atienda Orbi, si corresponde). */
+  async procesarWebhook(body: IgWebhookBody): Promise<MensajeDeCliente[]> {
+    const nuevos: MensajeDeCliente[] = [];
+    if (body.object !== 'instagram') return nuevos;
     for (const entry of body.entry ?? []) {
       for (const m of entry.messaging ?? []) {
         try {
-          await this.guardarMensaje(entry.id, m);
+          const nuevo = await this.guardarMensaje(entry.id, m);
+          if (nuevo) nuevos.push(nuevo);
         } catch (e) {
           // Un mensaje que falla no tumba el resto ni hace que Meta reintente el lote.
           this.logger.error(`No se pudo guardar el mensaje ${m.message?.mid ?? '?'}: ${describeError(e)}`);
         }
       }
     }
+    return nuevos;
   }
 
   // Los archivos que vinieron con el mensaje. Las imágenes se guardan en el almacenamiento propio; el resto
@@ -696,13 +709,13 @@ export class InstagramService {
     return ETIQUETA_ADJUNTO[tipo] ?? '[Mensaje no compatible]';
   }
 
-  private async guardarMensaje(entryId: string | undefined, m: IgMessaging): Promise<void> {
+  private async guardarMensaje(entryId: string | undefined, m: IgMessaging): Promise<MensajeDeCliente | null> {
     const msg = m.message;
-    if (!msg?.mid) return;
+    if (!msg?.mid) return null;
     const texto = this.textoDe(msg);
-    if (!texto) return;
+    if (!texto) return null;
     // Meta reintenta si no recibe 200 a tiempo: un mismo mensaje no se guarda dos veces.
-    if (await this.prisma.message.findUnique({ where: { externalId: msg.mid }, select: { id: true } })) return;
+    if (await this.yaGuardado(msg.mid)) return null;
 
     // El eco (is_echo) es un mensaje que mandó EL NEGOCIO (por Órbita o desde la
     // app de Instagram): ahí el remitente es la cuenta y el cliente es el
@@ -710,16 +723,16 @@ export class InstagramService {
     const eco = msg.is_echo === true;
     const idCuenta = eco ? m.sender?.id : m.recipient?.id;
     const idCliente = eco ? m.recipient?.id : m.sender?.id;
-    if (!idCliente) return;
+    if (!idCliente) return null;
 
     const conexion = await this.conexionActiva([entryId, idCuenta]);
     if (!conexion) {
       this.logger.warn('Evento de Instagram para una cuenta sin conexión activa');
-      return;
+      return null;
     }
 
     const customerId = await this.resolverCliente(conexion.businessId, idCliente);
-    if (!customerId) return;
+    if (!customerId) return null;
 
     // Primera vez que esta persona escribe: es la ocasión de la bienvenida.
     let esNueva = false;
@@ -727,9 +740,16 @@ export class InstagramService {
       (await this.prisma.conversation.findFirst({ where: { businessId: conexion.businessId, customerId }, select: { id: true } })) ??
       ((esNueva = true), await this.prisma.conversation.create({ data: { businessId: conexion.businessId, customerId, isUnread: !eco }, select: { id: true } }));
 
+    // Un eco que no conocemos en un chat que atiende Orbi puede ser la respuesta de Orbi que todavía se está guardando: se
+    // espera un poco y se vuelve a mirar antes de tomarlo como escrito por una persona (que callaría a Orbi).
+    if (eco && !esNueva && (await this.orbiAtiendeSinFallar(conexion.businessId, conv.id))) {
+      await new Promise((r) => setTimeout(r, Number(this.config.get<string>('INSTAGRAM_ESPERA_ECO_MS') ?? ESPERA_ECO_MS)));
+      if (await this.yaGuardado(msg.mid)) return null;
+    }
+
     const creado = m.timestamp ? new Date(m.timestamp > 1e12 ? m.timestamp : m.timestamp * 1000) : new Date();
     const adjuntos = await this.adjuntosDe(conexion.businessId, msg);
-    await this.prisma.$transaction([
+    const [guardado] = await this.prisma.$transaction([
       this.prisma.message.create({
         data: {
           conversationId: conv.id, sender: eco ? 'STORE' : 'CUSTOMER', text: texto, channel: 'INSTAGRAM', externalId: msg.mid, createdAt: creado,
@@ -742,7 +762,42 @@ export class InstagramService {
         data: eco ? { updatedAt: new Date() } : { isUnread: true, isArchived: false, updatedAt: new Date() },
       }),
     ]);
-    if (!eco) await this.responderSolo(conexion.businessId, conv.id, idCliente, esNueva, creado);
+    if (eco) {
+      // Lo escribió una persona desde la app de Instagram: si Orbi atendía este chat, se calla (lo reactiva el dueño).
+      try {
+        await pausarSiAtendiaOrbi(this.prisma, conexion.businessId, conv.id, 'INSTAGRAM');
+      } catch (err) {
+        this.logger.warn(`No se pudo pausar a Orbi en ${conv.id}: ${describeError(err)}`);
+      }
+      return null;
+    }
+    // Si Orbi atiende el chat, la bienvenida y la ausencia no salen: se presenta y contesta Orbi.
+    if (!(await this.orbiAtiendeSinFallar(conexion.businessId, conv.id))) await this.responderSolo(conexion.businessId, conv.id, idCliente, esNueva, creado);
+    if (!guardado?.id) return null;
+    const conTexto = msg.text?.trim();
+    return {
+      businessId: conexion.businessId,
+      conversationId: conv.id,
+      customerId,
+      messageId: guardado.id,
+      destinatario: idCliente,
+      esTexto: !!conTexto,
+      ...(conTexto ? { texto: conTexto } : {}),
+      ...(msg.quick_reply?.payload ? { opcionId: msg.quick_reply.payload } : {}),
+    };
+  }
+
+  private async yaGuardado(mid: string): Promise<boolean> {
+    return !!(await this.prisma.message.findUnique({ where: { externalId: mid }, select: { id: true } }));
+  }
+
+  /** Mejor esfuerzo: si no se puede saber, se toma como que Orbi no atiende (y sale la respuesta automática de siempre). */
+  private async orbiAtiendeSinFallar(businessId: string, conversationId: string): Promise<boolean> {
+    try {
+      return await orbiAtiendeAhora(this.prisma, businessId, conversationId, 'INSTAGRAM');
+    } catch {
+      return false;
+    }
   }
 
   // Bienvenida y ausencia: si corresponde, contesta solo. Nunca tira: un mensaje automático que falla no puede
@@ -827,6 +882,20 @@ export class InstagramService {
       throw new BadRequestException('El mensaje es demasiado largo para Instagram (máximo 1000 caracteres).');
     }
     return this.enviarCarga(businessId, conversationId, igsid, { text: texto });
+  }
+
+  /**
+   * Un texto con respuestas rápidas (botones que el cliente toca y vuelven como `quick_reply.payload`). Mismas reglas que
+   * el texto; Instagram admite hasta 13, con títulos de hasta 20 caracteres.
+   */
+  async enviarConRespuestasRapidas(businessId: string, conversationId: string, igsid: string, texto: string, opciones: { titulo: string; payload: string }[]): Promise<string> {
+    if (Buffer.byteLength(texto, 'utf8') > MAX_BYTES_TEXTO) {
+      throw new BadRequestException('El mensaje es demasiado largo para Instagram (máximo 1000 caracteres).');
+    }
+    return this.enviarCarga(businessId, conversationId, igsid, {
+      text: texto,
+      quick_replies: opciones.slice(0, MAX_RESPUESTAS_RAPIDAS).map((o) => ({ content_type: 'text', title: o.titulo.slice(0, MAX_TITULO_RESPUESTA_RAPIDA), payload: o.payload })),
+    });
   }
 
   /** Manda una imagen (de una dirección pública) por mensaje directo; mismas reglas de plazo que el texto. */

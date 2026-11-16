@@ -172,7 +172,7 @@ describe('webhook: respuesta automática', () => {
 
     const falla = armarWebhook('Hola');
     falla.enviar.mockRejectedValue(new Error('Instagram caído'));
-    await expect(falla.svc.procesarWebhook(evento('mid.4') as any)).resolves.toBeUndefined();
+    await expect(falla.svc.procesarWebhook(evento('mid.4') as any)).resolves.toEqual([]);
     expect(falla.prisma.$transaction).toHaveBeenCalled();
   });
 

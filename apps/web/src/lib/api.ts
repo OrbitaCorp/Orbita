@@ -3407,19 +3407,26 @@ export type BotModalidad = 'CONVERSACIONAL' | 'MENU_Y_CONVERSACION' | 'SOLO_MENU
 export type MenuEstilo = 'LISTA' | 'BOTONES'
 /** Una opción del menú. Las de fábrica: catalogo, pedidos, promos, envios, horarios, persona. Las del dueño: custom-N (con su `respuesta`). */
 export type OpcionDeMenu = { id: string; titulo: string; descripcion?: string; activa: boolean; respuesta?: string }
-export type WhatsappBotEstado = {
+/** Lo que Orbi configura igual en WhatsApp y en Instagram. */
+export type OrbiCanalEstado = {
   disponible: boolean; conectado: boolean; enabled: boolean; modo: BotModo
   instrucciones: string | null; topeCreditos: number | null
-  modalidad: BotModalidad; menuEstilo: MenuEstilo; bienvenida: string | null; bienvenidaPorDefecto: string; menuOpciones: OpcionDeMenu[]
-  // Orbi toma pedidos (quedan pendientes, "coordinar por WhatsApp"), sus topes por pedido y si la tienda puede (o qué le falta).
+  // Orbi toma pedidos (quedan pendientes, a coordinar por el chat), sus topes por pedido y si la tienda puede (o qué le falta).
   tomaPedidos: boolean; maxUnidades: number; maxMonto: number; pedidos: { disponible: boolean; motivo?: string }
-  cupo: { mes: string; usados: number; total: number; limite: number; porcentaje: number }
+  // El cupo del plan es uno para los dos canales: `usados` es lo de este canal, `otrosCanales` lo que gastó el otro y
+  // `limite` lo que este canal todavía puede llegar a usar (su tope propio, o lo que deja el otro).
+  cupo: { mes: string; usados: number; total: number; limite: number; porcentaje: number; otrosCanales?: number }
+}
+export type OrbiCanalCambios = {
+  enabled?: boolean; modo?: BotModo; instrucciones?: string | null; topeCreditos?: number | null
+  tomaPedidos?: boolean; maxUnidades?: number; maxMonto?: number
+}
+export type WhatsappBotEstado = OrbiCanalEstado & {
+  modalidad: BotModalidad; menuEstilo: MenuEstilo; bienvenida: string | null; bienvenidaPorDefecto: string; menuOpciones: OpcionDeMenu[]
 }
 export function getWhatsappBot() { return panelRequest<WhatsappBotEstado>('/whatsapp/bot') }
-export function updateWhatsappBot(input: {
-  enabled?: boolean; modo?: BotModo; instrucciones?: string | null; topeCreditos?: number | null
+export function updateWhatsappBot(input: OrbiCanalCambios & {
   modalidad?: BotModalidad; menuEstilo?: MenuEstilo; bienvenida?: string | null; menuOpciones?: OpcionDeMenu[]
-  tomaPedidos?: boolean; maxUnidades?: number; maxMonto?: number
 }) {
   return panelRequest<WhatsappBotEstado>('/whatsapp/bot', { method: 'PATCH', body: JSON.stringify(input) })
 }
@@ -3558,6 +3565,8 @@ export type InstagramCharla = {
   noLeida: boolean
   /** Hasta cuándo se puede contestar (24 h desde el último mensaje del cliente); null si ya venció. */
   puedeResponderHasta: string | null
+  /** Orbi en esta charla (mismos estados que en WhatsApp). */
+  bot: { estado: BotChatEstado; motivo: string | null }
 }
 export type InstagramMensaje = {
   id: string
@@ -3566,11 +3575,22 @@ export type InstagramMensaje = {
   adjuntos: { tipo: 'image' | 'video' | 'audio' | 'file'; url: string }[]
   estado: string | null
   creado: string
+  /** Lo mandó Orbi (no una persona). */
+  viaOrbi: boolean
 }
 export function getInstagramCharlas() { return panelRequest<InstagramCharla[]>('/instagram/inbox') }
 export function getInstagramNoLeidos() { return panelRequest<{ count: number }>('/instagram/inbox/unread-count') }
 export function getInstagramMensajes(id: string) {
-  return panelRequest<{ mensajes: InstagramMensaje[]; puedeResponderHasta: string | null }>(`/instagram/inbox/${id}/messages`)
+  return panelRequest<{ mensajes: InstagramMensaje[]; puedeResponderHasta: string | null; bot: InstagramCharla['bot'] }>(`/instagram/inbox/${id}/messages`)
+}
+// Orbi atendiendo los mensajes directos de Instagram (paquete Avanzado): lo mismo que en WhatsApp, sin el menú.
+export function getInstagramBot() { return panelRequest<OrbiCanalEstado>('/instagram/bot') }
+export function updateInstagramBot(input: OrbiCanalCambios) {
+  return panelRequest<OrbiCanalEstado>('/instagram/bot', { method: 'PATCH', body: JSON.stringify(input) })
+}
+/** Enciende (ON, también reactiva una charla pausada o derivada) o apaga (OFF) a Orbi en una charla de Instagram. */
+export function setInstagramCharlaBot(id: string, estado: 'ON' | 'OFF') {
+  return panelRequest<{ botEstado: BotChatEstado }>(`/instagram/inbox/${id}/bot`, { method: 'PATCH', body: JSON.stringify({ estado }) })
 }
 export function responderInstagram(id: string, input: { texto?: string; foto?: File }) {
   const form = new FormData()

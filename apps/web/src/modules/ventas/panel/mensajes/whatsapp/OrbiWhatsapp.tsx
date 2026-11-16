@@ -3,6 +3,7 @@ import { ArrowLeft, Lock, Sparkles } from 'lucide-react'
 import { ApiError, updateWhatsappBot, type BotModalidad, type BotModo, type MenuEstilo, type WhatsappBotEstado } from '@/lib/api'
 import { MenuEditor, CSS_MENU } from './MenuEditor'
 import { errorDelMenu, menuCambio, opcionesParaGuardar } from './menuBot'
+import { MAX_INSTRUCCIONES, formularioDe, revisarFormulario, soloDigitos, textoDelCupo, type FormularioDeOrbi } from '../../_shared/orbiAtencion'
 
 // Mensajes → WhatsApp → "Orbi en WhatsApp": el panel donde el dueño enciende a Orbi como atención al público de su
 // número, elige CÓMO atiende (todo con IA, menú + IA, o solo menú), en qué chats contesta, le deja indicaciones y ve cuánto
@@ -15,8 +16,6 @@ interface Props {
   onToast: (m: string) => void
 }
 
-const MAX_INSTRUCCIONES = 1000
-
 const MODALIDADES: { id: BotModalidad; titulo: string; texto: string }[] = [
   { id: 'CONVERSACIONAL', titulo: 'Conversación', texto: 'Orbi contesta todo con inteligencia artificial, como una persona del equipo.' },
   { id: 'MENU_Y_CONVERSACION', titulo: 'Menú y conversación', texto: 'Saluda con un menú de opciones (catálogo, pedidos, promos…) y después conversa con IA.' },
@@ -25,13 +24,11 @@ const MODALIDADES: { id: BotModalidad; titulo: string; texto: string }[] = [
 
 export function OrbiWhatsapp({ bot, onCambio, onVolver, onToast }: Props) {
   const [guardando, setGuardando] = useState(false)
-  const [instrucciones, setInstrucciones] = useState(bot.instrucciones ?? '')
-  const [tope, setTope] = useState(bot.topeCreditos === null ? '' : String(bot.topeCreditos))
+  const [form, setForm] = useState<FormularioDeOrbi>(() => formularioDe(bot))
+  const campo = (k: keyof FormularioDeOrbi) => (v: string) => setForm((f) => ({ ...f, [k]: v }))
   const [estilo, setEstilo] = useState<MenuEstilo>(bot.menuEstilo)
   const [bienvenida, setBienvenida] = useState(bot.bienvenida ?? '')
   const [opciones, setOpciones] = useState(bot.menuOpciones)
-  const [maxUnidades, setMaxUnidades] = useState(String(bot.maxUnidades))
-  const [maxMonto, setMaxMonto] = useState(String(bot.maxMonto))
 
   const guardar = async (cambios: Parameters<typeof updateWhatsappBot>[0], aviso?: string, sincronizarFormulario = false) => {
     setGuardando(true)
@@ -40,9 +37,8 @@ export function OrbiWhatsapp({ bot, onCambio, onVolver, onToast }: Props) {
       onCambio(nuevo)
       // Solo se vuelve a llenar el formulario con lo guardado cuando lo que se guardó es el formulario: un interruptor no pisa lo que se está escribiendo.
       if (sincronizarFormulario) {
-        setInstrucciones(nuevo.instrucciones ?? ''); setTope(nuevo.topeCreditos === null ? '' : String(nuevo.topeCreditos))
+        setForm(formularioDe(nuevo))
         setEstilo(nuevo.menuEstilo); setBienvenida(nuevo.bienvenida ?? ''); setOpciones(nuevo.menuOpciones)
-        setMaxUnidades(String(nuevo.maxUnidades)); setMaxMonto(String(nuevo.maxMonto))
       }
       if (aviso) onToast(aviso)
     } catch (e) {
@@ -52,25 +48,18 @@ export function OrbiWhatsapp({ bot, onCambio, onVolver, onToast }: Props) {
     }
   }
 
-  const topeNumero = tope.trim() === '' ? null : Number(tope)
-  const topeValido = topeNumero === null || (Number.isInteger(topeNumero) && topeNumero >= 0)
+  const { topeValido, topesValidos, hayCambios: cambioComun, cambios } = revisarFormulario(form, bot)
   const conMenu = bot.modalidad !== 'CONVERSACIONAL'
   const errorMenu = conMenu ? errorDelMenu(opciones, estilo) : null
   const cambioMenu = estilo !== bot.menuEstilo || (bienvenida.trim() || null) !== (bot.bienvenida ?? null) || menuCambio(opciones, bot.menuOpciones)
-  const unidadesNum = Number(maxUnidades)
-  const montoNum = Number(maxMonto)
-  const topesValidos = Number.isInteger(unidadesNum) && unidadesNum >= 1 && unidadesNum <= 1000 && Number.isInteger(montoNum) && montoNum >= 1000
-  const cambioTopes = unidadesNum !== bot.maxUnidades || montoNum !== bot.maxMonto
-  const hayCambios = (instrucciones.trim() || null) !== (bot.instrucciones ?? null) || topeNumero !== bot.topeCreditos || cambioMenu || cambioTopes
+  const hayCambios = cambioComun || cambioMenu
   const bloqueado = !bot.disponible || !bot.conectado
   const { cupo } = bot
 
   const guardarCambios = () =>
     void guardar(
       {
-        instrucciones: instrucciones.trim() || null,
-        topeCreditos: topeNumero,
-        ...(cambioTopes ? { maxUnidades: unidadesNum, maxMonto: montoNum } : {}),
+        ...cambios,
         ...(cambioMenu ? { menuEstilo: estilo, bienvenida: bienvenida.trim() || null, menuOpciones: opcionesParaGuardar(opciones) } : {}),
       },
       'Cambios guardados',
@@ -171,11 +160,11 @@ export function OrbiWhatsapp({ bot, onCambio, onVolver, onToast }: Props) {
               <div className="orb-topes">
                 <label htmlFor="orbi-max-unidades">
                   <span className="orb-titulo orb-chico">Máximo de unidades por pedido</span>
-                  <input id="orbi-max-unidades" className="orb-campo orb-campo-chico" inputMode="numeric" value={maxUnidades} disabled={bloqueado} onChange={(e) => setMaxUnidades(e.target.value.replace(/[^0-9]/g, ''))} />
+                  <input id="orbi-max-unidades" className="orb-campo orb-campo-chico" inputMode="numeric" value={form.maxUnidades} disabled={bloqueado} onChange={(e) => campo('maxUnidades')(soloDigitos(e.target.value))} />
                 </label>
                 <label htmlFor="orbi-max-monto">
                   <span className="orb-titulo orb-chico">Monto máximo por pedido ($)</span>
-                  <input id="orbi-max-monto" className="orb-campo orb-campo-chico" inputMode="numeric" value={maxMonto} disabled={bloqueado} onChange={(e) => setMaxMonto(e.target.value.replace(/[^0-9]/g, ''))} />
+                  <input id="orbi-max-monto" className="orb-campo orb-campo-chico" inputMode="numeric" value={form.maxMonto} disabled={bloqueado} onChange={(e) => campo('maxMonto')(soloDigitos(e.target.value))} />
                 </label>
               </div>
             )}
@@ -209,11 +198,11 @@ export function OrbiWhatsapp({ bot, onCambio, onVolver, onToast }: Props) {
             <label className="orb-titulo" htmlFor="orbi-indicaciones">Qué querés que sepa Orbi</label>
             <p className="orb-ayuda">Opcional: tono, promociones del mes, políticas propias. Orbi lo tiene en cuenta en cada respuesta con IA.</p>
             <textarea
-              id="orbi-indicaciones" className="orb-campo" rows={4} maxLength={MAX_INSTRUCCIONES} value={instrucciones}
-              onChange={(e) => setInstrucciones(e.target.value)} disabled={bloqueado}
+              id="orbi-indicaciones" className="orb-campo" rows={4} maxLength={MAX_INSTRUCCIONES} value={form.instrucciones}
+              onChange={(e) => campo('instrucciones')(e.target.value)} disabled={bloqueado}
               placeholder="Ej.: Hablá de vos. Este mes hay 10% de descuento pagando en efectivo."
             />
-            <p className="orb-contador">{instrucciones.length}/{MAX_INSTRUCCIONES}</p>
+            <p className="orb-contador">{form.instrucciones.length}/{MAX_INSTRUCCIONES}</p>
           </section>
         )}
 
@@ -223,12 +212,12 @@ export function OrbiWhatsapp({ bot, onCambio, onVolver, onToast }: Props) {
             <i style={{ width: `${cupo.porcentaje}%` }} className={cupo.porcentaje >= 90 ? 'orb-barra-alta' : ''} />
           </div>
           <p className="orb-ayuda">
-            Usaste <strong>{cupo.usados.toLocaleString('es-AR')}</strong> de {cupo.limite.toLocaleString('es-AR')} créditos ({cupo.porcentaje}%). Se renueva el 1° de cada mes. Si se agota, Orbi deja de contestar con IA y te avisa en los chats; el menú sigue funcionando.
+            {textoDelCupo(cupo, 'Instagram')} Se renueva el 1° de cada mes. Si se agota, Orbi deja de contestar con IA y te avisa en los chats; el menú sigue funcionando.
           </p>
           <label className="orb-titulo orb-chico" htmlFor="orbi-tope">Tope propio (opcional)</label>
           <input
-            id="orbi-tope" className="orb-campo orb-campo-chico" inputMode="numeric" value={tope} disabled={bloqueado}
-            onChange={(e) => setTope(e.target.value.replace(/[^0-9]/g, ''))} placeholder={`Hasta ${cupo.total.toLocaleString('es-AR')}`}
+            id="orbi-tope" className="orb-campo orb-campo-chico" inputMode="numeric" value={form.tope} disabled={bloqueado}
+            onChange={(e) => campo('tope')(soloDigitos(e.target.value))} placeholder={`Hasta ${cupo.total.toLocaleString('es-AR')}`}
           />
           <p className="orb-ayuda">Si querés gastar menos que tu cupo, poné acá un número menor.</p>
         </section>

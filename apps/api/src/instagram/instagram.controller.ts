@@ -17,7 +17,10 @@ import { ConectarInstagramDto } from './dto/conectar-instagram.dto';
 import { OcultarComentarioDto, ResponderComentarioDto } from './dto/comentarios-instagram.dto';
 import { CrearPublicacionDto, SubirVideoDto } from './dto/crear-publicacion.dto';
 import { SolicitarAccesoDto } from './dto/solicitar-acceso.dto';
+import { CambiosDeOrbiDto } from '../orbi/atencion/dto/cambios-de-orbi.dto';
+import { ChatBotDto } from '../conversations/dto/chat-bot.dto';
 import { InstagramAjustesService } from './instagram-ajustes.service';
+import { InstagramBotService } from './instagram-bot.service';
 import { InstagramBandejaService } from './instagram-bandeja.service';
 import { InstagramComentariosService } from './instagram-comentarios.service';
 import { InstagramEstadisticasService } from './instagram-estadisticas.service';
@@ -49,6 +52,7 @@ export class InstagramController {
     private readonly bandeja: InstagramBandejaService,
     private readonly orbi: InstagramOrbiService,
     private readonly ajustes: InstagramAjustesService,
+    private readonly bot: InstagramBotService,
     config: ConfigService,
   ) {
     this.frontendUrl = config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
@@ -114,6 +118,34 @@ export class InstagramController {
   async vincularCliente(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: VincularClienteDto) {
     const { businessId } = assertMemberContext(ctx);
     return this.bandeja.vincular(businessId, id, dto.customerId);
+  }
+
+  // Orbi en este chat: ON lo enciende (también lo reactiva si estaba pausado o derivado), OFF lo deja para una persona.
+  // Como en la bandeja de Mensajes, lo puede hacer todo el equipo.
+  @Patch('inbox/:id/bot')
+  @FullModeOnly()
+  async orbiEnCharla(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: ChatBotDto) {
+    const { businessId } = assertMemberContext(ctx);
+    return this.bot.cambiarEstadoDelChat(businessId, id, dto.estado);
+  }
+
+  // Orbi atendiendo los mensajes directos (paquete Avanzado): su configuración y lo que va gastado del cupo del mes.
+  @Get('bot')
+  @FullModeOnly()
+  @Roles('owner', 'admin')
+  async estadoDelBot(@CurrentBusiness() ctx: AuthContext) {
+    const { businessId } = assertMemberContext(ctx);
+    await this.instagram.asegurarHabilitado(businessId);
+    return this.bot.estado(businessId);
+  }
+
+  @Patch('bot')
+  @FullModeOnly()
+  @Roles('owner', 'admin')
+  async guardarBot(@CurrentBusiness() ctx: AuthContext, @Body() dto: CambiosDeOrbiDto) {
+    const { businessId } = assertMemberContext(ctx);
+    await this.instagram.asegurarHabilitado(businessId);
+    return this.bot.guardar(businessId, dto);
   }
 
   @Patch('inbox/:id')

@@ -1,21 +1,24 @@
-import type { LlmToolDefinition } from '../orbi/llm/llm-adapter.interface';
-import type { PrismaService } from '../prisma/prisma.service';
-import type { StorefrontService } from '../storefront/storefront.service';
+import type { LlmToolDefinition } from '../llm/llm-adapter.interface';
+import type { PrismaService } from '../../prisma/prisma.service';
+import type { StorefrontService } from '../../storefront/storefront.service';
+import { NOMBRE_DEL_CANAL, type CanalDeOrbi } from './estado';
 
-// Las herramientas de Orbi cuando atiende al público por WhatsApp. TODAS son de solo lectura y devuelven lo mismo que ve un
+// Las herramientas de Orbi cuando atiende al público por WhatsApp o por Instagram. TODAS son de solo lectura y devuelven lo mismo que ve un
 // comprador en la tienda (el catálogo sale del mismo servicio que la tienda pública: precios con descuento y stock real,
 // nunca costos) más los pedidos de la propia persona. Nada de acá escribe.
 
 export interface ContextoDelBot {
-  /** Solo si Orbi puede tomar pedidos: arma el borrador del pedido en el chat (ver whatsapp-bot-pedidos.ts). */
+  /** Solo si Orbi puede tomar pedidos: arma el borrador del pedido en el chat (ver pedidos.ts). */
   prepararPedido?: (items: unknown) => Promise<ResultadoDeHerramienta>;
   businessId: string;
   /** Subdominio de la tienda (así se resuelve el catálogo público). */
   slug: string;
   /** La persona que escribe: sus pedidos son los únicos que se pueden consultar. */
   customerId: string;
-  /** Manda una foto de producto al chat (la prepara, la envía y la deja en la conversación). Ver whatsapp-bot.service.ts. */
+  /** Manda una foto de producto al chat (la prepara, la envía y la deja en la conversación). Ver atencion-de-orbi.ts. */
   enviarFoto?: (foto: { url: string; pie: string }) => Promise<ResultadoDeHerramienta>;
+  /** Por dónde escribe el cliente (WhatsApp si no se dice). En Instagram la foto llega sin el nombre del producto. */
+  canal?: CanalDeOrbi;
 }
 
 export type ResultadoDeHerramienta = { ok: true; datos: unknown } | { ok: false; error: string };
@@ -253,9 +256,11 @@ export class HerramientasDelBot {
     const detalle = variante?.optionValues.map((ov) => ov.value).join(' / ');
     const pie = recortar(detalle ? `${p.name} (${detalle})` : p.name, 200) ?? p.name;
     const r = await ctx.enviarFoto({ url: foto.url, pie });
-    return r.ok
-      ? { ok: true, datos: 'La foto ya le llegó al cliente con el nombre del producto. No la describas ni repitas el nombre: seguí la charla (precio, talles, si le interesa).' }
-      : r;
+    if (!r.ok) return r;
+    // Instagram no manda texto junto con una foto: ahí el nombre lo tiene que decir Orbi.
+    return ctx.canal === 'INSTAGRAM'
+      ? { ok: true, datos: `La foto ya le llegó al cliente, sin texto (Instagram no muestra el nombre con la foto). No la describas: nombrá el producto (${pie}) y seguí la charla (precio, talles, si le interesa).` }
+      : { ok: true, datos: 'La foto ya le llegó al cliente con el nombre del producto. No la describas ni repitas el nombre: seguí la charla (precio, talles, si le interesa).' };
   }
 
   private async datosDeLaTienda(ctx: ContextoDelBot) {
@@ -265,7 +270,7 @@ export class HerramientasDelBot {
       ? [
           pago.mercadopagoAvailable && 'Mercado Pago (tarjetas y QR)',
           pago.acceptsCash && 'Efectivo',
-          pago.acceptsTransfer && 'Se coordina el pago por WhatsApp con el equipo',
+          pago.acceptsTransfer && `Se coordina el pago por ${NOMBRE_DEL_CANAL[ctx.canal ?? 'WHATSAPP']} con el equipo`,
           pago.acceptsPickup && 'Retiro en el local',
         ].filter(Boolean)
       : [];

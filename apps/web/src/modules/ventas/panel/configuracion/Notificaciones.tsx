@@ -52,11 +52,11 @@ export const GRUPOS: { titulo: string; desc: string; eventos: { key: string; lab
         ],
     },
     {
-        titulo: 'Orbi en WhatsApp',
+        titulo: 'Orbi en WhatsApp e Instagram',
         desc: 'Cuando Orbi necesita de una persona o te deja una venta para cerrar',
         eventos: [
             { key: 'orbi_necesita_atencion', label: 'Un chat necesita atención', desc: 'Orbi te pasó un chat (un reclamo, una duda que no pudo resolver o alguien que pidió hablar con una persona)', Icon: MessageCircleWarning, defecto: { panel: true, email: true } },
-            { key: 'orbi_pedido_pendiente',  label: 'Pedido pendiente de Orbi', desc: 'Orbi tomó un pedido por WhatsApp: falta coordinar el pago y la entrega',                                         Icon: Sparkles,             defecto: { panel: true, email: true } },
+            { key: 'orbi_pedido_pendiente',  label: 'Pedido pendiente de Orbi', desc: 'Orbi tomó un pedido por WhatsApp o Instagram: falta coordinar el pago y la entrega',                               Icon: Sparkles,             defecto: { panel: true, email: true } },
         ],
     },
     {

@@ -106,6 +106,7 @@ model Business {
   instagramEarlyAccess InstagramEarlyAccess?
   instagramPosts       InstagramPost[]
   instagramSettings    InstagramSettings?
+  instagramBotConfig   InstagramBotConfig?
   discounts            Discount[]
   discountRedemptions  DiscountRedemption[]
   returns              Return[]
@@ -1860,6 +1861,9 @@ model WhatsappBotTurn {
   id               String   @id @default(uuid())
   businessId       String   @map("business_id")
   conversationId   String?  @map("conversation_id")
+  // Por qué canal atendió Orbi. La tabla quedó con el nombre de WhatsApp (fue el primero), pero guarda los turnos de todos:
+  // el cupo mensual del plan es uno solo para WhatsApp e Instagram.
+  canal            MessageChannel @default(WHATSAPP)
   status           String // ok | error | quota | derivado | limite
   rounds           Int      @default(0)
   toolsUsed        String[] @default([]) @map("tools_used")
@@ -1876,7 +1880,30 @@ model WhatsappBotTurn {
   business Business @relation(fields: [businessId], references: [id])
 
   @@index([businessId, createdAt])
+  @@index([businessId, canal, createdAt])
   @@map("whatsapp_bot_turns")
+}
+
+// Orbi atendiendo los mensajes directos de Instagram (paquete Avanzado). Lo mismo que WhatsappBotConfig salvo el menú de
+// opciones, que es de WhatsApp. El estado de cada chat (encendido, pausado, derivado, el pedido en armado) vive en la
+// conversación, igual que en WhatsApp.
+model InstagramBotConfig {
+  id            String          @id @default(uuid())
+  businessId    String          @unique @map("business_id")
+  enabled       Boolean         @default(false)
+  modo          WhatsappBotModo @default(SELECCIONADOS)
+  instrucciones String? // indicaciones del dueño para Orbi (tono, promociones, políticas), hasta 1000 caracteres
+  // Orbi puede tomar pedidos (quedan pendientes, a coordinar por el chat): apagado por defecto, con topes por pedido.
+  tomaPedidos   Boolean         @default(false) @map("toma_pedidos")
+  maxUnidades   Int             @default(10) @map("max_unidades")
+  maxMonto      Int             @default(200000) @map("max_monto") // en pesos
+  topeCreditos  Int?            @map("tope_creditos") // tope mensual propio para Instagram, dentro del cupo del plan (compartido con WhatsApp)
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@map("instagram_bot_configs")
 }
 
 enum WhatsappConnectionStatus {

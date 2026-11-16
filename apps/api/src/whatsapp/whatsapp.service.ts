@@ -1,4 +1,4 @@
-import { pausarSiAtendiaOrbi, type MensajeEntrante } from './whatsapp-bot-estado';
+import { pausarSiAtendiaOrbi, type MensajeEntrante } from '../orbi/atencion/estado';
 import {
   BadGatewayException,
   BadRequestException,

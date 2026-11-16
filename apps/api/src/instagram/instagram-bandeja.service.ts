@@ -1,6 +1,8 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { describeError } from '../common/utils/describe-error.util';
+import { pausarSiAtendiaOrbi, type BotChatEstado } from '../orbi/atencion/estado';
 import { InstagramMediosService } from './instagram-medios.service';
 import { InstagramService } from './instagram.service';
 
@@ -35,6 +37,8 @@ export interface CharlaVista {
   noLeida: boolean;
   /** Hasta cuándo se puede contestar (24 h desde el último mensaje del cliente), o null si ya venció. */
   puedeResponderHasta: string | null;
+  /** Orbi en esta charla: si la atiende, y por qué se calló (pausado o derivado). */
+  bot: { estado: BotChatEstado; motivo: string | null };
 }
 
 export interface FichaDelCliente {
@@ -58,6 +62,8 @@ export interface MensajeVista {
   /** 'sent' / 'failed'… cuando se sabe; null en los que mandó el cliente. */
   estado: string | null;
   creado: string;
+  /** Lo mandó Orbi (no una persona). */
+  viaOrbi: boolean;
 }
 
 const adjuntosDe = (valor: Prisma.JsonValue | null | undefined): AdjuntoVista[] => {
@@ -76,6 +82,8 @@ const textoVisible = (texto: string, adjuntos: AdjuntoVista[]): string => (adjun
 
 @Injectable()
 export class InstagramBandejaService {
+  private readonly logger = new Logger(InstagramBandejaService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly instagram: InstagramService,
@@ -92,6 +100,8 @@ export class InstagramBandejaService {
         id: true,
         isUnread: true,
         updatedAt: true,
+        botEstado: true,
+        botMotivo: true,
         customer: { select: { firstName: true, lastName: true } },
         messages: { orderBy: { createdAt: 'desc' }, take: 1, select: { sender: true, text: true, attachments: true, createdAt: true } },
       },
@@ -118,6 +128,7 @@ export class InstagramBandejaService {
         fecha: (m?.createdAt ?? f.updatedAt).toISOString(),
         noLeida: f.isUnread,
         puedeResponderHasta: this.hastaCuando(ventana.get(f.id)),
+        bot: { estado: f.botEstado, motivo: f.botMotivo },
       };
     });
   }
@@ -130,13 +141,13 @@ export class InstagramBandejaService {
   }
 
   /** Los mensajes de una charla (y la marca como leída). */
-  async mensajes(businessId: string, conversationId: string): Promise<{ mensajes: MensajeVista[]; puedeResponderHasta: string | null }> {
+  async mensajes(businessId: string, conversationId: string): Promise<{ mensajes: MensajeVista[]; puedeResponderHasta: string | null; bot: CharlaVista['bot'] }> {
     const conv = await this.charla(businessId, conversationId);
     const filas = await this.prisma.message.findMany({
       where: { conversationId, channel: 'INSTAGRAM' },
       orderBy: { createdAt: 'desc' },
       take: MAX_MENSAJES,
-      select: { id: true, sender: true, text: true, attachments: true, deliveryStatus: true, createdAt: true },
+      select: { id: true, sender: true, text: true, attachments: true, deliveryStatus: true, createdAt: true, viaOrbi: true },
     });
     if (conv.isUnread) {
       // Raw UPDATE a propósito (igual que en Mensajes): update() de Prisma toca updatedAt y abrir una charla
@@ -147,6 +158,7 @@ export class InstagramBandejaService {
     return {
       mensajes: filas.reverse().map((f) => this.aVista(f)),
       puedeResponderHasta: this.hastaCuando(ultimoDelCliente?.createdAt),
+      bot: { estado: conv.botEstado, motivo: conv.botMotivo },
     };
   }
 
@@ -171,7 +183,7 @@ export class InstagramBandejaService {
           conversationId, sender: 'STORE', text: '[Imagen]', channel: 'INSTAGRAM', externalId, deliveryStatus: 'sent',
           attachments: [{ tipo: 'image', url }],
         },
-        select: { id: true, sender: true, text: true, attachments: true, deliveryStatus: true, createdAt: true },
+        select: { id: true, sender: true, text: true, attachments: true, deliveryStatus: true, createdAt: true, viaOrbi: true },
       });
       creados.push(this.aVista(m));
     }
@@ -179,12 +191,13 @@ export class InstagramBandejaService {
       const externalId = await this.instagram.enviarTexto(businessId, conversationId, igsid, limpio);
       const m = await this.prisma.message.create({
         data: { conversationId, sender: 'STORE', text: limpio, channel: 'INSTAGRAM', externalId, deliveryStatus: 'sent' },
-        select: { id: true, sender: true, text: true, attachments: true, deliveryStatus: true, createdAt: true },
+        select: { id: true, sender: true, text: true, attachments: true, deliveryStatus: true, createdAt: true, viaOrbi: true },
       });
       creados.push(this.aVista(m));
     }
-    // El staff acaba de contestar: la charla queda al día y sube al tope de la lista.
+    // El staff acaba de contestar: la charla queda al día y sube al tope de la lista, y si Orbi la atendía, se calla.
     await this.prisma.conversation.updateMany({ where: { id: conversationId, businessId }, data: { isUnread: false, updatedAt: new Date() } });
+    await this.pausarOrbi(businessId, conversationId);
     return creados;
   }
 
@@ -228,6 +241,7 @@ export class InstagramBandejaService {
     const externalId = await this.instagram.enviarTexto(businessId, conversationId, igsid, texto);
     creados.push(await this.guardarSaliente(conversationId, { text: texto, externalId }));
     await this.prisma.conversation.updateMany({ where: { id: conversationId, businessId }, data: { isUnread: false, updatedAt: new Date() } });
+    await this.pausarOrbi(businessId, conversationId);
     return creados;
   }
 
@@ -296,6 +310,16 @@ export class InstagramBandejaService {
 
   // ── Internos ────────────────────────────────────────────────────────────────
 
+  // Entró una persona a la charla: Orbi deja de contestar ahí hasta que el dueño lo reactive. Mejor esfuerzo: que no se
+  // pueda pausar a Orbi no puede hacer fallar un mensaje que ya salió.
+  private async pausarOrbi(businessId: string, conversationId: string): Promise<void> {
+    try {
+      await pausarSiAtendiaOrbi(this.prisma, businessId, conversationId, 'INSTAGRAM');
+    } catch (e) {
+      this.logger.warn(`No se pudo pausar a Orbi en ${conversationId}: ${describeError(e)}`);
+    }
+  }
+
   private async guardarSaliente(
     conversationId: string,
     d: { text: string; externalId: string; attachments?: { tipo: string; url: string }[] },
@@ -305,7 +329,7 @@ export class InstagramBandejaService {
         conversationId, sender: 'STORE', text: d.text, channel: 'INSTAGRAM', externalId: d.externalId, deliveryStatus: 'sent',
         ...(d.attachments ? { attachments: d.attachments } : {}),
       },
-      select: { id: true, sender: true, text: true, attachments: true, deliveryStatus: true, createdAt: true },
+      select: { id: true, sender: true, text: true, attachments: true, deliveryStatus: true, createdAt: true, viaOrbi: true },
     });
     return this.aVista(m);
   }
@@ -313,7 +337,7 @@ export class InstagramBandejaService {
   private async charla(businessId: string, conversationId: string) {
     const conv = await this.prisma.conversation.findFirst({
       where: { id: conversationId, businessId, messages: { some: { channel: 'INSTAGRAM' } }, customer: { instagramId: { not: null } } },
-      select: { id: true, isUnread: true, customerId: true, customer: { select: { instagramId: true } } },
+      select: { id: true, isUnread: true, customerId: true, botEstado: true, botMotivo: true, customer: { select: { instagramId: true } } },
     });
     if (!conv) throw new NotFoundException('Conversación no encontrada');
     return conv;
@@ -325,7 +349,7 @@ export class InstagramBandejaService {
     return vence > Date.now() ? new Date(vence).toISOString() : null;
   }
 
-  private aVista(f: { id: string; sender: 'CUSTOMER' | 'STORE'; text: string; attachments: Prisma.JsonValue | null; deliveryStatus: string | null; createdAt: Date }): MensajeVista {
+  private aVista(f: { id: string; sender: 'CUSTOMER' | 'STORE'; text: string; attachments: Prisma.JsonValue | null; deliveryStatus: string | null; createdAt: Date; viaOrbi?: boolean }): MensajeVista {
     const adjuntos = adjuntosDe(f.attachments);
     return {
       id: f.id,
@@ -334,6 +358,7 @@ export class InstagramBandejaService {
       adjuntos,
       estado: f.sender === 'STORE' ? f.deliveryStatus : null,
       creado: f.createdAt.toISOString(),
+      viaOrbi: f.viaOrbi === true,
     };
   }
 }

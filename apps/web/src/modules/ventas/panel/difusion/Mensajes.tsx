@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react'
-import { ArrowLeft, ImagePlus, Search, SendHorizontal, Settings2, ShoppingBag, UserRound, X } from 'lucide-react'
+import { useRouter } from 'next/router'
+import { ArrowLeft, ImagePlus, Search, SendHorizontal, Settings2, ShoppingBag, Sparkles, UserRound, X } from 'lucide-react'
 import {
-  ApiError, getInstagramCharlas, getInstagramMensajes, pedirRespuestaAOrbi, responderInstagram,
-  type InstagramCharla, type InstagramEstado, type InstagramMensaje,
+  ApiError, getInstagramBot, getInstagramCharlas, getInstagramMensajes, pedirRespuestaAOrbi, responderInstagram, setInstagramCharlaBot,
+  type InstagramCharla, type InstagramEstado, type InstagramMensaje, type OrbiCanalEstado,
 } from '@/lib/api'
+import { orbiAtiende } from '../_shared/orbiAtencion'
 import { AjustesModal } from './AjustesModal'
+import { OrbiInstagram } from './OrbiInstagram'
 import { Compuerta } from './Compuerta'
 import { EnviarProductoModal } from './EnviarProductoModal'
 import { PanelDelCliente } from './PanelDelCliente'
@@ -17,6 +20,10 @@ import { SugerenciasDeOrbi } from './SugerenciasDeOrbi'
 //
 // Instagram solo deja contestar dentro de las 24 horas del último mensaje del cliente: pasado el plazo la
 // charla se puede leer pero no responder, y la pantalla lo dice. Se actualiza sola cada pocos segundos.
+//
+// Orbi puede atender estas charlas (paquete Avanzado, igual que en WhatsApp): se configura con el botón de Orbi de la
+// cabecera, se enciende o apaga en cada charla, y cuando se calla (contestaste vos, o te pasó la charla) lo dice arriba
+// del campo de texto con el botón para reactivarlo. Sus mensajes llevan "Orbi" junto a la hora.
 
 const MAX_FOTO_BYTES = 10 * 1024 * 1024
 const FOTOS_ACEPTADAS = ['image/jpeg', 'image/png', 'image/webp']
@@ -53,9 +60,15 @@ function useRefresco(accion: () => void, cadaMs: number) {
 // ─── Bandeja ───────────────────────────────────────────────────────────────────
 
 function Bandeja({ usuario }: { usuario: string | null }) {
+  const router = useRouter()
   const [charlas, setCharlas] = useState<InstagramCharla[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [abierta, setAbierta] = useState<string | null>(null)
+  // ?charla= abre una charla directo (el link del correo de Orbi cuando te pasa una charla), hasta que se elija otra.
+  const [elegida, setAbierta] = useState<string | null | undefined>(undefined)
+  const abierta = elegida === undefined ? (typeof router.query.charla === 'string' ? router.query.charla : null) : elegida
+  // La configuración de Orbi solo la ven el dueño y los administradores: para el resto queda en null y no se muestra.
+  const [bot, setBot] = useState<OrbiCanalEstado | null>(null)
+  const [orbiAbierto, setOrbiAbierto] = useState(false)
   const [busqueda, setBusqueda] = useState('')
   const [soloSinLeer, setSoloSinLeer] = useState(false)
   const [ajustesAbiertos, setAjustesAbiertos] = useState(false)
@@ -69,6 +82,9 @@ function Bandeja({ usuario }: { usuario: string | null }) {
   }, [])
   useEffect(() => { cargar() }, [cargar])
   useRefresco(cargar, REFRESCO_LISTA_MS)
+  useEffect(() => {
+    getInstagramBot().then((b) => { if (montado.current) setBot(b) }).catch(() => undefined)
+  }, [])
 
   const visibles = useMemo(() => {
     const q = busqueda.trim().toLowerCase()
@@ -87,6 +103,14 @@ function Bandeja({ usuario }: { usuario: string | null }) {
           <header className="msg-lista-cabecera">
             <div className="msg-titulo-fila">
               <h2 className="msg-usuario">{usuario ? `@${usuario}` : 'Mensajes'}</h2>
+              {bot?.disponible && (
+                <button
+                  type="button" className={`msg-orbi-config${bot.enabled ? ' msg-orbi-config-on' : ''}`} onClick={() => setOrbiAbierto(true)}
+                  aria-label="Orbi en Instagram" title={bot.enabled ? 'Orbi atiende tus mensajes: configurarlo' : 'Que Orbi atienda tus mensajes'}
+                >
+                  <Sparkles size={15} strokeWidth={1.9} aria-hidden /> Orbi
+                </button>
+              )}
               <button type="button" className="msg-ajustes" onClick={() => setAjustesAbiertos(true)} aria-label="Respuestas automáticas" title="Respuestas automáticas">
                 <Settings2 size={18} strokeWidth={1.8} />
               </button>
@@ -121,6 +145,7 @@ function Bandeja({ usuario }: { usuario: string | null }) {
                   <span className="msg-charla-texto">
                     <span className={`msg-charla-nombre${c.noLeida ? ' msg-negrita' : ''}`}>{c.nombre}</span>
                     <span className={`msg-charla-ultimo${c.noLeida ? ' msg-negrita' : ''}`}>
+                      {c.bot?.estado === 'DERIVADO' && <span className="msg-negrita">Necesita atención · </span>}
                       {c.ultimoDe === 'negocio' ? 'Vos: ' : ''}{c.ultimo || 'Sin mensajes'}
                       <span className="msg-charla-cuando"> · {cuandoFue(c.fecha)}</span>
                     </span>
@@ -137,6 +162,8 @@ function Bandeja({ usuario }: { usuario: string | null }) {
             <Hilo
               key={actual.id}
               charla={actual}
+              bot={bot}
+              onConfigurarOrbi={() => setOrbiAbierto(true)}
               onVolver={() => setAbierta(null)}
               onLeida={alLeer}
               onCambio={cargar}
@@ -153,6 +180,7 @@ function Bandeja({ usuario }: { usuario: string | null }) {
         </section>
       </div>
       {ajustesAbiertos && <AjustesModal parte="mensajes" onCerrar={() => setAjustesAbiertos(false)} />}
+      {orbiAbierto && bot && <OrbiInstagram bot={bot} onCambio={(b) => { setBot(b); cargar() }} onCerrar={() => setOrbiAbierto(false)} />}
     </div>
   )
 }
@@ -169,6 +197,9 @@ function Avatar({ nombre, anillo = false, tam = 44 }: { nombre: string; anillo?:
 
 interface HiloProps {
   charla: InstagramCharla
+  /** La configuración de Orbi (null si no se pudo leer: quien no es dueño ni administrador). */
+  bot: OrbiCanalEstado | null
+  onConfigurarOrbi: () => void
   onVolver: () => void
   onLeida: (id: string) => void
   onCambio: () => void
@@ -177,9 +208,11 @@ interface HiloProps {
 
 const CLAVE_PANEL = 'difusion-panel-cliente'
 
-function Hilo({ charla, onVolver, onLeida, onCambio, onVinculado }: HiloProps) {
+function Hilo({ charla, bot, onConfigurarOrbi, onVolver, onLeida, onCambio, onVinculado }: HiloProps) {
   const [mensajes, setMensajes] = useState<InstagramMensaje[] | null>(null)
   const [hasta, setHasta] = useState<string | null>(charla.puedeResponderHasta)
+  const [estadoOrbi, setEstadoOrbi] = useState<InstagramCharla['bot'] | undefined>(charla.bot)
+  const [cambiandoOrbi, setCambiandoOrbi] = useState(false)
   const [texto, setTexto] = useState('')
   const [foto, setFoto] = useState<{ archivo: File; vista: string } | null>(null)
   const [enviando, setEnviando] = useState(false)
@@ -203,6 +236,7 @@ function Hilo({ charla, onVolver, onLeida, onCambio, onVinculado }: HiloProps) {
         if (!montado.current) return
         setMensajes((previos) => (previos && previos.length === r.mensajes.length && previos.at(-1)?.id === r.mensajes.at(-1)?.id ? previos : r.mensajes))
         setHasta(r.puedeResponderHasta)
+        if (r.bot) setEstadoOrbi(r.bot)
         onLeida(charla.id)
       })
       .catch(() => undefined)
@@ -257,6 +291,23 @@ function Hilo({ charla, onVolver, onLeida, onCambio, onVinculado }: HiloProps) {
     }
   }
 
+  // Orbi en esta charla: ON la atiende (también la reactiva si estaba pausada o derivada), OFF la deja para una persona.
+  const atiendeOrbi = orbiAtiende(bot, estadoOrbi?.estado)
+  const orbiCallado = estadoOrbi?.estado === 'PAUSADO' || estadoOrbi?.estado === 'DERIVADO'
+  const cambiarOrbi = async (estado: 'ON' | 'OFF') => {
+    setCambiandoOrbi(true); setError(null)
+    try {
+      const r = await setInstagramCharlaBot(charla.id, estado)
+      if (!montado.current) return
+      setEstadoOrbi({ estado: r.botEstado, motivo: null })
+      onCambio()
+    } catch (e) {
+      if (montado.current) setError(e instanceof ApiError ? e.message : 'No se pudo cambiar a Orbi en esta charla.')
+    } finally {
+      if (montado.current) setCambiandoOrbi(false)
+    }
+  }
+
   const alTeclear = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void enviar() }
   }
@@ -281,6 +332,16 @@ function Hilo({ charla, onVolver, onLeida, onCambio, onVinculado }: HiloProps) {
             {puedeResponder && hasta ? `Podés responder hasta las ${horaDe(hasta)}` : 'Pasó el plazo de 24 horas para responder'}
           </p>
         </div>
+        {bot?.disponible && (
+          <button
+            type="button" className={`msg-cliente-boton msg-orbi-boton${atiendeOrbi ? ' msg-cliente-boton-activo' : ''}`} disabled={cambiandoOrbi}
+            aria-pressed={atiendeOrbi}
+            onClick={() => (bot.enabled ? void cambiarOrbi(atiendeOrbi ? 'OFF' : 'ON') : onConfigurarOrbi())}
+            title={!bot.enabled ? 'Primero encendé a Orbi para Instagram' : atiendeOrbi ? 'Orbi está contestando acá: tocá para atenderla vos' : 'Que Orbi atienda esta charla'}
+          >
+            <Sparkles size={15} aria-hidden /> {atiendeOrbi ? 'Orbi atiende' : 'Activar Orbi'}
+          </button>
+        )}
         <button type="button" className={`msg-cliente-boton${panelAbierto ? ' msg-cliente-boton-activo' : ''}`} aria-pressed={panelAbierto} onClick={alternarPanel}>
           <UserRound size={15} aria-hidden /> Cliente
         </button>
@@ -299,7 +360,7 @@ function Hilo({ charla, onVolver, onLeida, onCambio, onVinculado }: HiloProps) {
                   <Adjunto key={i} adjunto={a} propio={m.de === 'negocio'} />
                 ))}
                 {m.texto && <p className={`msg-burbuja msg-burbuja-${m.de}`} title={`${diaDe(m.creado)}, ${horaDe(m.creado)}`}>{m.texto}</p>}
-                {cierraRacha && <span className="msg-hora">{horaDe(m.creado)}{m.id === ultimoPropio?.id && m.estado === 'sent' ? ' · Enviado' : ''}</span>}
+                {cierraRacha && <span className="msg-hora">{m.viaOrbi ? 'Orbi · ' : ''}{horaDe(m.creado)}{m.id === ultimoPropio?.id && m.estado === 'sent' ? ' · Enviado' : ''}</span>}
               </div>
             </div>
           </div>
@@ -312,6 +373,17 @@ function Hilo({ charla, onVolver, onLeida, onCambio, onVinculado }: HiloProps) {
           <p className="msg-plazo" role="status">
             Instagram solo deja responder dentro de las 24 horas del último mensaje del cliente. Cuando {charla.nombre} te vuelva a escribir vas a poder contestarle.
           </p>
+        )}
+        {orbiCallado && (
+          <div className="msg-orbi-aviso" role="status">
+            <p>
+              {estadoOrbi?.estado === 'DERIVADO' ? 'Orbi te pasó esta charla' : 'Orbi dejó de contestar acá'}
+              {estadoOrbi?.motivo ? `: ${estadoOrbi.motivo}` : '.'}
+            </p>
+            {bot?.enabled && (
+              <button type="button" className="msg-cliente-boton" disabled={cambiandoOrbi} onClick={() => void cambiarOrbi('ON')}>Reactivar Orbi</button>
+            )}
+          </div>
         )}
         {error && <p className="msg-error" role="alert">{error}</p>}
         {puedeResponder && (mensajes?.length ?? 0) > 0 && (
@@ -401,6 +473,14 @@ const CSS = `
 .msg-ajustes:focus-visible, .msg-cliente-boton:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .msg-cliente-boton { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-surface); cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 500; color: var(--color-muted); transition: background-color 150ms, color 150ms; }
 .msg-cliente-boton:hover { color: var(--color-text); background: var(--color-surface-alt); }
+.msg-cliente-boton:disabled { opacity: 0.5; cursor: not-allowed; }
+.msg-orbi-boton + .msg-cliente-boton { margin-left: 0; }
+.msg-orbi-config { display: inline-flex; align-items: center; gap: 5px; height: 32px; margin-left: auto; padding: 0 11px; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-surface); cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 500; color: var(--color-muted); transition: background-color 150ms, color 150ms; }
+.msg-orbi-config:hover { color: var(--color-text); background: var(--color-surface-alt); }
+.msg-orbi-config-on { color: var(--color-text); border-color: var(--color-muted); }
+.msg-orbi-config:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.msg-orbi-aviso { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 10px; padding: 8px 8px 8px 12px; border-radius: 10px; background: var(--color-surface-alt); }
+.msg-orbi-aviso p { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--color-text); }
 .msg-cliente-boton-activo, .msg-cliente-boton-activo:hover { color: var(--color-text); background: var(--color-surface-alt); border-color: var(--color-muted); }
 .msg-hilo-fila { position: relative; flex: 1; min-height: 0; display: flex; }
 .msg-usuario { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
