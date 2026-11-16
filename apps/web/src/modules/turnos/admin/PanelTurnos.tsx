@@ -14,10 +14,15 @@
 // que faltan cobrar (y el menú las cuenta) y Recordatorios muestra cómo vino
 // la confirmación de hoy; las dos salen de la misma agenda que todo lo demás.
 //
-// Acá vive todo lo que se puede tocar en la demo (turnos, clientes, servicios,
-// equipo, roles, pagos): son copias en memoria de los datos de ejemplo, así lo
-// que se agrega en una pantalla aparece en las otras. No hay backend: al
-// recargar, o al cambiar de rubro, vuelve todo a como estaba. La excepción son
+// Los datos con que arranca salen del origen (datos/origen): los de ejemplo en
+// /turnos-demo, la API de reservas en el panel de un negocio real. Las
+// pantallas no saben de dónde vienen: reciben todo por props desde acá.
+//
+// Acá vive todo lo que se puede tocar (turnos, clientes, servicios, equipo,
+// roles, pagos): son copias en memoria de lo que trajo el origen, así lo que
+// se agrega en una pantalla aparece en las otras. Las escrituras todavía no
+// van a la API: al recargar, o al cambiar de rubro, vuelve todo a como estaba
+// (se conectan sección por sección, plan de Turnos en Módulos). La excepción son
 // los servicios pausados, que quedan en el navegador (datos/negocio.ts) porque
 // el sitio público tiene que dejar de ofrecerlos.
 //
@@ -33,12 +38,12 @@ import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import { LayoutDashboard, CalendarDays, Users, Contact, Settings, Sparkles, BellRing, UserX, Ban, CalendarClock, HandCoins, LayoutGrid, Eye, CalendarCog, Bell, Wallet } from 'lucide-react'
 import LayoutPanel, { type ItemNav, type AvisoNav, type ItemBusqueda } from '@/design-system/reservas/LayoutPanel'
-import { useAviso } from '@/design-system/reservas/piezas'
+import { useAviso, Vacio } from '@/design-system/reservas/piezas'
 import { SkeletonVista, useCargaSimulada, type FormaSkeleton } from '@/design-system/reservas/skeleton'
 import { temaDe } from '@/modules/turnos/storefront/tema'
 import { useRubroDemo } from '@/modules/turnos/demo/BarraDemo'
 import { useNegocioDemo } from '@/modules/turnos/datos/negocio'
-import { ESTADO_TURNO, recursosDe, clientesDe, semanaDe, tramosDeRecurso, esSalud, horaTxt, duracionTxt, pesos, type EstadoTurno, type Turno, type Cliente, type Recurso, type RubroTurnos } from '@/modules/turnos/datos'
+import { ESTADO_TURNO, semanaDe, tramosDeRecurso, esSalud, horaTxt, duracionTxt, pesos, type EstadoTurno, type Turno, type Cliente, type Recurso, type RubroTurnos } from '@/modules/turnos/datos'
 import { AHORA_DEMO, HOY_SEMANA, extremos, tramosDelDia, type Tramo } from '@/modules/turnos/horario'
 import ResumenDia from './KPIs'
 import Agenda from './Agenda'
@@ -59,10 +64,11 @@ import Pagos from './configuracion/Pagos'
 import { Dominio, Suscripcion } from './configuracion/Cuenta'
 import AvanzadoTurnos from './avanzado/AvanzadoTurnos'
 import { CSS_UI_CONFIG } from './configuracion/ui'
-import { SUBS_CONFIG, TABS_VIEJAS, subdominioDe, type TabConfig } from './configuracion/datos'
+import { SUBS_CONFIG, TABS_VIEJAS, type TabConfig } from './configuracion/datos'
 import { CSS_PIEZAS_PANEL, MensajeWhatsApp } from './piezasPanel'
-import { cuandoTxt, fechaLarga, indiceDia, libresPorTramo, tieneTelefono, turnosDelDia, type MensajeWA, type NuevoTurnoPre, type ServicioPanel, type TurnoAgenda } from '../datos/agenda'
-import { clientesDeLaAgenda, pagadoHastaInicial, personasDe, plata, puedeDe, rolesDe, taparTelefono, type Pago, type Persona, type Rol, type VerComo } from '../datos/equipo'
+import { cuandoTxt, fechaLarga, indiceDia, libresPorTramo, tieneTelefono, type MensajeWA, type NuevoTurnoPre, type ServicioBase, type ServicioPanel, type TurnoAgenda } from '../datos/agenda'
+import { clientesDeLaAgenda, pagadoHastaInicial, plata, puedeDe, taparTelefono, type Pago, type Persona, type Rol, type VerComo } from '../datos/equipo'
+import { useDatosPanel, useOrigenTurnos, type DatosPanel } from '../datos/origen'
 
 // Las hojas que comparten varias pantallas se montan una sola vez acá; lo propio de cada pantalla lo monta ella.
 const CSS_PANEL = CSS_UI_CONFIG + CSS_PIEZAS_PANEL + CSS_ESPACIOS + CSS_PAGO + `
@@ -76,8 +82,6 @@ const CSS_PANEL = CSS_UI_CONFIG + CSS_PIEZAS_PANEL + CSS_ESPACIOS + CSS_PAGO + `
 type Agenda = { atiende: number[]; horario: string; dias: string }
 /** Las secciones del negocio que cada rol ve según sus permisos. */
 type SeccionNegocio = 'servicios' | 'equipo' | 'espacios' | 'ganancias'
-/** Un servicio en el estado del panel: el estado (activo o pausado) se deriva del almacén de la demo. */
-type ServicioBase = Omit<ServicioPanel, 'estado'>
 /** Las secciones del panel: lo que puede venir en ?vista=. */
 type Vista = 'resumen' | 'agenda' | 'clientes' | 'servicios' | 'equipo' | 'espacios' | 'ganancias' | 'reglas' | 'mensajes' | 'pagos' | 'configuracion' | 'avanzado'
 // La silueta de cada sección mientras llegan sus datos: la forma de la pantalla que viene
@@ -102,32 +106,38 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
   const router = useRouter()
   // Mismo nombre que muestra el sitio público de ese rubro.
   const negocio = temaDe(rubro).nombre
-  // El horario del negocio. Cambia solo si se guarda otro en Configuración → Horarios.
-  const semana = useMemo(() => semanaDe(rubro), [rubro])
   const { demo, guardar: guardarDemo } = useNegocioDemo()
-  // La espera de la API, fingida (no hay backend). Como el panel se monta por rubro (la key en
+  // De dónde salen los datos: la demo por defecto, la API en el panel de un negocio real.
+  const origen = useOrigenTurnos()
+  const carga = useDatosPanel(origen, rubro)
+  // En la demo la espera de la API es fingida. Como el panel se monta por rubro (la key en
   // PanelTurnos), cambiar de rubro vuelve a mostrar la silueta: es cargar otro negocio.
-  const cargando = useCargaSimulada()
+  const simulada = useCargaSimulada()
+  const cargando = !carga.datos || (origen.tipo === 'demo' && simulada)
 
-  const [recursos, setRecursos] = useState<Recurso[]>(() => {
-    const base = recursosDe(rubro)
-    if (rubro.modo !== 'profesional') return base
-    // Cada agenda es de una persona: debajo del nombre va su rol (Aprendiz, Colorista…).
-    const equipo = personasDe(rubro, base, '')
-    const deFabrica = rolesDe(rubro)
-    return base.map(r => {
-      const rol = deFabrica.find(x => x.id === equipo.find(p => p.recursoId === r.id)?.rolId)
-      return rol && !rol.fijo ? { ...r, rol: rol.nombre } : r
-    })
-  })
-  const [clientes, setClientes] = useState<Cliente[]>(() => clientesDe(rubro))
-  const [serviciosBase, setServicios] = useState<ServicioBase[]>(() => rubro.servicios.map((s, i) => ({ ...s, id: `s${i + 1}`, online: i !== 3 })))
-  // Los pausados viven en el navegador (el sitio los lee de ahí): acá solo se les pone el estado.
+  // Lo que se edita en el panel arranca con lo que trae el origen (la demo o la API, datos/origen)
+  // y de ahí en más vive acá, en memoria. Mientras llega, todo vacío y la silueta en pantalla.
+  const [recursos, setRecursos] = useState<Recurso[]>([])
+  const [clientes, setClientes] = useState<Cliente[]>([])
+  const [serviciosBase, setServicios] = useState<ServicioBase[]>([])
+  const [roles, setRoles] = useState<Rol[]>([])
+  const [personas, setPersonas] = useState<Persona[]>([])
+  const [cargados, setCargados] = useState<DatosPanel | null>(null)
+  if (carga.datos && carga.datos !== cargados) {
+    // Se ajusta durante el render (no en un efecto), así la primera pantalla ya sale con los datos.
+    setCargados(carga.datos)
+    setRecursos(carga.datos.recursos)
+    setClientes(carga.datos.clientes)
+    setServicios(carga.datos.servicios)
+    setRoles(carga.datos.roles)
+    setPersonas(carga.datos.personas)
+  }
+  // El horario del negocio. En la demo cambia apenas se guarda otro en Configuración → Horarios.
+  const semana = useMemo(() => (cargados ? cargados.agenda.semana(rubro) : semanaDe(rubro)), [cargados, rubro])
+  // Los pausados de la demo viven en el navegador (el sitio los lee de ahí); los de la API llegan marcados.
   const nombresPausados = useMemo(() => (demo.pausados?.rubro === rubro.key ? demo.pausados.nombres : []), [demo.pausados, rubro.key])
-  const servicios: ServicioPanel[] = useMemo(() => serviciosBase.map(s => ({ ...s, estado: nombresPausados.includes(s.nombre) ? 'pausado' : 'activo' })), [serviciosBase, nombresPausados])
+  const servicios: ServicioPanel[] = useMemo(() => serviciosBase.map(({ pausado, ...s }) => ({ ...s, estado: pausado || nombresPausados.includes(s.nombre) ? 'pausado' : 'activo' })), [serviciosBase, nombresPausados])
   const serviciosActivos = servicios.filter(s => s.estado === 'activo')
-  const [roles, setRoles] = useState<Rol[]>(() => rolesDe(rubro))
-  const [personas, setPersonas] = useState<Persona[]>(() => personasDe(rubro, recursosDe(rubro), `${subdominioDe(temaDe(rubro).nombre)}.com.ar`))
   // Hasta qué día se le pagó a cada uno (los que no figuran: el último cierre según cada cuánto cobran).
   const [pagadoHasta, setPagadoHasta] = useState<Record<string, number>>({})
   const [cambios, setCambios] = useState<Record<string, Partial<Turno>>>({})
@@ -141,13 +151,14 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
   // sus cambios. Se arman una vez para dos meses para atrás y dos para adelante:
   // la agenda del mes y las ganancias miran muchos días a la vez.
   const porDia = useMemo(() => {
-    const armar = (dia: number): TurnoAgenda[] => [...turnosDelDia(rubro, recursos, semana, dia), ...agregados.filter(t => t.dia === dia)]
+    const deOrigen = (dia: number): TurnoAgenda[] => (cargados ? cargados.agenda.delDia(dia, recursos, semana) : [])
+    const armar = (dia: number): TurnoAgenda[] => [...deOrigen(dia), ...agregados.filter(t => t.dia === dia)]
       .filter(t => !ocultos.includes(t.id) && recursos.some(r => r.id === t.recursoId))
       .map(t => ({ ...t, ...cambios[t.id] }))
     const dias = new Map<number, TurnoAgenda[]>()
     for (let d = -62; d <= 62; d++) dias.set(d, armar(d))
     return { dias, armar }
-  }, [rubro, recursos, semana, agregados, ocultos, cambios])
+  }, [cargados, recursos, semana, agregados, ocultos, cambios])
   const delDia = (dia: number): TurnoAgenda[] => porDia.dias.get(dia) ?? porDia.armar(dia)
   /** En qué tramos atiende una agenda un día (contado desde hoy). */
   const jornada = (recursoId: string, dia: number): Tramo[] => {
@@ -497,7 +508,9 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
       <style>{CSS_PANEL}</style>
 
       {/* Mientras llegan los datos, la silueta de la sección; las secciones recién se montan con ellos. */}
-      {cargando ? (
+      {carga.error ? (
+        <Vacio titulo="No pudimos abrir el panel" texto={carga.error} accion={<button type="button" className="rv-btn rv-btn--primario" onClick={carga.reintentar}>Reintentar</button>} />
+      ) : cargando ? (
         <SkeletonVista forma={FORMAS[vista]} nombre={vista === 'configuracion' ? SUBS_CONFIG.find(s => s.id === tab)?.label : items.find(i => i.id === vista)?.label} />
       ) : (
         <>

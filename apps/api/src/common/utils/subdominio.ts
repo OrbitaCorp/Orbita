@@ -36,7 +36,7 @@ const INFRA = [
 // persiguen las variantes ("tienda1", "demo2" son nombres razonables).
 const GENERICOS = [
   'dev', 'staging', 'stage', 'sandbox', 'beta', 'alpha', 'prod', 'produccion', 'production', 'uat',
-  'test', 'tests', 'demo', 'demos', 'preview', 'tienda', 'tiendas', 'turnos', 'ventas', 'marketing',
+  'test', 'tests', 'demo', 'demos', 'demo-moda', 'preview', 'tienda', 'tiendas', 'turnos', 'ventas', 'marketing',
   'manual', 'tutoriales', 'planes', 'precios', 'pricing',
 ];
 

@@ -37,6 +37,8 @@ import { useMovilPlantilla } from '@/hooks/useMovilPlantilla'
 import { Home as PlantillaHome, LAYOUTS_CON_HEADER_PROPIO } from '@/modules/ventas/panel/avanzado/plantillas/homes'
 import { cargarFuentes, CSS as PLANTILLA_CSS } from '@/modules/ventas/panel/avanzado/plantillas/piezas'
 import { AnnouncementBar } from './AnnouncementBar'
+import { BarraDemo } from '@/modules/demo/BarraDemo'
+import { esSlugDemo } from '@/lib/demo/modo'
 import { CountdownBanner } from './CountdownBanner'
 import { useRouter } from 'next/router'
 import { definicionPlantilla, variablesDeTema, headerCentrado, headerBold, anuncioReal } from '@/modules/ventas/cliente/inicio/plantillaReal'
@@ -157,14 +159,23 @@ export function StorefrontChrome({ tienda, config, anuncio = false, homeTemplate
           primera sino que se dibujaba AL LADO, y el crossfade del hover no
           existía. Se veía en "También te puede gustar" de la ficha. */}
       {plantilla && <style>{PLANTILLA_CSS}</style>}
+      {/* Tienda demo: la franja para pasar de la tienda de ropa a la de
+          tecnología (y al panel). Arriba de todo, en todas las páginas. */}
+      {esSlugDemo(slug) && slug && <BarraDemo slug={slug} />}
       {/* Cartelera ARRIBA del header, no debajo — así la dibujan las dos
           maquetas (Vidriera y Escaparate, ver homes.tsx: `<Marquee>`/el div
           fijo van antes de `<HeaderCentrado>`/el navbar) y el propio preview
           de Apariencia (StorePreview.tsx: "Announcement bar" antes de
           "Header"). Quedó al revés acá siendo la única pieza de la tienda
           real que dibujaba primero el header — bug reportado con captura
-          (Escaparate aplicada vs. la maqueta original). */}
-      {anuncio && (
+          (Escaparate aplicada vs. la maqueta original).
+
+          Con una plantilla que dibuja su propio header (`usaHeaderPropio`) el
+          anuncio ya viene adentro de ese header (`anuncio: anuncioReal(...)`
+          más abajo): dibujar también este salía DOBLE en el catálogo y en las
+          categorías — la franja de la plantilla y, debajo, la barra clásica
+          (reportado con captura en Cruzyparfums, plantilla Sobrio). */}
+      {anuncio && !usaHeaderPropio && (
         <AnnouncementBar
           text={config?.appearance?.shippingText}
           visible={config?.appearance?.showAnnouncementBar ?? true}

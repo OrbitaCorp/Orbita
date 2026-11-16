@@ -495,7 +495,9 @@ Es para quien lleva las redes y los videos (por ejemplo, Milagros). A diferencia
 solo entra a lo que lo nombra a propósito (`PlatformAdminGuard`: sin `@SuperadminYMarketing()` / `@TodoElEquipo()` lo rechaza, también en lectura).
 Hoy puede: Resumen (sin facturación: `overview` le saca el MRR y las suscripciones), Marketing completo (TikTok, Instagram con mensajes directos y
 contenido, videos, tutoriales, prospección y el conector de Claude), y Correo (ver, vista previa y enviar; las casillas siguen siendo de SUPERADMIN).
-No ve Negocios, Soporte, Costos, Admins, Actividad, Auditoría ni campañas. La lista exacta está fijada en `test/unit/platform.rol-marketing.unit-spec.ts`.
+De Negocios ve solo el contacto (dueño/a, email, WhatsApp y redes de la tienda) y la dirección de la tienda (subdominio y dominios
+propios activos), por un endpoint aparte (`GET /platform/business-contacts`, `contactos-negocios.ts`) cuyo `select` no lee nada más: sin ventas,
+pedidos, suscripción, estado ni ficha (desde el 12/11). No ve Soporte, Costos, Admins, Actividad, Auditoría ni campañas. La lista exacta está fijada en `test/unit/platform.rol-marketing.unit-spec.ts`.
 Dar el rol: Super panel → Admins → editar → Rol «Marketing». Ahí mismo se le saca el acceso total a quien lo tenga como SUPERADMIN.
 Sus videos los aprueba la dirección (`politica-aprobacion.ts` sigue mandando por quién subió); los avisos por correo de videos también le llegan.
 
@@ -840,7 +842,7 @@ request como cualquier otra.
 | `nightly-subscriptions-maintenance` | 03:00 diario | `reconcileOverdueSubscriptions()` + `cleanupExpiredPendingSignups()` (antes eran 2 `@Cron` separados a las 3am/4am — se juntaron en 1 solo disparo, sin razón de negocio para separarlos). También sincroniza los costos de proveedores (`CostsService.syncAll()`) para la pantalla Costos del super admin |
 | `resumen-diario` | 22:00 diario | `resumenDiario()` |
 | `reporte-semanal` | 09:00 lunes | `reporteSemanal()` |
-| `instagram-cada-5-minutos` | cada 5 minutos | `instagramCada5Minutos()`: lanza las publicaciones de Instagram **programadas** (Difusión → Publicaciones) que ya llegaron a su hora, sigue avanzando las que se están procesando y modera los comentarios de los negocios que prendieron la moderación. **Es un 4º job: cuesta ~US$0.10/mes** (ver abajo). Sin este job, las publicaciones programadas no salen |
+| `instagram-cada-5-minutos` | cada 5 minutos | `instagramCada5Minutos()`: lanza las publicaciones de Instagram **programadas** (Difusión → Publicaciones) que ya llegaron a su hora, sigue avanzando las que se están procesando y modera los comentarios de los negocios que prendieron la moderación. También vence las reservas retenidas y **verifica solos los dominios propios pendientes** (`DomainsService.verificarPendientes()`: los pasa a activos apenas el DNS apunta y hay certificado, sin que el dueño toque "Verificar"; además CORS verifica en el momento el dominio por el que entra un visitante). **Es un 4º job: cuesta ~US$0.10/mes** (ver abajo). Sin este job, las publicaciones programadas no salen |
 
 **Por qué son 3 jobs y no 4:** Cloud Scheduler regala **3 jobs gratis por
 proyecto/mes**; del 4to en adelante cobra **US$0.10/job/mes**. Consolidando

@@ -1,24 +1,26 @@
 // "Probá la demo": la entrada a la demo pública desde la landing. Dos roles,
-// sin cuenta: la tienda (como cliente) y el panel (como dueño). La demo vive
-// en el subdominio `demo` (ver lib/demo/modo.ts); lo que el visitante cambia
-// queda solo en su navegador.
+// sin cuenta: la tienda (como cliente) y el panel (como dueño). La tienda
+// arranca en la de ropa (DEMO_SLUG_TIENDA) y el panel es el de Nébula Tech
+// (DEMO_SLUG); ver lib/demo/modo.ts. Lo que el visitante cambia queda solo en
+// su navegador.
 
 import { useEffect, useState } from 'react';
 import { Reveal, Seccion, Encabezado, Card } from './Reveal';
 import { ROOT_DOMAIN, tenantUrl } from '@/lib/tenant';
-import { DEMO_SLUG } from '@/lib/demo/modo';
+import { DEMO_SLUG, DEMO_SLUG_TIENDA } from '@/lib/demo/modo';
 
 // En el server no hay window para saber protocolo y puerto: arranca con la
 // URL de producción y se corrige al montar (dev: http y :3001).
-const urlInicial = (path: string) => `https://${DEMO_SLUG}.${ROOT_DOMAIN}${path}`;
+const urlInicial = (slug: string, path: string) => `https://${slug}.${ROOT_DOMAIN}${path}`;
 
 const ROLES = [
     {
         id: 'tienda',
         rol: 'Como cliente',
         titulo: 'La tienda',
-        texto: 'Recorré Nébula Tech: catálogo, fichas con video, descuentos, carrito y un checkout completo con pago simulado.',
+        texto: 'Recorré Nébula Moda: ropa, zapatillas y accesorios con talles, descuentos, carrito y un checkout completo con pago simulado. Y si querés, pasá a la de tecnología.',
         cta: 'Ver la tienda',
+        slug: DEMO_SLUG_TIENDA,
         path: '/',
     },
     {
@@ -27,14 +29,15 @@ const ROLES = [
         titulo: 'El panel',
         texto: 'Inicio, pedidos, productos, clientes, descuentos y reportes, con tres meses de ventas cargadas.',
         cta: 'Ver el panel',
+        slug: DEMO_SLUG,
         path: '/panel',
     },
 ] as const;
 
 export function Demo() {
-    const [urls, setUrls] = useState<Record<string, string>>(() => Object.fromEntries(ROLES.map(r => [r.id, urlInicial(r.path)])));
+    const [urls, setUrls] = useState<Record<string, string>>(() => Object.fromEntries(ROLES.map(r => [r.id, urlInicial(r.slug, r.path)])));
     useEffect(() => {
-        setUrls(Object.fromEntries(ROLES.map(r => [r.id, tenantUrl(DEMO_SLUG, r.path)])));
+        setUrls(Object.fromEntries(ROLES.map(r => [r.id, tenantUrl(r.slug, r.path)])));
     }, []);
 
     return (

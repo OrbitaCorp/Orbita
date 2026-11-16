@@ -1,7 +1,15 @@
 import { normalizarWhatsApp } from '@/lib/utils'
 
+// Pesos: sin decimales si el monto es entero y, si no, siempre con dos ("$ 91.398,50"). Sin el tope, toLocaleString
+// mostraba hasta tres ("$ 37.124,325" pagando con transferencia).
 export function fmt(n: number): string {
-  return '$ ' + Number(n).toLocaleString('es-AR')
+  return '$ ' + montoEsAr(n)
+}
+
+export function montoEsAr(n: number): string {
+  const v = Math.round(Number(n) * 100) / 100
+  const entero = Number.isInteger(v)
+  return v.toLocaleString('es-AR', { minimumFractionDigits: entero ? 0 : 2, maximumFractionDigits: 2 })
 }
 
 // "Grilla de productos" de Apariencia (Configuración → Apariencia → Diseño y

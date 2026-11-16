@@ -10,7 +10,9 @@ import { openWpp } from '@/lib/storefront/utils'
 import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
 import { meGetOrder, meCreateReturn, ApiError, type MeOrderDetail } from '@/lib/api'
 
-const MOTIVOS = ['Talle incorrecto', 'No era lo que esperaba', 'Producto defectuoso', 'Me arrepentí', 'Otro']
+// La tienda no conoce el rubro del negocio: el primero (el que viene marcado) tiene que servir para cualquier producto.
+// Antes arrancaba en «Talle incorrecto», que en una notebook no tiene sentido.
+const MOTIVOS = ['No era lo que esperaba', 'Producto defectuoso', 'Llegó dañado', 'Talle o medida incorrecta', 'Me arrepentí', 'Otro']
 
 // Compartido entre el skeleton de carga y la pantalla real de más abajo —
 // esta página tiene dos returns, y el padding angosto de mobile solo estaba

@@ -117,7 +117,7 @@ function skuLibre(base: string, usados: Set<string>): string {
 export interface ErrorFila { fila: number; columna: string; mensaje: string }
 
 export interface ProductoImportable {
-    /** Clave estable del producto dentro de la importación (su nombre, normalizado). */
+    /** Clave estable del producto dentro de la importación (categoría + nombre, normalizados). */
     clave: string
     nombre: string
     categoria: string
@@ -171,11 +171,14 @@ export function armarProductos(filas: FilaCruda[], opciones: { vidriera?: boolea
         const nombre = texto(f.nombre)
         if (!nombre) { error('Nombre', 'Falta el nombre del producto.'); continue }
         if (nombre.length > MAX_NOMBRE) error('Nombre', `El nombre no puede tener más de ${MAX_NOMBRE} caracteres.`)
-        const clave = plano(nombre)
-        if (vistos.has(clave)) error('Nombre', `"${nombre}" ya está en la fila ${vistos.get(clave)}. Va una fila por producto: si son variantes, escribilas en "Valores 1" separadas por coma; si son productos distintos, cambiales el nombre.`)
+        const categoria = texto(f.categoria)
+        // El nombre se repite solo en categorías distintas (mismo criterio que
+        // validateUniqueName() en products.service.ts): "CK IN2U EDT 100ML" puede
+        // estar en Femeninos y en Masculinos.
+        const clave = `${plano(categoria)}|${plano(nombre)}`
+        if (vistos.has(clave)) error('Nombre', `"${nombre}" ya está en la fila ${vistos.get(clave)}, en la misma categoría. Va una fila por producto: si son variantes, escribilas en "Valores 1" separadas por coma; si son productos distintos, cambiales el nombre o la categoría.`)
         else vistos.set(clave, f.fila)
 
-        const categoria = texto(f.categoria)
         if (!categoria) error('Categoría', 'Falta la categoría.')
         else if (categoria.length > 60) error('Categoría', 'El nombre de la categoría es demasiado largo (máximo 60 caracteres).')
 

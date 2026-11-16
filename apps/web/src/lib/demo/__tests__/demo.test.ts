@@ -128,3 +128,34 @@ describe('interceptor de la demo', () => {
     expect(res.status).toBe(403)
   })
 })
+
+describe('tiendas de la demo', () => {
+  async function modo(host: string, pathname = '/') {
+    entorno(host)
+    ;(window.location as { pathname: string }).pathname = pathname
+    return import('../modo')
+  }
+
+  it('reconoce las dos tiendas por subdominio y ninguna otra', async () => {
+    expect((await modo('demo.orbita.site')).slugTiendaDemo()).toBe('demo')
+    vi.resetModules()
+    expect((await modo('demo-moda.orbita.site')).slugTiendaDemo()).toBe('demo-moda')
+    vi.resetModules()
+    const otra = await modo('tienda1.orbita.site')
+    expect(otra.slugTiendaDemo()).toBeNull()
+    expect(otra.esTiendaDemo()).toBe(false)
+  })
+
+  it('en dev sin subdominios, por /tienda/<slug>', async () => {
+    expect((await modo('localhost:3001', '/tienda/demo-moda/catalogo')).slugTiendaDemo()).toBe('demo-moda')
+    vi.resetModules()
+    expect((await modo('localhost:3001', '/tienda/demolicion')).slugTiendaDemo()).toBeNull()
+  })
+
+  it('la entrada a la tienda es la de ropa y el panel el de Nébula Tech', async () => {
+    const m = await modo('orbita.site')
+    expect(m.DEMO_SLUG_TIENDA).toBe('demo-moda')
+    expect(m.DEMO_SLUG).toBe('demo')
+    expect(m.esSlugDemo('demo-moda') && m.esSlugDemo('demo') && !m.esSlugDemo('demos')).toBe(true)
+  })
+})

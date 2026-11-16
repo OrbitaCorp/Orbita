@@ -11,7 +11,7 @@ import {
 } from '@/lib/platform/api'
 import {
   LayoutDashboard, Store, Globe, Users, ShieldCheck, ScrollText, Mail, Ticket, Tag, Wand2, ClipboardCheck, LifeBuoy,
-  Search, Plus, DollarSign, Bot, Send, Blocks, Megaphone, MessageCircle,
+  Search, Plus, DollarSign, Bot, Send, Blocks, Megaphone, MessageCircle, HeartHandshake,
 } from 'lucide-react'
 import { SuperAdminShell, type ItemNav } from './Shell'
 import { TabDescuentos } from './Descuentos'
@@ -25,6 +25,8 @@ import { TabOrbi } from './Orbi'
 import { TabCorreo } from './Correo'
 import { TabMarketing } from './Marketing'
 import { TabInstagram } from './InstagramAccesos'
+import { TabSeguimiento } from './Seguimiento'
+import { TabNegociosContacto } from './NegociosContacto'
 import {
   useFetch, Grid, Row2, Kpi, Card, Table, StatusBadge, SubBadge, Pill, Chip,
   Loader, ErrorBox, Empty, ModalShell, Field, ConfirmModal, PageHeader,
@@ -40,7 +42,8 @@ import { LineSeriesChart, AreaSeriesChart, BarDistribution, ChartSkeleton, Range
 const ES_TAB = (v: unknown): v is Tab => typeof v === 'string' && NAV.some((n) => n.id === v)
 
 // El rol de marketing ve solo estas secciones (el servidor además le cierra todo lo demás, aunque llame a la API a mano).
-const SECCIONES_DE_MARKETING: Tab[] = ['resumen', 'marketing', 'correo']
+// En Negocios ve otra pantalla: solo contacto y dirección de la tienda (NegociosContacto.tsx).
+const SECCIONES_DE_MARKETING: Tab[] = ['resumen', 'negocios', 'marketing', 'correo']
 export const navDelRol = (rol: string | undefined) => (rol === 'MARKETING' ? NAV.filter((n) => SECCIONES_DE_MARKETING.includes(n.id)) : NAV)
 
 export function SuperAdminDashboard() {
@@ -115,7 +118,8 @@ export function SuperAdminDashboard() {
     >
       {tab === 'resumen' && <TabResumen sinFacturacion={user.admin.role === 'MARKETING'} />}
       {tab === 'wizard' && <TabWizard />}
-      {tab === 'negocios' && <TabNegocios />}
+      {tab === 'negocios' && (user.admin.role === 'MARKETING' ? <TabNegociosContacto /> : <TabNegocios />)}
+      {tab === 'seguimiento' && <TabSeguimiento puedeEnviar={user.admin.role === 'SUPERADMIN'} adminEmail={user.admin.email} />}
       {tab === 'soporte' && <TabSoporte currentAdminId={user.admin.id} onCambio={refrescarSoporte} />}
       {tab === 'dominios' && <TabDominios />}
       {tab === 'duenos' && <TabDuenos />}
@@ -135,7 +139,7 @@ export function SuperAdminDashboard() {
   )
 }
 
-export type Tab = 'resumen' | 'wizard' | 'negocios' | 'soporte' | 'dominios' | 'duenos' | 'descuentos' | 'campanias' | 'modulos' | 'auditoria' | 'admins' | 'logs' | 'testeo' | 'costos' | 'orbi' | 'correo' | 'marketing' | 'instagram'
+export type Tab = 'resumen' | 'wizard' | 'negocios' | 'seguimiento' | 'soporte' | 'dominios' | 'duenos' | 'descuentos' | 'campanias' | 'modulos' | 'auditoria' | 'admins' | 'logs' | 'testeo' | 'costos' | 'orbi' | 'correo' | 'marketing' | 'instagram'
 // Mismos 7 destinos de siempre, en el mismo orden, ahora agrupados en el
 // sidebar: primero la foto general, después lo que es de los clientes y al
 // final lo de puertas adentro de Órbita.
@@ -146,6 +150,9 @@ export const NAV: ItemNav<Tab>[] = [
   // gestión de clientes que ya entraron.
   { id: 'wizard', label: 'Wizard', Icono: Wand2, grupo: 'General' },
   { id: 'negocios', label: 'Negocios', Icono: Store, grupo: 'Clientes' },
+  // Pegado a Negocios: en qué etapa está cada tienda y el correo de
+  // seguimiento de esa etapa, con botón de WhatsApp al número de la casilla.
+  { id: 'seguimiento', label: 'Seguimiento', Icono: HeartHandshake, grupo: 'Clientes' },
   // Pegado a Negocios: las consultas son de los clientes y se responden
   // mirando su ficha. La pastilla con las abiertas la pone el dashboard.
   { id: 'soporte', label: 'Soporte', Icono: LifeBuoy, grupo: 'Clientes' },
@@ -684,7 +691,7 @@ function AdminFormModal({ admin, onClose, onSaved }: { admin: AdminRow | null; o
         <Field label="Rol">
           <select value={role} onChange={(e) => setRole(e.target.value as PlatformAdminRole)} className="ds-field" style={inputStyle}>
             <option value="OPERATOR">Operador</option>
-            <option value="MARKETING">Marketing (solo Marketing, Correo y Resumen)</option>
+            <option value="MARKETING">Marketing (Marketing, Correo, Resumen y el contacto de los negocios)</option>
             <option value="SUPERADMIN">Super administrador</option>
           </select>
         </Field>

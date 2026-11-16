@@ -32,7 +32,7 @@ const guard = new PlatformAdminGuard(new Reflector());
 // Endpoints marcados con @SoloSuperadmin(): tocan plata, accesos o el estado
 // de un negocio.
 const SOLO_SUPERADMIN = [
-  'suspend', 'reactivate', 'grantComp', 'cancelBusiness',
+  'suspend', 'reactivate', 'grantComp', 'updateComp', 'cancelBusiness',
   'createAdmin', 'updateAdmin', 'removeAdmin', 'reactivateAdmin',
   'createDiscountCode', 'updateDiscountCode', 'sendDiscountOffer',
 ];

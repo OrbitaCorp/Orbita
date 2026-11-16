@@ -11,7 +11,7 @@ import { Skeleton, SkeletonText } from '@/design-system/components/Skeleton'
 import { PromoChip } from '@/modules/ventas/_shared/components'
 import type { TiendaConfig } from '@/lib/storefront/types'
 import { MarcaVista, type Marca } from './marca'
-import { DEMO_SLUG } from '@/lib/demo/modo'
+import { esSlugDemo } from '@/lib/demo/modo'
 
 type Props = {
   tienda:  TiendaConfig
@@ -204,7 +204,7 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
 
   // Tienda demo: el visitante ya entra como el cliente Invitado (ver
   // lib/auth/authClient.ts) — no hay login ni "Cerrar sesión".
-  const enDemo = tienda.slug === DEMO_SLUG
+  const enDemo = esSlugDemo(tienda.slug)
 
   // Items del menú de cuenta (dropdown desktop + drawer mobile).
   const accountLinks = [

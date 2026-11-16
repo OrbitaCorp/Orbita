@@ -3,7 +3,7 @@ import type { Cupon } from '../types'
 // Cupones mock — cubren los 5 estados y los 4 tipos (% / $ × ticket / producto).
 // TODO: Reemplazar por GET /api/cupones
 
-const CREADO_POR = 'usr-admin'
+const CREADO_POR = 'Marcos Olivera'
 
 export const cuponesMock: Cupon[] = [
   {

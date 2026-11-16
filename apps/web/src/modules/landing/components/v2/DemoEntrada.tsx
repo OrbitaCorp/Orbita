@@ -2,11 +2,14 @@
 // hero trae acá, a una vista propia a pantalla completa, en vez de bajar a la
 // sección #demo del home (que sigue existiendo, pedido 29/09).
 //
-// El visitante elige desde dónde mirar Órbita —como cliente (la tienda Nébula
-// Tech) o como dueño (el panel)— y el fondo le muestra esa perspectiva,
-// borrosa: capturas reales de la demo en public/demo/ (tienda-desk.webp,
-// panel-desk.webp y sus versiones de celular). Para regenerarlas: Chrome
-// headless contra demo.orbita.site a 1440×900 y 390×844, pasadas a webp.
+// El visitante elige desde dónde mirar Órbita —como cliente (la tienda de
+// ropa, Nébula Moda; desde ahí pasa a la de tecnología) o como dueño (el
+// panel de Nébula Tech)— y el fondo le muestra esa perspectiva, borrosa:
+// capturas reales de la demo en public/demo/ (tienda-desk.webp, panel-desk.webp
+// y sus versiones de celular). Para regenerarlas: Chrome headless contra
+// demo-moda.orbita.site (tienda) y demo.orbita.site/panel a 1440×900 y
+// 390×844 ×2, con el consentimiento de cookies ya cargado en localStorage
+// (si no, el banner sale en la foto), pasadas a webp.
 //
 // Al ingresar, en vez de saltar directo, hay una pantalla de carga: el fondo
 // se va enfocando (se "entra" a la perspectiva) mientras un anillo de
@@ -16,7 +19,7 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo';
 import { ROOT_DOMAIN, tenantUrl } from '@/lib/tenant';
-import { DEMO_SLUG } from '@/lib/demo/modo';
+import { DEMO_SLUG, DEMO_SLUG_TIENDA } from '@/lib/demo/modo';
 
 type Rol = 'tienda' | 'panel';
 
@@ -32,11 +35,11 @@ const ROLES: Record<Rol, {
     tienda: {
         rol: 'Como cliente',
         titulo: 'La tienda',
-        texto: 'Recorré Nébula Tech: catálogo, fichas con video, descuentos, carrito y checkout con pago simulado.',
+        texto: 'Recorré Nébula Moda: ropa, zapatillas y accesorios con talles, descuentos, carrito y checkout con pago simulado.',
         cta: 'Ingresar como cliente',
         path: '/',
         fondo: { desk: '/demo/tienda-desk.webp', movil: '/demo/tienda-movil.webp' },
-        pasos: ['Cargando el catálogo de Nébula Tech', 'Preparando tu carrito', 'Abriendo la tienda'],
+        pasos: ['Cargando el catálogo de Nébula Moda', 'Preparando tu carrito', 'Abriendo la tienda'],
     },
     panel: {
         rol: 'Como dueño',
@@ -56,8 +59,9 @@ const DURACION_CARGA = 2400;
 
 // En el server no hay window para saber protocolo y puerto: arranca con la
 // URL de producción y se corrige al montar (dev: http y :3001). Mismo
-// criterio que Demo.tsx.
-const urlInicial = (path: string) => `https://${DEMO_SLUG}.${ROOT_DOMAIN}${path}`;
+// criterio que Demo.tsx. La tienda arranca en la de ropa; el panel es el de
+// Nébula Tech (ver lib/demo/modo.ts).
+const urlInicial = (slug: string, path: string) => `https://${slug}.${ROOT_DOMAIN}${path}`;
 
 function prefiereMenosMovimiento() {
     return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -71,11 +75,11 @@ export function DemoEntrada({ rolInicial }: { rolInicial?: Rol | null }) {
     const [alterna, setAlterna] = useState<Rol>('tienda');
     const [cargando, setCargando] = useState(false);
     const [progreso, setProgreso] = useState(0);
-    const [urls, setUrls] = useState<Record<Rol, string>>({ tienda: urlInicial('/'), panel: urlInicial('/panel') });
+    const [urls, setUrls] = useState<Record<Rol, string>>({ tienda: urlInicial(DEMO_SLUG_TIENDA, '/'), panel: urlInicial(DEMO_SLUG, '/panel') });
     const rafRef = useRef<number | null>(null);
 
     useEffect(() => {
-        setUrls({ tienda: tenantUrl(DEMO_SLUG, '/'), panel: tenantUrl(DEMO_SLUG, '/panel') });
+        setUrls({ tienda: tenantUrl(DEMO_SLUG_TIENDA, '/'), panel: tenantUrl(DEMO_SLUG, '/panel') });
     }, []);
 
     useEffect(() => {

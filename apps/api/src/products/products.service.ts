@@ -179,7 +179,7 @@ export class ProductsService {
   async create(businessId: string, dto: CreateProductDto) {
     if (dto.categoryId) await this.validateCategory(businessId, dto.categoryId);
     if (dto.tagIds?.length) await this.validateTags(businessId, dto.tagIds);
-    await this.validateUniqueName(businessId, dto.name);
+    await this.validateUniqueName(businessId, dto.name, dto.categoryId);
     this.validateVariantShape(dto);
     this.validateVisualOption(dto);
     this.validateNoDuplicateVariants(dto);
@@ -307,7 +307,7 @@ export class ProductsService {
     const existing = await this.findOneRaw(businessId, id);
     if (dto.categoryId) await this.validateCategory(businessId, dto.categoryId);
     if (dto.tagIds?.length) await this.validateTags(businessId, dto.tagIds);
-    await this.validateUniqueName(businessId, dto.name, id);
+    await this.validateUniqueName(businessId, dto.name, dto.categoryId, id);
     this.validateVariantOwnership(dto, existing);
     this.validateVariantShape(dto);
     this.validateVisualOption(dto);
@@ -736,6 +736,36 @@ export class ProductsService {
   }
 
   // ── Imágenes ─────────────────────────────────────────────────────────────
+
+  /**
+   * Lo que hace falta para buscarle una foto en la web a un producto ya
+   * guardado (Importar Excel → paso Fotos): nombre, categoría, rubro del
+   * negocio y, si se buscan las fotos de un color, el valor de esa variante.
+   */
+  async datosParaFotoWeb(businessId: string, productId: string, optionValueId?: string) {
+    const producto = await this.prisma.product.findFirst({
+      where: { id: productId, businessId, deletedAt: null },
+      select: { name: true, category: { select: { name: true } }, business: { select: { industry: true } } },
+    });
+    if (!producto) throw new NotFoundException('Producto no encontrado');
+
+    let variant: string | null = null;
+    if (optionValueId) {
+      const valor = await this.prisma.productOptionValue.findFirst({
+        where: { id: optionValueId, option: { productId, isVisual: true } },
+        select: { value: true },
+      });
+      if (!valor) throw new BadRequestException('optionValueId inválido para este producto');
+      variant = valor.value;
+    }
+
+    return {
+      name: producto.name,
+      category: producto.category?.name ?? null,
+      industry: producto.business.industry ?? null,
+      variant,
+    };
+  }
 
   async addImage(
     businessId: string,
@@ -1210,16 +1240,22 @@ export class ProductsService {
   // idénticos — pasó en producción con "Remera Oversize negra" x5. Comparación
   // insensible a mayúsculas y a espacios al borde, como el resto de los checks
   // de unicidad del proyecto (ver OnboardingService.checkEmail).
-  private async validateUniqueName(businessId: string, name: string, excludeId?: string) {
+  //
+  // El nombre es único DENTRO DE CADA CATEGORÍA, no en toda la tienda (07/11,
+  // pedido explícito): una perfumería tiene "CK IN2U EDT 100ML" en Femeninos y
+  // en Masculinos, con precios distintos, y la categoría ya dice cuál es cuál.
+  // El doble click de arriba sigue frenado: el reintento manda la misma categoría.
+  private async validateUniqueName(businessId: string, name: string, categoryId: string | null | undefined, excludeId?: string) {
     const existente = await this.prisma.product.findFirst({
       where: {
         businessId,
         deletedAt: null,
+        categoryId: categoryId ?? null,
         name: { equals: name.trim(), mode: 'insensitive' },
         ...(excludeId ? { id: { not: excludeId } } : {}),
       },
     });
-    if (existente) throw new ConflictException('Ya existe un producto con este nombre');
+    if (existente) throw new ConflictException('Ya existe un producto con este nombre en esta categoría');
   }
 
   private async validateTags(businessId: string, tagIds: string[]) {

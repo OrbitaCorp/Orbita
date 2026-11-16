@@ -63,6 +63,18 @@ export function onColorPara(hex: string): '#0F172A' | '#FFFFFF' {
   return luminancia(rgb) > 0.42 ? '#0F172A' : '#FFFFFF'
 }
 
+/**
+ * Contraste WCAG entre dos colores (1 a 21), o null si alguno no es un hex.
+ * Lo usa el hero para no dibujar el botón en el primario cuando el fondo del
+ * slide es de ese mismo tono (botón casi negro sobre fondo casi negro).
+ */
+export function contraste(a: string, b: string): number | null {
+  const ra = aRgb(a), rb = aRgb(b)
+  if (!ra || !rb) return null
+  const [l1, l2] = [luminancia(ra), luminancia(rb)].sort((x, y) => y - x)
+  return (l1 + 0.05) / (l2 + 0.05)
+}
+
 export function cssPrimarioTienda(primario: string): string {
   const oscuro = primarioParaOscuro(primario)
   const onClaro = onColorPara(primario)

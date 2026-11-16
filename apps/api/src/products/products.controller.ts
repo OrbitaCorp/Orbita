@@ -40,8 +40,10 @@ import { AiAssistDto } from './dto/ai-assist.dto';
 import { AiVariantsDto } from './dto/ai-variants.dto';
 import { SuggestedImagesDto } from './dto/suggested-images.dto';
 import { ProxyImageDto } from './dto/proxy-image.dto';
+import { WebImageSuggestionsDto } from './dto/web-image-suggestions.dto';
+import { AddImageFromWebDto } from './dto/add-image-from-web.dto';
 import { CuotaService } from '../common/cuota/cuota.service';
-import { AI_ASSIST_DIA_NEGOCIO } from '../common/cuota/limites';
+import { AI_ASSIST_DIA_NEGOCIO, FOTOS_WEB_DIA_NEGOCIO } from '../common/cuota/limites';
 import { DemoIa } from '../demo/demo-ia';
 import { DemoIaInterceptor } from '../demo/demo-ia.interceptor';
 import { PresignVideoUploadDto } from '../businesses/dto/presign-video-upload.dto';
@@ -243,6 +245,52 @@ export class ProductsController {
     const member = assertMemberContext(ctx);
     if (!file) throw new BadRequestException('Falta el archivo "file"');
     return this.productsService.addImage(member.businessId, id, dto, file);
+  }
+
+  // Importar Excel → paso Fotos: fotos de la web para un producto ya importado,
+  // buscadas por nombre (sin el filtro de modelo de 'suggested-images'). Todos
+  // los planes, con tope diario por negocio. Sin @DemoIa: el visitante de la
+  // demo no importa productos.
+  @Post(':id/web-image-suggestions')
+  @RequirePermission('catalog.manage')
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
+  async webImageSuggestions(
+    @CurrentBusiness() ctx: AuthContext,
+    @Param('id') id: string,
+    @Body() dto: WebImageSuggestionsDto,
+  ) {
+    const member = assertMemberContext(ctx);
+    if (!this.productImageSearchService) return [];
+    const datos = await this.productsService.datosParaFotoWeb(member.businessId, id, dto.optionValueId);
+    if (!(await this.cuotaService.consumir(`fotos-web:${member.businessId}`, FOTOS_WEB_DIA_NEGOCIO))) {
+      throw new HttpException(
+        `Llegaste al máximo de ${FOTOS_WEB_DIA_NEGOCIO} búsquedas de fotos por hoy. Mañana se renueva; mientras tanto podés subir las tuyas.`,
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+    return this.productImageSearchService.searchCatalogImages({ ...datos, businessId: member.businessId });
+  }
+
+  // Guarda una foto sugerida de la web: la baja el servidor y entra por el
+  // mismo camino que una subida (webp, storage propio, tope de fotos).
+  @Post(':id/images/from-web')
+  @RequirePermission('catalog.manage')
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
+  async addImageFromWeb(
+    @CurrentBusiness() ctx: AuthContext,
+    @Param('id') id: string,
+    @Body() dto: AddImageFromWebDto,
+  ) {
+    const member = assertMemberContext(ctx);
+    if (!this.productImageSearchService) throw new BadRequestException('Servicio de imágenes no disponible');
+    const { buffer, mimeType } = await this.productImageSearchService.descargarImagen(dto.url);
+    const extension = mimeType.split('/')[1] || 'jpg';
+    return this.productsService.addImage(
+      member.businessId,
+      id,
+      { optionValueId: dto.optionValueId, isPrimary: dto.isPrimary },
+      { buffer, mimetype: mimeType, originalname: `foto-web.${extension}` },
+    );
   }
 
   @Delete(':id/images/:imageId')

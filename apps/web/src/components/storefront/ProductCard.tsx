@@ -3,6 +3,7 @@ import { ArrowUpRight, Eye, Check, ShoppingCart, Timer } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { ProdImage } from './Thumb'
+import { VariantesTexto, textoVariantes } from './VariantesTexto'
 import { VariantPickerModal } from './VariantPickerModal'
 import { fmt, thumbGradient, thumbGradientAlt, imagenParaVariante, variantePrincipal } from '@/lib/storefront/utils'
 import { useCart } from '@/lib/storefront/CartContext'
@@ -387,6 +388,11 @@ export function ProductCard({ producto, rank, layout = 'grid', mode: modoDeLaTie
             })()}
             {producto.lowStock && <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: '#D97706' }}>Últimas unidades</span>}
           </div>
+          {textoVariantes(producto.variantOptions, true) && (
+            <div style={{ marginTop: -2, marginBottom: 3 }}>
+              <VariantesTexto de={producto} sinVisuales tamano={11.5} />
+            </div>
+          )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
               {/* "Desde" — variantes con precio distinto (ver priceTo en
@@ -614,7 +620,10 @@ export function ProductCard({ producto, rank, layout = 'grid', mode: modoDeLaTie
             </div>
           )}
 
-          <div style={{ fontSize: 14.5, fontWeight: 700, lineHeight: 1.3 }}>{producto.nombre}</div>
+          <div style={{ fontSize: 14.5, fontWeight: 700, lineHeight: 1.3 }}>
+            {producto.nombre}
+            <VariantesTexto de={producto} t={tema} sinVisuales />
+          </div>
 
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
             {producto.precioAnt && (
@@ -930,6 +939,13 @@ export function ProductCard({ producto, rank, layout = 'grid', mode: modoDeLaTie
         }}>
           {producto.nombre}
         </div>
+        {/* Fuera del nombre: el nombre va recortado a 2 líneas (line-clamp) y
+            adentro esta línea quedaría oculta justo en los nombres largos. */}
+        {textoVariantes(producto.variantOptions, true) && (
+          <div style={{ marginTop: -2, marginBottom: 6 }}>
+            <VariantesTexto de={producto} sinVisuales tamano={12.5} />
+          </div>
+        )}
 
         {/* flexWrap: si en una columna muy angosta no entran precio +
             "Comprar ahora" en la misma línea (los dos ahora con flexShrink:0

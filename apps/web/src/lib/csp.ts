@@ -60,7 +60,13 @@ export const TEMA_SCRIPT = `
             if (sub.indexOf('www.') === 0) sub = sub.slice(4);
             esTiendaPorSubdominio = !!sub && sub !== 'www';
           }
-          var esStorefront = !esPanel && (esTiendaPorPath || esTiendaPorSubdominio);
+          // Dominio propio de una tienda (cruzyparfums.shop): ni el path ni el
+          // subdominio lo delatan, así que lo dice _app.tsx, que lo sabe por
+          // el server (__storefront). Sin esto caía en la rama del panel: el
+          // checkout salía en oscuro si el sistema del visitante lo estaba,
+          // aunque el dueño eligiera claro (pasó 08/11/2026).
+          var esTiendaPorProps = !!s && s.getAttribute('data-storefront') === '1';
+          var esStorefront = !esPanel && (esTiendaPorProps || esTiendaPorPath || esTiendaPorSubdominio);
           // Las páginas de la landing (PaginaV2) tienen su propia clave (ThemeContext.tsx):
           // oscuras salvo que el visitante haya elegido claro ahí. Sin esto, quien eligió
           // claro veía el primer cuadro oscuro hasta que React hidrataba.

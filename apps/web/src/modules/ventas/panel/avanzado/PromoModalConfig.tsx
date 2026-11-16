@@ -211,7 +211,7 @@ export default function PromoModalConfig({ onVolver }: { onVolver: () => void })
                         <div style={{ display: 'flex', gap: 8, padding: '10px 12px', borderRadius: 8, background: 'var(--color-surface)', border: '1px solid var(--color-border)', marginBottom: 14 }}>
                             <Info size={14} strokeWidth={1.8} color="var(--color-muted)" style={{ flexShrink: 0, marginTop: 1 }} />
                             <div style={{ fontSize: 11.5, color: 'var(--color-muted)', lineHeight: 1.5 }}>
-                                Esto es un anuncio: el título, el mensaje y el código son texto libre, no se validan contra ningún descuento real. Asegurate de poder cumplir lo que promete — por ejemplo, hoy no hay un motor de &ldquo;2x1&rdquo; automático; si anunciás un código, que exista de verdad como descuento en Descuentos o se resuelva a mano.
+                                Esto es un anuncio: el título, el mensaje y el código son texto libre, no se validan contra ningún descuento real. Asegurate de poder cumplir lo que promete: si anunciás un 2x1, armalo en Avanzado → 2x1 y 3x2; si anunciás un código, que exista de verdad como cupón o descuento.
                             </div>
                         </div>
 

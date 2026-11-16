@@ -42,11 +42,13 @@ export function DetalleEncabezado({ descuento, onEditar }: Props) {
             Creado el{' '}
             <span style={{ color: 'var(--color-body)' }}>
               {isoADisplay(descuento.createdAt.split('T')[0]) || descuento.createdAt}
-            </span>{' '}
-            por{' '}
-            <span style={{ color: 'var(--color-body)', fontWeight: 500 }}>
-              {descuento.creadoPor === 'usr-admin' ? 'Marcos Olivera' : descuento.creadoPor}
             </span>
+            {descuento.creadoPor && (
+              <>
+                {' '}por{' '}
+                <span style={{ color: 'var(--color-body)', fontWeight: 500 }}>{descuento.creadoPor}</span>
+              </>
+            )}
           </div>
         </div>
 

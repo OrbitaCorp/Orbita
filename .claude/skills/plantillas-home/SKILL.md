@@ -170,6 +170,8 @@ muestra.
    color (ver § Que no se parezca a otra).
 5. **Comprar y entrar a la cuenta es igual en todas.** Cuenta con "Mis
    pedidos" adentro y carrito con contador. Cambia cómo se ve, no qué hace.
+   Y **tocar el logo (el nombre de la tienda) en el header vuelve a la
+   portada**, en escritorio y en celular (ver § El logo vuelve al inicio).
 
 6. **En celular tiene que quedar tan bien como en computadora.** La mayoría de
    los clientes de una tienda entra desde el teléfono: la versión de celular no
@@ -405,6 +407,42 @@ El grupo `enlaces del nav` del check lo prueba: la vitrina no tiene enlaces
 sin `onClick`, la tienda real conserva los de Apariencia y `.pl-nav:hover` no
 toca la opacidad.
 
+### El logo vuelve al inicio
+
+El nombre/logo de la tienda en el header lleva a la portada en TODAS las
+plantillas y en todas las vistas: el header de la plantilla también se dibuja
+en el catálogo, la ficha y el carrito (`soloHeader`), y ahí es la forma de
+volver. Siempre el mismo patrón, en el elemento que muestra la marca (o en el
+que la envuelve, si va con un ícono):
+
+```tsx
+<span
+  onClick={acciones?.irAInicio}
+  style={{ /* lo de la plantilla */, cursor: acciones?.irAInicio ? 'pointer' : undefined }}
+>{p.marca}</span>
+```
+
+Vale para cada variante del header: la de escritorio y la de celular (son JSX
+distintos y se olvida uno), y para las piezas compartidas (`HeaderCentrado`,
+`HeaderLateral`). En la vitrina no hay `acciones`: no hace nada ni muestra la
+mano, como el resto. Se rompió en Sobrio y otras 9 de receta (08/11,
+Cruzyparfums): el logo del header centrado de escritorio no tenía el `onClick`.
+El grupo `logo` del check lo prueba en las de header propio, en las dos
+pantallas (busca el nombre de la tienda y pide el cursor de mano en él o en lo
+que lo envuelve). Las tiendas sin plantilla usan `StorefrontHeader`, que ya
+enlaza el logo con `<a href={base}>`.
+
+### Las tarjetas muestran las variantes
+
+Una tarjeta de producto propia de la plantilla (las que no pasan por
+`acciones.renderProducto`, y la `Card` de `piezas.tsx`) pone
+`<VariantesTexto de={x} t={t} />` (de `@/components/storefront/VariantesTexto`)
+dentro del elemento del nombre, justo después del texto: una línea tenue con
+lo que se puede elegir ("50 ml · 100 ml"). Solo aparece si el producto tiene
+una opción con 2 o más valores. Si el nombre va con alto fijo o recortado a N
+líneas, va como hermano, después del nombre, para que no quede oculta. En las
+filas mixtas de producto o categoría, `de={x.producto}`.
+
 ## La carga
 
 Tres cosas hacen que una portada con plantilla no pegue saltos al cargar. Las
@@ -562,6 +600,7 @@ categorías, cuarenta productos).
 | editor-portada | Cada cosa que el editor deja cargar cambia la portada: los campos de cada slide, cada campo de Secciones, la cartelera y los ítems del anuncio, estadísticas, parallax, marcas, la descripción, las redes y el cupón. Y al revés: no dibuja lo que el editor no ofrece |
 | esqueleto | El esqueleto de carga de cada plantilla no dibuja imágenes ni deja nada de la maqueta en el HTML |
 | header | El header suelto (el que usa el catálogo, la ficha y el carrito) trae cuenta y carrito, y no arrastra la portada |
+| logo | En las de header propio, en escritorio y celular, el nombre de la tienda en el header lleva al inicio (`onClick={acciones?.irAInicio}` con su cursor de mano) |
 | deslizar | En celular, el gesto del hero se escucha sobre el bloque del hero y no sobre toda la portada (contiene el título del slide y abarca ≤60% de los elementos), o el hero es de slides fijos |
 | menú de celular | "Inicio" va primero, no se duplica, en "minimal" el menú es solo "Inicio" |
 

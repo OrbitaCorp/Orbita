@@ -11,11 +11,16 @@
 //                la misma API del alta manual. Muestra el avance y lo que falló.
 //   4. Fotos     las fotos no viajan en el Excel: acá se recorren los productos
 //                importados uno por uno para cargarles las suyas, generales o
-//                por color cuando el producto tiene esa variante.
+//                por color cuando el producto tiene esa variante. Cada producto
+//                trae una foto sugerida de la web (búsqueda por nombre en la
+//                API, ver ProductImageSearchService.searchCatalogImages): se
+//                usa, se cambia por otra opción o se descarta. Se busca al
+//                mostrarse el producto (y los siguientes, por adelantado), no
+//                todo de una: cada búsqueda es paga y tiene tope diario.
 //
 // La lista de lo importado queda guardada en la pestaña (sessionStorage): si se
 // cierra la ventana, al volver a abrirla se puede seguir cargando fotos.
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react'
 import {
     AlertCircle, ArrowLeft, ArrowRight, Check, CheckCircle2, ChevronLeft, ChevronRight, Download, FileSpreadsheet,
     ImagePlus, Images, Loader2, Search, Upload, X,
@@ -24,8 +29,9 @@ import { Modal } from '@/design-system/components/Modal'
 import { Button } from '@/design-system/components/Button'
 import { fmtMoney } from '@/lib/utils'
 import {
-    ApiError, panelCreateCategory, panelCreateProduct, panelGetBusiness, panelGetCategoriesFlat, panelUploadProductImage,
-    type ApiCategory,
+    ApiError, panelAddProductImageFromWeb, panelCreateCategory, panelCreateProduct, panelGetBusiness, panelGetCategoriesFlat,
+    panelGetWebImageSuggestions, panelUploadProductImage,
+    type ApiCategory, type SuggestedProductImage,
 } from '@/lib/api'
 import {
     ArchivoInvalido, armarPlantilla, armarProductos, leerExcel, plano,
@@ -60,7 +66,36 @@ function guardarSesion(lista: Importado[]) {
     } catch { /* sin acceso al almacenamiento: queda solo en memoria */ }
 }
 
-const mensajeDe = (e: unknown) => (e instanceof ApiError || e instanceof Error ? e.message : 'No se pudo completar. Probá de nuevo.')
+// ─── Fotos sugeridas de la web ──────────────────────────────────────────────
+
+interface Sugerencia {
+    estado: 'buscando' | 'lista' | 'error'
+    fotos: SuggestedProductImage[]
+    /** URL de la opción elegida en "Ver otras"; sin elegir, la primera que cargue. */
+    elegida?: string
+    descartada?: boolean
+    mensaje?: string
+}
+/** Una búsqueda por producto y destino (Generales o cada color). */
+const claveSug = (productoId: string, destino: string | null) => `${productoId}:${destino ?? ''}`
+const CLAVE_SUGERIDAS = 'orbita_importacion_sugeridas'
+/** Productos de más adelante en la lista que se buscan antes de que la persona llegue. */
+const POR_ADELANTADO = 3
+
+function leerSugeridas(): Record<string, Sugerencia> {
+    try { return JSON.parse(window.sessionStorage.getItem(CLAVE_SUGERIDAS) ?? '{}') as Record<string, Sugerencia> } catch { return {} }
+}
+function guardarSugeridas(todas: Record<string, Sugerencia>) {
+    try {
+        // Solo lo terminado: una búsqueda a medias o fallida se repite al volver.
+        const listas = Object.fromEntries(Object.entries(todas).filter(([, s]) => s.estado === 'lista'))
+        if (Object.keys(listas).length) window.sessionStorage.setItem(CLAVE_SUGERIDAS, JSON.stringify(listas))
+        else window.sessionStorage.removeItem(CLAVE_SUGERIDAS)
+    } catch { /* sin acceso al almacenamiento */ }
+}
+const dominioDe = (f: SuggestedProductImage) => f.domain || (() => { try { return new URL(f.sourceUrl || f.url).hostname.replace(/^www\./, '') } catch { return '' } })()
+
+const mensajeDe = (e: unknown) =>(e instanceof ApiError || e instanceof Error ? e.message : 'No se pudo completar. Probá de nuevo.')
 
 // ─── Estilos ─────────────────────────────────────────────────────────────────
 
@@ -139,6 +174,26 @@ const CSS = `
   .imp-foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .imp-foto em { position: absolute; left: 6px; bottom: 6px; padding: 2px 7px; border-radius: 999px; font-style: normal; font-size: 10.5px; font-weight: 700; background: rgba(15,23,42,0.78); color: #fff; }
   .imp-foto[data-subiendo='true'] { display: grid; place-items: center; color: var(--color-muted); }
+  .imp-mini img[data-sugerida='true'] { opacity: 0.55; }
+
+  .imp-sug { display: grid; grid-template-columns: 168px minmax(0, 1fr); gap: 14px; padding: 12px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-bg); }
+  .imp-sug-foto { width: 168px; aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: var(--color-surface-alt); display: grid; place-items: center; color: var(--color-subtle); }
+  .imp-sug-foto img { width: 100%; height: 100%; object-fit: contain; background: #fff; display: block; }
+  .imp-sug-info { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .imp-sug-info b { font-size: 14px; font-weight: 600; color: var(--color-text); }
+  .imp-sug-info p { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--color-muted); }
+  .imp-sug-info p span { color: var(--color-body); overflow-wrap: anywhere; }
+  .imp-sug-acciones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 6px; }
+  .imp-sug-otras { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 8px; }
+  .imp-sug-otras button { position: relative; aspect-ratio: 1; padding: 0; border-radius: 9px; overflow: hidden; border: 1px solid var(--color-border); background: #fff; cursor: pointer; transition: border-color 160ms ease; }
+  .imp-sug-otras button:hover { border-color: var(--color-border-strong, var(--color-subtle)); }
+  .imp-sug-otras button[aria-pressed='true'] { border: 2px solid var(--color-primary); }
+  .imp-sug-otras button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  .imp-sug-otras img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .imp-sug-linea { margin: 0; font-size: 12.5px; color: var(--color-muted); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .imp-link { border: none; background: none; padding: 0; font: inherit; font-weight: 600; color: var(--color-primary); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+  .imp-link:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 3px; }
+
   .imp-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; padding-top: 6px; }
   .imp-gira { animation: impGira 900ms linear infinite; }
   @keyframes impGira { to { transform: rotate(360deg); } }
@@ -148,6 +203,8 @@ const CSS = `
     .imp-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .imp-fotos { grid-template-columns: minmax(0, 1fr); }
     .imp-items { max-height: 200px; }
+    .imp-sug { grid-template-columns: minmax(0, 1fr); }
+    .imp-sug-foto { width: 100%; max-width: 240px; }
     .imp-pasos li span { display: none; }
     .imp-pasos li[data-estado='actual'] span { display: inline; }
   }
@@ -320,7 +377,7 @@ export function ImportarProductos({ abierto, onCerrar, onImportado }: {
     const actual = importados.find(p => p.id === elegido) ?? filtrados[0] ?? null
     const conFotos = importados.filter(p => p.fotos.length > 0).length
 
-    const elegir = (id: string) => { setElegido(id); setDestino(null); setErrorFoto('') }
+    const elegir = (id: string) => { setElegido(id); setDestino(null); setErrorFoto(''); setVerOtras(false) }
     const mover = (delta: number) => {
         if (!actual) return
         const i = filtrados.findIndex(p => p.id === actual.id)
@@ -364,12 +421,175 @@ export function ImportarProductos({ abierto, onCerrar, onImportado }: {
     const alElegirFotos = (e: ChangeEvent<HTMLInputElement>) => { void subirFotos([...(e.target.files ?? [])]); e.target.value = '' }
     const alSoltarFotos = (e: DragEvent) => { e.preventDefault(); setEncima(false); void subirFotos([...e.dataTransfer.files]) }
 
-    const retomar = () => { setImportados(pendientes); setFallos([]); setPaso('fotos') }
-    const terminar = () => { guardarSesion([]); setImportados([]); setPendientes([]); reiniciar(); onCerrar() }
+    // ── 4b. Fotos sugeridas de la web ──
+    const [sugeridas, setSugeridas] = useState<Record<string, Sugerencia>>({})
+    const sugRef = useRef<Record<string, Sugerencia>>({})
+    const enCurso = useRef(new Map<string, Promise<Sugerencia>>())
+    // El 429 del tope diario corta todas las búsquedas que siguen, no solo una.
+    const topeRef = useRef('')
+    const [rotas, setRotas] = useState<Set<string>>(new Set())
+    const [verOtras, setVerOtras] = useState(false)
+    const [guardandoSug, setGuardandoSug] = useState(false)
+    const [enBloque, setEnBloque] = useState<{ hechos: number; total: number } | null>(null)
+    const [confirmarBloque, setConfirmarBloque] = useState(false)
+    const [avisoBloque, setAvisoBloque] = useState('')
+
+    const ponerSug = useCallback((k: string, cambio: (previa?: Sugerencia) => Sugerencia) => {
+        const todas = { ...sugRef.current, [k]: cambio(sugRef.current[k]) }
+        sugRef.current = todas
+        setSugeridas(todas)
+        guardarSugeridas(todas)
+    }, [])
+
+    const buscarSugerida = useCallback((productoId: string, dest: string | null): Promise<Sugerencia> => {
+        const k = claveSug(productoId, dest)
+        const previa = sugRef.current[k]
+        if (previa && previa.estado === 'lista') return Promise.resolve(previa)
+        const pendiente = enCurso.current.get(k)
+        if (pendiente) return pendiente
+        if (topeRef.current) {
+            const sinCupo: Sugerencia = { estado: 'error', fotos: [], mensaje: topeRef.current }
+            ponerSug(k, () => sinCupo)
+            return Promise.resolve(sinCupo)
+        }
+        ponerSug(k, () => ({ estado: 'buscando', fotos: [] }))
+        const p = panelGetWebImageSuggestions(productoId, dest ?? undefined)
+            .then((fotos): Sugerencia => ({ estado: 'lista', fotos: Array.isArray(fotos) ? fotos : [] }))
+            .catch((e: unknown): Sugerencia => {
+                if (e instanceof ApiError && e.status === 429) topeRef.current = e.message
+                return { estado: 'error', fotos: [], mensaje: mensajeDe(e) }
+            })
+            .then(s => { ponerSug(k, () => s); enCurso.current.delete(k); return s })
+        enCurso.current.set(k, p)
+        return p
+    }, [ponerSug])
+
+    // La que se muestra: la elegida en "Ver otras" o la primera cuya foto cargue.
+    const opcionesDe = (s?: Sugerencia) => (s?.fotos ?? []).filter(f => !rotas.has(f.url))
+    const mostradaDe = (s?: Sugerencia) => {
+        const opciones = opcionesDe(s)
+        return opciones.find(f => f.url === s?.elegida) ?? opciones[0] ?? null
+    }
+    const marcarRota = (url: string) => setRotas(prev => new Set(prev).add(url))
+
+    // Al mostrarse un producto (o cambiar a las fotos de un color) se busca la
+    // suya, y por adelantado las de los siguientes, para que al tocar
+    // "Siguiente" ya esté. Solo para lo que todavía no tiene fotos.
+    useEffect(() => {
+        if (paso !== 'fotos' || !actual) return
+        const i = filtrados.findIndex(p => p.id === actual.id)
+        const cola: { p: Importado; dest: string | null }[] = [
+            { p: actual, dest: destino },
+            ...filtrados.slice(i + 1, i + 1 + POR_ADELANTADO).map(p => ({ p, dest: null })),
+        ]
+        for (const { p, dest } of cola) {
+            if (p.fotos.some(f => f.destino === dest)) continue
+            if (sugRef.current[claveSug(p.id, dest)]) continue // ya buscada (o falló: se reintenta a mano)
+            void buscarSugerida(p.id, dest)
+        }
+    }, [paso, actual, destino, filtrados, buscarSugerida])
+
+    const agregarFotoLocal = (id: string, url: string, dest: string | null) => {
+        setImportados(lista => {
+            const nueva = lista.map(p => (p.id === id ? { ...p, fotos: [...p.fotos, { url, destino: dest }] } : p))
+            guardarSesion(nueva)
+            return nueva
+        })
+    }
+
+    // El servidor baja la foto y la guarda en nuestro storage, como una subida más.
+    const guardarSugerida = async (p: Importado, dest: string | null, foto: SuggestedProductImage) => {
+        const img = await panelAddProductImageFromWeb(p.id, {
+            url: foto.url,
+            isPrimary: p.fotos.length === 0 && !dest,
+            ...(dest ? { optionValueId: dest } : {}),
+        })
+        agregarFotoLocal(p.id, img.url, dest)
+    }
+
+    const usarSugerida = async () => {
+        if (!actual) return
+        const foto = mostradaDe(sugeridas[claveSug(actual.id, destino)])
+        if (!foto) return
+        setErrorFoto('')
+        setGuardandoSug(true)
+        try {
+            await guardarSugerida(actual, destino, foto)
+            setVerOtras(false)
+            onImportado()
+        } catch (e) {
+            setErrorFoto(`No pudimos guardar esa foto (${mensajeDe(e)}). Probá con otra opción o subí la tuya.`)
+        } finally { setGuardandoSug(false) }
+    }
+
+    const descartarSugerida = () => {
+        if (!actual) return
+        ponerSug(claveSug(actual.id, destino), s => ({ ...(s ?? { estado: 'lista', fotos: [] }), descartada: true }))
+        setVerOtras(false)
+    }
+
+    const reintentarSugerida = () => {
+        if (!actual) return
+        topeRef.current = ''
+        void buscarSugerida(actual.id, destino)
+    }
+
+    // "Usar las sugeridas de esta página": los productos de la página sin
+    // ninguna foto y con la sugerencia sin descartar. Busca lo que falte y
+    // guarda la que se mostraría (la elegida o la primera).
+    const candidatosBloque = visibles.filter(p => p.fotos.length === 0 && !sugeridas[claveSug(p.id, null)]?.descartada)
+    const usarSugeridasDeLaPagina = async () => {
+        const lista = [...candidatosBloque]
+        setConfirmarBloque(false)
+        setAvisoBloque('')
+        setErrorFoto('')
+        if (!lista.length) return
+        let hechos = 0, guardadas = 0, sinFoto = 0, fallidas = 0
+        setEnBloque({ hechos, total: lista.length })
+        const cola = [...lista]
+        const trabajador = async () => {
+            for (;;) {
+                const p = cola.shift()
+                if (!p) return
+                const s = await buscarSugerida(p.id, null)
+                const foto = mostradaDe(s)
+                if (!foto) sinFoto++
+                else {
+                    try { await guardarSugerida(p, null, foto); guardadas++ } catch { fallidas++ }
+                }
+                setEnBloque({ hechos: ++hechos, total: lista.length })
+            }
+        }
+        await Promise.all(Array.from({ length: EN_PARALELO }, trabajador))
+        setEnBloque(null)
+        if (guardadas) onImportado()
+        const partes = [`Se guardaron ${guardadas} foto${guardadas === 1 ? '' : 's'}.`]
+        if (sinFoto) partes.push(`${sinFoto} producto${sinFoto === 1 ? '' : 's'} no tenía${sinFoto === 1 ? '' : 'n'} sugerencia.`)
+        if (fallidas) partes.push(`${fallidas} no se pudo bajar del sitio de origen.`)
+        if (topeRef.current) partes.push(topeRef.current)
+        partes.push('Revisalas en la lista: la búsqueda es por nombre y alguna puede no ser la del producto.')
+        setAvisoBloque(partes.join(' '))
+    }
+
+    const retomar = () => {
+        const previas = leerSugeridas()
+        sugRef.current = previas
+        setSugeridas(previas)
+        setImportados(pendientes); setFallos([]); setPaso('fotos')
+    }
+    const terminar = () => {
+        guardarSesion([]); setImportados([]); setPendientes([])
+        guardarSugeridas({}); sugRef.current = {}; setSugeridas({}); topeRef.current = ''; setAvisoBloque('')
+        reiniciar(); onCerrar()
+    }
 
     const iPaso = PASOS.findIndex(p => p.id === paso)
     const fotosDelDestino = actual ? actual.fotos.filter(f => f.destino === destino) : []
     const nombreDestino = actual?.visual?.valores.find(v => v.id === destino)?.valor
+    const sugActual = actual ? sugeridas[claveSug(actual.id, destino)] : undefined
+    const opcionesActual = opcionesDe(sugActual)
+    const mostrada = mostradaDe(sugActual)
+    const ocupado = subiendo > 0 || guardandoSug || enBloque !== null
 
     return (
         <Modal isOpen={abierto} onClose={cerrar} title="Importar productos desde Excel" maxWidth={paso === 'fotos' ? 980 : 760} dismissable={paso !== 'importando'}>
@@ -551,19 +771,29 @@ export function ImportarProductos({ abierto, onCerrar, onImportado }: {
                                     <button type="button" aria-pressed={soloSinFoto} onClick={() => { setSoloSinFoto(true); setPagina(0) }}>Sin fotos ({importados.length - conFotos})</button>
                                 </div>
                                 <div className="imp-items">
-                                    {visibles.map(p => (
-                                        <button key={p.id} type="button" className="imp-item" aria-current={actual?.id === p.id} onClick={() => elegir(p.id)}>
-                                            <span className="imp-mini">
-                                                {/* eslint-disable-next-line @next/next/no-img-element -- miniatura de una foto recién subida */}
-                                                {p.fotos[0] ? <img src={p.fotos[0].url} alt="" /> : <ImagePlus size={16} aria-hidden />}
-                                            </span>
-                                            <span style={{ minWidth: 0, flex: 1 }}>
-                                                <b>{p.nombre}</b>
-                                                <small>{p.cantVariantes > 0 ? `${p.cantVariantes} variantes · ` : ''}{p.fotos.length ? `${p.fotos.length} foto${p.fotos.length === 1 ? '' : 's'}` : 'sin fotos'}</small>
-                                            </span>
-                                            {p.fotos.length > 0 && <Check size={15} strokeWidth={3} aria-hidden style={{ color: 'var(--color-success)', flexShrink: 0 }} />}
-                                        </button>
-                                    ))}
+                                    {visibles.map(p => {
+                                        const sug = sugeridas[claveSug(p.id, null)]
+                                        const sugerida = p.fotos.length === 0 && !sug?.descartada ? mostradaDe(sug) : null
+                                        return (
+                                            <button key={p.id} type="button" className="imp-item" aria-current={actual?.id === p.id} onClick={() => elegir(p.id)}>
+                                                <span className="imp-mini">
+                                                    {/* eslint-disable-next-line @next/next/no-img-element -- miniatura de una foto recién subida o sugerida */}
+                                                    {p.fotos[0] ? <img src={p.fotos[0].url} alt="" />
+                                                        // eslint-disable-next-line @next/next/no-img-element -- miniatura de Google de la sugerida
+                                                        : sugerida ? <img src={sugerida.thumbnailUrl || sugerida.url} alt="" data-sugerida="true" referrerPolicy="no-referrer" loading="lazy" />
+                                                        : <ImagePlus size={16} aria-hidden />}
+                                                </span>
+                                                <span style={{ minWidth: 0, flex: 1 }}>
+                                                    <b>{p.nombre}</b>
+                                                    <small>
+                                                        {p.cantVariantes > 0 ? `${p.cantVariantes} variantes · ` : ''}
+                                                        {p.fotos.length ? `${p.fotos.length} foto${p.fotos.length === 1 ? '' : 's'}` : sugerida ? 'foto sugerida' : 'sin fotos'}
+                                                    </small>
+                                                </span>
+                                                {p.fotos.length > 0 && <Check size={15} strokeWidth={3} aria-hidden style={{ color: 'var(--color-success)', flexShrink: 0 }} />}
+                                            </button>
+                                        )
+                                    })}
                                     {visibles.length === 0 && <p style={{ margin: 0, padding: 18, fontSize: 13, color: 'var(--color-muted)', textAlign: 'center' }}>{soloSinFoto ? 'Todos los productos tienen fotos.' : 'Ningún producto coincide con la búsqueda.'}</p>}
                                 </div>
                                 {paginas > 1 && (
@@ -588,15 +818,84 @@ export function ImportarProductos({ abierto, onCerrar, onImportado }: {
                                         </div>
                                         {actual.visual && (
                                             <div className="imp-destinos" role="group" aria-label="A qué corresponden las fotos">
-                                                <button type="button" aria-pressed={destino === null} onClick={() => setDestino(null)}>
+                                                <button type="button" aria-pressed={destino === null} onClick={() => { setDestino(null); setVerOtras(false) }}>
                                                     Generales <span>{actual.fotos.filter(f => f.destino === null).length}</span>
                                                 </button>
                                                 {actual.visual.valores.map(v => (
-                                                    <button key={v.id} type="button" aria-pressed={destino === v.id} onClick={() => setDestino(v.id)}>
+                                                    <button key={v.id} type="button" aria-pressed={destino === v.id} onClick={() => { setDestino(v.id); setVerOtras(false) }}>
                                                         {v.valor} <span>{actual.fotos.filter(f => f.destino === v.id).length}</span>
                                                     </button>
                                                 ))}
                                             </div>
+                                        )}
+                                        {fotosDelDestino.length === 0 && sugActual && !sugActual.descartada && (
+                                            sugActual.estado === 'buscando' ? (
+                                                <div className="imp-sug" role="status" aria-live="polite">
+                                                    <div className="imp-sug-foto"><Loader2 size={20} className="imp-gira" aria-hidden /></div>
+                                                    <div className="imp-sug-info">
+                                                        <b>Buscando una foto en la web…</b>
+                                                        <p>Mientras tanto podés subir las tuyas.</p>
+                                                    </div>
+                                                </div>
+                                            ) : sugActual.estado === 'error' ? (
+                                                <p className="imp-sug-linea" role="alert">
+                                                    {sugActual.mensaje || 'No pudimos buscar una foto en la web.'}
+                                                    <button type="button" className="imp-link" onClick={reintentarSugerida}>Probar de nuevo</button>
+                                                </p>
+                                            ) : mostrada ? (
+                                                <>
+                                                    <div className="imp-sug">
+                                                        <div className="imp-sug-foto">
+                                                            {/* eslint-disable-next-line @next/next/no-img-element -- foto externa, todavía no guardada */}
+                                                            <img
+                                                                key={mostrada.url}
+                                                                src={mostrada.url}
+                                                                alt={`Foto sugerida para ${actual.nombre}`}
+                                                                referrerPolicy="no-referrer"
+                                                                onError={e => {
+                                                                    // El sitio de origen no deja mostrarla: la miniatura de Google, y si tampoco, la siguiente opción.
+                                                                    const img = e.currentTarget
+                                                                    if (mostrada.thumbnailUrl && img.src !== mostrada.thumbnailUrl) img.src = mostrada.thumbnailUrl
+                                                                    else marcarRota(mostrada.url)
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        <div className="imp-sug-info">
+                                                            <b>Foto sugerida de la web</b>
+                                                            {dominioDe(mostrada) && <p>De <span>{dominioDe(mostrada)}</span></p>}
+                                                            <p>Fijate que sea este producto antes de usarla. Se guarda en tu tienda como una foto más.</p>
+                                                            <div className="imp-sug-acciones">
+                                                                <Button variant="primary" size="sm" icon={guardandoSug ? <Loader2 size={14} className="imp-gira" /> : <Check size={14} />} onClick={() => void usarSugerida()} disabled={guardandoSug || ocupado}>
+                                                                    {guardandoSug ? 'Guardando…' : 'Usar esta foto'}
+                                                                </Button>
+                                                                {opcionesActual.length > 1 && (
+                                                                    <Button variant="outline" size="sm" onClick={() => setVerOtras(v => !v)} aria-expanded={verOtras} disabled={guardandoSug}>
+                                                                        {/* "Ver otras" como texto propio: el manual nombra el botón así (ver manual/contrato.test.ts). */}
+                                                                        {verOtras ? 'Ocultar opciones' : <>Ver otras <span>({opcionesActual.length - 1})</span></>}
+                                                                    </Button>
+                                                                )}
+                                                                <Button variant="ghost" size="sm" onClick={descartarSugerida} disabled={guardandoSug}>Descartar</Button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    {verOtras && (
+                                                        <div className="imp-sug-otras" role="group" aria-label="Otras fotos sugeridas">
+                                                            {opcionesActual.map((f, i) => (
+                                                                <button
+                                                                    key={f.url} type="button" aria-pressed={f.url === mostrada.url}
+                                                                    aria-label={`Opción ${i + 1}${dominioDe(f) ? `, de ${dominioDe(f)}` : ''}`}
+                                                                    onClick={() => ponerSug(claveSug(actual.id, destino), s => ({ ...(s ?? { estado: 'lista', fotos: [] }), elegida: f.url }))}
+                                                                >
+                                                                    {/* eslint-disable-next-line @next/next/no-img-element -- miniatura de una opción externa */}
+                                                                    <img src={f.thumbnailUrl || f.url} alt="" referrerPolicy="no-referrer" loading="lazy" onError={() => marcarRota(f.url)} />
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <p className="imp-sug-linea">No encontramos una foto de este producto en la web. Subí la tuya.</p>
+                                            )
                                         )}
                                         <input ref={fotosRef} type="file" accept="image/*" multiple hidden onChange={alElegirFotos} />
                                         <div
@@ -606,7 +905,11 @@ export function ImportarProductos({ abierto, onCerrar, onImportado }: {
                                             onDragOver={e => { e.preventDefault(); setEncima(true) }} onDragLeave={() => setEncima(false)} onDrop={alSoltarFotos}
                                         >
                                             {subiendo > 0 ? <Loader2 size={22} className="imp-gira" aria-hidden /> : <ImagePlus size={22} aria-hidden />}
-                                            <b>{subiendo > 0 ? `Subiendo ${subiendo} foto${subiendo === 1 ? '' : 's'}…` : nombreDestino ? `Fotos de ${nombreDestino}: elegilas o arrastralas acá` : 'Elegí las fotos o arrastralas acá'}</b>
+                                            <b>
+                                                {subiendo > 0 ? `Subiendo ${subiendo} foto${subiendo === 1 ? '' : 's'}…`
+                                                    : mostrada && fotosDelDestino.length === 0 && !sugActual?.descartada ? 'O subí las tuyas: elegilas o arrastralas acá'
+                                                    : nombreDestino ? `Fotos de ${nombreDestino}: elegilas o arrastralas acá` : 'Elegí las fotos o arrastralas acá'}
+                                            </b>
                                             <span>Podés subir varias juntas. JPG, PNG o WebP, hasta {MAX_MB_FOTO} MB cada una.</span>
                                         </div>
                                         {errorFoto && <div className="imp-aviso" data-tono="error" role="alert"><AlertCircle size={16} aria-hidden /> <span>{errorFoto}</span></div>}
@@ -622,9 +925,9 @@ export function ImportarProductos({ abierto, onCerrar, onImportado }: {
                                             </div>
                                         )}
                                         <div className="imp-nav">
-                                            <Button variant="outline" icon={<ChevronLeft size={15} />} onClick={() => mover(-1)} disabled={iActual <= 0 || subiendo > 0}>Anterior</Button>
+                                            <Button variant="outline" icon={<ChevronLeft size={15} />} onClick={() => mover(-1)} disabled={iActual <= 0 || ocupado}>Anterior</Button>
                                             <span style={{ fontSize: 12.5, color: 'var(--color-muted)', fontVariantNumeric: 'tabular-nums' }}>{iActual + 1} de {filtrados.length}</span>
-                                            <Button variant="primary" onClick={() => mover(1)} disabled={iActual < 0 || iActual >= filtrados.length - 1 || subiendo > 0}>
+                                            <Button variant="primary" onClick={() => mover(1)} disabled={iActual < 0 || iActual >= filtrados.length - 1 || ocupado}>
                                                 Siguiente <ArrowRight size={15} style={{ marginLeft: 6 }} />
                                             </Button>
                                         </div>
@@ -636,9 +939,43 @@ export function ImportarProductos({ abierto, onCerrar, onImportado }: {
                         </div>
                     )}
 
+                    {enBloque ? (
+                        <div style={{ display: 'grid', gap: 8 }} role="status" aria-live="polite">
+                            <div className="imp-barra" role="progressbar" aria-valuemin={0} aria-valuemax={enBloque.total} aria-valuenow={enBloque.hechos}>
+                                <i style={{ width: `${(enBloque.hechos / enBloque.total) * 100}%` }} />
+                            </div>
+                            <p className="imp-sug-linea">Guardando las fotos sugeridas: {enBloque.hechos} de {enBloque.total}.</p>
+                        </div>
+                    ) : confirmarBloque ? (
+                        <div className="imp-aviso" data-tono="info">
+                            <Images size={16} aria-hidden />
+                            <div style={{ flex: 1 }}>
+                                Se va a guardar la foto sugerida de <b>{candidatosBloque.length} producto{candidatosBloque.length === 1 ? '' : 's'}</b> de esta página que todavía no tiene{candidatosBloque.length === 1 ? '' : 'n'} fotos.
+                                La búsqueda es por nombre: alguna puede no ser la del producto, así que revisalas después en la lista.
+                            </div>
+                            <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                                <Button variant="ghost" size="sm" onClick={() => setConfirmarBloque(false)}>Cancelar</Button>
+                                <Button variant="primary" size="sm" onClick={() => void usarSugeridasDeLaPagina()}>Usar {candidatosBloque.length} foto{candidatosBloque.length === 1 ? '' : 's'}</Button>
+                            </div>
+                        </div>
+                    ) : avisoBloque ? (
+                        <div className="imp-aviso" data-tono="info" role="status">
+                            <CheckCircle2 size={16} aria-hidden />
+                            <span style={{ flex: 1 }}>{avisoBloque}</span>
+                            <button type="button" className="imp-link" onClick={() => setAvisoBloque('')}>Cerrar</button>
+                        </div>
+                    ) : null}
+
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-                        <Button variant="outline" onClick={() => { onCerrar() }} disabled={subiendo > 0}>Seguir después</Button>
-                        <Button variant="primary" icon={<X size={15} />} onClick={terminar} disabled={subiendo > 0}>Terminar</Button>
+                        <Button variant="outline" onClick={() => { onCerrar() }} disabled={ocupado}>Seguir después</Button>
+                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                            {candidatosBloque.length > 0 && !enBloque && !confirmarBloque && (
+                                <Button variant="outline" icon={<Images size={15} />} onClick={() => { setAvisoBloque(''); setConfirmarBloque(true) }} disabled={ocupado}>
+                                    Usar las sugeridas de esta página
+                                </Button>
+                            )}
+                            <Button variant="primary" icon={<X size={15} />} onClick={terminar} disabled={ocupado}>Terminar</Button>
+                        </div>
                     </div>
                 </div>
             )}

@@ -20,7 +20,7 @@ import { AcceptInvitationDto } from './dto/accept-invitation.dto';
 import { DemoCustomerSessionResponse, DemoSessionResponse, LoginResponse, PlatformAdminAuthResponse, PlatformAdminMfaChallenge } from './auth.types';
 import { errorDemo } from '../common/guards/demo.guard';
 import { DemoFechasService } from '../demo/demo-fechas.service';
-import { EMAIL_INVITADO_DEMO } from '../demo/demo.constants';
+import { DEMO_SLUG_PANEL, DEMO_SLUGS, EMAIL_INVITADO_DEMO } from '../demo/demo.constants';
 import { GoogleIdentity } from './google-auth.service';
 import * as argon2 from 'argon2';
 import * as jwt from 'jsonwebtoken';
@@ -28,8 +28,7 @@ import { createHash, randomBytes, randomInt } from 'crypto';
 import { contrasenaTemporalVencida } from '../common/utils/contrasena-temporal';
 import { PlatformAdminLogService } from '../platform/platform-admin-log.service';
 
-const LOCKOUT_THRESHOLD = 5;
-const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutos
+import { trasIntentoFallido } from './bloqueo-login';
 const MEMBER_REFRESH_DAYS = 7;
 const CUSTOMER_REFRESH_DAYS = 30;
 // Código de recuperación: 6 dígitos, 15 minutos, máximo 5 intentos fallidos
@@ -266,7 +265,7 @@ export class AuthService implements OnModuleInit {
 
         const valid = await argon2.verify(member.passwordHash, dto.password);
         if (!valid) {
-          await this.handleFailedLogin('member', member.id, member.failedLoginAttempts);
+          await this.handleFailedLogin('member', member.id, member.failedLoginAttempts, member.lockedUntil);
           throw new UnauthorizedException('Credenciales inválidas');
         }
         this.assertInvitacionVigente(member);
@@ -362,7 +361,7 @@ export class AuthService implements OnModuleInit {
 
       const valid = await argon2.verify(customer.passwordHash, dto.password);
       if (!valid) {
-        await this.handleFailedLogin('customer', customer.id, customer.failedLoginAttempts);
+        await this.handleFailedLogin('customer', customer.id, customer.failedLoginAttempts, customer.lockedUntil);
         throw new UnauthorizedException('Credenciales inválidas');
       }
 
@@ -410,7 +409,7 @@ export class AuthService implements OnModuleInit {
 
       const valid = await argon2.verify(admin.passwordHash, dto.password);
       if (!valid) {
-        await this.handleFailedLogin('platform_admin', admin.id, admin.failedLoginAttempts);
+        await this.handleFailedLogin('platform_admin', admin.id, admin.failedLoginAttempts, admin.lockedUntil);
         await this.adminLog?.loginFallido({ adminId: admin.id, email: dto.email, motivo: 'password', ...deviceInfo });
         throw new UnauthorizedException('Credenciales inválidas');
       }
@@ -465,7 +464,7 @@ export class AuthService implements OnModuleInit {
       // Un intento fallido cuenta contra CADA negocio de ese email — no hay
       // forma de saber cuál de los dos quiso, así que los dos acumulan.
       await Promise.all(
-        conPassword.map((c) => this.handleFailedLogin('member', c.id, c.failedLoginAttempts)),
+        conPassword.map((c) => this.handleFailedLogin('member', c.id, c.failedLoginAttempts, c.lockedUntil)),
       );
       throw new UnauthorizedException('Credenciales inválidas');
     }
@@ -1035,10 +1034,17 @@ export class AuthService implements OnModuleInit {
   // refresh del panel (vive en todo .orbita.site): si un dueño real prueba la
   // demo, su propia sesión queda intacta. Cuando el token vence, el frontend
   // vuelve a pedir uno acá. Todo lo que no sea lectura lo corta DemoGuard.
-  async demoSession(canal: 'panel' | 'customer' = 'panel'): Promise<DemoSessionResponse | DemoCustomerSessionResponse> {
-    if (canal === 'customer') return this.demoSessionCliente();
+  //
+  // La demo tiene varias tiendas (DEMO_SLUGS): el Invitado es el de la tienda
+  // que pide (`slug`); sin slug o con uno que no es de la demo, el de
+  // DEMO_SLUG_PANEL (lo que mandaba el frontend antes de que hubiera dos). El
+  // panel es siempre el de DEMO_SLUG_PANEL.
+  async demoSession(canal: 'panel' | 'customer' = 'panel', slug?: string): Promise<DemoSessionResponse | DemoCustomerSessionResponse> {
+    if (canal === 'customer') {
+      return this.demoSessionCliente((DEMO_SLUGS as readonly string[]).includes(slug ?? '') ? slug! : DEMO_SLUG_PANEL);
+    }
     const member = await this.prisma.member.findFirst({
-      where: { readOnly: true, business: { isDemo: true, deletedAt: null } },
+      where: { readOnly: true, business: { isDemo: true, deletedAt: null, subdomain: DEMO_SLUG_PANEL } },
       include: {
         role: { include: { rolePermissions: { include: { permission: true } } } },
         business: { select: { id: true, name: true, subdomain: true, mode: true } },
@@ -1066,9 +1072,9 @@ export class AuthService implements OnModuleInit {
   // (sembrado, con pedidos), sin contraseña ni refresh token. Solo lectura:
   // AuthGuard marca readOnly a todo cliente de un negocio demo y DemoGuard le
   // corta las escrituras; lo que "compra" vive en su navegador.
-  private async demoSessionCliente(): Promise<DemoCustomerSessionResponse> {
+  private async demoSessionCliente(slug: string): Promise<DemoCustomerSessionResponse> {
     const customer = await this.prisma.customer.findFirst({
-      where: { email: EMAIL_INVITADO_DEMO, deletedAt: null, business: { isDemo: true, deletedAt: null } },
+      where: { email: EMAIL_INVITADO_DEMO, deletedAt: null, business: { isDemo: true, deletedAt: null, subdomain: slug } },
       include: { business: { select: { id: true, name: true, subdomain: true, mode: true } } },
     });
     if (!customer) throw new NotFoundException('La demo no está disponible');
@@ -1464,13 +1470,10 @@ export class AuthService implements OnModuleInit {
     type: 'member' | 'customer' | 'platform_admin',
     id: string,
     currentAttempts: number,
+    lockedUntil: Date | null,
   ): Promise<void> {
-    const newAttempts = currentAttempts + 1;
-    const data: { failedLoginAttempts: number; lockedUntil?: Date } = { failedLoginAttempts: newAttempts };
-
-    if (newAttempts >= LOCKOUT_THRESHOLD) {
-      data.lockedUntil = new Date(Date.now() + LOCKOUT_DURATION_MS);
-    }
+    // Si el bloqueo anterior ya venció, el contador arranca de nuevo (ver bloqueo-login.ts).
+    const data = trasIntentoFallido(currentAttempts, lockedUntil);
 
     if (type === 'member') {
       await this.prisma.member.update({ where: { id }, data });

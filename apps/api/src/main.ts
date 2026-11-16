@@ -7,6 +7,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { crearOrigenPermitido, subdominiosDelFrontend } from './common/cors/origen-permitido';
 import { saltosDeProxy } from './common/utils/proxy';
 import { PrismaService } from './prisma/prisma.service';
+import { DomainsService } from './domains/domains.service';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
@@ -55,14 +56,15 @@ async function bootstrap(): Promise<void> {
   // con DNS verificado) con caché en memoria de 5 minutos, positiva y
   // negativa, para no pegarle a la base en cada request (auditoría interna
   // 10/09, hallazgo `hallazgo.cors-dominios-propios`; ver
-  // common/cors/origen-permitido.ts). Consecuencia: un dominio recién
-  // activado tarda hasta 5 minutos en pasar CORS, y uno eliminado o
+  // common/cors/origen-permitido.ts). Un dominio todavía pendiente se
+  // verifica en el momento (ver esDominioPropioActivo). Uno eliminado o
   // suspendido sigue pasando ese mismo rato. Los orígenes fijos de abajo se
   // evalúan antes y nunca tocan la base.
   const ORBITA_LOCAL_ORIGIN = /^http:\/\/([a-z0-9-]+\.)?orbita\.local:3001$/;
   const ORBITA_SITE_ORIGIN = /^https:\/\/([a-z0-9-]+\.)?orbita\.site$/;
   const isProd = process.env.NODE_ENV === 'production';
   const prisma = app.get(PrismaService);
+  const domains = app.get(DomainsService);
   app.enableCors({
     origin: crearOrigenPermitido({
       fijos: [
@@ -76,10 +78,24 @@ async function bootstrap(): Promise<void> {
         // repite la regla de orbita.site).
         ...[subdominiosDelFrontend(process.env.FRONTEND_URL)].filter((re): re is RegExp => re !== null),
       ],
-      esDominioPropioActivo: (host) =>
-        prisma.customDomain
-          .findFirst({ where: { domain: host, status: 'ACTIVE', dnsVerified: true }, select: { id: true } })
-          .then(Boolean),
+      esDominioPropioActivo: async (host) => {
+        const activo = await prisma.customDomain.findFirst({
+          where: { domain: host, status: 'ACTIVE', dnsVerified: true },
+          select: { id: true },
+        });
+        if (activo) return true;
+        // Un visitante entró por un dominio propio que todavía figura
+        // pendiente: si llegó hasta acá, el DNS ya apunta a Órbita, así que
+        // se verifica ahora en vez de esperar a que el dueño toque
+        // "Verificar" (ver DomainsService.activarSiYaAnda). Pasa a lo sumo una
+        // vez cada 5 minutos por host: el resultado entra en la caché de
+        // arriba. Con tope de tiempo (las llamadas a Vercel no tienen uno
+        // propio); si no llega, el disparo de cada 5 minutos lo termina.
+        return Promise.race([
+          domains.activarSiYaAnda(host),
+          new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 10_000)),
+        ]).catch(() => false);
+      },
     }),
     credentials: true,
   });

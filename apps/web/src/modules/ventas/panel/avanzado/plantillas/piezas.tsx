@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { esPreview } from '@/lib/storefront/previewBridge'
 import { User, ShoppingBag } from 'lucide-react'
 import { CreditoOrbita } from '@/components/storefront/CreditoOrbita'
+import { VariantesTexto } from '@/components/storefront/VariantesTexto'
 import { abrirPreferenciasDeCookies } from '@/lib/cookies/consentimiento'
 import type { AccionesHome, ItemPie, Producto, Slide, Tema } from './tipos'
 
@@ -257,7 +258,7 @@ export function Card({ p, t, sangre, alto = 300, onClick }: { p: Producto; t: Te
             la tarjeta real (ProductCard con `tema`) tampoco las tiene.
             Los campos `estrellas`/`resenas` siguen en los datos de muestra,
             sin usarse, para no tocar las dieciséis plantillas de una. */}
-        <div style={{ fontSize: 14.5, fontWeight: 700 }}>{p.nombre}</div>
+        <div style={{ fontSize: 14.5, fontWeight: 700 }}>{p.nombre}<VariantesTexto de={p} t={t} /></div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
           {p.antes && <span style={{ fontSize: 12.5, color: t.muted, textDecoration: 'line-through' }}>{p.antes}</span>}
           <span style={{ fontSize: 18, fontWeight: 800 }}>{p.precio}</span>
@@ -277,7 +278,12 @@ export function Card({ p, t, sangre, alto = 300, onClick }: { p: Producto; t: Te
 }
 
 // `onClick` solo lo pasa la tienda real; en el panel el botón es decorativo.
-export function Boton({ t, children, grande, secundario, ancho, onClick }: { t: Tema; children: React.ReactNode; grande?: boolean; secundario?: boolean; ancho?: boolean; onClick?: () => void }) {
+// `sobreFoto`: el botón va encima de una foto (el hero a sangre). El
+// secundario no puede usar el texto del tema, que en una tienda con primario
+// casi negro queda negro sobre una foto oscura: va en blanco, con un velo
+// oscuro detrás para que se lea también sobre una foto clara.
+export function Boton({ t, children, grande, secundario, ancho, sobreFoto, onClick }: { t: Tema; children: React.ReactNode; grande?: boolean; secundario?: boolean; ancho?: boolean; sobreFoto?: boolean; onClick?: () => void }) {
+  const secFoto = secundario && sobreFoto
   return (
     <span
       className="pl-cta"
@@ -286,9 +292,11 @@ export function Boton({ t, children, grande, secundario, ancho, onClick }: { t: 
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         padding: grande ? '15px 34px' : '11px 22px',
         borderRadius: t.radio === 0 ? 0 : 999,
-        background: secundario ? 'transparent' : t.primary,
-        color: secundario ? t.text : t.onPrimary,
-        border: secundario ? `1px solid ${t.border}` : 'none',
+        background: secFoto ? 'rgba(0,0,0,0.28)' : secundario ? 'transparent' : t.primary,
+        color: secFoto ? '#fff' : secundario ? t.text : t.onPrimary,
+        border: secFoto ? '1px solid rgba(255,255,255,0.75)' : secundario ? `1px solid ${t.border}` : 'none',
+        backdropFilter: secFoto ? 'blur(6px)' : undefined,
+        WebkitBackdropFilter: secFoto ? 'blur(6px)' : undefined,
         fontSize: grande ? 14.5 : 13.5, fontWeight: 700, fontFamily: t.fb, whiteSpace: 'nowrap',
         boxShadow: secundario ? 'none' : t.sombra,
         width: ancho ? '100%' : undefined, cursor: 'pointer',
@@ -544,7 +552,10 @@ export function HeaderCentrado({ t, marca, links, conBuscador, movil, acciones }
               </div>
             )
         ) : <span />}
-        <span style={{ fontFamily: t.fh, fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', color: t.text }}>{marca}</span>
+        <span
+          onClick={acciones?.irAInicio}
+          style={{ fontFamily: t.fh, fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', color: t.text, cursor: acciones?.irAInicio ? 'pointer' : undefined }}
+        >{marca}</span>
         <span style={{ justifySelf: 'end' }}><AccionesTienda t={t} acciones={acciones} /></span>
       </div>
       <div style={{ display: 'flex', justifyContent: 'center', gap: 26, padding: '0 28px 14px', fontSize: 13.5, color: t.text }}>
@@ -566,14 +577,20 @@ export function HeaderLateral({ t, marca, links, conBuscador, movil, acciones }:
     return (
       <div style={{ borderBottom: `1px solid ${t.border}`, background: t.surf, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontSize: 18 }}>☰</span>
-        <span style={{ fontFamily: t.fh, fontSize: 18, fontWeight: 800, color: t.text }}>{marca}</span>
+        <span
+          onClick={acciones?.irAInicio}
+          style={{ fontFamily: t.fh, fontSize: 18, fontWeight: 800, color: t.text, cursor: acciones?.irAInicio ? 'pointer' : undefined }}
+        >{marca}</span>
         <AccionesTienda t={t} movil acciones={acciones} />
       </div>
     )
   }
   return (
     <div style={{ padding: '16px 32px', borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', gap: 28, background: t.surf }}>
-      <span style={{ fontFamily: t.fh, fontSize: 21, fontWeight: 800, color: t.text, letterSpacing: '-0.015em' }}>{marca}</span>
+      <span
+        onClick={acciones?.irAInicio}
+        style={{ fontFamily: t.fh, fontSize: 21, fontWeight: 800, color: t.text, letterSpacing: '-0.015em', cursor: acciones?.irAInicio ? 'pointer' : undefined }}
+      >{marca}</span>
       <div style={{ display: 'flex', gap: 22, fontSize: 13.5, color: t.muted }}>
         {nav.map((l) => (
           <span key={l.label} onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined, color: l.activo ? t.text : undefined }}>{l.label}</span>

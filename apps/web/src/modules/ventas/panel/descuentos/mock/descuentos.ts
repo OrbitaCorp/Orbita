@@ -4,7 +4,7 @@ import type { Descuento } from '../types'
 // TODO: Reemplazar por GET /api/descuentos
 // Fechas en ISO 8601; el formato DD/MM/YYYY se resuelve en la UI.
 
-const CREADO_POR = 'usr-admin'
+const CREADO_POR = 'Marcos Olivera'
 
 export const descuentosMock: Descuento[] = [
   {

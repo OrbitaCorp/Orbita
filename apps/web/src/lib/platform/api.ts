@@ -49,6 +49,8 @@ export type CasillaCorreo = {
   name: string
   jobTitle: string | null
   phone: string | null
+  // Número del botón de WhatsApp de los correos de Seguimiento (solo dígitos, con código de país).
+  whatsapp: string | null
   signatureImageUrl: string | null
   // La imagen es la firma completa (una tarjeta) y reemplaza a la de texto.
   signatureBanner: boolean
@@ -56,6 +58,42 @@ export type CasillaCorreo = {
   verified?: boolean | null
 }
 export type CasillaCorreoInput = Omit<CasillaCorreo, 'id' | 'verified'>
+
+// Seguimiento a clientes (ver apps/api/src/platform/seguimiento/).
+export type EtapaSeguimiento =
+  | 'baja' | 'pago_pendiente' | 'pausada' | 'por_vencer' | 'bienvenida'
+  | 'sin_productos' | 'sin_publicar' | 'se_enfrio' | 'sin_ventas' | 'vendiendo'
+export type PlantillaSeguimiento = {
+  etapa: EtapaSeguimiento
+  nombre: string
+  cuando: string
+  asunto: string
+  cuerpo: string
+  botonWhatsapp: string
+  mensajeWhatsapp: string
+}
+export type FilaSeguimiento = {
+  id: string
+  name: string
+  subdomain: string
+  etapa: EtapaSeguimiento
+  // Le falta un correo por su etapa actual (no se le escribió por esta etapa en los últimos 30 días).
+  pendiente: boolean
+  createdAt: string
+  publicada: boolean
+  productos: number
+  pedidos: number
+  owner: { name: string; email: string; lastAccessAt: string | null } | null
+  suscripcion: { status: string; currentPeriodEnd: string } | null
+  ultimoSeguimiento: { etapa: EtapaSeguimiento | null; asunto: string; enviadoPor: string; fecha: string; cantidad: number } | null
+}
+export type BorradorSeguimiento = {
+  to: string | null
+  subject: string
+  body: string
+  whatsapp: { numero: string; texto: string; mensaje: string } | null
+}
+type SeguimientoInput = { businessId: string; etapa: EtapaSeguimiento; senderId: string }
 export type CorreoEnviado = {
   id: string
   fromEmail: string
@@ -396,6 +434,17 @@ export interface UpdateDiscountCodeInput {
 }
 
 export type BusinessStatus = 'draft' | 'active' | 'paused'
+
+// Lo único de los negocios que ve el rol MARKETING (GET /platform/business-contacts): contacto y dirección de la tienda.
+export interface BusinessContactRow {
+  id: string
+  name: string
+  industry: string
+  owner: { name: string; email: string } | null
+  contact: { email: string | null; whatsapp: string | null; instagram: string | null; tiktok: string | null; facebook: string | null }
+  store: { subdomain: string; customDomains: string[] }
+}
+export interface BusinessContactList { data: BusinessContactRow[]; total: number; page: number; limit: number }
 
 export interface Overview {
   businesses: {
@@ -1136,6 +1185,8 @@ export const platformApi = {
     return getJSON<BusinessList>(`/platform/businesses${q ? `?${q}` : ''}`)
   },
   business: (id: string) => getJSON<BusinessDetail>(`/platform/businesses/${id}`),
+  businessContacts: (params: { search?: string; page?: number; limit?: number } = {}) =>
+    getJSON<BusinessContactList>(`/platform/business-contacts${toQuery(params)}`),
   // Pedidos de acceso anticipado a Instagram (apps/api/src/instagram/instagram-admin.controller.ts).
   instagramPedidos: () => getJSON<InstagramPedido[]>('/platform/instagram/acceso'),
   // `avisado`: salió el correo "tu acceso está listo" al dueño (false si ya estaba habilitado o falló el envío).
@@ -1231,6 +1282,9 @@ export const platformApi = {
   // ¿Tengo un Claude conectado? Decide si «Mejorar con Claude» abre Claude o pide conectarlo primero.
   mcpEstado: () => getJSONConMensaje<{ conectado: boolean }>('/platform/mcp/estado'),
   grantComp: (businessId: string, input: GrantCompInput) => sendJSON<SubscriptionRow>(`/platform/subscriptions/${businessId}/grant-comp`, 'POST', input),
+  // Extender o acortar una cortesía ya cedida (hasta hoy, no antes).
+  updateComp: (businessId: string, input: { currentPeriodEnd: string; grantReason?: string }) =>
+    sendJSON<{ status: string; currentPeriodEnd: string; grantReason: string | null }>(`/platform/subscriptions/${businessId}/comp`, 'PUT', input),
   domains: () => getJSON<DomainsList>('/platform/domains'),
   owners: () => getJSON<OwnerRow[]>('/platform/owners'),
   subscriptions: () => getJSON<SubscriptionListRow[]>('/platform/subscriptions'),
@@ -1351,6 +1405,13 @@ export const platformApi = {
   correoVistaPrevia: (input: { senderId: string; body: string }) => sendJSON<{ html: string }>('/platform/correo/vista-previa', 'POST', input),
   enviarCorreo: (input: CorreoInput) => sendJSON<{ sent: boolean; simulated: boolean; error: string | null }>('/platform/correo/enviar', 'POST', input),
   correosEnviados: () => getJSON<CorreoEnviado[]>('/platform/correo/enviados'),
+
+  seguimiento: () => getJSON<FilaSeguimiento[]>('/platform/seguimiento'),
+  seguimientoPlantillas: () => getJSON<PlantillaSeguimiento[]>('/platform/seguimiento/plantillas'),
+  seguimientoBorrador: (input: SeguimientoInput) => sendJSON<BorradorSeguimiento>('/platform/seguimiento/borrador', 'POST', input),
+  seguimientoVistaPrevia: (input: SeguimientoInput & { body: string }) => sendJSON<{ html: string }>('/platform/seguimiento/vista-previa', 'POST', input),
+  enviarSeguimiento: (input: SeguimientoInput & { subject: string; body: string }) =>
+    sendJSON<{ sent: boolean; simulated: boolean; error: string | null }>('/platform/seguimiento/enviar', 'POST', input),
   correosRecibidos: () => getJSON<CorreoRecibido[]>('/platform/correo/recibidos'),
   correoRecibidoDetalle: (folderId: string, messageId: string) =>
     getJSON<{ html: string }>(`/platform/correo/recibidos/${encodeURIComponent(folderId)}/${encodeURIComponent(messageId)}`),

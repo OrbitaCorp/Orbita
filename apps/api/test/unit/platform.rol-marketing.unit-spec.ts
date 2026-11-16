@@ -20,6 +20,7 @@ import { OrbiSaludController } from '../../src/platform/orbi-salud.controller';
 import { ConversacionesPlataformaController } from '../../src/platform/orbi-uso/conversaciones.controller';
 import { OrbiUsoPlataformaController } from '../../src/platform/orbi-uso/orbi-uso.controller';
 import { PlatformController } from '../../src/platform/platform.controller';
+import { SeguimientoController } from '../../src/platform/seguimiento/seguimiento.controller';
 import { SupportAdminController } from '../../src/support/support-admin.controller';
 
 // Rol MARKETING (por ejemplo, Milagros): ve y usa SOLO lo que se le habilitó a propósito. Lo que no la nombra le queda cerrado,
@@ -30,6 +31,7 @@ const CONTROLADORES = [
   InstagramAdminController, InstagramBandejaController, InstagramContenidoController, MarketingController, McpConsentimientoController,
   ProspeccionController, TiktokController, VideosController, TutorialesController, PlatformAuditController, CorreoPlataformaController,
   CostsController, OrbiSaludController, ConversacionesPlataformaController, OrbiUsoPlataformaController, PlatformController, SupportAdminController,
+  SeguimientoController,
 ];
 
 type Clase = { name: string; prototype: object };
@@ -56,6 +58,8 @@ const guard = new PlatformAdminGuard(new Reflector());
 const ABIERTO_A_MARKETING = [
   // Resumen (sin plata: overview le saca la facturación) y canales
   'PlatformController.overview', 'PlatformController.growthSeries', 'MarketingController.estadoDeLosCanales',
+  // Negocios: solo contacto y dirección de la tienda (contactos-negocios.ts); la lista completa y la ficha siguen cerradas
+  'PlatformController.listBusinessContacts',
   // Correo: ver casillas y lo enviado, vista previa y enviar (tocar las casillas sigue siendo solo de superadmin)
   'CorreoPlataformaController.casillas', 'CorreoPlataformaController.vistaPrevia', 'CorreoPlataformaController.enviar', 'CorreoPlataformaController.enviados',
   // Conector de Claude (prospección y cola de videos)
@@ -92,8 +96,8 @@ describe('Rol MARKETING — acceso por lista cerrada', () => {
 
   it('nunca le abre lo que toca plata, accesos o cuentas de la empresa', () => {
     const cerrado: [Clase, string][] = [
-      [PlatformController, 'suspend'], [PlatformController, 'grantComp'], [PlatformController, 'createAdmin'], [PlatformController, 'updateAdmin'], [PlatformController, 'removeAdmin'],
-      [PlatformController, 'revenueSeries'], [PlatformController, 'listSubscriptions'], [PlatformController, 'listBusinesses'], [PlatformController, 'listAdmins'], [PlatformController, 'listLogs'],
+      [PlatformController, 'suspend'], [PlatformController, 'grantComp'], [PlatformController, 'updateComp'], [PlatformController, 'createAdmin'], [PlatformController, 'updateAdmin'], [PlatformController, 'removeAdmin'],
+      [PlatformController, 'revenueSeries'], [PlatformController, 'listSubscriptions'], [PlatformController, 'listBusinesses'], [PlatformController, 'getBusiness'], [PlatformController, 'businessSeries'], [PlatformController, 'listOwners'], [PlatformController, 'listAdmins'], [PlatformController, 'listLogs'],
       [CostsController, 'overview'], [InstagramAdminController, 'pedidos'],
       [CorreoPlataformaController, 'crearCasilla'], [CorreoPlataformaController, 'borrarCasilla'],
     ];

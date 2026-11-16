@@ -134,9 +134,11 @@ export class DiscountsService {
     });
     if (!d) throw new NotFoundException('Descuento no encontrado');
 
-    const [resumenes, conCountdown] = await Promise.all([
+    const [resumenes, conCountdown, autor] = await Promise.all([
       resumenesDeAlcance(this.prisma, businessId, [d]),
       this.countdown.discountIdConCountdown(businessId),
+      // El detalle muestra «Creado por <nombre>»: el id del member no le dice nada a nadie.
+      d.createdBy ? this.prisma.member.findFirst({ where: { id: d.createdBy, businessId }, select: { name: true } }) : null,
     ]);
 
     return {
@@ -167,6 +169,7 @@ export class DiscountsService {
       productIds: d.products.map((p) => p.productId),
       categoryIds: d.categories.map((c) => c.categoryId),
       createdBy: d.createdBy,
+      createdByName: autor?.name ?? null,
       createdAt: d.createdAt,
       updatedAt: d.updatedAt,
     };

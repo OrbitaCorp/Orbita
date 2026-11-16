@@ -27,6 +27,7 @@ export const ACTION_LABELS: Record<string, string> = {
   instagram_comment_show: 'Volver a mostrar un comentario de Instagram',
   instagram_disconnect: 'Desconectar la cuenta de Instagram de Órbita',
   grant_comp: 'Ceder cortesía',
+  update_comp: 'Modificar cortesía',
   create_price_campaign: 'Crear campaña de precio',
   update_price_campaign: 'Editar campaña de precio',
   update_plan_prices: 'Cambiar precios de lista',

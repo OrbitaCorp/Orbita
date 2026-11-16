@@ -19,6 +19,41 @@ describe('TEMA_SCRIPT', () => {
   })
 })
 
+// Corre el script con un <html>, un <script> y un navegador de mentira.
+function correrTema(opts: { hostname: string; pathname: string; atributos: Record<string, string>; sistemaOscuro: boolean; guardado?: Record<string, string> }) {
+  const clases = new Set<string>()
+  const documento = {
+    currentScript: { getAttribute: (k: string) => opts.atributos[k] ?? null },
+    documentElement: { classList: { add: (c: string) => clases.add(c) }, setAttribute: () => {} },
+  }
+  const ventana = {
+    location: { hostname: opts.hostname, pathname: opts.pathname },
+    matchMedia: (q: string) => ({ matches: q.includes('dark') && opts.sistemaOscuro }),
+  }
+  const almacen = { getItem: (k: string) => opts.guardado?.[k] ?? null }
+  new Function('document', 'window', 'localStorage', 'sessionStorage', TEMA_SCRIPT)(documento, ventana, almacen, almacen)
+  return clases
+}
+
+describe('TEMA_SCRIPT en un dominio propio', () => {
+  const base = { hostname: 'cruzyparfums.shop', pathname: '/checkout/datos', sistemaOscuro: true }
+
+  it('usa el modo que eligió el dueño, no el del sistema (data-storefront)', () => {
+    const clases = correrTema({ ...base, atributos: { 'data-root-domain': 'orbita.site', 'data-color-mode': 'light', 'data-storefront': '1' } })
+    expect(clases.has('dark')).toBe(false)
+  })
+
+  it('respeta lo que el visitante eligió en el toggle de la tienda', () => {
+    const clases = correrTema({ ...base, atributos: { 'data-root-domain': 'orbita.site', 'data-color-mode': 'light', 'data-storefront': '1' }, guardado: { 'orbita-theme-tienda': 'dark' } })
+    expect(clases.has('dark')).toBe(true)
+  })
+
+  it('sin data-storefront caía en la rama del panel (el bug): oscuro por el sistema', () => {
+    const clases = correrTema({ ...base, atributos: { 'data-root-domain': 'orbita.site', 'data-color-mode': 'light' } })
+    expect(clases.has('dark')).toBe(true)
+  })
+})
+
 describe('sha256Base64', () => {
   it('coincide con node:crypto (mismo formato que pide CSP)', async () => {
     const esperado = createHash('sha256').update(TEMA_SCRIPT, 'utf8').digest('base64')

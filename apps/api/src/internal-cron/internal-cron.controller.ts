@@ -9,6 +9,7 @@ import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { WizardAnalyticsService } from '../wizard-analytics/wizard-analytics.service';
 import { DomainExpiryService } from '../domains/domain-expiry.service';
+import { DomainsService } from '../domains/domains.service';
 import { EmailVerificationService } from '../member-profile/email-verification.service';
 import { CostsService } from '../platform/costs/costs.service';
 import { AlertasDeCostoService } from '../platform/costs/alertas-de-costo.service';
@@ -98,6 +99,9 @@ export class InternalCronController {
     // Reservas: vence las retenidas que pasaron su tiempo (cada 5 minutos, colgado del mismo disparo).
     // Opcional por la misma razón de compatibilidad con specs unitarios.
     private readonly reservasMantenimiento?: ReservasMantenimientoService,
+    // Dominios propios pendientes: se verifican solos (cada 5 minutos, colgado del mismo disparo) en vez de
+    // esperar a que el dueño toque "Verificar". Opcional por la misma razón de compatibilidad con specs unitarios.
+    private readonly domains?: DomainsService,
   ) {}
 
   // Antes: @Cron(EVERY_DAY_AT_3AM) + @Cron(EVERY_DAY_AT_4AM), por separado.
@@ -220,7 +224,16 @@ export class InternalCronController {
     } catch (e) {
       this.logger.error(`Reservas retenidas vencidas: no se pudo correr — ${describeError(e)}`);
     }
-    return { publicaciones, moderacion, reservas };
+    // Dominios propios que esperan DNS o certificado → ACTIVE apenas estén listos (ver
+    // DomainsService.verificarPendientes). Mismo criterio: si falla, se anota y sigue.
+    let dominios: { revisados: number; activados: string[] } | undefined;
+    try {
+      dominios = await this.domains?.verificarPendientes();
+      if (dominios?.activados.length) this.logger.log(`Dominios activados solos: ${dominios.activados.join(', ')}`);
+    } catch (e) {
+      this.logger.error(`Verificación automática de dominios: no se pudo correr — ${describeError(e)}`);
+    }
+    return { publicaciones, moderacion, reservas, dominios };
   }
 
   // Antes: @Cron('0 22 * * *')

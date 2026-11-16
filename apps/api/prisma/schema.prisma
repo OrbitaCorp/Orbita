@@ -1602,11 +1602,11 @@ enum RefundApiStatus {
 }
 
 model Conversation {
-  id         String   @id @default(uuid())
-  businessId String   @map("business_id")
-  customerId String   @map("customer_id") // FK real (antes era string nombre)
-  isUnread   Boolean  @default(true) @map("is_unread")
-  isArchived Boolean  @default(false) @map("is_archived")
+  id            String                @id @default(uuid())
+  businessId    String                @map("business_id")
+  customerId    String                @map("customer_id") // FK real (antes era string nombre)
+  isUnread      Boolean               @default(true) @map("is_unread")
+  isArchived    Boolean               @default(false) @map("is_archived")
   // Orbi atendiendo este chat de WhatsApp: DEFAULT sigue el modo general del negocio, ON/OFF lo decide el dueño para
   // este chat, PAUSADO es que entró una persona y Orbi se calló, DERIVADO que Orbi pidió que lo atienda una persona.
   // PAUSADO y DERIVADO solo los levanta el dueño (a mano).
@@ -1618,8 +1618,8 @@ model Conversation {
   botBorrador   Json?                 @map("bot_borrador")
   // Cuándo se le avisó por última vez al dueño que este chat necesita atención: evita mandar un correo por cada mensaje.
   botAvisoAt    DateTime?             @map("bot_aviso_at")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  createdAt     DateTime              @default(now()) @map("created_at")
+  updatedAt     DateTime              @updatedAt @map("updated_at")
 
   business Business  @relation(fields: [businessId], references: [id])
   customer Customer  @relation(fields: [customerId], references: [id])
@@ -1832,22 +1832,22 @@ enum WhatsappBotChatEstado {
 // Orbi como atención al público por WhatsApp (función del paquete Avanzado): el interruptor general del negocio, cómo
 // elige los chats y lo que el dueño quiere que Orbi sepa. Una fila por negocio.
 model WhatsappBotConfig {
-  id            String          @id @default(uuid())
-  businessId    String          @unique @map("business_id")
-  enabled       Boolean         @default(false)
-  modo          WhatsappBotModo @default(SELECCIONADOS)
+  id            String               @id @default(uuid())
+  businessId    String               @unique @map("business_id")
+  enabled       Boolean              @default(false)
+  modo          WhatsappBotModo      @default(SELECCIONADOS)
   instrucciones String? // indicaciones del dueño para Orbi (tono, promociones, políticas), hasta 1000 caracteres
   modalidad     WhatsappBotModalidad @default(CONVERSACIONAL)
   menuEstilo    WhatsappMenuEstilo   @default(LISTA) @map("menu_estilo")
   bienvenida    String? // saludo antes del menú; null = el de siempre
-  menuOpciones  Json?   @map("menu_opciones") // [{ id, titulo, descripcion?, activa, respuesta? }] en orden; null = el menú por defecto
+  menuOpciones  Json?                @map("menu_opciones") // [{ id, titulo, descripcion?, activa, respuesta? }] en orden; null = el menú por defecto
   // Orbi puede tomar pedidos (quedan pendientes, "coordinar por WhatsApp"): apagado por defecto, con topes por pedido.
-  tomaPedidos   Boolean @default(false) @map("toma_pedidos")
-  maxUnidades   Int     @default(10) @map("max_unidades")
-  maxMonto      Int     @default(200000) @map("max_monto") // en pesos
-  topeCreditos  Int?            @map("tope_creditos") // tope mensual propio del dueño, por debajo del cupo del plan
-  createdAt     DateTime        @default(now()) @map("created_at")
-  updatedAt     DateTime        @updatedAt @map("updated_at")
+  tomaPedidos   Boolean              @default(false) @map("toma_pedidos")
+  maxUnidades   Int                  @default(10) @map("max_unidades")
+  maxMonto      Int                  @default(200000) @map("max_monto") // en pesos
+  topeCreditos  Int?                 @map("tope_creditos") // tope mensual propio del dueño, por debajo del cupo del plan
+  createdAt     DateTime             @default(now()) @map("created_at")
+  updatedAt     DateTime             @updatedAt @map("updated_at")
 
   business Business @relation(fields: [businessId], references: [id])
 
@@ -2617,6 +2617,9 @@ model PlatformMailSender {
   name              String // con qué nombre sale el correo y firma
   jobTitle          String?  @map("job_title")
   phone             String?
+  // Número al que apunta el botón "Escribime por WhatsApp" de los correos de
+  // seguimiento a clientes. Solo dígitos, con código de país (5493757123456).
+  whatsapp          String?
   signatureImageUrl String?  @map("signature_image_url")
   // true: la imagen ES la firma (tarjeta completa) y reemplaza al texto.
   signatureBanner   Boolean  @default(false) @map("signature_banner")
@@ -2630,20 +2633,26 @@ model PlatformMailSender {
 // no guarda ni el cuerpo ni desde qué casilla salió. La casilla va copiada (no
 // como relación) para que borrarla no rompa el historial.
 model PlatformOutboundMail {
-  id        String          @id @default(uuid())
-  adminId   String          @map("admin_id")
-  fromEmail String          @map("from_email")
-  fromName  String          @map("from_name")
-  to        String
-  subject   String
-  body      String
-  status    EmailSendStatus
-  error     String?
-  createdAt DateTime        @default(now()) @map("created_at")
+  id            String          @id @default(uuid())
+  adminId       String          @map("admin_id")
+  fromEmail     String          @map("from_email")
+  fromName      String          @map("from_name")
+  to            String
+  subject       String
+  body          String
+  status        EmailSendStatus
+  error         String?
+  // Seguimiento a clientes (superadmin → Seguimiento): a qué negocio se le
+  // escribió y por qué etapa. Sin relación a propósito, como la casilla: el
+  // historial no se rompe si el negocio se borra. null = correo suelto.
+  businessId    String?         @map("business_id")
+  followUpStage String?         @map("follow_up_stage")
+  createdAt     DateTime        @default(now()) @map("created_at")
 
   admin PlatformAdmin @relation(fields: [adminId], references: [id])
 
   @@index([createdAt])
+  @@index([businessId, createdAt])
   @@map("platform_outbound_mails")
 }
 
@@ -3860,28 +3869,28 @@ model ReservaConfig {
   modulo     ReservaModulo
   activo     Boolean       @default(true)
 
-  confirmacion ReservaConfirmacion @default(AUTOMATICA)
+  confirmacion              ReservaConfirmacion @default(AUTOMATICA)
   /// Cuántos minutos queda tomado el lugar mientras la persona termina (RETENIDA).
-  retencionMinutos Int @default(10) @map("retencion_minutos")
+  retencionMinutos          Int                 @default(10) @map("retencion_minutos")
   /// Con cuánta anticipación mínima se puede reservar desde el sitio (minutos) y hasta cuántos días adelante.
-  anticipacionMinimaMinutos Int @default(60) @map("anticipacion_minima_minutos")
-  anticipacionMaximaDias    Int @default(60) @map("anticipacion_maxima_dias")
+  anticipacionMinimaMinutos Int                 @default(60) @map("anticipacion_minima_minutos")
+  anticipacionMaximaDias    Int                 @default(60) @map("anticipacion_maxima_dias")
   /// Hasta cuántas horas antes del inicio el cliente puede cancelar o reprogramar por su cuenta.
-  cancelacionHastaHoras    Int @default(24) @map("cancelacion_hasta_horas")
-  reprogramacionHastaHoras Int @default(24) @map("reprogramacion_hasta_horas")
-  reprogramacionesMaximas  Int @default(2) @map("reprogramaciones_maximas")
+  cancelacionHastaHoras     Int                 @default(24) @map("cancelacion_hasta_horas")
+  reprogramacionHastaHoras  Int                 @default(24) @map("reprogramacion_hasta_horas")
+  reprogramacionesMaximas   Int                 @default(2) @map("reprogramaciones_maximas")
   /// Seña: porcentaje del precio (0 = sin seña) y si se devuelve cuando se cancela a tiempo.
-  senaPorcentaje   Int     @default(0) @map("sena_porcentaje")
-  senaReembolsable Boolean @default(true) @map("sena_reembolsable")
+  senaPorcentaje            Int                 @default(0) @map("sena_porcentaje")
+  senaReembolsable          Boolean             @default(true) @map("sena_reembolsable")
   /// Reservas activas (futuras) que una misma persona puede tener a la vez desde el sitio. 0 = sin tope.
-  maximoActivasPorCliente Int @default(3) @map("maximo_activas_por_cliente")
+  maximoActivasPorCliente   Int                 @default(3) @map("maximo_activas_por_cliente")
   /// Si al cancelar una reserva de un recurso lleno, el primero de la lista de espera toma el lugar.
-  listaDeEspera Boolean @default(true) @map("lista_de_espera")
+  listaDeEspera             Boolean             @default(true) @map("lista_de_espera")
   /// Minutos libres entre una reserva y la siguiente (limpieza, descanso).
-  margenMinutos Int @default(0) @map("margen_minutos")
+  margenMinutos             Int                 @default(0) @map("margen_minutos")
   /// Horario semanal por defecto de los recursos sin horario propio:
   /// { "1": [[540, 780], [900, 1200]], … } con 0 = domingo y minutos desde las 00:00 de Argentina.
-  horario Json
+  horario                   Json
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -3896,37 +3905,37 @@ model ReservaConfig {
 // salón, un alojamiento o una clase con cupo. El precio y la duración de
 // fábrica viven acá; Turnos los toma del servicio elegido.
 model ReservaRecurso {
-  id          String             @id @default(uuid())
-  businessId  String             @map("business_id")
-  modulo      ReservaModulo
-  tipo        ReservaRecursoTipo
-  nombre      String             @db.VarChar(120)
-  descripcion String?            @db.VarChar(500)
+  id              String             @id @default(uuid())
+  businessId      String             @map("business_id")
+  modulo          ReservaModulo
+  tipo            ReservaRecursoTipo
+  nombre          String             @db.VarChar(120)
+  descripcion     String?            @db.VarChar(500)
   /// Cuántas reservas entran a la vez en el mismo rango. 1 = exclusivo (lo protege la base).
-  cupo        Int                @default(1)
+  cupo            Int                @default(1)
   /// Minutos de lo que se reserva (un turno de cancha, una noche no: para ALOJAMIENTO se ignora, una sesión de clase).
   /// null = lo define el servicio (Turnos).
-  duracionMinutos Int?           @map("duracion_minutos")
+  duracionMinutos Int?               @map("duracion_minutos")
   /// Cada cuántos minutos arranca una franja; null = cada `duracionMinutos`.
-  pasoMinutos     Int?           @map("paso_minutos")
+  pasoMinutos     Int?               @map("paso_minutos")
   /// Minutos libres entre reservas; null = el de la config.
-  margenMinutos   Int?           @map("margen_minutos")
+  margenMinutos   Int?               @map("margen_minutos")
   /// Canchas: cuántas franjas seguidas se pueden tomar en una sola reserva.
-  maximoSeguidos  Int            @default(1) @map("maximo_seguidos")
+  maximoSeguidos  Int                @default(1) @map("maximo_seguidos")
   /// Por franja, por noche o por lugar. Turnos usa el precio del servicio.
-  precio          Decimal        @default(0) @db.Decimal(12, 2)
+  precio          Decimal            @default(0) @db.Decimal(12, 2)
   /// Horario semanal propio (mismo formato que ReservaConfig.horario); null = el de la config.
   /// En una CLASE cada tramo es una sesión completa (no se parte en franjas).
   horario         Json?
   /// Lo que cada módulo necesita además: { checkIn, checkOut, nochesMinimas, extras: [{ id, nombre, precio }], profesor, disciplina, superficie… }.
   datos           Json?
   /// PROFESIONAL: el miembro del equipo cuya agenda es.
-  memberId        String?        @map("member_id")
-  orden           Int            @default(0)
-  activo          Boolean        @default(true)
-  eliminadoEn     DateTime?      @map("eliminado_en")
-  createdAt       DateTime       @default(now()) @map("created_at")
-  updatedAt       DateTime       @updatedAt @map("updated_at")
+  memberId        String?            @map("member_id")
+  orden           Int                @default(0)
+  activo          Boolean            @default(true)
+  eliminadoEn     DateTime?          @map("eliminado_en")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
 
   business Business         @relation(fields: [businessId], references: [id])
   reservas Reserva[]
@@ -3966,35 +3975,35 @@ model ReservaServicio {
 // del cliente y del servicio al momento de reservar: lo que se borre o cambie
 // después no la toca.
 model Reserva {
-  id         String        @id @default(uuid())
-  businessId String        @map("business_id")
-  modulo     ReservaModulo
-  recursoId  String        @map("recurso_id")
-  servicioId String?       @map("servicio_id")
+  id          String        @id @default(uuid())
+  businessId  String        @map("business_id")
+  modulo      ReservaModulo
+  recursoId   String        @map("recurso_id")
+  servicioId  String?       @map("servicio_id")
   /// Referencia visible ("decile al negocio tu código 4F7K2Q"). Única por negocio. No autentica nada.
-  codigo     String        @db.VarChar(8)
+  codigo      String        @db.VarChar(8)
   /// Secreto del enlace personal del cliente (/mi-reserva/<token>). Se devuelve al crear y nunca en el panel.
-  tokenAcceso String       @unique @map("token_acceso")
-  estado     ReservaEstado @default(RETENIDA)
-  origen     ReservaOrigen @default(TIENDA)
+  tokenAcceso String        @unique @map("token_acceso")
+  estado      ReservaEstado @default(RETENIDA)
+  origen      ReservaOrigen @default(TIENDA)
 
-  inicio   DateTime
-  fin      DateTime
+  inicio        DateTime
+  fin           DateTime
   /// Día de Argentina del inicio, AAAA-MM-DD, para listar la agenda por día.
-  fecha    String   @db.VarChar(10)
+  fecha         String    @db.VarChar(10)
   /// Lugares que ocupa del cupo del recurso (una clase con dos amigos = 2).
-  cantidad Int      @default(1)
+  cantidad      Int       @default(1)
   /// Copia de "el recurso tiene cupo 1": la restricción de exclusión de la base mira esta columna.
-  exclusivo Boolean @default(true)
+  exclusivo     Boolean   @default(true)
   /// RETENIDA: hasta cuándo ocupa lugar sin confirmar.
   retenidaHasta DateTime? @map("retenida_hasta")
 
-  clienteId       String?  @map("cliente_id")
-  clienteNombre   String   @db.VarChar(120) @map("cliente_nombre")
-  clienteTelefono String?  @db.VarChar(30) @map("cliente_telefono")
-  clienteEmail    String?  @db.VarChar(200) @map("cliente_email")
-  notas           String?  @db.VarChar(500)
-  notaInterna     String?  @db.VarChar(500) @map("nota_interna")
+  clienteId       String? @map("cliente_id")
+  clienteNombre   String  @map("cliente_nombre") @db.VarChar(120)
+  clienteTelefono String? @map("cliente_telefono") @db.VarChar(30)
+  clienteEmail    String? @map("cliente_email") @db.VarChar(200)
+  notas           String? @db.VarChar(500)
+  notaInterna     String? @map("nota_interna") @db.VarChar(500)
   /// Foto del servicio elegido: { id, nombre, duracionMinutos, precio }.
   servicio        Json?
   /// Extras elegidos del recurso: [{ id, nombre, precio }].
@@ -4003,20 +4012,20 @@ model Reserva {
   precio     Decimal @default(0) @db.Decimal(12, 2)
   sena       Decimal @default(0) @db.Decimal(12, 2)
   pagado     Decimal @default(0) @db.Decimal(12, 2)
-  pagoMetodo String? @db.VarChar(30) @map("pago_metodo")
+  pagoMetodo String? @map("pago_metodo") @db.VarChar(30)
 
   confirmadaEn      DateTime?     @map("confirmada_en")
   completadaEn      DateTime?     @map("completada_en")
   canceladaEn       DateTime?     @map("cancelada_en")
   canceladaPor      ReservaActor? @map("cancelada_por")
-  motivoCancelacion String?       @db.VarChar(300) @map("motivo_cancelacion")
+  motivoCancelacion String?       @map("motivo_cancelacion") @db.VarChar(300)
   reprogramaciones  Int           @default(0)
 
   /// La manda quien reserva (un uuid por intento): repetir el pedido devuelve la misma reserva.
-  claveIdempotencia String? @db.VarChar(80) @map("clave_idempotencia")
+  claveIdempotencia String?  @map("clave_idempotencia") @db.VarChar(80)
   /// Sube en cada cambio de estado: quien actúa sobre una versión vieja recibe 409.
-  version           Int     @default(1)
-  creadaPorMemberId String? @map("creada_por_member_id")
+  version           Int      @default(1)
+  creadaPorMemberId String?  @map("creada_por_member_id")
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
@@ -4067,9 +4076,9 @@ model ReservaEspera {
   inicio          DateTime
   fin             DateTime
   clienteId       String?             @map("cliente_id")
-  clienteNombre   String              @db.VarChar(120) @map("cliente_nombre")
-  clienteTelefono String?             @db.VarChar(30) @map("cliente_telefono")
-  clienteEmail    String?             @db.VarChar(200) @map("cliente_email")
+  clienteNombre   String              @map("cliente_nombre") @db.VarChar(120)
+  clienteTelefono String?             @map("cliente_telefono") @db.VarChar(30)
+  clienteEmail    String?             @map("cliente_email") @db.VarChar(200)
   tokenAcceso     String              @unique @map("token_acceso")
   estado          ReservaEsperaEstado @default(ESPERANDO)
   reservaId       String?             @map("reserva_id")

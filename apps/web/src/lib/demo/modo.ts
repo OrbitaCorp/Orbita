@@ -18,14 +18,40 @@
 
 import { currentSlug } from '@/lib/tenant'
 
+// La demo tiene dos tiendas, cada una su negocio sembrado (ver
+// apps/api/prisma/demo/tienda.ts): Nébula Tech en `demo` —la original, y la
+// única con panel: demo.orbita.site/panel— y Nébula Moda en `demo-moda`, la
+// de ropa, que es la que abre "Probá la demo". Las dos tiendas llevan el
+// selector para pasar de una a otra (SelectorTiendaDemo).
 export const DEMO_SLUG = process.env.NEXT_PUBLIC_DEMO_SLUG ?? 'demo'
+export const DEMO_SLUG_MODA = process.env.NEXT_PUBLIC_DEMO_SLUG_MODA ?? 'demo-moda'
 
-/** ¿Esta pestaña está en la tienda o el panel de la demo? */
-export function esTiendaDemo(): boolean {
-  if (typeof window === 'undefined') return false
-  if (currentSlug() === DEMO_SLUG) return true
+export const TIENDAS_DEMO = [
+  { slug: DEMO_SLUG_MODA, rubro: 'Ropa y accesorios', corto: 'Ropa' },
+  { slug: DEMO_SLUG, rubro: 'Tecnología', corto: 'Tecnología' },
+] as const
+
+/** La tienda con la que arranca la demo ("Probá la demo" → Tienda). */
+export const DEMO_SLUG_TIENDA = DEMO_SLUG_MODA
+
+/** ¿Es el slug de una tienda de la demo? */
+export function esSlugDemo(slug: string | null | undefined): boolean {
+  return !!slug && TIENDAS_DEMO.some(t => t.slug === slug)
+}
+
+/** Slug de la tienda demo de esta pestaña (por subdominio, o /tienda/<slug> en dev), o null. */
+export function slugTiendaDemo(): string | null {
+  if (typeof window === 'undefined') return null
+  const porHost = currentSlug()
+  if (esSlugDemo(porHost)) return porHost
   // Dev sin subdominios: /tienda/demo/...
-  return window.location.pathname === `/tienda/${DEMO_SLUG}` || window.location.pathname.startsWith(`/tienda/${DEMO_SLUG}/`)
+  const enRuta = window.location.pathname.match(/^\/tienda\/([^/]+)/)?.[1] ?? null
+  return esSlugDemo(enRuta) ? enRuta : null
+}
+
+/** ¿Esta pestaña está en una tienda o el panel de la demo? */
+export function esTiendaDemo(): boolean {
+  return slugTiendaDemo() !== null
 }
 
 // Si la sesión del panel es la anónima de la demo. En memoria, igual que el

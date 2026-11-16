@@ -81,14 +81,24 @@ describe('armarProductos', () => {
         expect(r.errores.map(e => `${e.fila}:${e.columna}`)).toEqual(['2:Nombre', '3:Precio', '4:Categoría', '5:Precio', '6:Stock', '7:Valores 1', '8:Variante 1'])
     })
 
-    it('el mismo nombre en dos filas es un error: va una fila por producto', () => {
+    it('el mismo nombre dos veces en la misma categoría es un error: va una fila por producto', () => {
         const r = armarProductos([
             fila(2, { nombre: 'Gorra', categoria: 'Accesorios', precio: 100 }),
-            fila(3, { nombre: 'gorra', categoria: 'Accesorios', precio: 200 }),
+            fila(3, { nombre: 'gorra', categoria: 'accesorios', precio: 200 }),
         ])
         expect(r.productos.map(p => p.nombre)).toEqual(['Gorra'])
         expect(r.errores).toHaveLength(1)
         expect(r.errores[0]).toMatchObject({ fila: 3, columna: 'Nombre' })
+    })
+
+    it('el mismo nombre en categorías distintas son dos productos', () => {
+        const r = armarProductos([
+            fila(2, { nombre: 'CK IN2U EDT 100ML', categoria: 'Femeninos', precio: 74000, stock: 7, estado: 'Publicado' }),
+            fila(3, { nombre: 'CK IN2U EDT 100ML', categoria: 'Masculinos', precio: 75000, stock: 7, estado: 'Publicado' }),
+        ])
+        expect(r.errores).toEqual([])
+        expect(r.productos.map(p => p.categoria)).toEqual(['Femeninos', 'Masculinos'])
+        expect(new Set(r.productos.map(p => p.clave)).size).toBe(2)
     })
 
     it('para publicar hace falta stock, como en el alta manual', () => {

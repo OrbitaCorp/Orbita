@@ -68,6 +68,16 @@ function idsDelNodo(arbol: ArbolCategorias, c: StorefrontCategoryItem): string[]
 // que pide los productos.
 const cacheConsultas = new Map<string, Awaited<ReturnType<typeof getStorefrontProducts>>>()
 
+// Valores de una faceta en el orden en que conviene leerlos. La API los manda
+// en el orden en que los encontró ("60 ml, 90 ml, 100 ml, 50 ml…"): si TODOS
+// empiezan con un número (ml, gramos, talles numéricos) se ordenan de menor a
+// mayor; si no (S/M/L, colores) quedan como vienen, que es el orden del dueño.
+export function ordenarValoresFaceta<V extends { value: string }>(valores: V[]): V[] {
+  const num = (s: string) => parseFloat(s.replace(',', '.'))
+  if (!valores.every(v => /^\s*\d/.test(v.value))) return valores
+  return [...valores].sort((a, b) => num(a.value) - num(b.value))
+}
+
 const ORDENES: StorefrontSort[] =['relevancia', 'precio-asc', 'precio-desc', 'bestselling', 'recommended']
 
 export default function Catalogo() {
@@ -95,6 +105,12 @@ export default function Catalogo() {
   const [facetas, setFacetas] = useState<StorefrontFacet[]>([])
   const [opcionesActivas, setOpcionesActivas] = useState<string[]>([])
   const [facetasAbiertas, setFacetasAbiertas] = useState<Set<string>>(new Set())
+  // Filtro "Marca": sale de la característica "Marca" de los productos (no
+  // es un campo aparte, ver marcaDeSpecs en storefront.service.ts). Sin
+  // ninguna marca cargada en la tienda, la sección no aparece.
+  const [marcas, setMarcas] = useState<{ value: string; count: number }[]>([])
+  const [marcasActivas, setMarcasActivas] = useState<string[]>([])
+  const [seccionMarca, setSeccionMarca] = useState(true)
   const [orden, setOrden] = useState<StorefrontSort>('relevancia')
   const [soloOferta, setSoloOferta] = useState(false)
   const [precioMin, setPrecioMin] = useState('')
@@ -149,12 +165,37 @@ export default function Catalogo() {
     if (uno('max')) setPrecioMax(uno('max'))
     const opt = lista('opt')
     if (opt.length > 0) setOpcionesActivas(opt)
+    const marca = lista('marca')
+    if (marca.length > 0) setMarcasActivas(marca)
     const vista = uno('vista')
     if (vista === 'list' || vista === 'grid') { vistaEnUrl.current = true; setViewMode(vista) }
     const pag = parseInt(uno('page'), 10)
     if (Number.isFinite(pag) && pag > 1) setPage(pag)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady])
+
+  // ?search= que llega DESPUÉS de abrir el catálogo: el buscador del header
+  // (BuscadorPlantilla, StorefrontHeader) hace router.push al mismo catálogo,
+  // así que la página no se vuelve a montar y el efecto de arriba —que lee la
+  // URL una sola vez— no se enteraba: buscar estando en el catálogo no hacía
+  // nada (reportado con captura en Cruzyparfums). El header busca en TODA la
+  // tienda, por eso además se saca el filtro de categoría si la URL no trae uno.
+  // `ultimaQuerySearchRef` lo actualiza también el efecto "URL <- estado", así
+  // lo que escribe este mismo componente no se toma como búsqueda nueva.
+  const ultimaQuerySearchRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!router.isReady || !urlListo) return
+    const crudo = router.query.search
+    const s = (typeof crudo === 'string' ? crudo : '').trim()
+    if (ultimaQuerySearchRef.current === null) { ultimaQuerySearchRef.current = s; return }
+    if (s === ultimaQuerySearchRef.current) return
+    ultimaQuerySearchRef.current = s
+    setBusqueda(s)
+    setPage(1)
+    if (!router.query.cat) setCatsActivas([])
+    if (!router.query.marca) setMarcasActivas([])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady, urlListo, router.query.search])
 
   // ?cat=<slug> — lo mandan los mosaicos de categoría del home con plantilla
   // (ver AccionesHome#irACategoria) y los enlaces de categoría del header
@@ -231,6 +272,7 @@ export default function Catalogo() {
     const params = {
       categoryId: catsActivas.length > 0 ? catsActivas : undefined,
       optionValues: opcionesActivas.length > 0 ? opcionesActivas : undefined,
+      brand: marcasActivas.length > 0 ? marcasActivas : undefined,
       search: busqueda.trim() || undefined,
       onSale: soloOferta || undefined,
       minPrice: precioMin ? Number(precioMin) : undefined,
@@ -250,6 +292,7 @@ export default function Catalogo() {
       setCrudos(previo.data)
       setTotal(previo.total)
       setFacetas(previo.availableOptions ?? [])
+      setMarcas(previo.availableBrands ?? [])
       setCargando(false)
     } else {
       setCargando(true)
@@ -265,11 +308,12 @@ export default function Catalogo() {
         // abajo tiraba "Cannot read properties of undefined" y la pagina
         // quedaba en blanco entera.
         setFacetas(r.availableOptions ?? [])
+        setMarcas(r.availableBrands ?? [])
       })
       .catch(() => { if (!cancelado) { setCrudos([]); setTotal(0) } })
       .finally(() => { if (!cancelado) setCargando(false) })
     return () => { cancelado = true }
-  }, [slug, urlListo, catsActivas, opcionesActivas, busqueda, soloOferta, precioMin, precioMax, orden, page])
+  }, [slug, urlListo, catsActivas, opcionesActivas, marcasActivas, busqueda, soloOferta, precioMin, precioMax, orden, page])
 
   // Scroll al volver atrás desde una ficha. Cada entrada del historial de Next
   // tiene una clave propia y estable (`history.state.key`: `push` crea una
@@ -326,9 +370,11 @@ export default function Catalogo() {
     if (catStr) q.set('cat', catStr)
     ultimaQueryCatRef.current = catStr
     if (opcionesActivas.length > 0) q.set('opt', opcionesActivas.join(','))
+    if (marcasActivas.length > 0) q.set('marca', marcasActivas.join(','))
     if (orden !== 'relevancia') q.set('sort', orden)
     if (soloOferta) q.set('onSale', '1')
     if (busqueda.trim()) q.set('search', busqueda.trim())
+    ultimaQuerySearchRef.current = busqueda.trim()
     if (precioMin) q.set('min', precioMin)
     if (precioMax) q.set('max', precioMax)
     const vistaDefault = config?.appearance?.gridLayout === 'list' ? 'list' : 'grid'
@@ -343,7 +389,7 @@ export default function Catalogo() {
       { shallow: true, scroll: false },
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlListo, catsActivas, categorias, opcionesActivas, orden, soloOferta, busqueda, precioMin, precioMax, viewMode, page, config])
+  }, [urlListo, catsActivas, categorias, opcionesActivas, marcasActivas, orden, soloOferta, busqueda, precioMin, precioMax, viewMode, page, config])
 
   const tienda: TiendaConfig = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
   // Mismo dato que ya desglosa ProductoDetalle.tsx (RBT-693) — acá se pasa
@@ -408,6 +454,10 @@ export default function Catalogo() {
     setPage(1)
   }
   function limpiarOpciones() { setOpcionesActivas([]); setPage(1) }
+  function alternarMarca(marca: string) {
+    setMarcasActivas(prev => prev.includes(marca) ? prev.filter(x => x !== marca) : [...prev, marca])
+    setPage(1)
+  }
   function alternarFaceta(id: string) {
     setFacetasAbiertas(prev => {
       const next = new Set(prev)
@@ -423,8 +473,8 @@ export default function Catalogo() {
   // Se usa para el globito del boton "Filtros" en celular: cuenta 'Solo en
   // oferta' tambien, que hayFiltrosActivos deja afuera a proposito (ese
   // filtro tiene su propio aviso arriba de la pagina).
-  const cantFiltrosActivos = catsActivas.length + opcionesActivas.length + (precioMin || precioMax ? 1 : 0) + (soloOferta ? 1 : 0)
-  const hayFiltrosActivos = catsActivas.length > 0 || opcionesActivas.length > 0 || !!precioMin || !!precioMax
+  const cantFiltrosActivos = catsActivas.length + opcionesActivas.length + marcasActivas.length + (precioMin || precioMax ? 1 : 0) + (soloOferta ? 1 : 0)
+  const hayFiltrosActivos = catsActivas.length > 0 || opcionesActivas.length > 0 || marcasActivas.length > 0 || !!precioMin || !!precioMax
   const columnas = columnasDeGrilla(config?.appearance?.gridLayout)
 
   // Filas del filtro de Categoría. Una raíz con subcategorías muestra un
@@ -586,7 +636,7 @@ export default function Catalogo() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)' }}>Filtros</div>
               {hayFiltrosActivos && (
-                <button className="ds-link" onClick={() => { limpiarCategorias(); limpiarOpciones(); setPrecioMin(''); setPrecioMax(''); setPage(1) }} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}>
+                <button className="ds-link" onClick={() => { limpiarCategorias(); limpiarOpciones(); setMarcasActivas([]); setPrecioMin(''); setPrecioMax(''); setPage(1) }} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}>
                   Limpiar
                 </button>
               )}
@@ -638,6 +688,30 @@ export default function Catalogo() {
               </button>
             </FilterSection>
 
+            {/* Marca: la característica "Marca" de los productos. Puede ser una
+                lista larga (una perfumería tiene más de cien), así que va con
+                tope de alto y scroll propio, y las elegidas siempre arriba. */}
+            {marcas.length > 0 && (
+              <FilterSection title="Marca" open={seccionMarca} onToggle={() => setSeccionMarca(o => !o)}>
+                <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+                  {[...marcas.filter(m => marcasActivas.includes(m.value)), ...marcas.filter(m => !marcasActivas.includes(m.value))].map(m => {
+                    const activa = marcasActivas.includes(m.value)
+                    return (
+                      <div key={m.value} className="sf-catrow" onClick={() => alternarMarca(m.value)}>
+                        <span className={`sf-catchk${activa ? ' on' : ''}`}>
+                          {activa && <Check size={11} strokeWidth={3} color="#fff" />}
+                        </span>
+                        <span style={{ fontSize: 13, fontWeight: activa ? 700 : 500, color: 'var(--color-text)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {m.value}
+                        </span>
+                        <span style={{ color: 'var(--color-subtle)', fontSize: 10.5, fontFamily: '"Geist Mono", monospace' }}>{m.count}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </FilterSection>
+            )}
+
             {/* Una sección por cada tipo de variación que el negocio haya
                 definido (Talle, Color, Material, lo que sea) — el backend
                 las arma dinámicamente a partir de lo que de verdad tienen
@@ -648,7 +722,7 @@ export default function Catalogo() {
             {facetas.map(f => (
               <FilterSection key={f.id} title={f.name} open={facetasAbiertas.has(f.id)} onToggle={() => alternarFaceta(f.id)}>
                 <div>
-                  {f.values.map(v => {
+                  {ordenarValoresFaceta(f.values).map(v => {
                     const activa = opcionesActivas.includes(v.id)
                     return (
                       <div key={v.id} className="sf-catrow" onClick={() => alternarOpcion(v.id)}>
@@ -678,8 +752,16 @@ export default function Catalogo() {
             {/* Chips de categorías activas — con multi-select, un chip por
                 categoría es la única forma clara de ver (y sacar) cada una
                 sin volver a abrir el filtro. */}
-            {catsActivas.length > 0 && (
+            {(catsActivas.length > 0 || marcasActivas.length > 0) && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
+                {marcasActivas.map(m => (
+                  <span key={`marca-${m}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 6px 0 12px', borderRadius: 999, background: 'var(--color-surface)', border: '1px solid var(--color-border)', fontSize: 12, fontWeight: 600, color: 'var(--color-text)' }}>
+                    {m}
+                    <button className="ds-hover" onClick={() => alternarMarca(m)} aria-label={`Quitar ${m}`} style={{ width: 18, height: 18, borderRadius: '50%', background: 'var(--color-border)', border: 'none', cursor: 'pointer', display: 'grid', placeItems: 'center', color: 'var(--color-muted)' }}>
+                      <X size={10} strokeWidth={2.5} />
+                    </button>
+                  </span>
+                ))}
                 {catsActivas.map(id => {
                   const cat = categorias.find(c => c.id === id)
                   if (!cat) return null

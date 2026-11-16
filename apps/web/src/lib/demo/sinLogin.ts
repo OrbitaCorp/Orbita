@@ -4,13 +4,14 @@
 // cualquier otra tienda, el getServerSideProps de siempre.
 import type { GetServerSideProps } from 'next'
 import { getServerSideProps as forceSSR } from '@/lib/storefront/forceSSR'
-import { DEMO_SLUG } from './modo'
+import { esSlugDemo } from './modo'
 
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
-  if (ctx.params?.slug === DEMO_SLUG) {
+  const slug = typeof ctx.params?.slug === 'string' ? ctx.params.slug : null
+  if (slug && esSlugDemo(slug)) {
     // demo.orbita.site/login → "/"; en dev sin subdominio, /tienda/demo/login → /tienda/demo
-    const porSubdominio = (ctx.req.headers.host ?? '').startsWith(`${DEMO_SLUG}.`)
-    return { redirect: { destination: porSubdominio ? '/' : `/tienda/${DEMO_SLUG}`, permanent: false } }
+    const porSubdominio = (ctx.req.headers.host ?? '').startsWith(`${slug}.`)
+    return { redirect: { destination: porSubdominio ? '/' : `/tienda/${slug}`, permanent: false } }
   }
   return forceSSR(ctx)
 }

@@ -14,7 +14,7 @@ import { EmailSendStatus, PlatformMailSender, Prisma } from '@prisma/client';
 import sharp from 'sharp';
 import { PrismaService } from '../../prisma/prisma.service';
 import { esDestinatarioUnico, MailService } from '../../mail/mail.service';
-import { extraerDestinatarios, MAX_DESTINATARIOS_DIRECTO } from '../../mail/correo-directo';
+import { extraerDestinatarios, MAX_DESTINATARIOS_DIRECTO, normalizarWhatsapp, type BotonWhatsapp } from '../../mail/correo-directo';
 import { SupabaseService } from '../../supabase/supabase.service';
 import { ENTRADA_IMAGEN } from '../../common/utils/subida-imagen';
 import { EnviarCorreoDto, UpsertCasillaDto, VistaPreviaCorreoDto } from './correo.dto';
@@ -119,6 +119,17 @@ export class CorreoPlataformaService {
 
   async enviar(adminId: string, dto: EnviarCorreoDto) {
     const casilla = await this.casilla(dto.senderId);
+    return this.enviarDesde(adminId, casilla, { to: dto.to, subject: dto.subject, body: dto.body });
+  }
+
+  // El envío de verdad, compartido con Seguimiento (que suma el botón de
+  // WhatsApp y anota a qué negocio y etapa corresponde): mismo tope diario,
+  // mismo registro en Enviados y en Actividad.
+  async enviarDesde(
+    adminId: string,
+    casilla: PlatformMailSender,
+    e: { to: string; subject: string; body: string; whatsapp?: BotonWhatsapp; businessId?: string; followUpStage?: string },
+  ) {
     const desde = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const enviadosHoy = await this.prisma.platformOutboundMail.count({
       where: { createdAt: { gte: desde }, status: { not: EmailSendStatus.FAILED } },
@@ -127,7 +138,7 @@ export class CorreoPlataformaService {
       throw new HttpException(`Ya salieron ${TOPE_DIARIO} correos en las últimas 24 horas. Probá más tarde.`, HttpStatus.TOO_MANY_REQUESTS);
     }
 
-    const destinatarios = extraerDestinatarios(dto.to);
+    const destinatarios = extraerDestinatarios(e.to);
     if (destinatarios.length === 0) {
       throw new BadRequestException('Escribí al menos un email de destino');
     }
@@ -143,16 +154,19 @@ export class CorreoPlataformaService {
       throw new BadRequestException(`Podés enviar a hasta ${MAX_DESTINATARIOS_DIRECTO} destinatarios por correo`);
     }
     const to = destinatarios.join(', ');
-    const subject = dto.subject.trim();
-    const { status, error } = await this.mail.sendDirecto({ to, subject, cuerpo: dto.body, firma: this.firma(casilla) });
+    const subject = e.subject.trim();
+    const { status, error } = await this.mail.sendDirecto({ to, subject, cuerpo: e.body, firma: this.firma(casilla), whatsapp: e.whatsapp });
 
     const fila = await this.prisma.platformOutboundMail.create({
-      data: { adminId, fromEmail: casilla.email, fromName: casilla.name, to, subject, body: dto.body, status, error: error ?? null },
+      data: {
+        adminId, fromEmail: casilla.email, fromName: casilla.name, to, subject, body: e.body, status, error: error ?? null,
+        businessId: e.businessId ?? null, followUpStage: e.followUpStage ?? null,
+      },
     });
     // El registro de actividad nunca rompe un envío que ya salió.
     await this.prisma.platformAdminLog
-      .create({ data: { adminId, action: ACCION_LOG, targetType: 'outbound_mail', targetId: fila.id, details: { from: casilla.email, to, subject, status } } })
-      .catch((e) => this.logger.warn(`No se pudo registrar el correo ${fila.id} en platform_admin_logs: ${e}`));
+      .create({ data: { adminId, action: ACCION_LOG, targetType: 'outbound_mail', targetId: fila.id, details: { from: casilla.email, to, subject, status, ...(e.followUpStage ? { seguimiento: e.followUpStage } : {}) } } })
+      .catch((err) => this.logger.warn(`No se pudo registrar el correo ${fila.id} en platform_admin_logs: ${err}`));
 
     return { sent: status !== EmailSendStatus.FAILED, simulated: status === EmailSendStatus.SIMULATED, error: error ?? null };
   }
@@ -194,13 +208,13 @@ export class CorreoPlataformaService {
     }
   }
 
-  private async casilla(id: string): Promise<PlatformMailSender> {
+  async casilla(id: string): Promise<PlatformMailSender> {
     const casilla = await this.prisma.platformMailSender.findUnique({ where: { id } });
     if (!casilla) throw new NotFoundException('Esa casilla ya no existe');
     return casilla;
   }
 
-  private firma(c: PlatformMailSender) {
+  firma(c: PlatformMailSender) {
     return { name: c.name, email: c.email, jobTitle: c.jobTitle, phone: c.phone, imageUrl: c.signatureImageUrl, banner: c.signatureBanner };
   }
 
@@ -210,14 +224,23 @@ export class CorreoPlataformaService {
       name: dto.name.trim(),
       jobTitle: dto.jobTitle?.trim() || null,
       phone: dto.phone?.trim() || null,
+      // Sin el campo no se toca: una pantalla vieja que no lo manda no lo borra.
+      ...(dto.whatsapp !== undefined ? { whatsapp: this.whatsapp(dto.whatsapp) } : {}),
       signatureImageUrl: dto.signatureImageUrl?.trim() || null,
       // Sin imagen no hay firma completa que mostrar.
       signatureBanner: !!dto.signatureBanner && !!dto.signatureImageUrl?.trim(),
     };
   }
 
+  private whatsapp(raw: string | null | undefined): string | null {
+    if (!raw?.trim()) return null;
+    const numero = normalizarWhatsapp(raw);
+    if (!numero) throw new BadRequestException('El WhatsApp tiene que llevar el código de país: por ejemplo +54 9 3757 123456');
+    return numero;
+  }
+
   private serializar(c: PlatformMailSender) {
-    return { id: c.id, email: c.email, name: c.name, jobTitle: c.jobTitle, phone: c.phone, signatureImageUrl: c.signatureImageUrl, signatureBanner: c.signatureBanner };
+    return { id: c.id, email: c.email, name: c.name, jobTitle: c.jobTitle, phone: c.phone, whatsapp: c.whatsapp, signatureImageUrl: c.signatureImageUrl, signatureBanner: c.signatureBanner };
   }
 
   private traducir(e: unknown): unknown {

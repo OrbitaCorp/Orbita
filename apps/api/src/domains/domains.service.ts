@@ -199,6 +199,60 @@ export class DomainsService {
     return actualizado;
   }
 
+  // Verificación automática (2026-11-08): antes un dominio quedaba en
+  // "Verificando" hasta que el dueño volviera a Configuración → Dominios y
+  // tocara "Verificar", aunque el DNS y el certificado ya estuvieran bien
+  // (pasó con cruzyparfums.shop: la tienda abría pero CORS le bloqueaba los
+  // productos). Ahora se verifica solo por dos caminos:
+  //  - verificarPendientes(): el disparo de cada 5 minutos (internal-cron).
+  //  - activarSiYaAnda(): CORS, cuando un visitante entra por un dominio que
+  //    todavía no figura activo (main.ts). Así la primera visita ya anda sin
+  //    esperar al cron.
+  // Solo PENDING/VERIFYING: SUSPENDED y EXPIRED los pone Órbita a propósito.
+  // Ventana de 30 días y tope por corrida: un dominio que el dueño vinculó y
+  // nunca configuró no puede quedar pegándole a Vercel para siempre.
+  static readonly VENTANA_AUTOVERIFICACION_MS = 30 * 24 * 60 * 60_000;
+  static readonly TOPE_AUTOVERIFICACION = 10;
+
+  private dondePendiente(): Prisma.CustomDomainWhereInput {
+    return {
+      status: { in: ['PENDING', 'VERIFYING'] },
+      createdAt: { gte: new Date(Date.now() - DomainsService.VENTANA_AUTOVERIFICACION_MS) },
+    };
+  }
+
+  async verificarPendientes(): Promise<{ revisados: number; activados: string[] }> {
+    const pendientes = await this.prisma.customDomain.findMany({
+      where: this.dondePendiente(),
+      select: { id: true, businessId: true },
+      // Los que llevan más tiempo esperando primero: con el tope, ninguno queda sin turno.
+      orderBy: { updatedAt: 'asc' },
+      take: DomainsService.TOPE_AUTOVERIFICACION,
+    });
+    const activados: string[] = [];
+    for (const d of pendientes) {
+      try {
+        const r = await this.verifyDns(d.businessId, d.id);
+        if (r.status === 'ACTIVE') activados.push(r.domain);
+      } catch (err) {
+        // Uno que falla (Vercel caído, dominio borrado entre medio) no corta a los demás.
+        this.logger.warn(`Autoverificación: no se pudo verificar el dominio ${d.id} — ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+    return { revisados: pendientes.length, activados };
+  }
+
+  /** CORS: si `host` es un dominio propio pendiente, lo verifica ahora. true = quedó activo. */
+  async activarSiYaAnda(host: string): Promise<boolean> {
+    const d = await this.prisma.customDomain.findFirst({
+      where: { domain: host, ...this.dondePendiente() },
+      select: { id: true, businessId: true },
+    });
+    if (!d) return false;
+    const r = await this.verifyDns(d.businessId, d.id);
+    return r.status === 'ACTIVE' && r.dnsVerified;
+  }
+
   // El certificado lo emite Vercel solo cuando el DNS ya apunta; su API no
   // expone un estado de SSL y `verified` es de ownership (ver linkDomain), así
   // que el estado se mide de verdad en verifyDns(). Antes se deducía de
