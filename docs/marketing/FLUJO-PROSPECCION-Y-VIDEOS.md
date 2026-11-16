@@ -38,7 +38,7 @@ en el panel (el mismo login con Google y segundo factor del superadmin). Con ese
 
 - **Prospección:** leer el criterio, consultar cuentas, leer lotes y guardar análisis.
 - **Videos:** ver la cola, leer un video con sus comentarios (para mejorarlo), pedir dónde subir uno, registrarlo (también como mejora de otro) y avisar al equipo por correo cuando termina la tanda (el texto del correo es fijo).
-- **Tutoriales:** ver la lista de lo que hay y lo que falta, y marcar el estado de cada uno.
+- **Tutoriales:** ver la lista de lo que hay y lo que falta (de todos los módulos o de uno), marcar el estado de cada uno, cargar su link de YouTube y, al terminar un módulo nuevo, sumar los tutoriales de su lista.
 
 **Producir videos** necesita, además del conector, **Claude Code en la computadora de quien los genera, y el mismo conector** (si entra con la misma cuenta, el conector de claude.ai aparece en Claude Code). No hay que clonar nada a mano: las instrucciones del conector le dicen a Claude que baje solo el repo de videos (público, trae la skill `videos-cola` y las herramientas) a `~/orbita-videos/repo`, avisando antes. Opcional: el repo también se instala como plugin (`claude plugin marketplace add Gisterkuk/Orbita-Videos` y `claude plugin install orbita-videos@orbita-videos`); para buscar clientes, comentar o leer videos alcanza con el chat de Claude. El panel lo explica en el bloque «Conectá tu Claude a Órbita».
 
@@ -104,7 +104,26 @@ Cada tutorial dice en qué **pantallas del panel** se ofrece (`pantallas`, ya ca
 `tutoriales_actualizar`). En esas pantallas, el botón «Ver tutorial» del panel de cada tienda pregunta **¿Video o Recorrido
 guiado?** y el video se reproduce ahí mismo (YouTube sin cookies). Aparece apenas se carga el link, sin deploy.
 
+**Cada tutorial es de un módulo:** Tienda (los 39 de arriba), Turnos, Alquileres o Gimnasio. Al terminar el ciclo de un módulo
+nuevo, **su responsable le pide a su Claude que cargue la lista de ese módulo**: `tutoriales_crear` suma un tutorial por llamada
+(título, grupo y módulo; si se quiere, también pantallas, notas y si es opcional o de prioridad alta). Queda en «falta», al final
+de su grupo; si el grupo todavía no existe en ese módulo, se abre al final. Crear un tutorial no produce ni sube ningún video:
+después se hace y se carga su link igual que los de Tienda. Reglas:
+
+- **Los títulos no se repiten, ni entre módulos** (el conector y la cola ubican un tutorial por su título): para un módulo
+  conviene un título propio, como «Conocé tu panel de Gimnasio».
+- **Las pantallas de un módulo que no es Tienda empiezan con el módulo** (`gimnasio/clases`, `turnos/agenda`,
+  `alquileres/reservas`): así nunca chocan con las claves de Tienda.
+- `tutoriales_listar` filtra con `modulo` (y el resumen pasa a ser de ese módulo); `tutoriales_actualizar` acepta `modulo` para
+  corregir uno cargado en el módulo equivocado (pasa al final de su grupo en el otro, y sus pantallas tienen que llevar el
+  prefijo nuevo).
+- El panel de Tienda sigue recibiendo **solo los de Tienda** en «Ver tutorial»; el panel de un módulo pide los suyos con
+  `GET /business/tutoriales-video?modulo=<módulo>`.
+
 En Marketing → Videos → Tutoriales se sigue el progreso: cuántos están hechos y cuántos tienen video, y «Ver video» en cada uno.
+Arriba se elige el módulo (Todos, Tienda, Turnos, Alquileres o Gimnasio: la lista y el resumen pasan a ser de ese módulo) y los
+tutoriales que no son de Tienda llevan un chip con su módulo. Los de un módulo nuevo no se cargan desde el panel: solo por el
+conector.
 
 ## Controles y límites (lo que lo hace seguro)
 

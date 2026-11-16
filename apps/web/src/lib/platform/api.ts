@@ -276,8 +276,12 @@ export type VideoDeCola = {
 export type VideoComentario = { id: string; autor: string; texto: string; fecha: string; esTuyo: boolean }
 export type TutorialEstado = 'FALTA' | 'EN_PROCESO' | 'EN_REVISION' | 'HECHO'
 export type ResponsableTutorial = 'ALAN' | 'MATEO' | 'ALE'
+/** De qué módulo es cada tutorial (MODULOS_TUTORIAL en apps/api/src/marketing/videos/tutoriales.service.ts). */
+export type ModuloTutorial = 'tienda' | 'turnos' | 'alquileres' | 'gimnasio'
 export type TutorialDeLaLista = {
   id: string; grupo: string; titulo: string; estado: TutorialEstado; asignadoA: ResponsableTutorial | null; opcional: boolean; prioridadAlta: boolean
+  /** La API de antes de los módulos no lo manda (el frontend sale antes que la API): sin él, es de Tienda. */
+  modulo?: ModuloTutorial
   notas: string | null; videoId: string | null; updatedAt: string
   /** El video en YouTube (lo carga el Claude de cada persona por el conector) y las pantallas del panel donde se ofrece. */
   youtubeId: string | null; pantallas: string[]
@@ -1277,7 +1281,8 @@ export const platformApi = {
   videoComentar: (id: string, texto: string) => sendJSON<VideoComentario>(`/platform/marketing/videos/${id}/comentarios`, 'POST', { texto }),
   videoBorrarComentario: (id: string, comentarioId: string) => sendJSON<{ ok: true }>(`/platform/marketing/videos/${id}/comentarios/${comentarioId}`, 'DELETE'),
   // La lista de tutoriales: qué hay y qué falta. La actualiza el Claude de cada persona; acá se mira y se corrige.
-  tutorialesLista: () => getJSONConMensaje<TutorialesRespuesta>('/platform/marketing/tutoriales'),
+  // Con módulo, la lista y el resumen son solo de ese módulo; sin módulo, todos.
+  tutorialesLista: (modulo?: ModuloTutorial) => getJSONConMensaje<TutorialesRespuesta>(`/platform/marketing/tutoriales${modulo ? `?modulo=${modulo}` : ''}`),
   tutorialActualizar: (id: string, cambios: { estado?: Exclude<TutorialEstado, 'EN_REVISION'>; asignadoA?: ResponsableTutorial | null; notas?: string }) => sendJSON<{ id: string; estado: TutorialEstado; asignadoA: ResponsableTutorial | null }>(`/platform/marketing/tutoriales/${id}`, 'PATCH', cambios),
   // ¿Tengo un Claude conectado? Decide si «Mejorar con Claude» abre Claude o pide conectarlo primero.
   mcpEstado: () => getJSONConMensaje<{ conectado: boolean }>('/platform/mcp/estado'),

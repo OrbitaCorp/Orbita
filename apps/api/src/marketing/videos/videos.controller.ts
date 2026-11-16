@@ -82,6 +82,8 @@ export class VideosController {
 }
 
 // La lista de tutoriales (qué hay y qué falta). La actualiza el Claude de cada persona por el conector; acá se mira y se corrige.
+// Cada tutorial es de un módulo: ?modulo=tienda|turnos|alquileres|gimnasio filtra la lista y el resumen (uno desconocido es 400).
+// Los de un módulo nuevo se cargan por el conector (tutoriales_crear), no desde el panel.
 @UseGuards(PlatformAdminGuard)
 @SuperadminYMarketing()
 @Controller('platform/marketing/tutoriales')
@@ -89,25 +91,26 @@ export class TutorialesController {
   constructor(private readonly tutoriales: TutorialesService) {}
 
   @Get()
-  listar(@Query('estado') estado?: string) {
-    return this.tutoriales.listar(estado);
+  listar(@Query('estado') estado?: string, @Query('modulo') modulo?: string) {
+    return this.tutoriales.listar(estado, modulo);
   }
 
   @Patch(':id')
   actualizar(@Req() req: RequestWithAdmin, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ActualizarTutorialDto) {
-    return this.tutoriales.actualizar(req.user.adminId, { tutorial: id, estado: dto.estado, asignadoA: dto.asignadoA, notas: dto.notas, youtube: dto.youtube, pantallas: dto.pantallas });
+    return this.tutoriales.actualizar(req.user.adminId, { tutorial: id, estado: dto.estado, asignadoA: dto.asignadoA, notas: dto.notas, youtube: dto.youtube, pantallas: dto.pantallas, modulo: dto.modulo });
   }
 }
 
 // «Ver tutorial» → Video, en el panel de cada tienda: los tutoriales con link de YouTube y en qué pantallas se ofrecen.
-// Lo lee cualquier member (es el mismo contenido para todas las tiendas).
+// Lo lee cualquier member (es el mismo contenido para todas las tiendas). Sin ?modulo= son los de Tienda, como siempre; el
+// panel de un módulo nuevo pide los suyos con ?modulo=turnos|alquileres|gimnasio.
 @Controller('business/tutoriales-video')
 export class TutorialesPanelController {
   constructor(private readonly tutoriales: TutorialesService) {}
 
   @Get()
-  listar(@CurrentBusiness() ctx: AuthContext) {
+  listar(@CurrentBusiness() ctx: AuthContext, @Query('modulo') modulo?: string) {
     assertMemberContext(ctx);
-    return this.tutoriales.videosDelPanel();
+    return this.tutoriales.videosDelPanel(modulo || undefined);
   }
 }

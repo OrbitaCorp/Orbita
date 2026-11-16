@@ -581,6 +581,12 @@ Código en `src/marketing/videos/`; tablas `marketing_videos`, `marketing_video_
   además las carga para la lista y aprueba los tutoriales que estaban pendientes en la cola). Cargar el link deja el tutorial HECHO.
   El panel de cada tienda los lee con `GET /business/tutoriales-video` (cualquier member). Estado y responsable también se corrigen
   desde el panel; el link, solo por el conector (o `PATCH /platform/marketing/tutoriales/:id` con `youtube` / `pantallas`).
+  **Cada tutorial es de un módulo** (`modulo`: `tienda`, `turnos`, `alquileres` o `gimnasio`; migración
+  `20261116120000_marketing_tutoriales_modulo`, aditiva e idempotente: los que existían quedan como `tienda`). El responsable de
+  cada módulo nuevo carga su lista con `tutoriales_crear` (queda FALTA, al final de su grupo; `tutorial_crear` en el registro de
+  acciones); `tutoriales_listar`, `tutoriales_actualizar`, `GET /platform/marketing/tutoriales` y el PATCH aceptan `modulo` (uno
+  desconocido es 400). Fuera de Tienda cada pantalla empieza con `<modulo>/` (`gimnasio/clases`). `GET /business/tutoriales-video`
+  sin `?modulo=` devuelve solo los de Tienda, igual que antes. El conector pasa a tener 14 herramientas.
 - **Aviso por correo a TODO el equipo (solo marketing; los tutoriales no avisan):** cuando entra un video, un correo (por Resend, con el diseño de Órbita) a los superadmins
   ACTIVOS con correo `@orbita.site` u `@orbita-corp.com` (`MCP_DOMINIOS_PERMITIDOS`) y también a su correo personal si lo cargó:
   «Hay N videos nuevos para ver y comentar», con los títulos y un botón al panel (el texto no habla de aprobaciones). Sale **uno por

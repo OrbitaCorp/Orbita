@@ -26,6 +26,7 @@ function armar() {
   const tutoriales = {
     listar: jest.fn().mockResolvedValue({ resumen: { total: 39, hechos: 2 }, tutoriales: [{ id: 't-1', titulo: 'Cargar un producto', estado: 'HECHO' }] }),
     actualizar: jest.fn().mockResolvedValue({ id: 't-2', titulo: 'Atender un pedido', estado: 'EN_PROCESO', notas: null }),
+    crear: jest.fn().mockResolvedValue({ id: 't-3', modulo: 'gimnasio', grupo: 'Arrancar', titulo: 'Cargar una clase', estado: 'FALTA' }),
   };
   return { svc, videos, tutoriales, mcp: new McpProspeccion(svc as never, videos as never, tutoriales as never) };
 }
@@ -68,7 +69,7 @@ describe('herramientas', () => {
       'prospeccion_criterio', 'prospeccion_listar_lotes', 'prospeccion_listar_prospectos',
       'prospeccion_consultar_cuentas', 'prospeccion_obtener_lote', 'prospeccion_guardar_analisis',
       'videos_listar', 'videos_obtener', 'videos_pedir_subida', 'videos_registrar', 'videos_avisar',
-      'tutoriales_listar', 'tutoriales_actualizar',
+      'tutoriales_listar', 'tutoriales_actualizar', 'tutoriales_crear',
     ]);
     for (const h of HERRAMIENTAS) {
       expect(h.name).not.toMatch(/enviar|mandar|borrar|eliminar|contactar|publicar/);
@@ -84,7 +85,7 @@ describe('herramientas', () => {
 
   it('tools/list las devuelve', async () => {
     const { mcp } = armar();
-    expect(((await mcp.manejar(rpc('tools/list'), CTX)) as any).result.tools).toHaveLength(13);
+    expect(((await mcp.manejar(rpc('tools/list'), CTX)) as any).result.tools).toHaveLength(14);
   });
 
   it('consultar y guardar usan al superadmin que autorizó, no un dato que mande Claude', async () => {
@@ -127,12 +128,47 @@ describe('herramientas', () => {
   it('la lista de tutoriales se lee y se actualiza como quien autorizó; el estado EN_REVISION no se puede poner a mano desde el esquema', async () => {
     const { mcp, tutoriales } = armar();
     const lista = JSON.parse(texto(await mcp.manejar(rpc('tools/call', { name: 'tutoriales_listar', arguments: { estado: 'FALTA' } }), CTX)));
-    expect(tutoriales.listar).toHaveBeenCalledWith('FALTA');
+    expect(tutoriales.listar).toHaveBeenCalledWith('FALTA', undefined);
     expect(lista.resumen.total).toBe(39);
     await mcp.manejar(rpc('tools/call', { name: 'tutoriales_actualizar', arguments: { tutorial: 'Atender un pedido', estado: 'EN_PROCESO', notas: 'arranco hoy', adminId: 'otro' } }), CTX);
     expect(tutoriales.actualizar).toHaveBeenCalledWith('admin-1', { tutorial: 'Atender un pedido', estado: 'EN_PROCESO', notas: 'arranco hoy' });
     const esquema = HERRAMIENTAS.find((h) => h.name === 'tutoriales_actualizar')!.inputSchema as { properties: { estado: { enum: string[] } } };
     expect(esquema.properties.estado.enum).toEqual(['FALTA', 'EN_PROCESO', 'HECHO']);
+  });
+
+  it('la lista se filtra por módulo y el módulo se puede corregir; los cuatro módulos son los mismos que valida el servicio', async () => {
+    const { mcp, tutoriales } = armar();
+    await mcp.manejar(rpc('tools/call', { name: 'tutoriales_listar', arguments: { modulo: 'gimnasio' } }), CTX);
+    expect(tutoriales.listar).toHaveBeenLastCalledWith(undefined, 'gimnasio');
+    await mcp.manejar(rpc('tools/call', { name: 'tutoriales_actualizar', arguments: { tutorial: 't-2', modulo: 'turnos', pantallas: ['turnos/agenda'] } }), CTX);
+    expect(tutoriales.actualizar).toHaveBeenLastCalledWith('admin-1', expect.objectContaining({ tutorial: 't-2', modulo: 'turnos', pantallas: ['turnos/agenda'] }));
+    for (const nombre of ['tutoriales_listar', 'tutoriales_actualizar', 'tutoriales_crear']) {
+      const props = HERRAMIENTAS.find((h) => h.name === nombre)!.inputSchema.properties as { modulo: { enum: string[] } };
+      expect(props.modulo.enum).toEqual(['tienda', 'turnos', 'alquileres', 'gimnasio']);
+    }
+  });
+
+  it('tutoriales_crear carga un tutorial como quien autorizó, con título, grupo y módulo obligatorios, y no sube nada', async () => {
+    const { mcp, tutoriales, videos } = armar();
+    const r = JSON.parse(texto(await mcp.manejar(rpc('tools/call', {
+      name: 'tutoriales_crear',
+      arguments: { titulo: 'Cargar una clase', grupo: 'Arrancar', modulo: 'gimnasio', pantallas: ['gimnasio/clases'], prioridadAlta: true, adminId: 'otro' },
+    }), CTX)));
+    expect(tutoriales.crear).toHaveBeenCalledWith('admin-1', expect.objectContaining({ titulo: 'Cargar una clase', grupo: 'Arrancar', modulo: 'gimnasio', pantallas: ['gimnasio/clases'], prioridadAlta: true }));
+    expect(tutoriales.crear.mock.calls[0][1]).not.toHaveProperty('adminId');
+    expect(r).toMatchObject({ id: 't-3', estado: 'FALTA' });
+    expect(videos.pedirSubida).not.toHaveBeenCalled();
+    const herramienta = HERRAMIENTAS.find((h) => h.name === 'tutoriales_crear')!;
+    expect(herramienta.inputSchema.required).toEqual(['titulo', 'grupo', 'modulo']);
+    expect(herramienta.inputSchema.additionalProperties).toBe(false);
+    expect(herramienta.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false });
+  });
+
+  it('las instrucciones explican los módulos y cómo cargar la lista de uno nuevo', async () => {
+    const { mcp } = armar();
+    const r: any = await mcp.manejar(rpc('initialize', {}), CTX);
+    expect(r.result.instructions).toMatch(/tutoriales_crear/);
+    expect(r.result.instructions).toMatch(/gimnasio\/clases/);
   });
 
   it('videos_avisar manda el aviso de fin de tanda como el superadmin que autorizó y no recibe texto libre', async () => {

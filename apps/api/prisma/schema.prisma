@@ -3740,11 +3740,15 @@ model MarketingVideo {
 
 // ─── Marketing de Órbita: lista de tutoriales (qué hay y qué falta) ───────────────
 // La lista de tutoriales del panel y de la tienda que el equipo va a ir produciendo. La actualiza el Claude de cada
-// persona por el conector (tutoriales_listar / tutoriales_actualizar) y también se puede corregir desde el panel.
+// persona por el conector (tutoriales_listar / tutoriales_crear / tutoriales_actualizar) y también se puede corregir desde el panel.
 // `estado`: FALTA | EN_PROCESO | EN_REVISION (de antes: los tutoriales ya no esperan aprobación) | HECHO.
 // Los videos viven en YouTube (`youtubeId`) y el panel los ofrece en "Ver tutorial" según `pantallas`.
+// Cada tutorial es de un módulo (`modulo`): la lista de cada uno la carga su responsable al terminar su ciclo.
 model MarketingTutorial {
   id             String   @id @default(uuid())
+  /// tienda | turnos | alquileres | gimnasio (MODULOS_TUTORIAL en marketing/videos/tutoriales.service.ts). `grupoOrden` y
+  /// `orden` cuentan dentro del módulo. Fuera de Tienda, cada pantalla empieza con «<modulo>/», así no choca con las de Tienda.
+  modulo         String   @default("tienda")
   grupo          String
   grupoOrden     Int      @map("grupo_orden")
   orden          Int
@@ -3764,6 +3768,7 @@ model MarketingTutorial {
   updatedAt      DateTime @updatedAt @map("updated_at")
 
   @@index([grupoOrden, orden])
+  @@index([modulo, grupoOrden, orden])
   @@map("marketing_tutoriales")
 }
 
