@@ -262,4 +262,39 @@ Alternativas: dejarlo para después del ciclo (los 19 rubros ya cubren lugares y
       'apps/api/prisma/schema.prisma:3901',
     ],
   }),
+
+  // ─── Ciclo 2 · Gimnasio (16/11/2026) ────────────────────────────────────────
+  decisionAbierta({
+    modulo: 'gimnasio', slug: 'planes-pases-alumnos', decide: 'Ale', fecha: '2026-11-16',
+    titulo: 'Gimnasio: dónde viven los planes, los pases y los alumnos (y las actividades, las salas y el equipo)',
+    foco: 'Las clases ya son reservas en el motor compartido. Los planes, los pases que se descuentan al reservar y los alumnos no son reservas: hay que decidir dónde se guardan antes de conectar Alumnos (17/11), Planes (18/11) y los pases (19/11). La propuesta es tablas propias de Gimnasio en la API, al lado del motor y sin tocarlo.',
+    simple: 'Las clases ya se guardan como reservas. Lo demás de Gimnasio no es una reserva: los planes (mensual, pase libre, packs), cuántas clases le quedan a cada alumno y los alumnos mismos. ¿Se guardan en tablas propias de Gimnasio en la API (la propuesta), en los datos sueltos de las clases, o en la ficha de cliente de Tienda?',
+    alcance: 'Solo Gimnasio: sus tablas, sus rutas y sus pantallas (Alumnos, Planes y precios, Ingresos, el check-in con el aviso de plan vencido, Actividades y salas, Equipo). No cambia el motor compartido ni a Turnos o Alquileres, salvo un detalle que se avisa antes (el punto 4 de la propuesta). Lleva una migración nueva en producción. La decide Ale.',
+    propuesta: `**Tablas propias de Gimnasio** (módulo \`apps/api/src/gimnasio\`, tablas \`gimnasio_*\`), al lado del motor de reservas y sin tocarlo:
+
+1. **\`gimnasio_planes\`:** tipo (prueba, suelta, pack, membresía), nombre, precio, cuántas clases trae (pack), cuántas por semana (membresía; 0 = libre), días de vigencia, si se ofrece en el sitio y el orden. Es lo que hoy edita Planes y precios.
+2. **\`gimnasio_alumnos\`:** el alumno del negocio, enganchado a la ficha de cliente (\`Customer\`) que el motor ya vincula a cada reserva por celular o email; más la nota, el día de alta y si ya usó la clase de prueba. Así una reserva hecha desde el sitio cae en su alumno sin pasos de más.
+3. **\`gimnasio_suscripciones\`:** el plan de cada alumno, desde y hasta, las clases que le quedan (pack), su estado (vigente, vencida, cancelada) y de cuál renovó: el historial de renovaciones que hoy Ingresos arma a mano.
+4. **\`gimnasio_movimientos\`:** cada clase que se descuenta del pack o vuelve al cancelar a tiempo, con la reserva que la generó (única) y el porqué. Para que vuelva aunque la cancelación llegue por el enlace del email (ruta del motor), el motor tiene que avisar que una reserva se canceló: un evento interno, sin cambiar sus rutas. Es lo único que toca lo compartido y se avisa a Mateo y Alan antes.
+5. **\`gimnasio_actividades\` y \`gimnasio_salas\`:** el catálogo que hoy sale de las clases (\`datos.gimnasio\`), para que una actividad o una sala existan aunque todavía no tengan clases. El profe: un miembro del negocio o, si no da clases con cuenta, un nombre.
+
+**Cómo se usa con el motor:** reservar un lugar con plan pasa por una ruta de Gimnasio que mira el plan (vigente, tope de la semana, clases del pack), le pide la reserva al motor con su clave de intento y anota el movimiento con la misma clave: si algo se corta, repetir no descuenta dos veces. La reserva sigue siendo del motor (cupo, espera, candado).
+
+**Alternativas:**
+
+- **En los datos sueltos de las clases o de la config** (\`datos\` JSON): sin migración, pero sin integridad (dos reservas a la vez podrían gastar la misma clase del pack), sin historial y difícil de listar o filtrar.
+- **En la ficha de cliente de Tienda** (\`Customer\`) con campos de más: mezcla Tienda con Gimnasio, y el plan y los pases igual necesitan tablas propias.
+
+**Recomendación:** la primera. Es la base de las tareas del 17 al 19/11 (alumnos, planes y pases), del check-in con plan vencido (30/11) y de los ingresos por plan (07/12).`,
+    abierta: 'Es el modelo de datos del módulo (una migración nueva en producción) y define cómo se cuenta la plata de los planes: lo decide Ale. Las tareas del 17 al 19/11 dependen de esta respuesta.',
+    origen: 'Tarea del 16/11 del plan de Gimnasio. La propuesta sale de conectar Clases y Días sin clases a la API (entrada "el mapa de Gimnasio sobre el backend compartido", 05/11): las clases son reservas y lo demás no.',
+    archivos: [
+      'apps/web/src/modules/gimnasio/datos/index.ts:117',
+      'apps/web/src/modules/gimnasio/datos/index.ts:259',
+      'apps/web/src/modules/gimnasio/datos/negocio.ts:86',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:53',
+      'apps/api/prisma/schema.prisma:3912',
+      'apps/api/src/reservas/reservas.service.ts:301',
+    ],
+  }),
 ]

@@ -157,6 +157,13 @@ const F4 = '2026-11-04'
 const F13 = '2026-11-13'
 // El rubro en subrubros y el alcance en salud (15/11/2026).
 const F15 = '2026-11-15'
+// Ciclo 2 · Gimnasio (Ale): cada tarea con el día que le toca en el plan.
+const G5 = '2026-11-05'
+const G6 = '2026-11-06'
+const G9 = '2026-11-09'
+const G10 = '2026-11-10'
+const G11 = '2026-11-11'
+const G12 = '2026-11-12'
 
 export const ENTRADAS: Entrada[] = [
   // ─── Transversal · la sección Módulos ───────────────────────────────────────
@@ -2449,6 +2456,351 @@ Lo que no entró y queda como decisión abierta ("cosas con stock"): alquilar ob
       'apps/web/src/modules/turnos/admin/configuracion/Reservas.tsx:74',
       'apps/web/src/modules/turnos/admin/configuracion/Reservas.tsx:227',
       'apps/web/src/modules/superadmin/modulos/reglas.ts:46',
+    ],
+  }),
+
+  // ─── Ciclo 2 · Gimnasio (Ale) ───────────────────────────────────────────────
+  entrada({
+    modulo: 'gimnasio', fecha: F4, slug: 'plan-orbi-y-tutoriales', tipo: 'tarea', quien: 'Ale', transversal: true,
+    titulo: 'Transversal: el plan suma el manual de Orbi y los tutoriales de cada módulo, y lo que decide cada uno',
+    foco: 'Pedido de Ale del 04/11: cada plan cierra con el manual del módulo en Orbi (21/12) y sus tutoriales (22/12); Gimnasio suma la transversal del 12/11 que engancha a los módulos en Orbi y en la lista de tutoriales; Alan decide cómo entran sus paquetes, temporadas y alquiler por mes; y Cómo se trabaja suma dos reglas.',
+    que: `Cambio del plan que pidió Ale el 04/11, para que Mateo y Alan lo sepan (la regla es que un cambio del plan queda en una entrada):
+
+- **Tareas nuevas al final de cada plan** (los ids son por posición): "El manual de <módulo> en Orbi" el 21/12 y "Tutoriales de <módulo>" el 22/12, en los tres. En Gimnasio, además, la transversal del 12/11 "Orbi y la lista de tutoriales reciben a los módulos".
+- **Alquileres:** la tarea del 06/11 dice que la forma de los paquetes por salón, las temporadas y el alquiler por mes la decide Alan (y que, si toca lo compartido, lo avisa antes); el aviso del módulo dice lo mismo.
+- **Cómo se trabaja:** dos reglas nuevas, "Orbi tiene que saberlo, sin usar Orbi" y "Al terminar, los tutoriales del módulo", y la que dice qué decide Ale nombra el cobro online de la seña, WhatsApp, los recordatorios y la salida de Próximamente.
+- **El checklist entero** quedó en \`.claude/rules/modulos.md\` (se carga solo al tocar los módulos) y su resumen en \`CLAUDE.md\`.`,
+    archivos: [
+      'apps/web/src/modules/superadmin/modulos/plan.ts:184',
+      'apps/web/src/modules/superadmin/modulos/plan.ts:213',
+      'apps/web/src/modules/superadmin/modulos/plan.ts:325',
+      'apps/web/src/modules/superadmin/modulos/reglas.ts:43',
+      'apps/web/src/modules/superadmin/modulos/reglas.ts:55',
+      'apps/web/src/modules/superadmin/modulos/datos.test.ts:257',
+    ],
+  }),
+  entrada({
+    modulo: 'gimnasio', fecha: G5, slug: 'mapa-sobre-el-backend', tipo: 'tarea', quien: 'Ale',
+    titulo: 'El mapa de Gimnasio sobre el backend compartido: cada pantalla con su ruta, y planes, pases y alumnos aparte',
+    foco: 'Cada pantalla del panel y cada página del sitio de Gimnasio con la ruta de /reservas que la cubre. Las clases son reservas (cupo, sesiones, lista de espera); los planes, los pases y los alumnos no son reservas y quedan marcados como del módulo, con su decisión aparte (16/11).',
+    que: `Tarea del 05/11 del plan: leer el contrato del backend compartido (\`apps/api/src/reservas\`, su README y \`lib/reservasApi\`) y armar el mapa de Gimnasio, con lo que no cubre marcado.
+
+**Cómo entra Gimnasio en el motor:** cada clase de la grilla es un recurso \`CLASE\` con **una sesión semanal** (su horario es \`{ día: [[inicio, fin]] }\`), su cupo y la duración de su actividad; lo propio de Gimnasio (actividad, color, profe y sala) va en \`datos.gimnasio\`. Así cada clase tiene su cupo y su profe, como en la demo. Cada lugar reservado es una reserva (con \`cantidad\` si son varios) y cada persona esperando, una fila de la lista de espera.
+
+**Panel** (rutas \`/api/v1/reservas/...\`, con la sesión del panel):
+
+| Pantalla | Lee | Escribe | Estado |
+|---|---|---|---|
+| Clases · Día y detalle de la clase | \`GET /reservas\` (una ventana de semanas), \`GET /recursos\`, \`GET /espera\`, \`GET /bloqueos\` | \`POST /reservas\`, \`POST /:id/cancelar\`, \`completar\` y \`ausente\`, \`POST /espera\`, \`POST /espera/:id/lugar\`, \`DELETE /espera/:id\` | Cubre. Las dos rutas de la espera se sumaron al motor (11/11) |
+| Clases · Grilla semanal | \`GET /recursos\` (CLASE) | \`POST\`, \`PUT\` y \`DELETE /recursos\` | Cubre |
+| Días sin clases | \`GET /bloqueos\` | \`POST\` y \`DELETE /bloqueos\` (devuelve cuántas reservas quedaron adentro) | Cubre |
+| Reglas de reserva | \`GET /config\` | \`PUT /config\` | Parcial: el check-in antes de la clase no existe en el motor (marca presente recién cuando empieza) |
+| Configuración → Horarios | \`config.horario\` | \`PUT /config\` | Cubre (la pantalla se conecta aparte) |
+| Alumnos | Las reservas y la espera dan nombre y contacto | — | **No son reservas:** falta dónde vive el alumno y su plan |
+| Planes y precios | — | — | **No son reservas:** falta |
+| Ingresos | \`GET /resumen\` (lo cobrado por reservas) | — | Parcial: planes y renovaciones no existen en el motor |
+| Equipo, Actividades y salas | Lo que dicen las clases (\`datos.gimnasio\`) | — | Falta un catálogo propio: hoy una actividad sin clases no se puede guardar |
+| Recordatorios y mensajes | — | — | Falta: lo decide Ale (WhatsApp y recordatorio) |
+| Pagos | \`POST /:id/pago\` registra | — | Parcial: el cobro online lo decide Ale |
+| Calendarios (.ics) y Datos del negocio | — | — | No son de reservas |
+
+**Sitio** (rutas \`/api/v1/storefront/:slug/reservas/...\`, sin sesión):
+
+| Página | Rutas | Estado |
+|---|---|---|
+| Inicio y grilla pública | \`GET /config\`, \`/recursos\` | Cubre |
+| Reservar un lugar | \`GET /disponibilidad\`, \`POST /retener\` y \`/mi/:token/confirmar\` (o \`/reservar\`), con \`cantidad\` | Cubre |
+| Lista de espera | \`POST /espera\`, \`GET\` y \`DELETE /espera/:token\` | Cubre |
+| Mi clase (enlace del email) | \`GET /mi/:token\`, \`POST /mi/:token/cancelar\` | Cubre; falta la página \`/mi-clase/<token>\` del sitio |
+| Mis clases con sesión | — | Falta (como en Turnos) |
+| Comprar un plan | — | Falta: planes y cobro |
+
+**Lo que el backend no cubre:**
+
+1. **Planes, pases y alumnos:** no existen en el motor ni tienen por qué: no son reservas. La propuesta (tablas propias de Gimnasio, al lado del motor y sin tocarlo) es la decisión abierta del 16/11.
+2. **Actividades, salas y equipo:** hoy salen de las clases. Entran en la misma decisión.
+3. **Check-in anticipado:** el motor marca presente o ausente desde que la clase empieza; la demo deja el check-in unos minutos antes (Reglas de reserva). Con la API, el panel usa la regla del motor.
+4. **Corregir la asistencia:** en el motor, presente y ausente son estados finales; la demo deja pasar de uno al otro. Con la API, el panel no ofrece la corrección.
+5. **Anotar en la espera y darle el lugar desde el panel:** no existían; se sumaron al motor compartido (entrada transversal del 11/11).
+
+**Lo que falta del lado del front:**
+
+- **Rutas de producción:** el panel de un negocio de Gimnasio todavía no tiene dónde abrirse fuera de \`/gimnasio-demo\` (lo mismo marcó Mateo para Turnos). Para probarlo contra la API está \`/gimnasio-demo/panel?origen=api\`, solo en local.
+- **El rubro:** va como en Tienda, \`industry: "gimnasio"\` y el subrubro en \`subrubros\` (\`["crossfit"]\`); por ahora el panel lo toma de \`?rubro=\`.`,
+    archivos: [
+      'apps/api/src/reservas/README.md:98',
+      'apps/api/src/reservas/reservas-panel.controller.ts:162',
+      'apps/api/src/reservas/disponibilidad.service.ts:79',
+      'apps/api/src/reservas/reservas.service.ts:440',
+      'apps/api/prisma/schema.prisma:3912',
+      'apps/api/prisma/schema.prisma:65',
+      'apps/web/src/lib/reservasApi/cliente.ts:1',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:1',
+    ],
+  }),
+  entrada({
+    modulo: 'gimnasio', fecha: G5, slug: 'api-en-produccion', tipo: 'tarea', quien: 'Ale', transversal: true,
+    titulo: 'Transversal: la API de reservas responde en producción y el deploy queda cerrado en Módulos',
+    foco: 'GET /api/v1/reservas/config en api.orbita.site responde 401 (la ruta existe y pide sesión) y no 404, y la ruta pública del sitio también existe. El deploy del motor compartido figura como decisión tomada (04/11).',
+    que: `Tarea del 05/11 del plan: verificar que el backend compartido de reservas está vivo en producción y dar por cerrado su deploy en Módulos.
+
+| Pedido a api.orbita.site | Respuesta | Qué dice |
+|---|---|---|
+| \`GET /api/v1/reservas/config?modulo=GIMNASIO\` | 401 "Token requerido" | La ruta del panel existe y pide la sesión del panel |
+| \`GET /api/v1/storefront/no-existe-xyz/reservas/config?modulo=GIMNASIO\` | 404 "Negocio no encontrado" | La ruta pública existe: busca el negocio y no lo encuentra |
+| \`GET /api/v1/reservas-no-existe\` (de control) | 404 "Cannot GET …" | Así responde una ruta que no existe, distinto de las dos de arriba |
+
+- **El deploy:** la decisión abierta "lo que el backend compartido deja para decidir" lo tiene tomado en su punto 6 (04/11: la migración \`20261103120000_reservas\` aplicada en producción y la API desplegada), y la entrada del 04/11 "todo a producción con los módulos en Próximamente" lo documenta.
+- **La revisión de Cloud Run no se miró:** gcloud no tenía sesión en esta máquina; para el criterio de la tarea alcanza con lo que responde la API.
+- **Ojo:** lo que se sumó al motor después (anotar en la espera y darle el lugar desde el panel, 11/11) todavía no está en producción: va con el próximo \`deploy.sh\`, cuando Ale lo decida.`,
+    archivos: [
+      'apps/api/src/reservas/reservas-panel.controller.ts:32',
+      'apps/api/src/reservas/reservas-publico.controller.ts:29',
+      'apps/api/prisma/migrations/20261103120000_reservas/migration.sql:1',
+    ],
+  }),
+  entrada({
+    modulo: 'gimnasio', fecha: G6, slug: 'negocio-de-prueba', tipo: 'tarea', quien: 'Ale',
+    titulo: 'El negocio de prueba de Gimnasio en dev: config de reservas y dos clases con cupo',
+    foco: 'Un script deja en la base de dev el negocio "Gimnasio de prueba" con su dueño, la config de reservas de GIMNASIO (lunes a sábado de 7 a 22, con lista de espera) y dos clases como recursos CLASE con cupo y su sesión semanal. Se puede correr de nuevo sin duplicar nada.',
+    que: `Tarea del 06/11 del plan. El alta real todavía muestra Gimnasio como "Próximamente", así que el negocio de prueba lo crea un script: \`apps/api/scripts/gimnasio-de-prueba.ts\`.
+
+- **Solo dev:** antes de conectar mira el ref del proyecto en \`DATABASE_URL\` y \`DIRECT_URL\` (sin imprimirlas): si es producción corta, y si no es la base de dev no toca nada.
+- **El negocio y su dueño, con Prisma, igual que el alta:** sucursal, los dos roles de fábrica con sus permisos (Propietario con todo, Empleado sin configurar) y la config del negocio y de la tienda. El rubro va como en Tienda: \`industry: "gimnasio"\` y \`subrubros: ["crossfit"]\`. Subdominio \`gimnasio-prueba\`, dueño \`dueno@gimnasio-prueba.orbita.test\`; la clave no está en el repo: se pasa al correrlo (\`GIMNASIO_PRUEBA_CLAVE\`).
+- **La config y las clases, por la API** (\`PUT /reservas/config\` y \`POST /reservas/recursos\`, con la sesión del dueño): pasan por las mismas validaciones que el panel. Lunes a sábado de 7 a 22, confirmación automática, 14 días de anticipación, cancelación hasta 2 horas antes y lista de espera.
+- **Las dos clases:** WOD los lunes de 19 a 20 con cupo 12 (Nico, Box) y Halterofilia los miércoles de 18 a 19 con cupo 3 (Seba, Box): la de cupo 3 se llena rápido y deja probar la espera.
+
+**Verificado:** \`GET /reservas/recursos?modulo=GIMNASIO\` devuelve las dos clases con su cupo, su sesión en el horario y lo de Gimnasio en \`datos\`:
+
+\`\`\`
+WOD: cupo 12, 60 min, sesiones {"1":[[1140,1200]]}, datos {"gimnasio":{"sala":"Box","color":"#2563EB","profe":"Nico","profeId":"p1","actividadId":"a1"}}
+Halterofilia: cupo 3, 60 min, sesiones {"3":[[1080,1140]]}, datos {"gimnasio":{"sala":"Box","color":"#059669","profe":"Seba","profeId":"p2","actividadId":"a3"}}
+\`\`\`
+
+La segunda corrida no duplicó nada. Para usarlo: con la API local levantada contra dev, \`GIMNASIO_PRUEBA_CLAVE=… pnpm exec ts-node scripts/gimnasio-de-prueba.ts\` desde \`apps/api\`; después, entrar en \`localhost:3001/login\` con el dueño y abrir \`/gimnasio-demo/panel?origen=api\`.`,
+    archivos: [
+      'apps/api/scripts/gimnasio-de-prueba.ts:68',
+      'apps/api/scripts/gimnasio-de-prueba.ts:75',
+      'apps/api/scripts/gimnasio-de-prueba.ts:119',
+      'apps/api/scripts/gimnasio-de-prueba.ts:57',
+    ],
+  }),
+  entrada({
+    modulo: 'gimnasio', fecha: G9, slug: 'clases-como-recursos', tipo: 'tarea', quien: 'Ale',
+    titulo: 'Las clases de la grilla son recursos CLASE: el panel de Gimnasio lee y guarda en la API',
+    foco: 'El panel de Gimnasio ya no arma sus datos por su cuenta: se los pide a un origen, la demo o la API de reservas. Crear, cambiar o quitar una clase de la grilla crea, edita o borra su recurso CLASE (cupo, duración, sesión en el horario, y profe y sala en datos). La demo queda igual.',
+    que: `Tarea del 09/11 del plan.
+
+- **El origen** (\`datos/origen/\`), con el mismo criterio que Turnos y sin importarlo: el panel pide el negocio, los socios, las inscripciones, el reloj y las acciones, y las pantallas los siguen recibiendo por props. **La demo** (\`demo.ts\`) es el almacén del navegador de siempre; **la API** (\`api.ts\`) lee una ventana de días con \`GET /reservas\` (la agranda si se mira otra fecha) y, después de cada acción, vuelve a leer: lo que se ve es lo que quedó en la base.
+- **Las traducciones** (\`mapear.ts\`, puras, con 18 tests): los días (la API cuenta el domingo como 0, el panel el lunes), una clase por sesión, lo de Gimnasio en \`datos.gimnasio\` y, al guardar, qué crear, cambiar y quitar. Las acciones contra la API tienen 11 tests con un cliente falso.
+- **La grilla:** "Nueva clase" crea un recurso \`CLASE\` con una sesión semanal; cambiar una clase edita su recurso (si el recurso tuviera varias sesiones, solo la suya); quitarla lo borra o le saca su sesión. Las actividades, las salas y el equipo salen de las clases hasta que el módulo tenga su catálogo (decisión del 16/11).
+- **Lo reservado se cuida** (en la demo también): el cupo no baja de los lugares tomados en una fecha que viene, y una clase con lugares por delante no cambia de día, hora ni duración ni se quita.
+- **El reloj:** con la API, el día y la hora son los de Argentina (se mueven solos); la demo sigue en su sábado 14/11 a las 10:40.
+- **Lo que todavía no guarda:** con la API, las secciones que no son Clases ni Días sin clases lo dicen en una franja y no mandan nada.
+- **Para probarlo:** \`/gimnasio-demo/panel?origen=api\` en local, con la sesión del dueño del negocio de prueba.
+
+**Verificado en el navegador contra la API local y la base de dev:** una clase nueva el jueves a las 7 con cupo 10 sale en \`GET /reservas/recursos\` con su sesión \`{"4":[[420,480]]}\`, cupo 10 y profe y sala en \`datos.gimnasio\`. Tests de \`modules/gimnasio\` en verde, typecheck y eslint sin errores, y la demo sin cambios (9 chequeos en el navegador).
+
+${comoQuedo('gimnasio', ['Grilla semanal sobre la API · 1280', 'api-grilla-1280.webp'], ['Grilla semanal sobre la API · 390', 'api-grilla-390.webp'])}`,
+    archivos: [
+      'apps/web/src/modules/gimnasio/datos/origen/index.ts:52',
+      'apps/web/src/modules/gimnasio/datos/origen/index.ts:101',
+      'apps/web/src/modules/gimnasio/datos/origen/demo.ts:21',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:70',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:121',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:207',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:84',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:288',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:313',
+      'apps/web/src/modules/gimnasio/datos/reloj.ts:76',
+      'apps/web/src/modules/gimnasio/admin/Panel.tsx:62',
+      'apps/web/src/modules/gimnasio/admin/Panel.tsx:180',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:406',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:429',
+      'apps/web/src/pages/gimnasio-demo/panel.tsx:28',
+      'apps/web/src/modules/gimnasio/datos/origen/__tests__/mapear.test.ts:47',
+      'apps/web/src/modules/gimnasio/datos/origen/__tests__/api.test.ts:52',
+    ],
+  }),
+  entrada({
+    modulo: 'gimnasio', fecha: G10, slug: 'grilla-con-cupo-real', tipo: 'tarea', quien: 'Ale',
+    titulo: 'Las clases de cada día muestran las sesiones reales con cuántos lugares quedan',
+    foco: 'Con la API, las clases de cada día salen de las sesiones de los recursos y los lugares tomados, de las reservas que ocupan lugar (también las retenidas que todavía no vencieron), como cuenta el motor. Lo que dice el panel coincide con GET disponibilidad.',
+    que: `Tarea del 10/11 del plan.
+
+- **De dónde sale cada número:** las clases de un día son las sesiones de los recursos en ese día de la semana (menos los días sin clases); los lugares tomados son la suma de \`cantidad\` de las reservas confirmadas, pendientes o retenidas que todavía no vencieron, igual que cuenta el motor. Una retenida vencida no ocupa lugar aunque el barrido todavía no la haya marcado.
+- **Por qué \`GET /reservas\` y no una llamada a \`GET disponibilidad\` por clase:** la disponibilidad no devuelve lo que ya pasó (el día de ayer, la clase de hace una hora) y el panel lo necesita para la asistencia y el % de la grilla. Con una lectura por ventana de semanas se dibujan todos los días; al reservar, el que manda sigue siendo el motor (si no queda lugar, 409 con su mensaje).
+- **Varios lugares por reserva:** una persona que viene acompañada ocupa \`cantidad\` lugares; la barra de cupo y "N lugares libres" los cuentan (en la demo también).
+- **La grilla:** el % de cada clase en las últimas cuatro semanas sale de las mismas reservas.
+
+**Verificado:** con la clase de cupo 3 llena (una reserva de 2 lugares y otra de 1), el panel la muestra completa y \`GET /reservas/disponibilidad\` de esa fecha devuelve \`libres: 0, cupo: 3\`. A 390 no hay scroll horizontal.
+
+${comoQuedo('gimnasio', ['Clases de hoy sobre la API · 1280', 'api-clases-dia-1280.webp'], ['Clases de hoy sobre la API · 390', 'api-clases-dia-390.webp'])}`,
+    archivos: [
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:229',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:192',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:242',
+      'apps/web/src/modules/gimnasio/datos/index.ts:573',
+      'apps/web/src/modules/gimnasio/datos/index.ts:287',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:70',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:168',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:357',
+    ],
+  }),
+  entrada({
+    modulo: 'gimnasio', fecha: G11, slug: 'anotar-y-lista-de-espera', tipo: 'tarea', quien: 'Ale',
+    titulo: 'Anotar desde el panel (también a alguien nuevo y con varios lugares) y la lista de espera sobre la API',
+    foco: 'En la clase del día se anota a quien ya vino o a alguien nuevo (nombre y celular), con varios lugares si viene acompañado. Con la clase llena el panel ofrece la lista de espera y avisa en qué lugar quedó; al liberarse un lugar, el primero pasa solo.',
+    que: `Tarea del 11/11 del plan.
+
+- **Anotar:** el selector de "Anotar" suma "Alguien nuevo…" (nombre y celular, validado como lo pide la API) y, si queda más de un lugar, "Lugares". Con la API es \`POST /reservas\` confirmada, con una clave por intento (dos clics no dan dos lugares) y los datos de la persona; el motor la vincula a la ficha de cliente del negocio por celular o email. En la demo, la persona nueva queda como socio.
+- **Con la clase llena:** el botón pasa a "A la lista de espera" y anota con \`POST /reservas/espera\`, una ruta nueva del panel (entrada transversal del mismo día); el aviso dice en qué lugar de la lista quedó (en la demo también).
+- **El primero pasa solo:** al liberar un lugar, el motor se lo da al primero que esperaba en la misma transacción, y el aviso dice quién pasó. "Darle el lugar" (\`POST /reservas/espera/:id/lugar\`) queda para cuando aparece un lugar sin que nadie cancele, por ejemplo al subirle el cupo a la clase.
+- **Si la clase se llenó mientras se miraba** (alguien reservó desde el sitio), la API contesta 409 "No queda lugar en ese horario.": el panel lo muestra en un aviso de error y vuelve a leer. Mientras se guarda y se relee, la sección no se puede tocar (lo que se ve puede estar viejo).
+
+**Verificado en el navegador contra la API local y la base de dev**, sobre Halterofilia (cupo 3): Lu Paz con 2 lugares y Sol Ríos con 1 llenan la clase; el botón pasa a "A la lista de espera" y Tomás Vera queda primero ("Está en el lugar 1 de la lista."). En la API: 3 de 3 lugares y una persona esperando.
+
+${comoQuedo('gimnasio', ['Clase llena con lista de espera · 1280', 'api-clase-llena-1280.webp'], ['Anotar a alguien nuevo · 390', 'api-clase-detalle-390.webp'])}`,
+    archivos: [
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:239',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:266',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:332',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:341',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:346',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:158',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:198',
+      'apps/web/src/modules/gimnasio/datos/origen/demo.ts:42',
+      'apps/web/src/modules/gimnasio/admin/piezas.tsx:33',
+      'apps/web/src/design-system/reservas/piezas.tsx:240',
+    ],
+  }),
+  entrada({
+    modulo: 'gimnasio', fecha: G11, slug: 'espera-desde-el-panel', tipo: 'tarea', quien: 'Ale', transversal: true,
+    titulo: 'Transversal: el motor de reservas anota en la espera y le da el lugar a quien espera, desde el panel',
+    foco: 'Dos rutas nuevas del panel en el backend compartido: POST /reservas/espera (el negocio anota a alguien en un horario lleno, hasta que empieza) y POST /reservas/espera/:id/lugar (darle el lugar, con el mismo candado y la misma cuenta que una reserva nueva). La lista del panel ya no trae el token del enlace personal. Sirve a los tres módulos.',
+    que: `Hacía falta para la tarea del 11/11 de Gimnasio y les sirve a Turnos y Alquileres: el panel no tenía cómo anotar a alguien en la espera ni cómo darle un lugar a quien esperaba. **Es lo compartido: hay que avisarles a Mateo y Alan antes de mergear.**
+
+- **\`POST /reservas/espera\`** (\`reservas.manage\`): el mismo \`anotarseEnEspera\` del sitio, en modo panel (un horario de hoy se anota hasta que empieza, sin la anticipación del sitio) y con registro en \`audit_logs\`. Solo con el horario lleno ("Todavía hay lugar en ese horario: reservá directo."). Devuelve la fila y su \`posicion\`.
+- **\`POST /reservas/espera/:id/lugar\`** (\`reservas.manage\`): con el recurso tomado (\`SELECT … FOR UPDATE\`) cuenta si entra uno más; si entra, la persona pasa a una reserva confirmada del panel y la espera queda tomada; si no, 409 "No queda lugar en ese horario." y sigue esperando. Repetirlo (dos clics, o una cancelación que la promovió en el medio) devuelve la misma reserva.
+- **La espera se reclama antes de crear nada:** \`promoverEspera\` (al cancelar) y darle el lugar usan el mismo camino, que primero marca la fila como tomada con un compare-and-set sobre \`ESPERANDO\`. Si la persona salió de la lista en ese mismo momento, no se crea una reserva para alguien que ya no esperaba (antes podía pasar) y, al cancelar, pasa el siguiente.
+- **\`GET /reservas/espera\` ya no devuelve \`tokenAcceso\`:** ese token es el enlace personal de la persona y no tiene por qué viajar al panel. La forma es la de \`Espera\` en \`lib/reservasApi/tipos.ts\`, que ya no lo tenía.
+- **El cliente web:** \`panel.anotarEnEspera\` y \`panel.darLugar\` en \`lib/reservasApi\`, y el tipo de lo que devuelve cancelar, arreglado: como intersección con \`Reserva\` se reducía a \`never\`, porque la API pisa \`sena\` con lo que pasó con la seña.
+
+**Verificado:** 5 tests unitarios nuevos del motor (30 en verde), 2 e2e nuevos contra Postgres de dev (17 de 17), entre ellos dos "darle el lugar" a la vez que devuelven la misma reserva, y el aislamiento por negocio en verde. **No está en producción:** va con el próximo \`deploy.sh\` (no lleva migración), cuando Ale lo decida.`,
+    archivos: [
+      'apps/api/src/reservas/reservas.service.ts:580',
+      'apps/api/src/reservas/reservas.service.ts:624',
+      'apps/api/src/reservas/reservas.service.ts:738',
+      'apps/api/src/reservas/reservas.service.ts:756',
+      'apps/api/src/reservas/reservas-panel.controller.ts:162',
+      'apps/api/src/reservas/reservas-panel.controller.ts:170',
+      'apps/api/src/reservas/reservas-panel.controller.ts:180',
+      'apps/api/src/reservas/reservas.types.ts:199',
+      'apps/api/src/reservas/README.md:98',
+      'apps/api/test/unit/reservas.service.unit-spec.ts:261',
+      'apps/api/test/reservas.e2e-spec.ts:314',
+      'apps/web/src/lib/reservasApi/cliente.ts:116',
+      'apps/web/src/lib/reservasApi/cliente.ts:41',
+    ],
+  }),
+  entrada({
+    modulo: 'gimnasio', fecha: G12, slug: 'liberar-presente-ausente', tipo: 'tarea', quien: 'Ale',
+    titulo: 'Liberar un lugar, check-in y faltó desde la clase del día, sobre la API',
+    foco: 'La cruz libera el lugar (si había espera, el primero pasa solo y el aviso dice quién), Check-in completa la reserva y Faltó la marca ausente. Con la API son estados finales: se marcan una vez, sobre un lugar reservado y desde que la clase empezó.',
+    que: `Tarea del 12/11 del plan.
+
+| En la clase | Con la API | Cuándo se puede |
+|---|---|---|
+| La cruz al lado de un anotado | \`POST /reservas/:id/cancelar\` | Antes de que la clase termine |
+| Check-in | \`POST /reservas/:id/completar\` | Desde que la clase empieza (en la demo, unos minutos antes) |
+| Faltó | \`POST /reservas/:id/ausente\` | Cuando la clase terminó |
+| La cruz al lado de alguien en espera | \`DELETE /reservas/espera/:id\` | Siempre |
+
+- **Estados finales:** en el motor, presente y ausente no se corrigen (de AUSENTE no se pasa a COMPLETADA). Con la API, el panel ofrece Check-in y Faltó solo sobre un lugar reservado; en la demo se sigue pudiendo corregir. Lo dice el origen (\`puede.corregirAsistencia\`), no la pantalla.
+- **Cuándo se abre el check-in:** el motor no deja completar antes de la hora; con la API el detalle dice "El check-in se abre cuando empieza la clase".
+- **El aviso:** al liberar un lugar con gente esperando, dice quién pasó de la lista (en la demo también).
+
+**Verificado en el navegador contra la API local y la base de dev:** en Halterofilia, la cruz de Sol Ríos la cancela y Tomás Vera pasa de la espera a confirmado ("Tomás pasó de la lista de espera y ya tiene su lugar."). En una clase que ya terminó, Check-in deja a Ana COMPLETADA y Faltó deja a Beto AUSENTE, y después no queda ningún botón para corregir.
+
+${comoQuedo('gimnasio', ['El primero de la espera toma el lugar · 1280', 'api-espera-pasa-1280.webp'], ['Asistencia de una clase que terminó · 1280', 'api-asistencia-1280.webp'])}`,
+    archivos: [
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:292',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:170',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:182',
+      'apps/web/src/modules/gimnasio/datos/origen/index.ts:52',
+      'apps/web/src/modules/gimnasio/datos/origen/demo.ts:50',
+    ],
+  }),
+  entrada({
+    modulo: 'gimnasio', fecha: G12, slug: 'orbi-y-tutoriales-por-modulo', tipo: 'tarea', quien: 'Ale', transversal: true,
+    titulo: 'Transversal: Orbi y la lista de tutoriales reciben a los módulos',
+    foco: 'Cada módulo escribe su manual para Orbi sin importar a Tienda (lib/manual) y el generador lo junta en el artefacto de la API, aparte de los temas de Tienda: no entra al prompt, no se paga IA por los módulos. La lista de tutoriales distingue el módulo y cada responsable carga la suya con tutoriales_crear.',
+    que: `Tarea transversal del 12/11 del plan (sumada el 04/11): que el manual de cada módulo llegue a Orbi y que la lista de tutoriales distinga el módulo.
+
+**El manual de cada módulo:**
+
+- **El vocabulario** (\`lib/manual/bloques.ts\`): los bloques (párrafo, lista, pasos, campos, estados, nota) y el texto plano para Orbi salen del manual de Tienda a una librería que no conoce módulos (eslint lo vigila). Tienda los sigue usando igual.
+- **Un manual por módulo** (\`lib/manual/modulos.ts\`): cada uno escribe el suyo en \`modules/<módulo>/manual.ts\`. Gimnasio ya tiene el suyo: las secciones del panel, las clases del día, anotar, la lista de espera, liberar un lugar, check-in y faltas, la grilla semanal y los días sin clases, con los nombres exactos de los botones y un test que falla si un botón no existe en el panel.
+- **El generador** (\`modules/orbi/manual/artefacto.ts\`) junta Tienda y los módulos, como el alta conoce a los cuatro. Los temas de los módulos van en \`modulos\` del artefacto, con el módulo adelante del id (\`gimnasio.anotar\`), y **no entran al índice del prompt**: un test de la API lo vigila. Orbi no los usa todavía; quedan escritos y al día.
+- **Turnos y Alquileres:** no se tocaron sus módulos. Un test arma el artefacto con un tema de prueba de cada uno y comprueba que llega; cuando Mateo y Alan escriban su manual, lo suman a \`MANUALES_DE_MODULOS\` (está explicado en \`.claude/rules/modulos.md\`).
+
+**La lista de tutoriales:**
+
+- **Columna \`modulo\`** en \`marketing_tutoriales\` (tienda, turnos, alquileres o gimnasio; los 39 que había quedaron en tienda). Migración \`20261116120000_marketing_tutoriales_modulo\`, aditiva e idempotente, **aplicada en dev** (160 de 160) y **no en producción**.
+- **El conector:** \`tutoriales_listar\` y \`tutoriales_actualizar\` aceptan \`modulo\`, y **\`tutoriales_crear\`** suma un tutorial a la lista de un módulo (queda en FALTA, al final de su grupo). Las pantallas de un módulo empiezan con el módulo (\`gimnasio/clases\`), así no chocan con las de Tienda. Los títulos no se repiten, ni entre módulos.
+- **El panel de Tienda recibe lo mismo de siempre:** "Ver tutorial" pide los videos sin módulo y le llegan solo los de Tienda.
+- **Marketing → Videos → Tutoriales:** un filtro por módulo y un chip en los que no son de Tienda.
+- **Docs:** \`docs/marketing/FLUJO-PROSPECCION-Y-VIDEOS.md\` § La lista de tutoriales, \`apps/api/DEPLOYMENT.md\`, y las reglas \`.claude/rules/modulos.md\` (§ 4 y § 5) y \`manual.md\`.
+
+**Verificado:** los tests del manual (web y API) y del artefacto (al día, regenerado con \`pnpm manual:generar\`), los de tutoriales y del conector (5 suites, 116 casos) y el typecheck de las dos apps. **No está en producción:** la API necesita la migración (\`prisma-prod.sh migrate deploy\`) y \`deploy.sh\`; la web funciona igual con la API de antes.`,
+    archivos: [
+      'apps/web/src/lib/manual/bloques.ts:10',
+      'apps/web/src/lib/manual/modulos.ts:31',
+      'apps/web/src/lib/manual/modulos.ts:42',
+      'apps/web/src/lib/manual/contrato.ts:29',
+      'apps/web/src/modules/gimnasio/manual.ts:16',
+      'apps/web/src/modules/gimnasio/__tests__/manual.test.ts:13',
+      'apps/web/src/modules/orbi/manual/artefacto.ts:23',
+      'apps/web/src/modules/orbi/manual/artefacto.ts:29',
+      'apps/web/src/modules/orbi/manual/artefacto.test.ts:36',
+      'apps/web/src/modules/ventas/panel/manual/paraOrbi.ts:34',
+      'apps/web/src/modules/ventas/panel/manual/contenido.ts:43',
+      'apps/web/eslint.config.mjs:39',
+      'apps/api/src/orbi/manual/manual.types.ts:38',
+      'apps/api/src/orbi/manual/manual.generated.ts:1045',
+      'apps/api/src/orbi/manual/manual.spec.ts:52',
+      'apps/api/prisma/schema.prisma:3751',
+      'apps/api/prisma/migrations/20261116120000_marketing_tutoriales_modulo/migration.sql:5',
+      'apps/api/src/marketing/videos/tutoriales.service.ts:28',
+      'apps/api/src/marketing/videos/tutoriales.service.ts:121',
+      'apps/api/src/marketing/videos/tutoriales.service.ts:189',
+      'apps/api/src/marketing/prospeccion/mcp/mcp-prospeccion.ts:229',
+      'apps/api/src/marketing/videos/videos.controller.ts:94',
+      'apps/api/test/unit/tutoriales.unit-spec.ts:143',
+      'apps/web/src/modules/superadmin/ListaDeTutoriales.tsx:189',
+    ],
+  }),
+  entrada({
+    modulo: 'gimnasio', fecha: F13, slug: 'dias-sin-clases', tipo: 'tarea', quien: 'Ale',
+    titulo: 'Días sin clases sobre /reservas/bloqueos: el bloqueo saca las sesiones y avisa cuántas reservas quedaron adentro',
+    foco: 'Agregar días crea un bloqueo de todo el negocio (del primer día a las 00:00 al final del último) y Quitar lo borra. La API no deja reservar esos días y devuelve cuántas reservas quedaron adentro: el panel lo avisa, porque no se cancelan solas.',
+    que: `Tarea del 13/11 del plan.
+
+- **De días a instantes:** el panel guarda los días sin clases como \`[desde, hasta)\`; a la API van como \`fechaDesde\` y \`fechaHasta\` (el último día incluido, hasta las 24). Al leer, un bloqueo que termina a la medianoche no se lleva el día siguiente y uno que termina a mitad de un día lo cuenta entero. Solo los de todo el negocio son "días sin clases"; uno de una sola clase igual tapa esa sesión en la API.
+- **El aviso:** \`POST /reservas/bloqueos\` no cancela lo reservado y devuelve \`afectadas\`; el panel dice "2 reservas quedan adentro: no se cancelan solas, avisales.". La demo cuenta lo mismo con sus inscripciones, y el modal ya no dice que quien tenía lugar "lo ve cancelado" (con la API no es así).
+- **Las fechas:** el día de hoy es el de verdad con la API, y el selector no deja elegir días que ya pasaron.
+
+**Verificado en el navegador contra la API local y la base de dev:** el miércoles con dos reservas en Halterofilia, Agregar días con el motivo "Mantenimiento del box" avisa "2 reservas quedan adentro"; en la API el bloqueo existe y \`GET /reservas/disponibilidad\` de ese día queda sin sesiones; en Clases ese día se ve "Sin clases" con el motivo. Quitar lo borra de la API.
+
+${comoQuedo('gimnasio', ['Días sin clases sobre la API · 1280', 'api-dias-sin-clases-1280.webp'], ['Días sin clases sobre la API · 390', 'api-dias-sin-clases-390.webp'], ['El día bloqueado en Clases · 1280', 'api-dia-bloqueado-1280.webp'])}`,
+    archivos: [
+      'apps/web/src/modules/gimnasio/admin/configuracion/Bloqueos.tsx:29',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Bloqueos.tsx:74',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:132',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:331',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:140',
+      'apps/web/src/modules/gimnasio/datos/index.ts:585',
+      'apps/api/src/reservas/reservas-catalogo.service.ts:259',
     ],
   }),
 ]

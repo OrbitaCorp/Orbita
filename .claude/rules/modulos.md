@@ -66,14 +66,19 @@ el detalle para que lo lea el Claude de cada uno cuando toca su módulo.
 
 ## 4. Orbi tiene que saberlo, sin usar Orbi
 
-- **Todo cambio** de pantalla, botón, paso o sección del panel va al manual que lee Orbi: hoy
-  `apps/web/src/modules/ventas/panel/manual/contenido.ts`, con los nombres exactos de los botones.
+- **Todo cambio** de pantalla, botón, paso o sección del panel va al manual que lee Orbi, con los
+  nombres exactos de los botones: el de Tienda es
+  `apps/web/src/modules/ventas/panel/manual/contenido.ts`; el de cada módulo, el suyo (abajo).
+  `pnpm test` de `apps/web` falla si un botón del manual no existe o si el artefacto quedó viejo
+  (detalle en `.claude/rules/manual.md`).
+- Cada módulo escribe **su propio manual** en `apps/web/src/modules/<módulo>/manual.ts`, con los
+  tipos de `lib/manual/modulos.ts` (el mismo vocabulario de bloques que Tienda, sin importar a
+  Tienda), y lo suma a `MANUALES_DE_MODULOS` en `apps/web/src/modules/orbi/manual/artefacto.ts`.
   Después `cd apps/web && pnpm manual:generar` y commitear
-  `apps/api/src/orbi/manual/manual.generated.ts`. `pnpm test` de `apps/web` falla si un botón del
-  manual no existe o si el artefacto quedó viejo (detalle en `.claude/rules/manual.md`).
-- Cómo entra el manual de cada módulo sin importar a Tienda (un contenido por módulo que el
-  generador junta) lo define Ale: tarea transversal del 12/11 en el plan de Gimnasio. Hasta
-  entonces, el tema se escribe igual y queda listo para engancharse.
+  `apps/api/src/orbi/manual/manual.generated.ts`. Sus temas viajan aparte (`modulos` del
+  artefacto) y no entran al índice del prompt de Tienda. Gimnasio ya tiene el suyo, con un test
+  que falla si un `[[botón]]` no existe en el panel (`modules/gimnasio/__tests__/manual.test.ts`,
+  con `lib/manual/contrato.ts`): copiar ese test para el módulo propio.
 - **Los módulos no usan Orbi.** Solo conocimiento, en texto: no se le agregan tools, no se lo
   llama desde el panel ni el sitio, no se corren evals ni grabaciones contra el modelo. Así no
   pagamos IA por los módulos.
@@ -83,6 +88,11 @@ el detalle para que lo lea el Claude de cada uno cuando toca su módulo.
 - Como se hace con Tienda: la lista del módulo en Superadmin → Marketing → Videos → Tutoriales
   (tabla `marketing_tutoriales`: grupo, orden, título y las pantallas donde se ofrece el botón
   "Ver tutorial"), con qué hay y qué falta.
+- Cada tutorial es **de un módulo** (columna `modulo`: tienda, turnos, alquileres o gimnasio). La
+  lista del módulo la carga su responsable con su Claude por el conector, con `tutoriales_crear`
+  (título, grupo y módulo; uno por llamada). Las pantallas de un módulo empiezan con el módulo
+  (`gimnasio/clases`), así no chocan con las de Tienda. En Marketing → Videos → Tutoriales se
+  filtra por módulo.
 - Cada tutorial se produce con el conector MCP y la skill `videos-tutoriales` sobre la demo
   pública (nada de datos reales), se sube a YouTube como "No listado" y el Claude de la persona
   carga el link con `tutoriales_actualizar`: con el link queda hecho, sin cola, sin aprobación y
