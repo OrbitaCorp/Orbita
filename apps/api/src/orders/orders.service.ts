@@ -27,6 +27,10 @@ import { desgloseDePedido } from './order-mail-breakdown';
 // la lista con filtros, el descuento de stock al confirmar, las ventas de
 // caja (POS), los cupones y el comprobante. Está anotado en PENDIENTES.md.
 
+// A nombre de quién queda una venta cargada con "Solo registrar la venta"
+// (CreateOrderDto.sinComprador): el término de siempre en un ticket argentino.
+export const COMPRADOR_ANONIMO = 'Consumidor final';
+
 // Las reglas del juego: desde cada estado, a cuáles se puede pasar.
 // Un pedido online avanza pendiente → confirmado → en preparación → enviado →
 // entregado. Se puede SALTEAR pasos hacia adelante (para cuando el negocio
@@ -668,10 +672,14 @@ export class OrdersService {
     }
 
     // Para un pedido necesito saber a quién va: o un cliente, o los datos
-    // del comprador escritos a mano (al menos el nombre).
+    // del comprador escritos a mano (al menos el nombre), o que el panel diga
+    // explícitamente "solo la venta" (`sinComprador`). El checkout público
+    // nunca puede vender sin comprador.
+    const anonimo = !!dto.sinComprador && !opts?.publicCheckout && !dto.customerId && !dto.buyer;
     const buyerName =
       dto.buyer?.name ??
-      (customer ? `${customer.firstName}${customer.lastName ? ' ' + customer.lastName : ''}` : null);
+      (customer ? `${customer.firstName}${customer.lastName ? ' ' + customer.lastName : ''}` : null) ??
+      (anonimo ? COMPRADOR_ANONIMO : null);
     const buyerEmail = dto.buyer?.email ?? customer?.email ?? null;
     if (!buyerName) {
       throw new BadRequestException(

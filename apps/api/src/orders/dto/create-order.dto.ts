@@ -67,6 +67,11 @@ export class CreateOrderDto {
   @IsOptional() @IsUUID() shippingAddressId?: string;
   @IsOptional() @IsObject() @ValidateNested() @Type(() => OrderShippingAddressInput) shippingAddress?: OrderShippingAddressInput;
   @IsOptional() @IsObject() @ValidateNested() @Type(() => OrderBuyerInput) buyer?: OrderBuyerInput;
+  // "Solo registrar la venta" del alta manual del panel (16/11, pedido de varios
+  // dueños): sin cliente ni comprador. El pedido queda a nombre de
+  // COMPRADOR_ANONIMO y no crea ficha en Clientes. Explícito a propósito: un
+  // pedido al que solo le falta el comprador por error sigue rebotando.
+  @IsOptional() @IsBoolean() sinComprador?: boolean;
   // No puede ser negativo: un envío negativo bajaba el total (hasta $0) y
   // dejaba pasar pedidos con total falso que igual descuentan stock.
   @IsOptional() @IsNumber() @Min(0) @Max(1_000_000_000) shippingCost?: number;

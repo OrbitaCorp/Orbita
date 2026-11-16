@@ -1808,6 +1808,9 @@ export type CreateOrderInput = {
   // anónimas necesitan uno. Si el pedido va a un cliente YA registrado
   // (customerId), el backend igual exige que ESE cliente tenga email cargado.
   buyer?: { name: string; email?: string; phone?: string; dni?: string }
+  // "Solo registrar la venta": sin customerId ni buyer. Queda a nombre de
+  // "Consumidor final" y no crea ficha en Clientes.
+  sinComprador?: boolean
   items: { variantId: string; quantity: number; notes?: string }[]
   notes?: string
   shippingCost?: number

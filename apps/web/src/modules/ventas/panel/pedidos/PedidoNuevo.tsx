@@ -54,6 +54,7 @@ type ClienteElegido =
     | { tipo: 'manual'; nombre: string; email: string; tel: string }
 
 type Modalidad = 'presencial' | 'online'
+const CLAVE_SIN_CLIENTE = 'orbita:pedido-nuevo:sin-cliente'
 // 'MIXTO' = una parte en efectivo y otra por transferencia (solo presencial:
 // es "cómo se cobró", no una promesa).
 type MetodoCobro = 'CASH' | 'TRANSFER' | 'MIXTO'
@@ -107,18 +108,33 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
     const [cargandoCli, setCargandoCli] = useState(false)
     const [errorCli, setErrorCli]     = useState<string | null>(null)
     const [reintentoCli, setReintentoCli] = useState(0)
+    // "Solo la venta" (16/11, pedido de varios dueños: en el mostrador quieren
+    // registrar la venta y listo, sin cargar a nadie). Queda a nombre de
+    // "Consumidor final" y no crea ficha en Clientes. Se recuerda la última
+    // elección en este navegador, para no tener que tocarla en cada venta.
+    const [sinCliente, setSinClienteState] = useState(false)
+    const setSinCliente = (v: boolean) => {
+        setSinClienteState(v)
+        try { localStorage.setItem(CLAVE_SIN_CLIENTE, v ? '1' : '0') } catch { /* sin storage: solo dura esta visita */ }
+    }
 
     // Si venimos del perfil de un cliente ("Nuevo pedido" en Clientes), el
     // cliente ya llega elegido por la URL (?clienteId=…): se precarga y el
     // ticket arranca con el comprador puesto.
     const router = useRouter()
     const clienteIdInicial = typeof router.query.clienteId === 'string' ? router.query.clienteId : null
+    // La elección guardada vale salvo que se llegue con un cliente en la URL.
+    useEffect(() => {
+        if (!router.isReady || clienteIdInicial) return
+        try { if (localStorage.getItem(CLAVE_SIN_CLIENTE) === '1') setSinClienteState(true) } catch { /* sin storage */ }
+    }, [router.isReady, clienteIdInicial])
     useEffect(() => {
         if (!esDueno || !clienteIdInicial) return
         let cancelado = false
         getCustomer(clienteIdInicial)
             .then(c => {
                 if (cancelado) return
+                setSinClienteState(false)
                 setCliente(prev => prev ?? {
                     tipo: 'registrado', id: c.id,
                     nombre: `${c.firstName}${c.lastName ? ' ' + c.lastName : ''}`,
@@ -297,7 +313,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
     // búsquedas. Si falla, se asume sin descuento (el backend igual valida).
     const [descuentoAuto, setDescuentoAuto] = useState<{ total: number; nombres: string[] }>({ total: 0, nombres: [] })
     const carritoClave = carrito.map(l => `${l.variantId}:${l.cantidad}`).join(',')
-    const clienteIdEval = cliente?.tipo === 'registrado' ? cliente.id : undefined
+    const clienteIdEval = !sinCliente && cliente?.tipo === 'registrado' ? cliente.id : undefined
     useEffect(() => {
         if (!esDueno || carrito.length === 0) return
         let cancelado = false
@@ -349,12 +365,14 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
     const sinProductos = carrito.length === 0
     // Presencial exige saber cómo se cobró; online no (puede pagar después).
     const faltaCobro = esPresencial && (cobro === null || !mixtoValido)
-    const puedeCrear = clienteListo !== null && carrito.length > 0 && !faltaCobro && !creando
+    // Con "Solo la venta" no hace falta comprador.
+    const compradorListo = sinCliente || clienteListo !== null
+    const puedeCrear = compradorListo && carrito.length > 0 && !faltaCobro && !creando
     // A quién le llega el aviso por email al crear (si hay a quién).
-    const emailAviso = clienteListo?.email || null
+    const emailAviso = sinCliente ? null : (clienteListo?.email || null)
 
     const crear = async () => {
-        if (!clienteListo || carrito.length === 0 || creando) return
+        if (!compradorListo || carrito.length === 0 || creando) return
         setCreando(true)
         setErrorCrear(null)
         try {
@@ -366,7 +384,9 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                     ? { payments: [{ method: 'CASH' as const, amount: efectivoNum }, { method: 'TRANSFER' as const, amount: transferenciaNum }] }
                     : cobro ? { paymentMethod: cobro } : {}),
                 notifyCustomer: !!emailAviso,
-                ...(clienteListo.tipo === 'registrado'
+                ...(sinCliente || !clienteListo
+                    ? { sinComprador: true }
+                    : clienteListo.tipo === 'registrado'
                     ? { customerId: clienteListo.id }
                     : { buyer: { name: clienteListo.nombre, ...(clienteListo.email ? { email: clienteListo.email } : {}), ...(clienteListo.tel ? { phone: clienteListo.tel } : {}) } }),
                 items: carrito.map(l => ({ variantId: l.variantId, quantity: l.cantidad })),
@@ -678,8 +698,22 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                             <User size={13} style={{ color: 'var(--color-subtle)' }} />
                             <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-subtle)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cliente</span>
                         </div>
+                        <div className="npos-seg" role="group" aria-label="Con o sin cliente" style={{ marginBottom: 10 }}>
+                            <button type="button" className="npos-segbtn" aria-pressed={!sinCliente} onClick={() => setSinCliente(false)}>
+                                <span className="npos-segico"><UserCheck size={15} strokeWidth={2} /></span>
+                                <span className="npos-segtxt"><b>Venta y cliente</b><span>Queda a nombre de alguien</span></span>
+                            </button>
+                            <button type="button" className="npos-segbtn" aria-pressed={sinCliente} onClick={() => setSinCliente(true)}>
+                                <span className="npos-segico"><ShoppingBag size={15} strokeWidth={2} /></span>
+                                <span className="npos-segtxt"><b>Solo la venta</b><span>Sin datos del comprador</span></span>
+                            </button>
+                        </div>
 
-                        {cliente ? (
+                        {sinCliente ? (
+                            <div style={{ fontSize: 12, lineHeight: 1.45, color: 'var(--color-body)', marginBottom: 16 }}>
+                                Queda a nombre de <strong>Consumidor final</strong>. No se guarda en tu lista de Clientes ni se le avisa a nadie.
+                            </div>
+                        ) : cliente ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, padding: 10, background: 'var(--color-primary-bg)', border: '1px solid var(--color-primary)', borderRadius: 10 }}>
                                 <Avatar name={cliente.nombre} size={32} />
                                 <div style={{ minWidth: 0, flex: 1 }}>
@@ -906,7 +940,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                                 : <>El pedido nace <strong>pendiente</strong>: el stock se descuenta cuando lo confirmes{cobro ? ', y el cobro queda por confirmar hasta entonces' : ', y el cobro se registra después'}.</>}
                             {' '}{descuentoNum > 0 ? 'El descuento ya está aplicado en el total.' : 'Si hay descuentos o cupones activos, se aplican solos al crear.'}
                         </div>
-                        {clienteListo && (
+                        {!sinCliente && clienteListo && (
                             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 11.5, color: emailAviso ? 'var(--color-body)' : 'var(--color-subtle)', lineHeight: 1.5, marginTop: 6 }}>
                                 <Mail size={12} style={{ flexShrink: 0, marginTop: 2, color: emailAviso ? 'var(--color-primary)' : 'var(--color-subtle)' }} />
                                 {emailAviso
@@ -924,13 +958,13 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                             <Button variant="primary" loading={creando} disabled={!puedeCrear} onClick={() => void crear()} data-ayuda="pedido-confirmar" style={{ width: '100%', justifyContent: 'center' }}>
                                 {esPresencial ? 'Registrar venta' : 'Crear pedido'}
                             </Button>
-                            {!clienteListo && carrito.length > 0 && (
-                                <div style={{ fontSize: 11.5, color: 'var(--color-muted)', textAlign: 'center', marginTop: 8 }}>Falta elegir el cliente ↑</div>
+                            {!compradorListo && carrito.length > 0 && (
+                                <div style={{ fontSize: 11.5, color: 'var(--color-muted)', textAlign: 'center', marginTop: 8 }}>Falta elegir el cliente ↑ (o tocá «Solo la venta»)</div>
                             )}
-                            {clienteListo && carrito.length === 0 && (
+                            {compradorListo && carrito.length === 0 && (
                                 <div style={{ fontSize: 11.5, color: 'var(--color-muted)', textAlign: 'center', marginTop: 8 }}>Falta agregar productos ←</div>
                             )}
-                            {clienteListo && carrito.length > 0 && faltaCobro && (
+                            {compradorListo && carrito.length > 0 && faltaCobro && (
                                 <div style={{ fontSize: 11.5, color: 'var(--color-muted)', textAlign: 'center', marginTop: 8 }}>
                                     {cobro === 'MIXTO' ? 'Falta cargar cuánto fue por cada medio ↑' : 'Falta marcar cómo se cobró ↑'}
                                 </div>
