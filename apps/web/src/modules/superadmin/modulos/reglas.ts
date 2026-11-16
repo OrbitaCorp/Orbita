@@ -29,7 +29,7 @@ export const COMO_SE_TRABAJA: Regla[] = [
   },
   {
     titulo: 'Las decisiones de tu módulo son tuyas',
-    texto: 'En Auditoría, cada decisión abierta dice en simple qué hay que decidir, hasta dónde llega (su alcance) y una propuesta. Escribí tu respuesta en la tarjeta, copiala con el botón y pegala en tu sesión de Claude: queda registrada como decisión tomada, con su porqué. Lo que toca plata, producción de Tienda o a los tres módulos a la vez lo decide Ale.',
+    texto: 'En Auditoría, cada decisión abierta dice en simple qué hay que decidir, hasta dónde llega (su alcance) y una propuesta. Escribí tu respuesta en la tarjeta, copiala con el botón y pegala en tu sesión de Claude: queda registrada como decisión tomada, con su porqué. Lo que toca plata, producción de Tienda o a los tres módulos a la vez lo decide Ale: el cobro online de la seña, WhatsApp, los recordatorios y cuándo sale cada módulo de Próximamente.',
   },
   {
     titulo: 'Lo compartido se avisa',
@@ -39,11 +39,19 @@ export const COMO_SE_TRABAJA: Regla[] = [
     titulo: 'Todo queda en Auditoría',
     texto: 'Cada tarea hecha tiene su entrada: qué se hizo, quién, cuándo, archivos tocados y capturas. Lo que se decide, también. Así cualquiera entiende el módulo sin preguntar, y el cierre del ciclo se arma solo.',
   },
+  {
+    titulo: 'Orbi tiene que saberlo, sin usar Orbi',
+    texto: 'Todo cambio de pantalla, botón o paso va al manual que lee Orbi (contenido.ts y pnpm manual:generar), con los nombres exactos. Solo conocimiento, en texto: ningún módulo le agrega tools a Orbi, lo llama desde el panel o el sitio ni corre evals contra el modelo, así no pagamos IA.',
+  },
+  {
+    titulo: 'Al terminar, los tutoriales del módulo',
+    texto: 'Como se hace con Tienda: la lista del módulo en Marketing → Videos → Tutoriales (grupos y pantallas) y cada video producido con el conector, subido a YouTube como No listado y con el link cargado por tutoriales_actualizar. Son las tareas del 21 y 22/12 de cada plan. La lista completa de lo que no puede faltar en cada avance está en .claude/rules/modulos.md.',
+  },
 ]
 
 /** El aviso propio de cada módulo: lo que hay que tener presente antes de tocar. */
 export const AVISOS_MODULO: Record<ConPlan, string> = {
   turnos: 'Cuidado con los rubros: Turnos tiene 23 rubros en dos modos de agenda. En "por profesional" (barbería, peluquería, consultorios, clases, uñas, tatuajes…) el panel muestra Equipo, roles y personas; en "por sala o cabina" (clínica, estética, spa, depilación, electro) muestra Espacios y no Equipo, y algunos rubros atienden a domicilio. El sidebar no es el mismo para todos: cada sección nueva tiene que decir en qué modo aparece, y ninguna puede quedar vacía en un rubro. La tarea del 06/11 lo deja escrito.',
-  alquileres: 'Tres modos que no se mezclan: canchas (por hora, una o varias seguidas), salones (por bloque, uno o varios salones con paquetes) y estadías (por noche o por mes). Cada sección del panel y del sitio tiene que saber en qué modo está, y Qué hay libre responde distinto en cada uno. Lo que el motor no cubre (paquetes, temporadas, por mes) se define con Ale la primera semana.',
+  alquileres: 'Tres modos que no se mezclan: canchas (por hora, una o varias seguidas), salones (por bloque, uno o varios salones con paquetes) y estadías (por noche o por mes). Cada sección del panel y del sitio tiene que saber en qué modo está, y Qué hay libre responde distinto en cada uno. Lo que el motor no cubre (paquetes, temporadas, por mes) lo define Alan la primera semana (tarea del 06/11) y, si toca lo compartido, lo avisa antes.',
   gimnasio: 'Las clases son reservas (cupo, sesiones, lista de espera) y van al motor compartido; los planes, los pases y los alumnos no son reservas: son del módulo, y dónde viven se decide el 16/11 antes de conectarlos. Lo transversal (Módulos, alta única, cobro, recordatorios, cierre) está en este plan con el prefijo "Transversal".',
 }
