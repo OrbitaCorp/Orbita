@@ -93,8 +93,12 @@ const CSS_TUTORIAL_ALTA = `
     .tuob-cab:has(.tuob-tutorial) { flex-direction: column; align-items: center; gap: 6px; }
     .tuob-cab:has(.tuob-tutorial) .tuob-marca { position: static; }
   }
+  /* Celular: la regla de arriba (con :has, más específica) pisaba el align-items: stretch de estilo.ts y la tarjeta
+     «Paso N de 5» quedaba angosta y centrada, debajo del botón. Acá vuelve a estirarse, y el botón va en la fila de
+     la marca, centrado con ella (la marca mide 26 px desde top 16; el botón, 44 px de alto). */
   @media (max-width: 720px) {
-    .tuob-tutorial { right: 16px; top: 16px; margin: 0; padding: 0 14px; }
+    .tuob-cab:has(.tuob-tutorial) { align-items: stretch; }
+    .tuob-tutorial { right: 16px; top: 7px; margin: 0; padding: 0 14px; font-size: 13.5px; }
   }
   @media (prefers-reduced-motion: reduce) { .tuob-tutorial, .tuob-tut-cerrar { transition: none; } }
 `
