@@ -15,6 +15,8 @@ import {
   type ConversationRow, type MessageTemplateRow,
 } from '@/lib/api'
 import { adminPath, currentSlug } from '@/lib/tenant'
+import { esVisitanteDemo } from '@/lib/demo/modo'
+import { SoloConTienda } from '@/modules/demo/SoloConTienda'
 
 // El backend usa el enum en mayúsculas; el resto de esta pantalla trabaja en
 // minúsculas — mismo criterio que Plantillas.tsx.
@@ -208,6 +210,8 @@ function BandejaMensajes({ canal, onCanal, convId, onAbrir, onCerrar, ir, onToas
 
   // ── WhatsApp: el chat con el aspecto de WhatsApp Web, o cómo conectar la cuenta ──
   if (canal === 'whatsapp') {
+    // Demo pública: conectar WhatsApp Business pide el número y la cuenta del negocio; se explica en vez de conectar.
+    if (esVisitanteDemo()) return <>{selector}<SoloConTienda funcion="whatsapp" /></>
     const conectado = typeof whatsapp === 'object' && whatsapp.connected ? whatsapp : null
     return (
       <>
