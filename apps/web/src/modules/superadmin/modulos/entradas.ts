@@ -157,6 +157,8 @@ const F4 = '2026-11-04'
 const F13 = '2026-11-13'
 // El rubro en subrubros y el alcance en salud (15/11/2026).
 const F15 = '2026-11-15'
+// Lunes 16/11: la tabla rubro → sidebar de Turnos.
+const F16 = '2026-11-16'
 
 export const ENTRADAS: Entrada[] = [
   // ─── Transversal · la sección Módulos ───────────────────────────────────────
@@ -2448,6 +2450,70 @@ Lo que no entró y queda como decisión abierta ("cosas con stock"): alquilar ob
       'apps/web/src/modules/turnos/datos/index.ts:245',
       'apps/web/src/modules/turnos/admin/configuracion/Reservas.tsx:74',
       'apps/web/src/modules/turnos/admin/configuracion/Reservas.tsx:227',
+      'apps/web/src/modules/superadmin/modulos/reglas.ts:46',
+    ],
+  }),
+  entrada({
+    modulo: 'turnos', fecha: F16, slug: 'sidebar-por-rubro', tipo: 'tarea', quien: 'Mateo',
+    titulo: 'Qué muestra el sidebar del panel en cada rubro de Turnos',
+    foco: 'El menú del panel ya no se arma con condiciones sueltas: sale de una tabla (turnos/admin/secciones.ts) que dice, sección por sección, en qué modo de agenda aparece y con qué permiso. Un test la recorre en los 23 rubros y en cada rol de fábrica, y chequea que ninguna sección quede vacía con los datos de ejemplo. Del rubro, lo único que cambia el menú es el modo: los 5 rubros por sala o cabina suman Espacios.',
+    que: `Tarea del 06/11 del plan (pedido de Ale del 04/11: "el sidebar tiene más o menos cosas" según el subrubro), hecha el 16/11.
+
+**La regla, en un solo lugar.** \`REGLAS_SECCIONES\` lista las 12 secciones en orden de menú, cada una con los modos en que aparece y el permiso que la abre. \`PanelTurnos\` arma el menú con \`seccionesVisibles(modo, puede)\` y le pone a cada sección su nombre, su ícono y su badge. Una sección nueva se suma ahí, diciendo en qué modo y con qué permiso aparece; si no, no entra al menú. El panel se ve igual que antes.
+
+**Por modo de agenda** (lo que ve el dueño):
+
+| Sección | Por profesional (18 rubros) | Por sala o cabina (5 rubros) |
+|---|---|---|
+| Resumen, Agenda | Sí | Sí |
+| Clientes / Pacientes | Sí | Sí |
+| Servicios | Sí | Sí |
+| Equipo | Sí: cada persona que atiende es una columna de la agenda | Sí: quién atiende en cada cabina, su rol y cómo cobra, sin columna propia |
+| Espacios (Cabinas, Consultorios, Equipos EMS) | No | Sí: son las columnas de la agenda |
+| Ganancias | Sí | Sí |
+| Reglas de reserva, Recordatorios y mensajes, Pagos | Sí | Sí |
+| Configuración, Avanzado | Sí | Sí |
+
+Por sala o cabina: estética, depilación, spa y masajes, clínica y electroestimulación. Los otros 18, por profesional.
+
+**Por rol** (igual en los dos modos, salvo Espacios):
+
+| Rol de fábrica | Secciones |
+|---|---|
+| Dueño/a | Todas |
+| Encargado/a | Resumen, Agenda, Clientes, Servicios, Equipo, Espacios (si hay), Ganancias. Sin Reservas, Configuración ni Avanzado |
+| Recepción / Secretaría | Resumen, Agenda, Clientes |
+| Quien atiende (barbero, médico/a, masajista, aprendiz, colorista…) | Resumen, Mi agenda, Mis clientes o pacientes, Mis ganancias |
+| Administración (salud) | Resumen, Agenda, Pacientes, Ganancias |
+| Asistente, Enfermería, Asistente dental | Resumen, Agenda |
+
+Reglas de reserva, Recordatorios, Pagos, Configuración y Avanzado van siempre juntas: las abre el mismo permiso (configurar), y el test lo chequea.
+
+**Lo que cambia por rubro adentro de cada sección, no en el menú:**
+
+- **Salud** (11 rubros): dice "Pacientes", la ficha tiene obra social y DNI, recepción se llama Secretaría y se suma el rol Administración. Los espacios se llaman Consultorios.
+- **Seña** (9 rubros la piden de ejemplo: peluquería, estilista, maquillaje, estética, pestañas, spa, tatuajes, medicina estética y medicina alternativa): Pagos lista las señas por cobrar y el menú las cuenta. Sin seña, Pagos explica que no se pide y lleva a Reglas de reserva para activarla. No queda vacía.
+- **Por sala o cabina:** Recordatorios no ofrece la lista de espera, Reglas de reserva habla de "Asignación de espacios" en vez de "Elegir profesional" y el mini sitio arranca sin la sección del equipo.
+- **A domicilio** (estilista, consulta médica y clases, con un servicio a domicilio de ejemplo): no cambia el panel. Cambia el sitio: muestra las zonas en lugar del mapa y pide la dirección al reservar.
+
+**Ninguna sección vacía.** El test carga los datos de ejemplo de cada rubro y chequea que la agenda de hoy, los clientes, los servicios, el equipo, los espacios (en cabina) y quien cobra (para Ganancias) tengan algo.
+
+**Corregido de paso:**
+
+- El aviso del módulo decía que en modo cabina el panel "muestra Espacios y no Equipo". El panel muestra los dos, y tiene sentido: en un spa las masajistas no son columnas de la agenda, pero tienen cuenta, rol y comisión. El aviso quedó como el panel.
+- El rol Administración de salud decía "Factura a las obras sociales", que está afuera del alcance en salud (decisión del 15/11). Ahora dice "Cierra la caja y lleva los números".
+
+**Para cuando se conecte la API:** con el origen de la API, Equipo en modo cabina sale vacío (hoy solo trae a quien es una agenda, y en cabina las agendas son espacios) y Ganancias no tiene a quién repartir (el backend no guarda cómo cobra cada uno, faltante 4 del mapa). Las dos secciones tienen que mostrar un vacío que explique qué cargar, o esperar a que el backend tenga el equipo. Se resuelve con la tarea de Equipo (semana 2).
+
+**Verificado:** typecheck de \`apps/web\` sin errores y los tests de Turnos en verde (25, 4 de ellos nuevos). No se probó a mano en el navegador.`,
+    archivos: [
+      'apps/web/src/modules/turnos/admin/secciones.ts:1',
+      'apps/web/src/modules/turnos/admin/__tests__/secciones.test.ts:1',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:207',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:225',
+      'apps/web/src/modules/turnos/datos/equipo.ts:171',
+      'apps/web/src/modules/turnos/admin/configuracion/Mensajes.tsx:82',
+      'apps/web/src/modules/turnos/admin/configuracion/datos.ts:113',
       'apps/web/src/modules/superadmin/modulos/reglas.ts:46',
     ],
   }),

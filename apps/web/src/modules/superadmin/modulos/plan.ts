@@ -180,7 +180,7 @@ const TURNOS = plan('turnos', 'Turnos', 'Mateo',
     t('2026-12-22', 'Mateo', 'Propuesta para sacar Turnos de "Próximamente": qué falta y qué decide Ale', 'Entrada tipo decisión con la lista de lo que falta y la propuesta'),
     t('2026-12-23', 'Mateo', 'Cierre de Turnos: resumen del ciclo y entrega a Ale', 'Entrada de cierre con lo hecho, lo que quedó afuera y lo que sigue'),
     // Sumada el 04/11 (pedido de Ale: "tener mucho cuidado" con los rubros): el sidebar cambia según el modo de agenda.
-    t('2026-11-06', 'Mateo', 'Revisar qué muestra el sidebar del panel en cada rubro de Turnos (por profesional: Equipo; por sala o cabina: Espacios) y dejarlo escrito', 'Tabla rubro → secciones del sidebar en Auditoría, con lo que cambia por modo y por modalidad (a domicilio); ninguna sección vacía en ningún rubro'),
+    documentada(t('2026-11-06', 'Mateo', 'Revisar qué muestra el sidebar del panel en cada rubro de Turnos (por profesional: Equipo; por sala o cabina: Espacios) y dejarlo escrito', 'Tabla rubro → secciones del sidebar en Auditoría, con lo que cambia por modo y por modalidad (a domicilio); ninguna sección vacía en ningún rubro'), 'auditoria.turnos.2026-11-16-sidebar-por-rubro'),
   ])
 
 // ─── Alquileres · Alan ────────────────────────────────────────────────────────

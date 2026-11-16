@@ -69,6 +69,7 @@ import { CSS_PIEZAS_PANEL, MensajeWhatsApp } from './piezasPanel'
 import { cuandoTxt, fechaLarga, indiceDia, libresPorTramo, tieneTelefono, type MensajeWA, type NuevoTurnoPre, type ServicioBase, type ServicioPanel, type TurnoAgenda } from '../datos/agenda'
 import { clientesDeLaAgenda, pagadoHastaInicial, plata, puedeDe, taparTelefono, type Pago, type Persona, type Rol, type VerComo } from '../datos/equipo'
 import { useDatosPanel, useOrigenTurnos, type DatosPanel } from '../datos/origen'
+import { seccionesVisibles, type Vista } from './secciones'
 
 // Las hojas que comparten varias pantallas se montan una sola vez acá; lo propio de cada pantalla lo monta ella.
 const CSS_PANEL = CSS_UI_CONFIG + CSS_PIEZAS_PANEL + CSS_ESPACIOS + CSS_PAGO + `
@@ -80,10 +81,6 @@ const CSS_PANEL = CSS_UI_CONFIG + CSS_PIEZAS_PANEL + CSS_ESPACIOS + CSS_PAGO + `
 `
 
 type Agenda = { atiende: number[]; horario: string; dias: string }
-/** Las secciones del negocio que cada rol ve según sus permisos. */
-type SeccionNegocio = 'servicios' | 'equipo' | 'espacios' | 'ganancias'
-/** Las secciones del panel: lo que puede venir en ?vista=. */
-type Vista = 'resumen' | 'agenda' | 'clientes' | 'servicios' | 'equipo' | 'espacios' | 'ganancias' | 'reglas' | 'mensajes' | 'pagos' | 'configuracion' | 'avanzado'
 // La silueta de cada sección mientras llegan sus datos: la forma de la pantalla que viene
 // después. Resumen y Ganancias son indicadores con gráficos y listas; la Agenda, la grilla del
 // día; Clientes y Servicios, un buscador y una tabla; Equipo, Espacios y Avanzado, una grilla
@@ -205,31 +202,27 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
   const senasPendientes: TurnoAgenda[] = rubro.sena > 0
     ? Array.from({ length: 14 }, (_, d) => delDia(d).filter(t => !t.senaPagada && (t.estado === 'confirmado' || t.estado === 'pendiente') && (d > 0 || t.inicio > AHORA_DEMO)).sort((a, b) => a.inicio - b.inicio)).flat()
     : []
-  const conEspacios = rubro.modo !== 'profesional'
-  // Quien puede configurar tiene todas las secciones; el resto del equipo ve las que su rol permite.
+  // Qué secciones hay sale de secciones.ts (la tabla rubro → sidebar); acá cada una toma su nombre,
+  // su ícono y su badge. Quien puede configurar las tiene todas; el resto, las que su rol permite.
+  const visibles = seccionesVisibles(rubro.modo, puede)
+  const veSeccion = (s: Vista) => visibles.includes(s)
   const enConfig = puede('config.editar') !== 'no'
   const negocioTxt = enConfig ? 'Negocio' : puede('equipo.editar') !== 'no' || puede('clientes.ver') === 'todo' ? 'El negocio' : 'Lo tuyo'
-  const veSeccion = (s: SeccionNegocio) =>
-    s === 'servicios' ? puede('servicios.editar') !== 'no'
-      : s === 'equipo' ? puede('equipo.editar') !== 'no'
-        : s === 'espacios' ? conEspacios && puede('equipo.editar') !== 'no'
-          : puede('ganancias.ver') !== 'no'
-  const items: ItemNav[] = [
-    { id: 'resumen', label: 'Resumen', Icon: LayoutDashboard, grupo: 'Hoy' },
-    ...(puede('agenda.ver') !== 'no' ? [{ id: 'agenda', label: soloMiAgenda ? 'Mi agenda' : 'Agenda', Icon: CalendarDays, badge: pendientes || undefined, grupo: 'Hoy' }] : []),
-    ...(puede('clientes.ver') !== 'no' ? [{ id: 'clientes', label: puede('clientes.ver') === 'propio' ? `Mis ${pluralCliente(rubro).toLowerCase()}` : pluralCliente(rubro), Icon: Contact, grupo: negocioTxt }] : []),
-    ...(veSeccion('servicios') ? [{ id: 'servicios', label: 'Servicios', Icon: rubro.Icon, grupo: negocioTxt }] : []),
-    ...(veSeccion('equipo') ? [{ id: 'equipo', label: 'Equipo', Icon: Users, grupo: negocioTxt }] : []),
-    ...(veSeccion('espacios') ? [{ id: 'espacios', label: espaciosTxt(rubro), Icon: LayoutGrid, grupo: negocioTxt }] : []),
-    ...(veSeccion('ganancias') ? [{ id: 'ganancias', label: puede('ganancias.ver') === 'propio' ? 'Mis ganancias' : 'Ganancias', Icon: HandCoins, grupo: negocioTxt }] : []),
-    ...(enConfig ? [
-      { id: 'reglas', label: 'Reglas de reserva', Icon: CalendarCog, grupo: 'Reservas' },
-      { id: 'mensajes', label: 'Recordatorios y mensajes', Icon: Bell, grupo: 'Reservas' },
-      { id: 'pagos', label: 'Pagos', Icon: Wallet, grupo: 'Reservas', badge: senasPendientes.length || undefined },
-      { id: 'configuracion', label: 'Configuración', Icon: Settings, subs: SUBS_CONFIG },
-      { id: 'avanzado', label: 'Avanzado', Icon: Sparkles },
-    ] : []),
-  ]
+  const ITEM: Record<Vista, Omit<ItemNav, 'id'>> = {
+    resumen: { label: 'Resumen', Icon: LayoutDashboard, grupo: 'Hoy' },
+    agenda: { label: soloMiAgenda ? 'Mi agenda' : 'Agenda', Icon: CalendarDays, badge: pendientes || undefined, grupo: 'Hoy' },
+    clientes: { label: puede('clientes.ver') === 'propio' ? `Mis ${pluralCliente(rubro).toLowerCase()}` : pluralCliente(rubro), Icon: Contact, grupo: negocioTxt },
+    servicios: { label: 'Servicios', Icon: rubro.Icon, grupo: negocioTxt },
+    equipo: { label: 'Equipo', Icon: Users, grupo: negocioTxt },
+    espacios: { label: espaciosTxt(rubro), Icon: LayoutGrid, grupo: negocioTxt },
+    ganancias: { label: puede('ganancias.ver') === 'propio' ? 'Mis ganancias' : 'Ganancias', Icon: HandCoins, grupo: negocioTxt },
+    reglas: { label: 'Reglas de reserva', Icon: CalendarCog, grupo: 'Reservas' },
+    mensajes: { label: 'Recordatorios y mensajes', Icon: Bell, grupo: 'Reservas' },
+    pagos: { label: 'Pagos', Icon: Wallet, grupo: 'Reservas', badge: senasPendientes.length || undefined },
+    configuracion: { label: 'Configuración', Icon: Settings, subs: SUBS_CONFIG },
+    avanzado: { label: 'Avanzado', Icon: Sparkles },
+  }
+  const items: ItemNav[] = visibles.map(id => ({ id, ...ITEM[id] }))
 
   // ── Qué pantalla se ve: ?vista= y, en Configuración, ?tab= ──
   const vistaQuery = typeof router.query.vista === 'string' ? router.query.vista : 'resumen'
