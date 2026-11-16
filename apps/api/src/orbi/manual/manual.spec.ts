@@ -49,6 +49,18 @@ describe('manual de Orbi (artefacto generado)', () => {
     expect(temaDelManual('constructor')).toBeUndefined();
   });
 
+  it('los manuales de los módulos nuevos viajan aparte y no entran al índice del prompt (los módulos no usan Orbi)', () => {
+    const deModulos = MANUAL.modulos.flatMap((m) => m.temas.map((t) => ({ ...t, modulo: m.modulo })));
+    expect(deModulos.length).toBeGreaterThan(0);
+    for (const t of deModulos) expect(t.id.startsWith(`${t.modulo}.`)).toBe(true);
+    const indice = indiceDelManual();
+    for (const t of deModulos) {
+      expect(indice).not.toContain(t.id);
+      expect(temaDelManual(t.id)).toBeUndefined();
+    }
+    expect(MANUAL.temas.some((t) => /^(turnos|alquileres|gimnasio)\./.test(t.id))).toBe(false);
+  });
+
   it('el índice tiene un renglón por tema, agrupado por capítulo', () => {
     const indice = indiceDelManual();
     expect(indice.split('\n').filter((l) => l.startsWith('- '))).toHaveLength(MANUAL.temas.length);

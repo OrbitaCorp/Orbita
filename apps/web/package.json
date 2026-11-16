@@ -10,7 +10,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "manual:generar": "vitest run src/modules/ventas/panel/manual/paraOrbi.test.ts -u"
+    "manual:generar": "vitest run src/modules/orbi/manual/artefacto.test.ts -u"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.0",

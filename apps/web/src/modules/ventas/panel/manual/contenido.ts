@@ -38,19 +38,10 @@ export interface Destino {
     query?: Record<string, string>
 }
 
-export type Bloque =
-    /** Texto corrido. Admite **negrita** y [[botón]] (los resuelve piezas.tsx). */
-    | { tipo: 'parrafo'; texto: string }
-    /** Bullets sueltos. */
-    | { tipo: 'lista'; items: string[] }
-    /** Pasos numerados: es una receta, se sigue en orden. */
-    | { tipo: 'pasos'; items: { titulo: string; texto: string }[] }
-    /** Definiciones: "este número / este campo significa esto". */
-    | { tipo: 'campos'; titulo?: string; items: { label: string; texto: string }[] }
-    /** Chips de estado con su color real de la pantalla y qué quiere decir. */
-    | { tipo: 'estados'; items: { label: string; color: string; texto: string }[] }
-    /** Recuadro destacado. */
-    | { tipo: 'nota'; variante: 'tip' | 'aviso' | 'dato'; texto: string }
+// El vocabulario de bloques es el mismo para el manual de cada módulo nuevo: vive en lib/manual
+// (así un módulo escribe el suyo sin importar a Tienda) y se reexporta acá para lo de Tienda.
+export type { Bloque } from '@/lib/manual/bloques'
+import type { Bloque } from '@/lib/manual/bloques'
 
 export interface Tema {
     id: string

@@ -4,8 +4,9 @@ import nextTs from "eslint-config-next/typescript";
 
 // Cada módulo es independiente (decisión de Ale, 26/10/2026): Turnos, Alquileres y
 // Gimnasio no se importan entre sí ni importan el alta, y lo compartido
-// (lib/reservas, design-system/reservas) no importa ningún módulo. El único que
-// conoce a todos es el alta (modules/onboarding/alta). El porqué, en
+// (lib/reservas, design-system/reservas, lib/manual) no importa ningún módulo. Los
+// únicos que conocen a todos son el alta (modules/onboarding/alta) y el generador del
+// manual de Orbi (modules/orbi/manual/artefacto.ts). El porqué, en
 // src/lib/reservas/README.md. Turnos todavía usa piezas de Tienda (ventas) y de la
 // landing desde antes de esta regla: no se cortan acá.
 const MENSAJE_MODULOS =
@@ -34,7 +35,8 @@ const eslintConfig = defineConfig([
   independiente("alquileres", ["ventas", "landing", "onboarding"]),
   independiente("gimnasio", ["ventas", "landing", "onboarding"]),
   {
-    files: ["src/lib/reservas/**", "src/design-system/reservas/**"],
+    // lib/manual también: es el vocabulario con el que cada módulo escribe su manual para Orbi.
+    files: ["src/lib/reservas/**", "src/design-system/reservas/**", "src/lib/manual/**"],
     rules: {
       "no-restricted-imports": ["error", {
         patterns: [

@@ -4,6 +4,8 @@ paths:
   - "apps/web/src/layouts/components/Sidebar.tsx"
   - "apps/web/src/layouts/components/permisosDelMenu.ts"
   - "apps/api/src/orbi/tools/**"
+  - "apps/web/src/modules/orbi/manual/**"
+  - "apps/web/src/lib/manual/**"
 ---
 
 # El manual del panel es lo que Orbi sabe del sistema
@@ -18,9 +20,12 @@ Antes de terminar:
 1. Buscá el tema del manual que explica esta pantalla y corregilo si cambió un botón, una etiqueta,
    un paso o una sección. Los `[[botones]]` tienen que decir el texto exacto de la pantalla.
 2. Regenerá el artefacto que lee la API: `cd apps/web && pnpm manual:generar`, y commiteá
-   `apps/api/src/orbi/manual/manual.generated.ts`.
+   `apps/api/src/orbi/manual/manual.generated.ts`. Lo arma `modules/orbi/manual/artefacto.ts`:
+   junta el manual de Tienda con el de cada módulo nuevo (`modules/<módulo>/manual.ts`), que va
+   aparte en `modulos` y no entra al índice del prompt (los módulos no usan Orbi).
 3. `cd apps/web && pnpm test`: `manual/contrato.test.ts` falla si un botón del manual no existe en
-   las pantallas o un destino no abre; `manual/paraOrbi.test.ts` falla si el artefacto quedó viejo.
+   las pantallas o un destino no abre; `modules/orbi/manual/artefacto.test.ts` falla si el
+   artefacto quedó viejo.
 
 Si sumaste una tool de Orbi, revisá también la lista de solo lectura y el invariante 3 de
 `apps/api/src/orbi/tools/tool-catalog.spec.ts`, y registrala en las evals
