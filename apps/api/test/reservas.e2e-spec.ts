@@ -309,4 +309,41 @@ describe('Reservas (e2e)', () => {
       expect(res.body.porEstado.CANCELADA).toBe(1);
     });
   });
+
+  // Va después del resumen: suma una reserva a la clase de las 10, que sigue llena (3 de 3).
+  describe('la lista de espera desde el panel', () => {
+    it('el panel anota en la espera solo un horario lleno, y lo que lista no trae el token del enlace personal', async () => {
+      const conLugar = await http().post(`${PANEL}/espera`).set(employee()).send({ modulo: 'GIMNASIO', recursoId: claseId, fecha: dia, inicioMinutos: 1140, cliente: { nombre: 'Con Lugar', email: mail('con-lugar') } });
+      expect(conLugar.status).toBe(400);
+      expect(conLugar.body.message).toMatch(/reservá directo/);
+      const anotada = await http().post(`${PANEL}/espera`).set(employee()).send({ modulo: 'GIMNASIO', recursoId: claseId, fecha: dia, inicioMinutos: 600, cliente: { nombre: 'Desde Panel', email: mail('desde-panel') } });
+      expect(anotada.status).toBe(201);
+      expect(anotada.body).toMatchObject({ estado: 'ESPERANDO', posicion: 1, clienteNombre: 'Desde Panel' });
+      expect(anotada.body.tokenAcceso).toBeUndefined();
+      const lista = await http().get(`${PANEL}/espera`).set(employee()).query({ modulo: 'GIMNASIO', recursoId: claseId, fecha: dia });
+      expect(lista.status).toBe(200);
+      expect(lista.body.map((e: { id: string }) => e.id)).toContain(anotada.body.id);
+      for (const e of lista.body) expect(e.tokenAcceso).toBeUndefined();
+    });
+
+    it('darle el lugar: sin lugar es 409; con un lugar nuevo (le subieron el cupo) pasa a confirmada, y dos clics dan la misma reserva', async () => {
+      const lista = await http().get(`${PANEL}/espera`).set(employee()).query({ modulo: 'GIMNASIO', recursoId: claseId, fecha: dia });
+      const id = lista.body.find((e: { clienteNombre: string }) => e.clienteNombre === 'Desde Panel').id as string;
+      const sinLugar = await http().post(`${PANEL}/espera/${id}/lugar`).set(employee()).send({});
+      expect(sinLugar.status).toBe(409);
+      expect(sinLugar.body.message).toMatch(/No queda lugar/);
+      // Subirle el cupo libera un lugar sin que nadie cancele: no pasa sola, se lo da el panel.
+      const masCupo = await http().put(`${PANEL}/recursos/${claseId}`).set(owner()).send({ modulo: 'GIMNASIO', tipo: 'CLASE', nombre: '[e2e] Funcional', cupo: 4 });
+      expect(masCupo.status).toBe(200);
+      const [uno, dos] = await Promise.all([
+        http().post(`${PANEL}/espera/${id}/lugar`).set(employee()).send({}),
+        http().post(`${PANEL}/espera/${id}/lugar`).set(employee()).send({}),
+      ]);
+      expect([uno.status, dos.status]).toEqual([201, 201]);
+      expect(uno.body).toMatchObject({ estado: 'CONFIRMADA', origen: 'PANEL', clienteNombre: 'Desde Panel', inicioMinutos: 600 });
+      expect(dos.body.id).toBe(uno.body.id);
+      const disp = await http().get(`${PUBLICO}/disponibilidad`).query({ modulo: 'GIMNASIO', recursoId: claseId, fecha: dia });
+      expect(disp.body.franjas.find((f: { inicioMinutos: number }) => f.inicioMinutos === 600)).toMatchObject({ libres: 0, cupo: 4 });
+    });
+  });
 });

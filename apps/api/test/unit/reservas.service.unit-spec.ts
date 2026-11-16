@@ -258,6 +258,84 @@ describe('ReservasService · transiciones', () => {
   });
 });
 
+describe('ReservasService · lista de espera desde el panel', () => {
+  // La clase de los lunes a las 10:30 y los martes a las 10:30, con dos lugares.
+  const clase = () => cancha({ id: 'r-clase', modulo: 'GIMNASIO', tipo: 'CLASE', nombre: 'Funcional', cupo: 2, maximoSeguidos: 1, precio: 2500, datos: null, horario: { '1': [[630, 690]], '2': [[630, 690]] } });
+  const espera = (over: Record<string, unknown> = {}) => ({
+    id: 'esp-1', businessId: BIZ, modulo: 'GIMNASIO', recursoId: 'r-clase', inicio: instante('2026-11-10', 630), fin: instante('2026-11-10', 690),
+    clienteId: null, clienteNombre: 'Lu Paz', clienteTelefono: '11 5555 0000', clienteEmail: null, tokenAcceso: 'e'.repeat(32),
+    estado: 'ESPERANDO', reservaId: null, createdAt: AHORA, updatedAt: AHORA, ...over,
+  });
+  const conEspera = (fila: Record<string, unknown> | null) => {
+    const armado = armar({ recurso: clase(), config: config({ modulo: 'GIMNASIO', senaPorcentaje: 0 }) });
+    const p = armado.prisma as Record<string, Record<string, jest.Mock> | jest.Mock>;
+    p.reservaEspera = {
+      findFirst: jest.fn().mockResolvedValue(fila),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      create: jest.fn(async ({ data }: { data: Record<string, unknown> }) => ({ id: 'esp-nueva', estado: 'ESPERANDO', reservaId: null, createdAt: AHORA, ...data })),
+    };
+    (p.reserva as Record<string, jest.Mock>).create = jest.fn(async ({ data }: { data: Record<string, unknown> }) => ({ id: 'res-nueva', ...data }));
+    (p.$queryRaw as jest.Mock).mockResolvedValue([{ id: 'r-clase', cupo: 2, activo: true, nombre: 'Funcional' }]);
+    return { ...armado, espera: p.reservaEspera as Record<string, jest.Mock>, reservas: p.reserva as Record<string, jest.Mock> };
+  };
+
+  it('el negocio anota en la espera una clase de hoy que el sitio ya no ofrece por la anticipación', async () => {
+    const { svc, espera: tabla, reservas, audit } = conEspera(null);
+    // Lunes 10:00; la clase de las 10:30 está llena (dos lugares tomados). Con 60 minutos de anticipación, el sitio ya no la muestra.
+    reservas.findMany.mockResolvedValue([{ inicio: instante('2026-11-09', 630), fin: instante('2026-11-09', 690), cantidad: 2 }]);
+    const pedidoEspera = { modulo: 'GIMNASIO' as const, recursoId: 'r-clase', fecha: '2026-11-09', inicioMinutos: 630, cliente: { nombre: 'Lu Paz', telefono: '11 5555 0000' } };
+    await expect(svc.anotarseEnEspera(BIZ, pedidoEspera, undefined, AHORA)).rejects.toThrow(/no existe o ya pasó/);
+    const anotada = await svc.anotarseEnEspera(BIZ, pedidoEspera, undefined, AHORA, { modo: 'panel', memberId: 'm-1' });
+    expect(anotada).toMatchObject({ id: 'esp-nueva', clienteNombre: 'Lu Paz', estado: 'ESPERANDO' });
+    expect(tabla.create.mock.calls[0][0].data).toMatchObject({ recursoId: 'r-clase', inicio: instante('2026-11-09', 630), fin: instante('2026-11-09', 690) });
+    expect(audit.registrar).toHaveBeenCalledWith(expect.objectContaining({ entityType: 'reserva_espera', action: 'CREATE', memberId: 'm-1' }));
+  });
+
+  it('con lugar, la persona pasa a una reserva confirmada del panel y la espera queda tomada', async () => {
+    const { svc, espera: tabla, reservas, prisma, avisos, audit } = conEspera(espera());
+    // vencerRetenidasDe no encuentra nada; después hay un lugar tomado de dos.
+    reservas.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([{ cantidad: 1 }]);
+    const r = await svc.darLugarDesdeEspera(BIZ, 'esp-1', 'm-1', AHORA);
+    expect(r.id).toBe('res-nueva');
+    // Primero se reclama la fila de la espera (compare-and-set) y recién después se crea la reserva.
+    expect(tabla.updateMany.mock.calls[0][0]).toMatchObject({ where: { id: 'esp-1', estado: 'ESPERANDO' }, data: { estado: 'TOMADA' } });
+    expect(tabla.updateMany.mock.invocationCallOrder[0]).toBeLessThan(reservas.create.mock.invocationCallOrder[0]);
+    expect(reservas.create.mock.calls[0][0].data).toMatchObject({ estado: 'CONFIRMADA', origen: 'PANEL', cantidad: 1, clienteNombre: 'Lu Paz', creadaPorMemberId: 'm-1', precio: 2500, sena: 0 });
+    expect(tabla.updateMany.mock.calls[1][0]).toMatchObject({ where: { id: 'esp-1' }, data: { reservaId: 'res-nueva' } });
+    expect((prisma.reservaHistorial as Record<string, jest.Mock>).create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ a: 'CONFIRMADA', quien: 'NEGOCIO', memberId: 'm-1' }) }));
+    expect(avisos.lugarTomado).toHaveBeenCalledWith(expect.objectContaining({ id: 'res-nueva' }), 'Funcional');
+    expect(audit.registrar).toHaveBeenCalledWith(expect.objectContaining({ entityType: 'reserva', action: 'CREATE' }));
+  });
+
+  it('sin lugar: 409 y la persona sigue esperando (no se reclama ni se crea nada)', async () => {
+    const { svc, espera: tabla, reservas } = conEspera(espera());
+    reservas.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([{ cantidad: 2 }]);
+    await expect(svc.darLugarDesdeEspera(BIZ, 'esp-1', 'm-1', AHORA)).rejects.toThrow(ConflictException);
+    expect(tabla.updateMany).not.toHaveBeenCalled();
+    expect(reservas.create).not.toHaveBeenCalled();
+  });
+
+  it('si salió de la lista en el medio (el compare-and-set no la encuentra), no se crea ninguna reserva', async () => {
+    const { svc, espera: tabla, reservas } = conEspera(espera());
+    reservas.findMany.mockResolvedValue([]);
+    tabla.updateMany.mockResolvedValue({ count: 0 });
+    await expect(svc.darLugarDesdeEspera(BIZ, 'esp-1', 'm-1', AHORA)).rejects.toThrow(/salió de la lista/);
+    expect(reservas.create).not.toHaveBeenCalled();
+  });
+
+  it('repetirlo devuelve la reserva que ya tomó; fuera de la lista es 409 y una clase que ya empezó, 400', async () => {
+    const tomada = conEspera(espera({ estado: 'TOMADA', reservaId: 'res-1' }));
+    await expect(tomada.svc.darLugarDesdeEspera(BIZ, 'esp-1', 'm-1', AHORA)).resolves.toMatchObject({ id: 'res-1' });
+    expect(tomada.reservas.create).not.toHaveBeenCalled();
+    const fuera = conEspera(espera({ estado: 'CANCELADA' }));
+    await expect(fuera.svc.darLugarDesdeEspera(BIZ, 'esp-1', 'm-1', AHORA)).rejects.toThrow(ConflictException);
+    const empezada = conEspera(espera({ inicio: instante('2026-11-09', 570), fin: instante('2026-11-09', 630) }));
+    await expect(empezada.svc.darLugarDesdeEspera(BIZ, 'esp-1', 'm-1', AHORA)).rejects.toThrow(BadRequestException);
+    const nadie = conEspera(null);
+    await expect(nadie.svc.darLugarDesdeEspera(BIZ, 'esp-x', 'm-1', AHORA)).rejects.toThrow(/no está en la lista/);
+  });
+});
+
 describe('ReservasService · política', () => {
   const { svc } = armar();
   const reglas = { cancelacionHastaHoras: 24, reprogramacionHastaHoras: 12, reprogramacionesMaximas: 1, senaReembolsable: true };

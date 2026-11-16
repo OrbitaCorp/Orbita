@@ -95,7 +95,7 @@ mira la restricción de exclusión de la base.
 | Permiso | Rutas |
 |---|---|
 | `reservas.view` | `GET config`, `GET recursos`, `GET servicios`, `GET bloqueos`, `GET disponibilidad[/rango|/noches]`, `GET /` (agenda, por `desde`/`hasta`/`recursoId`/`estado`/`q`), `GET :id` (con historial), `GET resumen`, `GET espera` |
-| `reservas.manage` | `POST /` (nace `CONFIRMADA` o `PENDIENTE`), `POST :id/confirmar|completar|ausente|cancelar|reprogramar|pago`, `PATCH :id/nota`, `DELETE espera/:id` |
+| `reservas.manage` | `POST /` (nace `CONFIRMADA` o `PENDIENTE`), `POST :id/confirmar|completar|ausente|cancelar|reprogramar|pago`, `PATCH :id/nota`, `POST espera` (el negocio anota a alguien en un horario lleno, hasta que empieza), `POST espera/:id/lugar` ("Darle el lugar": pasa a reserva confirmada si entra; 409 si no), `DELETE espera/:id` |
 | `reservas.config` | `PUT config`, `POST|PUT|DELETE recursos`, `POST|PUT|DELETE servicios`, `POST|DELETE bloqueos` (y el `precio` a mano al crear) |
 
 Los roles de fábrica: `owner`/`admin` tienen los tres; `empleado` ve y gestiona, no configura
@@ -121,7 +121,10 @@ cliente con su `modulo` y sus tipos de recurso.
   y check-out en `datos`). Extras en `datos.extras`. Enlace: `/mi-reserva/<token>`.
 - **Gimnasio (Ale):** `CLASE` con `cupo` y el horario como sesiones; `cantidad` de lugares;
   `espera` cuando está llena; al cancelar, el primero toma el lugar. Enlace: `/mi-clase/<token>`.
-  Planes, pases y socios siguen siendo del módulo (no son reservas).
+  El panel guarda **una clase de la grilla por recurso** (una sesión semanal), con lo propio del
+  módulo en `datos.gimnasio` (actividad, color, profe y sala): así cada clase tiene su cupo y su
+  profe. Desde el panel también anota en la espera y le da el lugar a quien espera (`POST espera`,
+  `POST espera/:id/lugar`). Planes, pases y socios siguen siendo del módulo (no son reservas).
 
 Cada módulo tiene que servir en su sitio la ruta de "mi reserva" (`RUTA_MI_RESERVA` en
 `reservas-avisos.service.ts`): es a donde llevan los emails.

@@ -1,7 +1,7 @@
 // Lo que devuelven los endpoints de reservas. Es el contrato que leen los
 // paneles y los sitios de Turnos, Alquileres y Gimnasio (apps/web/src/lib/
 // reservasApi/tipos.ts lo copia): si cambia algo acá, cambia allá.
-import { Prisma, Reserva, ReservaActor, ReservaConfig, ReservaEstado, ReservaModulo, ReservaRecurso, ReservaServicio } from '@prisma/client';
+import { Prisma, Reserva, ReservaActor, ReservaConfig, ReservaEspera, ReservaEstado, ReservaModulo, ReservaRecurso, ReservaServicio } from '@prisma/client';
 import { fechaYMinutos } from './dominio/tiempo';
 
 export interface RecursoDto {
@@ -93,6 +93,26 @@ export interface ReservaDto {
   creadaEn: string;
 }
 
+/**
+ * Alguien en la lista de espera, como lo ve el panel. Sin `tokenAcceso`: ese
+ * token es el enlace personal de la persona (con él sale de la lista desde el
+ * sitio) y no tiene por qué viajar al panel.
+ */
+export interface EsperaDto {
+  id: string;
+  modulo: ReservaModulo;
+  recursoId: string;
+  inicio: string;
+  fin: string;
+  clienteId: string | null;
+  clienteNombre: string;
+  clienteTelefono: string | null;
+  clienteEmail: string | null;
+  estado: ReservaEspera['estado'];
+  reservaId: string | null;
+  createdAt: string;
+}
+
 /** Lo que el cliente puede hacer con su reserva ahora mismo, según las reglas del negocio. */
 export interface PoliticaDto {
   puedeCancelar: boolean;
@@ -173,6 +193,14 @@ export function configPublicaDto(c: ReservaConfig) {
     cancelacionHastaHoras: c.cancelacionHastaHoras, reprogramacionHastaHoras: c.reprogramacionHastaHoras,
     reprogramacionesMaximas: c.reprogramacionesMaximas, senaPorcentaje: c.senaPorcentaje, senaReembolsable: c.senaReembolsable,
     listaDeEspera: c.listaDeEspera, horario: c.horario,
+  };
+}
+
+export function esperaDto(e: ReservaEspera): EsperaDto {
+  return {
+    id: e.id, modulo: e.modulo, recursoId: e.recursoId, inicio: e.inicio.toISOString(), fin: e.fin.toISOString(),
+    clienteId: e.clienteId, clienteNombre: e.clienteNombre, clienteTelefono: e.clienteTelefono, clienteEmail: e.clienteEmail,
+    estado: e.estado, reservaId: e.reservaId, createdAt: e.createdAt.toISOString(),
   };
 }
 

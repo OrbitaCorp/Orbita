@@ -32,6 +32,14 @@ export class ReservasApiError extends Error {
   get esConflicto() { return this.status === 409 }
 }
 
+/**
+ * Lo que devuelve cancelar: la reserva, pero con `sena` diciendo qué pasó con
+ * la seña (DEVUELTA, PERDIDA o SIN_SENA) en lugar del monto: la API pisa ese
+ * campo. Como intersección con Reserva, `sena` quedaba number & string y el
+ * tipo entero se reducía a never.
+ */
+export type Cancelada = Omit<Reserva, 'sena'> & { sena: SenaAlCancelar }
+
 /** Un uuid por intento de reserva: se manda como `clave` y, si hay que reintentar, se repite el mismo. */
 export const claveDeIntento = (): string => crypto.randomUUID()
 
@@ -98,12 +106,16 @@ export const panel = {
   confirmar: (id: string, datos: CambioDeEstado = {}) => delPanel<Reserva>(`/${id}/confirmar`, json(datos)),
   completar: (id: string, datos: CambioDeEstado = {}) => delPanel<Reserva>(`/${id}/completar`, json(datos)),
   ausente: (id: string, datos: CambioDeEstado = {}) => delPanel<Reserva>(`/${id}/ausente`, json(datos)),
-  cancelar: (id: string, datos: Cancelar = {}) => delPanel<Reserva & { sena: SenaAlCancelar; promovida: Reserva | null }>(`/${id}/cancelar`, json(datos)),
+  cancelar: (id: string, datos: Cancelar = {}) => delPanel<Cancelada & { promovida: Reserva | null }>(`/${id}/cancelar`, json(datos)),
   reprogramar: (id: string, datos: Reprogramar) => delPanel<Reserva>(`/${id}/reprogramar`, json(datos)),
   pago: (id: string, datos: Pago) => delPanel<Reserva>(`/${id}/pago`, json(datos)),
   nota: (id: string, notaInterna: string | null) => delPanel<Reserva>(`/${id}/nota`, { method: 'PATCH', body: JSON.stringify({ notaInterna }) }),
 
   espera: (modulo: Modulo, recursoId?: string, fecha?: string) => delPanel<Espera[]>(`/espera${query({ modulo, recursoId, fecha })}`),
+  /** El negocio anota a alguien en la espera de un horario lleno (hasta que empieza). Si ya estaba, devuelve la misma. */
+  anotarEnEspera: (datos: AnotarseEnEspera) => delPanel<Espera & { posicion: number | null }>('/espera', json(datos)),
+  /** "Darle el lugar": pasa de la espera a una reserva confirmada si entra; si no, 409 con el mensaje. */
+  darLugar: (id: string) => delPanel<Reserva>(`/espera/${id}/lugar`, json({})),
   quitarDeEspera: (id: string) => delPanel<{ ok: true }>(`/espera/${id}`, { method: 'DELETE' }),
 }
 
@@ -127,7 +139,7 @@ export const sitio = (slug: string) => ({
   reservar: (datos: Reservar) => delSitio<ReservaConToken>(slug, '/reservar', json(datos)),
 
   miReserva: (token: string) => delSitio<MiReserva>(slug, `/mi/${token}`),
-  cancelar: (token: string, datos: Cancelar = {}) => delSitio<Reserva & { sena: SenaAlCancelar }>(slug, `/mi/${token}/cancelar`, json(datos)),
+  cancelar: (token: string, datos: Cancelar = {}) => delSitio<Cancelada>(slug, `/mi/${token}/cancelar`, json(datos)),
   reprogramar: (token: string, datos: Reprogramar) => delSitio<Reserva>(slug, `/mi/${token}/reprogramar`, json(datos)),
 
   anotarseEnEspera: (datos: AnotarseEnEspera) => delSitio<MiEspera & { token: string }>(slug, '/espera', json(datos)),
