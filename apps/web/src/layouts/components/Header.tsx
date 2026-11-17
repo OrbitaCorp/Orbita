@@ -16,6 +16,7 @@ import { esVisitanteDemo } from '@/lib/demo/modo'
 import { useOrbiStore } from '@/components/orbi/useOrbiStore'
 import { OrbiPet } from '@/components/orbi/pet/OrbiPet'
 import AyudaBoton from '@/modules/ventas/panel/ayuda/AyudaBoton'
+import NovedadesBoton from '@/modules/ventas/panel/ayuda/NovedadesBoton'
 import { ID_PANEL_ORBI } from '@/components/orbi/types'
 
 const seccionLabels: Record<string, string> = {
@@ -413,6 +414,9 @@ export default function Header({ onMenuClick }: Props) {
 
                     {/* Tutorial de la pantalla en la que estás (solo donde hay uno). */}
                     <AyudaBoton />
+
+                    {/* Novedades del panel (botón compacto solo de ícono). */}
+                    <NovedadesBoton />
 
                     {/* Dark mode toggle */}
                     <button

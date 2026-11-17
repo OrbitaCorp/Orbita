@@ -7,6 +7,7 @@ import { ESTADO_AYUDA_VACIO, parsear } from '../almacen'
 import { puedeUsarModoPrueba, comandoDeQuery, cumplidasSimuladas, siguientePasoDePrueba } from '../acceso'
 import { INTERVALO_MS, SUGERENCIAS, claveDeSugerencia, elegirSugerencia } from '../sugerencias'
 import { VIDEOS_PROPIOS, agruparPorPantalla, sumarPropios } from '../videos'
+import { NOVEDADES, indiceInicialNovedades, novedadesSinVer } from '../novedades'
 
 describe('recorrido por módulo', () => {
     it('las claves son secciones del panel o una vista de Configuración', () => {
@@ -253,5 +254,45 @@ describe('videos tutoriales', () => {
             for (const v of VIDEOS_PROPIOS[clave]) expect(v.src).toMatch(/^https:\/\/.+\.mp4$/)
         }
         expect(Object.keys(VIDEOS_PROPIOS).sort()).toEqual(['difusion', 'mensajes'])
+    })
+})
+
+describe('novedades del panel', () => {
+    it('cada novedad tiene id único, contenido completo, al menos una imagen y destino válido', () => {
+        const ids = NOVEDADES.map(n => n.id)
+        expect(new Set(ids).size).toBe(ids.length)
+        for (const n of NOVEDADES) {
+            expect(n.id.trim().length).toBeGreaterThan(0)
+            expect(n.titulo.trim().length).toBeGreaterThan(0)
+            expect(n.descripcion.trim().length).toBeGreaterThan(0)
+            expect(n.imagenes.length).toBeGreaterThan(0)
+            for (const img of n.imagenes) {
+                expect(img.src.trim().length).toBeGreaterThan(0)
+                expect(img.epigrafe.trim().length).toBeGreaterThan(0)
+            }
+            if (n.irA) {
+                expect(SECCIONES_DEL_PANEL as readonly string[]).toContain(n.irA.seccion)
+            }
+        }
+    })
+
+    it('novedadesSinVer e indiceInicialNovedades filtran y posicionan según novedadesVistas', () => {
+        expect(novedadesSinVer([])).toEqual([...NOVEDADES])
+        expect(indiceInicialNovedades([])).toBe(0)
+
+        if (NOVEDADES.length >= 2) {
+            expect(novedadesSinVer([NOVEDADES[0].id])).toEqual(NOVEDADES.slice(1))
+            expect(indiceInicialNovedades([NOVEDADES[0].id])).toBe(1)
+        }
+
+        const todasVistas = NOVEDADES.map(n => n.id)
+        expect(novedadesSinVer(todasVistas)).toEqual([])
+        expect(indiceInicialNovedades(todasVistas)).toBe(0)
+    })
+
+    it('parsear conserva novedadesVistas válidas y descarta valores inválidos', () => {
+        expect(parsear('{"novedadesVistas":["2026-11-orbi-barra",42,null,"otra"]}').novedadesVistas)
+            .toEqual(['2026-11-orbi-barra', 'otra'])
+        expect(parsear('{"novedadesVistas":"no-es-array"}').novedadesVistas).toEqual([])
     })
 })

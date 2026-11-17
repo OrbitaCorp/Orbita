@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" width="800" height="450" fill="none">
+  <defs>
+    <radialGradient id="glowTut" cx="35%" cy="25%" r="65%">
+      <stop offset="0%" stop-color="#3B82F6" stop-opacity="0.16" />
+      <stop offset="100%" stop-color="#05080F" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+  <rect width="800" height="450" fill="#05080F" />
+  <rect width="800" height="450" fill="url(#glowTut)" />
+
+  <!-- Boton Ver tutorial en el header -->
+  <rect x="52" y="38" width="696" height="54" rx="12" fill="#0B101D" stroke="#1B2439" stroke-width="1.5" />
+  <text x="76" y="69" fill="#E8EDF7" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600">Pedidos</text>
+  <rect x="558" y="49" width="118" height="32" rx="8" fill="#151D31" stroke="#60A5FA" stroke-width="1.4" />
+  <circle cx="576" cy="65" r="7" stroke="#60A5FA" stroke-width="1.5" />
+  <text x="576" y="69" text-anchor="middle" fill="#60A5FA" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="700">?</text>
+  <text x="590" y="69" fill="#E8EDF7" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Ver tutorial</text>
+  <rect x="686" y="49" width="36" height="32" rx="8" fill="#0B101D" stroke="#1B2439" />
+
+  <!-- Tarjeta de eleccion Video vs Recorrido guiado -->
+  <rect x="190" y="114" width="420" height="296" rx="16" fill="#0B101D" stroke="#2D3A59" stroke-width="1.5" />
+  <text x="218" y="148" fill="#7E89A6" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="500">Tutorial</text>
+  <text x="218" y="176" fill="#E8EDF7" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="700">¿Cómo querés verlo?</text>
+
+  <!-- Opcion 1: Video -->
+  <rect x="218" y="198" width="364" height="80" rx="12" fill="#05080F" stroke="#1B2439" stroke-width="1.4" />
+  <circle cx="246" cy="238" r="14" stroke="#60A5FA" stroke-width="1.6" />
+  <polygon points="243,232 253,238 243,244" fill="#60A5FA" />
+  <text x="274" y="232" fill="#E8EDF7" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600">Video explicativo</text>
+  <text x="274" y="252" fill="#7E89A6" font-family="system-ui, -apple-system, sans-serif" font-size="12">Mirá cómo se hace, con voz y ejemplos reales.</text>
+  <path d="m558 232 6 6-6 6" stroke="#7E89A6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- Opcion 2: Recorrido guiado -->
+  <rect x="218" y="292" width="364" height="80" rx="12" fill="#151D31" stroke="#60A5FA" stroke-width="1.4" />
+  <path d="m242 322 10 10-4 1-2 4-4-15Z" stroke="#60A5FA" stroke-width="1.6" stroke-linejoin="round" />
+  <text x="274" y="326" fill="#E8EDF7" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600">Recorrido guiado</text>
+  <text x="274" y="346" fill="#A9B4CB" font-family="system-ui, -apple-system, sans-serif" font-size="12">Paso a paso sobre tu pantalla, a tu ritmo.</text>
+  <path d="m558 326 6 6-6 6" stroke="#93C5FD" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+</svg>
