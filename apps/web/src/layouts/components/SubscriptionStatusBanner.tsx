@@ -34,6 +34,11 @@ export default function SubscriptionStatusBanner() {
     if (!sub) return null
 
     const esCortesia = sub.origin === 'COMP'
+    // Una cortesía cedida desde el superadmin arranca con plan 'standard' (no
+    // es un plan real): hasta que el dueño elija uno, lo primero es elegirlo.
+    // Antes se miraba `!sub.planActive`, que en una cortesía nunca es true.
+    const PLANES_REALES = ['mensual', 'semestral', 'anual', 'mensualAvanzado', 'semestralAvanzado', 'anualAvanzado']
+    const tienePlanElegido = PLANES_REALES.includes(sub.nextPlan ?? sub.plan)
     const venciendo = new Date(sub.currentPeriodEnd ?? 0) <= new Date()
     if (!venciendo) return null // todo al día — sin banner
 
@@ -74,7 +79,7 @@ export default function SubscriptionStatusBanner() {
                 )}
             </span>
             <span style={{ marginLeft: 'auto', fontWeight: 700, color: suspendida ? 'var(--color-error)' : 'var(--color-primary)', whiteSpace: 'nowrap' }}>
-                {esCortesia && !sub.planActive ? 'Elegí tu plan →' : 'Activar mi plan →'}
+                {esCortesia && !tienePlanElegido ? 'Elegí tu plan →' : 'Activar mi plan →'}
             </span>
         </div>
     )

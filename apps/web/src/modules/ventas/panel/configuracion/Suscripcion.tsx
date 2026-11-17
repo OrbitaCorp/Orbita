@@ -360,7 +360,9 @@ export default function Suscripcion() {
                 catch { setDescuento(null); codigo = undefined }
             }
 
-            const vencido = s.origin !== 'COMP' && new Date(s.currentPeriodEnd ?? 0) <= new Date()
+            // Una cortesía vencida también sigue derecho a Mercado Pago: el
+            // backend la activa igual que un fin de primer período (activatePlan).
+            const vencido = new Date(s.currentPeriodEnd ?? 0) <= new Date()
             if (activar && vencido) {
                 setGuardandoPlan(false)
                 activarPlan(codigo)
@@ -407,14 +409,18 @@ export default function Suscripcion() {
         : null
     const suspendida = sub?.status === 'SUSPENDED'
     const cancelada = !!cancelledAt
-    // Cortesías (COMP) no pasan por nada de esto: no tienen preapproval real
-    // ni un plan que activar, se renuevan a mano desde la ficha del negocio.
+    // Cortesías (COMP): mientras está vigente no hay nada que pagar, pero se
+    // puede elegir con qué plan se sigue. Cuando vence pasa por el MISMO
+    // bloque de activación que el fin del primer período (el backend ya no las
+    // bloquea desde el rediseño de ciclo de vida, ver activatePlan/changePlan).
+    // Una cortesía creada desde el superadmin arranca con plan 'standard', que
+    // no es un plan real: planMostrado queda en null hasta que elija uno.
     const esCortesia = sub?.origin === 'COMP'
     const planMostrado = sub && esPlanKey(sub.nextPlan ?? sub.plan) ? (sub.nextPlan ?? sub.plan) as PlanKey : null
     // El bloque de activación ya trae el selector con "Base + Avanzado": mientras se
     // ve, la tarjeta del paquete de más abajo NO ofrece activarlo (era la misma
     // acción dos veces) y queda solo como explicación de qué suma.
-    const activacionVisible = !esCortesia && !cancelada && venciendo
+    const activacionVisible = !cancelada && venciendo
 
     return (
         <div className="panel-page panel-page--form">
@@ -451,7 +457,9 @@ export default function Suscripcion() {
                             })()}
                         </div>
                         <div style={{ fontSize: 13, color: 'var(--color-muted)', marginTop: 8 }}>
-                            {esCortesia ? 'Suscripción de cortesía, sin cargo.' : `${sub.currency} ${sub.amount.toLocaleString('es-AR')} por período`}
+                            {esCortesia
+                                ? venciendo ? 'Tu cortesía terminó: para seguir, elegí tu plan y activalo.' : 'Suscripción de cortesía, sin cargo.'
+                                : `${sub.currency} ${sub.amount.toLocaleString('es-AR')} por período`}
                         </div>
                         <div style={{ fontSize: 12.5, color: 'var(--color-subtle)', marginTop: 4 }}>
                             Período actual: {formatFecha(sub.currentPeriodStart)} — {formatFecha(sub.currentPeriodEnd)}
@@ -492,7 +500,7 @@ export default function Suscripcion() {
                             </div>
                         )}
 
-                        {!esCortesia && !cancelada && venciendo && (
+                        {!cancelada && venciendo && (
                             <div style={{
                                 marginTop: 16, padding: 14, borderRadius: 12,
                                 background: suspendida ? 'var(--color-error-bg)' : 'var(--color-primary-bg)',
@@ -503,6 +511,8 @@ export default function Suscripcion() {
                                     <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)' }}>
                                         {suspendida
                                             ? 'Tu tienda está pausada'
+                                            : esCortesia
+                                                ? 'Tu período de cortesía terminó'
                                             : sub.planActive
                                                 ? 'Tu plan cambió — hay que autorizarlo'
                                                 : `Tu ${primerPeriodo(sub).toLowerCase()} terminó`}
@@ -540,30 +550,38 @@ export default function Suscripcion() {
                             </div>
                         )}
 
-                        {/* ── Caso 1 y 3: elegir/cambiar el plan (todavía sin vencer) ── */}
-                        {!esCortesia && !cancelada && !venciendo && (
+                        {/* ── Caso 1 y 3: elegir/cambiar el plan (todavía sin vencer) ──
+                            Una cortesía vigente también puede dejar elegido con qué
+                            plan sigue: así, cuando vence, solo le falta autorizarlo. */}
+                        {!cancelada && !venciendo && (
                             <div style={{ marginTop: 16 }}>
                                 {!editandoPlan ? (
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
                                         <div style={{ fontSize: 12.5, color: 'var(--color-muted)' }}>
-                                            {sub.planActive
+                                            {esCortesia
+                                                ? planMostrado
+                                                    ? <>Cuando termine la cortesía ({formatFecha(sub.currentPeriodEnd)}) seguís con <strong style={{ color: 'var(--color-text)' }}>{PLANES[planMostrado].nombre}</strong></>
+                                                    : `Tu cortesía termina el ${formatFecha(sub.currentPeriodEnd)}. Podés dejar elegido con qué plan seguís.`
+                                                : sub.planActive
                                                 ? sub.nextPlan
                                                     ? <>Pasás a <strong style={{ color: 'var(--color-text)' }}>{PLANES[sub.nextPlan as PlanKey]?.nombre ?? sub.nextPlan}</strong> el {formatFecha(sub.currentPeriodEnd)}</>
                                                     : 'Podés cambiar de plan para la próxima renovación'
                                                 : <>Vas a pasar a <strong style={{ color: 'var(--color-text)' }}>{planMostrado ? PLANES[planMostrado].nombre : sub.plan}</strong> cuando termine el beneficio</>}
                                         </div>
                                         <Button variant="outline" size="sm" onClick={() => setEditandoPlan(true)}>
-                                            {sub.planActive ? 'Cambiar plan' : 'Elegir otro plan'}
+                                            {esCortesia ? (planMostrado ? 'Cambiar plan' : 'Elegir plan') : sub.planActive ? 'Cambiar plan' : 'Elegir otro plan'}
                                         </Button>
                                     </div>
                                 ) : (
                                     <div>
                                         <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-body)', marginBottom: 8 }}>
-                                            {sub.planActive ? 'Elegí tu próximo plan (rige desde la próxima renovación)' : 'Elegí con qué plan seguís después del beneficio'}
+                                            {esCortesia
+                                                ? 'Elegí con qué plan seguís cuando termine la cortesía'
+                                                : sub.planActive ? 'Elegí tu próximo plan (rige desde la próxima renovación)' : 'Elegí con qué plan seguís después del beneficio'}
                                         </div>
                                         {errorPlan && <p style={{ fontSize: 12.5, color: 'var(--color-error)', margin: '0 0 8px' }}>{errorPlan}</p>}
                                         <SelectorPlan
-                                            valor={planMostrado ?? 'semestral'}
+                                            valor={esCortesia ? planMostrado : planMostrado ?? 'semestral'}
                                             onElegir={elegirPlan}
                                             disabled={guardandoPlan}
                                         />
