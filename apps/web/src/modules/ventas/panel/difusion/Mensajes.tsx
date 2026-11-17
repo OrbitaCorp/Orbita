@@ -73,7 +73,7 @@ function Bandeja({ usuario }: { usuario: string | null }) {
   const [soloSinLeer, setSoloSinLeer] = useState(false)
   const [ajustesAbiertos, setAjustesAbiertos] = useState(false)
   const montado = useRef(true)
-  useEffect(() => () => { montado.current = false }, [])
+  useEffect(() => { montado.current = true; return () => { montado.current = false } }, [])
 
   const cargar = useCallback(() => {
     getInstagramCharlas()
@@ -227,7 +227,7 @@ function Hilo({ charla, bot, onConfigurarOrbi, onVolver, onLeida, onCambio, onVi
   const lista = useRef<HTMLDivElement>(null)
   const entrada = useRef<HTMLInputElement>(null)
   const montado = useRef(true)
-  useEffect(() => () => { montado.current = false }, [])
+  useEffect(() => { montado.current = true; return () => { montado.current = false } }, [])
   useEffect(() => () => { if (foto) URL.revokeObjectURL(foto.vista) }, [foto])
 
   const cargar = useCallback(() => {

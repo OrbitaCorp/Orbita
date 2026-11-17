@@ -24,7 +24,7 @@ export function EnviarProductoModal({ charlaId, cliente, onCerrar, onEnviado }: 
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const montado = useRef(true)
-  useEffect(() => () => { montado.current = false }, [])
+  useEffect(() => { montado.current = true; return () => { montado.current = false } }, [])
 
   useEffect(() => {
     let cancelado = false

@@ -47,7 +47,7 @@ function Mes() {
   const [rendimiento, setRendimiento] = useState<InstagramRendimiento | null>(null)
   const [abierta, setAbierta] = useState<InstagramPublicacion | null>(null)
   const montado = useRef(true)
-  useEffect(() => () => { montado.current = false }, [])
+  useEffect(() => { montado.current = true; return () => { montado.current = false } }, [])
 
   const mes = claveDeMes(visible)
   const cargar = useCallback(async (clave: string) => {
