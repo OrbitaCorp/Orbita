@@ -18,7 +18,7 @@ export function RendimientoDeLaCuenta() {
   const [datos, setDatos] = useState<InstagramRendimiento | null>(null)
   const [error, setError] = useState<string | null>(null)
   const montado = useRef(true)
-  useEffect(() => () => { montado.current = false }, [])
+  useEffect(() => { montado.current = true; return () => { montado.current = false } }, [])
 
   useEffect(() => {
     getInstagramRendimiento()
