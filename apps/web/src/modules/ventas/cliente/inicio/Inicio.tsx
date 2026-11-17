@@ -1900,10 +1900,14 @@ function MarcaItem({ m }: { m: StorefrontBrandItem }) {
 // una con `repeticiones` copias adentro — el punto medio del track sigue
 // siendo exactamente donde arrancó, la métrica no cambia, solo lo que hay
 // adentro de cada mitad.
+// Velocidad de lectura de las cintas que corren solas (categorías): lo
+// bastante lenta para leer cada píldora al pasar.
+const VELOCIDAD_MARQUEE_PX_S = 30
+
 function MarqueeLoop<T>({ items, gap, duracion, render }: {
     items: T[]
     gap: number
-    /** Segundos de una vuelta entera. Sin esto manda el CSS (.sf-marquee-track). */
+    /** Segundos de una vuelta entera. Sin esto se calcula a VELOCIDAD_MARQUEE_PX_S. */
     duracion?: number
     render: (item: T, key: string) => ReactNode
 }) {
@@ -1916,18 +1920,29 @@ function MarqueeLoop<T>({ items, gap, duracion, render }: {
     // y el resultado se iría de rango.
     const medidorRef = useRef<HTMLDivElement>(null)
     const [repeticiones, setRepeticiones] = useState(1)
+    // Sin `duracion` fija, la vuelta dura lo que tarda en recorrer su mitad a
+    // VELOCIDAD_MARQUEE_PX_S. Con una duración fija (los 36s del CSS) la
+    // velocidad dependía de la distancia: la mitad mide ~2 pantallas (ver
+    // `repeticiones`), así que en un monitor ancho las categorías corrían a
+    // más de 100 px/s, imposibles de leer (reportado con captura, 16/11).
+    const [duracionMedida, setDuracionMedida] = useState<number | null>(null)
 
     useEffect(() => {
         const medir = () => {
             const anchoVisible = wrapRef.current?.clientWidth ?? 0
             const anchoSet = medidorRef.current?.scrollWidth ?? 0
             if (!anchoVisible || !anchoSet) return
-            setRepeticiones(Math.max(1, Math.ceil((anchoVisible * 2) / anchoSet)))
+            const rep = Math.max(1, Math.ceil((anchoVisible * 2) / anchoSet))
+            setRepeticiones(rep)
+            // Cada mitad = `rep` sets separados por `gap`, más el paddingRight
+            // (otro `gap`): rep × (set + gap).
+            setDuracionMedida((rep * (anchoSet + gap)) / VELOCIDAD_MARQUEE_PX_S)
         }
         medir()
         window.addEventListener('resize', medir)
         return () => window.removeEventListener('resize', medir)
-    }, [items.length])
+    }, [items.length, gap])
+    const duracionFinal = duracion ?? duracionMedida
 
     return (
         <div className="sf-marquee-wrap" ref={wrapRef}>
@@ -1947,7 +1962,7 @@ function MarqueeLoop<T>({ items, gap, duracion, render }: {
                 cada una: así el track mide exactamente 2 × (mitad + gap) y el
                 -50% de la animación cae justo donde arrancó, con cualquier
                 separación (con el gap del CSS, la costura se corría gap/2). */}
-            <div className="sf-marquee-track" style={{ gap: 0, ...(duracion ? { animationDuration: `${duracion}s` } : undefined) }}>
+            <div className="sf-marquee-track" style={{ gap: 0, ...(duracionFinal ? { animationDuration: `${duracionFinal}s` } : undefined) }}>
                 {/* Dos mitades idénticas (loop sin costura) — cada una con
                     `repeticiones` copias del set, calculadas arriba. */}
                 {[0, 1].map(mitad => (

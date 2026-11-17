@@ -47,14 +47,33 @@ export async function catalogoApi(rubro: RubroTurnos, semana: Semana): Promise<{
   }
 }
 
-/** Las reservas de Turnos entre dos fechas, todas las páginas. */
-export async function reservasEntre(desde: ISO, hasta: ISO): Promise<Reserva[]> {
-  const todas: Reserva[] = []
-  for (let page = 1; ; page++) {
-    const p = await panel.agenda({ modulo: 'TURNOS', desde, hasta, page, limit: POR_PAGINA })
-    todas.push(...p.data)
-    if (p.data.length < POR_PAGINA || todas.length >= p.total) return todas
+/**
+ * Cuántos días entran en un pedido del listado: la API acepta hasta 93 por vez (MAX_DIAS_LISTADO
+ * en reservas.service.ts) y la ventana del panel son 125, así que va en tramos.
+ */
+export const DIAS_POR_PEDIDO = 90
+
+/** Los tramos de hasta `porTramo` días (desde y hasta incluidos) que cubren el rango. */
+export function tramosDeFechas(desde: ISO, hasta: ISO, porTramo = DIAS_POR_PEDIDO): [ISO, ISO][] {
+  const tramos: [ISO, ISO][] = []
+  for (let d = desde; d <= hasta; d = sumarDias(d, porTramo)) {
+    const fin = sumarDias(d, porTramo - 1)
+    tramos.push([d, fin < hasta ? fin : hasta])
   }
+  return tramos
+}
+
+/** Las reservas de Turnos entre dos fechas (incluidas), todas las páginas de cada tramo. */
+export async function reservasEntre(desde: ISO, hasta: ISO): Promise<Reserva[]> {
+  const porTramo = await Promise.all(tramosDeFechas(desde, hasta).map(async ([d, h]) => {
+    const todas: Reserva[] = []
+    for (let page = 1; ; page++) {
+      const p = await panel.agenda({ modulo: 'TURNOS', desde: d, hasta: h, page, limit: POR_PAGINA })
+      todas.push(...p.data)
+      if (p.data.length < POR_PAGINA || todas.length >= p.total) return todas
+    }
+  }))
+  return porTramo.flat()
 }
 
 /** Agenda: las reservas ya traídas, por día. La semana es la de la config (no depende del rubro). */

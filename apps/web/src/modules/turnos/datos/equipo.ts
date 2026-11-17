@@ -168,7 +168,7 @@ export function rolesDe(r: RubroTurnos): Rol[] {
     },
     ...(EXTRAS[r.key] ?? []).map(([id, nombre, descripcion, base, atiende]): Rol => ({ id, nombre, descripcion, deFabrica: true, atiende, permisos: BASE[base] })),
   ]
-  if (salud) roles.push({ id: 'administracion', nombre: 'Administración', descripcion: 'Factura a las obras sociales y cierra la caja. Ve los números; no da turnos.', deFabrica: true, atiende: false, permisos: BASE.administracion })
+  if (salud) roles.push({ id: 'administracion', nombre: 'Administración', descripcion: 'Cierra la caja y lleva los números. Ve las ganancias; no da turnos.', deFabrica: true, atiende: false, permisos: BASE.administracion })
   return roles
 }
 

@@ -44,12 +44,12 @@ export const CSS_ONBOARDING = `
   .tuob-pasos li { position: absolute; transform: translate(-50%, -50%); transition: left 620ms var(--tuo-ease), top 620ms var(--tuo-ease); animation: tuobEstacion 520ms var(--tuo-ease) both; }
   @keyframes tuobEstacion { from { opacity: 0; transform: translate(-50%, -50%) scale(0.4) } to { opacity: 1; transform: translate(-50%, -50%) } }
   .tuob-punto { position: relative; width: 44px; height: 44px; display: grid; place-items: center; padding: 0; border: none; background: none; color: inherit; font-family: inherit; cursor: default; border-radius: 50%; }
-  .tuob-punto > i { width: 12px; height: 12px; border-radius: 50%; display: grid; place-items: center; background: #05070C; border: 1.5px solid rgba(147,197,253,0.34); color: #fff; transition: transform 240ms var(--tuo-ease), background 240ms ease, border-color 240ms ease, box-shadow 240ms ease, width 240ms var(--tuo-ease), height 240ms var(--tuo-ease); }
+  .tuob-punto > i { width: 12px; height: 12px; border-radius: 50%; display: grid; place-items: center; background: rgba(147,197,253,0.10); border: 1.5px solid rgba(147,197,253,0.34); color: #fff; transition: transform 240ms var(--tuo-ease), background 240ms ease, border-color 240ms ease, box-shadow 240ms ease, width 240ms var(--tuo-ease), height 240ms var(--tuo-ease); }
   .tuob-punto > i svg { width: 10px; height: 10px; opacity: 0; transition: opacity 200ms ease; }
   .tuob-punto > span { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 12px; font-weight: 500; color: var(--color-muted); transition: color 200ms ease; }
   .tuob-punto[data-tocable='true'] { cursor: pointer; }
-  /* --tuo-grad es hoy el azul claro del acento (#60A5FA): encima va la tinta oscura (--color-on-primary); el blanco daba 2,5:1. */
-  .tuob-punto[data-estado='hecho'] > i { width: 18px; height: 18px; border-color: transparent; background: var(--tuo-grad); color: var(--color-on-primary); box-shadow: 0 0 14px rgba(59,130,246,0.55); }
+  /* Relleno = el primario del espacio (#60A5FA) y encima la tinta oscura (--color-on-primary, ~8:1); el blanco daba 2,5:1. Antes era --tuo-grad, que el kit de Turnos dejó de definir: el fondo quedaba transparente y el tilde negro sobre el cielo. */
+  .tuob-punto[data-estado='hecho'] > i { width: 18px; height: 18px; border-color: transparent; background: var(--color-primary); color: var(--color-on-primary); box-shadow: 0 0 14px rgba(59,130,246,0.55); }
   .tuob-punto[data-estado='hecho'] > i svg { opacity: 1; }
   .tuob-punto[data-estado='hecho'] > span { color: var(--color-body); }
   /* Ya se pasó por acá, pero se volvió para atrás: queda marcado y se puede saltar. */
@@ -142,7 +142,7 @@ export const CSS_ONBOARDING = `
   .tuob-rubro small { margin-top: 4px; font-size: 12px; line-height: 1.45; color: var(--color-muted); }
   .tuob-rubro:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .tuob-rubro[aria-pressed='true'] { border-color: #60A5FA; background: linear-gradient(180deg, rgba(37,99,235,0.26), rgba(30,58,138,0.12)); box-shadow: 0 0 0 3px rgba(96,165,250,0.18), 0 16px 40px rgba(37,99,235,0.22); }
-  .tuob-rubro[aria-pressed='true'] .tuob-rubro-icono { background: var(--tuo-grad); color: var(--color-on-primary); border-color: transparent; box-shadow: 0 6px 18px rgba(37,99,235,0.5); }
+  .tuob-rubro[aria-pressed='true'] .tuob-rubro-icono { background: var(--color-primary); color: var(--color-on-primary); border-color: transparent; box-shadow: 0 6px 18px rgba(37,99,235,0.5); }
   .tuob-rubro[aria-pressed='true'] small { color: var(--color-body); }
   .tuob-etiqueta { display: inline-flex; align-items: center; gap: 5px; margin-top: 10px; padding: 3px 8px; border-radius: 999px; background: rgba(96,165,250,0.12); font-size: 10.5px; font-weight: 600; color: var(--chip-primary-fg); }
   .tuob-tilde { position: absolute; top: 12px; right: 12px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: #fff; color: #1D4ED8; animation: tuobTilde 320ms var(--tuo-ease) both; }
@@ -233,7 +233,7 @@ export const CSS_ONBOARDING = `
   .tuob-logo-marco img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
   .tuob-logo-marco:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
   .tuob-logo-sigla { font-family: var(--tuo-fh); font-size: 28px; font-weight: 700; letter-spacing: -0.03em; color: var(--color-text); }
-  .tuob-logo-marco > i { position: absolute; right: -2px; bottom: -2px; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--tuo-grad); color: var(--color-on-primary); border: 2px solid #05070C; }
+  .tuob-logo-marco > i { position: absolute; right: -2px; bottom: -2px; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--color-primary); color: var(--color-on-primary); border: 2px solid #05070C; }
   .tuob-logo-botones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 
   /* Opciones tipo tarjeta: radio (una) o casilla (varias) */
@@ -277,7 +277,7 @@ export const CSS_ONBOARDING = `
   .tuob-plan-precio { font-size: 15px; font-weight: 600; color: var(--color-text); }
   .tuob-dias { display: flex; flex-wrap: wrap; gap: 8px; }
   .tuob-dia { min-width: 50px; height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--color-border); background: var(--tuob-hueco); color: var(--color-muted); font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; transition: border-color 160ms ease, background 160ms ease, color 160ms ease, box-shadow 200ms ease; }
-  .tuob-dia[aria-pressed='true'] { border-color: transparent; background: var(--tuo-grad); color: var(--color-on-primary); box-shadow: 0 6px 16px rgba(37,99,235,0.35); }
+  .tuob-dia[aria-pressed='true'] { border-color: transparent; background: var(--color-primary); color: var(--color-on-primary); box-shadow: 0 6px 16px rgba(37,99,235,0.35); }
   .tuob-dia:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .tuob-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
   /* Horarios: un renglón por turno de atención (mañana y tarde), cada uno con su llave y su "de… a…". */
@@ -512,7 +512,7 @@ export const CSS_ONBOARDING = `
     .tuob-modulo:not([data-elegido='true']):not([data-proximamente='true']):hover { background: var(--tuob-vidrio-alto); border-color: var(--color-border-strong); }
     .tuob-portada:not([data-elegido='true']):hover { border-color: var(--color-border-strong); }
     .tuob-rubro:not([aria-pressed='true']):hover { background: var(--tuob-vidrio-alto); }
-    .tuob-rubro:hover { transform: translateY(-3px); border-color: rgba(147,197,253,0.5); box-shadow: 0 18px 40px rgba(0,0,0,0.45); }
+    .tuob-rubro:hover { transform: translateY(-3px); border-color: rgba(147,197,253,0.5); }
     .tuob-rubro[aria-pressed='true']:hover { box-shadow: 0 0 0 3px rgba(96,165,250,0.3), 0 20px 46px rgba(37,99,235,0.4); }
     .tuob-rubro:hover .tuob-rubro-icono { transform: scale(1.08) rotate(-5deg); box-shadow: 0 0 22px rgba(96,165,250,0.45); }
     .tuob-serv:hover { border-color: var(--color-border-strong); }

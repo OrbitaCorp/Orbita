@@ -1,7 +1,7 @@
 // Banner angosto debajo del header. `text`/`visible` vienen de Apariencia
 // (StorefrontConfig.shippingText/showAnnouncementBar) — los defaults acá
 // abajo son solo para páginas que todavía no pasan esos props.
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 const DEFAULT_TEXT = 'Envíos gratis en compras mayores a $30.000 · Cambios en 30 días'
 
@@ -26,6 +26,12 @@ const ROTACION_MS = 4000
 // (ver keyframes) — de más nunca se corta, de menos sí se notaría el hueco.
 const REPETICIONES = 6
 
+// Velocidad del modo cartelera. Antes la vuelta duraba 22s por mensaje, fijo,
+// pero lo que recorre es la mitad del track (6 copias del mensaje): con un
+// mensaje de largo normal eso daba más de 100 px/s, no se llegaba a leer
+// (reportado 16/11). Ahora se mide el track y la duración sale de acá.
+const VELOCIDAD_CARTELERA_PX_S = 45
+
 export function AnnouncementBar({ text, visible = true, scroll = false, dark = false }: { text?: string | null; visible?: boolean; scroll?: boolean; dark?: boolean }) {
   const parsed = mensajesAnuncio(text)
   const mensajes = parsed.length > 0 ? parsed : [DEFAULT_TEXT]
@@ -41,6 +47,24 @@ export function AnnouncementBar({ text, visible = true, scroll = false, dark = f
     const id = window.setInterval(() => setActivo(a => (a + 1) % mensajes.length), ROTACION_MS)
     return () => window.clearInterval(id)
   }, [scroll, multiple, mensajes.length])
+
+  // Ancho real del track (las dos tandas) → cuánto dura recorrer su mitad.
+  // Se vuelve a medir cuando cargan las fuentes: con la de respaldo el texto
+  // mide distinto. Hasta medir, manda la duración de respaldo del CSS.
+  const carteleraRef = useRef<HTMLDivElement>(null)
+  const [duracionCartelera, setDuracionCartelera] = useState<number | null>(null)
+  useEffect(() => {
+    if (!scroll || !visible) return
+    let vivo = true
+    const medir = () => {
+      const ancho = carteleraRef.current?.scrollWidth ?? 0
+      if (vivo && ancho) setDuracionCartelera(ancho / 2 / VELOCIDAD_CARTELERA_PX_S)
+    }
+    medir()
+    document.fonts?.ready.then(medir).catch(() => {})
+    window.addEventListener('resize', medir)
+    return () => { vivo = false; window.removeEventListener('resize', medir) }
+  }, [scroll, visible, text])
 
   if (!visible) return null
 
@@ -110,7 +134,7 @@ export function AnnouncementBar({ text, visible = true, scroll = false, dark = f
         <>
           <style>{`
             @keyframes orbAnuncioCartelera { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-            .orb-anuncio-cartelera { animation: orbAnuncioCartelera ${22 * mensajes.length}s linear infinite; }
+            .orb-anuncio-cartelera { animation: orbAnuncioCartelera ${60 * mensajes.length}s linear infinite; }
             /* Respeta "menos movimiento" del sistema operativo — se
                congela en vez de animar; el mensaje se sigue leyendo (solo
                deja de correr), no desaparece. */
@@ -118,7 +142,7 @@ export function AnnouncementBar({ text, visible = true, scroll = false, dark = f
               .orb-anuncio-cartelera { animation: none; }
             }
           `}</style>
-          <div className="orb-anuncio-cartelera" style={{ display: 'flex', width: 'max-content' }}>
+          <div ref={carteleraRef} className="orb-anuncio-cartelera" style={{ display: 'flex', width: 'max-content', ...(duracionCartelera ? { animationDuration: `${duracionCartelera}s` } : undefined) }}>
             {Array.from({ length: REPETICIONES * 2 }).map((_, tanda) => mensajes.map((m, i) => item(`${tanda}-${i}`, m, true)))}
           </div>
         </>

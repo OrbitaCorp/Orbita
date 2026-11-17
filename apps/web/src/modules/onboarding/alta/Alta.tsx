@@ -65,6 +65,7 @@ import { useOnboardingHidratado, useOnboardingStore } from '@/modules/onboarding
 import { CSS_ONBOARDING } from './estilo'
 import { useAlta } from './estadoAlta'
 import { OrbitaPasos } from './OrbitaPasos'
+import { BotonTutorialAlta } from './TutorialAlta'
 import { OrbiAlta } from './OrbiAlta'
 import { ICONO_MODULO, PasoModulo } from './PasoModulo'
 import { PasoTipo } from './PasoTipo'
@@ -457,6 +458,8 @@ export default function Alta({ real = false, modulo: pedido }: {
           ? <Link href="/" className="tuob-marca" aria-label="Órbita: volver al inicio"><OrbitaLogo size={26} /> Órbita</Link>
           : <span className="tuob-marca"><OrbitaLogo size={26} /> Órbita</span>}
         <OrbitaPasos pasos={pasos} actual={paso} alcanzado={alcanzado} onIr={irDesdeArco} />
+        {/* El video "Cómo crear tu espacio" (YouTube), en una ventana encima: lo cargado no se pierde. */}
+        <BotonTutorialAlta />
       </header>
 
       {/* key = paso: al cambiar se monta de nuevo y vuelve a correr la animación

@@ -115,7 +115,7 @@ function Previa({ rubro }: { rubro: RubroTurnos }) {
   return (
     <div className="tuob-previa-cuerpo">
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14 }}>
-        <span className="tuob-rubro-icono" style={{ margin: 0, background: 'var(--tuo-grad)', color: 'var(--color-on-primary)', borderColor: 'transparent' }}><rubro.Icon size={20} strokeWidth={1.75} aria-hidden /></span>
+        <span className="tuob-rubro-icono" style={{ margin: 0, background: 'var(--color-primary)', color: 'var(--color-on-primary)', borderColor: 'transparent' }}><rubro.Icon size={20} strokeWidth={1.75} aria-hidden /></span>
         <div style={{ minWidth: 0 }}>
           <div className="tuo-h2" style={{ fontSize: 17 }}>{rubro.label}</div>
           <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 2 }}>{rubro.descripcion}</div>

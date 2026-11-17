@@ -12,6 +12,8 @@ import { Tablero } from './Tablero'
 import { InstagramModal, Marca } from '../mensajes/components/InstagramModal'
 import { useInstagramEstado } from '../mensajes/components/InstagramConexion'
 import type { InstagramEstado } from '@/lib/api'
+import { esVisitanteDemo } from '@/lib/demo/modo'
+import { SoloConTienda } from '@/modules/demo/SoloConTienda'
 
 // Difusión: darle a conocer el negocio en redes. Hoy está la conexión con Instagram (la misma que
 // se ve en Mensajes); publicar productos, responder comentarios y ver estadísticas se suman acá
@@ -79,12 +81,15 @@ export default function Difusion() {
 
   // Cada vez que se entra a Difusión sin la conexión completa, el modal se abre solo. Si se cierra,
   // no vuelve a abrirse hasta volver a entrar al módulo o tocar el botón.
+  // Demo pública: Difusión pide la cuenta de Instagram del negocio; se explica en vez de ofrecer conectar.
+  const demo = esVisitanteDemo()
   useEffect(() => {
+    if (demo) return
     if (visible && estado && !estado.connected && !yaSeOfrecio) {
       setAbierto(true)
       setYaSeOfrecio(true)
     }
-  }, [visible, estado, yaSeOfrecio])
+  }, [demo, visible, estado, yaSeOfrecio])
 
   // Al volver del login de Instagram la API manda ?ig=conectado | sin-suscripcion | error (se vuelve a
   // la pantalla desde la que se pidió la conexión): se abre el modal con el resultado, se refresca el
@@ -111,7 +116,9 @@ export default function Difusion() {
       <h1 className="dif-titulo">Difusión</h1>
       <p className="dif-bajada">Mostrá tus productos en redes y respondé a quienes te escriben, desde un solo lugar.</p>
 
-      {!visible ? (
+      {demo ? (
+        <SoloConTienda funcion="difusion" />
+      ) : !visible ? (
         <div className="dif-tarjeta dif-aviso">Instagram todavía no está disponible para tu negocio.</div>
       ) : (
         <>

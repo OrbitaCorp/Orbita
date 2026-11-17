@@ -164,6 +164,8 @@ const G9 = '2026-11-09'
 const G10 = '2026-11-10'
 const G11 = '2026-11-11'
 const G12 = '2026-11-12'
+// Lunes 16/11: la tabla rubro → sidebar de Turnos.
+const F16 = '2026-11-16'
 
 export const ENTRADAS: Entrada[] = [
   // ─── Transversal · la sección Módulos ───────────────────────────────────────
@@ -2404,7 +2406,7 @@ Lo que no entró y queda como decisión abierta ("cosas con stock"): alquilar ob
 
 - **Un origen por sección** (\`datos/origen/index.ts\`): catálogo (agendas y servicios), clientes, equipo (personas y roles) y agenda (la semana del negocio y los turnos de cada día). Cada origen implementa las cuatro y \`cargar\` las junta. El panel toma el origen del contexto (\`useOrigenTurnos\`): por defecto la demo; el panel real de un negocio va a montar \`<OrigenTurnosProvider origen={origenApi}>\`.
 - **La demo** (\`demo.ts\`) da exactamente lo que el panel armaba antes, y hay un test que lo compara rubro por rubro. La espera fingida (\`useCargaSimulada\`, \`?cargando=1\`) solo corre en la demo. Si se cambia el horario de alguien, sus turnos de ejemplo se siguen acomodando, porque la agenda es una función y no una lista.
-- **La API** (\`api.ts\`): la semana sale de la config de Turnos (sin config, el panel avisa que el negocio no tiene Turnos configurado). Las agendas son los recursos PROFESIONAL o ESPACIO según el rubro, con los servicios pausados incluidos. Los turnos son las reservas de 62 días para cada lado, todas las páginas. Los clientes salen de esas reservas y el equipo es quien atiende. Si algo falla, el panel muestra el mensaje de la API y un botón para reintentar.
+- **La API** (\`api.ts\`): la semana sale de la config de Turnos (sin config, el panel avisa que el negocio no tiene Turnos configurado). Las agendas son los recursos PROFESIONAL o ESPACIO según el rubro, con los servicios pausados incluidos. Los turnos son las reservas de 62 días para cada lado, todas las páginas (en tramos de 90 días: la API da hasta 93 por pedido, corregido el 16/11). Los clientes salen de esas reservas y el equipo es quien atiende. Si algo falla, el panel muestra el mensaje de la API y un botón para reintentar.
 - **Las traducciones** (\`mapear.ts\`, con sus tests): fechas a días desde hoy, el domingo en 0 de la API al lunes en 0 del panel, el horario semanal a la semana del panel y de vuelta, y los estados. VENCIDA no se muestra, RETENIDA y PENDIENTE van como "Sin confirmar" y una confirmada que está pasando va "En curso". También el cliente: si no hay ficha, se toma su teléfono o su email, y una agenda con horarios distintos por día se muestra con el horario del primero (el panel tiene uno solo por agenda).
 - **Lo que no cambió:** las escrituras (dar un turno, pausar, sumar a alguien) siguen en el estado del panel. Se conectan con las tareas de Servicios, Equipo, Espacios, reglas y agenda (semanas 2 y 3). Configuración y Avanzado siguen leyendo adentro de cada pantalla hasta las tareas de horarios y reglas.
 - **Verificado:** typecheck y eslint de \`apps/web\` sin errores y los tests de Turnos en verde (21). La demo no se probó a mano en el navegador.`,
@@ -2456,6 +2458,121 @@ Lo que no entró y queda como decisión abierta ("cosas con stock"): alquilar ob
       'apps/web/src/modules/turnos/admin/configuracion/Reservas.tsx:74',
       'apps/web/src/modules/turnos/admin/configuracion/Reservas.tsx:227',
       'apps/web/src/modules/superadmin/modulos/reglas.ts:46',
+    ],
+  }),
+  entrada({
+    modulo: 'turnos', fecha: F16, slug: 'sidebar-por-rubro', tipo: 'tarea', quien: 'Mateo',
+    titulo: 'Qué muestra el sidebar del panel en cada rubro de Turnos',
+    foco: 'El menú del panel ya no se arma con condiciones sueltas: sale de una tabla (turnos/admin/secciones.ts) que dice, sección por sección, en qué modo de agenda aparece y con qué permiso. Un test la recorre en los 23 rubros y en cada rol de fábrica, y chequea que ninguna sección quede vacía con los datos de ejemplo. Del rubro, lo único que cambia el menú es el modo: los 5 rubros por sala o cabina suman Espacios.',
+    que: `Tarea del 06/11 del plan (pedido de Ale del 04/11: "el sidebar tiene más o menos cosas" según el subrubro), hecha el 16/11.
+
+**La regla, en un solo lugar.** \`REGLAS_SECCIONES\` lista las 12 secciones en orden de menú, cada una con los modos en que aparece y el permiso que la abre. \`PanelTurnos\` arma el menú con \`seccionesVisibles(modo, puede)\` y le pone a cada sección su nombre, su ícono y su badge. Una sección nueva se suma ahí, diciendo en qué modo y con qué permiso aparece; si no, no entra al menú. El panel se ve igual que antes.
+
+**Por modo de agenda** (lo que ve el dueño):
+
+| Sección | Por profesional (18 rubros) | Por sala o cabina (5 rubros) |
+|---|---|---|
+| Resumen, Agenda | Sí | Sí |
+| Clientes / Pacientes | Sí | Sí |
+| Servicios | Sí | Sí |
+| Equipo | Sí: cada persona que atiende es una columna de la agenda | Sí: quién atiende en cada cabina, su rol y cómo cobra, sin columna propia |
+| Espacios (Cabinas, Consultorios, Equipos EMS) | No | Sí: son las columnas de la agenda |
+| Ganancias | Sí | Sí |
+| Reglas de reserva, Recordatorios y mensajes, Pagos | Sí | Sí |
+| Configuración, Avanzado | Sí | Sí |
+
+Por sala o cabina: estética, depilación, spa y masajes, clínica y electroestimulación. Los otros 18, por profesional.
+
+**Por rol** (igual en los dos modos, salvo Espacios):
+
+| Rol de fábrica | Secciones |
+|---|---|
+| Dueño/a | Todas |
+| Encargado/a | Resumen, Agenda, Clientes, Servicios, Equipo, Espacios (si hay), Ganancias. Sin Reservas, Configuración ni Avanzado |
+| Recepción / Secretaría | Resumen, Agenda, Clientes |
+| Quien atiende (barbero, médico/a, masajista, aprendiz, colorista…) | Resumen, Mi agenda, Mis clientes o pacientes, Mis ganancias |
+| Administración (salud) | Resumen, Agenda, Pacientes, Ganancias |
+| Asistente, Enfermería, Asistente dental | Resumen, Agenda |
+
+Reglas de reserva, Recordatorios, Pagos, Configuración y Avanzado van siempre juntas: las abre el mismo permiso (configurar), y el test lo chequea.
+
+**Lo que cambia por rubro adentro de cada sección, no en el menú:**
+
+- **Salud** (11 rubros): dice "Pacientes", la ficha tiene obra social y DNI, recepción se llama Secretaría y se suma el rol Administración. Los espacios se llaman Consultorios.
+- **Seña** (9 rubros la piden de ejemplo: peluquería, estilista, maquillaje, estética, pestañas, spa, tatuajes, medicina estética y medicina alternativa): Pagos lista las señas por cobrar y el menú las cuenta. Sin seña, Pagos explica que no se pide y lleva a Reglas de reserva para activarla. No queda vacía.
+- **Por sala o cabina:** Recordatorios no ofrece la lista de espera, Reglas de reserva habla de "Asignación de espacios" en vez de "Elegir profesional" y el mini sitio arranca sin la sección del equipo.
+- **A domicilio** (estilista, consulta médica y clases, con un servicio a domicilio de ejemplo): no cambia el panel. Cambia el sitio: muestra las zonas en lugar del mapa y pide la dirección al reservar.
+
+**Ninguna sección vacía.** El test carga los datos de ejemplo de cada rubro y chequea que la agenda de hoy, los clientes, los servicios, el equipo, los espacios (en cabina) y quien cobra (para Ganancias) tengan algo.
+
+**Corregido de paso:**
+
+- El aviso del módulo decía que en modo cabina el panel "muestra Espacios y no Equipo". El panel muestra los dos, y tiene sentido: en un spa las masajistas no son columnas de la agenda, pero tienen cuenta, rol y comisión. El aviso quedó como el panel.
+- El rol Administración de salud decía "Factura a las obras sociales", que está afuera del alcance en salud (decisión del 15/11). Ahora dice "Cierra la caja y lleva los números".
+
+**Para cuando se conecte la API:** con el origen de la API, Equipo en modo cabina sale vacío (hoy solo trae a quien es una agenda, y en cabina las agendas son espacios) y Ganancias no tiene a quién repartir (el backend no guarda cómo cobra cada uno, faltante 4 del mapa). Las dos secciones tienen que mostrar un vacío que explique qué cargar, o esperar a que el backend tenga el equipo. Se resuelve con la tarea de Equipo (semana 2).
+
+**Verificado:** typecheck de \`apps/web\` sin errores y los tests de Turnos en verde (25, 4 de ellos nuevos). No se probó a mano en el navegador.`,
+    archivos: [
+      'apps/web/src/modules/turnos/admin/secciones.ts:1',
+      'apps/web/src/modules/turnos/admin/__tests__/secciones.test.ts:1',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:207',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:225',
+      'apps/web/src/modules/turnos/datos/equipo.ts:171',
+      'apps/web/src/modules/turnos/admin/configuracion/Mensajes.tsx:82',
+      'apps/web/src/modules/turnos/admin/configuracion/datos.ts:113',
+      'apps/web/src/modules/superadmin/modulos/reglas.ts:46',
+    ],
+  }),
+  entrada({
+    modulo: 'turnos', fecha: F16, slug: 'negocio-de-prueba', tipo: 'tarea', quien: 'Mateo',
+    titulo: 'Negocio de prueba de Turnos en dev, y el panel leyendo de la API',
+    foco: 'En la base de dev hay una barbería de Turnos (turnos-prueba) con su config, tres barberos, cinco servicios y unas 500 reservas alrededor de hoy, sembrada por un script que se puede repetir. Hay una página local que monta el panel con el origen de la API y la sesión del dueño. Al probarla apareció un error del origen: la agenda pedía 125 días de una vez y la API acepta 93. Ya está corregido.',
+    que: `Tarea del 05/11 del plan, hecha el 16/11, más lo que hacía falta para ver el panel con datos de verdad.
+
+**El negocio** (\`apps/api/prisma/seed-turnos-prueba.ts\`, \`pnpm seed:turnos-prueba\` desde \`apps/api\`):
+
+- **Qué es:** "Barbería de Prueba", subdominio \`turnos-prueba\`. El rubro va como se decidió el 15/11: \`industry: "turnos"\` y \`subrubros: ["barberia"]\`. El dueño es \`dueno@turnos-prueba.invalid\`: tiene todos los permisos, también los de reservas, y una cortesía sin vencimiento.
+- **Config de Turnos:** lunes a sábado de 9 a 13 y de 16 a 20, confirmación automática, una hora de anticipación mínima y hasta 2 reservas activas por persona. La retención y la cancelación quedan en lo que trae la API: 10 minutos y 24 horas.
+- **Agendas:** tres PROFESIONAL, con el rol y el color en \`datos\`. Nico atiende solo a la tarde, para probar el horario propio de una agenda. La primera está atada al dueño (\`memberId\`).
+- **Servicios y reservas:** los cinco servicios de la barbería de la demo y unas 500 reservas, de dos semanas atrás a dos adelante. Las pasadas están atendidas, ausentes o canceladas; las que vienen, confirmadas, sin confirmar o canceladas. Hay clientes repetidos con varias visitas.
+- **Cómo se corre:** solo contra la base de dev. Lo chequea antes de tocar nada y no imprime la URL. El negocio y el dueño se crean una sola vez; las agendas, los servicios y las reservas se borran y se arman de nuevo alrededor de hoy en cada corrida, así "hoy" siempre tiene turnos. La contraseña del dueño va en \`TURNOS_PRUEBA_PASSWORD\` y no se imprime. Hace falta la primera vez, y pasarla de nuevo la cambia.
+
+**La página** (\`apps/web/src/pages/panel/turnos.tsx\`, solo en local): el mismo panel de \`/turnos-demo/panel\`, montado con \`origenApi\` y la sesión del dueño. Se abre en \`turnos-prueba.orbita.local:3001/panel/turnos\`. Va bajo \`/panel\` porque ahí el subdominio usa la sesión del panel y no la de un cliente. El rubro sale de \`?rubro=\`, como en la demo (barbería si no viene). Leerlo de \`subrubros\` va con las rutas de producción.
+
+**Lo que se probó contra la API local** (la de dev, con la sesión del dueño):
+
+- **Respuestas de la API:** la config, las 3 agendas, los 5 servicios y las 30 reservas de hoy.
+- **El origen de la API del panel** (\`origenApi.cargar\`), con esas respuestas reales:
+  - 3 agendas, la de Nico de 16 a 20;
+  - 5 servicios y 14 clientes con sus visitas;
+  - 30 turnos hoy (27 confirmados y 3 sin confirmar);
+  - el domingo vacío, porque está cerrado.
+
+**El error que apareció:** el origen pedía las reservas de 62 días para cada lado en un solo pedido (125 días), y la API corta en 93 ("Pedí hasta 93 días por vez."). El panel con la API habría abierto con ese error. Ahora la ventana se pide en tramos de 90 días (\`tramosDeFechas\`), cada uno con todas sus páginas, y un test chequea que no queden huecos ni días repetidos.
+
+**Lo que se ve con la API y todavía no está:**
+
+- **Equipo y Ganancias:** el equipo son los tres barberos, todos con el rol "Barbero" y sin forma de cobro, así que Ganancias no tiene a quién repartir. El dueño tampoco figura como dueño (faltante 4 del mapa).
+- **El "hoy":** la línea de "ahora" del panel sigue en la hora fija de la demo.
+- **Lo que se toca en el panel:** queda en memoria y se pierde al recargar.
+
+Esas tres cosas se resuelven con las tareas de la semana 2.
+
+**Para probarlo en tu máquina:**
+
+1. Desde \`apps/api\`, con el \`.env\` de dev: \`$env:TURNOS_PRUEBA_PASSWORD='tu-contraseña'; pnpm seed:turnos-prueba\`.
+2. Levantá la API y el front en local.
+3. Entrá en \`orbita.local:3001/login\` con \`dueno@turnos-prueba.invalid\`.
+4. Abrí \`turnos-prueba.orbita.local:3001/panel/turnos\`.
+
+**Verificado:** typecheck y eslint de \`apps/web\` sin errores, tests de Turnos en verde (27) y el seed corrido dos veces contra dev con el mismo resultado. El panel no se abrió a mano en el navegador.`,
+    archivos: [
+      'apps/api/prisma/seed-turnos-prueba.ts:1',
+      'apps/api/package.json:21',
+      'apps/web/src/pages/panel/turnos.tsx:1',
+      'apps/web/src/modules/turnos/datos/origen/api.ts:50',
+      'apps/web/src/modules/turnos/datos/origen/__tests__/api.test.ts:1',
     ],
   }),
 

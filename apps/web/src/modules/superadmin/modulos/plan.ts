@@ -137,7 +137,7 @@ const TURNOS = plan('turnos', 'Turnos', 'Mateo',
   [
     // Semana 1 · arranque (jueves y viernes)
     documentada(t('2026-11-05', 'Mateo', 'Leer el contrato del backend compartido y armar el mapa pantalla → ruta de Turnos', 'Tabla pantalla → ruta (panel y sitio) en una entrada de auditoría, con lo que el backend no cubre marcado'), 'auditoria.turnos.2026-11-13-mapa-sobre-el-backend'),
-    t('2026-11-05', 'Mateo', 'Crear el negocio de prueba de Turnos en dev con su ReservaConfig (PUT /reservas/config)', 'El negocio existe en la base de dev con config de Turnos: horario semanal, retención y política de cancelación'),
+    documentada(t('2026-11-05', 'Mateo', 'Crear el negocio de prueba de Turnos en dev con su ReservaConfig (PUT /reservas/config)', 'El negocio existe en la base de dev con config de Turnos: horario semanal, retención y política de cancelación'), 'auditoria.turnos.2026-11-16-negocio-de-prueba'),
     documentada(t('2026-11-06', 'Mateo', 'Separar en el panel de Turnos la capa de datos: un origen (demo o API) por sección, sin tocar las pantallas', 'Cada sección lee de una función de datos propia; la demo sigue igual en /turnos-demo'), 'auditoria.turnos.2026-11-13-capa-de-datos-por-origen'),
     documentada(t('2026-11-06', 'Mateo', 'Registrar en Auditoría qué necesita Turnos del backend que hoy no existe (o la constancia de que no falta nada)', 'Entrada con la lista de faltantes, avisada a Ale si hay algo que tocar en lo compartido'), 'auditoria.turnos.2026-11-13-mapa-sobre-el-backend'),
     // Semana 2 · catálogo
@@ -180,7 +180,7 @@ const TURNOS = plan('turnos', 'Turnos', 'Mateo',
     t('2026-12-22', 'Mateo', 'Propuesta para sacar Turnos de "Próximamente": qué falta y qué decide Ale', 'Entrada tipo decisión con la lista de lo que falta y la propuesta'),
     t('2026-12-23', 'Mateo', 'Cierre de Turnos: resumen del ciclo y entrega a Ale', 'Entrada de cierre con lo hecho, lo que quedó afuera y lo que sigue'),
     // Sumada el 04/11 (pedido de Ale: "tener mucho cuidado" con los rubros): el sidebar cambia según el modo de agenda.
-    t('2026-11-06', 'Mateo', 'Revisar qué muestra el sidebar del panel en cada rubro de Turnos (por profesional: Equipo; por sala o cabina: Espacios) y dejarlo escrito', 'Tabla rubro → secciones del sidebar en Auditoría, con lo que cambia por modo y por modalidad (a domicilio); ninguna sección vacía en ningún rubro'),
+    documentada(t('2026-11-06', 'Mateo', 'Revisar qué muestra el sidebar del panel en cada rubro de Turnos (por profesional: Equipo; por sala o cabina: Espacios) y dejarlo escrito', 'Tabla rubro → secciones del sidebar en Auditoría, con lo que cambia por modo y por modalidad (a domicilio); ninguna sección vacía en ningún rubro'), 'auditoria.turnos.2026-11-16-sidebar-por-rubro'),
     // Sumadas el 04/11 (pedido de Ale): todo cambio en conocimiento de Orbi, sin usar Orbi; y los tutoriales del módulo al terminar, como los de Tienda.
     t('2026-12-21', 'Mateo', 'El manual de Turnos en Orbi: cada pantalla del panel y del sitio con su tema y los nombres exactos de los botones, regenerado (sin tools ni llamadas a Orbi)', 'Orbi tiene cada pantalla de Turnos en el manual; pnpm test de apps/web en verde con el artefacto regenerado'),
     t('2026-12-22', 'Mateo', 'Tutoriales de Turnos: la lista en Marketing → Videos → Tutoriales y los videos como los de Tienda', 'La lista de Turnos cargada con grupos y pantallas, y cada tutorial con su link de YouTube (No listado) cargado por el conector, o en proceso con quién lo hace'),
