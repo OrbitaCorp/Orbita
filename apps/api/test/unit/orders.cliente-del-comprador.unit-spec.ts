@@ -42,7 +42,7 @@ describe('Venta del panel con comprador tipeado a mano', () => {
     await crear({ name: '  Ana Paz Ruiz ', email: 'Ana@X.com', phone: '3757 111222' });
 
     expect(customer.create).toHaveBeenCalledWith({
-      data: { businessId: BIZ, firstName: 'Ana', lastName: 'Paz Ruiz', email: 'ana@x.com', phone: '3757 111222', dni: null },
+      data: { businessId: BIZ, firstName: 'Ana', lastName: 'Paz Ruiz', email: 'ana@x.com', phone: '3757 111222' },
     });
     expect(emit).toHaveBeenCalledWith('notification.cliente_nuevo', { businessId: BIZ, customerName: 'Ana Paz Ruiz', customerId: 'c-1' });
   });

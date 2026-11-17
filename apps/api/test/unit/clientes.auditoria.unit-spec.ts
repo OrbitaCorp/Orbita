@@ -3,8 +3,9 @@ import { CustomersController } from '../../src/customers/customers.controller';
 import { CustomersService } from '../../src/customers/customers.service';
 
 // Auditoría interna 10/09, ítem web.panel.clientes: la exportación pide el
-// mismo permiso que el botón del panel (customers.manage) y la lista deja de
-// traer el DNI de cada cliente (sigue en detalle y exportación).
+// mismo permiso que el botón del panel (customers.manage). El DNI ya no sale
+// por ningún lado (17/11): se dejó de pedir y de mostrar; lo viejo queda en la
+// base pero la API no lo devuelve.
 
 describe('Permisos de /customers', () => {
   const permiso = (metodo: keyof CustomersController) => Reflect.getMetadata(PERMISSION_KEY, CustomersController.prototype[metodo]);
@@ -19,7 +20,7 @@ describe('Permisos de /customers', () => {
   });
 });
 
-describe('La lista no trae el DNI', () => {
+describe('El DNI no sale de la API', () => {
   const cliente = {
     id: 'c-1', firstName: 'Ana', lastName: null, email: 'ana@x.com', phone: '1155556666', dni: '30111222',
     passwordHash: null, createdAt: new Date('2026-09-01'),
@@ -42,12 +43,13 @@ describe('La lista no trae el DNI', () => {
   it('GET /customers devuelve nombre, email y teléfono, pero no el DNI', async () => {
     const r = await armar().findAll('biz', {});
     expect(r.data[0]).toMatchObject({ firstName: 'Ana', email: 'ana@x.com', phone: '1155556666' });
-    expect(r.data[0].dni).toBeUndefined();
+    expect(r.data[0]).not.toHaveProperty('dni');
     expect(JSON.stringify(r.data)).not.toContain('30111222');
   });
 
-  it('la exportación (customers.manage) sí lo trae', async () => {
+  it('la exportación tampoco lo trae', async () => {
     const r = await armar().exportAll('biz', 'm-1');
-    expect(r.data[0].dni).toBe('30111222');
+    expect(r.data[0]).toMatchObject({ firstName: 'Ana', email: 'ana@x.com' });
+    expect(JSON.stringify(r.data)).not.toContain('30111222');
   });
 });

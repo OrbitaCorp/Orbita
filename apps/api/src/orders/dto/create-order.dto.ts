@@ -28,7 +28,6 @@ class OrderBuyerInput {
   @IsString() @MaxLength(150) name!: string;
   @IsOptional() @IsEmail() @MaxLength(254) email?: string;
   @IsOptional() @IsString() @MaxLength(40) phone?: string;
-  @IsOptional() @IsString() @MaxLength(30) dni?: string;
 }
 // Dirección tipeada a mano (invitados del checkout público, o un cliente que
 // no quiere guardarla) — se guarda como snapshot en el pedido, nunca crea una

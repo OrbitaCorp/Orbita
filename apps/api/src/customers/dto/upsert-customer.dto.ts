@@ -9,5 +9,4 @@ export class UpsertCustomerDto {
   @IsOptional() @IsString() @MaxLength(120) lastName?: string;
   @IsOptional() @NormalizedEmail() email?: string;
   @IsOptional() @IsString() @MaxLength(40) phone?: string;
-  @IsOptional() @IsString() @MaxLength(30) dni?: string;
 }

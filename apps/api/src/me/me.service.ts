@@ -90,7 +90,6 @@ export class MeService {
           // Cambiar el email obliga a re-verificarlo, mismo criterio que el registro.
           ...(cambiaEmail && { email: dto.email ?? null, emailVerified: false }),
           ...(dto.phone !== undefined && { phone: dto.phone }),
-          ...(dto.dni !== undefined && { dni: dto.dni }),
           ...(dto.birthDate !== undefined && { birthDate: dto.birthDate ? new Date(dto.birthDate) : null }),
         },
       });
@@ -177,7 +176,7 @@ export class MeService {
 
   private toResponse(c: {
     id: string; firstName: string; lastName: string | null; email: string | null;
-    phone: string | null; dni: string | null; birthDate: Date | null; avatarUrl: string | null;
+    phone: string | null; birthDate: Date | null; avatarUrl: string | null;
     emailVerified: boolean;
   }) {
     return {
@@ -186,7 +185,6 @@ export class MeService {
       lastName: c.lastName,
       email: c.email,
       phone: c.phone,
-      dni: c.dni,
       birthDate: c.birthDate,
       avatarUrl: c.avatarUrl,
       emailVerified: c.emailVerified,

@@ -945,7 +945,6 @@ export class OrdersService {
               buyerName,
               buyerEmail,
               buyerPhone: dto.buyer?.phone ?? customer?.phone ?? null,
-              buyerDni: dto.buyer?.dni ?? customer?.dni ?? null,
               carrier: dto.carrier ?? null,
               carrierDeliveryMode: dto.carrierDeliveryMode ?? null,
               shippingCost: shippingCost != null ? new Prisma.Decimal(shippingCost.toFixed(2)) : null,
@@ -1203,7 +1202,7 @@ export class OrdersService {
   // cliente borrado conserva su email), el pedido sale sin cliente, como antes.
   private async altaClienteDelComprador(
     businessId: string,
-    buyer: { name: string; email?: string; phone?: string; dni?: string },
+    buyer: { name: string; email?: string; phone?: string },
   ) {
     const email = buyer.email?.trim().toLowerCase();
     if (!email || !buyer.name.trim()) return null;
@@ -1219,7 +1218,6 @@ export class OrdersService {
           lastName,
           email,
           phone: buyer.phone?.trim() || null,
-          dni: buyer.dni?.trim() || null,
         },
       });
       this.eventEmitter.emit('notification.cliente_nuevo', {
