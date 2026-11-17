@@ -16,15 +16,16 @@ errores que ya resolvimos. Sirve para seguir la serie de TikTok, los videos del 
 | Tutorial «Cómo crear tu espacio» | 16:9, 2:22 | YouTube `VLpCXDsma94` · botón «Ver tutorial» del alta | Alta de nuevos clientes |
 | «WhatsApp en tu panel» | 16:9, 1:01 | R2 `demo/videos/` (demo) y `tutoriales/` (panel) | Demo pública + «Ver tutorial» de Mensajes |
 | «Difusión: tu Instagram desde Órbita» | 16:9, 1:08 | R2 `demo/videos/` (demo) y `tutoriales/` (panel) | Demo pública + «Ver tutorial» de Difusión |
+| «Un día con Órbita» | 16:9, 4:26 | `docs/marketing/un-dia-con-orbita-16x9.mp4` (sin git) · Escritorio → *Videos TikToks* (+ `.txt` con capítulos) | Para quien pregunta «¿qué hace Órbita?» y candidato para el home |
 
 Guiones: `docs/marketing/tiktok-serie/GUIONES.md` (serie de 10) y `GUIONES-DEMO-WHATSAPP-DIFUSION.md`.
 Proyectos de trabajo (local, no en git): `~/orbita-videos/` → `crear-tu-espacio`, `tiktok-serie/v01…`, `demo-whatsapp`,
 `demo-difusion`, `motion/orbita-reel-v2`, `motion/orbita-explica-v4`.
 
-**Próximo:** «Un pedido, de punta a punta» (16:9, ~2:30): una misma venta vista de los dos lados a la vez, pantalla partida
-(celular del cliente | panel del dueño), en capítulos: la tienda → el pedido en el panel → vender más (Orbi, Difusión,
-promos) → manejar el negocio → cierre. Con link para compartir (R2) y candidato para el home. Después: videos en el home
-de orbita.site para reemplazar parte del texto.
+**Próximo:** videos en el home de orbita.site para reemplazar parte del texto (versión web liviana de «Un día con Órbita» y
+cortes 9:16 por capítulo: «Cómo te pagan» y «Descuentos y cupones» dan para un TikTok cada uno). Proyecto de trabajo de
+«Un día con Órbita»: `~/orbita-videos/un-dia` (compositor de pantalla partida `compose/dia.html` + `herramientas/lib/dia.mjs`,
+estado en `PROGRESO.md`).
 
 ---
 
@@ -103,5 +104,10 @@ de orbita.site para reemplazar parte del texto.
 - **Difusión en «Cargando…» en local:** era la ref `montado` con el modo estricto de React; arreglado en `main` (aec21280).
 - **Clics que no pegan:** usar el botón exacto (`button.pub-producto`, nombres exactos como «Sugerir con Orbi»), no un texto
   que puede repetirse en la pantalla.
+- **Pantalla partida (celular + panel a la vez):** `dia.html`/`dia.mjs` de `~/orbita-videos/un-dia`: dos pistas, modos
+  panel/dividida/celular con transición, etiquetas, capítulos y subtítulos en banda propia. Tiempos por palabra con
+  scribe_v1 (`stt-dia.mjs`).
+- **Datos de ejemplo en el panel de producción de la demo** sin tocar nada: `ctx.route` reemplaza un pedido real por el
+  del guion y `page.clock.setFixedTime` pone la hora del capítulo (`un-dia/panel.mjs`).
 - **Claves:** la de ElevenLabs va solo por variable de entorno (nunca en archivos ni en el chat; las que se pegaron en el chat
   hay que rotarlas). Las de R2 de producción se leen de Secret Manager a variables de entorno, sin imprimirlas.
