@@ -18,17 +18,20 @@
 
 import { currentSlug } from '@/lib/tenant'
 
-// La demo tiene dos tiendas, cada una su negocio sembrado (ver
+// La demo tiene tres tiendas, cada una su negocio sembrado (ver
 // apps/api/prisma/demo/tienda.ts): Nébula Tech en `demo` —la original, y la
-// única con panel: demo.orbita.site/panel— y Nébula Moda en `demo-moda`, la
-// de ropa, que es la que abre "Probá la demo". Las dos tiendas llevan el
-// selector para pasar de una a otra (SelectorTiendaDemo).
+// única con panel: demo.orbita.site/panel—, Nébula Moda en `demo-moda`, la de
+// ropa, que es la que abre "Probá la demo", y Nébula Regalos en
+// `demo-regalos`, armada con la plantilla Confeti del paquete Avanzado. Todas
+// llevan la franja para pasar de una a otra (modules/demo/BarraDemo.tsx).
 export const DEMO_SLUG = process.env.NEXT_PUBLIC_DEMO_SLUG ?? 'demo'
 export const DEMO_SLUG_MODA = process.env.NEXT_PUBLIC_DEMO_SLUG_MODA ?? 'demo-moda'
+export const DEMO_SLUG_REGALOS = process.env.NEXT_PUBLIC_DEMO_SLUG_REGALOS ?? 'demo-regalos'
 
 export const TIENDAS_DEMO = [
   { slug: DEMO_SLUG_MODA, rubro: 'Ropa y accesorios', corto: 'Ropa' },
   { slug: DEMO_SLUG, rubro: 'Tecnología', corto: 'Tecnología' },
+  { slug: DEMO_SLUG_REGALOS, rubro: 'Regalería', corto: 'Regalos' },
 ] as const
 
 /** La tienda con la que arranca la demo ("Probá la demo" → Tienda). */

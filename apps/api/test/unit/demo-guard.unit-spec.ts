@@ -138,10 +138,11 @@ describe('AuthService.demoSession', () => {
     const config = { getOrThrow: () => 'x'.repeat(32), get: () => undefined };
     const svc = new AuthService(prisma as never, {} as never, config as never);
     await svc.demoSession('customer', 'demo-moda');
+    await svc.demoSession('customer', 'demo-regalos');
     await svc.demoSession('customer', 'tienda-real');
     await svc.demoSession('customer');
     const subdominios = customer.mock.calls.map(([q]) => q.where.business.subdomain);
-    expect(subdominios).toEqual(['demo-moda', 'demo', 'demo']);
+    expect(subdominios).toEqual(['demo-moda', 'demo-regalos', 'demo', 'demo']);
   });
 
   it('sin negocio demo sembrado responde 404', async () => {

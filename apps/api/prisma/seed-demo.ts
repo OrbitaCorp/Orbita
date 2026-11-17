@@ -14,10 +14,12 @@
 //   DEMO_OWNER_PASSWORD='...' pnpm seed:demo            (negocio + contenido)
 //   pnpm seed:demo -- --solo-base                       (solo el negocio)
 //   pnpm seed:demo -- --tienda moda                     (Nébula Moda en vez de Nébula Tech)
+//   pnpm seed:demo -- --tienda regalos                  (Nébula Regalos, con la plantilla Confeti)
 //
-// Hay dos tiendas (ver demo/tienda.ts): Nébula Tech (`demo`, la de siempre y
-// la del panel de la demo) y Nébula Moda (`demo-moda`, ropa y accesorios, la
-// que abre "Probá la demo"). Cada una es su propio negocio, con su dueño.
+// Hay tres tiendas (ver demo/tienda.ts): Nébula Tech (`demo`, la de siempre y
+// la del panel de la demo), Nébula Moda (`demo-moda`, ropa y accesorios, la
+// que abre "Probá la demo") y Nébula Regalos (`demo-regalos`, regalería, con
+// la plantilla Confeti). Cada una es su propio negocio, con su dueño.
 // Solo Nébula Tech tiene el miembro visitante: el panel de la demo es el suyo.
 //
 // DEMO_OWNER_PASSWORD es la contraseña del dueño de la demo: la cuenta con la
@@ -36,6 +38,8 @@ import { sembrarAvanzado, MODAL_TECH } from './demo/avanzado';
 import { NEBULA_TECH } from './demo/tienda';
 import { NEBULA_MODA } from './demo/moda/tienda';
 import { MODAL_MODA, sembrarAparienciaModa } from './demo/moda/apariencia';
+import { NEBULA_REGALOS } from './demo/regalos/tienda';
+import { MODAL_REGALOS, sembrarAparienciaRegalos } from './demo/regalos/apariencia';
 
 const prisma = new PrismaClient();
 
@@ -52,6 +56,11 @@ const TIENDAS = {
     slug: 'demo-moda', nombre: 'Nébula Moda', industria: 'Indumentaria', subrubros: ['ropa', 'calzado', 'accesorios'],
     equipo: 'Equipo Nébula Moda', contenido: NEBULA_MODA, apariencia: sembrarAparienciaModa, modal: MODAL_MODA, conVisitante: false,
     emailDueno: 'dueno@demo-moda.invalid',
+  },
+  regalos: {
+    slug: 'demo-regalos', nombre: 'Nébula Regalos', industria: 'Regalería', subrubros: ['regaleria', 'deco', 'papeleria'],
+    equipo: 'Equipo Nébula Regalos', contenido: NEBULA_REGALOS, apariencia: sembrarAparienciaRegalos, modal: MODAL_REGALOS, conVisitante: false,
+    emailDueno: 'dueno@demo-regalos.invalid',
   },
 };
 const argTienda = process.argv[process.argv.indexOf('--tienda') + 1];
