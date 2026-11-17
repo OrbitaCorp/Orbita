@@ -6,7 +6,7 @@ import { decidirPrimerosPasos, pasoInicial } from '../primerosPasos'
 import { ESTADO_AYUDA_VACIO, parsear } from '../almacen'
 import { puedeUsarModoPrueba, comandoDeQuery, cumplidasSimuladas, siguientePasoDePrueba } from '../acceso'
 import { INTERVALO_MS, SUGERENCIAS, claveDeSugerencia, elegirSugerencia } from '../sugerencias'
-import { agruparPorPantalla } from '../videos'
+import { VIDEOS_PROPIOS, agruparPorPantalla, sumarPropios } from '../videos'
 
 describe('recorrido por módulo', () => {
     it('las claves son secciones del panel o una vista de Configuración', () => {
@@ -236,5 +236,22 @@ describe('videos tutoriales', () => {
         expect(m.get('pedidos')).toEqual([{ titulo: 'Cargar una venta a mano', id: 'aaaaaaaaaaa' }, { titulo: 'Pedidos en lote', id: 'bbbbbbbbbbb' }])
         expect(m.get('pedidos/nuevo')).toEqual([{ titulo: 'Cargar una venta a mano', id: 'aaaaaaaaaaa' }])
         expect(m.get('clientes')).toBeUndefined()
+    })
+
+    it('los propios (R2) van después de los de la lista, sin repetirse, y aparecen aunque la lista no traiga nada', () => {
+        const propio = { titulo: 'WhatsApp en tu panel', id: 'r2:whatsapp', src: 'https://r2/w.mp4' }
+        const lista = agruparPorPantalla([{ titulo: 'Responder mensajes', youtubeId: 'ccccccccccc', pantallas: ['mensajes'] }])
+        const m = sumarPropios(lista, { mensajes: [propio], difusion: [{ ...propio, id: 'r2:difusion' }] })
+        expect(m.get('mensajes')?.map(v => v.id)).toEqual(['ccccccccccc', 'r2:whatsapp'])
+        expect(m.get('difusion')?.map(v => v.id)).toEqual(['r2:difusion'])
+        expect(sumarPropios(m, { mensajes: [propio] }).get('mensajes')?.length).toBe(2)
+    })
+
+    it('Mensajes y Difusión tienen su video propio, y su clave tiene recorrido (si no, «Ver tutorial» no abre)', () => {
+        for (const clave of Object.keys(VIDEOS_PROPIOS)) {
+            expect(recorridoDe(clave)).not.toBeNull()
+            for (const v of VIDEOS_PROPIOS[clave]) expect(v.src).toMatch(/^https:\/\/.+\.mp4$/)
+        }
+        expect(Object.keys(VIDEOS_PROPIOS).sort()).toEqual(['difusion', 'mensajes'])
     })
 })

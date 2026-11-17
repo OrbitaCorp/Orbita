@@ -63,13 +63,18 @@ export default function EleccionTutorial({ clave, hayRecorrido, onRecorrido, onC
                 <div className="ayv-cab">{volverBtn}</div>
                 <h2 className="ayu-h2 ayv-h2">{video.titulo}</h2>
                 <div className="ayv-marco">
-                    <iframe
-                        src={`https://www.youtube-nocookie.com/embed/${video.id}?autoplay=1&rel=0&modestbranding=1&playsinline=1`}
-                        title={video.titulo}
-                        allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-                        allowFullScreen
-                        referrerPolicy="strict-origin-when-cross-origin"
-                    />
+                    {/* Los propios (R2) se reproducen con <video>; los de la lista de Marketing, con YouTube. */}
+                    {video.src ? (
+                        <video src={video.src} poster={video.portada} controls autoPlay playsInline preload="auto" title={video.titulo} />
+                    ) : (
+                        <iframe
+                            src={`https://www.youtube-nocookie.com/embed/${video.id}?autoplay=1&rel=0&modestbranding=1&playsinline=1`}
+                            title={video.titulo}
+                            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                            allowFullScreen
+                            referrerPolicy="strict-origin-when-cross-origin"
+                        />
+                    )}
                 </div>
                 {hayRecorrido && (
                     <p className="ayv-pie">
@@ -173,7 +178,7 @@ const CSS_ELECCION = `
     position: relative; width: 100%; aspect-ratio: 16 / 9; margin-top: 12px;
     border-radius: 12px; overflow: hidden; background: #000;
 }
-.ayv-marco iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.ayv-marco iframe, .ayv-marco video { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #000; }
 .ayv-pie { margin: 12px 0 0; font-size: 13.5px; color: var(--color-muted); }
 .ayv-pie .ayu-link { font-size: 13.5px; min-height: 0; }
 @media (prefers-reduced-motion: reduce) { .ayv-opcion, .ayv-volver { transition: none; } }
