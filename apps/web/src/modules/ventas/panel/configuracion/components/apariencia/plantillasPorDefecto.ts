@@ -39,7 +39,7 @@
 import type { MarcaModo } from '@/components/storefront/marca'
 import type {
     Apariencia, BgPattern, BgPatternScope, CategoryLayout, EscalaFuente, HeroSlide, ImageOverlay, ImagePosition,
-    LayoutGrid, LayoutHeader, ModoColor, VideoLayout, WhatsappLayout,
+    LayoutGrid, LayoutHeader, ModoColor, TextoHorizontal, TextoVertical, VideoLayout, WhatsappLayout,
 } from '../../mock/apariencia.mock'
 
 type Fondo = 'blanco' | 'gris' | 'tinte'
@@ -58,6 +58,11 @@ export interface HeroDePlantilla {
     alcance: BgPatternScope
     // Color del slide con imagen centrada. Oscuro: el texto va en blanco.
     fondo: string
+    // Dónde va el texto con la foto a imagen completa (también en los slides
+    // de una plantilla centrada que tienen una foto común). Junto con el velo
+    // es lo que hace que dos plantillas con la misma foto se vean distintas.
+    textoH: TextoHorizontal
+    textoV: TextoVertical
 }
 
 export interface PlantillaPorDefecto {
@@ -87,10 +92,12 @@ export interface PlantillaPorDefecto {
 }
 
 // Atajos para no repetir los campos que no usa cada formato.
-const completa = (posicion: ImagePosition, velo: ImageOverlay): HeroDePlantilla =>
-    ({ formato: 'completa', posicion, velo, patron: 'none', alcance: 'image', fondo: '' })
-const centrada = (posicion: ImagePosition, patron: BgPattern, alcance: BgPatternScope, fondo: string, velo: ImageOverlay = 'tint'): HeroDePlantilla =>
-    ({ formato: 'centrada', posicion, velo, patron, alcance, fondo })
+// `texto` es [horizontal, vertical] del texto sobre la foto a imagen completa.
+type Texto = [TextoHorizontal, TextoVertical]
+const completa = (velo: ImageOverlay, [textoH, textoV]: Texto): HeroDePlantilla =>
+    ({ formato: 'completa', posicion: 'right', velo, patron: 'none', alcance: 'image', fondo: '', textoH, textoV })
+const centrada = (posicion: ImagePosition, patron: BgPattern, alcance: BgPatternScope, fondo: string, velo: ImageOverlay, [textoH, textoV]: Texto): HeroDePlantilla =>
+    ({ formato: 'centrada', posicion, velo, patron, alcance, fondo, textoH, textoV })
 
 export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
     {
@@ -100,7 +107,7 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#3B82F6', colorSecundario: '#0F172A', colorAccent: '#8B5CF6', fondo: 'gris', modoColor: 'claro',
         fuenteHeading: 'Geist', fuenteBody: 'Geist', escalaFuente: 'md',
         layoutHeader: 'full', marca: { ambos: 'lado', logo: 'normal', nombre: 'negrita' },
-        hero: completa('right', 'tint'),
+        hero: completa('tint', ['left', 'center']),
         layoutGrid: '4col', estiloCategorias: 'pills', bannerDesplazable: false, estiloWhatsapp: 'clasico', videoLayout: 'cine',
     },
     {
@@ -108,7 +115,7 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#1C1917', colorSecundario: '#1C1917', colorAccent: '#B45309', fondo: 'blanco', modoColor: 'claro',
         fuenteHeading: 'Playfair Display', fuenteBody: 'Lato', escalaFuente: 'md',
         layoutHeader: 'centered', marca: { ambos: 'espaciado', logo: 'normal', nombre: 'espaciado' },
-        hero: completa('left', 'bottom'),
+        hero: completa('bottom', ['center', 'bottom']),
         layoutGrid: '3col', estiloCategorias: 'circulos', bannerDesplazable: false, estiloWhatsapp: 'minimal', videoLayout: 'alternado',
     },
     {
@@ -116,7 +123,7 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#E11D48', colorSecundario: '#0A0A0A', colorAccent: '#FACC15', fondo: 'blanco', modoColor: 'oscuro',
         fuenteHeading: 'Montserrat', fuenteBody: 'Inter', escalaFuente: 'md',
         layoutHeader: 'full', marca: { ambos: 'espaciado', logo: 'normal', nombre: 'mayusculas' },
-        hero: centrada('right', 'stripes', 'full', '#18181B', 'diagonal'),
+        hero: centrada('right', 'stripes', 'full', '#18181B', 'diagonal', ['left', 'bottom']),
         layoutGrid: '4col', estiloCategorias: 'chips', bannerDesplazable: true, estiloWhatsapp: 'franja', videoLayout: 'reels',
     },
     {
@@ -124,7 +131,7 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#1E293B', colorSecundario: '#0F172A', colorAccent: '#B45309', fondo: 'blanco', modoColor: 'claro',
         fuenteHeading: 'Playfair Display', fuenteBody: 'Inter', escalaFuente: 'md',
         layoutHeader: 'minimal', marca: { ambos: 'espaciado', logo: 'normal', nombre: 'espaciado' },
-        hero: completa('right', 'diagonal'),
+        hero: completa('diagonal', ['right', 'center']),
         layoutGrid: '3col', estiloCategorias: 'indice', bannerDesplazable: false, estiloWhatsapp: 'minimal', videoLayout: 'cine',
     },
     {
@@ -132,7 +139,7 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#BE185D', colorSecundario: '#500724', colorAccent: '#D4A373', fondo: 'tinte', modoColor: 'claro',
         fuenteHeading: 'Cormorant Garamond', fuenteBody: 'Poppins', escalaFuente: 'md',
         layoutHeader: 'centered', marca: { ambos: 'apilado', logo: 'redondo', nombre: 'italica' },
-        hero: centrada('right', 'halo', 'image', '#831843', 'blanco'),
+        hero: centrada('right', 'halo', 'image', '#831843', 'blanco', ['right', 'center']),
         layoutGrid: '3col', estiloCategorias: 'circulos', bannerDesplazable: false, estiloWhatsapp: 'minimal', videoLayout: 'reels',
     },
     {
@@ -140,7 +147,7 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#78350F', colorSecundario: '#1C1917', colorAccent: '#D4AF37', fondo: 'blanco', modoColor: 'claro',
         fuenteHeading: 'Cormorant Garamond', fuenteBody: 'Lato', escalaFuente: 'md',
         layoutHeader: 'centered', marca: { ambos: 'espaciado', logo: 'redondo', nombre: 'espaciado' },
-        hero: centrada('center', 'halo', 'full', '#1C1917', 'radial'),
+        hero: centrada('center', 'halo', 'full', '#1C1917', 'radial', ['center', 'center']),
         layoutGrid: '3col', estiloCategorias: 'circulos', bannerDesplazable: false, estiloWhatsapp: 'minimal', videoLayout: 'cine',
     },
     {
@@ -148,7 +155,7 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#4D7C0F', colorSecundario: '#1A2E05', colorAccent: '#CA8A04', fondo: 'tinte', modoColor: 'claro',
         fuenteHeading: 'Cormorant Garamond', fuenteBody: 'Lato', escalaFuente: 'md',
         layoutHeader: 'standard', marca: { ambos: 'redondo', logo: 'redondo', nombre: 'italica' },
-        hero: centrada('left', 'waves', 'full', '#1A2E05', 'radial'),
+        hero: centrada('left', 'waves', 'full', '#1A2E05', 'radial', ['left', 'top']),
         layoutGrid: '3col', estiloCategorias: 'circulos', bannerDesplazable: false, estiloWhatsapp: 'bento', videoLayout: 'alternado',
     },
     {
@@ -156,7 +163,7 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#BE123C', colorSecundario: '#4C0519', colorAccent: '#65A30D', fondo: 'tinte', modoColor: 'claro',
         fuenteHeading: 'Playfair Display', fuenteBody: 'Lato', escalaFuente: 'md',
         layoutHeader: 'centered', marca: { ambos: 'apilado', logo: 'redondo', nombre: 'italica' },
-        hero: centrada('center', 'bubbles', 'full', '#881337', 'blanco'),
+        hero: centrada('center', 'bubbles', 'full', '#881337', 'blanco', ['center', 'bottom']),
         layoutGrid: '3col', estiloCategorias: 'circulos', bannerDesplazable: false, estiloWhatsapp: 'minimal', videoLayout: 'reels',
     },
     {
@@ -164,7 +171,7 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#92400E', colorSecundario: '#292524', colorAccent: '#65A30D', fondo: 'tinte', modoColor: 'claro',
         fuenteHeading: 'Playfair Display', fuenteBody: 'Poppins', escalaFuente: 'md',
         layoutHeader: 'standard', marca: { ambos: 'redondo', logo: 'redondo', nombre: 'italica' },
-        hero: completa('center', 'tint'),
+        hero: completa('tint', ['center', 'center']),
         layoutGrid: '3col', estiloCategorias: 'indice', bannerDesplazable: false, estiloWhatsapp: 'bento', videoLayout: 'alternado',
     },
     {
@@ -172,7 +179,7 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#B91C1C', colorSecundario: '#451A03', colorAccent: '#CA8A04', fondo: 'tinte', modoColor: 'claro',
         fuenteHeading: 'Playfair Display', fuenteBody: 'Lato', escalaFuente: 'md',
         layoutHeader: 'standard', marca: { ambos: 'lado', logo: 'normal', nombre: 'italica' },
-        hero: centrada('right', 'dots', 'image', '#7F1D1D', 'diagonal'),
+        hero: centrada('right', 'dots', 'image', '#7F1D1D', 'diagonal', ['left', 'bottom']),
         layoutGrid: '4col', estiloCategorias: 'chips', bannerDesplazable: true, estiloWhatsapp: 'bento', videoLayout: 'alternado',
     },
     {
@@ -180,7 +187,7 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#9A3412', colorSecundario: '#431407', colorAccent: '#0F766E', fondo: 'tinte', modoColor: 'claro',
         fuenteHeading: 'Cormorant Garamond', fuenteBody: 'Poppins', escalaFuente: 'md',
         layoutHeader: 'standard', marca: { ambos: 'redondo', logo: 'redondo', nombre: 'italica' },
-        hero: completa('left', 'radial'),
+        hero: completa('radial', ['left', 'bottom']),
         layoutGrid: '3col', estiloCategorias: 'indice', bannerDesplazable: false, estiloWhatsapp: 'bento', videoLayout: 'alternado',
     },
     {
@@ -188,7 +195,7 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#DB2777', colorSecundario: '#1E1B4B', colorAccent: '#F59E0B', fondo: 'blanco', modoColor: 'claro',
         fuenteHeading: 'Poppins', fuenteBody: 'Poppins', escalaFuente: 'md',
         layoutHeader: 'full', marca: { ambos: 'redondo', logo: 'redondo', nombre: 'mayusculas' },
-        hero: centrada('right', 'confetti', 'full', '#1E1B4B', 'marca'),
+        hero: centrada('right', 'confetti', 'full', '#1E1B4B', 'marca', ['left', 'center']),
         layoutGrid: '4col', estiloCategorias: 'pills', bannerDesplazable: true, estiloWhatsapp: 'clasico', videoLayout: 'reels',
     },
     {
@@ -196,7 +203,7 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#7C3AED', colorSecundario: '#3B0764', colorAccent: '#F9A8D4', fondo: 'tinte', modoColor: 'claro',
         fuenteHeading: 'Poppins', fuenteBody: 'Poppins', escalaFuente: 'md',
         layoutHeader: 'centered', marca: { ambos: 'redondo', logo: 'redondo', nombre: 'italica' },
-        hero: centrada('center', 'bubbles', 'full', '#5B21B6', 'blanco'),
+        hero: centrada('center', 'bubbles', 'full', '#5B21B6', 'blanco', ['center', 'top']),
         layoutGrid: '4col', estiloCategorias: 'circulos', bannerDesplazable: false, estiloWhatsapp: 'clasico', videoLayout: 'reels',
     },
     {
@@ -204,7 +211,7 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#0D9488', colorSecundario: '#134E4A', colorAccent: '#F59E0B', fondo: 'tinte', modoColor: 'claro',
         fuenteHeading: 'Poppins', fuenteBody: 'Poppins', escalaFuente: 'md',
         layoutHeader: 'full', marca: { ambos: 'redondo', logo: 'redondo', nombre: 'negrita' },
-        hero: centrada('left', 'plus', 'full', '#115E59'),
+        hero: centrada('left', 'plus', 'full', '#115E59', 'tint', ['right', 'center']),
         layoutGrid: '4col', estiloCategorias: 'circulos', bannerDesplazable: true, estiloWhatsapp: 'clasico', videoLayout: 'reels',
     },
     {
@@ -212,7 +219,7 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#EA580C', colorSecundario: '#0C0A09', colorAccent: '#FACC15', fondo: 'blanco', modoColor: 'claro',
         fuenteHeading: 'Montserrat', fuenteBody: 'Inter', escalaFuente: 'lg',
         layoutHeader: 'full', marca: { ambos: 'lado', logo: 'grande', nombre: 'mayusculas' },
-        hero: completa('left', 'diagonal'),
+        hero: completa('diagonal', ['left', 'bottom']),
         layoutGrid: '4col', estiloCategorias: 'circulos', bannerDesplazable: true, estiloWhatsapp: 'franja', videoLayout: 'reels',
     },
     {
@@ -220,7 +227,7 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#0E7490', colorSecundario: '#083344', colorAccent: '#F97316', fondo: 'tinte', modoColor: 'claro',
         fuenteHeading: 'Montserrat', fuenteBody: 'Lato', escalaFuente: 'md',
         layoutHeader: 'full', marca: { ambos: 'lado', logo: 'normal', nombre: 'negrita' },
-        hero: completa('center', 'bottom'),
+        hero: completa('bottom', ['center', 'bottom']),
         layoutGrid: '4col', estiloCategorias: 'circulos', bannerDesplazable: true, estiloWhatsapp: 'franja', videoLayout: 'alternado',
     },
     {
@@ -228,7 +235,7 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#0284C7', colorSecundario: '#0C4A6E', colorAccent: '#10B981', fondo: 'blanco', modoColor: 'claro',
         fuenteHeading: 'Inter', fuenteBody: 'Lato', escalaFuente: 'md',
         layoutHeader: 'standard', marca: { ambos: 'lado', logo: 'normal', nombre: 'negrita' },
-        hero: centrada('right', 'rings', 'image', '#0C4A6E', 'bottom'),
+        hero: centrada('right', 'rings', 'image', '#0C4A6E', 'bottom', ['left', 'bottom']),
         layoutGrid: '4col', estiloCategorias: 'chips', bannerDesplazable: true, estiloWhatsapp: 'bento', videoLayout: 'lista',
     },
     {
@@ -236,7 +243,7 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#4F46E5', colorSecundario: '#1E1B4B', colorAccent: '#F97316', fondo: 'gris', modoColor: 'claro',
         fuenteHeading: 'Poppins', fuenteBody: 'Inter', escalaFuente: 'md',
         layoutHeader: 'full', marca: { ambos: 'lado', logo: 'normal', nombre: 'negrita' },
-        hero: centrada('right', 'grid', 'full', '#312E81'),
+        hero: centrada('right', 'grid', 'full', '#312E81', 'tint', ['right', 'center']),
         layoutGrid: '4col', estiloCategorias: 'pills', bannerDesplazable: true, estiloWhatsapp: 'clasico', videoLayout: 'lista',
     },
     {
@@ -244,7 +251,7 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#1E3A8A', colorSecundario: '#0F172A', colorAccent: '#F59E0B', fondo: 'gris', modoColor: 'claro',
         fuenteHeading: 'Montserrat', fuenteBody: 'Inter', escalaFuente: 'md',
         layoutHeader: 'standard', marca: { ambos: 'lado', logo: 'grande', nombre: 'mayusculas' },
-        hero: centrada('right', 'diagonal', 'full', '#1E3A8A', 'diagonal'),
+        hero: centrada('right', 'diagonal', 'full', '#1E3A8A', 'diagonal', ['left', 'center']),
         // En lista: un catálogo largo se recorre mejor de a filas.
         layoutGrid: 'list', estiloCategorias: 'chips', bannerDesplazable: true, estiloWhatsapp: 'bento', videoLayout: 'lista',
     },
@@ -253,7 +260,7 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#44403C', colorSecundario: '#1C1917', colorAccent: '#A16207', fondo: 'blanco', modoColor: 'claro',
         fuenteHeading: 'Cormorant Garamond', fuenteBody: 'Inter', escalaFuente: 'md',
         layoutHeader: 'minimal', marca: { ambos: 'espaciado', logo: 'grande', nombre: 'espaciado' },
-        hero: centrada('left', 'arc', 'image', '#292524', 'none'),
+        hero: centrada('left', 'arc', 'image', '#292524', 'bottom', ['right', 'bottom']),
         layoutGrid: '3col', estiloCategorias: 'indice', bannerDesplazable: false, estiloWhatsapp: 'minimal', videoLayout: 'cine',
     },
     {
@@ -261,7 +268,7 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#0F172A', colorSecundario: '#0F172A', colorAccent: '#64748B', fondo: 'blanco', modoColor: 'claro',
         fuenteHeading: 'Inter', fuenteBody: 'Inter', escalaFuente: 'sm',
         layoutHeader: 'minimal', marca: { ambos: 'espaciado', logo: 'normal', nombre: 'espaciado' },
-        hero: completa('left', 'none'),
+        hero: completa('top', ['left', 'top']),
         layoutGrid: '3col', estiloCategorias: 'indice', bannerDesplazable: false, estiloWhatsapp: 'minimal', videoLayout: 'cine',
     },
     {
@@ -269,7 +276,7 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#0891B2', colorSecundario: '#0F172A', colorAccent: '#84CC16', fondo: 'gris', modoColor: 'oscuro',
         fuenteHeading: 'Montserrat', fuenteBody: 'Inter', escalaFuente: 'md',
         layoutHeader: 'minimal', marca: { ambos: 'lado', logo: 'normal', nombre: 'mayusculas' },
-        hero: centrada('right', 'orbit', 'full', '#0F172A', 'bottom'),
+        hero: centrada('right', 'orbit', 'full', '#0F172A', 'bottom', ['center', 'bottom']),
         layoutGrid: '4col', estiloCategorias: 'chips', bannerDesplazable: true, estiloWhatsapp: 'franja', videoLayout: 'lista',
     },
     {
@@ -277,7 +284,7 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#A21CAF', colorSecundario: '#0A0A0A', colorAccent: '#22D3EE', fondo: 'gris', modoColor: 'oscuro',
         fuenteHeading: 'Montserrat', fuenteBody: 'Inter', escalaFuente: 'md',
         layoutHeader: 'full', marca: { ambos: 'lado', logo: 'normal', nombre: 'mayusculas' },
-        hero: centrada('right', 'sparkle', 'full', '#0A0A0A', 'diagonal'),
+        hero: centrada('right', 'sparkle', 'full', '#0A0A0A', 'diagonal', ['right', 'center']),
         layoutGrid: '4col', estiloCategorias: 'chips', bannerDesplazable: true, estiloWhatsapp: 'franja', videoLayout: 'reels',
     },
     {
@@ -285,7 +292,7 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#B8913A', colorSecundario: '#1C1917', colorAccent: '#E7E5E4', fondo: 'blanco', modoColor: 'oscuro',
         fuenteHeading: 'Cormorant Garamond', fuenteBody: 'Lato', escalaFuente: 'md',
         layoutHeader: 'centered', marca: { ambos: 'espaciado', logo: 'redondo', nombre: 'espaciado' },
-        hero: completa('center', 'radial'),
+        hero: completa('radial', ['center', 'center']),
         layoutGrid: '3col', estiloCategorias: 'indice', bannerDesplazable: false, estiloWhatsapp: 'minimal', videoLayout: 'cine',
     },
 ]
@@ -308,9 +315,9 @@ export function admiteCentrada(s: HeroSlide, transparentes: ReadonlySet<string>)
 // botón quedan como estaban.
 function slideCon(s: HeroSlide, h: HeroDePlantilla, transparentes: ReadonlySet<string>): HeroSlide {
     if (h.formato === 'centrada' && admiteCentrada(s, transparentes)) {
-        return { ...s, imageStyle: 'centered', imagePosition: h.posicion, imageOverlay: h.velo, bgPattern: h.patron, bgPatternScope: h.alcance, bgColor: h.fondo }
+        return { ...s, imageStyle: 'centered', imagePosition: h.posicion, imageOverlay: h.velo, bgPattern: h.patron, bgPatternScope: h.alcance, bgColor: h.fondo, textAlign: h.textoH, textVertical: h.textoV }
     }
-    return { ...s, imageStyle: 'full', imagePosition: h.posicion, imageOverlay: h.velo, bgPattern: 'none', bgPatternScope: 'image', bgColor: '' }
+    return { ...s, imageStyle: 'full', imagePosition: h.posicion, imageOverlay: h.velo, bgPattern: 'none', bgPatternScope: 'image', bgColor: '', textAlign: h.textoH, textVertical: h.textoV }
 }
 
 // Los campos sueltos que escribe la plantilla (todo menos marca y slides, que
@@ -349,7 +356,7 @@ export function aplicarPlantilla(ap: Apariencia, p: PlantillaPorDefecto, transpa
     }
 }
 
-const CAMPOS_DE_SLIDE = ['imageStyle', 'imagePosition', 'imageOverlay', 'bgPattern', 'bgPatternScope', 'bgColor'] as const
+const CAMPOS_DE_SLIDE = ['imageStyle', 'imagePosition', 'imageOverlay', 'bgPattern', 'bgPatternScope', 'bgColor', 'textAlign', 'textVertical'] as const
 
 // La plantilla por defecto que coincide en todo con lo que hay en el
 // formulario, si alguna coincide (para marcarla "En uso"). Los colores se

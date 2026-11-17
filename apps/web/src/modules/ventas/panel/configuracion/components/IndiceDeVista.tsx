@@ -95,6 +95,32 @@ export function IndiceDeVista({ vista }: { vista: VistaConfig }) {
         }
     }, [indice])
 
+    // Solo se listan las secciones que la pantalla dibuja de verdad. Con una
+    // plantilla de Home activa, Apariencia no muestra la apariencia clásica
+    // (paleta, tipografía, diseño…) sino el editor de la plantilla, y el
+    // índice seguía ofreciendo esas secciones: tocarlas no hacía nada
+    // (reportado con captura, 17/11). Se mira el DOM porque es lo que de
+    // verdad hay en pantalla, y se vuelve a mirar cuando cambia (la pantalla
+    // carga después, o se activa o desactiva una plantilla).
+    const [presentes, setPresentes] = useState<Set<string> | null>(null)
+    // La pantalla avisa con este atributo que no tiene secciones para el
+    // índice (ver AparienciaBloqueada): ahí la columna no se dibuja. Sin él,
+    // mientras carga, queda solo el título para no correr el contenido.
+    const [sinIndice, setSinIndice] = useState(false)
+    useEffect(() => {
+        if (!indice) return
+        const main = document.querySelector('.admin-main') ?? document.body
+        const medir = () => {
+            const ids = new Set(indice.secciones.filter(sec => document.getElementById(sec.id)).map(sec => sec.id))
+            setPresentes(prev => (prev && prev.size === ids.size && [...ids].every(id => prev.has(id)) ? prev : ids))
+            setSinIndice(!!document.querySelector('[data-sin-indice]'))
+        }
+        medir()
+        const obs = new MutationObserver(medir)
+        obs.observe(main, { childList: true, subtree: true })
+        return () => obs.disconnect()
+    }, [indice])
+
     // Si el índice es más alto que la pantalla (scrollea solo), mantener visible
     // el ítem activo — se mueve el scroll de la columna a mano, sin scrollIntoView,
     // que también arrastraría el scroll del panel.
@@ -107,7 +133,8 @@ export function IndiceDeVista({ vista }: { vista: VistaConfig }) {
         else if (b.bottom > n.bottom - 8) nav.scrollTop += b.bottom - n.bottom + 8
     }, [seccionActiva])
 
-    if (!indice) return null
+    if (!indice || sinIndice) return null
+    const secciones = indice.secciones.filter(sec => presentes?.has(sec.id))
 
     return (
         <nav
@@ -136,7 +163,7 @@ export function IndiceDeVista({ vista }: { vista: VistaConfig }) {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {indice.secciones.map(sec => {
+                {secciones.map(sec => {
                     const actual = seccionActiva === sec.id
                     return (
                         <button

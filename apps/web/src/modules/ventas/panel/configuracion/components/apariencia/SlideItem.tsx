@@ -5,6 +5,7 @@ import { ArrowUp, ArrowDown, ChevronDown, Trash2 } from 'lucide-react'
 import {
     BG_PATTERNS, BG_PATTERN_SCOPES, IMAGE_OVERLAYS,
     type HeroSlide, type ImageStyle, type ImagePosition, type ImageOverlay, type BgPattern, type BgPatternScope,
+    type TextoHorizontal, type TextoVertical,
 } from '../../mock/apariencia.mock'
 import { SlideBgColorPicker } from './ColorPickers'
 import { Divider, FieldLabel, Inp } from './Controles'
@@ -144,6 +145,23 @@ export function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMo
                         </div>
                     )}
 
+                    {/* Dónde va el título, la bajada y el botón sobre la foto.
+                        Antes era fijo (izquierda y al medio). Solo con imagen
+                        completa: con la centrada, el texto va del lado opuesto
+                        a la foto. Los velos que oscurecen de un lado
+                        (diagonal, viñeta, color de marca, blanco) siguen al
+                        texto solos (ver HeroCarousel en Inicio.tsx). */}
+                    {!centrada && (
+                        <div style={{ marginBottom: 18 }}>
+                            <FieldLabel help="Dónde van el título, el texto y el botón sobre la foto. Elegí una zona donde la foto no tenga lo importante.">Posición del texto</FieldLabel>
+                            <PosicionTexto
+                                h={slide.textAlign ?? 'left'}
+                                v={slide.textVertical ?? 'center'}
+                                onChange={(textAlign, textVertical) => onChange({ ...slide, textAlign, textVertical })}
+                            />
+                        </div>
+                    )}
+
                     {centrada && (
                         <>
                             <FieldLabel>Posición de la imagen</FieldLabel>
@@ -190,6 +208,50 @@ export function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMo
                     </div>
                 </div>
             )}
+        </div>
+    )
+}
+
+// Las nueve posiciones del texto de un slide, como una grilla de 3×3 que
+// imita el slide: cada casilla es un lugar donde puede ir el bloque de texto.
+const NOMBRE_H: Record<TextoHorizontal, string> = { left: 'izquierda', center: 'centro', right: 'derecha' }
+const NOMBRE_V: Record<TextoVertical, string> = { top: 'arriba', center: 'al medio', bottom: 'abajo' }
+
+function PosicionTexto({ h, v, onChange }: { h: TextoHorizontal; v: TextoVertical; onChange: (h: TextoHorizontal, v: TextoVertical) => void }) {
+    const filas: TextoVertical[] = ['top', 'center', 'bottom']
+    const columnas: TextoHorizontal[] = ['left', 'center', 'right']
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+            <div role="radiogroup" aria-label="Posición del texto" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 44px)', gridTemplateRows: 'repeat(3, 30px)', gap: 4, padding: 6, borderRadius: 10, background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)' }}>
+                {filas.flatMap(fv => columnas.map(fh => {
+                    const a = fh === h && fv === v
+                    return (
+                        <button
+                            key={fh + fv}
+                            type="button"
+                            role="radio"
+                            aria-checked={a}
+                            aria-label={`Texto ${NOMBRE_V[fv]} a la ${NOMBRE_H[fh]}`.replace('a la centro', 'al centro')}
+                            title={`${NOMBRE_V[fv][0].toUpperCase()}${NOMBRE_V[fv].slice(1)}, ${NOMBRE_H[fh]}`}
+                            onClick={() => onChange(fh, fv)}
+                            className="ds-hover"
+                            style={{
+                                display: 'flex', flexDirection: 'column', justifyContent: 'center',
+                                alignItems: fh === 'left' ? 'flex-start' : fh === 'right' ? 'flex-end' : 'center',
+                                gap: 3, padding: '0 7px', borderRadius: 6, cursor: 'pointer',
+                                border: `1.5px solid ${a ? 'var(--color-primary)' : 'transparent'}`,
+                                background: a ? 'var(--color-primary-bg)' : 'var(--color-bg)',
+                            }}
+                        >
+                            <span style={{ width: 22, height: 3, borderRadius: 2, background: a ? 'var(--color-primary)' : 'var(--color-border-strong)' }} />
+                            <span style={{ width: 14, height: 3, borderRadius: 2, background: a ? 'var(--color-primary)' : 'var(--color-border)' }} />
+                        </button>
+                    )
+                }))}
+            </div>
+            <span style={{ fontSize: 12.5, color: 'var(--color-muted)' }}>
+                {`${NOMBRE_V[v][0].toUpperCase()}${NOMBRE_V[v].slice(1)}, ${NOMBRE_H[h]}`}
+            </span>
         </div>
     )
 }

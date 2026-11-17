@@ -215,6 +215,12 @@ function Miniatura({ p }: { p: PlantillaPorDefecto }) {
     const fotoIzq = h.posicion === 'left'
     const apilado = h.posicion === 'center'
 
+    const textoHeroCompleta = (
+        <span style={{ display: 'flex', flexDirection: 'column', alignItems: h.textoH === 'left' ? 'flex-start' : h.textoH === 'right' ? 'flex-end' : 'center', gap: 3 }}>
+            <span style={{ fontFamily: fontStack(p.fuenteHeading), fontSize: 12, fontWeight: 700, lineHeight: 1, color: veloClaro ? p.colorSecundario : '#fff' }}>Aa</span>
+            <span style={{ fontFamily: fontStack(p.fuenteBody), fontSize: 6.5, fontWeight: 600, color: '#fff', background: p.colorPrimario, borderRadius: 3, padding: '2px 5px', boxShadow: veloClaro ? 'none' : '0 0 0 1px rgba(255,255,255,0.35)' }}>Comprar</span>
+        </span>
+    )
     const textoHero = (
         <span style={{ display: 'flex', flexDirection: 'column', alignItems: apilado ? 'center' : 'flex-start', gap: 4 }}>
             <span style={{ fontFamily: fontStack(p.fuenteHeading), fontSize: 13, fontWeight: 700, lineHeight: 1, color: veloClaro ? p.colorSecundario : '#fff' }}>Aa</span>
@@ -250,14 +256,18 @@ function Miniatura({ p }: { p: PlantillaPorDefecto }) {
                     <span style={{ position: 'relative', width: apilado ? 14 : 20, height: apilado ? 10 : 20, borderRadius: '50% 50% 45% 45%', background: `linear-gradient(160deg, ${p.colorAccent}, ${p.colorPrimario})`, boxShadow: '0 2px 4px rgba(0,0,0,0.3)', flexShrink: 0 }} />
                 </span>
             ) : (
+                // A imagen completa: el texto donde lo pone la plantilla, y el
+                // velo oscuro de ese lado (como en la tienda).
                 <span style={{
-                    display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: apilado ? 'center' : fotoIzq ? 'flex-start' : 'flex-start',
-                    flex: 1, borderRadius: 4, padding: '0 7px',
+                    display: 'flex', flexDirection: 'column', padding: '4px 7px',
+                    justifyContent: h.textoV === 'top' ? 'flex-start' : h.textoV === 'bottom' ? 'flex-end' : 'center',
+                    alignItems: h.textoH === 'left' ? 'flex-start' : h.textoH === 'right' ? 'flex-end' : 'center',
+                    flex: 1, borderRadius: 4,
                     background: veloClaro
-                        ? `linear-gradient(90deg, rgba(255,255,255,0.92), ${p.colorAccent}55)`
-                        : `linear-gradient(${h.velo === 'bottom' ? '0deg' : '120deg'}, ${p.colorSecundario}, ${p.colorPrimario})`,
+                        ? `linear-gradient(${h.textoH === 'right' ? 270 : 90}deg, rgba(255,255,255,0.92), ${p.colorAccent}55)`
+                        : `linear-gradient(${h.textoV === 'bottom' ? '0deg' : h.textoV === 'top' ? '180deg' : h.textoH === 'right' ? '270deg' : '90deg'}, ${p.colorSecundario}, ${p.colorPrimario})`,
                 }}>
-                    {textoHero}
+                    {textoHeroCompleta}
                 </span>
             )}
             {/* Grilla de productos */}

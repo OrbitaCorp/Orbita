@@ -40,6 +40,12 @@ export class HeroSlideDto {
   // 'full' = cubre el slide entero parejo. Opcional por retrocompatibilidad
   // con slides guardados antes de que existiera este campo.
   @IsOptional() @IsIn(['image', 'full']) bgPatternScope?: string;
+  // Dónde va el texto del slide con la foto a imagen completa: de costado
+  // (izquierda, centro, derecha) y de alto (arriba, centro, abajo). Opcionales:
+  // un slide guardado antes queda con el texto a la izquierda y al medio, como
+  // siempre.
+  @IsOptional() @IsIn(['left', 'center', 'right']) textAlign?: string;
+  @IsOptional() @IsIn(['top', 'center', 'bottom']) textVertical?: string;
   // '' = degradé del tema. El selector del panel deja guardar un hex a medio
   // escribir ("#12"), por eso {0,6} y no el HEX_COLOR estricto de los colores
   // de marca; lo que importa es que no entre nada que no sea un color.

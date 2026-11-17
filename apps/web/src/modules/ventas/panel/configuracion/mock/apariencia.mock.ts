@@ -33,6 +33,11 @@ export type BgPatternScope = 'image' | 'full'
 // en Inicio.tsx/StorePreview.tsx): sin eso el título blanco de siempre
 // quedaría invisible contra un fondo claro.
 export type ImageOverlay = 'tint' | 'none' | 'diagonal' | 'bottom' | 'top' | 'radial' | 'marca' | 'blanco'
+// Dónde va el texto de un slide con la foto a imagen completa. Antes era fijo
+// (izquierda y al medio); los slides guardados antes caen ahí en el mapper.
+// Con imagen centrada no aplica: el texto va del lado opuesto a la foto.
+export type TextoHorizontal = 'left' | 'center' | 'right'
+export type TextoVertical   = 'top' | 'center' | 'bottom'
 
 export interface HeroSlide {
     id:        string
@@ -58,6 +63,9 @@ export interface HeroSlide {
     // Color de fondo propio del slide en modo 'centered'. '' = usa el
     // degradé del tema (colorPrimario/colorSecundario) como hasta ahora.
     bgColor:       string
+    // Solo con imageStyle 'full' — ver TextoHorizontal/TextoVertical.
+    textAlign:     TextoHorizontal
+    textVertical:  TextoVertical
 }
 
 export const BG_PATTERNS: { id: BgPattern; label: string }[] = [
@@ -346,9 +354,9 @@ export const AP_DEFAULTS: Apariencia = {
     tagline: '',
     logo: null, favicon: null,
     sliders: [
-        { id: 's1', titulo: 'Camperas que\nabrigan con estilo',  subtitulo: 'Hasta 25% off en abrigos seleccionados.',         img: null, cta: 'Ver camperas',  ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', imageOverlay: 'tint', bgPattern: 'none', bgPatternScope: 'image', bgColor: '' },
-        { id: 's2', titulo: 'Recién llegados,\nlistos para vos', subtitulo: 'Las últimas piezas de la temporada.',              img: null, cta: 'Ver novedades', ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', imageOverlay: 'tint', bgPattern: 'none', bgPatternScope: 'image', bgColor: '' },
-        { id: 's3', titulo: 'Ofertas flash',                     subtitulo: 'Precios especiales por tiempo limitado.',          img: null, cta: 'Ver ofertas',   ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', imageOverlay: 'tint', bgPattern: 'none', bgPatternScope: 'image', bgColor: '' },
+        { id: 's1', titulo: 'Camperas que\nabrigan con estilo',  subtitulo: 'Hasta 25% off en abrigos seleccionados.',         img: null, cta: 'Ver camperas',  ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', imageOverlay: 'tint', bgPattern: 'none', bgPatternScope: 'image', bgColor: '', textAlign: 'left', textVertical: 'center' },
+        { id: 's2', titulo: 'Recién llegados,\nlistos para vos', subtitulo: 'Las últimas piezas de la temporada.',              img: null, cta: 'Ver novedades', ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', imageOverlay: 'tint', bgPattern: 'none', bgPatternScope: 'image', bgColor: '', textAlign: 'left', textVertical: 'center' },
+        { id: 's3', titulo: 'Ofertas flash',                     subtitulo: 'Precios especiales por tiempo limitado.',          img: null, cta: 'Ver ofertas',   ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', imageOverlay: 'tint', bgPattern: 'none', bgPatternScope: 'image', bgColor: '', textAlign: 'left', textVertical: 'center' },
     ],
     colorPrimario: '#3B82F6', colorSecundario: '#0F172A', colorAccent: '#8B5CF6', colorFondo: '#F8FAFC', modoColor: 'claro',
     fuenteHeading: 'Geist', fuenteBody: 'Geist', escalaFuente: 'md',

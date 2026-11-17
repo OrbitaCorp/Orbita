@@ -1420,12 +1420,12 @@ function HeroCarousel({ slides, go, vidriera = false, primario = null }: { slide
                     // (Carrusel en piezas.tsx). Las variantes con imagen
                     // centrada/lateral no la piden: no fueron pensadas para
                     // un título tan grande al lado de una foto recortada.
-                    function textoBloque(align: 'left' | 'center', big = false) {
+                    function textoBloque(align: 'left' | 'center' | 'right', big = false) {
                         return (
                             // Textos y CTA más grandes — acompañan al hero más
                             // alto (pedido explícito del dueño, con una tienda
                             // de referencia de hero grande).
-                            <div style={{ ...(align === 'center' ? { textAlign: 'center' } : undefined), ...(big ? { maxWidth: 760 } : undefined) }}>
+                            <div style={{ ...(align !== 'left' ? { textAlign: align } : undefined), ...(big ? { maxWidth: 760 } : undefined) }}>
                                 <h1
                                     className={big ? 'sf-hero-title-vid' : undefined}
                                     style={{
@@ -1438,9 +1438,9 @@ function HeroCarousel({ slides, go, vidriera = false, primario = null }: { slide
                                     }}
                                 >{s.titulo}</h1>
                                 {s.subtitulo && (
-                                    <p style={{ fontSize: big ? 20 : 17, fontWeight: big ? 600 : 400, color: textoOscuro ? 'rgba(15,23,42,0.78)' : 'rgba(255,255,255,0.92)', lineHeight: 1.6, marginTop: big ? 8 : 18, maxWidth: 460, ...(align === 'center' ? { marginLeft: 'auto', marginRight: 'auto' } : {}) }}>{s.subtitulo}</p>
+                                    <p style={{ fontSize: big ? 20 : 17, fontWeight: big ? 600 : 400, color: textoOscuro ? 'rgba(15,23,42,0.78)' : 'rgba(255,255,255,0.92)', lineHeight: 1.6, marginTop: big ? 8 : 18, maxWidth: 460, ...(align === 'center' ? { marginLeft: 'auto', marginRight: 'auto' } : align === 'right' ? { marginLeft: 'auto' } : {}) }}>{s.subtitulo}</p>
                                 )}
-                                <div style={{ display: 'flex', gap: 10, marginTop: big ? 24 : 28, flexWrap: 'wrap', ...(align === 'center' ? { justifyContent: 'center' } : {}) }}>
+                                <div style={{ display: 'flex', gap: 10, marginTop: big ? 24 : 28, flexWrap: 'wrap', ...(align === 'center' ? { justifyContent: 'center' } : align === 'right' ? { justifyContent: 'flex-end' } : {}) }}>
                                     {big ? (
                                         // CTA de texto subrayado, sin botón — tal cual Carrusel
                                         // en panel/avanzado/plantillas/piezas.tsx.
@@ -1504,6 +1504,22 @@ function HeroCarousel({ slides, go, vidriera = false, primario = null }: { slide
                         )
                     }
 
+                    // Dónde va el texto (Apariencia → slide → "Posición del texto").
+                    // Antes era fijo a la izquierda y al medio, que sigue siendo
+                    // lo que cae para un slide guardado antes de que existiera
+                    // el campo. Vidriera no lo usa: su diseño lo fija ella.
+                    const lado: 'left' | 'center' | 'right' = vidriera ? 'left' : (s.textAlign === 'center' || s.textAlign === 'right' ? s.textAlign : 'left')
+                    const alto: 'top' | 'center' | 'bottom' = vidriera ? 'center' : (s.textVertical === 'top' || s.textVertical === 'bottom' ? s.textVertical : 'center')
+                    // Los velos que oscurecen "del lado del texto" (diagonal,
+                    // viñeta, color de marca, blanco) se dan vuelta con el
+                    // texto: si no, el texto a la derecha quedaba sobre la
+                    // parte sin velo de la foto. Con el texto al medio, el velo
+                    // se concentra en el centro.
+                    const xTexto = lado === 'left' ? 25 : lado === 'right' ? 75 : 50
+                    const yTexto = alto === 'top' ? 30 : alto === 'bottom' ? 70 : 50
+                    const deUnLado = (c0: string, c1: string, c2: string) => lado === 'center'
+                        ? `radial-gradient(70% 85% at 50% ${yTexto}%, ${c0} 0%, ${c1} 45%, ${c2} 80%)`
+                        : `linear-gradient(${lado === 'right' ? 260 : 100}deg, ${c0} 0%, ${c1} 36%, ${c2} 66%)`
                     // Velo diagonal: oscuro del lado del texto, transparente
                     // del otro — tal cual Carrusel en piezas.tsx. Vidriera lo
                     // usa siempre (su mock limpio no pasa por el campo de
@@ -1511,7 +1527,7 @@ function HeroCarousel({ slides, go, vidriera = false, primario = null }: { slide
                     // soloTexto en SlideItem de Apariencia.tsx); fuera de
                     // Vidriera es una de las opciones que elige el dueño
                     // (imageOverlay, Apariencia.tsx → "Overlay de imagen").
-                    const veloDiagonal = 'linear-gradient(100deg, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.58) 34%, rgba(0,0,0,0.12) 62%)'
+                    const veloDiagonal = deUnLado('rgba(0,0,0,0.88)', 'rgba(0,0,0,0.58)', 'rgba(0,0,0,0.12)')
                     // 'tint' = comportamiento de siempre (tinte parejo +
                     // puntos) y el default para slides guardados antes de
                     // que existiera este campo — no les cambia el diseño.
@@ -1521,41 +1537,56 @@ function HeroCarousel({ slides, go, vidriera = false, primario = null }: { slide
                         overlay === 'diagonal' ? veloDiagonal :
                         overlay === 'bottom' ? 'linear-gradient(to top, rgba(0,0,0,0.68) 0%, rgba(0,0,0,0.30) 42%, rgba(0,0,0,0) 75%)' :
                         overlay === 'top' ? 'linear-gradient(to bottom, rgba(0,0,0,0.68) 0%, rgba(0,0,0,0.30) 42%, rgba(0,0,0,0) 75%)' :
-                        // Viñeta: oscuro concentrado del lado del texto
-                        // (izquierda, ver textoBloque('left') más abajo),
-                        // se desvanece hacia la derecha — más suave y
-                        // redondeada que 'diagonal', sin un borde recto.
-                        overlay === 'radial' ? 'radial-gradient(60% 90% at 25% 50%, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.25) 45%, rgba(0,0,0,0) 75%)' :
+                        // Viñeta: oscuro concentrado donde está el texto, se
+                        // desvanece hacia afuera — más suave y redondeada que
+                        // 'diagonal', sin un borde recto.
+                        overlay === 'radial' ? `radial-gradient(60% 90% at ${xTexto}% ${yTexto}%, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.25) 45%, rgba(0,0,0,0) 75%)` :
                         // Único overlay a color: el primario del negocio en
-                        // vez de negro, mismo trazo diagonal que 'diagonal'.
-                        overlay === 'marca' ? 'linear-gradient(100deg, color-mix(in srgb, var(--color-primary) 82%, black) 0%, color-mix(in srgb, var(--color-primary) 45%, transparent) 40%, transparent 72%)' :
+                        // vez de negro, mismo trazo que 'diagonal'.
+                        overlay === 'marca' ? deUnLado('color-mix(in srgb, var(--color-primary) 82%, black)', 'color-mix(in srgb, var(--color-primary) 45%, transparent)', 'transparent') :
                         // Único overlay CLARO — pedido explícito con una
                         // tienda de referencia: velo blanco (en vez de negro)
                         // del lado del texto, se desvanece hacia la foto.
                         // Va de la mano con `textoOscuro` (más arriba): acá
                         // solo se pinta el velo, el texto pasa a oscuro aparte.
-                        overlay === 'blanco' ? 'linear-gradient(100deg, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.55) 38%, rgba(255,255,255,0.05) 68%)' :
+                        overlay === 'blanco' ? deUnLado('rgba(255,255,255,0.92)', 'rgba(255,255,255,0.55)', 'rgba(255,255,255,0.05)') :
                         'linear-gradient(rgba(15,23,42,0.55),rgba(15,23,42,0.55))' // 'tint'
+                    // La textura de puntos de 'tint' se borra del lado del texto.
+                    const mascaraPuntos = lado === 'right' ? 'linear-gradient(to left, transparent, black 60%)'
+                        : lado === 'center' ? 'radial-gradient(closest-side, transparent 40%, black)'
+                        : 'linear-gradient(to right, transparent, black 60%)'
                     return (
                         <div key={s.id} style={{ width: `${100 / n}%`, flexShrink: 0, display: 'flex' }}>
                             <div style={{
                                 position: 'relative', overflow: 'hidden',
                                 flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center',
-                                background: s.img
+                                // backgroundImage y no el atajo `background`: al
+                                // cambiar el velo o la foto, React reescribía el
+                                // atajo y eso borraba el backgroundSize de abajo
+                                // (que no cambia, así que no se volvía a poner).
+                                // Sin `cover` la foto se repetía en mosaico: se
+                                // veía dos veces en la vista previa del panel,
+                                // que recibe cada cambio en vivo (reportado con
+                                // captura, 17/11).
+                                backgroundImage: s.img
                                     ? (overlayGradient ? `${overlayGradient}, url(${s.img})` : `url(${s.img})`)
                                     : s.automatico ? degradeAutomatico('var(--color-primary)', i) : HERO_GRADS[i % HERO_GRADS.length],
-                                backgroundSize: 'cover', backgroundPosition: 'center',
+                                backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
                             }}>
                                 {/* Textura de puntos — solo con el overlay
                                     'tint' (comportamiento de siempre). Las
                                     demás opciones (diagonal, degradé, ninguno)
                                     son un velo limpio sin textura encima. */}
                                 {overlay === 'tint' && (
-                                    <div style={{ position: 'absolute', inset: 0, opacity: 0.40, backgroundImage: 'radial-gradient(rgba(255,255,255,0.18) 1px, transparent 1px)', backgroundSize: '22px 22px', maskImage: 'linear-gradient(to right, transparent, black 60%)', WebkitMaskImage: 'linear-gradient(to right, transparent, black 60%)' }} />
+                                    <div style={{ position: 'absolute', inset: 0, opacity: 0.40, backgroundImage: 'radial-gradient(rgba(255,255,255,0.18) 1px, transparent 1px)', backgroundSize: '22px 22px', maskImage: mascaraPuntos, WebkitMaskImage: mascaraPuntos }} />
                                 )}
 
-                                <div className="sf-hero-grid sf-hero-inner" style={{ gridTemplateColumns: '1fr' }}>
-                                    {textoBloque('left', vidriera)}
+                                <div className="sf-hero-grid sf-hero-inner" style={{
+                                    gridTemplateColumns: '1fr',
+                                    alignItems: alto === 'top' ? 'start' : alto === 'bottom' ? 'end' : 'center',
+                                    justifyItems: lado === 'left' ? 'start' : lado === 'right' ? 'end' : 'center',
+                                }}>
+                                    {textoBloque(lado, vidriera)}
                                 </div>
                             </div>
                         </div>

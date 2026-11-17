@@ -42,7 +42,9 @@ export function AparienciaBloqueada({ homeTemplate, onVolvio, onToast, children 
     }
 
     return (
-        <div style={pageWrap}>
+        // data-sin-indice: el índice de la izquierda (IndiceDeVista) no se dibuja
+        // acá; sus secciones son las de la apariencia clásica.
+        <div style={pageWrap} data-sin-indice>
             <div style={{ maxWidth: 880, margin: '0 auto' }}>
                 <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: '0 0 20px' }}>Apariencia pública</h1>
                 <Card style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginBottom: 18 }}>

@@ -46,7 +46,19 @@ describe('plantillas por defecto de Apariencia', () => {
             expect(contraste(p.hero.fondo, '#FFFFFF')).toBeGreaterThanOrEqual(4.5)
         })
 
-    it('hay variedad de sliders: completos y centrados', () => {
+    // Sobre una foto común el texto va en blanco (salvo con el velo blanco):
+    // necesita un velo que oscurezca justo donde está. Los degradés de arriba
+    // y de abajo solo oscurecen ese borde.
+    it.each(PLANTILLAS_POR_DEFECTO.map(p => [p.id, p] as const))('%s: el texto queda sobre el velo', (_, p) => {
+        expect(p.hero.velo).not.toBe('none')
+        if (p.hero.velo === 'bottom') expect(p.hero.textoV).toBe('bottom')
+        if (p.hero.velo === 'top') expect(p.hero.textoV).toBe('top')
+    })
+
+    it('hay variedad de sliders: formatos, velos y lugares del texto', () => {
+        expect(new Set(PLANTILLAS_POR_DEFECTO.map(p => p.hero.velo)).size).toBeGreaterThanOrEqual(6)
+        expect(new Set(PLANTILLAS_POR_DEFECTO.map(p => `${p.hero.textoH}-${p.hero.textoV}`)).size).toBeGreaterThanOrEqual(6)
+
         const formatos = new Set(PLANTILLAS_POR_DEFECTO.map(p => p.hero.formato))
         expect(formatos).toEqual(new Set(['completa', 'centrada']))
     })

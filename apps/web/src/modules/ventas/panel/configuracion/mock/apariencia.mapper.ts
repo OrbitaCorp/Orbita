@@ -9,7 +9,7 @@
 // del backend (columna ya escrita en negocios existentes, sin usarse) pero
 // de acá en más no se lee ni se manda más.
 
-import { type Apariencia as Ap, type EscalaFuente, type ModoColor, type ImageStyle, type ImagePosition, type ImageOverlay, type BgPattern, type BgPatternScope } from './apariencia.mock'
+import { type Apariencia as Ap, type EscalaFuente, type ModoColor, type ImageStyle, type ImagePosition, type ImageOverlay, type BgPattern, type BgPatternScope, type TextoHorizontal, type TextoVertical } from './apariencia.mock'
 import type { ApiAppearanceConfig, UpdateAppearanceInput } from '@/lib/api'
 import { escribirMarca, leerMarca, marcaValida, sinMarca } from '@/components/storefront/marca'
 
@@ -167,6 +167,9 @@ export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
                 bgPattern: (s.bgPattern as BgPattern) ?? 'none',
                 bgPatternScope: (s.bgPatternScope as BgPatternScope) ?? 'image',
                 bgColor: s.bgColor ?? '',
+                // El lugar de siempre: izquierda y al medio.
+                textAlign: (s.textAlign as TextoHorizontal) ?? 'left',
+                textVertical: (s.textVertical as TextoVertical) ?? 'center',
             }))
             : defaults.sliders,
         colorPrimario: dto.colorPrimary ?? defaults.colorPrimario,
