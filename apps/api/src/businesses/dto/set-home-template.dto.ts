@@ -47,6 +47,18 @@ export const HOME_TEMPLATES_DISPONIBLES = [
   'confeti',
 ] as const;
 
+// Las que se pueden activar SIN el paquete Avanzado (pedido de Mateo, 17/11):
+// tres de "cualquier rubro" y bien distintas entre sí —neutra clara, oscura y
+// de color fuerte— para que el plan Base tenga una portada distinta a la
+// clásica. Las de diseño propio de un rubro siguen siendo del Avanzado.
+// Espejo de PLANTILLAS_LIBRES en el panel (plantillas/libres.ts): un test del
+// front lee este archivo y falla si se separan.
+export const HOME_TEMPLATES_LIBRES = ['base', 'carbon', 'bloque'] as const;
+
+export function esPlantillaLibre(template: string | null): boolean {
+  return template === null || (HOME_TEMPLATES_LIBRES as readonly string[]).includes(template);
+}
+
 export class SetHomeTemplateDto {
   @ValidateIf((o) => o.template !== null)
   @IsIn(HOME_TEMPLATES_DISPONIBLES, { message: `template debe ser null o uno de: ${HOME_TEMPLATES_DISPONIBLES.join(', ')}` })

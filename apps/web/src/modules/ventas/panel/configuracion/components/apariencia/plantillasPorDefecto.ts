@@ -6,9 +6,9 @@
 // estructura propia, ver panel/avanzado/plantillas/). Una plantilla por
 // defecto es un atajo: aplicarla escribe en el formulario los mismos campos
 // que el dueño podría elegir uno por uno —paleta, modo claro u oscuro,
-// tipografías y escala, header, estilo de la marca, diseño del hero, grilla,
-// categorías, anuncio, WhatsApp y video— y queda sin publicar hasta que toque
-// "Guardar cambios". Por eso la puede usar cualquier plan.
+// tipografías y escala, header, estilo de la marca, diseño de cada slide del
+// hero, grilla, categorías, anuncio, WhatsApp y video— y queda sin publicar
+// hasta que toque "Guardar cambios". Por eso la puede usar cualquier plan.
 //
 // Regla: cambia CÓMO se ve la tienda, nunca lo que dice ni lo que muestra. No
 // toca textos, fotos, logo, enlaces del header ni los interruptores de "¿Qué
@@ -25,17 +25,40 @@
 //   · la marca no cambia de MODO (logo y nombre / solo logo / solo nombre):
 //     eso depende de si el dueño subió un logo. Solo cambia el estilo dentro
 //     del modo que ya tiene (ver MARCA_ESTILOS);
-//   · del hero solo cambia el diseño de cada slide (velo sobre la foto,
-//     patrón de fondo y su alcance), no el formato de la imagen ni su
-//     posición: eso depende de cómo es cada foto.
+//   · la imagen CENTRADA es para fotos sin fondo (PNG con transparencia): una
+//     foto común queda como un rectángulo pegado sobre el color del slide. Por
+//     eso una plantilla con hero centrado solo lo pone en los slides cuya foto
+//     es transparente (o que no tienen foto); los que tienen una foto común
+//     quedan a imagen completa, con el velo de la plantilla. Las fotos se
+//     guardan como webp, así que no alcanza con la extensión: la
+//     transparencia se mide en el navegador (ver transparencia.ts).
+//   · con imagen centrada el texto del slide va siempre en blanco (ver
+//     HeroCarousel en Inicio.tsx), así que el color de fondo del slide tiene
+//     que ser oscuro.
 
 import type { MarcaModo } from '@/components/storefront/marca'
 import type {
-    Apariencia, BgPattern, BgPatternScope, CategoryLayout, EscalaFuente, HeroSlide, ImageOverlay,
+    Apariencia, BgPattern, BgPatternScope, CategoryLayout, EscalaFuente, HeroSlide, ImageOverlay, ImagePosition,
     LayoutGrid, LayoutHeader, ModoColor, VideoLayout, WhatsappLayout,
 } from '../../mock/apariencia.mock'
 
 type Fondo = 'blanco' | 'gris' | 'tinte'
+
+// El diseño de los slides del hero.
+export interface HeroDePlantilla {
+    // 'completa' = la foto ocupa todo el slide; 'centrada' = la foto (sin
+    // fondo) al lado del texto, sobre un color con un patrón.
+    formato: 'completa' | 'centrada'
+    posicion: ImagePosition
+    // Velo sobre la foto a imagen completa (también lo usan los slides de una
+    // plantilla centrada que tienen una foto común).
+    velo: ImageOverlay
+    // Solo con imagen centrada.
+    patron: BgPattern
+    alcance: BgPatternScope
+    // Color del slide con imagen centrada. Oscuro: el texto va en blanco.
+    fondo: string
+}
 
 export interface PlantillaPorDefecto {
     id: string
@@ -55,15 +78,19 @@ export interface PlantillaPorDefecto {
     layoutHeader: LayoutHeader
     // Un estilo por cada modo de marca (ver MARCA_ESTILOS en marca.tsx).
     marca: Record<MarcaModo, string>
-    heroVelo: ImageOverlay
-    heroPatron: BgPattern
-    heroPatronAlcance: BgPatternScope
+    hero: HeroDePlantilla
     layoutGrid: LayoutGrid
     estiloCategorias: Exclude<CategoryLayout, 'mosaico' | 'tarjetas'>
     bannerDesplazable: boolean
     estiloWhatsapp: WhatsappLayout
     videoLayout: VideoLayout
 }
+
+// Atajos para no repetir los campos que no usa cada formato.
+const completa = (posicion: ImagePosition, velo: ImageOverlay): HeroDePlantilla =>
+    ({ formato: 'completa', posicion, velo, patron: 'none', alcance: 'image', fondo: '' })
+const centrada = (posicion: ImagePosition, patron: BgPattern, alcance: BgPatternScope, fondo: string, velo: ImageOverlay = 'tint'): HeroDePlantilla =>
+    ({ formato: 'centrada', posicion, velo, patron, alcance, fondo })
 
 export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
     {
@@ -73,15 +100,15 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#3B82F6', colorSecundario: '#0F172A', colorAccent: '#8B5CF6', fondo: 'gris', modoColor: 'claro',
         fuenteHeading: 'Geist', fuenteBody: 'Geist', escalaFuente: 'md',
         layoutHeader: 'full', marca: { ambos: 'lado', logo: 'normal', nombre: 'negrita' },
-        heroVelo: 'tint', heroPatron: 'none', heroPatronAlcance: 'image',
+        hero: completa('right', 'tint'),
         layoutGrid: '4col', estiloCategorias: 'pills', bannerDesplazable: false, estiloWhatsapp: 'clasico', videoLayout: 'cine',
     },
     {
-        id: 'boutique', nombre: 'Boutique', para: 'Ropa, accesorios y joyería',
+        id: 'boutique', nombre: 'Boutique', para: 'Ropa, accesorios y bijouterie',
         colorPrimario: '#1C1917', colorSecundario: '#1C1917', colorAccent: '#B45309', fondo: 'blanco', modoColor: 'claro',
         fuenteHeading: 'Playfair Display', fuenteBody: 'Lato', escalaFuente: 'md',
         layoutHeader: 'centered', marca: { ambos: 'espaciado', logo: 'normal', nombre: 'espaciado' },
-        heroVelo: 'bottom', heroPatron: 'none', heroPatronAlcance: 'image',
+        hero: completa('left', 'bottom'),
         layoutGrid: '3col', estiloCategorias: 'circulos', bannerDesplazable: false, estiloWhatsapp: 'minimal', videoLayout: 'alternado',
     },
     {
@@ -89,31 +116,55 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#E11D48', colorSecundario: '#0A0A0A', colorAccent: '#FACC15', fondo: 'blanco', modoColor: 'oscuro',
         fuenteHeading: 'Montserrat', fuenteBody: 'Inter', escalaFuente: 'md',
         layoutHeader: 'full', marca: { ambos: 'espaciado', logo: 'normal', nombre: 'mayusculas' },
-        heroVelo: 'diagonal', heroPatron: 'stripes', heroPatronAlcance: 'full',
+        hero: centrada('right', 'stripes', 'full', '#18181B', 'diagonal'),
         layoutGrid: '4col', estiloCategorias: 'chips', bannerDesplazable: true, estiloWhatsapp: 'franja', videoLayout: 'reels',
+    },
+    {
+        id: 'sastre', nombre: 'Sastre', para: 'Moda masculina, sastrería y calzado',
+        colorPrimario: '#1E293B', colorSecundario: '#0F172A', colorAccent: '#B45309', fondo: 'blanco', modoColor: 'claro',
+        fuenteHeading: 'Playfair Display', fuenteBody: 'Inter', escalaFuente: 'md',
+        layoutHeader: 'minimal', marca: { ambos: 'espaciado', logo: 'normal', nombre: 'espaciado' },
+        hero: completa('right', 'diagonal'),
+        layoutGrid: '3col', estiloCategorias: 'indice', bannerDesplazable: false, estiloWhatsapp: 'minimal', videoLayout: 'cine',
     },
     {
         id: 'belleza', nombre: 'Belleza', para: 'Peluquerías, uñas y maquillaje',
         colorPrimario: '#BE185D', colorSecundario: '#500724', colorAccent: '#D4A373', fondo: 'tinte', modoColor: 'claro',
         fuenteHeading: 'Cormorant Garamond', fuenteBody: 'Poppins', escalaFuente: 'md',
         layoutHeader: 'centered', marca: { ambos: 'apilado', logo: 'redondo', nombre: 'italica' },
-        heroVelo: 'blanco', heroPatron: 'halo', heroPatronAlcance: 'image',
+        hero: centrada('right', 'halo', 'image', '#831843', 'blanco'),
         layoutGrid: '3col', estiloCategorias: 'circulos', bannerDesplazable: false, estiloWhatsapp: 'minimal', videoLayout: 'reels',
     },
     {
-        id: 'natural', nombre: 'Natural', para: 'Dietéticas, plantas y cosmética natural',
+        id: 'joyas', nombre: 'Joyas', para: 'Joyería, relojería y regalos finos',
+        colorPrimario: '#78350F', colorSecundario: '#1C1917', colorAccent: '#D4AF37', fondo: 'blanco', modoColor: 'claro',
+        fuenteHeading: 'Cormorant Garamond', fuenteBody: 'Lato', escalaFuente: 'md',
+        layoutHeader: 'centered', marca: { ambos: 'espaciado', logo: 'redondo', nombre: 'espaciado' },
+        hero: centrada('center', 'halo', 'full', '#1C1917', 'radial'),
+        layoutGrid: '3col', estiloCategorias: 'circulos', bannerDesplazable: false, estiloWhatsapp: 'minimal', videoLayout: 'cine',
+    },
+    {
+        id: 'natural', nombre: 'Natural', para: 'Dietéticas y cosmética natural',
         colorPrimario: '#4D7C0F', colorSecundario: '#1A2E05', colorAccent: '#CA8A04', fondo: 'tinte', modoColor: 'claro',
         fuenteHeading: 'Cormorant Garamond', fuenteBody: 'Lato', escalaFuente: 'md',
         layoutHeader: 'standard', marca: { ambos: 'redondo', logo: 'redondo', nombre: 'italica' },
-        heroVelo: 'radial', heroPatron: 'waves', heroPatronAlcance: 'full',
+        hero: centrada('left', 'waves', 'full', '#1A2E05', 'radial'),
         layoutGrid: '3col', estiloCategorias: 'circulos', bannerDesplazable: false, estiloWhatsapp: 'bento', videoLayout: 'alternado',
+    },
+    {
+        id: 'floreria', nombre: 'Florería', para: 'Florerías, viveros y regalos',
+        colorPrimario: '#BE123C', colorSecundario: '#4C0519', colorAccent: '#65A30D', fondo: 'tinte', modoColor: 'claro',
+        fuenteHeading: 'Playfair Display', fuenteBody: 'Lato', escalaFuente: 'md',
+        layoutHeader: 'centered', marca: { ambos: 'apilado', logo: 'redondo', nombre: 'italica' },
+        hero: centrada('center', 'bubbles', 'full', '#881337', 'blanco'),
+        layoutGrid: '3col', estiloCategorias: 'circulos', bannerDesplazable: false, estiloWhatsapp: 'minimal', videoLayout: 'reels',
     },
     {
         id: 'cafe', nombre: 'Café', para: 'Cafeterías, panaderías y pastelerías',
         colorPrimario: '#92400E', colorSecundario: '#292524', colorAccent: '#65A30D', fondo: 'tinte', modoColor: 'claro',
         fuenteHeading: 'Playfair Display', fuenteBody: 'Poppins', escalaFuente: 'md',
         layoutHeader: 'standard', marca: { ambos: 'redondo', logo: 'redondo', nombre: 'italica' },
-        heroVelo: 'tint', heroPatron: 'plus', heroPatronAlcance: 'full',
+        hero: completa('center', 'tint'),
         layoutGrid: '3col', estiloCategorias: 'indice', bannerDesplazable: false, estiloWhatsapp: 'bento', videoLayout: 'alternado',
     },
     {
@@ -121,15 +172,23 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#B91C1C', colorSecundario: '#451A03', colorAccent: '#CA8A04', fondo: 'tinte', modoColor: 'claro',
         fuenteHeading: 'Playfair Display', fuenteBody: 'Lato', escalaFuente: 'md',
         layoutHeader: 'standard', marca: { ambos: 'lado', logo: 'normal', nombre: 'italica' },
-        heroVelo: 'diagonal', heroPatron: 'dots', heroPatronAlcance: 'image',
+        hero: centrada('right', 'dots', 'image', '#7F1D1D', 'diagonal'),
         layoutGrid: '4col', estiloCategorias: 'chips', bannerDesplazable: true, estiloWhatsapp: 'bento', videoLayout: 'alternado',
+    },
+    {
+        id: 'artesanal', nombre: 'Artesanal', para: 'Productos hechos a mano y de autor',
+        colorPrimario: '#9A3412', colorSecundario: '#431407', colorAccent: '#0F766E', fondo: 'tinte', modoColor: 'claro',
+        fuenteHeading: 'Cormorant Garamond', fuenteBody: 'Poppins', escalaFuente: 'md',
+        layoutHeader: 'standard', marca: { ambos: 'redondo', logo: 'redondo', nombre: 'italica' },
+        hero: completa('left', 'radial'),
+        layoutGrid: '3col', estiloCategorias: 'indice', bannerDesplazable: false, estiloWhatsapp: 'bento', videoLayout: 'alternado',
     },
     {
         id: 'vibrante', nombre: 'Vibrante', para: 'Regalería, jugueterías y librerías',
         colorPrimario: '#DB2777', colorSecundario: '#1E1B4B', colorAccent: '#F59E0B', fondo: 'blanco', modoColor: 'claro',
         fuenteHeading: 'Poppins', fuenteBody: 'Poppins', escalaFuente: 'md',
         layoutHeader: 'full', marca: { ambos: 'redondo', logo: 'redondo', nombre: 'mayusculas' },
-        heroVelo: 'marca', heroPatron: 'confetti', heroPatronAlcance: 'full',
+        hero: centrada('right', 'confetti', 'full', '#1E1B4B', 'marca'),
         layoutGrid: '4col', estiloCategorias: 'pills', bannerDesplazable: true, estiloWhatsapp: 'clasico', videoLayout: 'reels',
     },
     {
@@ -137,15 +196,23 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#7C3AED', colorSecundario: '#3B0764', colorAccent: '#F9A8D4', fondo: 'tinte', modoColor: 'claro',
         fuenteHeading: 'Poppins', fuenteBody: 'Poppins', escalaFuente: 'md',
         layoutHeader: 'centered', marca: { ambos: 'redondo', logo: 'redondo', nombre: 'italica' },
-        heroVelo: 'blanco', heroPatron: 'bubbles', heroPatronAlcance: 'full',
+        hero: centrada('center', 'bubbles', 'full', '#5B21B6', 'blanco'),
         layoutGrid: '4col', estiloCategorias: 'circulos', bannerDesplazable: false, estiloWhatsapp: 'clasico', videoLayout: 'reels',
+    },
+    {
+        id: 'mascotas', nombre: 'Mascotas', para: 'Pet shops y veterinarias',
+        colorPrimario: '#0D9488', colorSecundario: '#134E4A', colorAccent: '#F59E0B', fondo: 'tinte', modoColor: 'claro',
+        fuenteHeading: 'Poppins', fuenteBody: 'Poppins', escalaFuente: 'md',
+        layoutHeader: 'full', marca: { ambos: 'redondo', logo: 'redondo', nombre: 'negrita' },
+        hero: centrada('left', 'plus', 'full', '#115E59'),
+        layoutGrid: '4col', estiloCategorias: 'circulos', bannerDesplazable: true, estiloWhatsapp: 'clasico', videoLayout: 'reels',
     },
     {
         id: 'deportiva', nombre: 'Deportiva', para: 'Deportes, calzado y suplementos',
         colorPrimario: '#EA580C', colorSecundario: '#0C0A09', colorAccent: '#FACC15', fondo: 'blanco', modoColor: 'claro',
         fuenteHeading: 'Montserrat', fuenteBody: 'Inter', escalaFuente: 'lg',
         layoutHeader: 'full', marca: { ambos: 'lado', logo: 'grande', nombre: 'mayusculas' },
-        heroVelo: 'diagonal', heroPatron: 'stripes', heroPatronAlcance: 'full',
+        hero: completa('left', 'diagonal'),
         layoutGrid: '4col', estiloCategorias: 'circulos', bannerDesplazable: true, estiloWhatsapp: 'franja', videoLayout: 'reels',
     },
     {
@@ -153,15 +220,31 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#0E7490', colorSecundario: '#083344', colorAccent: '#F97316', fondo: 'tinte', modoColor: 'claro',
         fuenteHeading: 'Montserrat', fuenteBody: 'Lato', escalaFuente: 'md',
         layoutHeader: 'full', marca: { ambos: 'lado', logo: 'normal', nombre: 'negrita' },
-        heroVelo: 'bottom', heroPatron: 'waves', heroPatronAlcance: 'full',
+        hero: completa('center', 'bottom'),
         layoutGrid: '4col', estiloCategorias: 'circulos', bannerDesplazable: true, estiloWhatsapp: 'franja', videoLayout: 'alternado',
+    },
+    {
+        id: 'salud', nombre: 'Salud', para: 'Farmacias, ortopedias y ópticas',
+        colorPrimario: '#0284C7', colorSecundario: '#0C4A6E', colorAccent: '#10B981', fondo: 'blanco', modoColor: 'claro',
+        fuenteHeading: 'Inter', fuenteBody: 'Lato', escalaFuente: 'md',
+        layoutHeader: 'standard', marca: { ambos: 'lado', logo: 'normal', nombre: 'negrita' },
+        hero: centrada('right', 'rings', 'image', '#0C4A6E', 'bottom'),
+        layoutGrid: '4col', estiloCategorias: 'chips', bannerDesplazable: true, estiloWhatsapp: 'bento', videoLayout: 'lista',
+    },
+    {
+        id: 'hogar', nombre: 'Hogar', para: 'Electrodomésticos y bazar',
+        colorPrimario: '#4F46E5', colorSecundario: '#1E1B4B', colorAccent: '#F97316', fondo: 'gris', modoColor: 'claro',
+        fuenteHeading: 'Poppins', fuenteBody: 'Inter', escalaFuente: 'md',
+        layoutHeader: 'full', marca: { ambos: 'lado', logo: 'normal', nombre: 'negrita' },
+        hero: centrada('right', 'grid', 'full', '#312E81'),
+        layoutGrid: '4col', estiloCategorias: 'pills', bannerDesplazable: true, estiloWhatsapp: 'clasico', videoLayout: 'lista',
     },
     {
         id: 'ferreteria', nombre: 'Ferretería', para: 'Ferreterías, repuestos y mayoristas',
         colorPrimario: '#1E3A8A', colorSecundario: '#0F172A', colorAccent: '#F59E0B', fondo: 'gris', modoColor: 'claro',
         fuenteHeading: 'Montserrat', fuenteBody: 'Inter', escalaFuente: 'md',
         layoutHeader: 'standard', marca: { ambos: 'lado', logo: 'grande', nombre: 'mayusculas' },
-        heroVelo: 'diagonal', heroPatron: 'grid', heroPatronAlcance: 'image',
+        hero: centrada('right', 'diagonal', 'full', '#1E3A8A', 'diagonal'),
         // En lista: un catálogo largo se recorre mejor de a filas.
         layoutGrid: 'list', estiloCategorias: 'chips', bannerDesplazable: true, estiloWhatsapp: 'bento', videoLayout: 'lista',
     },
@@ -170,7 +253,7 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#44403C', colorSecundario: '#1C1917', colorAccent: '#A16207', fondo: 'blanco', modoColor: 'claro',
         fuenteHeading: 'Cormorant Garamond', fuenteBody: 'Inter', escalaFuente: 'md',
         layoutHeader: 'minimal', marca: { ambos: 'espaciado', logo: 'grande', nombre: 'espaciado' },
-        heroVelo: 'none', heroPatron: 'arc', heroPatronAlcance: 'image',
+        hero: centrada('left', 'arc', 'image', '#292524', 'none'),
         layoutGrid: '3col', estiloCategorias: 'indice', bannerDesplazable: false, estiloWhatsapp: 'minimal', videoLayout: 'cine',
     },
     {
@@ -178,23 +261,31 @@ export const PLANTILLAS_POR_DEFECTO: PlantillaPorDefecto[] = [
         colorPrimario: '#0F172A', colorSecundario: '#0F172A', colorAccent: '#64748B', fondo: 'blanco', modoColor: 'claro',
         fuenteHeading: 'Inter', fuenteBody: 'Inter', escalaFuente: 'sm',
         layoutHeader: 'minimal', marca: { ambos: 'espaciado', logo: 'normal', nombre: 'espaciado' },
-        heroVelo: 'none', heroPatron: 'none', heroPatronAlcance: 'image',
+        hero: completa('left', 'none'),
         layoutGrid: '3col', estiloCategorias: 'indice', bannerDesplazable: false, estiloWhatsapp: 'minimal', videoLayout: 'cine',
     },
     {
-        id: 'tecno', nombre: 'Tecno', para: 'Electrónica, celulares y gamers',
+        id: 'tecno', nombre: 'Tecno', para: 'Electrónica y celulares',
         colorPrimario: '#0891B2', colorSecundario: '#0F172A', colorAccent: '#84CC16', fondo: 'gris', modoColor: 'oscuro',
         fuenteHeading: 'Montserrat', fuenteBody: 'Inter', escalaFuente: 'md',
         layoutHeader: 'minimal', marca: { ambos: 'lado', logo: 'normal', nombre: 'mayusculas' },
-        heroVelo: 'bottom', heroPatron: 'grid', heroPatronAlcance: 'full',
+        hero: centrada('right', 'orbit', 'full', '#0F172A', 'bottom'),
         layoutGrid: '4col', estiloCategorias: 'chips', bannerDesplazable: true, estiloWhatsapp: 'franja', videoLayout: 'lista',
+    },
+    {
+        id: 'gamer', nombre: 'Gamer', para: 'Gaming, consolas y accesorios',
+        colorPrimario: '#A21CAF', colorSecundario: '#0A0A0A', colorAccent: '#22D3EE', fondo: 'gris', modoColor: 'oscuro',
+        fuenteHeading: 'Montserrat', fuenteBody: 'Inter', escalaFuente: 'md',
+        layoutHeader: 'full', marca: { ambos: 'lado', logo: 'normal', nombre: 'mayusculas' },
+        hero: centrada('right', 'sparkle', 'full', '#0A0A0A', 'diagonal'),
+        layoutGrid: '4col', estiloCategorias: 'chips', bannerDesplazable: true, estiloWhatsapp: 'franja', videoLayout: 'reels',
     },
     {
         id: 'noche', nombre: 'Noche', para: 'Perfumería, vinos y regalos premium',
         colorPrimario: '#B8913A', colorSecundario: '#1C1917', colorAccent: '#E7E5E4', fondo: 'blanco', modoColor: 'oscuro',
         fuenteHeading: 'Cormorant Garamond', fuenteBody: 'Lato', escalaFuente: 'md',
         layoutHeader: 'centered', marca: { ambos: 'espaciado', logo: 'redondo', nombre: 'espaciado' },
-        heroVelo: 'radial', heroPatron: 'sparkle', heroPatronAlcance: 'image',
+        hero: completa('center', 'radial'),
         layoutGrid: '3col', estiloCategorias: 'indice', bannerDesplazable: false, estiloWhatsapp: 'minimal', videoLayout: 'cine',
     },
 ]
@@ -206,12 +297,20 @@ export function fondoDe(p: PlantillaPorDefecto): string {
     return p.colorPrimario + '0D'
 }
 
-// El diseño que la plantilla le pone a un slide del hero. Solo el velo, el
-// patrón y su alcance; el color propio vuelve al degradé del tema, que ya sale
-// de los colores de la plantilla. Título, foto, botón, formato y posición
-// quedan como estaban.
-function slideCon(s: HeroSlide, p: PlantillaPorDefecto): HeroSlide {
-    return { ...s, imageOverlay: p.heroVelo, bgPattern: p.heroPatron, bgPatternScope: p.heroPatronAlcance, bgColor: '' }
+// ¿Este slide puede ir con imagen centrada? Solo con una foto sin fondo (o sin
+// foto: queda el texto sobre el color). `transparentes` son las fotos que el
+// navegador ya midió (ver transparencia.ts).
+export function admiteCentrada(s: HeroSlide, transparentes: ReadonlySet<string>): boolean {
+    return !s.img || transparentes.has(s.img)
+}
+
+// El diseño que la plantilla le pone a un slide. Título, subtítulo, foto y
+// botón quedan como estaban.
+function slideCon(s: HeroSlide, h: HeroDePlantilla, transparentes: ReadonlySet<string>): HeroSlide {
+    if (h.formato === 'centrada' && admiteCentrada(s, transparentes)) {
+        return { ...s, imageStyle: 'centered', imagePosition: h.posicion, imageOverlay: h.velo, bgPattern: h.patron, bgPatternScope: h.alcance, bgColor: h.fondo }
+    }
+    return { ...s, imageStyle: 'full', imagePosition: h.posicion, imageOverlay: h.velo, bgPattern: 'none', bgPatternScope: 'image', bgColor: '' }
 }
 
 // Los campos sueltos que escribe la plantilla (todo menos marca y slides, que
@@ -236,31 +335,34 @@ function camposPlanos(p: PlantillaPorDefecto) {
 }
 
 // El formulario con la plantilla aplicada — y SOLO con lo suyo cambiado (ver
-// la regla de arriba). `maxNuevosIngresos` vuelve a automático: una cantidad
-// elegida para 4 columnas deja filas incompletas en 3 (ver OPCIONES_MAX_NUEVOS).
-export function aplicarPlantilla(ap: Apariencia, p: PlantillaPorDefecto): Apariencia {
+// la regla de arriba). `maxNuevosIngresos` vuelve a automático si cambia la
+// grilla: una cantidad elegida para 4 columnas deja filas incompletas en 3
+// (ver OPCIONES_MAX_NUEVOS).
+export function aplicarPlantilla(ap: Apariencia, p: PlantillaPorDefecto, transparentes: ReadonlySet<string> = new Set()): Apariencia {
     const cambiaGrilla = ap.layoutGrid !== p.layoutGrid
     return {
         ...ap,
         ...camposPlanos(p),
         marcaEstilo: p.marca[ap.marcaModo] ?? ap.marcaEstilo,
-        sliders: ap.sliders.map(s => slideCon(s, p)),
+        sliders: ap.sliders.map(s => slideCon(s, p.hero, transparentes)),
         maxNuevosIngresos: cambiaGrilla ? null : ap.maxNuevosIngresos,
     }
 }
 
+const CAMPOS_DE_SLIDE = ['imageStyle', 'imagePosition', 'imageOverlay', 'bgPattern', 'bgPatternScope', 'bgColor'] as const
+
 // La plantilla por defecto que coincide en todo con lo que hay en el
 // formulario, si alguna coincide (para marcarla "En uso"). Los colores se
 // comparan sin mayúsculas: el selector de color puede guardarlos en minúscula.
-export function plantillaEnUso(ap: Apariencia): string | null {
+export function plantillaEnUso(ap: Apariencia, transparentes: ReadonlySet<string> = new Set()): string | null {
     const igual = (a: unknown, b: unknown) =>
         typeof a === 'string' && typeof b === 'string' ? a.toLowerCase() === b.toLowerCase() : a === b
     for (const p of PLANTILLAS_POR_DEFECTO) {
         const c = camposPlanos(p)
-        const planos = (Object.keys(c) as (keyof typeof c)[]).every(k => igual(ap[k], c[k]))
-        const marca = ap.marcaEstilo === p.marca[ap.marcaModo]
-        const hero = ap.sliders.every(s => s.imageOverlay === p.heroVelo && s.bgPattern === p.heroPatron && s.bgPatternScope === p.heroPatronAlcance && s.bgColor === '')
-        if (planos && marca && hero) return p.id
+        if (!(Object.keys(c) as (keyof typeof c)[]).every(k => igual(ap[k], c[k]))) continue
+        if (ap.marcaEstilo !== p.marca[ap.marcaModo]) continue
+        const esperado = ap.sliders.map(s => slideCon(s, p.hero, transparentes))
+        if (esperado.every((e, i) => CAMPOS_DE_SLIDE.every(k => igual(e[k], ap.sliders[i][k])))) return p.id
     }
     return null
 }

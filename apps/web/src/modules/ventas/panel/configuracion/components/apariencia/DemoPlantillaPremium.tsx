@@ -1,13 +1,13 @@
-// La demo de una plantilla de Home del paquete Avanzado, abierta desde
+// La demo de una plantilla de Home (las del paquete Avanzado), abierta desde
 // Apariencia → Plantillas por defecto. Es la MISMA portada de muestra que se ve
 // en Avanzado → Plantillas (el `Home` de homes.tsx, con sus fotos y productos
-// de ejemplo), a pantalla completa, para que quien no tiene el paquete vea qué
-// se lleva antes de pagarlo.
+// de ejemplo), a pantalla completa, para ver qué se lleva antes de elegirla.
 //
-// Solo se mira: activarla sigue siendo cosa de Avanzado → Plantillas (el
-// endpoint exige el add-on, ver RequiresAddon en businesses.controller.ts). El
-// botón de abajo lleva ahí si el negocio ya tiene Avanzado, o a Suscripción si
-// no lo tiene.
+// "Usarla en mi tienda" la aplica ahí mismo, sin pasar por Avanzado: si se
+// puede (es una de las libres o el negocio tiene el paquete), pide confirmar y
+// la activa; si no, avisa que viene con el paquete Avanzado y ofrece ver los
+// planes. El permiso real lo decide la API (puedeElegirPlantilla en
+// businesses.service.ts).
 //
 // Se importa con next/dynamic desde SeccionPlantillasPorDefecto: homes.tsx son
 // miles de líneas de JSX que Apariencia no necesita hasta que alguien abre una.
@@ -17,34 +17,47 @@ import { ArrowRight, ChevronLeft, ChevronRight, Monitor, Smartphone, X } from 'l
 import { Button } from '@/design-system/components/Button'
 import { CSS, Celular, cargarFuentes } from '@/modules/ventas/panel/avanzado/plantillas/piezas'
 import { Home } from '@/modules/ventas/panel/avanzado/plantillas/homes'
+import { esPlantillaLibre } from '@/modules/ventas/panel/avanzado/plantillas/libres'
 import type { Plantilla } from '@/modules/ventas/panel/avanzado/plantillas/tipos'
 
-export default function DemoPlantillaPremium({ plantillas, inicial, tieneAvanzado, onCerrar, onSeguir }: {
+export default function DemoPlantillaPremium({ plantillas, inicial, tieneAvanzado, hayCambiosSinGuardar, onCerrar, onUsar, onVerPlanes }: {
     plantillas: Plantilla[]
     inicial: string
     tieneAvanzado: boolean
+    // Lo que el dueño tocó en Apariencia y no guardó: al activar una
+    // plantilla, Apariencia queda en manos de ella y eso no se publica.
+    hayCambiosSinGuardar: boolean
     onCerrar: () => void
-    // Avanzado → Plantillas (con el paquete) o Suscripción (sin él).
-    onSeguir: () => void
+    // Activa la plantilla. Si falla, rechaza con el mensaje para mostrar.
+    onUsar: (id: string) => Promise<void>
+    onVerPlanes: () => void
 }) {
     const [id, setId] = useState(inicial)
     const [celular, setCelular] = useState(false)
+    const [confirmar, setConfirmar] = useState(false)
+    const [activando, setActivando] = useState(false)
+    const [error, setError] = useState<string | null>(null)
     const i = Math.max(0, plantillas.findIndex(x => x.id === id))
     const p = plantillas[i]
-    const ir = (d: number) => setId(plantillas[(i + d + plantillas.length) % plantillas.length].id)
+    const libre = esPlantillaLibre(p.id)
+    const puedeUsar = libre || tieneAvanzado
+    const ir = (d: number) => { setId(plantillas[(i + d + plantillas.length) % plantillas.length].id); setError(null) }
 
     useEffect(() => { cargarFuentes() }, [])
 
-    // Esc cierra; ←/→ pasan de plantilla, igual que en Avanzado → Plantillas.
+    // Esc cierra (primero el aviso, si está abierto); ←/→ pasan de plantilla,
+    // igual que en Avanzado → Plantillas.
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') onCerrar()
+            if (activando) return
+            if (e.key === 'Escape') { if (confirmar) setConfirmar(false); else onCerrar() }
+            else if (confirmar) return
             else if (e.key === 'ArrowRight') setId(prev => { const k = plantillas.findIndex(x => x.id === prev); return plantillas[(k + 1) % plantillas.length].id })
             else if (e.key === 'ArrowLeft') setId(prev => { const k = plantillas.findIndex(x => x.id === prev); return plantillas[(k - 1 + plantillas.length) % plantillas.length].id })
         }
         window.addEventListener('keydown', onKey)
         return () => window.removeEventListener('keydown', onKey)
-    }, [onCerrar, plantillas])
+    }, [onCerrar, plantillas, confirmar, activando])
 
     // Sin scroll de fondo mientras la demo ocupa la pantalla.
     useEffect(() => {
@@ -52,6 +65,17 @@ export default function DemoPlantillaPremium({ plantillas, inicial, tieneAvanzad
         document.body.style.overflow = 'hidden'
         return () => { document.body.style.overflow = antes }
     }, [])
+
+    async function usar() {
+        setActivando(true)
+        setError(null)
+        try {
+            await onUsar(p.id)
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'No se pudo activar la plantilla')
+            setActivando(false)
+        }
+    }
 
     if (!p) return null
 
@@ -62,11 +86,16 @@ export default function DemoPlantillaPremium({ plantillas, inicial, tieneAvanzad
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '10px 16px', borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg)' }}>
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    <button className="ds-hover" onClick={() => ir(-1)} aria-label="Plantilla anterior" style={flecha}><ChevronLeft size={16} strokeWidth={2} /></button>
-                    <button className="ds-hover" onClick={() => ir(1)} aria-label="Plantilla siguiente" style={flecha}><ChevronRight size={16} strokeWidth={2} /></button>
+                    <button className="ds-hover" onClick={() => ir(-1)} aria-label="Plantilla anterior" style={cuadrado}><ChevronLeft size={16} strokeWidth={2} /></button>
+                    <button className="ds-hover" onClick={() => ir(1)} aria-label="Plantilla siguiente" style={cuadrado}><ChevronRight size={16} strokeWidth={2} /></button>
                 </div>
                 <div style={{ flex: 1, minWidth: 180 }}>
-                    <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>{p.nombre}</div>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>
+                        {p.nombre}
+                        <span style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--color-muted)', marginLeft: 8 }}>
+                            {libre ? 'Gratis en tu plan' : tieneAvanzado ? 'Incluida en Avanzado' : 'Con el paquete Avanzado'}
+                        </span>
+                    </div>
                     <div style={{ fontSize: 12.5, color: 'var(--color-muted)' }}>
                         Demo con fotos y productos de muestra · {i + 1} de {plantillas.length}
                     </div>
@@ -79,10 +108,10 @@ export default function DemoPlantillaPremium({ plantillas, inicial, tieneAvanzad
                         </button>
                     ))}
                 </div>
-                <Button variant="primary" size="sm" icon={<ArrowRight size={13} strokeWidth={2.2} />} onClick={onSeguir}>
-                    {tieneAvanzado ? 'Usarla en mi tienda' : 'Desbloquear con Avanzado'}
+                <Button variant="primary" size="sm" icon={<ArrowRight size={13} strokeWidth={2.2} />} onClick={() => { setError(null); setConfirmar(true) }}>
+                    Usarla en mi tienda
                 </Button>
-                <button className="ds-hover" onClick={onCerrar} aria-label="Cerrar la demo" style={flecha}><X size={16} strokeWidth={2} /></button>
+                <button className="ds-hover" onClick={onCerrar} aria-label="Cerrar la demo" style={cuadrado}><X size={16} strokeWidth={2} /></button>
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', background: celular ? 'var(--color-surface-alt)' : p.tema.bg }}>
@@ -92,15 +121,50 @@ export default function DemoPlantillaPremium({ plantillas, inicial, tieneAvanzad
             </div>
 
             <div style={{ padding: '10px 16px', borderTop: '1px solid var(--color-border)', fontSize: 12.5, color: 'var(--color-muted)', background: 'var(--color-bg)' }}>
-                {tieneAvanzado
-                    ? 'Ya tenés el paquete Avanzado: la activás desde Avanzado → Plantillas y tu portada se arma con tu catálogo real.'
-                    : 'Las plantillas premium vienen con el paquete Avanzado. Al activarla, tu portada se arma con tu catálogo real, no con estas fotos.'}
+                Al usarla, tu portada se arma con tu catálogo, tus categorías y tus fotos, no con las de esta muestra.
             </div>
+
+            {confirmar && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 9600, display: 'grid', placeItems: 'center', padding: 16, background: 'rgba(15,23,42,0.45)' }}
+                    onClick={e => { if (e.target === e.currentTarget && !activando) setConfirmar(false) }}>
+                    <div role="alertdialog" aria-modal="true" aria-labelledby="demo-confirmar-titulo"
+                        style={{ width: '100%', maxWidth: 460, background: 'var(--color-bg)', borderRadius: 12, padding: 22, boxShadow: '0 20px 50px -20px rgba(0,0,0,0.45)' }}>
+                        {puedeUsar ? (<>
+                            <div id="demo-confirmar-titulo" style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>
+                                ¿Usar la plantilla {p.nombre} en tu tienda?
+                            </div>
+                            <div style={{ fontSize: 13.5, color: 'var(--color-body)', lineHeight: 1.6 }}>
+                                Tu portada pasa a usar este diseño, con tu catálogo real, apenas confirmes. Mientras esté
+                                activa, en Apariencia editás su contenido (hero, header, textos y pie); los colores y las letras
+                                los pone ella. Podés volver a la apariencia clásica cuando quieras, sin perder nada.
+                                {hayCambiosSinGuardar && <><br /><br />Tenés cambios sin guardar en Apariencia: no se publican.</>}
+                            </div>
+                            {error && <div style={{ fontSize: 13, color: 'var(--color-error)', marginTop: 12 }}>{error}</div>}
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18 }}>
+                                <Button variant="secondary" disabled={activando} onClick={() => setConfirmar(false)}>Cancelar</Button>
+                                <Button variant="primary" loading={activando} onClick={usar}>Sí, usarla</Button>
+                            </div>
+                        </>) : (<>
+                            <div id="demo-confirmar-titulo" style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>
+                                {p.nombre} viene con el paquete Avanzado
+                            </div>
+                            <div style={{ fontSize: 13.5, color: 'var(--color-body)', lineHeight: 1.6 }}>
+                                Todavía no tenés el paquete Avanzado. Con él la activás desde acá mismo, igual que las
+                                plantillas gratis de tu plan, y además tenés juegos con premio, modales de anuncios, 2x1 y más.
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18 }}>
+                                <Button variant="secondary" onClick={() => setConfirmar(false)}>Cerrar</Button>
+                                <Button variant="primary" onClick={onVerPlanes}>Ver planes</Button>
+                            </div>
+                        </>)}
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
 
-const flecha: CSSProperties = {
+const cuadrado: CSSProperties = {
     width: 34, height: 34, display: 'grid', placeItems: 'center', borderRadius: 8,
     border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-body)', cursor: 'pointer',
 }
