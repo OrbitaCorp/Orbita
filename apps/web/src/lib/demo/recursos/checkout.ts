@@ -104,7 +104,6 @@ registrar({
         buyerName: input.buyer.name,
         buyerEmail: input.buyer.email,
         buyerPhone: input.buyer.phone,
-        buyerDni: input.buyer.dni,
         carrier: input.carrier ?? null,
         carrierDeliveryMode: input.carrierDeliveryMode ?? null,
         tracking: null,

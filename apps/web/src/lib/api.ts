@@ -1434,7 +1434,7 @@ export type ApiOrderDetail = {
   }[]
   payments: { id: string; method: string; status: string; amount: number; mpFeeAmount: number | null }[]
   onlineOrderDetails?: {
-    buyerName: string; buyerEmail: string; buyerPhone: string | null; buyerDni: string | null
+    buyerName: string; buyerEmail: string; buyerPhone: string | null
     carrier: ApiCarrier | null; carrierDeliveryMode: 'DOMICILIO' | 'SUCURSAL' | null
     tracking: string | null; shippingCost: number | null
     shippingMethod: 'DELIVERY' | 'PICKUP' | null
@@ -1699,8 +1699,6 @@ export type ApiCustomer = {
   lastName: string | null
   email: string | null
   phone: string | null
-  // Solo en la exportación (GET /customers/export): la lista ya no lo trae.
-  dni?: string | null
   hasAccount: boolean
   orderCount: number
   totalSpent: number
@@ -1807,7 +1805,7 @@ export type CreateOrderInput = {
   // El email queda opcional (Fase 3 — Ale, 31/07): no todas las ventas
   // anónimas necesitan uno. Si el pedido va a un cliente YA registrado
   // (customerId), el backend igual exige que ESE cliente tenga email cargado.
-  buyer?: { name: string; email?: string; phone?: string; dni?: string }
+  buyer?: { name: string; email?: string; phone?: string }
   // "Solo registrar la venta": sin customerId ni buyer. Queda a nombre de
   // "Consumidor final" y no crea ficha en Clientes.
   sinComprador?: boolean
@@ -3045,7 +3043,7 @@ export function panelGetMetrics(filtros: Partial<MetricasFiltros> = {}) {
 
 export type MeProfile = {
   id: string; firstName: string; lastName: string | null; email: string | null
-  phone: string | null; dni: string | null; birthDate: string | null
+  phone: string | null; birthDate: string | null
   avatarUrl: string | null; emailVerified: boolean
 }
 export type MeAddress = {
@@ -3074,7 +3072,7 @@ export type MeSession = {
 // Datos personales (RBT-630)
 export function meGetProfile() { return panelRequest<MeProfile>('/me') }
 // currentPassword: obligatoria solo si el email cambia (auditoría interna 10/09).
-export function meUpdateProfile(input: Partial<Pick<MeProfile, 'firstName' | 'lastName' | 'email' | 'phone' | 'dni' | 'birthDate'>> & { currentPassword?: string }) {
+export function meUpdateProfile(input: Partial<Pick<MeProfile, 'firstName' | 'lastName' | 'email' | 'phone' | 'birthDate'>> & { currentPassword?: string }) {
   return panelRequest<MeProfile>('/me', { method: 'PATCH', body: JSON.stringify(input) })
 }
 export function meChangePassword(input: { currentPassword: string; newPassword: string }) {
@@ -3105,7 +3103,7 @@ export type MeOrderDetail = {
   ivaRatePercent: number | null
   items: { id: string; productName: string; variantLabel: string | null; imgUrl: string | null; quantity: number; unitPrice: number }[]
   onlineOrderDetails: {
-    buyerName: string; buyerEmail: string | null; buyerPhone: string | null; buyerDni: string | null
+    buyerName: string; buyerEmail: string | null; buyerPhone: string | null
     carrier: ApiCarrier | null; carrierDeliveryMode: 'DOMICILIO' | 'SUCURSAL' | null
     tracking: string | null; shippingAddressId: string | null
     shippingAddress: MeAddress | null
@@ -3206,9 +3204,9 @@ export type CheckoutShippingAddress = {
 export type CheckoutInput = {
   items: { variantId: string; quantity: number }[]
   // Teléfono obligatorio: el checkout coordina el envío por WhatsApp, sin
-  // teléfono no hay forma de contactar al comprador para eso. DNI obligatorio
-  // a pedido puntual — identifica al comprador para facturación/entrega.
-  buyer: { name: string; email: string; phone: string; dni: string }
+  // teléfono no hay forma de contactar al comprador para eso. (El DNI se
+  // sacó el 17/11.)
+  buyer: { name: string; email: string; phone: string }
   // Envío a domicilio vs. retiro en el local — independiente del método de
   // pago (antes 'PICKUP' era un valor de paymentMethod).
   shippingMethod: 'DELIVERY' | 'PICKUP'

@@ -163,7 +163,6 @@ export default function Perfil() {
       setApellido(p.lastName ?? '')
       setEmail(p.email ?? '')
       setTelefono(p.phone ?? '')
-      setDni(p.dni ?? '')
       setFechaNac(p.birthDate ? p.birthDate.slice(0, 10) : '')
     }).catch(() => {})
     meListOrders().then((r) => { setPedidos(r.data); setResumen(r.resumen) }).catch(() => {}).finally(() => setPedidosCargando(false))
@@ -190,7 +189,6 @@ export default function Perfil() {
   const [apellido, setApellido] = useState('')
   const [email, setEmail]       = useState('')
   const [telefono, setTelefono] = useState('')
-  const [dni, setDni]           = useState('')
   const [fechaNac, setFechaNac] = useState('')
   const [guardado, setGuardado] = useState(false)
   const [errorDatos, setErrorDatos] = useState('')
@@ -208,7 +206,7 @@ export default function Perfil() {
     try {
       const p = await meUpdateProfile({
         firstName: nombre, lastName: apellido || null, email: email || null,
-        phone: telefono || null, dni: dni || null, birthDate: fechaNac || null,
+        phone: telefono || null, birthDate: fechaNac || null,
         ...(cambiaEmail ? { currentPassword: passEmail } : {}),
       })
       setPerfil(p)
@@ -561,9 +559,6 @@ export default function Perfil() {
                 <div className="sf-prf-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
                   <FI label="Fecha de nacimiento">
                     <DateInput className="ds-field" value={fechaNac} onChange={setFechaNac} style={inputStyle} />
-                  </FI>
-                  <FI label="DNI / CUIL (opcional)">
-                    <input className="ds-field" value={dni} onChange={e => setDni(e.target.value)} placeholder="20-12345678-3" style={inputStyle} />
                   </FI>
                 </div>
 

@@ -239,13 +239,12 @@ function ListaView({
             const { data: todos } = await exportCustomers(busquedaLista || undefined)
             descargarCsv(
                 `clientes-${new Date().toISOString().slice(0, 10)}.csv`,
-                ['Nombre', 'Apellido', 'Email', 'Teléfono', 'DNI', 'Tiene cuenta', 'Pedidos', 'Gastado', 'Ticket promedio', 'Última compra', 'Cliente desde'],
+                ['Nombre', 'Apellido', 'Email', 'Teléfono', 'Tiene cuenta', 'Pedidos', 'Gastado', 'Ticket promedio', 'Última compra', 'Cliente desde'],
                 todos.map(c => [
                     c.firstName,
                     c.lastName ?? '',
                     c.email ?? '',
                     c.phone ?? '',
-                    c.dni ?? '',
                     c.hasAccount ? 'Sí' : 'No',
                     c.orderCount,
                     numAR(c.totalSpent),
@@ -336,7 +335,7 @@ function ListaView({
                     <span style={{ display:'inline-flex', alignItems:'center', height:24, padding:'0 10px', borderRadius:9999, background:'var(--color-surface-alt)', color:'var(--color-muted)', fontSize:12, fontWeight:600, fontFamily:'"Geist Mono", monospace' }}>{cargando && !datos ? '…' : `${total} clientes`}</span>
                 </div>
                 <div style={{ display:'flex', gap:8 }}>
-                    {/* Exportar baja la base entera (con DNI y teléfono): mismo
+                    {/* Exportar baja la base entera (con email y teléfono): mismo
                         gate de permiso que el email masivo — antes lo veía
                         cualquier rol, a diferencia de Pedidos que sí lo gatea. */}
                     {puede('customers.manage') && (
