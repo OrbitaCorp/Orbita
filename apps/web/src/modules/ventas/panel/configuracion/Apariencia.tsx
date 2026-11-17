@@ -33,6 +33,7 @@ import { SeccionCupon, SeccionEstadisticas, SeccionPie, SeccionTextos } from './
 import { SeccionPaleta, SeccionTipografia } from './components/apariencia/secciones/SeccionesDiseno'
 import { SeccionMarcas, SeccionParallax, SeccionVideo, SeccionWhatsapp } from './components/apariencia/secciones/SeccionesHome'
 import { SeccionesPlantilla } from './components/apariencia/secciones/SeccionesPlantilla'
+import { SeccionPlantillasPorDefecto } from './components/apariencia/secciones/SeccionPlantillasPorDefecto'
 import type { Apariencia as Ap } from './mock/apariencia.mock'
 
 interface AparienciaProps {
@@ -301,6 +302,10 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
             <div className="ap-split">
                 {/* Controles */}
                 <div className="ap-controles" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+                    {/* Primero: es el punto de partida. Elegir una completa
+                        los controles de abajo, y desde ahí se ajusta. */}
+                    <SeccionPlantillasPorDefecto ap={ap} actualizar={actualizar} ir={ir} onToast={onToast} />
 
                     {heroCard}
 

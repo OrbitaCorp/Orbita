@@ -880,6 +880,8 @@ export const CAPITULOS: Capitulo[] = [
             bloques: [
                 { tipo: 'parrafo', texto: 'Cómo se ve tu tienda. Es la pantalla más larga de Configuración, y se divide en secciones:' },
                 { tipo: 'lista', items: [
+                    '**Plantillas por defecto**: combinaciones ya armadas de todo lo de esta pantalla (colores, modo claro u oscuro, tipografías, header, estilo del nombre o logo, diseño de los slides, grilla, categorías, anuncio, WhatsApp y video). Tocás una y se completan esos controles de una; después podés cambiar cualquiera. No toca tus textos, fotos, logo ni lo que tenés prendido o apagado, y no se publica hasta que guardás. **Clásica** es la apariencia con la que arranca toda tienda nueva.',
+                    '**Plantillas premium**: en la misma sección, las portadas del paquete Avanzado. Desde acá se mira la demo de cada una (en computadora y en celular); para usarla en tu tienda hace falta el paquete Avanzado y se activa en Avanzado → Plantillas.',
                     '**Identidad de marca**: logo y favicon.',
                     '**Sliders del hero**: el carrusel de arriba de tu portada. Si no cargás ninguno, tu tienda muestra hasta tres automáticos, uno por categoría, con un texto genérico y un fondo de color; no se editan, y desaparecen apenas cargás el primero tuyo.',
                     '**Paleta de colores** y **Tipografía**: los colores y la letra de toda tu tienda, incluida la escala de texto.',

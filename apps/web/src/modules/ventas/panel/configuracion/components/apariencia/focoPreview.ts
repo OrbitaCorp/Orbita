@@ -58,6 +58,7 @@ export const FOCO_POR_CAMPO: Partial<Record<keyof Ap, ObjetivoPreview>> = {
 // tus clientes?" no tiene uno: son interruptores de partes distintas, y cada
 // uno lleva a lo suyo por campo.
 export const FOCO_POR_TARJETA: Record<string, ObjetivoPreview> = {
+    'ap-sec-plantillas': 'inicio',
     'ap-sec-identidad': 'header',
     'ap-sec-paleta': 'inicio',
     'ap-sec-tipografia': 'inicio',

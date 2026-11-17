@@ -14,7 +14,7 @@
 import { useEffect, useRef, useState, type ComponentType, type CSSProperties } from 'react'
 import {
     Palette, Droplets, Type, LayoutGrid, Eye, AlignLeft, Hash, PanelBottom, BadgeCheck, Video,
-    Image as ImageIcon, MessageCircle,
+    Image as ImageIcon, MessageCircle, LayoutTemplate,
 } from 'lucide-react'
 import type { VistaConfig } from './ConfigTabs'
 import { EVENTO_TARJETA } from './apariencia/focoPreview'
@@ -29,6 +29,7 @@ const INDICES: Partial<Record<VistaConfig, Indice>> = {
     apariencia: {
         titulo: 'Apariencia',
         secciones: [
+            { id: 'ap-sec-plantillas',    label: 'Plantillas por defecto',   Icon: LayoutTemplate },
             { id: 'ap-sec-identidad',     label: 'Identidad de marca',       Icon: Palette },
             { id: 'ap-sec-paleta',        label: 'Paleta de colores',        Icon: Droplets },
             { id: 'ap-sec-tipografia',    label: 'Tipografía',               Icon: Type },
