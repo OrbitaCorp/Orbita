@@ -89,8 +89,8 @@ function OfertaTermina({ hasta, color }: { hasta?: string | null; color?: string
     <span className="sf-termina" style={{ background: fondo }}>
       <style>{`
         .sf-termina {
-          display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
-          padding: 3px 9px 3px 7px; border-radius: 999px;
+          display: inline-flex; align-items: center; flex-wrap: wrap; column-gap: 5px; row-gap: 0;
+          max-width: 100%; padding: 3px 9px 3px 7px; border-radius: 12px;
           font-size: 11px; font-weight: 800; letter-spacing: 0.01em; line-height: 1.3;
           color: #fff; white-space: nowrap;
           box-shadow: 0 2px 8px rgba(0,0,0,0.18);
@@ -100,7 +100,10 @@ function OfertaTermina({ hasta, color }: { hasta?: string | null; color?: string
         @media (prefers-reduced-motion: reduce) { .sf-termina svg { animation: none; } }
       `}</style>
       <Timer size={12} strokeWidth={2.6} aria-hidden />
-      Termina en {texto}
+      {/* En dos partes: en una tarjeta angosta (dos columnas en un teléfono
+          chico) la pastilla corta entre las dos en vez de ensanchar la
+          tarjeta y empujar la grilla fuera de la pantalla (reportado 17/11). */}
+      <span>Termina en</span><span>{texto}</span>
     </span>
   )
 }
