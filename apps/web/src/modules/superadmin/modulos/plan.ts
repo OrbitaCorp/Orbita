@@ -204,9 +204,9 @@ const ALQUILERES = plan('alquileres', 'Alquileres', 'Alan',
   ],
   [
     // Semana 1 · arranque (jueves y viernes)
-    t('2026-11-05', 'Alan', 'Leer el contrato del backend compartido y armar el mapa pantalla → ruta de Alquileres', 'Tabla pantalla → ruta (panel y sitio) por modo, con lo que el backend no cubre marcado (por mes, paquetes, temporadas)'),
-    t('2026-11-05', 'Alan', 'Crear el negocio de prueba de Alquileres en dev con su ReservaConfig y una cancha', 'El negocio existe en dev con config de Alquileres y GET /reservas/recursos devuelve la cancha'),
-    t('2026-11-06', 'Alan', 'Separar en el panel de Alquileres la capa de datos: un origen (demo o API) por sección', 'Cada sección lee de una función de datos propia; la demo sigue igual con ?tipo='),
+    documentada(t('2026-11-05', 'Alan', 'Leer el contrato del backend compartido y armar el mapa pantalla → ruta de Alquileres', 'Tabla pantalla → ruta (panel y sitio) por modo, con lo que el backend no cubre marcado (por mes, paquetes, temporadas)'), 'auditoria.alquileres.2026-11-18-mapa-sobre-el-backend'),
+    documentada(t('2026-11-05', 'Alan', 'Crear el negocio de prueba de Alquileres en dev con su ReservaConfig y una cancha', 'El negocio existe en dev con config de Alquileres y GET /reservas/recursos devuelve la cancha'), 'auditoria.alquileres.2026-11-18-negocios-de-prueba'),
+    documentada(t('2026-11-06', 'Alan', 'Separar en el panel de Alquileres la capa de datos: un origen (demo o API) por sección', 'Cada sección lee de una función de datos propia; la demo sigue igual con ?tipo='), 'auditoria.alquileres.2026-11-18-capa-de-datos-por-origen'),
     t('2026-11-06', 'Alan', 'Definir con Ale cómo entran al backend los paquetes por salón, las temporadas y el alquiler por mes (datos del recurso o tarifa nueva)', 'Decisión registrada en Auditoría con la forma elegida y avisada antes de tocar lo compartido'),
     // Semana 2 · canchas
     t('2026-11-09', 'Alan', 'Canchas y extras como recursos CANCHA (duración de la franja, turnos seguidos, extras en datos)', 'Una cancha creada en el panel sale en GET /reservas/recursos con sus extras'),

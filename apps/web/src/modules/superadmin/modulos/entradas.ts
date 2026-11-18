@@ -159,6 +159,8 @@ const F13 = '2026-11-13'
 const F15 = '2026-11-15'
 // Lunes 16/11: la tabla rubro → sidebar de Turnos.
 const F16 = '2026-11-16'
+// Miércoles 18/11: el arranque de Alquileres sobre el backend y la estadía para el dueño chico.
+const F18 = '2026-11-18'
 
 export const ENTRADAS: Entrada[] = [
   // ─── Transversal · la sección Módulos ───────────────────────────────────────
@@ -2566,6 +2568,127 @@ Esas tres cosas se resuelven con las tareas de la semana 2.
       'apps/web/src/pages/panel/turnos.tsx:1',
       'apps/web/src/modules/turnos/datos/origen/api.ts:50',
       'apps/web/src/modules/turnos/datos/origen/__tests__/api.test.ts:1',
+    ],
+  }),
+
+  // ─── Ciclo 2 · Alquileres (Alan) ────────────────────────────────────────────
+  entrada({
+    modulo: 'alquileres', fecha: F18, slug: 'mapa-sobre-el-backend', tipo: 'tarea', quien: 'Alan',
+    titulo: 'El mapa de Alquileres sobre el backend compartido: cada pantalla con su ruta y lo que falta',
+    foco: 'Cada sección del panel y cada página del sitio de Alquileres, en sus tres modos (canchas, salones, estadía), con la ruta de /reservas que la cubre, y los 18 faltantes del backend con su propuesta. Lo compartido se habla con Ale antes de tocarlo.',
+    que: `Tarea del 05/11 del plan, hecha el 18/11 (casi dos semanas tarde contra el plan). El diseño completo está en \`docs/superpowers/specs/2026-11-18-alquileres-sobre-el-backend-design.md\`; esto es el resumen.
+
+**Panel, común a los tres modos** (rutas \`/api/v1/reservas/...\`, sesión del panel):
+
+| Sección | Lee | Escribe | Estado |
+|---|---|---|---|
+| Reservas o Calendario | \`GET /reservas\` (en tramos de 90 días), \`GET /:id\` | \`confirmar\`, \`completar\`, \`ausente\`, \`cancelar\`, \`reprogramar\`, \`nota\` | Cubre |
+| Nueva reserva a mano | \`GET /disponibilidad\` o \`/noches\` | \`POST /reservas\` | Cubre; el canal → F8 |
+| Qué hay libre | \`/disponibilidad\`, \`/rango\`, \`/noches\` | — | Cubre |
+| Clientes o Huéspedes | Las reservas, por persona | — | Parcial → F13 |
+| Ingresos | \`GET /resumen\` y las reservas | \`POST /:id/pago\` | Parcial: sin canal ni Airbnb |
+| Reglas de reserva | \`GET /config\` | \`PUT /config\` | Parcial → F11 |
+| Bloqueos | \`GET /bloqueos\` | \`POST\`, \`DELETE /bloqueos\` | Cubre; los del .ics → F9 |
+| Recordatorios y mensajes | — | — | Falta → F10 |
+| Pagos y señas | \`GET /config\` | \`PUT /config\` | Parcial → F11 y F15 |
+| Calendarios (.ics) | — | — | Falta: hoy simulado → F9 |
+| Configuración → Equipo | Miembros de Órbita | — | Parcial → F12 |
+
+**Panel, por modo:** canchas, extras y salones cubren (recursos \`CANCHA\` y \`SALON\`; los extras de la demo son del negocio y el motor los tiene por recurso). Faltan los precios por horario (F2), los paquetes (F3), las temporadas (F4) y el alquiler por mes (F5). Las propiedades cubren lo de reservar (\`ALOJAMIENTO\` con check-in, check-out y noches mínimas en \`datos\`).
+
+**Sitio** (\`/api/v1/storefront/:slug/reservas/...\`): portada, reserva de cancha y Mi reserva cubren; la de salón y la de estadía, parciales (F3, F4, F6, F15); Mis reservas con sesión falta (F14). La página \`/mi-reserva/<token>\` no existe todavía y los emails ya apuntan ahí.
+
+**Lo que el backend no cubre.** (c) = compartido: lo decide Ale, está en su decisión abierta del 18/11.
+
+1. **Rubro:** como Turnos, \`industry: "alquileres"\` y \`subrubros\`. Sin migración.
+2. **Precios por horario** de las canchas: el cálculo al servidor (c).
+3. **Paquetes por salón:** cada paquete es un servicio limitado a su salón. Probablemente sin tocar lo compartido.
+4. **Temporadas, fin de semana y limpieza:** el cálculo al servidor (c).
+5. **Por mes:** mismo alojamiento con \`modalidad: "mes"\`; lo de menor prioridad (c).
+6. **\`datos\` en la reserva** para el evento, los huéspedes, el canal y el depósito (c, migración).
+7. **Depósito de garantía:** se registra en \`datos\` de la reserva.
+8. **Canal de cada reserva** y el resumen por canal (c).
+9. **Calendarios externos de verdad** (c, migración y sincronización).
+10. **Plantillas de mensajes:** \`datos\` en la config, igual que pide Turnos (c).
+11. **Formas de pago y alias:** en la misma \`datos\`. En la primera versión la seña es un porcentaje del total y se pierde o no.
+12. **Roles:** los bloqueos piden \`reservas.config\`; propuesta: pasarlos a \`manage\` (c).
+13. **Clientes** y 14. **Mis reservas con sesión:** los mismos faltantes de Turnos, una sola solución (c).
+15. **Seña online con Mercado Pago y devolución:** la decisión abierta de Ale del 03/11 (c).
+16. **Recordatorio del día anterior:** idem (c).
+17. **Ficha de Google Maps:** pieza transversal (c).
+18. **Ingresos de Airbnb** por el CSV: tabla propia de Alquileres.
+
+**Lo que falta del lado del front:** las rutas de producción (igual que Turnos, una solución para los tres) y el "hoy" fijo de la demo (\`HOY = 2026-11-14\`).`,
+    archivos: [
+      'apps/api/src/reservas/reservas-panel.controller.ts:22',
+      'apps/api/src/reservas/reservas-publico.controller.ts:29',
+      'apps/api/src/reservas/dominio/precio.ts:1',
+      'apps/api/src/reservas/reservas-catalogo.service.ts:36',
+      'apps/web/src/modules/alquileres/admin/navegacion.ts:1',
+      'apps/web/src/modules/alquileres/datos/index.ts:1',
+      'apps/web/src/lib/reservas/estadia.ts:1',
+    ],
+  }),
+  entrada({
+    modulo: 'alquileres', fecha: F18, slug: 'capa-de-datos-por-origen', tipo: 'tarea', quien: 'Alan',
+    titulo: 'El panel de Alquileres lee de un origen: la demo o la API de reservas',
+    foco: 'Panel.tsx ya no llama a useNegocio(): le pide sus datos al origen del contexto. Por defecto la demo, así /alquileres-demo queda igual; el origen de la API trae el negocio, los recursos del modo, las reservas y los bloqueos, y por ahora solo lee.',
+    que: `Tarea del 06/11 del plan, hecha el 18/11. Mismo patrón que Turnos, sin importarlo (los módulos no se importan entre sí).
+
+- **El origen** (\`datos/origen/index.ts\`): \`useDatos()\` devuelve el negocio, las reservas, los clientes, si ya llegó, el error y las siete escrituras con las mismas firmas que el almacén de la demo. El panel lo toma del contexto; el de un negocio real monta \`<OrigenAlquileresProvider origen={origenApi}>\`.
+- **La demo** (\`demo.ts\`) envuelve \`useNegocio()\` tal cual. Hay un test que la compara con el almacén en los tres modos, y se probó a mano en el navegador (los tres modos y quitar un bloqueo).
+- **La API** (\`api.ts\`): el negocio y su modo salen de \`/business\` (el primer subrubro de Alquileres); los recursos del modo, los servicios (paquetes), los bloqueos y las reservas de medio año para cada lado, en tramos de 90 días. Sin config de Alquileres, el panel lo dice y ofrece Reintentar. Las escrituras todavía no llegan a la API: el panel lo avisa arriba.
+- **Las traducciones** (\`mapear.ts\`, con 21 tests): fechas de Argentina, estados (VENCIDA no se muestra; AUSENTE va como cancelada hasta que Ingresos lo resuelva), la apertura con el lunes en 0, un bloqueo de todo el negocio repartido en cada unidad, clientes sin ficha por teléfono, email o nombre, y lo que la API no guarda con su valor de fábrica (mensajes, pagos, equipo, calendarios).
+- **Para probarlo:** \`/panel/alquileres\` en local (no existe en producción), con los negocios de prueba de la entrada de hoy.
+- **Verificado:** typecheck y eslint de \`apps/web\` sin errores, tests de Alquileres en verde (43), y por un script las seis rutas que usa el origen con los tres dueños de prueba. El panel con datos reales no se vio pintado: el navegador de la sesión no dejaba abrir el subdominio ni llamar a la API local.`,
+    archivos: [
+      'apps/web/src/modules/alquileres/datos/origen/index.ts:1',
+      'apps/web/src/modules/alquileres/datos/origen/demo.ts:1',
+      'apps/web/src/modules/alquileres/datos/origen/api.ts:58',
+      'apps/web/src/modules/alquileres/datos/origen/mapear.ts:256',
+      'apps/web/src/modules/alquileres/datos/origen/__tests__/mapear.test.ts:1',
+      'apps/web/src/modules/alquileres/admin/Panel.tsx:79',
+      'apps/web/src/pages/panel/alquileres.tsx:1',
+    ],
+  }),
+  entrada({
+    modulo: 'alquileres', fecha: F18, slug: 'negocios-de-prueba', tipo: 'tarea', quien: 'Alan',
+    titulo: 'Un negocio de prueba por modo de Alquileres en la base de dev',
+    foco: 'pnpm seed:alquileres-prueba arma en dev canchas-prueba, salones-prueba y cabanas-prueba, con su config de Alquileres, bloqueos y reservas en todos los estados alrededor de hoy. Solo corre contra dev y se puede repetir.',
+    que: `Tarea del 05/11 del plan, hecha el 18/11. El plan pedía un negocio con una cancha; como cada negocio tiene un solo modo, son tres:
+
+| Negocio | Subrubro | Qué tiene |
+|---|---|---|
+| \`canchas-prueba\` | canchas | 4 canchas por hora con extras, unas 3.100 reservas en seis meses |
+| \`salones-prueba\` | salon-cumples | 2 salones por bloque con 2 paquetes cada uno (servicios del salón), unas 220 reservas |
+| \`cabanas-prueba\` | cabana | 3 propiedades por noche (check-in 14:00, check-out 10:00, dos noches mínimas), unas 75 estadías |
+
+- Reservas entre 90 días atrás y 90 adelante, sin pisarse, con seña del 30 %, y en todos los estados: las pasadas completadas, algunas ausentes o canceladas; las que vienen confirmadas, pendientes o canceladas.
+- Un par de bloqueos por negocio (uno de todo el negocio en canchas y salones, uno por propiedad en cabañas).
+- **Para entrar:** \`dueno@<slug>.invalid\`, con la contraseña de \`ALQUILERES_PRUEBA_PASSWORD\` del \`.env\` local de \`apps/api\` (no se imprime ni se commitea).
+- **Verificado:** el seed corrido dos veces contra dev con los mismos números, y login como los tres dueños con las rutas del panel respondiendo.`,
+    archivos: [
+      'apps/api/prisma/seed-alquileres-prueba.ts:1',
+      'apps/api/package.json:22',
+      'apps/web/src/pages/panel/alquileres.tsx:1',
+    ],
+  }),
+  entrada({
+    modulo: 'alquileres', fecha: F18, slug: 'estadia-para-el-dueno-chico', tipo: 'decisión', quien: 'Alan',
+    titulo: 'La estadía apunta al dueño chico: Airbnb por calendario y CSV, Google Maps, seña online y estadísticas',
+    foco: 'Para la cabaña o el depto chico (Iguazú y lugares así), un solo panel que junta lo que entra por WhatsApp, Airbnb y el sitio propio, sin channel managers ni Booking. Airbnb no tiene API abierta: va por calendario .ics y el CSV de ganancias.',
+    que: `Alan definió el 18/11 hacia dónde va el modo estadía, con una investigación de qué permiten Airbnb y Google. Es lo nuevo que se suma al plan del ciclo (que solo pedía llevar la estadía al backend), así que el cuándo lo ve Ale.
+
+- **Airbnb no tiene API abierta:** solo la usan unas 40 empresas aprobadas, sin admisión abierta. Desde Órbita no se pueden subir fotos, cambiar precios ni leer mensajes de Airbnb. Sí se puede, como cualquier anfitrión: sincronizar el calendario \`.ics\` en las dos direcciones e importar el CSV de ganancias.
+- **Google Business Profile sí tiene API:** fotos, reseñas (leer y responder) y métricas (vistas, llamadas, clics al sitio, "cómo llegar"). Pide que Órbita solicite el acceso una vez (unas dos semanas de revisión) y que cada dueño conecte su ficha. Aparecer en el buscador de alojamientos de Google con precio no se puede: no acepta dueños individuales.
+- **Mercado Pago** ya está conectado por negocio en Ventas: la seña online reusa eso.`,
+    decision: 'La estadía es para el dueño chico y se arma sobre la demo de Alquileres. Airbnb: calendario sincronizado en las dos direcciones y el CSV de ganancias importado; las fotos y precios de Airbnb se siguen editando en Airbnb, y una estadía de Airbnb nunca se carga a mano como reserva. Google Maps: fotos, reseñas y métricas desde el panel, como pieza común de Órbita. Sitio propio: seña online con Mercado Pago; sin Mercado Pago, seña por transferencia que el dueño registra, y una reserva con la seña sin pagar la libera el dueño (no vence sola). Estadísticas: ocupación, ingresos, precio promedio por noche y de dónde vienen las reservas, junto a los números de Google. Fuera: channel managers, Booking y el buscador de alojamientos de Google.',
+    porque: 'Un depto chico en Iguazú no está en Booking: como mucho en Airbnb y en Google Maps, y las reservas le llegan por WhatsApp. Un intermediario certificado (lo único que permite manejar Airbnb por API) cobra por propiedad y por mes, y se come el margen de un dueño chico; lo que más le importa, no reservar dos veces lo mismo y ver sus números, sale con lo gratis. La seña la libera el dueño porque un vencimiento automático puede borrar la reserva de alguien que transfirió y el dueño no lo registró a tiempo. Alan pidió que el resto de las decisiones de diseño las tome Claude con sus recomendaciones; están marcadas así en el documento de diseño.',
+    archivos: [
+      'apps/web/src/modules/alquileres/admin/configuracion/Calendarios.tsx:1',
+      'apps/web/src/lib/reservas/ics.ts:1',
+      'apps/api/src/mercadopago/mercadopago.service.ts:388',
+      'apps/api/src/reservas/reservas.service.ts:100',
     ],
   }),
 ]
