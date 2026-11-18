@@ -2158,6 +2158,51 @@ export function panelUpdateProduct(id: string, input: UpsertProductInput) {
   return panelRequest<ApiProductFull>(`/products/${id}`, { method: 'PUT', body: JSON.stringify(input) })
 }
 
+// ─── Actualizar precios con Excel ───────────────────────────────────────────
+// Una fila por variante activa (ver precios-lote.service.ts). El código es el
+// id de la variante: es lo que el Excel trae de vuelta para saber qué cambiar.
+export interface FilaPrecioExcel {
+  variantId: string
+  nombre: string
+  variante: string
+  sku: string | null
+  categoria: string | null
+  precio: number
+  stock: number
+  estado: 'PUBLISHED' | 'DRAFT' | 'OUT_OF_STOCK'
+}
+export interface CambioDePrecioExcel {
+  variantId: string
+  productId: string
+  nombre: string
+  variante: string
+  antes: number
+  despues: number
+}
+export interface ResultadoPreciosExcel {
+  cambios: CambioDePrecioExcel[]
+  sinCambios: number
+  noEncontradas: string[]
+  aplicado: boolean
+}
+
+export function panelGetFilasPrecios(filters: Pick<ProductListFilters, 'search' | 'categoryId' | 'status'> = {}) {
+  const qs = new URLSearchParams()
+  if (filters.search) qs.set('search', filters.search)
+  if (filters.categoryId) qs.set('categoryId', filters.categoryId)
+  if (filters.status) qs.set('status', filters.status)
+  const query = qs.toString()
+  return panelRequest<FilaPrecioExcel[]>(`/products/precios-lote${query ? `?${query}` : ''}`)
+}
+
+/** Con `simular` no guarda nada: devuelve qué cambiaría, para el resumen. */
+export function panelActualizarPrecios(items: { variantId: string; price: number }[], simular: boolean) {
+  return panelRequest<ResultadoPreciosExcel>('/products/precios-lote', {
+    method: 'POST',
+    body: JSON.stringify({ items, simular }),
+  })
+}
+
 // Baja lógica: el producto desaparece del panel pero los pedidos históricos
 // que lo referencian siguen intactos.
 export function panelDeleteProduct(id: string) {
