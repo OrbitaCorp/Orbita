@@ -13,18 +13,20 @@
 //
 // Todo lo que se toca acá vive en el almacén de la demo (datos/negocio.ts):
 // una reserva que se confirma en el panel se ve en "Mis reservas", y una que
-// se hace desde el sitio aparece acá (y en la campanita). No hay backend.
+// se hace desde el sitio aparece acá (y en la campanita). Eso es con el origen
+// de la demo, el de fábrica; el panel de un negocio real monta el origen de la
+// API de reservas (datos/origen), que por ahora solo lee.
 import { useEffect, useEffectEvent } from 'react'
 import { useRouter } from 'next/router'
 import { Ban, Building2, CalendarCheck, CalendarDays, CalendarSearch, Contact, HandCoins, Home, Link2, LogIn, LogOut, MessageSquare, Package, PartyPopper, Settings, ShieldCheck, Sparkles, Sun, Tag, Trophy, Wallet, type LucideIcon } from 'lucide-react'
 import LayoutPanel, { type AvisoNav, type ItemBusqueda, type ItemNav } from '@/design-system/reservas/LayoutPanel'
-import { useAviso } from '@/design-system/reservas/piezas'
+import { Nota, Vacio, useAviso } from '@/design-system/reservas/piezas'
 import { SkeletonVista, useCargaSimulada, type FormaSkeleton } from '@/design-system/reservas/skeleton'
 import { DIAS_CORTOS, MESES_CORTOS, diaSemana, fechaCorta, hhmm, partes, rangoTxt } from '@/lib/reservas/fechas'
 import { pesos } from '@/lib/reservas/precio'
 import { AHORA, HOY, capital, clientePorId, cuenta, duracionEstadiaTxt, fechaDeReserva, palabrasDe, reservasDelDia, rolDe, rubroPorKey, tituloEvento, unidadPorId, unidadesDe, type Bloqueo, type NegocioAlquiler, type Reserva } from '../datos'
 import { deCalendario } from '../datos/negocio'
-import { useNegocio } from '../demo/useNegocio'
+import { useOrigenAlquileres } from '../datos/origen'
 import { ruta } from '../storefront/Sitio'
 import { resolverRuta, seccionesDe, type TabConfiguracion, type Vista } from './navegacion'
 import { EstiloPanelAlquileres } from './piezas'
@@ -73,16 +75,20 @@ function cuandoDe(n: NegocioAlquiler, r: Reserva) {
 
 export default function Panel() {
   const router = useRouter()
-  const n = useNegocio()
-  const { tipo, negocio, reservas, clientes, hidratado } = n
+  // Los datos salen del origen del contexto: la demo por defecto, la API en el panel de un negocio real (datos/origen).
+  const origen = useOrigenAlquileres()
+  const n = origen.useDatos()
+  const { tipo, negocio, reservas, clientes, listo } = n
   const [avisar, aviso] = useAviso()
   const palabras = palabrasDe(negocio)
-  // La espera fingida de la demo (ver skeleton.tsx) y lo guardado que el navegador lee después del primer pintado.
-  const cargando = useCargaSimulada() || !hidratado
+  // La espera fingida es solo de la demo (ver skeleton.tsx); con la API se espera a que lleguen los datos.
+  const simulada = useCargaSimulada()
+  const cargando = (origen.tipo === 'demo' && simulada) || !listo
   // Cada modo arranca con su propio estado de pantalla, y todo se vuelve a
-  // montar una vez cuando el navegador lee lo guardado: los formularios
-  // siembran su estado con el negocio, y al recargar se quedaban con el de ejemplo.
-  const k = `${tipo}:${hidratado ? 'guardado' : 'fabrica'}`
+  // montar una vez cuando llegan los datos (en la demo, cuando el navegador
+  // lee lo guardado): los formularios siembran su estado con el negocio, y al
+  // recargar se quedaban con el de ejemplo.
+  const k = `${tipo}:${listo ? 'guardado' : 'fabrica'}`
   const secciones = seccionesDe(tipo, palabras)
   const r = resolverRuta(router.query, tipo)
   const { vista, tab } = r
@@ -122,7 +128,7 @@ export default function Panel() {
   // ── La campanita: lo que pide atención hoy ──
   const avisos: AvisoNav[] = []
   // Lo que se reservó en la demo (desde el sitio o a mano) es la novedad de verdad: entra sin leer.
-  for (const x of (n.demo.reservas[tipo] ?? []).slice(-3).reverse()) {
+  for (const x of (n.demo?.reservas[tipo] ?? []).slice(-3).reverse()) {
     avisos.push({ id: `nueva-${x.id}`, Icon: CalendarCheck, titulo: `${x.meses ? 'Nuevo contrato' : 'Nueva reserva'}: ${nombre(x)}`, detalle: cuandoDe(negocio, x), cuando: `Hoy ${hhmm(AHORA)}`, nueva: true, onAbrir: () => verReserva(x.id) })
   }
   pendientes.slice(0, 3).forEach((x, i) => {
@@ -177,7 +183,10 @@ export default function Panel() {
     <LayoutPanel producto="Alquileres" negocio={negocio.nombre} rubro={rubroPorKey(negocio.rubro).label} fecha={FECHA} items={items} activo={vista} tab={tab} onIr={ir} sitio={ruta('inicio', tipo)}
       avisos={cargando ? [] : avisos} busqueda={busqueda} buscar={`Buscar ${palabras.clientes === 'eventos' ? 'eventos' : palabras.clientes}, reservas o secciones`} usuario={usuario} cargando={cargando}>
       <EstiloPanelAlquileres />
-      {cargando ? <SkeletonVista forma={FORMAS[vista]} nombre={nombreVista} /> : (
+      {n.soloLectura && !n.error && <div style={{ marginBottom: 16 }}><Nota tono="info"><span>Prueba con la API: lo que cambies acá todavía no se guarda.</span></Nota></div>}
+      {n.error ? (
+        <Vacio titulo="No pudimos traer los datos del panel" texto={n.error} accion={<button type="button" className="rv-btn rv-btn--sm" onClick={n.reintentar}>Reintentar</button>} />
+      ) : cargando ? <SkeletonVista forma={FORMAS[vista]} nombre={nombreVista} /> : (
         <>
           {vista === 'reservas' && <Reservas key={k} negocio={negocio} reservas={reservas} clientes={clientes} reservaAbierta={reservaAbierta} onAbrirReserva={abrirReserva} onCambiar={cambiar} onReservar={reservar} onBloqueo={bloquear} onQuitarBloqueo={quitarBloqueo} />}
           {vista === 'disponibilidad' && <Disponibilidad key={k} negocio={negocio} reservas={reservas} clientes={clientes} onReservar={reservar} onCambiar={cambiar} />}
