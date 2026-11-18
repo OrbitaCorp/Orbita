@@ -7,7 +7,7 @@ import { ESTADO_AYUDA_VACIO, parsear } from '../almacen'
 import { puedeUsarModoPrueba, comandoDeQuery, cumplidasSimuladas, siguientePasoDePrueba } from '../acceso'
 import { INTERVALO_MS, SUGERENCIAS, claveDeSugerencia, elegirSugerencia } from '../sugerencias'
 import { VIDEOS_PROPIOS, agruparPorPantalla, sumarPropios } from '../videos'
-import { NOVEDADES, indiceInicialNovedades, novedadesSinVer } from '../novedades'
+import { NOVEDADES, indiceInicialNovedades, novedadesSinVer, novedadesVigentes, leidaEn, LEIDAS_SIN_FECHA_DESDE, NOVEDAD_LEIDA_DURA_MS } from '../novedades'
 
 describe('recorrido por módulo', () => {
     it('las claves son secciones del panel o una vista de Configuración', () => {
@@ -294,5 +294,30 @@ describe('novedades del panel', () => {
         expect(parsear('{"novedadesVistas":["2026-11-orbi-barra",42,null,"otra"]}').novedadesVistas)
             .toEqual(['2026-11-orbi-barra', 'otra'])
         expect(parsear('{"novedadesVistas":"no-es-array"}').novedadesVistas).toEqual([])
+    })
+
+    describe('cuánto dura una novedad: hasta leerla, y 3 días más', () => {
+        const DIA = 24 * 60 * 60 * 1000
+        const lista = [{ ...NOVEDADES[0], id: 'a' }, { ...NOVEDADES[0], id: 'b' }]
+        const ahora = Date.parse('2026-12-10T12:00:00-03:00')
+
+        it('una sin leer no se va nunca, aunque pasen meses', () => {
+            expect(novedadesVigentes({ novedadesVistas: [], novedadesLeidasEn: {} }, ahora + 400 * DIA, lista).map(n => n.id)).toEqual(['a', 'b'])
+        })
+
+        it('leída, sigue 3 días y después se va', () => {
+            const leida = { novedadesVistas: ['a'], novedadesLeidasEn: { a: ahora } }
+            expect(novedadesVigentes(leida, ahora + 2 * DIA, lista).map(n => n.id)).toEqual(['a', 'b'])
+            expect(novedadesVigentes(leida, ahora + 3 * DIA, lista).map(n => n.id)).toEqual(['b'])
+        })
+
+        it('las "vistas" de antes del cambio (sin fecha) cuentan como leídas el día del cambio', () => {
+            expect(leidaEn('a', { novedadesVistas: ['a'], novedadesLeidasEn: {} })).toBe(LEIDAS_SIN_FECHA_DESDE)
+            expect(novedadesVigentes({ novedadesVistas: ['a'], novedadesLeidasEn: {} }, LEIDAS_SIN_FECHA_DESDE + NOVEDAD_LEIDA_DURA_MS, lista).map(n => n.id)).toEqual(['b'])
+        })
+
+        it('parsear guarda la fecha de lectura y descarta valores rotos', () => {
+            expect(parsear('{"novedadesLeidasEn":{"a":123,"otra":"x"}}').novedadesLeidasEn).toEqual({ a: 123 })
+        })
     })
 })

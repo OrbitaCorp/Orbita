@@ -43,7 +43,7 @@ import { EVENTO_ABRIR_NOVEDADES } from './NovedadesBoton'
 import Foco from './Foco'
 import EleccionTutorial from './EleccionTutorial'
 import ModalNovedades from './ModalNovedades'
-import { NOVEDADES, indiceInicialNovedades, novedadesSinVer } from './novedades'
+import { NOVEDADES, indiceInicialNovedades, novedadesSinVer, novedadesVigentes, type Novedad } from './novedades'
 
 // Mientras hay un paso a medias se vuelve a preguntar cada tanto: crear la
 // categoría o el producto no cambia de ruta, y el cierre tiene que aparecer
@@ -81,6 +81,10 @@ export default function AyudaHost() {
     // Modal de novedades del panel (carrusel compacto).
     const [novedadesAbiertas, setNovedadesAbiertas] = useState(false)
     const [indiceNovedadInicial, setIndiceNovedadInicial] = useState(0)
+    // Las vigentes al momento de abrir (ver novedadesVigentes). Quedan fijas
+    // mientras el modal está abierto: leer una no la saca de la lista ahí mismo.
+    const [novedadesMostradas, setNovedadesMostradas] = useState<readonly Novedad[]>([])
+    const novedadesAutoYa = useRef(false)
 
     const path = router.asPath.split(/[?#]/)[0]
     const segmentos = path.split('/').filter(Boolean)
@@ -319,41 +323,55 @@ export default function AyudaHost() {
     // Se abren automáticamente 1 vez por actualización al entrar a Inicio
     // (dashboard) cuando no hay primeros pasos activos, y se pueden reabrir
     // desde el botón compacto del encabezado en cualquier momento.
-    const marcarNovedadesVistas = useCallback(() => {
-        const ids = NOVEDADES.map(n => n.id)
+    // Leída = su diapositiva se mostró (la avisa ModalNovedades). Desde ahí la
+    // novedad sigue 3 días y se va (ver novedades.ts).
+    const marcarNovedadLeida = useCallback((id: string) => {
         actualizarAyuda(a => {
-            const faltantes = ids.filter(id => !a.novedadesVistas.includes(id))
-            return faltantes.length === 0 ? a : { ...a, novedadesVistas: [...a.novedadesVistas, ...faltantes] }
+            if (typeof a.novedadesLeidasEn[id] === 'number') return a
+            return {
+                ...a,
+                novedadesVistas: a.novedadesVistas.includes(id) ? a.novedadesVistas : [...a.novedadesVistas, id],
+                novedadesLeidasEn: { ...a.novedadesLeidasEn, [id]: Date.now() },
+            }
         })
     }, [actualizarAyuda])
+
+    // Abre el modal con las vigentes, parado en la primera sin leer.
+    const abrirConVigentes = useCallback((a: { novedadesVistas: string[]; novedadesLeidasEn: Record<string, number> }) => {
+        const vigentes = novedadesVigentes(a, Date.now())
+        if (vigentes.length === 0) return false
+        setNovedadesMostradas(vigentes)
+        setIndiceNovedadInicial(indiceInicialNovedades(a.novedadesVistas, vigentes))
+        setNovedadesAbiertas(true)
+        return true
+    }, [])
 
     const mostrarNovedadesAuto = hayNovedadesPendientes && listoParaAviso && primeros.tipo === 'nada' && !eleccionVisible
         && !novedadesAbiertas && !hojaAbierta && !eligiendo && !confirmando
 
     useEffect(() => {
-        if (!mostrarNovedadesAuto || !ayuda) return
+        if (!mostrarNovedadesAuto || !ayuda || novedadesAutoYa.current) return
+        // Una sola vez por visita: si la cierra sin pasar por todas, las que
+        // quedaron sin leer siguen en el botón y vuelven a abrirse en la
+        // próxima visita a Inicio, no apenas cierra.
+        novedadesAutoYa.current = true
         // eslint-disable-next-line react-hooks/set-state-in-effect
-        setIndiceNovedadInicial(indiceInicialNovedades(ayuda.novedadesVistas))
-        setNovedadesAbiertas(true)
-        marcarNovedadesVistas()
-    }, [mostrarNovedadesAuto, ayuda, marcarNovedadesVistas])
+        abrirConVigentes(ayuda)
+    }, [mostrarNovedadesAuto, ayuda, abrirConVigentes])
 
     useEffect(() => {
         if (!esAdmin || NOVEDADES.length === 0) return
         const abrirNovedades = () => {
-            const vistas = ayudaRef.current?.novedadesVistas ?? []
             setHojaAbierta(false)
             setAvisoCerrado(true)
             setSugerencia(null)
             setEligiendo(null)
             setConfirmando(null)
-            setIndiceNovedadInicial(indiceInicialNovedades(vistas))
-            setNovedadesAbiertas(true)
-            marcarNovedadesVistas()
+            abrirConVigentes(ayudaRef.current ?? { novedadesVistas: [], novedadesLeidasEn: {} })
         }
         window.addEventListener(EVENTO_ABRIR_NOVEDADES, abrirNovedades)
         return () => window.removeEventListener(EVENTO_ABRIR_NOVEDADES, abrirNovedades)
-    }, [esAdmin, marcarNovedadesVistas])
+    }, [esAdmin, abrirConVigentes])
 
     // ── Sugerencias ──
     // Solo a quien ya terminó los primeros pasos y no tiene nada más en pantalla.
@@ -416,10 +434,11 @@ export default function AyudaHost() {
             onCerrar={() => setEligiendo(null)}
         />
     )
-    const novedadesNodo = novedadesAbiertas && NOVEDADES.length > 0 && (
+    const novedadesNodo = novedadesAbiertas && novedadesMostradas.length > 0 && (
         <ModalNovedades
-            novedades={NOVEDADES}
+            novedades={novedadesMostradas}
             indiceInicial={indiceNovedadInicial}
+            onLeida={marcarNovedadLeida}
             onCerrar={() => setNovedadesAbiertas(false)}
             onIrA={(destino, query) => {
                 setNovedadesAbiertas(false)

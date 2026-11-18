@@ -8,7 +8,7 @@ import { useCallback, useSyncExternalStore } from 'react'
 import { Sparkles } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { EVENTO_CAMBIO_AYUDA, leerAyuda } from './almacen'
-import { NOVEDADES, novedadesSinVer } from './novedades'
+import { NOVEDADES, novedadesSinVer, novedadesVigentes } from './novedades'
 
 export const EVENTO_ABRIR_NOVEDADES = 'orbita:abrir-novedades'
 
@@ -31,8 +31,14 @@ export default function NovedadesBoton() {
         [negocioId],
     )
     const sinVer = useSyncExternalStore(suscribirAyuda, getSnapshot, () => 0)
+    // Sin ninguna vigente (todas leídas hace más de 3 días) el botón no aparece.
+    const getVigentes = useCallback(
+        () => (negocioId ? novedadesVigentes(leerAyuda(negocioId), Date.now()).length : 0),
+        [negocioId],
+    )
+    const vigentes = useSyncExternalStore(suscribirAyuda, getVigentes, () => 0)
 
-    if (!esAdmin || NOVEDADES.length === 0) return null
+    if (!esAdmin || NOVEDADES.length === 0 || vigentes === 0) return null
 
     return (
         <>
