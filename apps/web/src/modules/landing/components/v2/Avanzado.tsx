@@ -18,16 +18,16 @@ interface Parte { titulo: string; texto: string; desde: number; icon: ReactNode 
 const PARTES: Parte[] = [
     { titulo: 'Plantillas de portada', texto: 'Dieciséis diseños para la portada de tu tienda.', desde: 0,
       icon: <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 21V9" /></> },
-    { titulo: 'Juegos con premio', texto: 'Tu cliente juega, gana un descuento y el cupón se crea solo.', desde: 8.5,
+    { titulo: 'Juegos con premio', texto: 'Tu cliente juega, gana un descuento y el cupón se crea solo.', desde: 6.6,
       icon: <><path d="M6 11h4M8 9v4M15 12h.01M18 10h.01" /><rect x="2" y="6" width="20" height="12" rx="4" /></> },
-    { titulo: 'Anuncios en la tienda', texto: 'Promos y bienvenidas, en el momento justo.', desde: 22.5,
+    { titulo: 'Anuncios en la tienda', texto: 'Promos y bienvenidas, en el momento justo.', desde: 20.6,
       icon: <><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></> },
-    { titulo: 'Oferta relámpago', texto: 'Un reloj en tu portada que cuenta lo que falta.', desde: 28.9,
+    { titulo: 'Oferta relámpago', texto: 'Un reloj en tu portada que cuenta lo que falta.', desde: 27.0,
       icon: <><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2 2" /><path d="M9 3h6" /></> },
-    { titulo: 'Orbi atiende tu WhatsApp', texto: 'Contesta, muestra productos y toma pedidos. También en Instagram.', desde: 36.3,
+    { titulo: 'Orbi atiende tu WhatsApp', texto: 'Contesta, muestra productos y toma pedidos. También en Instagram.', desde: 34.4,
       icon: <><path d="M21 11.5a8.4 8.4 0 0 1-12.3 7.4L3 21l2.1-5.6A8.4 8.4 0 1 1 21 11.5z" /></> },
 ];
-const DURACION = 45.3;
+const DURACION = 43.5;
 const ADEMAS = ['2x1 y 3x2 sin código', 'Prueba social con pedidos reales', 'Orbi carga productos con una foto'];
 
 export function Avanzado() {

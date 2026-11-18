@@ -10,7 +10,9 @@ import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } fro
 import { createPortal } from 'react-dom';
 
 const R2 = 'https://pub-4c590787fd69461f8d464b91d826c1b4.r2.dev/home/clips';
-export const clipSrc = (n: string) => ({ video: `${R2}/${n}.mp4`, portada: `${R2}/${n}.jpg` });
+// ?v=: subirlo cuando se rehacen los clips con el mismo nombre (R2 los sirve con caché)
+const V = 2
+export const clipSrc = (n: string) => ({ video: `${R2}/${n}.mp4?v=${V}`, portada: `${R2}/${n}.jpg?v=${V}` });
 
 // «Reducir movimiento» del sistema, sin setState dentro de un efecto (regla react-hooks/set-state-in-effect).
 const MQ = '(prefers-reduced-motion: reduce)'
@@ -42,7 +44,7 @@ export function ClipVideo({ nombre, loop = true, onFin, onAvance, etiqueta, ajus
     useEffect(() => {
         const el = ref.current;
         if (!el) return;
-        const io = new IntersectionObserver(([e]) => { setEnPantalla(e.isIntersecting); if (e.isIntersecting) setVisto(true) }, { rootMargin: '200px 0px' });
+        const io = new IntersectionObserver(([e]) => { setEnPantalla(e.isIntersecting); if (e.isIntersecting) setVisto(true) }, { rootMargin: '500px 0px' });
         io.observe(el);
         return () => io.disconnect();
     }, [ref]);
