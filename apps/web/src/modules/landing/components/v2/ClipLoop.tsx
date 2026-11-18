@@ -3,42 +3,32 @@
 // - Viven en Cloudflare R2 (bucket de producción, carpeta home/clips/): <nombre>.mp4 (30 fps, sin audio, ~1 MB) y
 //   <nombre>.jpg (portada). Se generan en ~/orbita-videos/un-dia (clips-home.mjs + render-clips.sh).
 // - No se descarga nada hasta que el clip entra en pantalla (preload="none" + src recién al verse).
-// - Con «reducir movimiento» no arrancan solos: se ve la portada con un botón de play.
 // - Se muestran en una «Pantalla» limpia (sin marcos de navegador ni de dispositivo) con «Ampliar» → ModalClip.
 
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 const R2 = 'https://pub-4c590787fd69461f8d464b91d826c1b4.r2.dev/home/clips';
 // ?v=: subirlo cuando se rehacen los clips con el mismo nombre (R2 los sirve con caché)
-const V = 2
+const V = 3
 export const clipSrc = (n: string) => ({ video: `${R2}/${n}.mp4?v=${V}`, portada: `${R2}/${n}.jpg?v=${V}` });
 
-// «Reducir movimiento» del sistema, sin setState dentro de un efecto (regla react-hooks/set-state-in-effect).
-const MQ = '(prefers-reduced-motion: reduce)'
-function useMovimientoReducido() {
-    return useSyncExternalStore(
-        (avisar) => { const m = window.matchMedia(MQ); m.addEventListener('change', avisar); return () => m.removeEventListener('change', avisar) },
-        () => window.matchMedia(MQ).matches,
-        () => false,
-    );
-}
 
 /**
- * Video del clip. `loop` lo repite; sin loop avisa con `onFin` (la vitrina pasa a la siguiente función) y
- * reporta el avance (0–1) con `onAvance` para la barrita.
+ * Video del clip: arranca SOLO, sin que haya que tocar nada (pedido del dueño, 18/11), y se pausa cuando sale de pantalla.
+ * `activo` (la vitrina deja varios montados y precargados): al volverse activo arranca de cero al instante.
+ * `loop` lo repite; sin loop avisa con `onFin` y reporta el avance (0–1) con `onAvance` para la barrita.
  */
-export function ClipVideo({ nombre, loop = true, onFin, onAvance, etiqueta, ajuste = 'cover', videoRef }: {
+export function ClipVideo({ nombre, loop = true, onFin, onAvance, etiqueta, ajuste = 'cover', videoRef, activo = true }: {
     nombre: string; loop?: boolean; onFin?: () => void; onAvance?: (u: number) => void; etiqueta: string;
-    ajuste?: 'cover' | 'contain'; videoRef?: { current: HTMLVideoElement | null };
+    ajuste?: 'cover' | 'contain'; videoRef?: { current: HTMLVideoElement | null }; activo?: boolean;
 }) {
     const propio = useRef<HTMLVideoElement>(null);
     const ref = videoRef ?? propio;
     const [enPantalla, setEnPantalla] = useState(false);
     const [visto, setVisto] = useState(false);
     const [error, setError] = useState(false);
-    const [quieto, setQuieto] = useState(false);
-    const reducido = useMovimientoReducido();
+    const eraActivo = useRef(activo);
     const { video, portada } = clipSrc(nombre);
 
     useEffect(() => {
@@ -49,57 +39,50 @@ export function ClipVideo({ nombre, loop = true, onFin, onAvance, etiqueta, ajus
         return () => io.disconnect();
     }, [ref]);
 
-    // Reproduce solo mientras se ve (y si no pidieron menos movimiento); al cambiar de clip arranca de cero.
+    // Reproduce mientras se ve y está activo. React no siempre deja `muted` puesto en el elemento, y sin eso el
+    // navegador no deja arrancar solo: se fuerza antes de cada play. Si todavía no cargó, reintenta al poder.
     useEffect(() => {
         const el = ref.current;
         if (!el || error) return;
-        if (enPantalla && visto && !reducido) { el.play().catch(() => setQuieto(true)) } else el.pause();
-    }, [enPantalla, visto, reducido, nombre, error, ref]);
+        if (activo && !eraActivo.current) el.currentTime = 0;
+        eraActivo.current = activo;
+        if (!(enPantalla && visto && activo)) { el.pause(); return }
+        el.muted = true;
+        const intentar = () => { el.play().catch(() => {}) };
+        intentar();
+        el.addEventListener('canplay', intentar, { once: true });
+        return () => el.removeEventListener('canplay', intentar);
+    }, [enPantalla, visto, activo, error, ref]);
 
     useEffect(() => {
         const el = ref.current;
-        if (!el || !onAvance) return;
+        if (!el || !onAvance || !activo) return;
         let raf = 0;
         const tick = () => { if (el.duration) onAvance(el.currentTime / el.duration); raf = requestAnimationFrame(tick) };
         raf = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(raf);
-    }, [onAvance, nombre, ref]);
+    }, [onAvance, activo, ref]);
 
     if (error) {
         // eslint-disable-next-line @next/next/no-img-element
         return <img src={portada} alt={etiqueta} className="block h-full w-full object-cover" />;
     }
     return (
-        <div className="relative h-full w-full">
-            <video
-                ref={ref}
-                key={nombre}
-                src={visto ? video : undefined}
-                poster={portada}
-                muted
-                playsInline
-                loop={loop}
-                preload="none"
-                aria-label={etiqueta}
-                onEnded={onFin}
-                onError={() => setError(true)}
-                className={`block h-full w-full ${ajuste === 'contain' ? 'object-contain' : 'object-cover'}`}
-                style={{ background: ajuste === 'contain' ? '#060B1E' : '#fff' }}
-            />
-            {(reducido || quieto) && (
-                <button
-                    type="button"
-                    onClick={() => { setQuieto(false); ref.current?.play().catch(() => {}) }}
-                    aria-label={`Reproducir: ${etiqueta}`}
-                    className="absolute inset-0 grid cursor-pointer place-items-center"
-                    style={{ background: 'rgba(2,6,23,.18)', border: 'none' }}
-                >
-                    <span className="grid place-items-center rounded-full" style={{ width: 64, height: 64, background: '#fff', color: '#0F172A', paddingLeft: 4, boxShadow: '0 10px 30px rgba(2,6,23,.35)' }}>
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.14v13.72a1 1 0 0 0 1.52.85l10.29-6.86a1 1 0 0 0 0-1.7L9.52 4.29A1 1 0 0 0 8 5.14z" /></svg>
-                    </span>
-                </button>
-            )}
-        </div>
+        <video
+            ref={ref}
+            src={visto ? video : undefined}
+            poster={portada}
+            muted
+            autoPlay
+            playsInline
+            loop={loop}
+            preload={visto ? 'auto' : 'none'}
+            aria-label={etiqueta}
+            onEnded={activo ? onFin : undefined}
+            onError={() => setError(true)}
+            className={`block h-full w-full ${ajuste === 'contain' ? 'object-contain' : 'object-cover'}`}
+            style={{ background: ajuste === 'contain' ? '#060B1E' : '#fff' }}
+        />
     );
 }
 

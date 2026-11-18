@@ -125,8 +125,14 @@ export function Modulos() {
 
                     {/* El clip de la función elegida */}
                     <div className="vit-pantalla" role="tabpanel" aria-label={f.titulo}>
+                        {/* Los 6 clips quedan montados y precargados, uno encima del otro: al tocar una función, la suya
+                            ya está lista y arranca de cero al instante (solo se ve y corre la activa). */}
                         <Pantalla onAmpliar={() => setAmpliado(true)} etiqueta={f.titulo}>
-                            <ClipVideo nombre={f.clip} loop={false} onFin={siguiente} onAvance={setAvance} etiqueta={`${f.titulo}: ${f.texto}`} />
+                            {FUNCIONES.map((x, i) => (
+                                <div key={x.clip} className="absolute inset-0 transition-opacity duration-300" style={{ opacity: i === activa ? 1 : 0 }} aria-hidden={i !== activa}>
+                                    <ClipVideo nombre={x.clip} activo={i === activa} loop={false} onFin={siguiente} onAvance={setAvance} etiqueta={`${x.titulo}: ${x.texto}`} />
+                                </div>
+                            ))}
                         </Pantalla>
                         {/* Celular: la línea de la función, debajo del clip */}
                         <p className="mt-4 text-center text-[14px] lg:hidden" style={{ color: 'var(--oc-text-2)' }}>
