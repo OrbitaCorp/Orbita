@@ -53,6 +53,7 @@ const DETALLE_AVANZADO: DetalleItem[] = [
   { titulo: 'Fotos sin fondo automáticas', texto: 'Sacale el fondo a la foto de tu producto con un clic.' },
   { titulo: 'Fondo con IA', texto: 'Generá un fondo profesional para la foto de tu producto, sin sesión de fotos.' },
   { titulo: 'Escaneo de productos con IA', texto: 'Sacale una foto a tu producto y Orbi completa el nombre, la categoría y la descripción.' },
+  { titulo: 'Fotos sugeridas al importar desde Excel', texto: 'Cuando importás tu catálogo, cada producto trae fotos sugeridas de la web para elegir con un clic.' },
 ]
 
 interface CardPlan {

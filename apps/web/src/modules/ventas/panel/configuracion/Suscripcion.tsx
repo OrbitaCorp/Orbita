@@ -33,6 +33,7 @@ import {
     panelGetBusiness, panelCancelBusiness, panelReactivateFromCancellation, getOfertaPublica,
     type ApiSubscription, type PlanKey,
 } from '@/lib/api'
+import { estadoCortesiaDe, notificarSuscripcionActualizada } from '@/lib/cortesia'
 
 // Todo lo que el add-on ADVANCED habilita de verdad en el backend (cada una de
 // estas funciones está detrás de AddonGuard / hasActiveAddon). Si se suma o se
@@ -48,6 +49,33 @@ const INCLUYE = [
     'Fotos sin fondo automáticas',
     'Fondo con IA para tus productos',
     'Escaneo de productos con IA (cargá un producto desde su foto)',
+    'Fotos sugeridas de la web al importar desde Excel',
+]
+
+// Detalle completo para el modal "Ver qué incluye" del selector de planes:
+// qué trae el plan Base y qué suma encima Base + Avanzado.
+const DETALLE_BASE: { titulo: string; texto: string }[] = [
+    { titulo: 'Tienda online completa', texto: 'Catálogo con variantes, categorías, buscador y tu subdominio .orbita.site (o tu propio dominio).' },
+    { titulo: 'Cobros sin comisiones', texto: 'Cobrás directo en tu cuenta de Mercado Pago, por transferencia o acordando el pago aparte.' },
+    { titulo: 'Importación masiva desde Excel', texto: 'Cargá decenas o cientos de productos de una vez con nuestra plantilla y subí tus fotos.' },
+    { titulo: 'Pedidos, stock y clientes', texto: 'Estados de pedido, control de stock por variante, notas de crédito e historial de clientes.' },
+    { titulo: 'Orbi, tu asistente con IA', texto: 'Te responde sobre tus ventas, tu stock y tus pedidos, y te ayuda a redactar productos.' },
+    { titulo: 'Descuentos y cupones', texto: 'Cupones con vencimientos y topes de uso, aplicados solos en el carrito.' },
+    { titulo: 'Mensajes, equipo y reportes', texto: 'Bandeja de conversaciones, empleados con permisos por rol y reportes claros.' },
+    { titulo: 'Soporte prioritario por WhatsApp', texto: 'Te respondemos directo, sin tickets ni esperas largas.' },
+]
+
+const DETALLE_SOLO_AVANZADO: { titulo: string; texto: string }[] = [
+    { titulo: 'Plantillas de Home', texto: 'Diseños alternativos para la portada de tu tienda, sin tocar el catálogo ni el checkout.' },
+    { titulo: 'Modales de anuncios', texto: 'Promos, bienvenida con descuento y avisos en el momento justo de la visita.' },
+    { titulo: 'Juegos con premio', texto: 'Mini-juegos donde tus clientes se ganan un cupón de descuento real.' },
+    { titulo: 'Prueba social', texto: 'Notificaciones de "alguien acaba de comprar esto" armadas con pedidos reales.' },
+    { titulo: '2x1 y 3x2', texto: 'Promos "llevá X, pagá Y" aplicadas automáticamente en el carrito, sin código.' },
+    { titulo: 'Oferta relámpago', texto: 'Descuento por tiempo limitado con reloj en cuenta regresiva en tu tienda.' },
+    { titulo: 'Fotos sin fondo y Fondo con IA', texto: 'Recortá el fondo con un clic o generá fondos profesionales para tus productos.' },
+    { titulo: 'Escaneo de productos con IA', texto: 'Sacale una foto a tu producto y Orbi completa nombre, categoría, descripción y variantes.' },
+    { titulo: 'Fotos sugeridas al importar Excel', texto: 'Cada producto importado trae fotos sugeridas de la web para elegir con un clic.' },
+    { titulo: 'Orbi en WhatsApp', texto: 'Tu asistente con IA atendiendo consultas reales de clientes por WhatsApp.' },
 ]
 
 // SUSPENDED y CANCELLED sumados (RBT — ciclo de vida de suscripciones,
@@ -135,10 +163,66 @@ function formatFecha(iso: string | null): string {
     return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+function ModalDetallePlanes({ abierto, onCerrar }: { abierto: boolean; onCerrar: () => void }) {
+    return (
+        <Modal
+            isOpen={abierto}
+            onClose={onCerrar}
+            title="Qué incluye cada plan"
+            maxWidth={780}
+            footer={<Button variant="primary" size="sm" onClick={onCerrar}>Entendido</Button>}
+        >
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
+                <div style={{ border: '1px solid var(--color-border)', borderRadius: 12, padding: 16, background: 'var(--color-bg)' }}>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)' }}>Base</div>
+                    <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 2, marginBottom: 12 }}>
+                        {fmtPesos(PLANES.mensual.precioMes)}/mes · o desde {fmtPesos(PLANES.anual.precioMes)}/mes en plan anual
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {DETALLE_BASE.map(item => (
+                            <div key={item.titulo} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                                <Check size={14} strokeWidth={2.3} color="var(--color-success)" style={{ flexShrink: 0, marginTop: 3 }} />
+                                <div style={{ fontSize: 12.5, lineHeight: 1.45 }}>
+                                    <div style={{ fontWeight: 600, color: 'var(--color-text)' }}>{item.titulo}</div>
+                                    <div style={{ color: 'var(--color-muted)' }}>{item.texto}</div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div style={{ border: '1.5px solid var(--color-primary)', borderRadius: 12, padding: 16, background: 'var(--color-bg)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)' }}>Base + Avanzado</div>
+                        <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 9999, background: 'var(--color-primary-bg)', color: 'var(--color-primary)' }}>
+                            Todo Base incluido
+                        </span>
+                    </div>
+                    <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 2, marginBottom: 12 }}>
+                        {fmtPesos(PLANES.mensualAvanzado.precioMes)}/mes · o desde {fmtPesos(PLANES.anualAvanzado.precioMes)}/mes en plan anual
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {DETALLE_SOLO_AVANZADO.map(item => (
+                            <div key={item.titulo} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                                <Crown size={14} strokeWidth={2.1} color="var(--color-primary)" style={{ flexShrink: 0, marginTop: 3 }} />
+                                <div style={{ fontSize: 12.5, lineHeight: 1.45 }}>
+                                    <div style={{ fontWeight: 600, color: 'var(--color-text)' }}>{item.titulo}</div>
+                                    <div style={{ color: 'var(--color-muted)' }}>{item.texto}</div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </Modal>
+    )
+}
+
 // Selector compacto de plan — mismo uso en dos lugares (elegir el próximo
 // plan durante el beneficio, y pedir un cambio con un plan ya activo), así
 // que queda de una vez como pieza chica en vez de duplicar el markup.
 function SelectorPlan({ valor, onElegir, disabled }: { valor: PlanKey | null; onElegir: (p: PlanKey) => void; disabled?: boolean }) {
+    const [verDetalle, setVerDetalle] = useState(false)
     // Dos grupos, para que se entienda qué cambia entre uno y otro: Base, o Base
     // más el paquete Avanzado. Cada grupo arranca con su título.
     const TITULOS: Partial<Record<PlanKey, string>> = {
@@ -146,41 +230,56 @@ function SelectorPlan({ valor, onElegir, disabled }: { valor: PlanKey | null; on
         mensualAvanzado: 'Base + Avanzado — suma juegos, modales, 2x1, fondo con IA y más',
     }
     return (
-        <div role="radiogroup" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {PLAN_KEYS.map(key => {
-                const p = PLANES[key]
-                const activo = key === valor
-                const titulo = TITULOS[key]
-                return (
-                    <div key={key} style={{ display: 'contents' }}>
-                        {titulo && (
-                            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-body)', margin: key === 'mensual' ? '0 0 0' : '8px 0 0' }}>{titulo}</div>
-                        )}
-                        <button
-                            type="button"
-                            role="radio"
-                            aria-checked={activo}
-                            disabled={disabled}
-                            onClick={() => onElegir(key)}
-                            className="ds-hover"
-                            style={{
-                                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
-                                width: '100%', textAlign: 'left', cursor: disabled ? 'default' : 'pointer', fontFamily: 'inherit',
-                                padding: '9px 12px', borderRadius: 10,
-                                border: `1.5px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                                background: activo ? 'var(--color-primary-bg)' : 'var(--color-bg)',
-                                opacity: disabled && !activo ? 0.55 : 1,
-                            }}
-                        >
-                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>{p.corto}</span>
-                            <span style={{ fontSize: 12.5, color: 'var(--color-muted)' }}>
-                                {fmtPesos(p.precioMes)}{p.total ? '/mes' : ''} {!p.total && `· ${p.periodo}`}
-                            </span>
-                        </button>
-                    </div>
-                )
-            })}
-        </div>
+        <>
+            <div role="radiogroup" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {PLAN_KEYS.map(key => {
+                    const p = PLANES[key]
+                    const activo = key === valor
+                    const titulo = TITULOS[key]
+                    return (
+                        <div key={key} style={{ display: 'contents' }}>
+                            {titulo && (
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', margin: key === 'mensual' ? '0' : '8px 0 0' }}>
+                                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-body)' }}>{titulo}</span>
+                                    {key === 'mensual' && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setVerDetalle(true)}
+                                            className="ds-link"
+                                            style={{ background: 'none', border: 'none', padding: 0, fontFamily: 'inherit', fontSize: 12, fontWeight: 600, color: 'var(--color-primary)', cursor: 'pointer' }}
+                                        >
+                                            Ver qué incluye
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                            <button
+                                type="button"
+                                role="radio"
+                                aria-checked={activo}
+                                disabled={disabled}
+                                onClick={() => onElegir(key)}
+                                className="ds-hover"
+                                style={{
+                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                                    width: '100%', textAlign: 'left', cursor: disabled ? 'default' : 'pointer', fontFamily: 'inherit',
+                                    padding: '9px 12px', borderRadius: 10,
+                                    border: `1.5px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                                    background: activo ? 'var(--color-primary-bg)' : 'var(--color-bg)',
+                                    opacity: disabled && !activo ? 0.55 : 1,
+                                }}
+                            >
+                                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>{p.corto}</span>
+                                <span style={{ fontSize: 12.5, color: 'var(--color-muted)' }}>
+                                    {fmtPesos(p.precioMes)}{p.total ? '/mes' : ''} {!p.total && `· ${p.periodo}`}
+                                </span>
+                            </button>
+                        </div>
+                    )
+                })}
+            </div>
+            <ModalDetallePlanes abierto={verDetalle} onCerrar={() => setVerDetalle(false)} />
+        </>
     )
 }
 
@@ -350,6 +449,7 @@ export default function Suscripcion() {
             await panelChangePlan(p)
             const s = await panelGetSubscription()
             setSub(s)
+            notificarSuscripcionActualizada()
             setEditandoPlan(false)
 
             // Un código aplicado se calculó contra el precio del plan anterior:
@@ -360,10 +460,11 @@ export default function Suscripcion() {
                 catch { setDescuento(null); codigo = undefined }
             }
 
-            // Una cortesía vencida también sigue derecho a Mercado Pago: el
-            // backend la activa igual que un fin de primer período (activatePlan).
+            // Una cortesía vencida o por vencer (<= 3 días) sigue derecho a Mercado
+            // Pago: el backend la activa igual que un fin de primer período (activatePlan).
             const vencido = new Date(s.currentPeriodEnd ?? 0) <= new Date()
-            if (activar && vencido) {
+            const puedeActivar = vencido || !!estadoCortesiaDe(s)?.porVencer
+            if (activar && puedeActivar) {
                 setGuardandoPlan(false)
                 activarPlan(codigo)
                 return
@@ -392,6 +493,7 @@ export default function Suscripcion() {
                 setDescuento(null)
             }
             setSub(await panelGetSubscription())
+            notificarSuscripcionActualizada()
         } catch (e) {
             setErrorCancelar(e instanceof ApiError ? e.message : 'No se pudo completar la operación')
         } finally {
@@ -415,12 +517,15 @@ export default function Suscripcion() {
     // bloquea desde el rediseño de ciclo de vida, ver activatePlan/changePlan).
     // Una cortesía creada desde el superadmin arranca con plan 'standard', que
     // no es un plan real: planMostrado queda en null hasta que elija uno.
-    const esCortesia = sub?.origin === 'COMP'
+    const cortesia = estadoCortesiaDe(sub)
+    const esCortesia = !!cortesia
+    const cortesiaPorVencer = !!cortesia?.porVencer
+    const puedeEjecutarPago = !cancelada && (venciendo || cortesiaPorVencer)
     const planMostrado = sub && esPlanKey(sub.nextPlan ?? sub.plan) ? (sub.nextPlan ?? sub.plan) as PlanKey : null
     // El bloque de activación ya trae el selector con "Base + Avanzado": mientras se
     // ve, la tarjeta del paquete de más abajo NO ofrece activarlo (era la misma
     // acción dos veces) y queda solo como explicación de qué suma.
-    const activacionVisible = !cancelada && venciendo
+    const activacionVisible = puedeEjecutarPago
 
     return (
         <div className="panel-page panel-page--form">
@@ -458,7 +563,13 @@ export default function Suscripcion() {
                         </div>
                         <div style={{ fontSize: 13, color: 'var(--color-muted)', marginTop: 8 }}>
                             {esCortesia
-                                ? venciendo ? 'Tu cortesía terminó: para seguir, elegí tu plan y activalo.' : 'Suscripción de cortesía, sin cargo.'
+                                ? venciendo
+                                    ? 'Tu cortesía terminó: para seguir, elegí tu plan y activalo.'
+                                    : cortesiaPorVencer
+                                        ? `Suscripción de cortesía, sin cargo · te quedan ${cortesia.tiempoRestante}.`
+                                        : cortesia.mostrarContador
+                                            ? `Suscripción de cortesía, sin cargo · te quedan ${cortesia.tiempoRestante}.`
+                                            : 'Suscripción de cortesía, sin cargo.'
                                 : `${sub.currency} ${sub.amount.toLocaleString('es-AR')} por período`}
                         </div>
                         <div style={{ fontSize: 12.5, color: 'var(--color-subtle)', marginTop: 4 }}>
@@ -500,28 +611,36 @@ export default function Suscripcion() {
                             </div>
                         )}
 
-                        {!cancelada && venciendo && (
+                        {puedeEjecutarPago && (
                             <div style={{
                                 marginTop: 16, padding: 14, borderRadius: 12,
-                                background: suspendida ? 'var(--color-error-bg)' : 'var(--color-primary-bg)',
-                                border: `1px solid ${suspendida ? 'var(--color-error)' : 'var(--color-primary)'}`,
+                                background: suspendida
+                                    ? 'var(--color-error-bg)'
+                                    : cortesiaPorVencer
+                                        ? 'var(--color-warning-bg, rgba(245, 158, 11, 0.12))'
+                                        : 'var(--color-primary-bg)',
+                                border: `1px solid ${suspendida ? 'var(--color-error)' : cortesiaPorVencer ? 'var(--color-warning, #d97706)' : 'var(--color-primary)'}`,
                             }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                                    <Gift size={16} strokeWidth={1.8} color={suspendida ? 'var(--color-error)' : 'var(--color-primary)'} style={{ flexShrink: 0 }} />
+                                    <Gift size={16} strokeWidth={1.8} color={suspendida ? 'var(--color-error)' : cortesiaPorVencer ? 'var(--color-warning, #d97706)' : 'var(--color-primary)'} style={{ flexShrink: 0 }} />
                                     <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)' }}>
                                         {suspendida
                                             ? 'Tu tienda está pausada'
-                                            : esCortesia
-                                                ? 'Tu período de cortesía terminó'
-                                            : sub.planActive
-                                                ? 'Tu plan cambió — hay que autorizarlo'
-                                                : `Tu ${primerPeriodo(sub).toLowerCase()} terminó`}
+                                            : cortesiaPorVencer
+                                                ? 'Tu cortesía está a punto de vencer'
+                                                : esCortesia
+                                                    ? 'Tu período de cortesía terminó'
+                                                    : sub.planActive
+                                                        ? 'Tu plan cambió — hay que autorizarlo'
+                                                        : `Tu ${primerPeriodo(sub).toLowerCase()} terminó`}
                                     </span>
                                 </div>
                                 <p style={{ fontSize: 12.5, color: 'var(--color-muted)', margin: '6px 0 12px' }}>
                                     {suspendida
                                         ? 'Tu panel sigue funcionando en modo solo lectura — podés ver todo, pero para volver a editar y que tu tienda sea visible de nuevo hay que activar tu plan.'
-                                        : 'Para seguir usando Órbita sin cortes, elegí tu plan y activalo.'}
+                                        : cortesiaPorVencer
+                                            ? `Te quedan ${cortesia.tiempoRestante} de cortesía. Ya podés elegir tu plan y ejecutar el pago para seguir sin cortes (si pagás ahora, tu primer ciclo pago empieza hoy).`
+                                            : 'Para seguir usando Órbita sin cortes, elegí tu plan y activalo.'}
                                     {diasDeGracia !== null && (
                                         <> Te qued{diasDeGracia === 1 ? 'a' : 'an'} <strong style={{ color: 'var(--color-text)' }}>{diasDeGracia} día{diasDeGracia === 1 ? '' : 's'}</strong> de plazo para regularizar antes de que se pause.</>
                                     )}
@@ -545,7 +664,7 @@ export default function Suscripcion() {
                                 )}
                                 {errorActivar && <p style={{ fontSize: 12.5, color: 'var(--color-error)', margin: '0 0 10px' }}>{errorActivar}</p>}
                                 <Button variant="primary" size="sm" onClick={() => activarPlan(descuento?.code)} disabled={activando || guardandoPlan || !planMostrado} icon={<ArrowRight size={13} strokeWidth={2.2} />}>
-                                    {activando ? 'Abriendo Mercado Pago…' : planMostrado ? `Activar ${PLANES[planMostrado].nombre}` : 'Activar mi plan'}
+                                    {activando ? 'Abriendo Mercado Pago…' : planMostrado ? `Activar ${PLANES[planMostrado].nombre}` : 'Elegí un plan para pagar'}
                                 </Button>
                             </div>
                         )}
@@ -553,7 +672,7 @@ export default function Suscripcion() {
                         {/* ── Caso 1 y 3: elegir/cambiar el plan (todavía sin vencer) ──
                             Una cortesía vigente también puede dejar elegido con qué
                             plan sigue: así, cuando vence, solo le falta autorizarlo. */}
-                        {!cancelada && !venciendo && (
+                        {!cancelada && !puedeEjecutarPago && (
                             <div style={{ marginTop: 16 }}>
                                 {!editandoPlan ? (
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>

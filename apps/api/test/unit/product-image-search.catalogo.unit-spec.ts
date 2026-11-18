@@ -278,11 +278,11 @@ describe('ProductsController — fotos de la web en Importar Excel', () => {
     );
   });
 
-  it('no exige el paquete Avanzado (decisión del 12/11)', () => {
+  it('exige el paquete Avanzado', () => {
     const addon = (m: keyof ProductsController) =>
       Reflect.getMetadata(REQUIRES_ADDON_KEY, ProductsController.prototype[m] as object);
-    expect(addon('webImageSuggestions')).toBeUndefined();
-    expect(addon('addImageFromWeb')).toBeUndefined();
+    expect(addon('webImageSuggestions')).toBe('ADVANCED');
+    expect(addon('addImageFromWeb')).toBe('ADVANCED');
   });
 
   it('busca con los datos del producto guardado y consume el tope diario del negocio', async () => {

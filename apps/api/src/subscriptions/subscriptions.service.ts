@@ -85,6 +85,12 @@ const FREE_SIGNUP_PREFIX = 'FREE-';
 // recurrentes de un plan ya activo, que sí usan el businessId).
 const PENDING_REF_PREFIX = 'PEND-';
 
+// Días antes del vencimiento desde los cuales una cuenta de cortesía (COMP) ya
+// puede ejecutar el pago de su primer plan sin esperar al día 0 (mismo criterio
+// visual que el aviso en el panel, Suscripcion.tsx / Header.tsx /
+// SubscriptionStatusBanner.tsx).
+export const CORTESIA_VENTANA_PAGO_DIAS = 3;
+
 // Una alta pagada que el barrido nocturno rescató o no pudo resolver (ver
 // rescatarAltasPagadas): lo mínimo para identificarla en el aviso interno.
 interface AltaAvisada {
@@ -1243,7 +1249,11 @@ export class SubscriptionsService implements OnModuleInit {
     // por default de una comp (`'standard'`, seteado en platform.service.ts
     // grantComp) no es una PlanKey real — sub.nextPlan ?? sub.plan más abajo
     // exige que haya elegido uno real antes de poder activar.
-    if (sub.currentPeriodEnd > new Date()) {
+    const ahora = new Date();
+    const esCortesiaPorVencer =
+      sub.origin === 'COMP' &&
+      sub.currentPeriodEnd.getTime() - ahora.getTime() <= CORTESIA_VENTANA_PAGO_DIAS * 86_400_000;
+    if (sub.currentPeriodEnd > ahora && !esCortesiaPorVencer) {
       throw new BadRequestException(
         `Todavía no terminó tu período actual (vence el ${sub.currentPeriodEnd.toISOString().slice(0, 10)}) — no hay nada para activar todavía`,
       );

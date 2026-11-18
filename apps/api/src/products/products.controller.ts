@@ -141,6 +141,7 @@ export class ProductsController {
 
   @Post('suggested-images')
   @RequirePermission('catalog.manage')
+  @RequiresAddon('ADVANCED')
   @Throttle({ default: { limit: 25, ttl: 60000 } })
   @DemoIa('fotos-web') // prueba de la demo pública, ver demo/demo-ia.ts
   @UseInterceptors(DemoIaInterceptor)
@@ -161,6 +162,7 @@ export class ProductsController {
 
   @Post('proxy-image')
   @RequirePermission('catalog.manage')
+  @RequiresAddon('ADVANCED')
   @Throttle({ default: { limit: 40, ttl: 60000 } })
   @DemoIa('foto-web') // prueba de la demo pública, ver demo/demo-ia.ts
   @UseInterceptors(DemoIaInterceptor)
@@ -274,11 +276,12 @@ export class ProductsController {
   }
 
   // Importar Excel → paso Fotos: fotos de la web para un producto ya importado,
-  // buscadas por nombre (sin el filtro de modelo de 'suggested-images'). Todos
-  // los planes, con tope diario por negocio. Sin @DemoIa: el visitante de la
-  // demo no importa productos.
+  // buscadas por nombre (sin el filtro de modelo de 'suggested-images'). Exclusivo
+  // del paquete Avanzado, con tope diario por negocio. Sin @DemoIa: el visitante
+  // de la demo no importa productos.
   @Post(':id/web-image-suggestions')
   @RequirePermission('catalog.manage')
+  @RequiresAddon('ADVANCED')
   @Throttle({ default: { limit: 60, ttl: 60000 } })
   async webImageSuggestions(
     @CurrentBusiness() ctx: AuthContext,
@@ -297,10 +300,11 @@ export class ProductsController {
     return this.productImageSearchService.searchCatalogImages({ ...datos, businessId: member.businessId });
   }
 
-  // Guarda una foto sugerida de la web: la baja el servidor y entra por el
-  // mismo camino que una subida (webp, storage propio, tope de fotos).
+  // Guarda una foto sugerida de la web (paquete Avanzado): la baja el servidor y
+  // entra por el mismo camino que una subida (webp, storage propio, tope de fotos).
   @Post(':id/images/from-web')
   @RequirePermission('catalog.manage')
+  @RequiresAddon('ADVANCED')
   @Throttle({ default: { limit: 60, ttl: 60000 } })
   async addImageFromWeb(
     @CurrentBusiness() ctx: AuthContext,

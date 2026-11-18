@@ -1,14 +1,15 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/router'
-import { Bell, Moon, Sun, Search, LogOut, User, AlertCircle, AlertTriangle, X, Menu, ArrowLeft, ShoppingBag, Users, Package, Tag, LayoutGrid, Store, Check } from 'lucide-react'
+import { Bell, Moon, Sun, Search, LogOut, User, AlertCircle, AlertTriangle, Clock, X, Menu, ArrowLeft, ShoppingBag, Users, Package, Tag, LayoutGrid, Store, Check } from 'lucide-react'
 import { conFundidoDeTema, esOscuro, useDarkMode, type TemaPreferencia } from '@/hooks/useDarkMode'
 import { useAuth } from '@/hooks/useAuth'
 import { nombreConversacion } from '@/modules/ventas/panel/mensajes/mock/mensajes.mock'
 import {
-    ApiError, panelSearch, panelGetProfile, panelUpdateTheme,
+    ApiError, panelSearch, panelGetProfile, panelUpdateTheme, panelGetSubscription,
     panelGetUnreadNotificationsCount, panelGetNotifications, panelMarkNotificationRead, panelMarkAllNotificationsRead,
-    type ApiSearchResults, type ApiNotification, type MemberProfile,
+    type ApiSearchResults, type ApiNotification, type ApiSubscription, type MemberProfile,
 } from '@/lib/api'
+import { estadoCortesiaDe, EVENTO_SUSCRIPCION_ACTUALIZADA } from '@/lib/cortesia'
 import { Skeleton, SkeletonText } from '@/design-system/components/Skeleton'
 import { fmtMoney } from '@/lib/utils'
 import { adminPath, currentSlug } from '@/lib/tenant'
@@ -185,6 +186,28 @@ export default function Header({ onMenuClick }: Props) {
     const [notifsCargando,  setNotifsCargando]   = useState(false)
     const [notifsError,     setNotifsError]      = useState(false)
     const [unreadCount,     setUnreadCount]       = useState(0)
+    const [sub,             setSub]               = useState<ApiSubscription | null>(null)
+    const puedeGestionarSuscripcion = user?.type === 'member' && (user.role === 'owner' || user.role === 'admin') && !esVisitanteDemo()
+
+    useEffect(() => {
+        if (!puedeGestionarSuscripcion) return
+        let cancelado = false
+        const cargar = () => {
+            panelGetSubscription()
+                .then(s => { if (!cancelado) setSub(s) })
+                .catch(() => {})
+        }
+        cargar()
+        window.addEventListener('focus', cargar)
+        window.addEventListener(EVENTO_SUSCRIPCION_ACTUALIZADA, cargar)
+        return () => {
+            cancelado = true
+            window.removeEventListener('focus', cargar)
+            window.removeEventListener(EVENTO_SUSCRIPCION_ACTUALIZADA, cargar)
+        }
+    }, [puedeGestionarSuscripcion])
+
+    const cortesia = estadoCortesiaDe(puedeGestionarSuscripcion ? sub : null)
 
     const menuRef  = useRef<HTMLDivElement>(null)
     const notifRef = useRef<HTMLDivElement>(null)
@@ -270,8 +293,14 @@ export default function Header({ onMenuClick }: Props) {
                 .admin-header-bar button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
                 .admin-orbi-btn { display: flex; align-items: center; gap: 4px; height: 36px; padding: 0 12px 0 1px; border-radius: 9999px; cursor: pointer; transition: background 150ms ease, border-color 150ms ease; }
                 .admin-orbi-btn:hover { border-color: var(--color-primary) !important; }
+                .admin-cortesia-pill { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 11px; border-radius: 9999px; font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: border-color 150ms ease, background 150ms ease; }
+                .admin-cortesia-pill:hover { border-color: var(--color-primary) !important; }
                 .admin-bc-mobile   { display: none; }
+                @media (max-width: 1120px) {
+                    .admin-cortesia-extra { display: none; }
+                }
                 @media (max-width: 768px) {
+                    .admin-cortesia-pill { display: none !important; }
                     .admin-header-bar {
                         height: auto !important;
                         min-height: calc(56px + env(safe-area-inset-top, 0px)) !important;
@@ -380,6 +409,46 @@ export default function Header({ onMenuClick }: Props) {
 
                 {/* Acciones */}
                 <div className="flex items-center" style={{ gap: 8, flexShrink: 0 }}>
+
+                    {cortesia?.mostrarContador && (
+                        <button
+                            type="button"
+                            onClick={() => irA('configuracion', 'suscripcion')}
+                            className="admin-cortesia-pill"
+                            title={cortesia.vencida
+                                ? 'Tu período de cortesía terminó — ejecutá el pago para seguir'
+                                : cortesia.porVencer
+                                    ? 'Tu cortesía está a punto de vencer — ya podés ejecutar el pago'
+                                    : 'Ver detalles de tu cortesía y elegir plan'}
+                            style={{
+                                background: cortesia.vencida
+                                    ? 'var(--color-error-bg)'
+                                    : cortesia.porVencer
+                                        ? 'var(--color-warning-bg, rgba(245, 158, 11, 0.14))'
+                                        : 'var(--color-surface)',
+                                border: `1px solid ${cortesia.vencida ? 'var(--color-error)' : cortesia.porVencer ? 'var(--color-warning, #d97706)' : 'var(--color-border)'}`,
+                                color: cortesia.vencida
+                                    ? 'var(--color-error)'
+                                    : cortesia.porVencer
+                                        ? 'var(--color-warning, #b45309)'
+                                        : 'var(--color-body)',
+                            }}
+                        >
+                            {cortesia.vencida
+                                ? <AlertTriangle size={13} strokeWidth={2} />
+                                : <Clock size={13} strokeWidth={2} />}
+                            {cortesia.vencida ? (
+                                <span>Cortesía vencida <span className="admin-cortesia-extra">· Ejecutar pago</span></span>
+                            ) : cortesia.porVencer ? (
+                                <span>
+                                    Cortesía por vencer ({cortesia.tiempoRestante})
+                                    <span className="admin-cortesia-extra"> · Ya podés pagar</span>
+                                </span>
+                            ) : (
+                                <span>Cortesía · {cortesia.tiempoRestante}</span>
+                            )}
+                        </button>
+                    )}
 
                     {/* Buscador global (oculto en mobile) — Fase 4, Ale */}
                     <BusquedaGlobal />

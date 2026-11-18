@@ -29,8 +29,8 @@ import { Modal } from '@/design-system/components/Modal'
 import { Button } from '@/design-system/components/Button'
 import { fmtMoney } from '@/lib/utils'
 import {
-    ApiError, panelAddProductImageFromWeb, panelCreateCategory, panelCreateProduct, panelGetBusiness, panelGetCategoriesFlat,
-    panelGetWebImageSuggestions, panelUploadProductImage,
+    ApiError, panelAddProductImageFromWeb, panelCreateCategory, panelCreateProduct, panelGetAddons, panelGetBusiness,
+    panelGetCategoriesFlat, panelGetWebImageSuggestions, panelUploadProductImage,
     type ApiCategory, type SuggestedProductImage,
 } from '@/lib/api'
 import {
@@ -228,6 +228,8 @@ export function ImportarProductos({ abierto, onCerrar, onImportado }: {
     onImportado: () => void
 }) {
     const [paso, setPaso] = useState<Paso>('archivo')
+    // Paquete "Avanzado" — habilita las fotos sugeridas de la web en el paso 4.
+    const [avanzado, setAvanzado] = useState(false)
     // Vidriera digital: el stock es opcional (celda vacía = la tienda no lo muestra).
     const [vidriera, setVidriera] = useState(false)
     const [categorias, setCategorias] = useState<ApiCategory[]>([])
@@ -250,6 +252,7 @@ export function ImportarProductos({ abierto, onCerrar, onImportado }: {
         setPendientes(leerSesion())
         panelGetCategoriesFlat().then(setCategorias).catch(() => setCategorias([]))
         panelGetBusiness().then(b => setVidriera(b.mode === 'SHOWCASE')).catch(() => setVidriera(false))
+        panelGetAddons().then(r => setAvanzado(r.advanced)).catch(() => setAvanzado(false))
     }, [abierto])
 
     const guardar = (lista: Importado[]) => { setImportados(lista); guardarSesion(lista) }
@@ -457,6 +460,10 @@ export function ImportarProductos({ abierto, onCerrar, onImportado }: {
             .then((fotos): Sugerencia => ({ estado: 'lista', fotos: Array.isArray(fotos) ? fotos : [] }))
             .catch((e: unknown): Sugerencia => {
                 if (e instanceof ApiError && e.status === 429) topeRef.current = e.message
+                if (e instanceof ApiError && e.message.startsWith('ADDON_REQUIRED')) {
+                    setAvanzado(false)
+                    return { estado: 'error', fotos: [], mensaje: 'Las fotos sugeridas de la web son parte del paquete Avanzado.' }
+                }
                 return { estado: 'error', fotos: [], mensaje: mensajeDe(e) }
             })
             .then(s => { ponerSug(k, () => s); enCurso.current.delete(k); return s })
@@ -476,7 +483,7 @@ export function ImportarProductos({ abierto, onCerrar, onImportado }: {
     // suya, y por adelantado las de los siguientes, para que al tocar
     // "Siguiente" ya esté. Solo para lo que todavía no tiene fotos.
     useEffect(() => {
-        if (paso !== 'fotos' || !actual) return
+        if (paso !== 'fotos' || !actual || !avanzado) return
         const i = filtrados.findIndex(p => p.id === actual.id)
         const cola: { p: Importado; dest: string | null }[] = [
             { p: actual, dest: destino },
@@ -487,7 +494,7 @@ export function ImportarProductos({ abierto, onCerrar, onImportado }: {
             if (sugRef.current[claveSug(p.id, dest)]) continue // ya buscada (o falló: se reintenta a mano)
             void buscarSugerida(p.id, dest)
         }
-    }, [paso, actual, destino, filtrados, buscarSugerida])
+    }, [paso, actual, destino, filtrados, buscarSugerida, avanzado])
 
     const agregarFotoLocal = (id: string, url: string, dest: string | null) => {
         setImportados(lista => {
@@ -518,7 +525,12 @@ export function ImportarProductos({ abierto, onCerrar, onImportado }: {
             setVerOtras(false)
             onImportado()
         } catch (e) {
-            setErrorFoto(`No pudimos guardar esa foto (${mensajeDe(e)}). Probá con otra opción o subí la tuya.`)
+            if (e instanceof ApiError && e.message.startsWith('ADDON_REQUIRED')) {
+                setAvanzado(false)
+                setErrorFoto('Las fotos sugeridas de la web son parte del paquete Avanzado.')
+            } else {
+                setErrorFoto(`No pudimos guardar esa foto (${mensajeDe(e)}). Probá con otra opción o subí la tuya.`)
+            }
         } finally { setGuardandoSug(false) }
     }
 
@@ -537,7 +549,7 @@ export function ImportarProductos({ abierto, onCerrar, onImportado }: {
     // "Usar las sugeridas de esta página": los productos de la página sin
     // ninguna foto y con la sugerencia sin descartar. Busca lo que falte y
     // guarda la que se mostraría (la elegida o la primera).
-    const candidatosBloque = visibles.filter(p => p.fotos.length === 0 && !sugeridas[claveSug(p.id, null)]?.descartada)
+    const candidatosBloque = avanzado ? visibles.filter(p => p.fotos.length === 0 && !sugeridas[claveSug(p.id, null)]?.descartada) : []
     const usarSugeridasDeLaPagina = async () => {
         const lista = [...candidatosBloque]
         setConfirmarBloque(false)
@@ -586,7 +598,7 @@ export function ImportarProductos({ abierto, onCerrar, onImportado }: {
     const iPaso = PASOS.findIndex(p => p.id === paso)
     const fotosDelDestino = actual ? actual.fotos.filter(f => f.destino === destino) : []
     const nombreDestino = actual?.visual?.valores.find(v => v.id === destino)?.valor
-    const sugActual = actual ? sugeridas[claveSug(actual.id, destino)] : undefined
+    const sugActual = avanzado && actual ? sugeridas[claveSug(actual.id, destino)] : undefined
     const opcionesActual = opcionesDe(sugActual)
     const mostrada = mostradaDe(sugActual)
     const ocupado = subiendo > 0 || guardandoSug || enBloque !== null
@@ -772,7 +784,7 @@ export function ImportarProductos({ abierto, onCerrar, onImportado }: {
                                 </div>
                                 <div className="imp-items">
                                     {visibles.map(p => {
-                                        const sug = sugeridas[claveSug(p.id, null)]
+                                        const sug = avanzado ? sugeridas[claveSug(p.id, null)] : undefined
                                         const sugerida = p.fotos.length === 0 && !sug?.descartada ? mostradaDe(sug) : null
                                         return (
                                             <button key={p.id} type="button" className="imp-item" aria-current={actual?.id === p.id} onClick={() => elegir(p.id)}>
@@ -827,6 +839,9 @@ export function ImportarProductos({ abierto, onCerrar, onImportado }: {
                                                     </button>
                                                 ))}
                                             </div>
+                                        )}
+                                        {!avanzado && fotosDelDestino.length === 0 && (
+                                            <p className="imp-sug-linea"><span>Con el <b>paquete Avanzado</b>, cada producto trae fotos sugeridas de la web para elegir con un clic.</span></p>
                                         )}
                                         {fotosDelDestino.length === 0 && sugActual && !sugActual.descartada && (
                                             sugActual.estado === 'buscando' ? (
