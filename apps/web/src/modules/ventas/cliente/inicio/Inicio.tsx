@@ -87,6 +87,10 @@ type PortadaCargada = {
 }
 const PORTADAS = new Map<string, PortadaCargada>()
 
+// Con menos productos vendidos que esto, "Más vendidos" no aparece (ver
+// `todosTopVentas`).
+const MIN_TOP_VENTAS = 3
+
 export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { __homeTemplate?: string | null; __storeMeta?: { nombre?: string | null } | null } = {}) {
     const router = useRouter()
     const { slug } = router.query as { slug: string }
@@ -426,7 +430,11 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
     // grilla, que puede ser de tres, de cinco o una tira de seis. El home
     // clásico se queda con una fila de la grilla de Apariencia.
     const todosRecomendados = recomendados.map(p => toProducto(p, badgesEstante))
-    const todosTopVentas = topVentas.map(p => toProducto(p, badgesEstante))
+    // "Más vendidos" solo con MIN_TOP_VENTAS productos vendidos o más: con uno
+    // o dos el estante se veía vacío y no decía nada (pedido 17/11, nama-imp).
+    // Con menos se trata como una tienda sin ventas: el home clásico no lo
+    // muestra y las plantillas caen a lo que ya hacían sin ventas.
+    const todosTopVentas = topVentas.length >= MIN_TOP_VENTAS ? topVentas.map(p => toProducto(p, badgesEstante)) : []
     const estanteRecomendados = todosRecomendados.slice(0, porEstante)
     const estanteTopVentas = todosTopVentas.slice(0, porEstante)
     // Las plantillas de Home siguen recibiendo su "más vendidos" como antes
@@ -994,7 +1002,7 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
             {(ap?.showBestSellersSection ?? true) && estanteTopVentas.length > 0 && (
                 <section data-ap-sec="estante-topventas" className="sf-w" style={{ paddingBottom: 36 }}>
                     <SectionHead color="#F59E0B" eyebrow="Top ventas" titulo="Más vendidos" onVer={() => go('/catalogo?sort=bestselling')} />
-                    <EstanteProductos productos={estanteTopVentas} modoLista={modoListaEstante} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />
+                    <EstanteProductos productos={estanteTopVentas} modoLista={modoListaEstante} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} verTodos={estanteTopVentas.length < porEstante ? () => go('/catalogo?sort=bestselling') : undefined} />
                 </section>
             )}
 
@@ -1334,7 +1342,7 @@ function SectionHead({ color, eyebrow, titulo, onVer }: { color: string; eyebrow
 // componente de arriba; en ese caso se reusa el mismo ProductCard
 // layout="list" que ya usan Catalogo.tsx/Categoria.tsx, apilado en una sola
 // columna en vez de la grilla de .sf-g4 (que ya lee columnasDeGrilla).
-function EstanteProductos({ productos, modoLista, mode, transferPct }: { productos: Producto[]; modoLista: boolean; mode: 'FULL' | 'SHOWCASE'; transferPct: number | null }) {
+function EstanteProductos({ productos, modoLista, mode, transferPct, verTodos }: { productos: Producto[]; modoLista: boolean; mode: 'FULL' | 'SHOWCASE'; transferPct: number | null; verTodos?: () => void }) {
     if (modoLista) {
         return (
             <div className="sf-g4-lista">
@@ -1345,7 +1353,39 @@ function EstanteProductos({ productos, modoLista, mode, transferPct }: { product
     return (
         <div className="sf-g4">
             {productos.map(p => <ProductCard key={p.id} producto={p} mode={mode} transferPct={transferPct} />)}
+            {verTodos && <TarjetaVerTodos onClick={verTodos} />}
         </div>
+    )
+}
+
+// El lugar que sobra en una fila corta ("Más vendidos" con 3 en una grilla de
+// 4): una tarjeta del mismo tamaño que la de producto —la grilla la estira al
+// alto de la fila; el recuadro de arriba repite la foto 3:4 y el mismo radio—
+// que lleva al catálogo completo. Sobria a propósito: borde y texto, sin color
+// de acento (ver feedback de diseño "menos IA").
+function TarjetaVerTodos({ onClick }: { onClick: () => void }) {
+    return (
+        <button
+            type="button"
+            className="ds-hover"
+            onClick={onClick}
+            aria-label="Ver todos los productos"
+            style={{
+                display: 'flex', flexDirection: 'column', width: '100%', padding: 0, background: 'transparent',
+                border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+            }}
+        >
+            <span style={{
+                width: '100%', aspectRatio: '3 / 4', borderRadius: 16, border: '1px solid var(--color-border)',
+                background: 'var(--color-surface)', display: 'flex', flexDirection: 'column', alignItems: 'center',
+                justifyContent: 'center', gap: 10, color: 'var(--color-text)',
+            }}>
+                <span style={{ width: 44, height: 44, borderRadius: '50%', border: '1px solid var(--color-border)', display: 'grid', placeItems: 'center' }}>
+                    <ArrowRight size={18} strokeWidth={2} />
+                </span>
+                <span style={{ fontSize: 15, fontWeight: 600 }}>Ver todos</span>
+            </span>
+        </button>
     )
 }
 
