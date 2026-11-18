@@ -18,17 +18,19 @@ interface Parte { titulo: string; texto: string; desde: number; icon: ReactNode 
 const PARTES: Parte[] = [
     { titulo: 'Plantillas de portada', texto: 'Dieciséis diseños para la portada de tu tienda.', desde: 0,
       icon: <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 21V9" /></> },
-    { titulo: 'Juegos con premio', texto: 'Tu cliente juega, gana un descuento y el cupón se crea solo.', desde: 6.6,
+    { titulo: 'Juegos con premio', texto: 'Tu cliente juega, gana un descuento y el cupón se crea solo.', desde: 6.0,
       icon: <><path d="M6 11h4M8 9v4M15 12h.01M18 10h.01" /><rect x="2" y="6" width="20" height="12" rx="4" /></> },
-    { titulo: 'Anuncios en la tienda', texto: 'Promos y bienvenidas, en el momento justo.', desde: 20.6,
+    { titulo: 'Anuncios en la tienda', texto: 'Promos y bienvenidas, en el momento justo.', desde: 12.0,
       icon: <><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></> },
-    { titulo: 'Oferta relámpago', texto: 'Un reloj en tu portada que cuenta lo que falta.', desde: 27.0,
+    { titulo: 'Oferta relámpago', texto: 'Un reloj en tu portada que cuenta lo que falta.', desde: 18.0,
       icon: <><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2 2" /><path d="M9 3h6" /></> },
-    { titulo: 'Orbi atiende tu WhatsApp', texto: 'Contesta, muestra productos y toma pedidos. También en Instagram.', desde: 34.4,
+    { titulo: 'Orbi atiende tu WhatsApp', texto: 'Contesta, muestra productos y toma pedidos. También en Instagram.', desde: 24.0,
       icon: <><path d="M21 11.5a8.4 8.4 0 0 1-12.3 7.4L3 21l2.1-5.6A8.4 8.4 0 1 1 21 11.5z" /></> },
+    { titulo: 'Carga con Orbi e importación Excel', texto: 'Subís una foto y Orbi completa todo, o importás tu Excel con fotos sugeridas.', desde: 30.0,
+      icon: <><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" /><circle cx="12" cy="13" r="3" /></> },
 ];
-const DURACION = 43.5;
-const ADEMAS = ['2x1 y 3x2 sin código', 'Prueba social con pedidos reales', 'Orbi carga productos con una foto'];
+const DURACION = 36.0;
+const ADEMAS = ['2x1 y 3x2 sin código', 'Prueba social con pedidos reales', 'Fondo de fotos con IA'];
 
 export function Avanzado() {
     const video = useRef<HTMLVideoElement | null>(null);
@@ -54,10 +56,10 @@ export function Avanzado() {
             <Reveal>
                 <div className="mt-12 grid grid-cols-1 items-center gap-8 lg:mt-14 lg:grid-cols-[minmax(0,8fr)_minmax(0,5fr)] lg:gap-12">
                     <Pantalla aspecto="16 / 9" onAmpliar={() => setAmpliado(true)} etiqueta="Paquete Avanzado">
-                        <ClipVideo nombre="avanzado" videoRef={video} onAvance={(u) => setT(u * DURACION)} etiqueta="El paquete Avanzado: plantillas, juegos con premio, anuncios, oferta relámpago y Orbi en WhatsApp" />
+                        <ClipVideo nombre="avanzado" videoRef={video} onAvance={(u) => setT(u * DURACION)} etiqueta="El paquete Avanzado: plantillas, juegos con premio, anuncios, oferta relámpago, Orbi en WhatsApp y carga con foto o Excel" />
                     </Pantalla>
 
-                    <ul className="space-y-1.5" aria-label="Lo que incluye el paquete Avanzado">
+                    <ul className="space-y-1" aria-label="Lo que incluye el paquete Avanzado">
                         {PARTES.map((p, i) => {
                             const on = i === activa;
                             const fin = PARTES[i + 1]?.desde ?? DURACION;
@@ -66,7 +68,7 @@ export function Avanzado() {
                                 <li key={p.titulo}>
                                     <button
                                         type="button" onClick={() => ir(i)} aria-current={on ? 'true' : undefined}
-                                        className="av-item relative flex w-full cursor-pointer items-start gap-3.5 overflow-hidden rounded-xl px-4 py-3 text-left transition-colors duration-200"
+                                        className="av-item relative flex w-full cursor-pointer items-start gap-3.5 overflow-hidden rounded-xl px-4 py-2.5 text-left transition-colors duration-200"
                                         style={{ border: `1px solid ${on ? 'var(--oc-card-alt-bd, var(--oc-accent-bd))' : 'transparent'}`, background: on ? 'var(--oc-card-bg)' : 'transparent' }}
                                     >
                                         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg transition-colors duration-200"

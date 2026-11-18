@@ -10,7 +10,7 @@ import { createPortal } from 'react-dom';
 
 const R2 = 'https://pub-4c590787fd69461f8d464b91d826c1b4.r2.dev/home/clips';
 // ?v=: subirlo cuando se rehacen los clips con el mismo nombre (R2 los sirve con caché)
-const V = 3
+const V = 5;
 export const clipSrc = (n: string) => ({ video: `${R2}/${n}.mp4?v=${V}`, portada: `${R2}/${n}.jpg?v=${V}` });
 
 
@@ -81,7 +81,7 @@ export function ClipVideo({ nombre, loop = true, onFin, onAvance, etiqueta, ajus
             onEnded={activo ? onFin : undefined}
             onError={() => setError(true)}
             className={`block h-full w-full ${ajuste === 'contain' ? 'object-contain' : 'object-cover'}`}
-            style={{ background: ajuste === 'contain' ? '#060B1E' : '#fff' }}
+            style={{ background: '#060B1E' }}
         />
     );
 }
@@ -96,11 +96,11 @@ const IconoAmpliar = () => (
  * Pantalla limpia para un clip: un rectángulo redondeado, sin barras ni controles de reproductor (que no parezca
  * «un video»), con un botón chico de «Ampliar» que abre el clip grande en un modal.
  */
-export function Pantalla({ children, aspecto = '16 / 10', onAmpliar, etiqueta }: { children: ReactNode; aspecto?: string; onAmpliar?: () => void; etiqueta?: string }) {
+export function Pantalla({ children, aspecto = '16 / 9', onAmpliar, etiqueta }: { children: ReactNode; aspecto?: string; onAmpliar?: () => void; etiqueta?: string }) {
     return (
         <div
             className="pantalla group relative overflow-hidden"
-            style={{ aspectRatio: aspecto, borderRadius: 18, border: '1px solid var(--oc-card-bd)', background: '#fff', boxShadow: '0 30px 80px rgba(2,6,23,.38), 0 2px 0 rgba(255,255,255,.04) inset' }}
+            style={{ aspectRatio: aspecto, borderRadius: 18, border: '1px solid var(--oc-card-bd)', background: '#060B1E', boxShadow: '0 30px 80px rgba(2,6,23,.38), 0 2px 0 rgba(255,255,255,.04) inset' }}
         >
             <style>{`
                 .pantalla-ampliar { opacity: 0; transform: translateY(-4px); transition: opacity 180ms ease, transform 180ms ease, background 180ms ease; }

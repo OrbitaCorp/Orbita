@@ -139,7 +139,7 @@ export function ComoFunciona() {
                                 <button
                                     type="button" onClick={() => setAbierto(i)} aria-label={`Ver completo: ${p.titulo}`}
                                     className="paso-video relative block w-full cursor-pointer overflow-hidden"
-                                    style={{ aspectRatio: '16 / 10', background: '#fff', border: 'none', padding: 0, borderBottom: '1px solid var(--oc-card-bd)' }}
+                                    style={{ aspectRatio: '16 / 9', background: '#060B1E', border: 'none', padding: 0, borderBottom: '1px solid var(--oc-card-bd)' }}
                                 >
                                     <ClipVideo nombre={p.clip} etiqueta={`${p.titulo}: ${p.texto}`} />
                                     <span className="paso-ver absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-full px-3 text-[12.5px] font-semibold text-white"
