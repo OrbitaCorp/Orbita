@@ -506,7 +506,20 @@ export const CAPITULOS: Capitulo[] = [
         {
             id: 'exportar-catalogo', titulo: 'Exportar el catálogo',
             bloques: [
-                { tipo: 'parrafo', texto: '[[Exportar Excel]] baja el catálogo completo en .xlsx: sirve para revisar precios en planilla, pasarle la lista a alguien, o tener un respaldo antes de un cambio grande.' },
+                { tipo: 'parrafo', texto: '[[Exportar Excel]] baja el catálogo en .xlsx, con una fila por cada variante (cada talle, color o tamaño con su precio). Si filtraste la lista, baja solo lo filtrado. Sirve para revisar precios en planilla, pasarle la lista a alguien, tener un respaldo o cambiar los precios de todo junto.' },
+            ],
+        },
+        {
+            id: 'actualizar-precios', titulo: 'Cambiar muchos precios a la vez',
+            bloques: [
+                { tipo: 'parrafo', texto: 'Para actualizar los precios de todo el catálogo juntos (por ejemplo, cuando cambia la cotización), no hace falta entrar producto por producto. En Productos, tocá [[Actualizar precios]].' },
+                { tipo: 'pasos', items: [
+                    { titulo: 'Bajá el Excel', texto: 'Tocá [[Descargar Excel]]: trae tus productos con una fila por variante.' },
+                    { titulo: 'Cambiá los precios', texto: 'En el Excel cambiá solo la columna Precio. La columna Código no se toca: es la que dice qué producto es.' },
+                    { titulo: 'Subilo', texto: 'Volvé a [[Actualizar precios]] y tocá [[Subir Excel con precios nuevos]].' },
+                    { titulo: 'Revisá y guardá', texto: 'Antes de guardar se ve la lista de cambios. Arriba aparecen los precios que se duplican o caen a la mitad, por si se coló un cero de más o de menos. Al guardar, los precios nuevos ya se ven en la tienda.' },
+                ] },
+                { tipo: 'nota', variante: 'dato', texto: 'Solo cambia precios. El stock del Excel no se toca: es el de cuando lo bajaste, y si entre medio vendiste algo, pisarlo deshacería esas ventas. El stock se ajusta desde Inventario.' },
             ],
         },
     ],

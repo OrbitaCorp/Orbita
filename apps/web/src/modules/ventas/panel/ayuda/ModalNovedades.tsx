@@ -12,9 +12,11 @@ interface Props {
     indiceInicial?: number
     onCerrar: () => void
     onIrA: (seccion: SeccionDelPanel, query?: Record<string, string>) => void
+    /** Se llama con cada novedad cuya diapositiva se mostró: eso es "leerla" (ver novedades.ts). */
+    onLeida?: (id: string) => void
 }
 
-export default function ModalNovedades({ novedades, indiceInicial = 0, onCerrar, onIrA }: Props) {
+export default function ModalNovedades({ novedades, indiceInicial = 0, onCerrar, onIrA, onLeida }: Props) {
     const clampedInicial = Math.min(Math.max(0, indiceInicial), Math.max(0, novedades.length - 1))
     const [idx, setIdx] = useState(clampedInicial)
     const [imgIdx, setImgIdx] = useState(0)
@@ -23,6 +25,14 @@ export default function ModalNovedades({ novedades, indiceInicial = 0, onCerrar,
 
     const novedad = novedades[idx]
     const total = novedades.length
+
+    // Leída = su diapositiva estuvo en pantalla. Antes se marcaban todas al
+    // abrir el modal, aunque se mirara solo la primera.
+    const idActual = novedad?.id
+    useEffect(() => {
+        if (idActual) onLeida?.(idActual)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [idActual])
     const imagenes = novedad?.imagenes
     const imagenesCount = imagenes?.length ?? 0
     const imgActualIdx = imagenesCount > 0 ? Math.min(imgIdx, imagenesCount - 1) : 0

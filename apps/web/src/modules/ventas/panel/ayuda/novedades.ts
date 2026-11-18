@@ -8,6 +8,12 @@
 //      cuando hay al menos un `id` que este dispositivo todavía no vio.
 //   3. Si querés retirar novedades viejas, sacalas de `NOVEDADES` y el botón
 //      del encabezado seguirá abriendo las que dejes acá.
+//
+// Cuánto dura una novedad (pedido 18/11): hasta que el propietario la LEE —su
+// diapositiva se mostró en el modal—, y desde ahí 3 días más
+// (NOVEDAD_LEIDA_DURA_MS). Si nunca la lee, no se va nunca. Se cuenta por
+// dispositivo, como el resto de la ayuda (ver almacen.ts). Sin ninguna vigente
+// el botón del encabezado no aparece.
 
 import type { SeccionDelPanel } from '../secciones'
 
@@ -35,6 +41,32 @@ export interface Novedad {
 }
 
 export const NOVEDADES: readonly Novedad[] = [
+    {
+        id: '2026-11-actualizar-precios-excel',
+        etiqueta: 'Nuevo',
+        modulo: 'Productos',
+        titulo: 'Cambiá todos tus precios juntos con un Excel',
+        descripcion: 'Si ajustás precios por cotización o por inflación, ya no hace falta entrar producto por producto: bajás el Excel con tus productos, cambiás la columna Precio y lo volvés a subir.',
+        puntos: [
+            'Una fila por variante: cada talle, color o tamaño con su precio',
+            'Antes de guardar ves qué cambia, con los precios raros arriba (un cero de más o de menos)',
+            'Solo toca precios: el stock se sigue manejando desde Inventario',
+        ],
+        imagenes: [
+            {
+                src: '/novedades/actualizar-precios-excel.svg',
+                epigrafe: 'En el Excel cambiás solo la columna Precio',
+            },
+            {
+                src: '/novedades/actualizar-precios.svg',
+                epigrafe: 'Antes de guardar, revisás todos los cambios',
+            },
+        ],
+        irA: {
+            texto: 'Ir a Productos',
+            seccion: 'catalogo',
+        },
+    },
     {
         id: '2026-11-pedido-solo-venta',
         etiqueta: 'Nuevo',
@@ -129,6 +161,33 @@ export const NOVEDADES: readonly Novedad[] = [
         },
     },
 ]
+
+/** Una novedad leída sigue a mano 3 días más y después se va. */
+export const NOVEDAD_LEIDA_DURA_MS = 3 * 24 * 60 * 60 * 1000
+
+/**
+ * Las que estaban "vistas" antes de guardar la fecha de lectura (todas se
+ * marcaban juntas al abrir el modal) cuentan como leídas el día del cambio:
+ * vencen 3 días después, como cualquier otra.
+ */
+export const LEIDAS_SIN_FECHA_DESDE = Date.parse('2026-11-18T12:00:00-03:00')
+
+type Lecturas = { novedadesVistas: readonly string[]; novedadesLeidasEn: Readonly<Record<string, number>> }
+
+/** Cuándo se leyó (ms epoch), o null si todavía no. */
+export function leidaEn(id: string, a: Lecturas): number | null {
+    const en = a.novedadesLeidasEn[id]
+    if (typeof en === 'number') return en
+    return a.novedadesVistas.includes(id) ? LEIDAS_SIN_FECHA_DESDE : null
+}
+
+/** Las que se muestran: las no leídas y las leídas hace menos de 3 días, en el orden de `NOVEDADES`. */
+export function novedadesVigentes(a: Lecturas, ahora: number, lista: readonly Novedad[] = NOVEDADES): Novedad[] {
+    return lista.filter(n => {
+        const en = leidaEn(n.id, a)
+        return en === null || ahora - en < NOVEDAD_LEIDA_DURA_MS
+    })
+}
 
 /** Devuelve las novedades que todavía no fueron vistas en este dispositivo. */
 export function novedadesSinVer(

@@ -27,6 +27,8 @@ import { assertMemberContext } from '../common/utils/assert-member-context';
 import { ProductsService } from './products.service';
 import { ProductAiService } from './product-ai.service';
 import { ProductImageSearchService } from './product-image-search.service';
+import { PreciosLoteService } from './precios-lote.service';
+import { PreciosLoteDto } from './dto/precios-lote.dto';
 import { BusinessesService } from '../businesses/businesses.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { FindProductsQueryDto } from './dto/find-products-query.dto';
@@ -56,6 +58,8 @@ export class ProductsController {
     private readonly businessesService: BusinessesService,
     private readonly cuotaService: CuotaService,
     @Optional() private readonly productImageSearchService?: ProductImageSearchService,
+    // Opcional solo para los tests que arman el controller a mano.
+    @Optional() private readonly preciosLoteService?: PreciosLoteService,
   ) {}
 
   // Alternativa a pegar un link de video en el producto (Variantes e imágenes)
@@ -174,6 +178,28 @@ export class ProductsController {
   findAll(@CurrentBusiness() ctx: AuthContext, @Query() query: FindProductsQueryDto) {
     const member = assertMemberContext(ctx);
     return this.productsService.findAll(member.businessId, query);
+  }
+
+  // El Excel para "Actualizar precios": una fila por variante, con su código.
+  // Mismos filtros que el listado (lo que el dueño está viendo).
+  @Get('precios-lote')
+  @RequirePermission('catalog.manage')
+  preciosLoteFilas(@CurrentBusiness() ctx: AuthContext, @Query() query: FindProductsQueryDto) {
+    const member = assertMemberContext(ctx);
+    if (!this.preciosLoteService) throw new BadRequestException('Actualizar precios no está disponible');
+    return this.preciosLoteService.filas(member.businessId, query);
+  }
+
+  // "Actualizar precios con Excel" (Catálogo): con `simular` devuelve qué
+  // cambiaría, para el resumen previo; sin él lo guarda. Solo precios, ver
+  // precios-lote.dto.ts. Throttle bajo: es una operación de a muchas filas.
+  @Post('precios-lote')
+  @RequirePermission('catalog.manage')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  preciosLote(@CurrentBusiness() ctx: AuthContext, @Body() dto: PreciosLoteDto) {
+    const member = assertMemberContext(ctx);
+    if (!this.preciosLoteService) throw new BadRequestException('Actualizar precios no está disponible');
+    return this.preciosLoteService.actualizar(member.businessId, member.memberId, dto);
   }
 
   // Declarado antes de ':id' — si no, Nest interpreta "stats" como un :id.

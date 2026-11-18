@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/router'
-import { Plus, Search, Edit2, MoreVertical, Copy, Trash2, Package, Globe, AlertCircle, Wallet, TrendingUp, Download, Upload, LayoutGrid, List, ChevronLeft, ChevronRight, Star, Clock, Loader2, MessageSquare, Clapperboard, UploadCloud } from 'lucide-react'
+import { Plus, Search, Edit2, MoreVertical, Copy, Trash2, Package, Globe, AlertCircle, Wallet, TrendingUp, Download, Upload, LayoutGrid, List, ChevronLeft, ChevronRight, Star, Clock, Loader2, MessageSquare, Clapperboard, UploadCloud, RefreshCw } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Modal } from '@/design-system/components/Modal'
@@ -12,7 +12,7 @@ import { Toast } from '@/design-system/components/Toast'
 import { Skeleton } from '@/design-system/components/Skeleton'
 import { fmtMoney, toastEsError } from '@/lib/utils'
 import {
-    panelListProducts, panelGetProductStats, panelGetCategoriesFlat,
+    panelListProducts, panelGetProductStats, panelGetCategoriesFlat, panelGetFilasPrecios,
     panelDeleteProduct, panelDuplicateProduct, panelToggleProductFeatured,
     panelUpdateProductStatus,
     ApiError,
@@ -35,6 +35,8 @@ import { ResenasProducto } from './components/ResenasProducto'
 import { ContenidoFichaModal } from './components/ContenidoFichaModal'
 import { StockRapidoModal } from './components/StockRapido'
 import { ImportarProductos } from './importar/ImportarProductos'
+import { ActualizarPreciosModal } from './precios/ActualizarPrecios'
+import { armarExcelPrecios } from './precios/excelPrecios'
 import { OrbiPetVacio } from '@/components/orbi/pet/OrbiPetVacio'
 
 const COLS = '56px 1.5fr 110px 110px 80px 90px 110px 90px'
@@ -773,6 +775,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
     const [cargando, setCargando] = useState(true)
     const [exportando, setExportando] = useState(false)
     const [importando, setImportando] = useState(false)
+    const [actualizandoPrecios, setActualizandoPrecios] = useState(false)
     const [error, setError] = useState('')
 
     const createdProductIds = useOrbiStore(s => s.createdProductIds)
@@ -977,81 +980,19 @@ function ListaView({ irNuevo, irEditar, onToast }: {
 
 
     // Exporta TODO lo que matchea los filtros actuales (no solo la página
-    // visible) — pide todas las páginas en secuencia y arma un .xlsx con
-    // estilo real (encabezado con color, anchos por columna, moneda
-    // formateada), no un CSV disfrazado.
+    // visible): una fila por variante, con su código en la primera columna.
+    // Es el mismo archivo que "Actualizar precios" lee de vuelta (ver
+    // precios/excelPrecios.ts): se cambia la columna Precio y se sube.
     async function exportarExcel() {
         setExportando(true)
         try {
-            const ExcelJS = (await import('exceljs')).default
-            const todas: ApiProductRow[] = []
-            let pag = 1
-            const limite = 100
-            while (true) {
-                const res = await panelListProducts({
-                    search: busqDebounced || undefined,
-                    categoryId: fcat !== 'todos' ? fcat : undefined,
-                    status: fest !== 'todos' ? (fest as ProductStatusFilter) : undefined,
-                    page: pag,
-                    limit: limite,
-                })
-                todas.push(...res.data)
-                if (todas.length >= res.total || res.data.length === 0) break
-                pag++
-            }
-
-            const wb = new ExcelJS.Workbook()
-            wb.creator = 'Órbita'
-            wb.created = new Date()
-            const ws = wb.addWorksheet('Productos', { views: [{ state: 'frozen', ySplit: 1 }] })
-
-            ws.columns = [
-                { header: 'Nombre', key: 'nombre', width: 34 },
-                { header: 'Categoría', key: 'categoria', width: 20 },
-                { header: 'Precio', key: 'precio', width: 14, style: { numFmt: '"$"#,##0' } },
-                { header: 'Stock', key: 'stock', width: 10 },
-                { header: 'Variantes', key: 'variantes', width: 11 },
-                { header: 'Estado', key: 'estado', width: 14 },
-                { header: 'Creado', key: 'creado', width: 14 },
-            ]
-
-            const ESTADO_LABEL: Record<EstadoProducto, string> = { publicado: 'Publicado', borrador: 'Borrador', sin_stock: 'Sin stock' }
-            for (const p of todas) {
-                ws.addRow({
-                    nombre: p.name,
-                    categoria: p.categoryName ?? 'Sin categoría',
-                    precio: p.basePrice,
-                    stock: p.totalStock,
-                    variantes: p.variantCount,
-                    estado: ESTADO_LABEL[estadoVisual(p)],
-                    creado: new Date(p.createdAt).toLocaleDateString('es-AR'),
-                })
-            }
-
-            // Encabezado con estilo real: fondo, tipografía blanca, bordes finos
-            // en toda la tabla — lo que pediste como "buen diseño de celdas".
-            const header = ws.getRow(1)
-            header.font = { bold: true, color: { argb: 'FFFFFFFF' } }
-            header.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } }
-            header.alignment = { vertical: 'middle' }
-            header.height = 22
-
-            ws.eachRow((row, i) => {
-                row.eachCell(cell => {
-                    cell.border = {
-                        top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-                        bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-                        left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-                        right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-                    }
-                    if (i > 1) cell.alignment = { vertical: 'middle' }
-                })
-                if (i > 1 && i % 2 === 0) {
-                    row.eachCell(cell => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } } })
-                }
+            const filas = await panelGetFilasPrecios({
+                search: busqDebounced || undefined,
+                categoryId: fcat !== 'todos' ? fcat : undefined,
+                status: fest !== 'todos' ? (fest as ProductStatusFilter) : undefined,
             })
-
-            const buffer = await wb.xlsx.writeBuffer()
+            const todas = new Set(filas.map(f => f.nombre + '|' + (f.categoria ?? '')))
+            const buffer = await armarExcelPrecios(filas)
             const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
             const url = URL.createObjectURL(blob)
             const a = document.createElement('a')
@@ -1059,7 +1000,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
             a.download = `productos-${new Date().toISOString().slice(0, 10)}.xlsx`
             a.click()
             URL.revokeObjectURL(url)
-            onToast(`${todas.length} producto${todas.length === 1 ? '' : 's'} exportado${todas.length === 1 ? '' : 's'}`)
+            onToast(`${todas.size} producto${todas.size === 1 ? '' : 's'} exportado${todas.size === 1 ? '' : 's'}`)
         } catch {
             onToast('No se pudo generar el Excel')
         } finally {
@@ -1227,6 +1168,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                     <Button variant="outline" icon={<Download size={15} />} onClick={() => void exportarExcel()} disabled={exportando || total === 0}>
                         {exportando ? 'Exportando…' : 'Exportar Excel'}
                     </Button>
+                    <Button variant="outline" icon={<RefreshCw size={15} />} onClick={() => setActualizandoPrecios(true)} disabled={total === 0} data-ayuda="actualizar-precios">Actualizar precios</Button>
                     <Button variant="primary" icon={<Plus size={16} />} onClick={irNuevo} data-ayuda="crear-producto">Crear producto</Button>
                 </div>
             </div>
@@ -1592,6 +1534,16 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                 cambiar el estado visual si pasó a/de "sin stock"). */}
             {/* Carga masiva desde Excel: plantilla, revisión, importación y fotos. */}
             <ImportarProductos abierto={importando} onCerrar={() => setImportando(false)} onImportado={() => void cargarSilencioso()} />
+
+            {/* Actualizar precios con Excel: se baja el Excel, se cambian los precios y se sube (ver precios/). */}
+            {actualizandoPrecios && (
+                <ActualizarPreciosModal
+                    onClose={() => setActualizandoPrecios(false)}
+                    onExportar={() => void exportarExcel()}
+                    exportando={exportando}
+                    onGuardado={(m, ok) => { onToast(m); if (ok) void cargar() }}
+                />
+            )}
 
             {stockDe && (
                 <StockRapidoModal

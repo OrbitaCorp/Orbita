@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" width="800" height="450" fill="none">
+  <defs>
+    <radialGradient id="glowExcel" cx="50%" cy="15%" r="65%">
+      <stop offset="0%" stop-color="#22C55E" stop-opacity="0.12" />
+      <stop offset="100%" stop-color="#05080F" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+  <rect width="800" height="450" fill="#05080F" />
+  <rect width="800" height="450" fill="url(#glowExcel)" />
+
+  <!-- Planilla: se cambia solo la columna Precio -->
+  <rect x="70" y="44" width="660" height="362" rx="14" fill="#0B101D" stroke="#1B2439" stroke-width="1.5" />
+  <g font-family="system-ui, -apple-system, sans-serif" font-size="12.5">
+    <rect x="70" y="44" width="660" height="40" rx="14" fill="#2563EB" />
+    <rect x="70" y="70" width="660" height="14" fill="#2563EB" />
+    <text x="92" y="69" fill="#FFFFFF" font-weight="700">Código (no lo cambies)</text>
+    <text x="300" y="69" fill="#FFFFFF" font-weight="700">Nombre</text>
+    <text x="520" y="69" fill="#FFFFFF" font-weight="700">Variante</text>
+    <text x="700" y="69" fill="#FFFFFF" font-weight="700" text-anchor="end">Precio</text>
+
+    <!-- Columna Precio resaltada -->
+    <rect x="606" y="84" width="124" height="322" fill="#16A34A" fill-opacity="0.10" />
+    <line x1="606" y1="84" x2="606" y2="406" stroke="#22C55E" stroke-opacity="0.5" />
+
+    <text x="92" y="116" fill="#556079">3fa8…c21e</text>
+    <text x="300" y="116" fill="#E8EDF7">Creed Aventus EDP</text>
+    <text x="520" y="116" fill="#7E89A6">100 ml</text>
+    <text x="700" y="116" fill="#E8EDF7" font-weight="600" text-anchor="end">$ 792.622</text>
+    <line x1="70" y1="132" x2="730" y2="132" stroke="#1B2439" />
+
+    <text x="92" y="160" fill="#556079">9b02…77d4</text>
+    <text x="300" y="160" fill="#E8EDF7">Kilian Angels' Share</text>
+    <text x="520" y="160" fill="#7E89A6">50 ml</text>
+    <text x="700" y="160" fill="#E8EDF7" font-weight="600" text-anchor="end">$ 612.348</text>
+    <line x1="70" y1="176" x2="730" y2="176" stroke="#1B2439" />
+
+    <text x="92" y="204" fill="#556079">c71d…0a93</text>
+    <text x="300" y="204" fill="#E8EDF7">Kilian Angels' Share</text>
+    <text x="520" y="204" fill="#7E89A6">100 ml</text>
+    <text x="700" y="204" fill="#E8EDF7" font-weight="600" text-anchor="end">$ 876.750</text>
+    <line x1="70" y1="220" x2="730" y2="220" stroke="#1B2439" />
+
+    <text x="92" y="248" fill="#556079">e410…5b6f</text>
+    <text x="300" y="248" fill="#E8EDF7">Dior Sauvage EDP</text>
+    <text x="520" y="248" fill="#7E89A6">100 ml</text>
+    <text x="700" y="248" fill="#E8EDF7" font-weight="600" text-anchor="end">$ 256.007</text>
+    <line x1="70" y1="264" x2="730" y2="264" stroke="#1B2439" />
+
+    <text x="92" y="292" fill="#556079">51cc…e2a0</text>
+    <text x="300" y="292" fill="#E8EDF7">Gucci Bloom EDT</text>
+    <text x="520" y="292" fill="#7E89A6">100 ml</text>
+    <text x="700" y="292" fill="#E8EDF7" font-weight="600" text-anchor="end">$ 198.450</text>
+    <line x1="70" y1="308" x2="730" y2="308" stroke="#1B2439" />
+
+    <text x="92" y="336" fill="#556079">0d9e…41b7</text>
+    <text x="300" y="336" fill="#E8EDF7">Rabanne Invictus</text>
+    <text x="520" y="336" fill="#7E89A6">200 ml</text>
+    <text x="700" y="336" fill="#E8EDF7" font-weight="600" text-anchor="end">$ 231.000</text>
+  </g>
+</svg>

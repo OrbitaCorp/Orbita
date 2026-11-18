@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" width="800" height="450" fill="none">
+  <defs>
+    <radialGradient id="glowPrecios" cx="50%" cy="15%" r="65%">
+      <stop offset="0%" stop-color="#3B82F6" stop-opacity="0.16" />
+      <stop offset="100%" stop-color="#05080F" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+  <rect width="800" height="450" fill="#05080F" />
+  <rect width="800" height="450" fill="url(#glowPrecios)" />
+
+  <!-- Modal "Actualizar precios con Excel" -->
+  <rect x="120" y="34" width="560" height="382" rx="16" fill="#0B101D" stroke="#1B2439" stroke-width="1.5" />
+  <text x="148" y="72" fill="#E8EDF7" font-family="system-ui, -apple-system, sans-serif" font-size="17" font-weight="700">Actualizar precios con Excel</text>
+  <text x="148" y="104" fill="#E8EDF7" font-family="system-ui, -apple-system, sans-serif" font-size="14">Vas a cambiar <tspan font-weight="700">412 precios</tspan>.<tspan fill="#7E89A6"> 38 quedan igual.</tspan></text>
+  <text x="148" y="126" fill="#F59E0B" font-family="system-ui, -apple-system, sans-serif" font-size="12.5">Hay 1 precio que se duplica o cae a la mitad: está arriba de la lista.</text>
+
+  <!-- Tabla de cambios -->
+  <rect x="148" y="144" width="504" height="206" rx="10" fill="#05080F" stroke="#1B2439" stroke-width="1.2" />
+  <g font-family="system-ui, -apple-system, sans-serif" font-size="12">
+    <text x="164" y="168" fill="#7E89A6" font-weight="600">Producto</text>
+    <text x="470" y="168" fill="#7E89A6" font-weight="600" text-anchor="end">Antes</text>
+    <text x="560" y="168" fill="#7E89A6" font-weight="600" text-anchor="end">Ahora</text>
+    <text x="636" y="168" fill="#7E89A6" font-weight="600" text-anchor="end">Cambio</text>
+
+    <line x1="148" y1="180" x2="652" y2="180" stroke="#1B2439" />
+    <text x="164" y="202" fill="#E8EDF7">Creed Aventus EDP <tspan fill="#7E89A6">· 100 ml</tspan></text>
+    <text x="470" y="202" fill="#7E89A6" text-anchor="end">$ 754.878</text>
+    <text x="560" y="202" fill="#E8EDF7" font-weight="600" text-anchor="end">$ 7.926.219</text>
+    <text x="636" y="202" fill="#F59E0B" font-weight="600" text-anchor="end">+950%</text>
+
+    <line x1="148" y1="214" x2="652" y2="214" stroke="#1B2439" />
+    <text x="164" y="236" fill="#E8EDF7">Kilian Angels' Share <tspan fill="#7E89A6">· 50 ml</tspan></text>
+    <text x="470" y="236" fill="#7E89A6" text-anchor="end">$ 583.189</text>
+    <text x="560" y="236" fill="#E8EDF7" font-weight="600" text-anchor="end">$ 612.348</text>
+    <text x="636" y="236" fill="#7E89A6" text-anchor="end">+5%</text>
+
+    <line x1="148" y1="248" x2="652" y2="248" stroke="#1B2439" />
+    <text x="164" y="270" fill="#E8EDF7">Kilian Angels' Share <tspan fill="#7E89A6">· 100 ml</tspan></text>
+    <text x="470" y="270" fill="#7E89A6" text-anchor="end">$ 835.000</text>
+    <text x="560" y="270" fill="#E8EDF7" font-weight="600" text-anchor="end">$ 876.750</text>
+    <text x="636" y="270" fill="#7E89A6" text-anchor="end">+5%</text>
+
+    <line x1="148" y1="282" x2="652" y2="282" stroke="#1B2439" />
+    <text x="164" y="304" fill="#E8EDF7">Dior Sauvage EDP <tspan fill="#7E89A6">· 100 ml</tspan></text>
+    <text x="470" y="304" fill="#7E89A6" text-anchor="end">$ 243.816</text>
+    <text x="560" y="304" fill="#E8EDF7" font-weight="600" text-anchor="end">$ 256.007</text>
+    <text x="636" y="304" fill="#7E89A6" text-anchor="end">+5%</text>
+
+    <line x1="148" y1="316" x2="652" y2="316" stroke="#1B2439" />
+    <text x="164" y="338" fill="#7E89A6">Y 408 cambios más…</text>
+  </g>
+
+  <!-- Botones -->
+  <rect x="436" y="366" width="96" height="34" rx="8" fill="#0B101D" stroke="#2A3550" stroke-width="1.2" />
+  <text x="484" y="388" fill="#E8EDF7" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600" text-anchor="middle">Cancelar</text>
+  <rect x="542" y="366" width="110" height="34" rx="8" fill="#2563EB" />
+  <text x="597" y="388" fill="#FFFFFF" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600" text-anchor="middle">Guardar 412</text>
+</svg>
