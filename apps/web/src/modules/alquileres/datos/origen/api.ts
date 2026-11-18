@@ -41,17 +41,24 @@ export function tramosDeFechas(desde: ISO, hasta: ISO, porTramo = DIAS_POR_PEDID
   return tramos
 }
 
-/** Las reservas de Alquileres entre dos fechas (incluidas), todas las páginas de cada tramo. */
+/**
+ * Las reservas de Alquileres entre dos fechas (incluidas), todas las páginas
+ * de cada tramo. De a un pedido por vez, no en paralelo: la API limita a 60
+ * pedidos por minuto por IP, y un complejo de canchas con mucho movimiento
+ * son varias páginas por tramo.
+ */
 export async function reservasEntre(desde: ISO, hasta: ISO): Promise<ReservaApi[]> {
-  const porTramo = await Promise.all(tramosDeFechas(desde, hasta).map(async ([d, h]) => {
-    const todas: ReservaApi[] = []
+  const todas: ReservaApi[] = []
+  for (const [d, h] of tramosDeFechas(desde, hasta)) {
+    let delTramo = 0
     for (let page = 1; ; page++) {
       const p = await panel.agenda({ modulo: 'ALQUILERES', desde: d, hasta: h, page, limit: POR_PAGINA })
       todas.push(...p.data)
-      if (p.data.length < POR_PAGINA || todas.length >= p.total) return todas
+      delTramo += p.data.length
+      if (p.data.length < POR_PAGINA || delTramo >= p.total) break
     }
-  }))
-  return porTramo.flat()
+  }
+  return todas
 }
 
 /** Todo lo que el panel necesita del negocio con sesión. Sin config de Alquileres, el negocio todavía no lo usa. */
@@ -61,23 +68,26 @@ export async function cargarApi(hoy: ISO): Promise<Pick<DatosPanelAlquiler, 'tip
   const [negocio, config, recursosTodos, servicios, bloqueos, reservasApi] = await Promise.all([
     getBusiness(),
     panel.config('ALQUILERES'),
-    panel.recursos('ALQUILERES'),
+    // Con los desactivados: sus reservas (las pasadas y las que siguen en pie) no desaparecen del panel.
+    panel.recursos('ALQUILERES', true),
     panel.servicios('ALQUILERES'),
     panel.bloqueos('ALQUILERES', desde, hasta),
     reservasEntre(desde, hasta),
   ])
   if (!config) throw new Error('Este negocio todavía no tiene Alquileres configurado.')
   const { tipo, rubro } = tipoDeRubro(negocio.subrubros)
-  const recursos = recursosTodos.filter(r => r.tipo === tipoDeRecurso(tipo))
+  // Lo que se alquila hoy: solo los activos del modo.
+  const recursos = recursosTodos.filter(r => r.activo && r.tipo === tipoDeRecurso(tipo))
   const porId = new Map(recursosTodos.map(r => [r.id, r]))
-  const delModo = reservasApi.filter(r => porId.get(r.recursoId)?.tipo === tipoDeRecurso(tipo))
+  // Las reservas del modo, también las de un recurso desactivado o borrado (que ya no viene en la lista).
+  const delModo = reservasApi.filter(r => { const rec = porId.get(r.recursoId); return !rec || rec.tipo === tipoDeRecurso(tipo) })
   return {
     tipo,
     negocio: negocioDeApi({
       tipo, rubro, config, recursos, servicios, bloqueos,
       negocio: { nombre: negocio.name, slug: negocio.subdomain, descripcion: negocio.description },
     }),
-    reservas: delModo.map(r => reservaDeApi(r, porId.get(r.recursoId))).filter(r => r !== null),
+    reservas: delModo.map(r => reservaDeApi(r, tipo)).filter(r => r !== null),
     clientes: clientesDeReservas(delModo),
   }
 }

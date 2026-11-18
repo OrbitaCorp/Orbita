@@ -204,12 +204,14 @@ async function canchas(businessId: string) {
   }
   const hoy = hoyArgentina();
   const filas: ReturnType<typeof reserva>[] = [];
-  for (let d = -DIAS; d <= DIAS; d++) {
+  // Menos días y menos movimiento que los otros dos: el panel trae las reservas de a 100 por pedido
+  // y la API limita a 60 pedidos por minuto por IP; unas 800 reservas alcanzan para probar.
+  for (let d = -60; d <= 45; d++) {
     const fecha = sumarDias(hoy, d);
     const finde = [0, 5, 6].includes(diaSemana(fecha));
     for (const [ri, rec] of recursos.entries()) {
       const r = azar(Number(fecha.replace(/-/g, '')) * 10 + ri);
-      const ocupacion = (d > 14 ? 0.15 : 0.3) + (finde ? 0.2 : 0);
+      const ocupacion = (d > 14 ? 0.06 : 0.12) + (finde ? 0.08 : 0);
       let t = 540;
       while (t < 1440) {
         const horas = r() < 0.25 && t + 120 <= 1440 ? 2 : 1;

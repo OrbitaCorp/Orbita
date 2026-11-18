@@ -88,6 +88,13 @@ export interface Ruta {
   corregir: boolean
 }
 
+/**
+ * Si el panel tiene que reescribir la URL. Solo con los datos ya llegados: con
+ * la API, mientras carga el modo es de relleno (canchas) y una sección de
+ * otro modo (?vista=propiedades) se "corregiría" a Reservas antes de tiempo.
+ */
+export const debeCorregirRuta = (ruta: Pick<Ruta, 'corregir'>, listo: boolean) => listo && ruta.corregir
+
 export function resolverRuta(query: { vista?: string | string[]; tab?: string | string[] }, tipo: TipoAlquiler): Ruta {
   const secciones = seccionesDe(tipo)
   const pedida = typeof query.vista === 'string' ? query.vista : ''

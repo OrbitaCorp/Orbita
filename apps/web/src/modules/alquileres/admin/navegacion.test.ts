@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { resolverRuta, seccionesDe } from './navegacion'
+import { debeCorregirRuta, resolverRuta, seccionesDe } from './navegacion'
+
+describe('debeCorregirRuta', () => {
+  it('no reescribe la URL mientras los datos no llegaron (el modo todavía es de relleno)', () => {
+    const r = resolverRuta({ vista: 'propiedades' }, 'cancha')
+    expect(r.corregir).toBe(true)
+    expect(debeCorregirRuta(r, false)).toBe(false)
+    expect(debeCorregirRuta(r, true)).toBe(true)
+  })
+})
 import { TIPOS_ORDEN } from '../datos'
 
 describe('seccionesDe', () => {

@@ -106,26 +106,26 @@ describe('propiedadDeApi', () => {
 
 describe('reservaDeApi', () => {
   it('una estadía va con entrada y salida en días de Argentina', () => {
-    const r = reservaDeApi(reserva({ fecha: '2026-11-20', inicio: '2026-11-20T17:00:00.000Z', fin: '2026-11-23T13:00:00.000Z' }), recurso({ tipo: 'ALOJAMIENTO' }))
+    const r = reservaDeApi(reserva({ fecha: '2026-11-20', inicio: '2026-11-20T17:00:00.000Z', fin: '2026-11-23T13:00:00.000Z' }), 'estadia')
     expect(r?.entrada).toBe('2026-11-20')
     expect(r?.salida).toBe('2026-11-23')
     expect(r?.fecha).toBeUndefined()
   })
   it('una cancha va con fecha, inicio y fin', () => {
-    const r = reservaDeApi(reserva(), recurso())
+    const r = reservaDeApi(reserva(), 'cancha')
     expect(r).toMatchObject({ fecha: '2026-11-20', inicio: 1020, fin: 1080, unidadId: 'r1', estado: 'confirmada', creada: '2026-11-10' })
   })
   it('una vencida no se muestra', () => {
-    expect(reservaDeApi(reserva({ estado: 'VENCIDA' }), recurso())).toBeNull()
+    expect(reservaDeApi(reserva({ estado: 'VENCIDA' }), 'cancha')).toBeNull()
   })
   it('la seña pagada y el saldo salen de lo pagado', () => {
-    const r = reservaDeApi(reserva({ sena: 10000, pagado: 10000, precio: 40000 }), recurso())
+    const r = reservaDeApi(reserva({ sena: 10000, pagado: 10000, precio: 40000 }), 'cancha')
     expect(r?.senaPagada).toBe(true)
     expect(r?.saldoPagado).toBe(false)
     expect(r?.total).toBe(40000)
   })
   it('los extras van por id y la nota interna gana', () => {
-    const r = reservaDeApi(reserva({ extras: [{ id: 'luz', nombre: 'Luz', precio: 5000 }], notas: 'del cliente', notaInterna: 'del negocio' }), recurso())
+    const r = reservaDeApi(reserva({ extras: [{ id: 'luz', nombre: 'Luz', precio: 5000 }], notas: 'del cliente', notaInterna: 'del negocio' }), 'cancha')
     expect(r?.extras).toEqual(['luz'])
     expect(r?.nota).toBe('del negocio')
   })
@@ -162,12 +162,23 @@ describe('bloqueosDeApi', () => {
 
 describe('aperturaDeHorario', () => {
   it('los días van con lunes en 0 y el tramo del más temprano al más tarde', () => {
-    expect(aperturaDeHorario({ '1': [[540, 780], [960, 1320]], '6': [[600, 1200]] })).toEqual({ dias: [0, 5], desde: 540, hasta: 1320 })
-    expect(aperturaDeHorario({ '0': [[600, 1200]] })).toEqual({ dias: [6], desde: 600, hasta: 1200 })
+    expect(aperturaDeHorario({ '1': [[540, 780], [960, 1320]], '6': [[600, 1200]] }, 'cancha')).toEqual({ dias: [0, 5], desde: 540, hasta: 1320 })
+    expect(aperturaDeHorario({ '0': [[600, 1200]] }, 'bloque')).toEqual({ dias: [6], desde: 600, hasta: 1200 })
   })
-  it('sin horario, abierto todo el día todos los días (la estadía no tiene apertura)', () => {
-    expect(aperturaDeHorario(null)).toEqual({ dias: [0, 1, 2, 3, 4, 5, 6], desde: 0, hasta: 1440 })
-    expect(aperturaDeHorario({})).toEqual({ dias: [0, 1, 2, 3, 4, 5, 6], desde: 0, hasta: 1440 })
+  it('sin horario, la estadía está abierta siempre (no tiene apertura)', () => {
+    expect(aperturaDeHorario(null, 'estadia')).toEqual({ dias: [0, 1, 2, 3, 4, 5, 6], desde: 0, hasta: 1440 })
+    expect(aperturaDeHorario({}, 'estadia')).toEqual({ dias: [0, 1, 2, 3, 4, 5, 6], desde: 0, hasta: 1440 })
+  })
+  it('sin horario, canchas y salones están cerrados, como los trata el servidor', () => {
+    expect(aperturaDeHorario({}, 'cancha').dias).toEqual([])
+    expect(aperturaDeHorario(null, 'bloque').dias).toEqual([])
+  })
+})
+
+describe('reservaDeApi sin recurso conocido', () => {
+  it('la forma sale del modo del negocio, no del recurso', () => {
+    const r = reservaDeApi(reserva({ recursoId: 'borrado', fecha: '2026-11-20', fin: '2026-11-22T13:00:00.000Z' }), 'estadia')
+    expect(r).toMatchObject({ unidadId: 'borrado', entrada: '2026-11-20', salida: '2026-11-22' })
   })
 })
 

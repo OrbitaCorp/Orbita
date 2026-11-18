@@ -181,11 +181,15 @@ export function clientesDeReservas(rs: ReservaApi[]): Cliente[] {
   return [...porId.values()]
 }
 
-/** Una reserva de la API como reserva del panel, o null si no se muestra. Sin recurso (borrado), se toma por cancha o salón. */
-export function reservaDeApi(r: ReservaApi, recurso: Recurso | undefined): Reserva | null {
+/**
+ * Una reserva de la API como reserva del panel, o null si no se muestra. La
+ * forma (noches o franja) sale del modo del negocio: así una reserva de una
+ * propiedad desactivada o borrada sigue saliendo como estadía.
+ */
+export function reservaDeApi(r: ReservaApi, tipo: TipoAlquiler): Reserva | null {
   const estado = estadoDeApi(r.estado)
   if (!estado) return null
-  const cuando = recurso?.tipo === 'ALOJAMIENTO'
+  const cuando = tipo === 'estadia'
     ? { entrada: r.fecha, salida: fechaArgentina(r.fin) }
     : { fecha: r.fecha, inicio: r.inicioMinutos, fin: r.finMinutos }
   const nota = r.notaInterna ?? r.notas ?? undefined
@@ -221,10 +225,13 @@ const TODOS_LOS_DIAS = [0, 1, 2, 3, 4, 5, 6]
 /**
  * El horario semanal de la API (0 = domingo, varios tramos por día) como la
  * apertura del panel (0 = lunes, un solo tramo): los días con algún tramo,
- * del inicio más temprano al fin más tarde. Sin horario, abierto siempre (la
- * estadía no tiene apertura: se entra y se sale a la hora de cada propiedad).
+ * del inicio más temprano al fin más tarde. Sin horario, la estadía está
+ * abierta siempre (no tiene apertura: se entra y se sale a la hora de cada
+ * propiedad); canchas y salones, cerrados, como los trata el servidor.
+ * Todavía no mira el horario propio de cada recurso, que el servidor usa
+ * antes que el del negocio.
  */
-export function aperturaDeHorario(horario: unknown): Apertura {
+export function aperturaDeHorario(horario: unknown, tipo: TipoAlquiler): Apertura {
   const h = comoDatos(horario)
   const dias: number[] = []
   let desde = MINUTOS_DIA
@@ -238,7 +245,7 @@ export function aperturaDeHorario(horario: unknown): Apertura {
       if (Array.isArray(t) && esNumero(t[0]) && esNumero(t[1])) { desde = Math.min(desde, t[0]); hasta = Math.max(hasta, t[1]) }
     }
   }
-  if (dias.length === 0 || hasta <= desde) return { dias: TODOS_LOS_DIAS, desde: 0, hasta: MINUTOS_DIA }
+  if (dias.length === 0 || hasta <= desde) return tipo === 'estadia' ? { dias: TODOS_LOS_DIAS, desde: 0, hasta: MINUTOS_DIA } : { dias: [], desde: 540, hasta: 1080 }
   return { dias: dias.sort((a, b) => a - b), desde, hasta }
 }
 
@@ -276,7 +283,7 @@ export function negocioDeApi(p: { tipo: TipoAlquiler; rubro: string; negocio: Da
     slug: p.negocio.slug,
     logo: p.negocio.logo ?? null,
     fotoPortada,
-    apertura: aperturaDeHorario(config.horario),
+    apertura: aperturaDeHorario(config.horario, tipo),
     senaPct: config.senaPorcentaje,
     cancelaHastaHoras: config.cancelacionHastaHoras,
     pasoMin: primera?.pasoMinutos ?? 60,

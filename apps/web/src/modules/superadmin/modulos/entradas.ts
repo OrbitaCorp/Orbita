@@ -2637,10 +2637,10 @@ Esas tres cosas se resuelven con las tareas de la semana 2.
 
 - **El origen** (\`datos/origen/index.ts\`): \`useDatos()\` devuelve el negocio, las reservas, los clientes, si ya llegó, el error y las siete escrituras con las mismas firmas que el almacén de la demo. El panel lo toma del contexto; el de un negocio real monta \`<OrigenAlquileresProvider origen={origenApi}>\`.
 - **La demo** (\`demo.ts\`) envuelve \`useNegocio()\` tal cual. Hay un test que la compara con el almacén en los tres modos, y se probó a mano en el navegador (los tres modos y quitar un bloqueo).
-- **La API** (\`api.ts\`): el negocio y su modo salen de \`/business\` (el primer subrubro de Alquileres); los recursos del modo, los servicios (paquetes), los bloqueos y las reservas de medio año para cada lado, en tramos de 90 días. Sin config de Alquileres, el panel lo dice y ofrece Reintentar. Las escrituras todavía no llegan a la API: el panel lo avisa arriba.
+- **La API** (\`api.ts\`): el negocio y su modo salen de \`/business\` (el primer subrubro de Alquileres); los recursos activos del modo, los servicios (paquetes), los bloqueos y las reservas de medio año para cada lado (también las de un recurso desactivado), en tramos de 90 días pedidos de a uno por el límite de 60 pedidos por minuto. El panel no reescribe la URL hasta que llegan los datos (antes, un link a Propiedades terminaba en Reservas mientras cargaba). Sin config de Alquileres, el panel lo dice y ofrece Reintentar. Las escrituras todavía no llegan a la API: el panel lo avisa arriba.
 - **Las traducciones** (\`mapear.ts\`, con 21 tests): fechas de Argentina, estados (VENCIDA no se muestra; AUSENTE va como cancelada hasta que Ingresos lo resuelva), la apertura con el lunes en 0, un bloqueo de todo el negocio repartido en cada unidad, clientes sin ficha por teléfono, email o nombre, y lo que la API no guarda con su valor de fábrica (mensajes, pagos, equipo, calendarios).
 - **Para probarlo:** \`/panel/alquileres\` en local (no existe en producción), con los negocios de prueba de la entrada de hoy.
-- **Verificado:** typecheck y eslint de \`apps/web\` sin errores, tests de Alquileres en verde (43), y por un script las seis rutas que usa el origen con los tres dueños de prueba. El panel con datos reales no se vio pintado: el navegador de la sesión no dejaba abrir el subdominio ni llamar a la API local.`,
+- **Verificado:** typecheck y eslint de \`apps/web\` sin errores, tests de Alquileres en verde (47), y por un script las seis rutas que usa el origen con los tres dueños de prueba. El panel con datos reales no se vio pintado: el navegador de la sesión no dejaba abrir el subdominio ni llamar a la API local.`,
     archivos: [
       'apps/web/src/modules/alquileres/datos/origen/index.ts:1',
       'apps/web/src/modules/alquileres/datos/origen/demo.ts:1',
@@ -2659,11 +2659,11 @@ Esas tres cosas se resuelven con las tareas de la semana 2.
 
 | Negocio | Subrubro | Qué tiene |
 |---|---|---|
-| \`canchas-prueba\` | canchas | 4 canchas por hora con extras, unas 3.100 reservas en seis meses |
+| \`canchas-prueba\` | canchas | 4 canchas por hora con extras, unas 800 reservas (60 días atrás y 45 adelante: el panel las trae de a 100 y la API limita a 60 pedidos por minuto) |
 | \`salones-prueba\` | salon-cumples | 2 salones por bloque con 2 paquetes cada uno (servicios del salón), unas 220 reservas |
 | \`cabanas-prueba\` | cabana | 3 propiedades por noche (check-in 14:00, check-out 10:00, dos noches mínimas), unas 75 estadías |
 
-- Reservas entre 90 días atrás y 90 adelante, sin pisarse, con seña del 30 %, y en todos los estados: las pasadas completadas, algunas ausentes o canceladas; las que vienen confirmadas, pendientes o canceladas.
+- Reservas entre 90 días atrás y 90 adelante (canchas, menos), sin pisarse, con seña del 30 %: las pasadas completadas, algunas ausentes o canceladas; las que vienen confirmadas, pendientes o canceladas. No hay retenidas ni vencidas.
 - Un par de bloqueos por negocio (uno de todo el negocio en canchas y salones, uno por propiedad en cabañas).
 - **Para entrar:** \`dueno@<slug>.invalid\`, con la contraseña de \`ALQUILERES_PRUEBA_PASSWORD\` del \`.env\` local de \`apps/api\` (no se imprime ni se commitea).
 - **Verificado:** el seed corrido dos veces contra dev con los mismos números, y login como los tres dueños con las rutas del panel respondiendo.`,

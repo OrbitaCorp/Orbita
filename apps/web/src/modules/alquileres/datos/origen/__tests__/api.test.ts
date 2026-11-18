@@ -74,6 +74,19 @@ describe('cargarApi', () => {
   })
 })
 
+describe('cargarApi con recursos desactivados', () => {
+  it('pide también los inactivos, conserva sus reservas y solo lista los activos', async () => {
+    getBusiness.mockResolvedValue({ id: 'b', name: 'Complejo', subdomain: 'complejo', description: null, industry: 'alquileres', subrubros: ['canchas'] })
+    panel.recursos.mockResolvedValue([recurso({ id: 'c1' }), recurso({ id: 'c2', activo: false })])
+    const base = { fecha: '2026-11-18', inicio: '2026-11-18T20:00:00.000Z', fin: '2026-11-18T21:00:00.000Z', inicioMinutos: 1020, finMinutos: 1080, clienteNombre: 'A', clienteTelefono: '1', clienteEmail: null, clienteId: null, extras: null, precio: 1, sena: 0, pagado: 0, creadaEn: '2026-11-01T00:00:00.000Z', notas: null, estado: 'COMPLETADA' }
+    panel.agenda.mockResolvedValueOnce({ data: [{ ...base, id: 'a', recursoId: 'c1' }, { ...base, id: 'b', recursoId: 'c2' }], total: 2, page: 1, limit: 100 })
+    const d = await cargarApi('2026-11-18')
+    expect(panel.recursos).toHaveBeenCalledWith('ALQUILERES', true)
+    expect(d.negocio.unidades.map(u => u.id)).toEqual(['c1'])
+    expect(d.reservas.map(r => r.id).sort()).toEqual(['a', 'b'])
+  })
+})
+
 describe('origenApi', () => {
   it('es el origen de la API', () => {
     expect(origenApi.tipo).toBe('api')

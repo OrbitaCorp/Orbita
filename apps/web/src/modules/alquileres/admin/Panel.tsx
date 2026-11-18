@@ -28,7 +28,7 @@ import { AHORA, HOY, capital, clientePorId, cuenta, duracionEstadiaTxt, fechaDeR
 import { deCalendario } from '../datos/negocio'
 import { useOrigenAlquileres } from '../datos/origen'
 import { ruta } from '../storefront/Sitio'
-import { resolverRuta, seccionesDe, type TabConfiguracion, type Vista } from './navegacion'
+import { debeCorregirRuta, resolverRuta, seccionesDe, type TabConfiguracion, type Vista } from './navegacion'
 import { EstiloPanelAlquileres } from './piezas'
 import Reservas from './Reservas'
 import Disponibilidad from './Disponibilidad'
@@ -106,7 +106,8 @@ export default function Panel() {
   const ir = (id: string, t?: string) => irA(id as Vista, t as TabConfiguracion | undefined)
   // Un link viejo (?vista=configuracion&tab=reglas, ?vista=salon) o una sección de otro modo: la URL se reescribe una vez.
   const corregir = useEffectEvent(() => irA(r.vista, r.tab))
-  useEffect(() => { if (r.corregir) corregir() }, [r.corregir, r.vista, r.tab])
+  const hayQueCorregir = debeCorregirRuta(r, listo)
+  useEffect(() => { if (hayQueCorregir) corregir() }, [hayQueCorregir, r.vista, r.tab])
   const abrirReserva = (id: string | null) => {
     const { reserva: _r, ...resto } = router.query
     void _r
