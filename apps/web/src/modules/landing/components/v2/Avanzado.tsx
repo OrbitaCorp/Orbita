@@ -1,88 +1,98 @@
-// Paquete "Avanzado" — desde el rediseño "Base"/"Base + Avanzado" (RBT,
-// 2026-09) se cobra JUNTO con la suscripción, un solo cargo combinado (ver
-// Cierre.tsx#Precios y subscriptions.service.ts) — ya no es un add-on aparte.
+// Paquete "Avanzado" — desde el rediseño "Base"/"Base + Avanzado" (RBT, 2026-09) se cobra JUNTO con la suscripción,
+// un solo cargo combinado (ver Cierre.tsx#Precios y subscriptions.service.ts) — ya no es un add-on aparte.
 //
-// Las seis features existen de verdad en el panel (panel/avanzado/Avanzado.tsx).
-// La sexta cambió de nombre: era "Countdown y exit-intent" y hoy es la "Oferta
-// relámpago" — un tipo más del formulario de Descuentos, con el reloj en la
-// tienda; por eso es la única sin pantalla propia dentro de Avanzado.
+// MOSTRADO, no explicado (pedido del dueño, 18/11): UN solo video que recorre el paquete (grabado en la demo, sin voz)
+// y al lado la lista de lo que se ve; la función que está en pantalla se resalta sola y con un clic se salta a esa
+// parte. Mismo lenguaje que la vitrina de «Qué incluye». Los tiempos de cada parte salen del montaje
+// (~/orbita-videos/un-dia/home/web/avanzado-capitulos.json): si se rehace el video, actualizarlos.
 //
-// El "Aviso de salida" (el viejo exit-intent) se eliminó por completo del
-// producto el 2026-09-09 (decisión del dueño): ya no existe ni en el panel ni
-// en la tienda, así que no se promete acá ni en el comparador de precios.
-//
-// Los textos son los mismos que ve el dueño adentro del panel, para que lo que
-// promete la landing y lo que encuentra después sean la misma cosa.
+// Todo lo de acá existe de verdad (panel/avanzado/Avanzado.tsx). La «Oferta relámpago» es un tipo más de Descuentos,
+// con el reloj en la tienda. El «Aviso de salida» (exit-intent) se eliminó del producto el 2026-09-09: no se promete.
 
-import type { ReactNode } from 'react';
-import { Reveal, Seccion, Encabezado, Card } from './Reveal';
+import { useRef, useState, type ReactNode } from 'react';
+import { Reveal, Seccion, Encabezado } from './Reveal';
+import { ClipVideo, ModalClip, Pantalla } from './ClipLoop';
 
-interface Feature { titulo: string; texto: string; icon: ReactNode }
+interface Parte { titulo: string; texto: string; desde: number; icon: ReactNode }
 
-const FEATURES: Feature[] = [
-    {
-        titulo: 'Plantillas de portada',
-        // Dieciséis: las de panel/avanzado/plantillas/datos.tsx (decía "veinte";
-        // auditoría interna 10/09, ítem web.landing).
-        texto: 'Dieciséis diseños distintos para la portada de tu tienda. Cambiás el look sin tocar el catálogo ni el checkout.',
-        icon: <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 21V9" /></>,
-    },
-    {
-        titulo: 'Modales de anuncios',
-        texto: 'Promos, bienvenida con descuento y avisos que aparecen en el momento justo de la visita.',
-        icon: <><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></>,
-    },
-    {
-        titulo: 'Juegos con premio',
-        texto: 'Mini-juegos donde tu cliente se gana un descuento. Vos ponés cuánto se gana y el tope; el descuento se crea solo.',
-        icon: <><path d="M6 11h4M8 9v4M15 12h.01M18 10h.01" /><rect x="2" y="6" width="20" height="12" rx="4" /></>,
-    },
-    {
-        titulo: 'Prueba social',
-        texto: 'Avisos de "alguien acaba de comprar esto" armados con pedidos reales de tu tienda, nunca con datos inventados.',
-        icon: <><path d="M20 6 9 17l-5-5" /><circle cx="12" cy="12" r="10" /></>,
-    },
-    {
-        titulo: '2x1 y 3x2',
-        texto: 'Promo "llevá X, pagá Y" que se aplica sola en el carrito, sin código, y muestra un cartel en la card del producto.',
-        icon: <><line x1="19" y1="5" x2="5" y2="19" /><circle cx="6.5" cy="6.5" r="2.5" /><circle cx="17.5" cy="17.5" r="2.5" /></>,
-    },
-    {
-        titulo: 'Oferta relámpago',
-        texto: 'Un descuento que dura poco, con un reloj en tu tienda que muestra el tiempo que falta. Lo armás desde Descuentos, como cualquier otro.',
-        icon: <><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2 2" /><path d="M9 3h6" /></>,
-    },
+const PARTES: Parte[] = [
+    { titulo: 'Plantillas de portada', texto: 'Dieciséis diseños para la portada de tu tienda.', desde: 0,
+      icon: <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 21V9" /></> },
+    { titulo: 'Juegos con premio', texto: 'Tu cliente juega, gana un descuento y el cupón se crea solo.', desde: 8.5,
+      icon: <><path d="M6 11h4M8 9v4M15 12h.01M18 10h.01" /><rect x="2" y="6" width="20" height="12" rx="4" /></> },
+    { titulo: 'Anuncios en la tienda', texto: 'Promos y bienvenidas, en el momento justo.', desde: 22.5,
+      icon: <><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></> },
+    { titulo: 'Oferta relámpago', texto: 'Un reloj en tu portada que cuenta lo que falta.', desde: 28.9,
+      icon: <><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2 2" /><path d="M9 3h6" /></> },
+    { titulo: 'Orbi atiende tu WhatsApp', texto: 'Contesta, muestra productos y toma pedidos. También en Instagram.', desde: 36.3,
+      icon: <><path d="M21 11.5a8.4 8.4 0 0 1-12.3 7.4L3 21l2.1-5.6A8.4 8.4 0 1 1 21 11.5z" /></> },
 ];
+const DURACION = 45.3;
+const ADEMAS = ['2x1 y 3x2 sin código', 'Prueba social con pedidos reales', 'Orbi carga productos con una foto'];
 
 export function Avanzado() {
+    const video = useRef<HTMLVideoElement | null>(null);
+    const [t, setT] = useState(0);
+    const [ampliado, setAmpliado] = useState(false);
+    let activa = 0;
+    PARTES.forEach((p, i) => { if (t >= p.desde - .05) activa = i });
+    const ir = (i: number) => { const v = video.current; if (!v) return; v.currentTime = PARTES[i].desde + .05; v.play().catch(() => {}); setT(PARTES[i].desde + .05) };
+
     return (
         <Seccion id="avanzado">
             <Encabezado
                 eyebrow="Paquete avanzado"
                 titulo="Para cuando quieras"
                 resalte="el siguiente nivel."
-                bajada="Un paquete opcional con las herramientas que empujan la conversión."
+                bajada="Un paquete opcional con las herramientas que empujan la conversión. Así se ve en tu tienda y en tu panel:"
             />
+            <style>{`
+                .av-item:hover { background: var(--oc-ghost-hover, rgba(255,255,255,.04)); }
+                .av-item:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+            `}</style>
 
-            <div className="mt-14 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {FEATURES.map((f, i) => (
-                    <Reveal key={f.titulo} delay={(i % 2) * 90}>
-                        <Card className="oc-card-hover h-full p-6">
-                            <span
-                                className="mb-4 grid h-11 w-11 place-items-center rounded-xl"
-                                style={{ background: 'rgba(168,85,247,.13)', border: '1px solid rgba(216,180,254,.22)' }}
-                            >
-                                <svg viewBox="0 0 24 24" fill="none" stroke="#d8b4fe" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
-                                    style={{ width: 20, height: 20 }} aria-hidden="true">
-                                    {f.icon}
-                                </svg>
-                            </span>
-                            <h3 className="text-[16.5px] font-bold text-white">{f.titulo}</h3>
-                            <p className="mt-2 text-[13.5px] leading-relaxed text-slate-400">{f.texto}</p>
-                        </Card>
-                    </Reveal>
-                ))}
-            </div>
+            <Reveal>
+                <div className="mt-12 grid grid-cols-1 items-center gap-8 lg:mt-14 lg:grid-cols-[minmax(0,8fr)_minmax(0,5fr)] lg:gap-12">
+                    <Pantalla aspecto="16 / 9" onAmpliar={() => setAmpliado(true)} etiqueta="Paquete Avanzado">
+                        <ClipVideo nombre="avanzado" videoRef={video} onAvance={(u) => setT(u * DURACION)} etiqueta="El paquete Avanzado: plantillas, juegos con premio, anuncios, oferta relámpago y Orbi en WhatsApp" />
+                    </Pantalla>
+
+                    <ul className="space-y-1.5" aria-label="Lo que incluye el paquete Avanzado">
+                        {PARTES.map((p, i) => {
+                            const on = i === activa;
+                            const fin = PARTES[i + 1]?.desde ?? DURACION;
+                            const u = on ? Math.min(1, Math.max(0, (t - p.desde) / (fin - p.desde))) : 0;
+                            return (
+                                <li key={p.titulo}>
+                                    <button
+                                        type="button" onClick={() => ir(i)} aria-current={on ? 'true' : undefined}
+                                        className="av-item relative flex w-full cursor-pointer items-start gap-3.5 overflow-hidden rounded-xl px-4 py-3 text-left transition-colors duration-200"
+                                        style={{ border: `1px solid ${on ? 'var(--oc-card-alt-bd, var(--oc-accent-bd))' : 'transparent'}`, background: on ? 'var(--oc-card-bg)' : 'transparent' }}
+                                    >
+                                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg transition-colors duration-200"
+                                            style={{ background: on ? 'var(--oc-accent-soft)' : 'var(--oc-ghost-bg)', border: `1px solid ${on ? 'var(--oc-accent-bd)' : 'var(--oc-card-bd)'}` }}>
+                                            <svg viewBox="0 0 24 24" fill="none" stroke={on ? 'var(--oc-accent)' : 'currentColor'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ width: 17, height: 17 }} aria-hidden="true">{p.icon}</svg>
+                                        </span>
+                                        <span className="min-w-0">
+                                            <span className="block text-[15px] font-bold" style={{ color: on ? 'var(--oc-text)' : 'var(--oc-text-2)' }}>{p.titulo}</span>
+                                            <span className="mt-0.5 block text-[13px] leading-snug" style={{ color: 'var(--oc-text-3)' }}>{p.texto}</span>
+                                        </span>
+                                        {on && <span aria-hidden="true" className="absolute bottom-0 left-0 h-[2px]" style={{ width: `${Math.round(u * 1000) / 10}%`, background: 'var(--oc-accent)' }} />}
+                                    </button>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </div>
+
+                <div className="mt-10 flex flex-wrap items-center justify-center gap-2">
+                    <span className="mr-1 text-[12.5px] font-semibold" style={{ color: 'var(--oc-text-4)' }}>Y también:</span>
+                    {ADEMAS.map(x => (
+                        <span key={x} className="rounded-full px-3.5 py-1.5 text-[12.5px] font-medium" style={{ border: '1px solid var(--oc-card-bd)', background: 'var(--oc-panel)', color: 'var(--oc-text-2)' }}>{x}</span>
+                    ))}
+                </div>
+            </Reveal>
+            {ampliado && <ModalClip nombre="avanzado" titulo="Paquete Avanzado" onCerrar={() => setAmpliado(false)} />}
         </Seccion>
     );
 }
