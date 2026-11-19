@@ -20,11 +20,12 @@
 //
 // Acá vive todo lo que se puede tocar (turnos, clientes, servicios, equipo,
 // roles, pagos): son copias en memoria de lo que trajo el origen, así lo que
-// se agrega en una pantalla aparece en las otras. Las escrituras todavía no
-// van a la API: al recargar, o al cambiar de rubro, vuelve todo a como estaba
-// (se conectan sección por sección, plan de Turnos en Módulos). La excepción son
-// los servicios pausados, que quedan en el navegador (datos/negocio.ts) porque
-// el sitio público tiene que dejar de ofrecerlos.
+// se agrega en una pantalla aparece en las otras. Las escrituras se conectan
+// al origen sección por sección (plan de Turnos en Módulos): Servicios ya
+// guarda ahí (en la API, /reservas/servicios). Lo demás todavía queda en
+// memoria y al recargar vuelve a como estaba. En la demo, los servicios
+// pausados quedan además en el navegador (datos/negocio.ts) porque el sitio de
+// la demo tiene que dejar de ofrecerlos.
 //
 // El horario es uno solo para todo el panel: el del negocio (semanaDe) y,
 // adentro, los días y las horas de cada agenda. De ahí salen la grilla de la
@@ -334,26 +335,41 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
 
   // ── Altas, cambios y bajas de lo demás ──
   const guardar = <T extends { id: string }>(lista: T[], item: T) => (lista.some(x => x.id === item.id) ? lista.map(x => (x.id === item.id ? item : x)) : [...lista, item])
-  // Los servicios pausados se llevan por nombre en el almacén de la demo: es lo que lee el sitio.
-  const setPausados = (nombres: string[]) => guardarDemo({ pausados: { rubro: rubro.key, nombres: [...new Set(nombres)] } })
-  const guardarServicio = (s: ServicioPanel, silencio?: boolean) => {
+  // Los servicios se guardan en el origen (la API, o nada en la demo) y recién si sale bien cambian en
+  // el panel: si la API dice que no (un nombre repetido, sin permiso), el aviso trae su mensaje y
+  // todo queda como estaba. En la demo, los pausados además se llevan por nombre en el navegador:
+  // es lo que lee el sitio de la demo.
+  const enDemo = origen.tipo === 'demo'
+  const setPausados = (nombres: string[]) => { if (enDemo) guardarDemo({ pausados: { rubro: rubro.key, nombres: [...new Set(nombres)] } }) }
+  const aBase = (s: ServicioPanel, pausado = s.estado === 'pausado'): ServicioBase =>
+    ({ id: s.id, nombre: s.nombre, duracion: s.duracion, precio: s.precio, online: s.online, ...(pausado ? { pausado: true } : {}) })
+  const noSePudo = (titulo: string, e: unknown) => avisar(titulo, e instanceof Error && e.message ? e.message : 'Probá de nuevo en un rato.')
+  const guardarServicio = async (s: ServicioPanel, silencio?: boolean) => {
     const antes = servicios.find(x => x.id === s.id)
-    setServicios(l => guardar(l, { id: s.id, nombre: s.nombre, duracion: s.duracion, precio: s.precio, online: s.online }))
+    let guardado: ServicioBase
+    try {
+      guardado = antes ? await origen.servicios.editar(aBase(s)) : await origen.servicios.crear(aBase(s), servicios.length)
+    } catch (e) { noSePudo(antes ? 'No se guardaron los cambios' : 'No se creó el servicio', e); return }
+    setServicios(l => (antes ? l.map(x => (x.id === s.id ? guardado : x)) : [...l, guardado]))
     // Un servicio pausado que cambia de nombre sigue pausado.
     if (antes?.estado === 'pausado' && antes.nombre !== s.nombre) setPausados(nombresPausados.map(n => (n === antes.nombre ? s.nombre : n)))
-    if (!silencio) avisar(antes ? 'Cambios guardados' : 'Servicio creado', `${s.nombre} · ${duracionTxt(s.duracion)}`)
+    if (!silencio) avisar(antes ? 'Cambios guardados' : 'Servicio creado', `${guardado.nombre} · ${duracionTxt(guardado.duracion)}`)
   }
-  const borrarServicio = (id: string) => {
+  const borrarServicio = async (id: string) => {
     const s = servicios.find(x => x.id === id)
+    try { await origen.servicios.borrar(id) } catch (e) { noSePudo('No se eliminó el servicio', e); return }
     setServicios(l => l.filter(x => x.id !== id))
     if (s?.estado === 'pausado') setPausados(nombresPausados.filter(n => n !== s.nombre))
     avisar('Servicio eliminado', s?.nombre)
   }
   /** Pausar saca el servicio del sitio y de Nuevo turno sin borrarlo; reanudar lo devuelve. */
-  const pausarServicio = (id: string, pausado: boolean) => {
+  const pausarServicio = async (id: string, pausado: boolean) => {
     const s = servicios.find(x => x.id === id)
     if (!s) return
     if (pausado && serviciosActivos.length <= 1) { avisar('Es el único servicio activo', 'Sin él no habría nada para reservar. Creá otro antes de pausarlo.'); return }
+    let guardado: ServicioBase
+    try { guardado = await origen.servicios.editar(aBase(s, pausado)) } catch (e) { noSePudo(pausado ? 'No se pausó el servicio' : 'No se reanudó el servicio', e); return }
+    setServicios(l => l.map(x => (x.id === id ? guardado : x)))
     setPausados(pausado ? [...nombresPausados, s.nombre] : nombresPausados.filter(n => n !== s.nombre))
     avisar(pausado ? 'Servicio pausado' : 'Servicio reanudado', pausado ? `${s.nombre} ya no se ofrece en tu sitio ni al dar un turno. Lo reanudás cuando quieras.` : `${s.nombre} vuelve a tu sitio y a Nuevo turno.`)
   }

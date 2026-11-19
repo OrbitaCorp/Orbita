@@ -16,9 +16,10 @@
 // las junta. El origen por defecto es la demo, así /turnos-demo sigue igual;
 // el panel real de un negocio monta <OrigenTurnosProvider origen={origenApi}>.
 //
-// Por ahora el origen solo LEE. Lo que se edita (dar un turno, pausar un
-// servicio, sumar a alguien) sigue en el estado de PanelTurnos y se conecta a
-// la API sección por sección (semanas 2 y 3 del plan). Configuración y
+// Las escrituras se conectan sección por sección (semanas 2 y 3 del plan).
+// Servicios ya guarda en el origen (`servicios`, 19/11): en la demo queda en
+// memoria y en la API va a /reservas/servicios. Lo demás que se edita (dar un
+// turno, sumar a alguien) sigue en el estado de PanelTurnos. Configuración y
 // Avanzado leen sus datos adentro de cada pantalla (useRubroDemo,
 // useNegocioDemo): se pasan al origen cuando se conectan las reglas y los
 // horarios (13/11). El mapa completo, con lo que el backend no cubre, está en
@@ -53,10 +54,23 @@ export interface DatosPanel {
   agenda: FuenteAgenda
 }
 
+/**
+ * Lo que el panel guarda de los servicios. Pausar es editar con `pausado`.
+ * Cada escritura devuelve el servicio como quedó (al crear, con el id que le
+ * dio el origen); si falla, el error trae el mensaje para mostrar.
+ */
+export interface EscrituraServicios {
+  /** `orden`: la posición en la lista; uno nuevo va al final. */
+  crear(s: ServicioBase, orden: number): Promise<ServicioBase>
+  editar(s: ServicioBase): Promise<ServicioBase>
+  borrar(id: string): Promise<void>
+}
+
 export interface OrigenTurnos {
   tipo: 'demo' | 'api'
   /** Lo de cada sección, junto. Si falla, el error trae el mensaje para mostrar. */
   cargar(rubro: RubroTurnos): Promise<DatosPanel>
+  servicios: EscrituraServicios
 }
 
 const Contexto = createContext<OrigenTurnos>(origenDemo)

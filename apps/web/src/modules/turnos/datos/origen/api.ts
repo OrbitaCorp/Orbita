@@ -6,7 +6,8 @@
 // backend" de Auditoría):
 // - Catálogo: las agendas son los recursos PROFESIONAL (rubros por
 //   profesional) o ESPACIO (por sala o cabina), y los servicios, con los
-//   pausados (inactivos) incluidos.
+//   pausados (inactivos) incluidos. Los servicios también se guardan acá
+//   (crear, editar, pausar y borrar, 19/11).
 // - Agenda: el horario del negocio sale de la config de Turnos y los turnos de
 //   las reservas de dos meses para atrás y dos para adelante, lo mismo que mira
 //   el panel (Ganancias del mes pasado, historial de cada cliente).
@@ -23,7 +24,7 @@ import type { Cliente, Recurso, RubroTurnos } from '@/modules/turnos/datos'
 import type { Semana } from '@/modules/turnos/horario'
 import type { ServicioBase } from '@/modules/turnos/datos/agenda'
 import { rolesDe, type Persona, type Rol } from '@/modules/turnos/datos/equipo'
-import { ahoraArgentina, clientesDeReservas, porDia, recursoDeApi, semanaDeHorario, servicioDeApi, tipoDeAgenda } from './mapear'
+import { ahoraArgentina, clientesDeReservas, porDia, recursoDeApi, semanaDeHorario, servicioDeApi, servicioParaApi, tipoDeAgenda } from './mapear'
 import type { DatosPanel, FuenteAgenda, OrigenTurnos } from './index'
 
 /** Cuántos días para cada lado de hoy trae la agenda: los mismos que arma el panel. */
@@ -110,5 +111,12 @@ export const origenApi: OrigenTurnos = {
       ...equipoApi(rubro, catalogo.recursos),
       agenda: agendaApi(reservas, semana, hoy, minutos),
     }
+  },
+  // /reservas/servicios (exige el permiso reservas.config). Borrar es una baja: las reservas ya
+  // dadas conservan la foto del servicio. La API rechaza un nombre repetido con su mensaje.
+  servicios: {
+    crear: async (s, orden) => servicioDeApi(await panel.crearServicio({ ...servicioParaApi(s), orden })),
+    editar: async s => servicioDeApi(await panel.editarServicio(s.id, servicioParaApi(s))),
+    borrar: async id => { await panel.borrarServicio(id) },
   },
 }

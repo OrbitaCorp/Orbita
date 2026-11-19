@@ -4,9 +4,19 @@ import { describe, expect, it, vi } from 'vitest'
 import { sumarDias } from '@/lib/reservas/fechas'
 
 const agenda = vi.fn()
-vi.mock('@/lib/reservasApi/cliente', () => ({ panel: { agenda: (f: unknown) => agenda(f) } }))
+const crearServicio = vi.fn()
+const editarServicio = vi.fn()
+const borrarServicio = vi.fn()
+vi.mock('@/lib/reservasApi/cliente', () => ({
+  panel: {
+    agenda: (f: unknown) => agenda(f),
+    crearServicio: (d: unknown) => crearServicio(d),
+    editarServicio: (id: string, d: unknown) => editarServicio(id, d),
+    borrarServicio: (id: string) => borrarServicio(id),
+  },
+}))
 
-const { DIAS_POR_PEDIDO, VENTANA_DIAS, reservasEntre, tramosDeFechas } = await import('../api')
+const { DIAS_POR_PEDIDO, VENTANA_DIAS, origenApi, reservasEntre, tramosDeFechas } = await import('../api')
 
 const dias = (desde: string, hasta: string) => Math.round((Date.parse(hasta) - Date.parse(desde)) / 86400_000) + 1
 
@@ -33,5 +43,31 @@ describe('la agenda de la API en tramos', () => {
     const reservas = await reservasEntre('2026-09-15', '2027-01-17')
     expect(reservas).toHaveLength(170)
     for (const [f] of agenda.mock.calls) expect(dias(f.desde, f.hasta)).toBeLessThan(93)
+  })
+})
+
+describe('servicios guardados en la API', () => {
+  const deApi = (d: Record<string, unknown>, id = 'srv-1') => ({ id, modulo: 'TURNOS', descripcion: null, recursoIds: [], orden: 0, ...d })
+
+  it('crear manda todo lo que maneja el panel y devuelve el servicio con el id de la API', async () => {
+    crearServicio.mockImplementation(async (d: Record<string, unknown>) => deApi(d))
+    const s = await origenApi.servicios.crear({ id: 's123', nombre: 'Corte', duracion: 30, precio: 12000, online: false }, 5)
+    expect(crearServicio).toHaveBeenCalledWith({ modulo: 'TURNOS', nombre: 'Corte', duracionMinutos: 30, precio: 12000, reservableOnline: false, activo: true, orden: 5 })
+    expect(s).toEqual({ id: 'srv-1', nombre: 'Corte', duracion: 30, precio: 12000, online: false })
+  })
+
+  it('pausar es editar con activo en falso, y vuelve pausado', async () => {
+    editarServicio.mockImplementation(async (id: string, d: Record<string, unknown>) => deApi(d, id))
+    const s = await origenApi.servicios.editar({ id: 'srv-1', nombre: 'Corte', duracion: 45, precio: 0, online: true, pausado: true })
+    expect(editarServicio).toHaveBeenCalledWith('srv-1', expect.objectContaining({ duracionMinutos: 45, precio: 0, activo: false }))
+    expect(s.pausado).toBe(true)
+  })
+
+  it('borrar llama a la baja y el error de la API sale con su mensaje', async () => {
+    borrarServicio.mockResolvedValueOnce({ ok: true })
+    await origenApi.servicios.borrar('srv-1')
+    expect(borrarServicio).toHaveBeenCalledWith('srv-1')
+    crearServicio.mockRejectedValueOnce(new Error('Ya tenés un servicio con ese nombre.'))
+    await expect(origenApi.servicios.crear({ id: 'x', nombre: 'Corte', duracion: 30, precio: 1, online: true }, 0)).rejects.toThrow('Ya tenés un servicio con ese nombre.')
   })
 })

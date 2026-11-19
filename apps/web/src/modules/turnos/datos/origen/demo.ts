@@ -46,4 +46,11 @@ export const origenDemo: OrigenTurnos = {
     ...equipoDemo(rubro),
     agenda: agendaDemo(rubro),
   }),
+  // En la demo lo que se guarda vive en el estado del panel: el servicio queda como vino.
+  // Los pausados, además, van al navegador para que el sitio deje de ofrecerlos (lo hace el panel).
+  servicios: {
+    crear: async s => s,
+    editar: async s => s,
+    borrar: async () => {},
+  },
 }

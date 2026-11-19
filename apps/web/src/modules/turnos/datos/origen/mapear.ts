@@ -6,7 +6,7 @@
 // hoy (`dia`, 0 = hoy), de minutos desde las 00:00, de días de la semana con
 // el lunes en 0 y de estados en minúscula. La API habla de fechas AAAA-MM-DD de
 // Argentina, del domingo en 0 y de estados en mayúscula. Acá se traduce.
-import type { HorarioSemanal, Recurso as RecursoApi, Reserva, Servicio as ServicioApi, TipoRecurso, Tramo } from '@/lib/reservasApi/tipos'
+import type { GuardarServicio, HorarioSemanal, Recurso as RecursoApi, Reserva, Servicio as ServicioApi, TipoRecurso, Tramo } from '@/lib/reservasApi/tipos'
 import { diasEntre, sumarDias, fechaNumerica, type ISO } from '@/lib/reservas/fechas'
 import { diasAbiertos, diasTxt, tramosDe, tramosTxt, type Semana } from '@/modules/turnos/horario'
 import { COLORES_EQUIPO } from '@/modules/turnos/datos/equipo'
@@ -93,6 +93,11 @@ export function recursoDeApi(r: RecursoApi, rubro: RubroTurnos, semana: Semana, 
 /** Un servicio de la API como lo maneja el panel. Uno inactivo es uno pausado. */
 export const servicioDeApi = (s: ServicioApi): ServicioBase => ({
   id: s.id, nombre: s.nombre, duracion: s.duracionMinutos, precio: s.precio, online: s.reservableOnline, ...(s.activo ? {} : { pausado: true }),
+})
+
+/** Lo que se manda al crear o editar un servicio: todos los campos que maneja el panel, así editar no deja nada viejo. */
+export const servicioParaApi = (s: ServicioBase): GuardarServicio => ({
+  modulo: 'TURNOS', nombre: s.nombre, duracionMinutos: s.duracion, precio: s.precio, reservableOnline: s.online, activo: !s.pausado,
 })
 
 // ─── Agenda ──────────────────────────────────────────────────────────────────
