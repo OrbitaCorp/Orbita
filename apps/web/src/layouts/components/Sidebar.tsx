@@ -27,6 +27,7 @@ import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 import { OrbiTrigger } from '@/components/orbi/OrbiTrigger'
 import { moduloDeSeccion } from './moduloActivo'
 import { PERMISOS_MODULO } from './permisosDelMenu'
+import { esVidriera, soloConCheckout } from '@/modules/ventas/panel/vidriera'
 import { adminPath, currentSlug } from '@/lib/tenant'
 import { useSidebarMode, type SidebarMode } from '@/layouts/SidebarModeContext'
 
@@ -158,7 +159,10 @@ export default function Sidebar({ isOpen, onClose }: Props) {
     // Módulos visibles según los permisos del rol.
     const permisos = user?.type === 'member' && user.role !== 'owner' ? user.permissions : null
     const rol = user?.type === 'member' ? user.role : null
+    // Vidriera digital: sin las pantallas que solo sirven con checkout (vidriera.ts).
+    const vidriera = user?.type === 'member' && esVidriera(user.business?.mode)
     const modulosVisibles = MODULOS.filter(m => {
+        if (vidriera && soloConCheckout(m.seccion)) return false
         const roles = ROLES_MODULO[m.id]
         if (roles && rol && !roles.includes(rol)) return false
         if (!permisos) return true
@@ -206,7 +210,7 @@ export default function Sidebar({ isOpen, onClose }: Props) {
     // Badge de "Mensajes": conteo real de conversaciones sin leer.
     const [mensajesNoLeidos, setMensajesNoLeidos] = useState(0)
     useEffect(() => {
-        if (user?.type !== 'member') return
+        if (user?.type !== 'member' || vidriera) return
         let cancelado = false
         const cargar = () => getUnreadConversationsCount()
             .then(r => { if (!cancelado) setMensajesNoLeidos(r.count) })
@@ -222,12 +226,12 @@ export default function Sidebar({ isOpen, onClose }: Props) {
             document.removeEventListener('visibilitychange', alVolver)
             window.removeEventListener('focus', alVolver)
         }
-    }, [user?.type])
+    }, [user?.type, vidriera])
 
     // Badge de "Difusión": mensajes de Instagram sin leer (su bandeja vive ahí, no en Mensajes).
     const [instagramNoLeidos, setInstagramNoLeidos] = useState(0)
     useEffect(() => {
-        if (user?.type !== 'member') return
+        if (user?.type !== 'member' || vidriera) return
         let cancelado = false
         const cargar = () => getInstagramNoLeidos()
             .then(r => { if (!cancelado) setInstagramNoLeidos(r.count) })
@@ -243,7 +247,7 @@ export default function Sidebar({ isOpen, onClose }: Props) {
             document.removeEventListener('visibilitychange', alVolver)
             window.removeEventListener('focus', alVolver)
         }
-    }, [user?.type])
+    }, [user?.type, vidriera])
 
     const ir = (sec: string, v?: string) => {
         router.push({ pathname: adminPath(negocioId, 'ventas', sec), query: v ? { vista: v } : undefined })
@@ -382,7 +386,7 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                 {modulosVisibles.map(m => {
                     const activo = moduloActivo === m.id
                     const open   = abierto === m.id
-                    const subs   = (m.subs ?? []).filter(s => !permisos || !s.permisos || s.permisos.some(p => permisos.includes(p)))
+                    const subs   = (m.subs ?? []).filter(s => !(vidriera && soloConCheckout(s.seccion, s.vista)) && (!permisos || !s.permisos || s.permisos.some(p => permisos.includes(p))))
                     const badge  = m.id === 'mensajes' ? (mensajesNoLeidos || undefined) : m.id === 'difusion' ? (instagramNoLeidos || undefined) : m.badge
                     const conSubs = subs.length > 0
                     const conFlotante = usaFlotante && conSubs

@@ -9,7 +9,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "e766a7a7113a6b7e",
+  "version": "12151f52baae0204",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -670,7 +670,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "cfg-peligro",
       "capitulo": "Configuración",
       "titulo": "Zona peligrosa",
-      "texto": "Lo que cambia la tienda entera. Está separada del resto y con avisos claros justamente para que nadie la toque de pasada. La ve quien tiene el permiso Editar configuración, pero las tres acciones las hace solo el propietario.\n\n- Pausar tienda: nadie la ve ni te compra hasta que la reactivás. Tus datos, productos y pedidos quedan intactos, y vos seguís entrando al panel. Mientras está pausada, el mismo lugar dice Reactivar tienda.\n- Pasar a vidriera digital: la tienda queda como catálogo, sin carrito ni pago online; tus clientes te consultan por WhatsApp. Se vuelve con Pasar a tienda online completa. No se puede si tenés pedidos online sin resolver.\n- Eliminar espacio: la tienda se pausa al instante y tenés 60 días para arrepentirte con Reactivar espacio. Pasado ese plazo se borra todo y no hay vuelta atrás.\n\nOjo: Antes de tocar algo de acá, abrí el \"¿Qué pasa si…?\" de cada opción: te explica exactamente qué cambia y qué se pierde.",
+      "texto": "Lo que cambia la tienda entera. Está separada del resto y con avisos claros justamente para que nadie la toque de pasada. La ve quien tiene el permiso Editar configuración, pero las tres acciones las hace solo el propietario.\n\n- Pausar tienda: nadie la ve ni te compra hasta que la reactivás. Tus datos, productos y pedidos quedan intactos, y vos seguís entrando al panel. Mientras está pausada, el mismo lugar dice Reactivar tienda.\n- Pasar a vidriera digital: la tienda queda como catálogo, sin carrito ni pago online; tus clientes te consultan por WhatsApp. Se vuelve con Pasar a tienda online completa. No se puede si tenés pedidos online sin resolver. En la vidriera el menú deja de mostrar lo que solo sirve con checkout: Mensajes, Difusión, Cupones y Cancelaciones y devoluciones de Configuración. Al volver a la tienda online completa reaparecen.\n- Eliminar espacio: la tienda se pausa al instante y tenés 60 días para arrepentirte con Reactivar espacio. Pasado ese plazo se borra todo y no hay vuelta atrás.\n\nOjo: Antes de tocar algo de acá, abrí el \"¿Qué pasa si…?\" de cada opción: te explica exactamente qué cambia y qué se pierde.",
       "destino": {
         "seccion": "configuracion",
         "vista": "peligro",
