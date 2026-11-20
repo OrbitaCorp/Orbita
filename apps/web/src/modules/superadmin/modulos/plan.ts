@@ -142,8 +142,8 @@ const TURNOS = plan('turnos', 'Turnos', 'Mateo',
     documentada(t('2026-11-06', 'Mateo', 'Registrar en Auditoría qué necesita Turnos del backend que hoy no existe (o la constancia de que no falta nada)', 'Entrada con la lista de faltantes, avisada a Ale si hay algo que tocar en lo compartido'), 'auditoria.turnos.2026-11-13-mapa-sobre-el-backend'),
     // Semana 2 · catálogo
     documentada(t('2026-11-09', 'Mateo', 'Servicios sobre /reservas/servicios: alta, edición, pausa y precio', 'Un servicio creado en el panel aparece en GET /reservas/servicios y en el sitio'), 'auditoria.turnos.2026-11-19-servicios-sobre-la-api'),
-    t('2026-11-10', 'Mateo', 'Equipo sobre /reservas/recursos como PROFESIONAL, con horario propio y sus servicios', 'Cada profesional es un recurso con horario y servicios; pausarlo lo saca de la disponibilidad'),
-    t('2026-11-11', 'Mateo', 'Espacios (sala, cabina, box) como recursos ESPACIO', 'Un espacio se crea y se asigna; la disponibilidad lo respeta'),
+    documentada(t('2026-11-10', 'Mateo', 'Equipo sobre /reservas/recursos como PROFESIONAL, con horario propio y sus servicios', 'Cada profesional es un recurso con horario y servicios; pausarlo lo saca de la disponibilidad'), 'auditoria.turnos.2026-11-19-equipo-y-espacios-sobre-la-api'),
+    documentada(t('2026-11-11', 'Mateo', 'Espacios (sala, cabina, box) como recursos ESPACIO', 'Un espacio se crea y se asigna; la disponibilidad lo respeta'), 'auditoria.turnos.2026-11-19-equipo-y-espacios-sobre-la-api'),
     t('2026-11-12', 'Mateo', 'Horarios y feriados del negocio sobre la config y los bloqueos', 'Cambiar el horario semanal o cargar un feriado cambia GET disponibilidad en el acto'),
     t('2026-11-13', 'Mateo', 'Reglas de reserva (anticipación, cancelación, seña, tope por persona) sobre la config', 'Cada regla guardada se refleja en lo que acepta POST /retener del sitio'),
     // Semana 3 · agenda y reservas del panel (el 20/11 es feriado)

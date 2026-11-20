@@ -53,4 +53,9 @@ export const origenDemo: OrigenTurnos = {
     editar: async s => s,
     borrar: async () => {},
   },
+  agendas: {
+    crear: async r => r,
+    editar: async r => r,
+    borrar: async () => {},
+  },
 }

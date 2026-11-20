@@ -2731,4 +2731,57 @@ Esas tres cosas se resuelven con las tareas de la semana 2.
       'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:342',
     ],
   }),
+  entrada({
+    modulo: 'turnos', fecha: F19, slug: 'equipo-y-espacios-sobre-la-api', tipo: 'tarea', quien: 'Mateo',
+    titulo: 'Equipo y Espacios de Turnos guardan sus agendas en la API',
+    foco: 'En el panel de un negocio real, la agenda de quien atiende (Equipo, en los rubros por profesional) y cada cabina o consultorio (Espacios, por sala) se guardan en /reservas/recursos, con sus días y su horario propio. La disponibilidad del sitio lo respeta en el acto. Lo que la API todavía no guarda (el email, el teléfono, cómo cobra cada uno, los roles y quien no atiende) queda en el panel, y el aviso lo dice.',
+    que: `Tareas del 10/11 (Equipo) y del 11/11 (Espacios) del plan, hechas juntas el 19/11 porque las dos son agendas de la misma ruta.
+
+**El origen guarda agendas** (\`datos/origen/index.ts\`, \`agendas\`): crear, editar y borrar, con el rubro (dice si es PROFESIONAL o ESPACIO) y la semana del negocio. En la demo la agenda vuelve como vino; en la API va a \`POST\`, \`PUT\` y \`DELETE /reservas/recursos\`.
+
+**Cómo se traduce una agenda** (\`mapear.ts\`):
+
+- **El horario:** si atiende todos los días que abre el negocio y sin horario propio, va \`null\`. Así un cambio de horario del negocio le llega sola. Si no, va día por día lo que de verdad atiende: el horario del negocio recortado a sus días y a su horario propio. El panel lo vuelve a leer igual.
+- **El rol, el color y el rol del equipo** van en \`datos\` (\`rol\`, \`color\`, \`rolId\`), porque la API no los tiene como campos. Al recargar, cada persona vuelve con su rol (aprendiz, colorista, dueño) si es uno de fábrica; si no, como "Profesional".
+- **Lo que no se manda al editar:** \`orden\` ni \`memberId\`, así quedan como estaban. Una agenda nueva va al final de la lista.
+
+**El panel espera a la API** (\`PanelTurnos.tsx\`), igual que en Servicios:
+
+- **Sumar o editar a alguien que atiende** guarda su agenda y recién ahí lo muestra.
+- **Sacarle la agenda o sacarlo del equipo** borra su agenda. Si tiene turnos por delante, la API no deja: el aviso dice cuántos ("Tiene 70 reservas por delante. Movelas o cancelalas antes de borrarlo.") y nada cambia.
+- **Cambiarle el nombre a un rol** actualiza el rótulo en las agendas de quienes lo tienen.
+- **Espacios:** crear, editar y borrar un espacio va por el mismo camino.
+
+**Lo que queda en el panel** (faltante 4 del mapa: las cuentas del equipo): el email, el teléfono, cómo cobra cada uno, los roles propios y la gente que no atiende (recepción, encargados). Con la API, el aviso al guardar lo dice: "Su agenda quedó guardada. La invitación y sus datos llegan con las cuentas del equipo.", o "Por ahora queda solo en este panel…" para quien no atiende. En la demo los avisos son los de siempre.
+
+**El negocio de prueba** ahora guarda el rol del equipo en cada agenda: la primera es la del dueño.
+
+**Probado contra la API local**, con el negocio de prueba y los mismos datos que manda el panel:
+
+- **Sumar a alguien con el horario del negocio:** su agenda queda sin horario propio, al final y con su rol en \`datos\`. El sitio le ofrece 16 franjas el martes (de 9 a 19:30).
+- **Pasarlo a "martes y jueves de 16 a 20":** el martes quedan 8 franjas, desde las 16, y el miércoles aparece cerrado.
+- **Borrar una agenda con turnos por delante:** la API la rechaza con su mensaje.
+- **Borrar una agenda sin turnos:** se borra, y el sitio deja de ofrecerla.
+- **Espacios:** un espacio (ESPACIO) se crea y se borra.
+- **Sin sesión:** la API rechaza el pedido.
+
+**Lo que no entra en esta tarea:**
+
+- **Qué servicios hace cada profesional** (\`recursoIds\` del servicio): el panel todavía no tiene dónde elegirlo.
+- **Pausar a alguien sin sacarle la agenda:** tampoco tiene botón. Hoy se le cambian los días que atiende.
+- **Un horario distinto en cada día:** sigue sin entrar, porque el panel maneja un solo horario por agenda.
+
+**Verificado:** typecheck y eslint de \`apps/web\` sin errores y los tests de Turnos en verde (33, 3 nuevos). El panel no se abrió a mano en el navegador.`,
+    archivos: [
+      'apps/web/src/modules/turnos/datos/origen/index.ts:79',
+      'apps/web/src/modules/turnos/datos/origen/mapear.ts:99',
+      'apps/web/src/modules/turnos/datos/origen/mapear.ts:110',
+      'apps/web/src/modules/turnos/datos/origen/api.ts:136',
+      'apps/web/src/modules/turnos/datos/origen/demo.ts:56',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:378',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:411',
+      'apps/web/src/modules/turnos/datos/origen/__tests__/api.test.ts:82',
+      'apps/api/prisma/seed-turnos-prueba.ts:175',
+    ],
+  }),
 ]

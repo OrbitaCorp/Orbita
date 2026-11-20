@@ -171,7 +171,8 @@ async function turnos(businessId: string) {
       data: {
         ...donde, tipo: 'PROFESIONAL', nombre: b.nombre, orden: i, cupo: 1,
         ...(b.horario ? { horario: b.horario } : {}),
-        datos: { rol: 'Barbero', color: b.color },
+        // rolId: el rol del equipo que el panel guarda en la agenda (la primera es la del dueño).
+        datos: { rol: 'Barbero', color: b.color, rolId: i === 0 ? 'dueno' : 'profesional' },
         ...(i === 0 && dueno ? { memberId: dueno.id } : {}),
       },
     }));

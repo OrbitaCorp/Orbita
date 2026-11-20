@@ -7,9 +7,13 @@ const agenda = vi.fn()
 const crearServicio = vi.fn()
 const editarServicio = vi.fn()
 const borrarServicio = vi.fn()
+const crearRecurso = vi.fn()
+const editarRecurso = vi.fn()
 vi.mock('@/lib/reservasApi/cliente', () => ({
   panel: {
     agenda: (f: unknown) => agenda(f),
+    crearRecurso: (d: unknown) => crearRecurso(d),
+    editarRecurso: (id: string, d: unknown) => editarRecurso(id, d),
     crearServicio: (d: unknown) => crearServicio(d),
     editarServicio: (id: string, d: unknown) => editarServicio(id, d),
     borrarServicio: (id: string) => borrarServicio(id),
@@ -17,6 +21,9 @@ vi.mock('@/lib/reservasApi/cliente', () => ({
 }))
 
 const { DIAS_POR_PEDIDO, VENTANA_DIAS, origenApi, reservasEntre, tramosDeFechas } = await import('../api')
+const { semanaDeHorario } = await import('../mapear')
+const { rubroPorKey } = await import('@/modules/turnos/datos')
+const PARTIDO: [number, number][] = [[540, 780], [960, 1200]]
 
 const dias = (desde: string, hasta: string) => Math.round((Date.parse(hasta) - Date.parse(desde)) / 86400_000) + 1
 
@@ -69,5 +76,33 @@ describe('servicios guardados en la API', () => {
     expect(borrarServicio).toHaveBeenCalledWith('srv-1')
     crearServicio.mockRejectedValueOnce(new Error('Ya tenés un servicio con ese nombre.'))
     await expect(origenApi.servicios.crear({ id: 'x', nombre: 'Corte', duracion: 30, precio: 1, online: true }, 0)).rejects.toThrow('Ya tenés un servicio con ese nombre.')
+  })
+})
+
+describe('agendas guardadas en la API', () => {
+  const barberia = rubroPorKey('barberia')
+  const spa = rubroPorKey('spa')
+  // Lunes a sábado partido, domingo cerrado: la semana de la barbería de prueba.
+  const semana = semanaDeHorario({ 1: PARTIDO, 2: PARTIDO, 3: PARTIDO, 4: PARTIDO, 5: PARTIDO, 6: PARTIDO })
+  const deApi = (d: Record<string, unknown>, id = 'rec-9') => ({ id, modulo: 'TURNOS', descripcion: null, duracionMinutos: null, pasoMinutos: null, margenMinutos: null, maximoSeguidos: 1, precio: 0, memberId: null, activo: true, orden: 0, ...d })
+
+  it('una persona con el horario del negocio va sin horario propio, con su rol del equipo en datos', async () => {
+    crearRecurso.mockImplementation(async (d: Record<string, unknown>) => deApi(d))
+    const r = await origenApi.agendas.crear(
+      { id: 'r1001', nombre: 'Sofi', rol: 'Aprendiz', color: '#3B82F6', atiende: [0, 1, 2, 3, 4, 5], horario: '', dias: 'Lun a sáb' },
+      { rubro: barberia, semana, rolId: 'aprendiz', orden: 3 },
+    )
+    expect(crearRecurso).toHaveBeenLastCalledWith({ modulo: 'TURNOS', tipo: 'PROFESIONAL', nombre: 'Sofi', cupo: 1, horario: null, datos: { rol: 'Aprendiz', color: '#3B82F6', rolId: 'aprendiz' }, orden: 3 })
+    expect(r).toMatchObject({ id: 'rec-9', nombre: 'Sofi', rol: 'Aprendiz', atiende: [0, 1, 2, 3, 4, 5], horario: '' })
+  })
+
+  it('con días u horario propio va día por día, y vuelve igual', async () => {
+    editarRecurso.mockImplementation(async (id: string, d: Record<string, unknown>) => deApi(d, id))
+    const r = await origenApi.agendas.editar(
+      { id: 'rec-2', nombre: 'Cabina 2', rol: 'Espacio', color: '#10B981', atiende: [1, 3], horario: '16:00 – 20:00', dias: 'Mar y jue' },
+      { rubro: spa, semana },
+    )
+    expect(editarRecurso).toHaveBeenLastCalledWith('rec-2', expect.objectContaining({ tipo: 'ESPACIO', horario: { 2: [[960, 1200]], 4: [[960, 1200]] } }))
+    expect(r).toMatchObject({ atiende: [1, 3], horario: '16:00 – 20:00' })
   })
 })
