@@ -172,10 +172,9 @@ export class BusinessesService {
     if (nPedidos > 0) cumplidas.push('pedidos');
     if (nPedidosMovidos > 0) cumplidas.push('estados');
     if (nClientes > 0) cumplidas.push('clientes');
-    // Mensajería es solo de modo FULL (BusinessModeGuard responde 403 en
-    // SHOWCASE): a una vidriera no se la manda a una pantalla que no puede
-    // abrir — la tarea se da por cumplida y no molesta.
-    if (nPlantillas > 0 || business.mode === 'SHOWCASE') cumplidas.push('plantillas');
+    // Desde 2026-11 la vidriera también tiene Mensajes (vende por WhatsApp e
+    // Instagram): las plantillas le sirven igual que a una tienda con checkout.
+    if (nPlantillas > 0) cumplidas.push('plantillas');
     if (storefront && (storefront.homeTemplate !== null || tocada(storefront))) cumplidas.push('apariencia');
     if (config?.whatsapp?.trim() || config?.email?.trim() || config?.scheduleText?.trim()) cumplidas.push('contacto');
     if (config?.instagram?.trim() || config?.tiktok?.trim() || config?.facebook?.trim()) cumplidas.push('redes');

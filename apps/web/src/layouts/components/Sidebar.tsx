@@ -210,7 +210,7 @@ export default function Sidebar({ isOpen, onClose }: Props) {
     // Badge de "Mensajes": conteo real de conversaciones sin leer.
     const [mensajesNoLeidos, setMensajesNoLeidos] = useState(0)
     useEffect(() => {
-        if (user?.type !== 'member' || vidriera) return
+        if (user?.type !== 'member') return
         let cancelado = false
         const cargar = () => getUnreadConversationsCount()
             .then(r => { if (!cancelado) setMensajesNoLeidos(r.count) })
@@ -226,12 +226,12 @@ export default function Sidebar({ isOpen, onClose }: Props) {
             document.removeEventListener('visibilitychange', alVolver)
             window.removeEventListener('focus', alVolver)
         }
-    }, [user?.type, vidriera])
+    }, [user?.type])
 
     // Badge de "Difusión": mensajes de Instagram sin leer (su bandeja vive ahí, no en Mensajes).
     const [instagramNoLeidos, setInstagramNoLeidos] = useState(0)
     useEffect(() => {
-        if (user?.type !== 'member' || vidriera) return
+        if (user?.type !== 'member') return
         let cancelado = false
         const cargar = () => getInstagramNoLeidos()
             .then(r => { if (!cancelado) setInstagramNoLeidos(r.count) })
@@ -247,7 +247,7 @@ export default function Sidebar({ isOpen, onClose }: Props) {
             document.removeEventListener('visibilitychange', alVolver)
             window.removeEventListener('focus', alVolver)
         }
-    }, [user?.type, vidriera])
+    }, [user?.type])
 
     const ir = (sec: string, v?: string) => {
         router.push({ pathname: adminPath(negocioId, 'ventas', sec), query: v ? { vista: v } : undefined })

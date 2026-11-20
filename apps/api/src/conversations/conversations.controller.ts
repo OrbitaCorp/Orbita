@@ -1,6 +1,5 @@
 import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { FullModeOnly } from '../common/decorators/full-mode-only.decorator';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
@@ -29,7 +28,6 @@ export class ConversationsController {
   ) {}
 
   @Get()
-  @FullModeOnly()
   @RequirePermission('messages.view')
   findAll(@CurrentBusiness() ctx: AuthContext) {
     const member = assertMemberContext(ctx);
@@ -40,7 +38,6 @@ export class ConversationsController {
   // findAll() a propósito: el header lo pide cada pocos segundos y no
   // necesita traer clientes/último mensaje de cada conversación para eso.
   @Get('unread-count')
-  @FullModeOnly()
   @RequirePermission('messages.view')
   unreadCount(@CurrentBusiness() ctx: AuthContext) {
     const member = assertMemberContext(ctx);
@@ -48,7 +45,6 @@ export class ConversationsController {
   }
 
   @Get(':id/messages')
-  @FullModeOnly()
   @RequirePermission('messages.view')
   messages(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Query('canal') canal?: string) {
     const member = assertMemberContext(ctx);
@@ -57,7 +53,6 @@ export class ConversationsController {
   }
 
   @Post(':id/messages')
-  @FullModeOnly()
   @RequirePermission('messages.manage')
   sendMessage(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: SendMessageDto) {
     const member = assertMemberContext(ctx);
@@ -66,7 +61,6 @@ export class ConversationsController {
 
   // Una foto por WhatsApp (campo `file`, y `texto` como pie de foto): solo desde la bandeja de WhatsApp.
   @Post(':id/messages/image')
-  @FullModeOnly()
   @RequirePermission('messages.manage')
   @UseInterceptors(FileInterceptor('file', SUBIDA_IMAGEN))
   sendImage(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: SendImageDto, @UploadedFile() file?: Express.Multer.File) {
@@ -76,7 +70,6 @@ export class ConversationsController {
 
   // Orbi en un chat de WhatsApp: encenderlo, apagarlo o reactivarlo (levanta la pausa y la derivación). Es decisión de quien atiende.
   @Patch(':id/bot')
-  @FullModeOnly()
   @RequirePermission('messages.manage')
   cambiarBot(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: ChatBotDto) {
     const member = assertMemberContext(ctx);
@@ -84,7 +77,6 @@ export class ConversationsController {
   }
 
   @Patch(':id')
-  @FullModeOnly()
   @RequirePermission('messages.manage')
   update(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: UpdateConversationDto) {
     const member = assertMemberContext(ctx);

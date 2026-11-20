@@ -1,6 +1,5 @@
 import { Body, Controller, Delete, Get, Patch, Post } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { FullModeOnly } from '../common/decorators/full-mode-only.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
@@ -22,7 +21,6 @@ export class WhatsappController {
   ) {}
 
   @Get('connection')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   async estado(@CurrentBusiness() ctx: AuthContext) {
     const { businessId } = assertMemberContext(ctx);
@@ -31,7 +29,6 @@ export class WhatsappController {
   }
 
   @Post('connection')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   async conectar(@CurrentBusiness() ctx: AuthContext, @Body() dto: ConnectWhatsappDto) {
     const { businessId } = assertMemberContext(ctx);
@@ -41,7 +38,6 @@ export class WhatsappController {
 
   // Conexión por Embedded Signup (el botón de Meta dentro del panel): el cliente conecta su propia cuenta sin pegar nada.
   @Post('embedded-signup')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   async conectarIntegrado(@CurrentBusiness() ctx: AuthContext, @Body() dto: EmbeddedSignupDto) {
@@ -52,7 +48,6 @@ export class WhatsappController {
 
   // Orbi como atención al público por WhatsApp (paquete Avanzado): su configuración y lo que va gastado del cupo del mes.
   @Get('bot')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   async estadoDelBot(@CurrentBusiness() ctx: AuthContext) {
     const { businessId } = assertMemberContext(ctx);
@@ -61,7 +56,6 @@ export class WhatsappController {
   }
 
   @Patch('bot')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   async guardarBot(@CurrentBusiness() ctx: AuthContext, @Body() dto: UpdateWhatsappBotDto) {
     const { businessId } = assertMemberContext(ctx);
@@ -70,7 +64,6 @@ export class WhatsappController {
   }
 
   @Delete('connection')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   async desconectar(@CurrentBusiness() ctx: AuthContext) {
     const { businessId } = assertMemberContext(ctx);
