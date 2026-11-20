@@ -16,7 +16,8 @@
 // (`soloLectura`). Las escrituras se conectan sección por sección en las
 // semanas 2 a 4 del plan.
 import { useCallback, useEffect, useEffectEvent, useState } from 'react'
-import { getBusiness } from '@/lib/api'
+// panelGetBusiness y no getBusiness: getBusiness manda el token del alta (onboarding), no el de la sesión del panel.
+import { panelGetBusiness } from '@/lib/api'
 import { panel } from '@/lib/reservasApi/cliente'
 import type { Reserva as ReservaApi } from '@/lib/reservasApi/tipos'
 import { sumarDias, type ISO } from '@/lib/reservas/fechas'
@@ -66,7 +67,7 @@ export async function cargarApi(hoy: ISO): Promise<Pick<DatosPanelAlquiler, 'tip
   const desde = sumarDias(hoy, -DIAS_ATRAS)
   const hasta = sumarDias(hoy, DIAS_ADELANTE)
   const [negocio, config, recursosTodos, servicios, bloqueos, reservasApi] = await Promise.all([
-    getBusiness(),
+    panelGetBusiness(),
     panel.config('ALQUILERES'),
     // Con los desactivados: sus reservas (las pasadas y las que siguen en pie) no desaparecen del panel.
     panel.recursos('ALQUILERES', true),

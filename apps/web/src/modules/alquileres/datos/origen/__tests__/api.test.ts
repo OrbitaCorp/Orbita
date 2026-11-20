@@ -4,9 +4,9 @@ import type { Config, Paginado, Recurso, Reserva } from '@/lib/reservasApi/tipos
 const panel = vi.hoisted(() => ({
   config: vi.fn(), recursos: vi.fn(), servicios: vi.fn(), bloqueos: vi.fn(), agenda: vi.fn(),
 }))
-const getBusiness = vi.hoisted(() => vi.fn())
+const panelGetBusiness = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/reservasApi/cliente', () => ({ panel }))
-vi.mock('@/lib/api', () => ({ getBusiness }))
+vi.mock('@/lib/api', () => ({ panelGetBusiness }))
 
 import { DIAS_POR_PEDIDO, cargarApi, origenApi, reservasEntre, tramosDeFechas } from '../api'
 
@@ -19,7 +19,7 @@ const pagina = (n: number, total: number): Paginado<Reserva> => ({ data: Array.f
 
 beforeEach(() => {
   vi.resetAllMocks()
-  getBusiness.mockResolvedValue({ id: 'b', name: 'Cabañas', subdomain: 'cabanas', description: null, industry: 'alquileres', subrubros: ['cabana'] })
+  panelGetBusiness.mockResolvedValue({ id: 'b', name: 'Cabañas', subdomain: 'cabanas', description: null, industry: 'alquileres', subrubros: ['cabana'] })
   panel.config.mockResolvedValue(config)
   panel.recursos.mockResolvedValue([])
   panel.servicios.mockResolvedValue([])
@@ -65,7 +65,7 @@ describe('cargarApi', () => {
 
   it('no muestra las reservas vencidas', async () => {
     panel.recursos.mockResolvedValue([recurso({ id: 'c1' })])
-    getBusiness.mockResolvedValue({ id: 'b', name: 'Complejo', subdomain: 'complejo', description: null, industry: 'alquileres', subrubros: ['canchas'] })
+    panelGetBusiness.mockResolvedValue({ id: 'b', name: 'Complejo', subdomain: 'complejo', description: null, industry: 'alquileres', subrubros: ['canchas'] })
     const base = { recursoId: 'c1', fecha: '2026-11-18', inicio: '2026-11-18T20:00:00.000Z', fin: '2026-11-18T21:00:00.000Z', inicioMinutos: 1020, finMinutos: 1080, clienteNombre: 'A', clienteTelefono: '1', clienteEmail: null, clienteId: null, extras: null, precio: 1, sena: 0, pagado: 0, creadaEn: '2026-11-01T00:00:00.000Z', notas: null }
     panel.agenda.mockResolvedValueOnce({ data: [{ ...base, id: 'ok', estado: 'CONFIRMADA' }, { ...base, id: 'no', estado: 'VENCIDA' }], total: 2, page: 1, limit: 100 })
     const d = await cargarApi('2026-11-18')
@@ -76,7 +76,7 @@ describe('cargarApi', () => {
 
 describe('cargarApi con recursos desactivados', () => {
   it('pide también los inactivos, conserva sus reservas y solo lista los activos', async () => {
-    getBusiness.mockResolvedValue({ id: 'b', name: 'Complejo', subdomain: 'complejo', description: null, industry: 'alquileres', subrubros: ['canchas'] })
+    panelGetBusiness.mockResolvedValue({ id: 'b', name: 'Complejo', subdomain: 'complejo', description: null, industry: 'alquileres', subrubros: ['canchas'] })
     panel.recursos.mockResolvedValue([recurso({ id: 'c1' }), recurso({ id: 'c2', activo: false })])
     const base = { fecha: '2026-11-18', inicio: '2026-11-18T20:00:00.000Z', fin: '2026-11-18T21:00:00.000Z', inicioMinutos: 1020, finMinutos: 1080, clienteNombre: 'A', clienteTelefono: '1', clienteEmail: null, clienteId: null, extras: null, precio: 1, sena: 0, pagado: 0, creadaEn: '2026-11-01T00:00:00.000Z', notas: null, estado: 'COMPLETADA' }
     panel.agenda.mockResolvedValueOnce({ data: [{ ...base, id: 'a', recursoId: 'c1' }, { ...base, id: 'b', recursoId: 'c2' }], total: 2, page: 1, limit: 100 })
