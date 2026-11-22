@@ -1,4 +1,5 @@
-import { IsBoolean, IsISO8601, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import { IsBoolean, IsIn, IsISO8601, IsOptional, IsString, IsUrl, Matches, MaxLength } from 'class-validator';
+import { DISENOS_PROMO, FORMATOS_ANUNCIO } from '../../common/disenos-promos';
 
 // Una página de la propia tienda ("/catalogo", "/descuentos/CODIGO"). Antes se
 // aceptaba cualquier URL y la tienda hacía window.location.href: el botón del
@@ -26,4 +27,11 @@ export class UpsertPromoModalDto {
   // ninguna de las dos, el modal no tiene límite de fechas (solo isActive).
   @IsOptional() @IsISO8601() startDate?: string;
   @IsOptional() @IsISO8601() endDate?: string;
+  // Formato, colores y foto. Ausentes = no tocar lo que ya estaba; la foto se
+  // saca mandando null. Solo https: la tienda la dibuja tal cual en un <img>.
+  @IsOptional() @IsIn([...FORMATOS_ANUNCIO]) format?: string;
+  @IsOptional() @IsIn([...DISENOS_PROMO]) design?: string;
+  @IsOptional() @IsString() @MaxLength(1000)
+  @IsUrl({ protocols: ['https'], require_protocol: true }, { message: 'La foto del anuncio tiene que ser un link https' })
+  imageUrl?: string | null;
 }

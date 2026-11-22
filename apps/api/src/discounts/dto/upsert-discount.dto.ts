@@ -15,6 +15,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { DISENOS_PROMO, FORMATOS_OFERTA } from '../../common/disenos-promos';
 
 // Topes desde la auditoría interna del 10/09 (ítem api.discounts): antes las
 // fechas eran cualquier string (una fecha inválida llegaba a Prisma como
@@ -60,6 +61,10 @@ export class UpsertDiscountDto {
   // un descuento por negocio la puede tener; prenderla acá se la saca al que
   // la tenía. Ausente = no tocar lo que ya estaba. Ver DiscountCountdownService.
   @IsOptional() @IsBoolean() countdown?: boolean;
+  // Formato y colores de la oferta relámpago en la portada. Ausentes = no
+  // tocar los que ya estaban.
+  @IsOptional() @IsIn([...FORMATOS_OFERTA]) countdownFormat?: string;
+  @IsOptional() @IsIn([...DISENOS_PROMO]) countdownDesign?: string;
   @IsOptional() @IsArray() @ArrayMaxSize(1000) @IsUUID('4', { each: true }) productIds?: string[];
   @IsOptional() @IsArray() @ArrayMaxSize(200) @IsUUID('4', { each: true }) categoryIds?: string[];
 }

@@ -38,9 +38,17 @@ export class PromoModalService {
     const distinta = (a: Date | null, b: Date | null) => (a?.getTime() ?? null) !== (b?.getTime() ?? null);
     const vigenciaNueva = !!existente && (distinta(startDate, existente.startDate) || distinta(endDate, existente.endDate));
 
+    // undefined = un cliente viejo que no conoce estos campos: no se pisan.
+    const diseno = {
+      ...(dto.format !== undefined ? { format: dto.format } : {}),
+      ...(dto.design !== undefined ? { design: dto.design } : {}),
+      ...(dto.imageUrl !== undefined ? { imageUrl: dto.imageUrl } : {}),
+    };
+
     const modal = await this.prisma.promoModal.upsert({
       where: { businessId },
       create: {
+        ...diseno,
         businessId,
         title: dto.title,
         message: dto.message ?? null,
@@ -53,6 +61,7 @@ export class PromoModalService {
         endDate,
       },
       update: {
+        ...diseno,
         title: dto.title,
         message: dto.message ?? null,
         badge: dto.badge ?? null,
@@ -88,6 +97,9 @@ export class PromoModalService {
     code: string | null;
     ctaText: string | null;
     ctaLink: string | null;
+    format?: string | null;
+    design?: string | null;
+    imageUrl?: string | null;
     isActive: boolean;
     campaignVersion: number;
     startDate: Date | null;
@@ -101,6 +113,9 @@ export class PromoModalService {
       code: modal.code,
       ctaText: modal.ctaText,
       ctaLink: modal.ctaLink,
+      format: modal.format ?? null,
+      design: modal.design ?? null,
+      imageUrl: modal.imageUrl ?? null,
       isActive: modal.isActive,
       campaignVersion: modal.campaignVersion,
       startDate: modal.startDate ? modal.startDate.toISOString() : null,

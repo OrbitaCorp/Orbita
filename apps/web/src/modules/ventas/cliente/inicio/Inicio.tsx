@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/router'
-import { ArrowRight, ArrowLeft, ChevronLeft, ChevronRight, X, Copy, Check } from 'lucide-react'
+import { ArrowRight, ChevronLeft, ChevronRight, Copy, Check } from 'lucide-react'
 import { StorefrontChrome } from '@/components/storefront/StorefrontChrome'
 import { useMovilPlantilla } from '@/hooks/useMovilPlantilla'
 import { useDeslizar } from '@/hooks/useDeslizar'
@@ -32,6 +32,8 @@ import { conOverrides, esPreview, usarOverridesPreview } from '@/lib/storefront/
 import { renderHeroBgPattern } from '@/components/storefront/heroPatterns'
 import { Skeleton, SkeletonText, SkeletonProductGrid } from '@/design-system/components/Skeleton'
 import JuegoInline, { TEMAS, yaGano, yaPerdio, estaDeclinado, declinadoKey } from '@/modules/ventas/cliente/juegos/JuegoInline'
+import { MarcoJuego as ModalJuego } from '@/modules/ventas/promos/MarcoJuego'
+import { AnuncioPromo } from '@/modules/ventas/promos/AnuncioPromo'
 // El mapa real de íconos vive junto al editor del panel (Categorias.tsx) —
 // ver catIcons.tsx para el porqué de compartirlo entre panel y storefront.
 import { CatIcon } from '@/modules/ventas/panel/catalogo/catIcons'
@@ -1126,8 +1128,11 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
                 // picker — sin ninguna de las dos, se muestra el picker.
                 const tipoMostrado = reclamo ? reclamo.tipo : (juegoElegido ?? (elegibles.length === 1 ? elegibles[0].type : null))
                 const mostrarPicker = !reclamo && !tipoMostrado
+                const juegoMostrado = juegosActivos.find(g => g.type === tipoMostrado)
                 return (
                     <ModalJuego
+                        tema={mostrarPicker ? null : juegoMostrado?.theme}
+                        presentacion={juegoMostrado?.presentation}
                         titulo={reclamo ? 'Reclamá tu premio' : mostrarPicker ? '¡Jugá y ganá un descuento!' : (elegibles.find(g => g.type === tipoMostrado)?.name || TEMAS[tipoMostrado ?? '']?.titulo || 'Juego con premio')}
                         onVolver={!reclamo && juegoElegido ? () => setJuegoElegido(null) : undefined}
                         onCerrar={cerrarModal}
@@ -1135,7 +1140,7 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
                         {mostrarPicker ? (
                             <PickerJuegos juegos={elegibles} onElegir={setJuegoElegido} />
                         ) : (
-                            <JuegoInline slug={slug} tipo={tipoMostrado!} nombreTienda={tienda.nombre} sessionIdReclamo={reclamo?.sessionId} />
+                            <JuegoInline slug={slug} tipo={tipoMostrado!} nombreTienda={tienda.nombre} sessionIdReclamo={reclamo?.sessionId} tema={juegoMostrado?.theme} />
                         )}
                     </ModalJuego>
                 )
@@ -1147,9 +1152,19 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
                 muestre mientras el modal de juegos está en pantalla, este
                 chequeo acá es defensivo, por si algo cambia el orden. */}
             {modalPromo && promoActivo && !modalJuego && !reclamo && (
-                <ModalJuego titulo={promoActivo.title} onCerrar={cerrarModalPromo}>
-                    <PromoModalContenido promo={promoActivo} go={go} />
-                </ModalJuego>
+                promoActivo.format ? (
+                    <AnuncioPromo
+                        anuncio={promoActivo}
+                        formato={promoActivo.format}
+                        diseno={promoActivo.design}
+                        onCerrar={cerrarModalPromo}
+                        onCta={() => { cerrarModalPromo(); irACtaDe(promoActivo, go) }}
+                    />
+                ) : (
+                    <ModalJuego titulo={promoActivo.title} onCerrar={cerrarModalPromo}>
+                        <PromoModalContenido promo={promoActivo} go={go} />
+                    </ModalJuego>
+                )
             )}
 
             {!enDemo && !hayModalAbierto && (jugables.length > 0 || promoActivo) && (
@@ -1165,16 +1180,28 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
             )}
             {juegoDemo && (
                 <ModalJuego
+                    tema={juegoDemo.juego.theme}
+                    presentacion={juegoDemo.juego.presentation}
                     titulo={juegoDemo.juego.name || TEMAS[juegoDemo.juego.type]?.titulo || 'Juego con premio'}
                     onCerrar={() => setJuegoDemo(null)}
                 >
-                    <JuegoInline key={juegoDemo.vez} slug={slug} tipo={juegoDemo.juego.type} nombreTienda={tienda.nombre} />
+                    <JuegoInline key={juegoDemo.vez} slug={slug} tipo={juegoDemo.juego.type} nombreTienda={tienda.nombre} tema={juegoDemo.juego.theme} />
                 </ModalJuego>
             )}
             {anuncioDemo && (
-                <ModalJuego titulo={anuncioDemo.title} onCerrar={() => setAnuncioDemo(null)}>
-                    <PromoModalContenido promo={anuncioDemo} go={go} />
-                </ModalJuego>
+                anuncioDemo.format ? (
+                    <AnuncioPromo
+                        anuncio={anuncioDemo}
+                        formato={anuncioDemo.format}
+                        diseno={anuncioDemo.design}
+                        onCerrar={() => setAnuncioDemo(null)}
+                        onCta={() => { setAnuncioDemo(null); irACtaDe(anuncioDemo, go) }}
+                    />
+                ) : (
+                    <ModalJuego titulo={anuncioDemo.title} onCerrar={() => setAnuncioDemo(null)}>
+                        <PromoModalContenido promo={anuncioDemo} go={go} />
+                    </ModalJuego>
+                )
             )}
         </StorefrontChrome>
     )
@@ -1192,38 +1219,7 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
 // El mismo marco se reusa para el modal de anuncios (RBT-675, ver
 // PromoModalContenido más abajo) — el dueño ya adelantó que el criterio de
 // UX ("sin URL propia, todo en un modal") aplica igual ahí.
-function ModalJuego({ titulo, onVolver, onCerrar, children }: { titulo: string; onVolver?: () => void; onCerrar: () => void; children: React.ReactNode }) {
-    return (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-            <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)' }} />
-            {/* Ancho pensado para que la escena del juego llegue a su escala
-                máxima (ANCHO_DISENO × ESCALA_MAX = 600px) sin quedar
-                apretada contra el padding. Sigue siendo responsive:
-                width:100% + el padding:16 del overlay hacen que en un celular
-                angosto ocupe todo el ancho disponible en vez de desbordar, y
-                la escena de adentro se escala sola a lo que haya. */}
-            <div style={{ position: 'relative', width: '100%', maxWidth: 680, maxHeight: 'calc(100vh - 32px)', overflowY: 'auto', background: 'var(--color-bg)', borderRadius: 16, boxShadow: '0 24px 64px rgba(0,0,0,0.22)', padding: 'clamp(18px, 4.5vw, 32px)' }}>
-                {/* Grid de 3 columnas con los dos extremos del mismo ancho — así el
-                    título queda centrado de verdad contra el modal entero, no solo
-                    contra el espacio que le queda libre entre los botones (con flex
-                    simple, la X sin nada que la balancee del otro lado corría el
-                    título hacia la izquierda). */}
-                <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 28px', alignItems: 'center', gap: 8, marginBottom: 18 }}>
-                    {onVolver ? (
-                        <button onClick={onVolver} aria-label="Volver" style={modalIconBtn}>
-                            <ArrowLeft size={15} />
-                        </button>
-                    ) : <span />}
-                    <h2 style={{ fontSize: 16, fontWeight: 800, letterSpacing: '-0.01em', color: 'var(--color-text)', margin: 0, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{titulo}</h2>
-                    <button onClick={onCerrar} aria-label="Cerrar" style={modalIconBtn}>
-                        <X size={15} />
-                    </button>
-                </div>
-                {children}
-            </div>
-        </div>
-    )
-}
+// El marco vive en promos/MarcoJuego.tsx: la vista previa del panel usa el mismo.
 
 // ─── Selector de juego (solo cuando hay más de uno elegible a la vez) ──────────
 function PickerJuegos({ juegos, onElegir }: { juegos: ActiveGame[]; onElegir: (tipo: string) => void }) {
@@ -1257,16 +1253,20 @@ function PickerJuegos({ juegos, onElegir }: { juegos: ActiveGame[]; onElegir: (t
     )
 }
 
-const modalIconBtn: React.CSSProperties = {
-    width: 28, height: 28, borderRadius: 8, border: '1px solid var(--color-border)', background: 'transparent',
-    color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', flexShrink: 0,
-}
-
 // ─── Contenido del modal de anuncios (RBT-675) ─────────────────────────────────
 // Texto libre a propósito — no se ata a ningún Discount/Cupón real (el
 // motor no tiene "2x1" implementado, ver discount-engine.ts en el backend).
 // El botón "Copiar" es el mismo patrón (navigator.clipboard + 2s de aviso)
 // que ya usa JuegoInline.tsx para el código del premio de un juego.
+// El botón del anuncio solo lleva a rutas de ESTA tienda: la API ya descarta
+// los links externos (hallazgo ctalink-externo), y acá tampoco se sigue uno por
+// si ese filtro se afloja. go() viene atado al slug de la tienda.
+function irACtaDe(promo: ActivePromoModal, go: (path: string) => void) {
+    const link = promo.ctaLink?.trim()
+    if (!link || /^[a-z][a-z0-9+.-]*:/i.test(link) || link.startsWith('//')) { go('/catalogo'); return }
+    go(link.startsWith('/') ? link : `/${link}`)
+}
+
 function PromoModalContenido({ promo, go }: { promo: ActivePromoModal; go: (path: string) => void }) {
     const [copiado, setCopiado] = useState(false)
 
@@ -1276,14 +1276,7 @@ function PromoModalContenido({ promo, go }: { promo: ActivePromoModal; go: (path
         setTimeout(() => setCopiado(false), 2000)
     }
 
-    // El botón del modal solo lleva a rutas de ESTA tienda: la API ya descarta
-    // los links externos (hallazgo ctalink-externo), y acá tampoco se sigue
-    // uno por si ese filtro se afloja. go() viene atado al slug de la tienda.
-    function irACta() {
-        const link = promo.ctaLink?.trim()
-        if (!link || /^[a-z][a-z0-9+.-]*:/i.test(link) || link.startsWith('//')) { go('/catalogo'); return }
-        go(link.startsWith('/') ? link : `/${link}`)
-    }
+    const irACta = () => irACtaDe(promo, go)
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, textAlign: 'center', padding: '8px 4px 4px' }}>

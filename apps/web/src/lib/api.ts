@@ -595,6 +595,9 @@ export type ApiGame = {
   // percentPerWin y además un solo fallo terminaba todo (bug reportado
   // 2026-08-28: "el juego solo te da un intento").
   maxAttempts: number
+  // Temática y forma de aparecer. null = el dibujo original, en ventana al centro.
+  theme: string | null
+  presentation: string | null
   // Se incrementa cada vez que se reactiva (inactivo → activo) o se le
   // carga una vigencia distinta — así el storefront trata un relanzamiento
   // como campaña nueva de cara al visitante (ver campaignVersion en
@@ -612,7 +615,7 @@ export function panelGetGames() {
   return panelRequest<ApiGame[]>('/games')
 }
 
-export function panelUpsertGame(type: string, input: { name?: string; isActive: boolean; percentPerWin: number; maxPercent: number; timeLimitSeconds?: number; maxAttempts?: number; startDate?: string; endDate?: string }) {
+export function panelUpsertGame(type: string, input: { name?: string; isActive: boolean; percentPerWin: number; maxPercent: number; timeLimitSeconds?: number; maxAttempts?: number; startDate?: string; endDate?: string; theme?: string; presentation?: string }) {
   return panelRequest<ApiGame>(`/games/${type}`, { method: 'PUT', body: JSON.stringify(input) })
 }
 
@@ -666,6 +669,9 @@ export type ApiPromoModal = {
   code: string | null
   ctaText: string | null
   ctaLink: string | null
+  format: string | null
+  design: string | null
+  imageUrl: string | null
   isActive: boolean
   // Mismo mecanismo que ApiGame.campaignVersion — se incrementa al
   // reactivar, cargar vigencia nueva, o con "Relanzar".
@@ -678,7 +684,7 @@ export function panelGetPromoModal() {
   return panelRequest<ApiPromoModal | null>('/promo-modal')
 }
 
-export function panelUpsertPromoModal(input: { title: string; message?: string; badge?: string; code?: string; ctaText?: string; ctaLink?: string; isActive: boolean; startDate?: string; endDate?: string }) {
+export function panelUpsertPromoModal(input: { title: string; message?: string; badge?: string; code?: string; ctaText?: string; ctaLink?: string; isActive: boolean; startDate?: string; endDate?: string; format?: string; design?: string; imageUrl?: string | null }) {
   return panelRequest<ApiPromoModal>('/promo-modal', { method: 'PUT', body: JSON.stringify(input) })
 }
 
@@ -770,6 +776,9 @@ export type ApiCountdownSettings = {
   // corriendo). Con esto en true el interruptor no se puede apagar (la API
   // devuelve 400) y no se puede crear otra.
   vigente: boolean
+  // Diseño de la oferta en la portada; queda guardado entre una oferta y otra.
+  format?: string | null
+  design?: string | null
 }
 
 export function panelGetCountdownSettings() {
@@ -2905,6 +2914,8 @@ export type ApiUpsertDiscountInput = {
   // Oferta relámpago: true la prende en este descuento (y se la saca al que la
   // tenía); false la apaga si era de este; ausente = no tocar lo que estaba.
   countdown?: boolean
+  countdownFormat?: string
+  countdownDesign?: string
 }
 
 export type DiscountListFilters = {
