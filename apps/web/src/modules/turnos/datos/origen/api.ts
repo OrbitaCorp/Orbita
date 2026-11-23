@@ -25,8 +25,8 @@ import type { Semana } from '@/modules/turnos/horario'
 import type { ServicioBase } from '@/modules/turnos/datos/agenda'
 import { rolesDe, type Persona, type Rol } from '@/modules/turnos/datos/equipo'
 import {
-  ahoraArgentina, bloqueoDeVacaciones, bloqueosDeDia, claveDeDia, claveDeVacaciones, clientesDeReservas, diasCerradosDeBloqueos, horarioDeSemana,
-  mismoHorario, porDia, recortarHorario, recursoDeApi, recursoParaApi, rolIdDeApi, semanaDeHorario, servicioDeApi, servicioParaApi, tipoDeAgenda,
+  ahoraArgentina, bloqueoDeVacaciones, bloqueosDeDia, claveDeDia, claveDeVacaciones, clientesDeReservas, configDeReglas, diasCerradosDeBloqueos, horarioDeSemana,
+  mismoHorario, porDia, recortarHorario, recursoDeApi, recursoParaApi, reglasDeConfig, rolIdDeApi, semanaDeHorario, servicioDeApi, servicioParaApi, tipoDeAgenda,
 } from './mapear'
 import type { DatosPanel, FuenteAgenda, OrigenTurnos } from './index'
 
@@ -182,5 +182,13 @@ export const origenApi: OrigenTurnos = {
       for (const id of aBorrar) await panel.borrarBloqueo(id)
       return { hayTurnos }
     },
+  },
+  reglas: {
+    async leer(rubro) {
+      const config = await panel.config('TURNOS')
+      if (!config) throw new Error('Este negocio todavía no tiene Turnos configurado.')
+      return reglasDeConfig(config, rubro.sena)
+    },
+    guardar: async (reglas, rubro) => reglasDeConfig(await panel.guardarConfig(configDeReglas(reglas)), rubro.sena),
   },
 }

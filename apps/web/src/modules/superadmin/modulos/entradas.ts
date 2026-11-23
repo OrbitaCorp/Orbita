@@ -2841,4 +2841,48 @@ Esas tres cosas se resuelven con las tareas de la semana 2.
       'apps/web/src/modules/turnos/datos/origen/__tests__/horarios.test.ts:1',
     ],
   }),
+  entrada({
+    modulo: 'turnos', fecha: F23, slug: 'reglas-sobre-la-api', tipo: 'tarea', quien: 'Mateo',
+    titulo: 'Reglas de reserva de Turnos guardan en la API',
+    foco: 'En un negocio real, Reglas de reserva lee y guarda en la config de Turnos lo que la API ya sabe aplicar: anticipación, margen, confirmación, seña en porcentaje, cancelación, reprogramación, tope por persona y lista de espera. Una reserva del sitio las respeta en el acto. Lo que la API no tiene (la grilla, la seña fija, elegir profesional, la tolerancia, los datos pedidos, la cuenta de clientes) queda sin guardar, y la pantalla lo dice. Con esto se cierra la semana 2 del plan.',
+    que: `Tarea del 13/11 del plan, hecha el 23/11.
+
+**Qué se guarda en la API** (\`PUT /reservas/config\`, sin tocar el horario):
+
+| En la pantalla | En la config |
+|---|---|
+| Anticipación mínima y máxima | \`anticipacionMinimaMinutos\`, \`anticipacionMaximaDias\` |
+| Margen entre turnos | \`margenMinutos\` |
+| Confirmación | \`confirmacion\` |
+| Seña en porcentaje | \`senaPorcentaje\` (sin seña es 0) |
+| Se cancela sin cargo | \`cancelacionHastaHoras\` |
+| Reprogramar: hasta cuándo y cuántas veces | \`reprogramacionHastaHoras\`, \`reprogramacionesMaximas\` (sin reprogramar es 0) |
+| Turnos activos por persona | \`maximoActivasPorCliente\` |
+| Lista de espera | \`listaDeEspera\` |
+
+**Lo que todavía no se guarda** (faltante 2 del mapa, lo decide Ale): cada cuánto arrancan los horarios, la seña de monto fijo, pedir seña a quien faltó, elegir profesional y "Cualquiera", el tiempo para aceptar un lugar de la lista de espera, qué pasa con la seña fuera de plazo, la tolerancia, los datos del paciente y la cuenta de clientes. Con la API:
+
+- La barra de guardar y el aviso dicen qué no se guarda.
+- La seña de monto fijo no deja guardar, porque el sitio cobraría otra cosa.
+- Estos valores no se escriben en el navegador, para que un negocio real no se mezcle con la demo.
+
+**Alcance en salud** (decisión del 15/11): "Motivo de la consulta" ahora arranca apagado en los 11 rubros de salud, también en la demo, y su ayuda pide que no se escriba un diagnóstico.
+
+**Probado contra la API local**, con el código real del panel y el negocio de prueba:
+
+- **Guardar** anticipación de 2 días a 21, margen, seña del 30%, confirmación manual, sin reprogramar y sin lista de espera: la config pública del sitio las muestra y el horario no cambia.
+- **Retener para mañana:** rechazado ("Hay que reservar con al menos 2 días de anticipación.").
+- **Retener a 30 días:** rechazado ("Se puede reservar hasta 21 días adelante.").
+- **Retener a 17 días:** entra, con precio de $12.000 y seña de $3.600.
+- **Al terminar** se restauraron las reglas originales y se volvió a sembrar el negocio.
+
+**Verificado:** typecheck y eslint de \`apps/web\` sin errores y los tests de Turnos en verde (48, 3 nuevos). El panel no se abrió a mano en el navegador.`,
+    archivos: [
+      'apps/web/src/modules/turnos/admin/configuracion/Reservas.tsx:82',
+      'apps/web/src/modules/turnos/datos/origen/mapear.ts:254',
+      'apps/web/src/modules/turnos/datos/origen/index.ts:115',
+      'apps/web/src/modules/turnos/datos/origen/api.ts:186',
+      'apps/web/src/modules/turnos/datos/origen/__tests__/reglas.test.ts:1',
+    ],
+  }),
 ]

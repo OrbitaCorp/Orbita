@@ -32,7 +32,7 @@ import type { Cliente, Recurso, RubroTurnos } from '@/modules/turnos/datos'
 import type { Semana } from '@/modules/turnos/horario'
 import type { ServicioBase, TurnoAgenda } from '@/modules/turnos/datos/agenda'
 import type { Persona, Rol } from '@/modules/turnos/datos/equipo'
-import type { DiasCerrados } from './mapear'
+import type { DiasCerrados, ReglasApi } from './mapear'
 import { origenDemo } from './demo'
 
 /**
@@ -111,6 +111,12 @@ export interface EscrituraHorarios {
   guardarDiasCerrados(antes: DiasCerrados, despues: DiasCerrados): Promise<{ hayTurnos: boolean }>
 }
 
+/** Las reglas de reserva que guarda la config (Reservas → Reglas). Como Horarios, solo en la API. */
+export interface EscrituraReglas {
+  leer(rubro: RubroTurnos): Promise<ReglasApi>
+  guardar(reglas: ReglasApi, rubro: RubroTurnos): Promise<ReglasApi>
+}
+
 export interface OrigenTurnos {
   tipo: 'demo' | 'api'
   /** Lo de cada sección, junto. Si falla, el error trae el mensaje para mostrar. */
@@ -118,6 +124,7 @@ export interface OrigenTurnos {
   servicios: EscrituraServicios
   agendas: EscrituraAgendas
   horarios?: EscrituraHorarios
+  reglas?: EscrituraReglas
 }
 
 const Contexto = createContext<OrigenTurnos>(origenDemo)
