@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { RUBROS_ALQUILERES } from '@/modules/alquileres/datos'
 import { RUBROS_PARA_CREAR, aSubdominio, erroresDeNegocio, type FormNegocio } from './negocioAlquileres'
 
-const OK: FormNegocio = { nombre: 'Cabañas del Sol', subdominio: 'cabanas-del-sol', rubro: 'cabana', duenoNombre: 'Ana Ríos', duenoEmail: 'ana@ejemplo.com', contrasenaTemporal: 'una-clave-larga' }
+const OK: FormNegocio = { nombre: 'Cabañas del Sol', subdominio: 'cabanas-del-sol', rubro: 'cabana', duenoNombre: 'Ana Ríos', duenoEmail: 'ana@ejemplo.com', contrasena: 'una-clave-larga' }
 
 describe('crear un negocio de Alquileres desde Superadmin', () => {
   it('los rubros que se ofrecen son de alojamiento y existen en el catálogo de Alquileres', () => {
@@ -26,9 +26,9 @@ describe('crear un negocio de Alquileres desde Superadmin', () => {
   })
 
   it('marca cada campo que falta o está mal, con el motivo', () => {
-    const e = erroresDeNegocio({ nombre: 'ab', subdominio: 'Con Espacios', rubro: '', duenoNombre: '', duenoEmail: 'no-es-mail', contrasenaTemporal: 'corta' })
-    expect(Object.keys(e).sort()).toEqual(['contrasenaTemporal', 'duenoEmail', 'duenoNombre', 'nombre', 'rubro', 'subdominio'])
+    const e = erroresDeNegocio({ nombre: 'ab', subdominio: 'Con Espacios', rubro: '', duenoNombre: '', duenoEmail: 'no-es-mail', contrasena: 'corta' })
+    expect(Object.keys(e).sort()).toEqual(['contrasena', 'duenoEmail', 'duenoNombre', 'nombre', 'rubro', 'subdominio'])
     expect(e.subdominio).toMatch(/minúsculas/)
-    expect(e.contrasenaTemporal).toMatch(/10/)
+    expect(e.contrasena).toMatch(/10/)
   })
 })

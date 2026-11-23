@@ -27,8 +27,20 @@ import { precioEstadia, precioMensual, salidaDeMeses, type RangoOcupado, type Ta
 // ─── El "hoy" de la demo ─────────────────────────────────────────────────────
 // Sábado 14/11/2026 a las 10:40, fijo: así la demo se ve igual cualquier día y
 // el servidor y el navegador pintan lo mismo.
-export const HOY: ISO = '2026-11-14'
-export const AHORA = 10 * 60 + 40
+export let HOY: ISO = '2026-11-14'
+export let AHORA = 10 * 60 + 40
+
+/**
+ * El panel de un negocio real usa el día y la hora de verdad. Las pantallas
+ * leen HOY y AHORA al dibujarse, así que alcanza con cambiarlos antes de
+ * montar el panel. Se llama SOLO en el navegador y solo desde el panel real
+ * (pages/panel/alquileres.tsx): en el servidor estas variables las comparten
+ * todos los pedidos, y la demo necesita su día fijo.
+ */
+export function usarHoyReal(fecha: ISO, minutos: number) {
+  HOY = fecha
+  AHORA = minutos
+}
 
 // ─── Modos ───────────────────────────────────────────────────────────────────
 
@@ -246,7 +258,8 @@ export interface Pagos {
   /** Mercado Pago conectado (en la demo se simula: no hay OAuth). */
   mpConectado: boolean
   /** Qué pasa con la seña si cancelan a tiempo (antes de `cancelaHastaHoras`) y si cancelan tarde. */
-  cancelaATiempo: 'devolver' | 'credito'
+  /** 'pierde': lo que hoy guarda la API cuando la seña no se devuelve (no maneja crédito a favor). */
+  cancelaATiempo: 'devolver' | 'credito' | 'pierde'
   cancelaTarde: 'pierde' | 'mitad' | 'credito'
 }
 

@@ -38,7 +38,22 @@ const DE_FABRICA: Record<TipoAlquiler, Pick<Palabras, 'unidades' | 'clientes'>> 
 
 const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
-export function seccionesDe(tipo: TipoAlquiler, palabras: Pick<Palabras, 'unidades' | 'clientes'> = DE_FABRICA[tipo]): SeccionNav[] {
+/**
+ * Lo que el panel real (con la API de reservas) todavía no guarda y por eso no
+ * muestra: mensajes, calendarios externos y la configuración del negocio y del
+ * equipo. Se suman a medida que se conectan (plan 2026-11-23-alquileres-en-produccion).
+ */
+const SIN_API: Vista[] = ['mensajes', 'calendarios', 'configuracion']
+
+/** `real`: el panel de un negocio de verdad (origen de la API), con solo lo que ya guarda. La demo no lo pasa. */
+export function seccionesDe(tipo: TipoAlquiler, palabras: Pick<Palabras, 'unidades' | 'clientes'> = DE_FABRICA[tipo], real = false): SeccionNav[] {
+  const todas = todasLasSecciones(tipo, palabras)
+  if (!real) return todas
+  // Sin temporadas hasta que el servidor las calcule: por ahora, un precio por noche.
+  return todas.filter(s => !SIN_API.includes(s.id)).map(s => (s.id === 'temporadas' ? { ...s, label: 'Precios' } : s))
+}
+
+function todasLasSecciones(tipo: TipoAlquiler, palabras: Pick<Palabras, 'unidades' | 'clientes'>): SeccionNav[] {
   const unidades = capital(palabras.unidades)
   const disponibilidad: SeccionNav = { id: 'disponibilidad', label: 'Qué hay libre', grupo: HOY }
   const ingresos: SeccionNav = { id: 'ingresos', label: 'Ingresos', grupo: HOY }
@@ -95,8 +110,8 @@ export interface Ruta {
  */
 export const debeCorregirRuta = (ruta: Pick<Ruta, 'corregir'>, listo: boolean) => listo && ruta.corregir
 
-export function resolverRuta(query: { vista?: string | string[]; tab?: string | string[] }, tipo: TipoAlquiler): Ruta {
-  const secciones = seccionesDe(tipo)
+export function resolverRuta(query: { vista?: string | string[]; tab?: string | string[] }, tipo: TipoAlquiler, real = false): Ruta {
+  const secciones = seccionesDe(tipo, undefined, real)
   const pedida = typeof query.vista === 'string' ? query.vista : ''
   const tab = typeof query.tab === 'string' ? query.tab : ''
   if (pedida === 'configuracion' && Object.hasOwn(TABS_VIEJAS, tab)) {

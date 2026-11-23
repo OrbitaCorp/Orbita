@@ -3,12 +3,26 @@ import type { Config, Paginado, Recurso, Reserva } from '@/lib/reservasApi/tipos
 
 const panel = vi.hoisted(() => ({
   config: vi.fn(), recursos: vi.fn(), servicios: vi.fn(), bloqueos: vi.fn(), agenda: vi.fn(),
+  crearRecurso: vi.fn(), editarRecurso: vi.fn(), borrarRecurso: vi.fn(), guardarConfig: vi.fn(),
+  crear: vi.fn(), pago: vi.fn(), confirmar: vi.fn(), completar: vi.fn(), cancelar: vi.fn(),
+  crearBloqueo: vi.fn(), borrarBloqueo: vi.fn(),
 }))
 const panelGetBusiness = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/reservasApi/cliente', () => ({ panel }))
 vi.mock('@/lib/api', () => ({ panelGetBusiness }))
 
-import { DIAS_POR_PEDIDO, cargarApi, origenApi, reservasEntre, tramosDeFechas } from '../api'
+import { DIAS_POR_PEDIDO, cargarApi, escriturasDe, origenApi, reservasEntre, tramosDeFechas } from '../api'
+import type { Bloqueo, Propiedad, Reserva as ReservaPanel } from '../../index'
+
+/** Un negocio de estadía ya cargado, con una cabaña y una reserva pendiente, y las escrituras sobre él. */
+async function conCabana() {
+  panel.recursos.mockResolvedValue([recurso({ id: 'p1', tipo: 'ALOJAMIENTO', nombre: 'Arrayán', precio: 85000, duracionMinutos: null, datos: { checkIn: 840, checkOut: 600, nochesMinimas: 2, tarifa: { limpieza: 15000, finDeSemanaPct: 20 } } })])
+  const base = { recursoId: 'p1', fecha: '2026-12-04', inicio: '2026-12-04T17:00:00.000Z', fin: '2026-12-07T13:00:00.000Z', inicioMinutos: 840, finMinutos: 600, clienteNombre: 'Ana', clienteTelefono: '1', clienteEmail: null, clienteId: null, extras: null, creadaEn: '2026-11-20T00:00:00.000Z', notas: null }
+  panel.agenda.mockResolvedValue({ data: [{ ...base, id: 'x1', estado: 'PENDIENTE', precio: 255000, sena: 76500, pagado: 0 }], total: 1, page: 1, limit: 100 })
+  const datos = await cargarApi('2026-11-23')
+  const recargar = vi.fn().mockResolvedValue(undefined)
+  return { datos, recargar, e: escriturasDe(datos, recargar) }
+}
 
 const recurso = (r: Partial<Recurso>): Recurso => ({
   id: 'r', modulo: 'ALQUILERES', tipo: 'CANCHA', nombre: 'X', descripcion: null, cupo: 1, duracionMinutos: 60, pasoMinutos: 60,
@@ -84,6 +98,67 @@ describe('cargarApi con recursos desactivados', () => {
     expect(panel.recursos).toHaveBeenCalledWith('ALQUILERES', true)
     expect(d.negocio.unidades.map(u => u.id)).toEqual(['c1'])
     expect(d.reservas.map(r => r.id).sort()).toEqual(['a', 'b'])
+  })
+})
+
+describe('lo que el panel real escribe en la API (estadía)', () => {
+  it('lee un precio fijo por noche: sin limpieza ni recargo hasta que el servidor los calcule', async () => {
+    const { datos } = await conCabana()
+    expect(datos.negocio.propiedades[0].tarifa).toEqual({ precioNoche: 85000, temporadas: [], finDeSemanaPct: 0, limpieza: 0, minNoches: 2 })
+  })
+
+  it('guardar las propiedades crea las nuevas, edita las que cambiaron, borra las que se quitaron y recarga', async () => {
+    const { datos, recargar, e } = await conCabana()
+    const p1 = datos.negocio.propiedades[0]
+    const nueva: Propiedad = { ...p1, id: 'c-local', nombre: 'Lapacho' }
+    await e.configurar('estadia', { propiedades: [{ ...p1, nombre: 'Arrayán II' }, nueva] })
+    expect(panel.editarRecurso).toHaveBeenCalledWith('p1', expect.objectContaining({ nombre: 'Arrayán II', tipo: 'ALOJAMIENTO', orden: 0 }))
+    expect(panel.crearRecurso).toHaveBeenCalledWith(expect.objectContaining({ nombre: 'Lapacho', orden: 1 }))
+    expect(panel.borrarRecurso).not.toHaveBeenCalled()
+    expect(recargar).toHaveBeenCalledTimes(1)
+
+    await e.configurar('estadia', { propiedades: [] })
+    expect(panel.borrarRecurso).toHaveBeenCalledWith('p1')
+  })
+
+  it('guardar la seña o el plazo de cancelación va a la config', async () => {
+    const { e } = await conCabana()
+    await e.configurar('estadia', { senaPct: 50 })
+    expect(panel.guardarConfig).toHaveBeenCalledWith({ modulo: 'ALQUILERES', senaPorcentaje: 50 })
+  })
+
+  it('lo que la API todavía no guarda falla con un mensaje, en vez de decir "guardado"', async () => {
+    const { e, recargar } = await conCabana()
+    await expect(Promise.resolve().then(() => e.configurar('estadia', { mensajes: [] }))).rejects.toThrow(/todavía no se guarda/)
+    expect(recargar).not.toHaveBeenCalled()
+  })
+
+  it('una reserva a mano se crea en la API; si ya pagó la seña, se anota el pago', async () => {
+    const { e, recargar } = await conCabana()
+    panel.crear.mockResolvedValue({ id: 'nueva', sena: 76500 })
+    const r: ReservaPanel = { id: 'n1', unidadId: 'p1', clienteId: 'k', estado: 'confirmada', creada: '2026-11-23', entrada: '2026-12-10', salida: '2026-12-13', extras: [], total: 255000, sena: 76500, senaPagada: true, saldoPagado: false }
+    await e.reservar('estadia', r, { id: 'k', nombre: 'Leo Paz', telefono: '3757 55-0102' })
+    expect(panel.crear).toHaveBeenCalledWith(expect.objectContaining({ recursoId: 'p1', fecha: '2026-12-10', fechaHasta: '2026-12-13', estado: 'CONFIRMADA', cliente: { nombre: 'Leo Paz', telefono: '3757 55-0102' } }))
+    expect(panel.pago).toHaveBeenCalledWith('nueva', { monto: 76500, metodo: 'OTRO' })
+    expect(recargar).toHaveBeenCalledTimes(1)
+  })
+
+  it('registrar la seña anota el pago y confirma; cancelar cancela', async () => {
+    const { e } = await conCabana()
+    await e.cambiarReserva('x1', { estado: 'confirmada', senaPagada: true })
+    expect(panel.pago).toHaveBeenCalledWith('x1', { monto: 76500, metodo: 'OTRO' })
+    expect(panel.confirmar).toHaveBeenCalledWith('x1')
+    await e.cambiarReserva('x1', { estado: 'cancelada' })
+    expect(panel.cancelar).toHaveBeenCalledWith('x1')
+  })
+
+  it('bloquear y quitar un bloqueo', async () => {
+    const { e } = await conCabana()
+    const b: Bloqueo = { id: 'local', unidadId: 'p1', desde: '2026-12-20', hasta: '2026-12-23', motivo: 'Uso propio', origen: 'dueno' }
+    await e.agregarBloqueo('estadia', b)
+    expect(panel.crearBloqueo).toHaveBeenCalledWith({ modulo: 'ALQUILERES', recursoId: 'p1', fechaDesde: '2026-12-20', minutoDesde: 840, fechaHasta: '2026-12-23', minutoHasta: 600, motivo: 'Uso propio' })
+    await e.quitarBloqueo('estadia', 'abc:p1')
+    expect(panel.borrarBloqueo).toHaveBeenCalledWith('abc')
   })
 })
 

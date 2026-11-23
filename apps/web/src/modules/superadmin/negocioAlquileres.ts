@@ -17,7 +17,7 @@ export interface FormNegocio {
   rubro: string
   duenoNombre: string
   duenoEmail: string
-  contrasenaTemporal: string
+  contrasena: string
 }
 
 /** "Cabañas del Sol" → "cabanas-del-sol": lo que se propone como subdominio. */
@@ -35,6 +35,6 @@ export function erroresDeNegocio(f: FormNegocio): Partial<Record<keyof FormNegoc
   if (!HABILITADOS.includes(f.rubro)) e.rubro = 'Elegí qué alquila.'
   if (f.duenoNombre.trim().length < 2) e.duenoNombre = 'Escribí el nombre de quien va a entrar al panel.'
   if (!RE_EMAIL.test(f.duenoEmail.trim())) e.duenoEmail = 'Ese email no parece válido.'
-  if (f.contrasenaTemporal.length < 10) e.contrasenaTemporal = 'La contraseña temporal lleva 10 caracteres o más.'
+  if (f.contrasena.length < 10) e.contrasena = 'La contraseña lleva 10 caracteres o más.'
   return e
 }

@@ -9,6 +9,6 @@ export class CrearNegocioAlquileresDto {
   @IsString() @MaxLength(40) rubro!: string;
   @IsString() @MinLength(2) @MaxLength(80) duenoNombre!: string;
   @IsEmail() @MaxLength(160) duenoEmail!: string;
-  // Temporal: el dueño la cambia al entrar. 72 es el tope que se le pide a cualquier contraseña.
-  @IsString() @MinLength(10) @MaxLength(72) contrasenaTemporal!: string;
+  // La elige el superadmin que crea el negocio de prueba. 72 es el tope que se le pide a cualquier contraseña.
+  @IsString() @MinLength(10) @MaxLength(72) contrasena!: string;
 }

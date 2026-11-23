@@ -30,7 +30,10 @@ const MOTIVO_CORTESIA = 'Alquileres todavía no se cobra: negocio creado desde S
  *  - cortesía por un año, sin cobro;
  *  - la config de reservas del módulo, con confirmación manual: una reserva
  *    del sitio queda pendiente hasta que el dueño registra la seña;
- *  - el dueño con contraseña temporal: la cambia al entrar por primera vez.
+ *  - el dueño entra con la contraseña que eligió el superadmin. No se le fuerza
+ *    el cambio al entrar: esa pantalla hoy vive en el panel de Tienda (Mi
+ *    perfil), y el panel de Alquileres todavía no tiene la suya. Son negocios
+ *    de prueba del equipo; la puede cambiar con "¿Olvidaste tu contraseña?".
  */
 @Injectable()
 export class NegociosAlquileresService {
@@ -54,7 +57,7 @@ export class NegociosAlquileresService {
       throw new ConflictException('Ese email ya tiene un negocio en Órbita.');
     }
 
-    const passwordHash = await argon2.hash(dto.contrasenaTemporal, { type: argon2.argon2id });
+    const passwordHash = await argon2.hash(dto.contrasena, { type: argon2.argon2id });
 
     // El catálogo de permisos es global: se asegura fuera de la transacción, como en el alta.
     for (const perm of PERMISSIONS) {
@@ -100,7 +103,7 @@ export class NegociosAlquileresService {
             email,
             roleId: roles.owner.id,
             status: 'ACTIVE',
-            hasTempPassword: true,
+            hasTempPassword: false,
             passwordHash,
             // Lo cargó un superadmin: no se le pide verificar el email.
             emailVerified: true,

@@ -1281,8 +1281,8 @@ export const platformApi = {
   tutorialActualizar: (id: string, cambios: { estado?: Exclude<TutorialEstado, 'EN_REVISION'>; asignadoA?: ResponsableTutorial | null; notas?: string }) => sendJSON<{ id: string; estado: TutorialEstado; asignadoA: ResponsableTutorial | null }>(`/platform/marketing/tutoriales/${id}`, 'PATCH', cambios),
   // ¿Tengo un Claude conectado? Decide si «Mejorar con Claude» abre Claude o pide conectarlo primero.
   mcpEstado: () => getJSONConMensaje<{ conectado: boolean }>('/platform/mcp/estado'),
-  // Crea un negocio de Alquileres (oculto de buscadores, con cortesía y dueño con contraseña temporal).
-  createAlquileresBusiness: (input: { nombre: string; subdominio: string; rubro: string; duenoNombre: string; duenoEmail: string; contrasenaTemporal: string }) =>
+  // Crea un negocio de Alquileres (oculto de buscadores, con cortesía y con la contraseña del dueño que se elige acá).
+  createAlquileresBusiness: (input: { nombre: string; subdominio: string; rubro: string; duenoNombre: string; duenoEmail: string; contrasena: string }) =>
     sendJSON<{ business: { id: string; name: string; subdomain: string }; owner: { email: string } }>('/platform/businesses/alquileres', 'POST', input),
   grantComp: (businessId: string, input: GrantCompInput) => sendJSON<SubscriptionRow>(`/platform/subscriptions/${businessId}/grant-comp`, 'POST', input),
   // Extender o acortar una cortesía ya cedida (hasta hoy, no antes).

@@ -15,6 +15,7 @@ export const plazoTxt = (horas: number) =>
 export const SENA_A_TIEMPO: Record<Pagos['cancelaATiempo'], string> = {
   devolver: 'se devuelve la seña entera',
   credito: 'la seña queda como crédito para otra reserva',
+  pierde: 'la seña no se devuelve',
 }
 /** Qué pasa con la seña si cancelan después del plazo. */
 export const SENA_TARDE: Record<Pagos['cancelaTarde'], string> = {

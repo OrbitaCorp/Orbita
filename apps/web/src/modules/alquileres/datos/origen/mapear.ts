@@ -297,7 +297,7 @@ export function negocioDeApi(p: { tipo: TipoAlquiler; rubro: string; negocio: Da
     bloqueos: bloqueosDeApi(p.bloqueos, recursos.map(r => r.id)),
     calendariosExternos: [],
     mensajes: mensajesDeFabrica(tipo),
-    pagos: { senaSobre: 'total', formas: ['efectivo', 'transferencia'], alias: '', titular: '', mpConectado: false, cancelaATiempo: config.senaReembolsable ? 'devolver' : 'credito', cancelaTarde: 'pierde' },
+    pagos: { senaSobre: 'total', formas: ['efectivo', 'transferencia'], alias: '', titular: '', mpConectado: false, cancelaATiempo: config.senaReembolsable ? 'devolver' : 'pierde', cancelaTarde: 'pierde' },
     equipo: [],
   }
 }

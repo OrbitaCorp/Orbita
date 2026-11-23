@@ -16,7 +16,12 @@ import { plazoTxt } from './Reglas'
 const de = (n: NegocioAlquiler) => ({ senaPct: n.senaPct, pagos: n.pagos, depositos: Object.fromEntries(n.salones.map(s => [s.id, s.deposito])) as Record<string, number> })
 
 
-export default function Pagos({ negocio, onGuardar, onIr }: Form & { onIr: (vista: Vista) => void }) {
+/**
+ * `real`: el panel de un negocio de verdad. Queda lo que la API guarda hoy: el
+ * porcentaje de seña y si se devuelve al cancelar a tiempo. Las formas de pago,
+ * el alias y "si cancelan tarde" llegan con los cambios del motor (etapa 3).
+ */
+export default function Pagos({ negocio, onGuardar, onIr, real = false }: Form & { onIr: (vista: Vista) => void; real?: boolean }) {
   const [v, setV] = useState(de(negocio))
   const cambiado = !igual(v, de(negocio))
   const tipo = negocio.tipo
@@ -36,24 +41,24 @@ export default function Pagos({ negocio, onGuardar, onIr }: Form & { onIr: (vist
     ? { que: `una hora de ${negocio.unidades[0]?.nombre ?? 'cancha'} con ${negocio.extras[0]?.nombre.toLowerCase() ?? 'un extra'}`, base: negocio.unidades[0]?.tarifaHora ?? 0, total: (negocio.unidades[0]?.tarifaHora ?? 0) + (negocio.extras[0]?.precio ?? 0) }
     : tipo === 'bloque'
       ? { que: `${negocio.salones[0]?.paquetes[0]?.nombre.toLowerCase() ?? 'un paquete'} con ${negocio.extras[0]?.nombre ?? 'un extra'}`, base: negocio.salones[0]?.paquetes[0]?.precio ?? 0, total: (negocio.salones[0]?.paquetes[0]?.precio ?? 0) + (negocio.extras[0]?.precio ?? 0) }
-      : { que: `dos noches en ${negocio.propiedades[0]?.nombre ?? 'una propiedad'} más la limpieza`, base: (negocio.propiedades[0]?.tarifa.precioNoche ?? 0) * 2, total: (negocio.propiedades[0]?.tarifa.precioNoche ?? 0) * 2 + (negocio.propiedades[0]?.tarifa.limpieza ?? 0) }
+      : { que: `dos noches en ${negocio.propiedades[0]?.nombre ?? 'una propiedad'}${real ? '' : ' más la limpieza'}`, base: (negocio.propiedades[0]?.tarifa.precioNoche ?? 0) * 2, total: (negocio.propiedades[0]?.tarifa.precioNoche ?? 0) * 2 + (negocio.propiedades[0]?.tarifa.limpieza ?? 0) }
   const senaEjemplo = senaDe(v.pagos.senaSobre === 'base' ? ejemplo.base : ejemplo.total, v.senaPct)
   const baseTxt = tipo === 'cancha' ? `Solo ${palabras.genero === 'm' ? 'el' : 'la'} ${palabras.unidad} (sin extras)` : tipo === 'bloque' ? 'Solo el paquete (sin extras)' : negocio.propiedades.some(x => x.modalidad === 'mes') ? 'Solo las noches o el primer mes' : 'Solo las noches (sin limpieza)'
 
   const guardar = () => onGuardar({ senaPct: v.senaPct, pagos: v.pagos, ...(tipo === 'bloque' ? { salones: negocio.salones.map(s => ({ ...s, deposito: v.depositos[s.id] ?? s.deposito })) } : {}) }, 'Pagos guardados')
 
   return (
-    <PaginaForm rotulo={TIPOS[tipo].label} titulo="Pagos y señas" bajada="Cuánto se paga al reservar, cómo te pagan y qué pasa con la seña si cancelan.">
+    <PaginaForm rotulo={TIPOS[tipo].label} titulo="Pagos y señas" bajada={real ? 'Cuánto se paga al reservar y qué pasa con la seña si cancelan.' : 'Cuánto se paga al reservar, cómo te pagan y qué pasa con la seña si cancelan.'}>
       <div className="rv-pila">
         <Seccion titulo="Seña" bajada="Lo que se paga al reservar. El resto, en el lugar.">
           <div className="rv-dos">
             <Selector label="Seña al reservar" valor={v.senaPct} onChange={x => setV({ ...v, senaPct: x })} opciones={[0, 20, 30, 50, 100].map(p => ({ id: p, label: p === 0 ? 'Sin seña' : p === 100 ? 'Se paga todo' : `${p}%` }))} />
-            <Selector label="Se calcula sobre" valor={v.pagos.senaSobre} onChange={x => setPagos({ senaSobre: x })} opciones={[{ id: 'total' as const, label: 'El total, con todo' }, { id: 'base' as const, label: baseTxt }]} />
+            {!real && <Selector label="Se calcula sobre" valor={v.pagos.senaSobre} onChange={x => setPagos({ senaSobre: x })} opciones={[{ id: 'total' as const, label: 'El total, con todo' }, { id: 'base' as const, label: baseTxt }]} />}
           </div>
           <p className="ala-pie-nota">{v.senaPct === 0 ? 'Sin seña: la reserva queda confirmada en el momento y todo se paga en el lugar.' : `Por ejemplo, ${ejemplo.que}: total ${pesos(ejemplo.total)}, seña ${pesos(senaEjemplo)}${senaEjemplo < ejemplo.total ? ` y ${pesos(ejemplo.total - senaEjemplo)} en el lugar` : ''}.`}</p>
         </Seccion>
 
-        <Seccion titulo="Formas de pago" bajada="Se muestran al reservar, para que lleguen sabiendo cómo pagar.">
+        {!real && <Seccion titulo="Formas de pago" bajada="Se muestran al reservar, para que lleguen sabiendo cómo pagar.">
           <FilaSwitch titulo={FORMAS_PAGO.efectivo.label} ayuda={FORMAS_PAGO.efectivo.ayuda} on={tiene('efectivo')} onChange={x => forma('efectivo', x)} />
           <FilaSwitch titulo={FORMAS_PAGO.transferencia.label} ayuda={FORMAS_PAGO.transferencia.ayuda} on={tiene('transferencia')} onChange={x => forma('transferencia', x)} />
           {tiene('transferencia') && (
@@ -76,7 +81,7 @@ export default function Pagos({ negocio, onGuardar, onIr }: Form & { onIr: (vist
             </div>
           )}
           {v.pagos.formas.length === 0 && <p className="rv-error" style={{ margin: '10px 0 0' }}>Dejá al menos una forma de pago.</p>}
-        </Seccion>
+        </Seccion>}
 
         {tipo === 'bloque' && (
           <Seccion titulo="Depósito de garantía" bajada={`Se entrega el día del evento y se devuelve al terminar. Solo se registra: no se cobra desde Órbita.${negocio.salones.length > 1 ? ` Cada ${palabras.unidad} tiene el suyo.` : ''}`}>
@@ -88,8 +93,8 @@ export default function Pagos({ negocio, onGuardar, onIr }: Form & { onIr: (vist
 
         <Seccion titulo="Cancelaciones" bajada={`Se cancela sin cargo hasta ${plazoTxt(negocio.cancelaHastaHoras)} antes (el plazo se cambia en Reglas de reserva).`}>
           <div className="rv-dos">
-            <Selector label="Si cancelan a tiempo" valor={v.pagos.cancelaATiempo} onChange={x => setPagos({ cancelaATiempo: x })} opciones={[{ id: 'devolver' as const, label: 'Se devuelve la seña' }, { id: 'credito' as const, label: 'Queda como crédito' }]} />
-            <Selector label="Si cancelan tarde" valor={v.pagos.cancelaTarde} onChange={x => setPagos({ cancelaTarde: x })} opciones={[{ id: 'pierde' as const, label: 'Se pierde la seña' }, { id: 'mitad' as const, label: 'Se devuelve la mitad' }, { id: 'credito' as const, label: 'Queda como crédito' }]} />
+            <Selector label="Si cancelan a tiempo" valor={v.pagos.cancelaATiempo} onChange={x => setPagos({ cancelaATiempo: x })} opciones={real ? [{ id: 'devolver' as const, label: 'Se devuelve la seña' }, { id: 'pierde' as const, label: 'No se devuelve' }] : [{ id: 'devolver' as const, label: 'Se devuelve la seña' }, { id: 'credito' as const, label: 'Queda como crédito' }]} />
+            {!real && <Selector label="Si cancelan tarde" valor={v.pagos.cancelaTarde} onChange={x => setPagos({ cancelaTarde: x })} opciones={[{ id: 'pierde' as const, label: 'Se pierde la seña' }, { id: 'mitad' as const, label: 'Se devuelve la mitad' }, { id: 'credito' as const, label: 'Queda como crédito' }]} />}
           </div>
           <Nota tono="info"><span style={{ flex: 1, minWidth: 0 }}>Así lo lee el cliente: “Si cancelás hasta {plazoTxt(negocio.cancelaHastaHoras)} antes, {A_TIEMPO[v.pagos.cancelaATiempo]}. Después, {TARDE[v.pagos.cancelaTarde]}.”</span><button type="button" className="rv-btn rv-btn--sm" onClick={() => onIr('reglas')}>Reglas de reserva <ArrowRight size={14} aria-hidden /></button></Nota>
         </Seccion>

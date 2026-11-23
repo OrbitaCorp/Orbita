@@ -88,3 +88,23 @@ describe('resolverRuta', () => {
     expect(resolverRuta({ vista: 'pagos', tab: 'negocio' }, 'cancha')).toEqual({ vista: 'pagos', corregir: true })
   })
 })
+
+describe('el panel real (con la API) muestra solo lo que ya guarda de verdad', () => {
+  it('en estadía quedan la agenda, las propiedades, los precios, los bloqueos, las reglas y la seña', () => {
+    const ids = seccionesDe('estadia', undefined, true).map(s => s.id)
+    expect(ids).toEqual(['reservas', 'disponibilidad', 'clientes', 'ingresos', 'propiedades', 'temporadas', 'bloqueos', 'reglas', 'pagos'])
+  })
+  it('Temporadas se llama Precios: por ahora hay un precio por noche', () => {
+    expect(seccionesDe('estadia', undefined, true).find(s => s.id === 'temporadas')?.label).toBe('Precios')
+    expect(seccionesDe('estadia').find(s => s.id === 'temporadas')?.label).toBe('Temporadas y precios')
+  })
+  it('un link a una sección que el panel real no tiene vuelve a la agenda', () => {
+    expect(resolverRuta({ vista: 'mensajes' }, 'estadia', true)).toEqual({ vista: 'reservas', corregir: true })
+    expect(resolverRuta({ vista: 'configuracion', tab: 'equipo' }, 'estadia', true)).toEqual({ vista: 'reservas', corregir: true })
+    expect(resolverRuta({ vista: 'propiedades' }, 'estadia', true)).toEqual({ vista: 'propiedades', corregir: false })
+  })
+  it('la demo no cambia', () => {
+    expect(seccionesDe('estadia').map(s => s.id)).toContain('mensajes')
+    expect(resolverRuta({ vista: 'mensajes' }, 'estadia')).toEqual({ vista: 'mensajes', corregir: false })
+  })
+})

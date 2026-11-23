@@ -38,6 +38,8 @@ export interface DatosPanelAlquiler extends Escrituras {
   reintentar: () => void
   /** Solo en la demo: el almacén del navegador (lo usa la campanita para las reservas nuevas). */
   demo?: DemoAlquiler
+  /** Sube cada vez que llegan datos nuevos de la API: los formularios se vuelven a montar con lo guardado. La demo no lo usa. */
+  version?: number
   /** true si lo que se cambia en el panel todavía no llega a la API. */
   soloLectura: boolean
 }

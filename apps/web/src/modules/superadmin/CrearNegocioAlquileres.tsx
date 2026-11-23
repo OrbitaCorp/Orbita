@@ -2,9 +2,8 @@
 //
 // El alta pública tiene Alquileres en "Próximamente": mientras tanto esta es la
 // forma de tener un negocio real para probar el panel y el sitio en
-// producción. El negocio nace oculto de buscadores, con cortesía y con el
-// dueño con una contraseña temporal que cambia al entrar. Por ahora, solo
-// alojamiento por noche (plan: docs/superpowers/plans/2026-11-23-alquileres-en-produccion.md).
+// producción. El negocio nace oculto de buscadores, con cortesía y con la
+// contraseña del dueño que se elige acá. Por ahora, solo alojamiento por noche (plan: docs/superpowers/plans/2026-11-23-alquileres-en-produccion.md).
 import { useState, type FormEvent } from 'react'
 import { ArrowRight, Check, Copy } from 'lucide-react'
 import { platformApi } from '@/lib/platform/api'
@@ -12,7 +11,7 @@ import { tenantUrl } from '@/lib/tenant'
 import { ErrorBox, Field, ModalShell, btnGhost, btnPrimary, inputStyle } from './ui'
 import { RUBROS_PARA_CREAR, aSubdominio, erroresDeNegocio, type FormNegocio } from './negocioAlquileres'
 
-const VACIO: FormNegocio = { nombre: '', subdominio: '', rubro: 'cabana', duenoNombre: '', duenoEmail: '', contrasenaTemporal: '' }
+const VACIO: FormNegocio = { nombre: '', subdominio: '', rubro: 'cabana', duenoNombre: '', duenoEmail: '', contrasena: '' }
 const errorTxt = { fontSize: 12, fontWeight: 500, color: 'var(--color-danger, #DC2626)' } as const
 
 interface Creado { subdomain: string; name: string; email: string }
@@ -57,7 +56,7 @@ export default function CrearNegocioAlquileres({ onCerrar }: { onCerrar: () => v
           <p style={{ margin: 0 }}><b style={{ color: 'var(--color-text)' }}>{creado.name}</b> ya existe. Está oculto de buscadores y no se le cobra.</p>
           <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
             <li>Cerrá tu sesión de superadmin o abrí una ventana privada: el dueño y el superadmin usan la misma sesión del navegador.</li>
-            <li>Entrá con <b>{creado.email}</b> y la contraseña temporal que elegiste. Al entrar te pide cambiarla.</li>
+            <li>Entrá con <b>{creado.email}</b> y la contraseña que elegiste.</li>
             <li>El panel está en <a href={panel} style={{ color: 'var(--color-primary)', fontWeight: 600, overflowWrap: 'anywhere' }}>{panel.replace(/^https?:\/\//, '')}</a>.</li>
           </ol>
           <p style={{ margin: 0, fontSize: 12.5, color: 'var(--color-muted)' }}>El sitio público ({sitio.replace(/^https?:\/\//, '').replace(/\/$/, '')}) todavía muestra la tienda vacía: el sitio de Alquileres es la etapa siguiente.</p>
@@ -98,9 +97,9 @@ export default function CrearNegocioAlquileres({ onCerrar }: { onCerrar: () => v
           <input style={inputStyle} type="email" inputMode="email" value={f.duenoEmail} maxLength={160} autoComplete="off" autoCapitalize="none" aria-invalid={!!ver('duenoEmail')} onChange={e => set({ duenoEmail: e.target.value })} />
           {ver('duenoEmail') && <span role="alert" style={errorTxt}>{ver('duenoEmail')}</span>}
         </Field>
-        <Field label="Contraseña temporal" hint="10 caracteres o más. Al entrar por primera vez se le pide cambiarla.">
-          <input style={inputStyle} type="text" value={f.contrasenaTemporal} maxLength={72} autoComplete="off" autoCapitalize="none" spellCheck={false} aria-invalid={!!ver('contrasenaTemporal')} onChange={e => set({ contrasenaTemporal: e.target.value })} />
-          {ver('contrasenaTemporal') && <span role="alert" style={errorTxt}>{ver('contrasenaTemporal')}</span>}
+        <Field label="Contraseña del dueño" hint="10 caracteres o más. Anotala: no se vuelve a mostrar.">
+          <input style={inputStyle} type="text" value={f.contrasena} maxLength={72} autoComplete="off" autoCapitalize="none" spellCheck={false} aria-invalid={!!ver('contrasena')} onChange={e => set({ contrasena: e.target.value })} />
+          {ver('contrasena') && <span role="alert" style={errorTxt}>{ver('contrasena')}</span>}
         </Field>
         {falla && <ErrorBox msg={falla} />}
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>

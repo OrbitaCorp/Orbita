@@ -38,7 +38,7 @@ const DTO = {
   rubro: 'cabana',
   duenoNombre: 'Ana Ríos',
   duenoEmail: 'Ana@Ejemplo.invalid',
-  contrasenaTemporal: 'una-clave-larga-123',
+  contrasena: 'una-clave-larga-123',
 };
 
 describe('NegociosAlquileresService.crear (unit)', () => {
@@ -55,12 +55,12 @@ describe('NegociosAlquileresService.crear (unit)', () => {
     expect(res).toEqual({ business: { id: 'biz-1', name: 'Cabañas del Sol', subdomain: 'cabanas-del-sol' }, owner: { email: 'ana@ejemplo.invalid' } });
   });
 
-  it('el dueño nace con contraseña temporal (la cambia al entrar) y nunca se guarda en claro', async () => {
+  it('el dueño entra con la contraseña elegida, que nunca se guarda en claro ni va al log', async () => {
     const prisma = makePrisma();
     await new NegociosAlquileresService(prisma as any).crear('admin-1', DTO);
 
     const dueno = prisma._tx.member.create.mock.calls[0][0].data;
-    expect(dueno).toMatchObject({ businessId: 'biz-1', name: 'Ana Ríos', email: 'ana@ejemplo.invalid', roleId: 'rol-owner', status: 'ACTIVE', hasTempPassword: true });
+    expect(dueno).toMatchObject({ businessId: 'biz-1', name: 'Ana Ríos', email: 'ana@ejemplo.invalid', roleId: 'rol-owner', status: 'ACTIVE', hasTempPassword: false });
     expect(dueno.passwordHash).toMatch(/^\$argon2id\$/);
     expect(JSON.stringify(prisma._tx.platformAdminLog.create.mock.calls)).not.toContain('una-clave-larga-123');
   });
