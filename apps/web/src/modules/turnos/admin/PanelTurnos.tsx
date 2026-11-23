@@ -45,7 +45,7 @@ import { temaDe } from '@/modules/turnos/storefront/tema'
 import { useRubroDemo } from '@/modules/turnos/demo/BarraDemo'
 import { useNegocioDemo } from '@/modules/turnos/datos/negocio'
 import { ESTADO_TURNO, semanaDe, tramosDeRecurso, esSalud, horaTxt, duracionTxt, pesos, type EstadoTurno, type Turno, type Cliente, type Recurso, type RubroTurnos } from '@/modules/turnos/datos'
-import { AHORA_DEMO, HOY_SEMANA, extremos, tramosDelDia, type Tramo } from '@/modules/turnos/horario'
+import { AHORA_DEMO, HOY_SEMANA, extremos, tramosDelDia, type Semana, type Tramo } from '@/modules/turnos/horario'
 import ResumenDia from './KPIs'
 import Agenda from './Agenda'
 import DetalleTurno from './Turnos'
@@ -121,6 +121,7 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
   const [roles, setRoles] = useState<Rol[]>([])
   const [personas, setPersonas] = useState<Persona[]>([])
   const [cargados, setCargados] = useState<DatosPanel | null>(null)
+  const [semanaGuardada, setSemanaGuardada] = useState<Semana | null>(null)
   if (carga.datos && carga.datos !== cargados) {
     // Se ajusta durante el render (no en un efecto), así la primera pantalla ya sale con los datos.
     setCargados(carga.datos)
@@ -129,9 +130,11 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
     setServicios(carga.datos.servicios)
     setRoles(carga.datos.roles)
     setPersonas(carga.datos.personas)
+    setSemanaGuardada(null)
   }
-  // El horario del negocio. En la demo cambia apenas se guarda otro en Configuración → Horarios.
-  const semana = useMemo(() => (cargados ? cargados.agenda.semana(rubro) : semanaDe(rubro)), [cargados, rubro])
+  // El horario del negocio. En la demo cambia apenas se guarda otro en Configuración → Horarios;
+  // con la API, es el que devolvió el último guardado o, si no, el que trajo la carga.
+  const semana = useMemo(() => semanaGuardada ?? (cargados ? cargados.agenda.semana(rubro) : semanaDe(rubro)), [semanaGuardada, cargados, rubro])
   // Los pausados de la demo viven en el navegador (el sitio los lee de ahí); los de la API llegan marcados.
   const nombresPausados = useMemo(() => (demo.pausados?.rubro === rubro.key ? demo.pausados.nombres : []), [demo.pausados, rubro.key])
   const servicios: ServicioPanel[] = useMemo(() => serviciosBase.map(({ pausado, ...s }) => ({ ...s, estado: pausado || nombresPausados.includes(s.nombre) ? 'pausado' : 'activo' })), [serviciosBase, nombresPausados])
@@ -597,7 +600,7 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
           {vista === 'mensajes' && <Mensajes {...config} turnosHoy={turnos} nombreDe={nombreDe} onAbrir={abrir} />}
           {vista === 'pagos' && <Pagos {...config} senas={senasPendientes} nombreDe={nombreDe} onAbrir={abrir} onRegistrar={registrarSena} onIr={ir} />}
           {vista === 'configuracion' && tab === 'negocio' && <Negocio {...config} />}
-          {vista === 'configuracion' && tab === 'horarios' && <Horarios {...config} />}
+          {vista === 'configuracion' && tab === 'horarios' && <Horarios {...config} semana={semana} onSemanaGuardada={(s, rs) => { setSemanaGuardada(s); setRecursos(rs) }} />}
           {vista === 'configuracion' && tab === 'apariencia' && <Apariencia {...config} />}
           {vista === 'configuracion' && tab === 'dominio' && <Dominio {...config} />}
           {vista === 'configuracion' && tab === 'suscripcion' && <Suscripcion {...config} />}
