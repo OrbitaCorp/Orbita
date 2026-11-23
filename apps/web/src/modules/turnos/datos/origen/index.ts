@@ -19,8 +19,10 @@
 // Las escrituras se conectan sección por sección (semanas 2 y 3 del plan).
 // Servicios ya guarda en el origen (`servicios`, 19/11), y también las agendas
 // de Equipo y Espacios (`agendas`): en la demo queda en memoria y en la API va
-// a /reservas/servicios y /reservas/recursos. Lo demás que se edita (dar un
-// turno, los roles, cómo cobra cada uno) sigue en el estado de PanelTurnos. Configuración y
+// a /reservas/servicios y /reservas/recursos. Horarios, feriados y vacaciones
+// van a la config y a los bloqueos (`horarios`, solo en la API). Lo demás que
+// se edita (dar un turno, los roles, cómo cobra cada uno) sigue en el estado de
+// PanelTurnos. Configuración y
 // Avanzado leen sus datos adentro de cada pantalla (useRubroDemo,
 // useNegocioDemo): se pasan al origen cuando se conectan las reglas y los
 // horarios (13/11). El mapa completo, con lo que el backend no cubre, está en
@@ -30,6 +32,7 @@ import type { Cliente, Recurso, RubroTurnos } from '@/modules/turnos/datos'
 import type { Semana } from '@/modules/turnos/horario'
 import type { ServicioBase, TurnoAgenda } from '@/modules/turnos/datos/agenda'
 import type { Persona, Rol } from '@/modules/turnos/datos/equipo'
+import type { DiasCerrados } from './mapear'
 import { origenDemo } from './demo'
 
 /**
@@ -83,12 +86,38 @@ export interface EscrituraAgendas {
   borrar(id: string): Promise<void>
 }
 
+/** Cómo quedó todo después de guardar el horario semanal. */
+export interface SemanaGuardada {
+  semana: Semana
+  /** Las agendas con el horario nuevo. */
+  recursos: Recurso[]
+  /** Quienes tenían horario propio y se recortaron al nuevo. */
+  ajustadas: string[]
+  /** A quienes no se les pudo recortar: siguen con el horario de antes. */
+  sinAjustar: string[]
+}
+
+/**
+ * El horario del negocio, los feriados y las vacaciones (Configuración →
+ * Horarios). La demo no los guarda acá: la semana va al navegador y lo demás
+ * queda en la pantalla, por eso solo los usa el origen de la API.
+ */
+export interface EscrituraHorarios {
+  /** Falla, sin tocar nada, si alguien con horario propio quedaría sin ningún día. */
+  guardarSemana(semana: Semana, rubro: RubroTurnos): Promise<SemanaGuardada>
+  /** Lo guardado de hoy en adelante. */
+  diasCerrados(): Promise<DiasCerrados>
+  /** Reemplaza solo lo que cambió. `hayTurnos`: quedaron turnos dados adentro (no se cancelan). */
+  guardarDiasCerrados(antes: DiasCerrados, despues: DiasCerrados): Promise<{ hayTurnos: boolean }>
+}
+
 export interface OrigenTurnos {
   tipo: 'demo' | 'api'
   /** Lo de cada sección, junto. Si falla, el error trae el mensaje para mostrar. */
   cargar(rubro: RubroTurnos): Promise<DatosPanel>
   servicios: EscrituraServicios
   agendas: EscrituraAgendas
+  horarios?: EscrituraHorarios
 }
 
 const Contexto = createContext<OrigenTurnos>(origenDemo)

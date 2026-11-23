@@ -24,7 +24,10 @@ import type { Cliente, Recurso, RubroTurnos } from '@/modules/turnos/datos'
 import type { Semana } from '@/modules/turnos/horario'
 import type { ServicioBase } from '@/modules/turnos/datos/agenda'
 import { rolesDe, type Persona, type Rol } from '@/modules/turnos/datos/equipo'
-import { ahoraArgentina, clientesDeReservas, porDia, recursoDeApi, recursoParaApi, rolIdDeApi, semanaDeHorario, servicioDeApi, servicioParaApi, tipoDeAgenda } from './mapear'
+import {
+  ahoraArgentina, bloqueoDeVacaciones, bloqueosDeDia, claveDeDia, claveDeVacaciones, clientesDeReservas, diasCerradosDeBloqueos, horarioDeSemana,
+  mismoHorario, porDia, recortarHorario, recursoDeApi, recursoParaApi, rolIdDeApi, semanaDeHorario, servicioDeApi, servicioParaApi, tipoDeAgenda,
+} from './mapear'
 import type { DatosPanel, FuenteAgenda, OrigenTurnos } from './index'
 
 /** Cuántos días para cada lado de hoy trae la agenda: los mismos que arma el panel. */
@@ -139,5 +142,45 @@ export const origenApi: OrigenTurnos = {
     editar: async (r, { rubro, semana, rolId }) =>
       recursoDeApi(await panel.editarRecurso(r.id, recursoParaApi(r, rubro, semana, rolId)), rubro, semana, 0),
     borrar: async id => { await panel.borrarRecurso(id) },
+  },
+  horarios: {
+    async guardarSemana(semana, rubro) {
+      const negocio = horarioDeSemana(semana)
+      // La API no cruza el horario propio de una agenda con el del negocio: se recorta acá.
+      // Se mira antes de escribir: una agenda no puede quedar sin días (la API lo rechaza).
+      const conPropio = (await panel.recursos('TURNOS')).flatMap(r => (r.horario ? [{ r, propio: r.horario, nuevo: recortarHorario(r.horario, negocio) }] : []))
+      const sinDias = conPropio.filter(x => !Object.keys(x.nuevo).length).map(x => x.r.nombre)
+      if (sinDias.length) throw new Error(`Con este horario, ${sinDias.join(', ')} ${sinDias.length === 1 ? 'se queda' : 'se quedan'} sin días para atender. Cambiá primero su agenda.`)
+      await panel.guardarConfig({ modulo: 'TURNOS', horario: negocio })
+      const cambian = conPropio.filter(x => !mismoHorario(x.propio, x.nuevo))
+      const hechos = await Promise.allSettled(cambian.map(({ r, nuevo }) => panel.editarRecurso(r.id, { modulo: 'TURNOS', tipo: r.tipo, nombre: r.nombre, horario: nuevo })))
+      const { recursos } = await catalogoApi(rubro, semana)
+      return {
+        semana, recursos,
+        ajustadas: cambian.filter((_, i) => hechos[i].status === 'fulfilled').map(x => x.r.nombre),
+        sinAjustar: cambian.filter((_, i) => hechos[i].status === 'rejected').map(x => x.r.nombre),
+      }
+    },
+    diasCerrados: async () => diasCerradosDeBloqueos(await panel.bloqueos('TURNOS', ahoraArgentina().hoy)),
+    async guardarDiasCerrados(antes, despues) {
+      const nuevas = new Set(despues.especiales.map(claveDeDia))
+      const viejas = new Set(antes.especiales.map(claveDeDia))
+      const cambiaVac = claveDeVacaciones(antes) !== claveDeVacaciones(despues)
+      const aCrear = [
+        ...despues.especiales.filter(e => !viejas.has(claveDeDia(e))).flatMap(bloqueosDeDia),
+        ...(cambiaVac && despues.vacaciones ? [bloqueoDeVacaciones(despues)] : []),
+      ]
+      const aBorrar = [
+        ...antes.especiales.filter(e => !nuevas.has(claveDeDia(e))).flatMap(e => e.bloqueos ?? []),
+        ...(cambiaVac && antes.vacBloqueo ? [antes.vacBloqueo] : []),
+      ]
+      // Primero lo nuevo: si algo falla en el medio, sobra un cierre en lugar de quedar abierto un feriado.
+      let hayTurnos = false
+      for (const b of aCrear) {
+        if ((await panel.crearBloqueo(b)).afectadas > 0) hayTurnos = true
+      }
+      for (const id of aBorrar) await panel.borrarBloqueo(id)
+      return { hayTurnos }
+    },
   },
 }

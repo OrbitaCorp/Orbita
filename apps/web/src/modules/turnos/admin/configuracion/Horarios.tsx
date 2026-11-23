@@ -8,10 +8,12 @@
 // Al lado de cada día va una franja de 6 a 24 h con lo que está abierto
 // pintado: la semana se lee de un vistazo, sin sumar horas de cabeza.
 //
-// El horario semanal se guarda en el negocio de la demo (datos/negocio.ts):
-// el sitio, la reserva y la agenda lo leen de ahí. Los días especiales y las
-// vacaciones siguen siendo demo en memoria.
-import { useState } from 'react'
+// En la demo, el horario semanal se guarda en el negocio de la demo
+// (datos/negocio.ts), de donde lo leen el sitio, la reserva y la agenda, y los
+// días especiales y las vacaciones quedan en memoria. En un negocio real, todo
+// va a la API por el origen (origen.horarios): la semana a la config, y los
+// feriados y las vacaciones a los bloqueos.
+import { useEffect, useState } from 'react'
 import { Clock, CalendarX, Plane, Plus, Trash2, Copy, TriangleAlert } from 'lucide-react'
 import { DIAS, semanaDe } from '@/modules/turnos/datos'
 import { useNegocioDemo } from '@/modules/turnos/datos/negocio'
@@ -19,12 +21,33 @@ import { JORNADA_INICIAL, errorJornada, jornadaDe, jornadaTxt, minutosAbiertos, 
 import { BloquesJornada, DiasSemana } from '@/modules/turnos/admin/piezasPanel'
 import { Encabezado, SecCard, Switch, Segmentado, Campo, Dos, BotonBorde, FilaSwitch, Chip, Vacio, type PropsTab } from './ui'
 import { BarraGuardar, useBorrador } from '@/design-system/reservas/piezas'
+import { SkeletonVista } from '@/design-system/reservas/skeleton'
+import { useOrigenTurnos, type EscrituraHorarios } from '@/modules/turnos/datos/origen'
+import { errorDiasCerrados, type DiaEspecial, type DiasCerrados } from '@/modules/turnos/datos/origen/mapear'
+import type { Recurso } from '@/modules/turnos/datos'
 import { vozDe } from './datos'
 
-type Rango = [string, string]
 /** Un día en el formulario: si abre, y su mañana y su tarde. */
 interface Dia { abierto: boolean; jornada: Jornada }
-interface Especial { id: string; fecha: string; motivo: string; tipo: 'cerrado' | 'especial'; rango: Rango }
+type Especial = DiaEspecial
+
+interface Props extends PropsTab {
+  /** El horario del negocio que muestra el panel. */
+  semana: Semana
+  /** Con la API: el horario quedó guardado, con las agendas como quedaron. */
+  onSemanaGuardada: (semana: Semana, recursos: Recurso[]) => void
+}
+
+// Los días especiales de ejemplo de la demo.
+const cerradosDemo = (): DiasCerrados => ({
+  especiales: [
+    { id: 'e1', fecha: '2026-10-12', motivo: 'Día de la Diversidad Cultural', tipo: 'cerrado', rango: ['09:00', '13:00'] },
+    { id: 'e2', fecha: '2026-11-20', motivo: 'Día de la Soberanía', tipo: 'especial', rango: ['10:00', '14:00'] },
+    { id: 'e3', fecha: '2026-12-24', motivo: 'Nochebuena', tipo: 'especial', rango: ['09:00', '14:00'] },
+    { id: 'e4', fecha: '2026-12-25', motivo: 'Navidad', tipo: 'cerrado', rango: ['09:00', '13:00'] },
+  ],
+  vacaciones: false, vacDesde: '2027-01-15', vacHasta: '2027-01-31', vacMensaje: 'Nos tomamos unos días. Volvemos el 1 de febrero con todo: ya podés reservar para esa semana.',
+})
 
 // La franja dibuja de 6:00 a 24:00: antes de las 6 no abre casi nadie y así
 // los horarios reales ocupan más ancho.
@@ -63,12 +86,47 @@ const CSS = `
   }
 `
 
-export default function Horarios({ rubro, avisar }: PropsTab) {
+export default function Horarios(props: Props) {
+  const { horarios } = useOrigenTurnos()
+  return horarios ? <HorariosApi {...props} horarios={horarios} /> : <FormHorarios {...props} inicial={cerradosDemo} />
+}
+
+/** Con la API: trae los feriados y las vacaciones guardados antes de mostrar el formulario. */
+function HorariosApi({ horarios, ...props }: Props & { horarios: EscrituraHorarios }) {
+  const [estado, setEstado] = useState<{ cerrados: DiasCerrados | null; error: string | null }>({ cerrados: null, error: null })
+  const [vuelta, setVuelta] = useState(0)
+  useEffect(() => {
+    let vivo = true
+    horarios.diasCerrados().then(
+      cerrados => { if (vivo) setEstado({ cerrados, error: null }) },
+      (e: unknown) => { if (vivo) setEstado({ cerrados: null, error: e instanceof Error && e.message ? e.message : 'No pudimos traer los horarios.' }) },
+    )
+    return () => { vivo = false }
+  }, [horarios, vuelta])
+  const recargar = () => { setEstado({ cerrados: null, error: null }); setVuelta(n => n + 1) }
+
+  if (estado.error) {
+    return (
+      <div className="rv-pagina rv-pagina--form">
+        <Vacio Icon={CalendarX} titulo="No pudimos abrir los horarios" accion={<BotonBorde onClick={recargar}>Reintentar</BotonBorde>}>{estado.error}</Vacio>
+      </div>
+    )
+  }
+  if (!estado.cerrados) return <SkeletonVista forma="formulario" nombre="Horarios" />
+  const cerrados = estado.cerrados
+  return <FormHorarios key={vuelta} {...props} inicial={() => cerrados} api={{ horarios, cerrados, recargar }} />
+}
+
+function FormHorarios({ rubro, avisar, semana, onSemanaGuardada, inicial, api }: Props & {
+  inicial: () => DiasCerrados
+  api?: { horarios: EscrituraHorarios; cerrados: DiasCerrados; recargar: () => void }
+}) {
   const voz = vozDe(rubro)
   // null = sin tocar: vale lo guardado (que llega del navegador recién después
   // de hidratar, por eso no se copia a un estado al montar).
   const { guardar: guardarDemo } = useNegocioDemo()
-  const guardada = semanaDe(rubro)
+  const guardada = api ? semana : semanaDe(rubro)
+  const [guardando, setGuardando] = useState(false)
   const [borrador, setBorrador] = useState<Dia[] | null>(null)
   const dias = borrador ?? diasDe(guardada)
   const semanaDirty = borrador !== null && JSON.stringify(semanaDeDias(borrador)) !== JSON.stringify(semanaDeDias(diasDe(guardada)))
@@ -90,15 +148,7 @@ export default function Horarios({ rubro, avisar }: PropsTab) {
   }
   const conError = errores.findIndex(Boolean)
 
-  const b = useBorrador(() => {
-    const especiales: Especial[] = [
-      { id: 'e1', fecha: '2026-10-12', motivo: 'Día de la Diversidad Cultural', tipo: 'cerrado', rango: ['09:00', '13:00'] },
-      { id: 'e2', fecha: '2026-11-20', motivo: 'Día de la Soberanía', tipo: 'especial', rango: ['10:00', '14:00'] },
-      { id: 'e3', fecha: '2026-12-24', motivo: 'Nochebuena', tipo: 'especial', rango: ['09:00', '14:00'] },
-      { id: 'e4', fecha: '2026-12-25', motivo: 'Navidad', tipo: 'cerrado', rango: ['09:00', '13:00'] },
-    ]
-    return { especiales, vacaciones: false, vacDesde: '2027-01-15', vacHasta: '2027-01-31', vacMensaje: 'Nos tomamos unos días. Volvemos el 1 de febrero con todo: ya podés reservar para esa semana.' }
-  })
+  const b = useBorrador<DiasCerrados>(inicial)
   const v = b.v
 
   const setDia = (i: number, d: Partial<Dia>) => setBorrador(dias.map((x, k) => (k === i ? { ...x, ...d } : x)))
@@ -116,12 +166,54 @@ export default function Horarios({ rubro, avisar }: PropsTab) {
   const guardar = () => {
     if (conError >= 0) { avisar(`Revisá el ${DIAS[conError].toLowerCase()}`, errores[conError] ?? undefined); return }
     if (abiertos === 0) { avisar('Dejá al menos un día abierto', 'Para cerrar unos días sin tocar el horario están las vacaciones, más abajo.'); return }
+    if (api) { void guardarEnApi(api); return }
     b.guardar()
     if (semanaDirty) guardarDemo({ horarios: { rubro: rubro.key, dias: semanaDeDias(dias) } })
     setBorrador(null); setModo(null)
     avisar('Horarios guardados', semanaDirty ? 'Tu página, la reserva y la agenda ya muestran el horario nuevo.' : 'Los días especiales y las vacaciones son una demo: la agenda no cambia.')
   }
   const descartar = () => { b.descartar(); setBorrador(null); setModo(null) }
+
+  // Primero la semana y después los días especiales, que se validan contra ella. Si falla la
+  // semana no cambió nada y el formulario queda como está. Si fallan los días puede haber
+  // quedado una parte: se vuelve a traer lo guardado para no repetirla al reintentar.
+  const guardarEnApi = async ({ horarios, cerrados, recargar }: NonNullable<typeof api>) => {
+    const semanaNueva = semanaDeDias(dias)
+    const error = errorDiasCerrados(v, semanaNueva)
+    if (error) { avisar(error.titulo, error.texto); return }
+    const tocaDias = b.cambiado
+    const partes: string[] = []
+    setGuardando(true)
+    try {
+      if (semanaDirty) {
+        const r = await horarios.guardarSemana(semanaNueva, rubro)
+        onSemanaGuardada(r.semana, r.recursos)
+        setBorrador(null); setModo(null)
+        partes.push('Tu disponibilidad ya usa el horario nuevo.')
+        if (r.ajustadas.length) partes.push(`Se recortó el horario propio de ${r.ajustadas.join(', ')}.`)
+        if (r.sinAjustar.length) partes.push(`No se pudo recortar el de ${r.sinAjustar.join(', ')}: revisalo en su agenda.`)
+      }
+    } catch (e) {
+      setGuardando(false)
+      avisar('No se guardó el horario', e instanceof Error && e.message ? e.message : 'Probá de nuevo en un rato.')
+      return
+    }
+    if (tocaDias) {
+      try {
+        const { hayTurnos } = await horarios.guardarDiasCerrados(cerrados, v)
+        partes.push(hayTurnos ? 'Hay turnos ya dados en esos días: no se cancelan, movelos o cancelalos desde la Agenda.' : 'Los días especiales ya no se pueden reservar.')
+      } catch (e) {
+        setGuardando(false)
+        avisar('No se guardaron todos los días especiales', `${e instanceof Error && e.message ? e.message : 'Probá de nuevo en un rato.'} Mirá cómo quedó y volvé a cargar lo que falte.`)
+        recargar()
+        return
+      }
+    }
+    setGuardando(false)
+    avisar('Horarios guardados', partes.join(' '))
+    // Los días nuevos ya tienen sus bloqueos: se vuelven a leer para poder editarlos o quitarlos.
+    if (tocaDias) recargar()
+  }
 
   return (
     <div className="rv-pagina rv-pagina--form">
@@ -196,7 +288,7 @@ export default function Horarios({ rubro, avisar }: PropsTab) {
             {v.especiales.map(e => (
               <div key={e.id} className="tuc-renglon tuc-especial">
                 <input type="date" aria-label="Fecha" value={e.fecha} onChange={x => setEsp(e.id, { fecha: x.target.value })} className="rv-input rv-num" style={{ width: 158 }} />
-                <input aria-label="Motivo" placeholder="Motivo (opcional)" value={e.motivo} onChange={x => setEsp(e.id, { motivo: x.target.value })} className="rv-input" style={{ flex: '1 1 160px', minWidth: 0 }} />
+                <input aria-label="Motivo" placeholder="Motivo (opcional)" maxLength={200} value={e.motivo} onChange={x => setEsp(e.id, { motivo: x.target.value })} className="rv-input" style={{ flex: '1 1 160px', minWidth: 0 }} />
                 <Segmentado label="Tipo de día" valor={e.tipo} onChange={x => setEsp(e.id, { tipo: x })} opciones={[{ id: 'cerrado', label: 'Cerrado' }, { id: 'especial', label: 'Otro horario' }]} />
                 {e.tipo === 'especial' && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -228,7 +320,7 @@ export default function Horarios({ rubro, avisar }: PropsTab) {
         </SecCard>
       </div>
 
-      <BarraGuardar cambiado={b.cambiado || semanaDirty} onDescartar={descartar} onGuardar={guardar} />
+      <BarraGuardar cambiado={b.cambiado || semanaDirty} onDescartar={descartar} onGuardar={guardar} motivo={guardando ? 'Guardando…' : undefined} />
     </div>
   )
 }

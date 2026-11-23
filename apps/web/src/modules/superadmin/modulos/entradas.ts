@@ -163,6 +163,8 @@ const F16 = '2026-11-16'
 const F19 = '2026-11-19'
 // Miércoles 18/11: el arranque de Alquileres sobre el backend y la estadía para el dueño chico.
 const F18 = '2026-11-18'
+// Lunes 23/11: Horarios y feriados de Turnos.
+const F23 = '2026-11-23'
 
 export const ENTRADAS: Entrada[] = [
   // ─── Transversal · la sección Módulos ───────────────────────────────────────
@@ -2782,6 +2784,61 @@ Esas tres cosas se resuelven con las tareas de la semana 2.
       'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:411',
       'apps/web/src/modules/turnos/datos/origen/__tests__/api.test.ts:82',
       'apps/api/prisma/seed-turnos-prueba.ts:175',
+    ],
+  }),
+  entrada({
+    modulo: 'turnos', fecha: F23, slug: 'horarios-y-feriados-sobre-la-api', tipo: 'tarea', quien: 'Mateo',
+    titulo: 'Horarios, feriados y vacaciones de Turnos guardan en la API',
+    foco: 'En un negocio real, Configuración → Horarios guarda la semana en la config de Turnos, y los feriados, los días con otro horario y las vacaciones como bloqueos. La disponibilidad del sitio cambia en el acto. Quien tiene horario propio se recorta al del negocio, porque la API no los cruza, y si alguien se quedaría sin días no se guarda nada. Los turnos ya dados en un día cerrado no se cancelan: el aviso lo dice.',
+    que: `Tarea del 12/11 del plan, hecha el 23/11.
+
+**La semana** va a \`PUT /reservas/config\`. La API usa el horario propio de una agenda tal cual, sin cruzarlo con el del negocio, y el panel promete que el propio va "dentro" del otro. Entonces, al guardar:
+
+- **Se recortan** día por día las agendas con horario propio. Si el sábado pasa a abrir solo a la mañana, a quien atendía el sábado a la tarde se le saca ese día.
+- **Si alguien se quedaría sin ningún día,** no se escribe nada y el aviso dice quién y qué hacer. La API no acepta una agenda sin días.
+- **El recorte no vuelve solo:** si después el negocio agranda el horario, esa agenda hay que volver a abrirla desde Equipo. Resolverlo de fondo es cruzar los dos horarios en la disponibilidad, que es código compartido: queda para hablar con Ale.
+
+**Feriados y vacaciones** van a \`/reservas/bloqueos\`, sin recurso (tapan a todas las agendas):
+
+| En la pantalla | En la API |
+|---|---|
+| Cerrado | Un bloqueo de 00:00 a 24:00 |
+| Otro horario | Dos bloqueos: lo de antes y lo de después de ese horario |
+| Vacaciones | Un bloqueo de varios días, con el aviso en el motivo (marca \`Vacaciones · \`) |
+
+- **"Otro horario" solo achica.** Un bloqueo saca horas, no agrega: tiene que estar dentro de lo que abre ese día, y un día cerrado no se puede abrir así. El panel lo avisa antes de guardar.
+- **Se reemplaza solo lo que cambió,** creando primero y borrando después: si algo falla en el medio, sobra un cierre en lugar de quedar abierto un feriado. En ese caso la pantalla vuelve a traer lo guardado.
+- **Los bloqueos que no tienen una de estas formas** (de un solo recurso, un rato suelto) no se muestran ni se tocan.
+- **Los turnos ya dados** en un día que se cierra no se cancelan. El aviso dice que hay que moverlos o cancelarlos desde la Agenda.
+
+**En la demo** no cambia nada: la semana sigue en el navegador y los días especiales en memoria.
+
+**Probado contra la API local**, con el código real del panel y el negocio de prueba:
+
+- **Sábado solo a la mañana:** Martín pasa de 16 a 8 franjas. Nico, que atendía de 16 a 20, queda de lunes a viernes y el sábado cerrado.
+- **Un horario que dejaría a Nico sin días:** no se guarda, el aviso lo nombra y la config queda intacta.
+- **Feriado:** el martes queda sin franjas.
+- **Otro horario de 10 a 12:** el miércoles quedan 4 franjas, de 10:00 a 11:30.
+- **Vacaciones de tres días:** sin franjas.
+- **Al volver a leer** aparecen igual, y guardar sin cambios no toca los bloqueos.
+- **Quitar el feriado y las vacaciones** devuelve las 16 franjas.
+
+**Lo que queda para otras tareas:**
+
+- **El aviso de vacaciones en el sitio:** la API pública no expone los bloqueos. Se resuelve con el sitio, en la semana 4.
+- **La agenda del panel** todavía no pinta los feriados ni avisa cuáles turnos caen adentro: va con la tarea de la agenda.
+
+**Verificado:** typecheck y eslint de \`apps/web\` sin errores y los tests de Turnos en verde (45, 12 nuevos). El panel no se abrió a mano en el navegador.`,
+    archivos: [
+      'apps/web/src/modules/turnos/admin/configuracion/Horarios.tsx:95',
+      'apps/web/src/modules/turnos/admin/configuracion/Horarios.tsx:180',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:603',
+      'apps/web/src/modules/turnos/datos/origen/index.ts:105',
+      'apps/web/src/modules/turnos/datos/origen/api.ts:146',
+      'apps/web/src/modules/turnos/datos/origen/mapear.ts:82',
+      'apps/web/src/modules/turnos/datos/origen/mapear.ts:142',
+      'apps/web/src/modules/turnos/datos/origen/mapear.ts:207',
+      'apps/web/src/modules/turnos/datos/origen/__tests__/horarios.test.ts:1',
     ],
   }),
 ]
