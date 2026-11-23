@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { Chip, Empty, ErrorBox, PageHeader, btnGhost, btnPrimary, inputStyle } from './ui'
 import { MarkdownInforme, MD_CSS, srcSeguro } from './MarkdownInforme'
+import CrearNegocioAlquileres from './CrearNegocioAlquileres'
 import { CICLO, PERSONAS, PLANES, type ConPlan, type Persona, type PlanModulo, type Tarea } from './modulos/plan'
 import { AVISO_SESION, ENTRADAS, type Entrada, type TipoEntrada } from './modulos/entradas'
 import { DECISIONES } from './modulos/decisiones'
@@ -729,6 +730,7 @@ function VistaModulo(p: PropsVista) {
 
   // Hoja de nueva entrada: null = cerrada; `tarea` = vino de "Registrar en auditoría".
   const [hoja, setHoja] = useState<{ tarea: Tarea | null } | null>(null)
+  const [crearNegocio, setCrearNegocio] = useState(false)
   // Entrada a la que llevó "Ver entrada" desde el plan o el resumen: se abre y se muestra.
   const [enfocar, setEnfocar] = useState<string | null>(null)
 
@@ -747,6 +749,7 @@ function VistaModulo(p: PropsVista) {
 
   return (
     <>
+      {crearNegocio && <CrearNegocioAlquileres onCerrar={() => setCrearNegocio(false)} />}
       <div>
         <button type="button" onClick={p.onVolver} className="ds-hover mo-volver">
           <ArrowLeft size={18} strokeWidth={2} aria-hidden /> Volver a Módulos
@@ -765,9 +768,15 @@ function VistaModulo(p: PropsVista) {
           </p>
           {/* La demo de Alquileres está abierta en producción solo para superadmin (modules/alquileres/demo/SoloEquipo). */}
           {m.def.slug === 'alquileres' && (
-            <Link href="/alquileres-demo" style={{ ...btnGhost, display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 10, textDecoration: 'none' }}>
-              Abrir la demo <ArrowRight size={15} strokeWidth={2} aria-hidden />
-            </Link>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
+              <Link href="/alquileres-demo" style={{ ...btnGhost, display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}>
+                Abrir la demo <ArrowRight size={15} strokeWidth={2} aria-hidden />
+              </Link>
+              {/* Un negocio real de Alquileres, mientras el alta pública lo tenga en "Próximamente". */}
+              <button type="button" onClick={() => setCrearNegocio(true)} style={{ ...btnPrimary, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <Plus size={15} strokeWidth={2} aria-hidden /> Crear negocio de Alquileres
+              </button>
+            </div>
           )}
         </div>
         {m.plan && (
