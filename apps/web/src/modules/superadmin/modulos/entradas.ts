@@ -163,7 +163,7 @@ const F16 = '2026-11-16'
 const F19 = '2026-11-19'
 // Miércoles 18/11: el arranque de Alquileres sobre el backend y la estadía para el dueño chico.
 const F18 = '2026-11-18'
-// Lunes 23/11: Horarios y feriados de Turnos.
+// Lunes 23/11: Horarios y feriados de Turnos, y Alquileres en producción (la demo para superadmin y el primer negocio real).
 const F23 = '2026-11-23'
 
 export const ENTRADAS: Entrada[] = [
@@ -2839,6 +2839,72 @@ Esas tres cosas se resuelven con las tareas de la semana 2.
       'apps/web/src/modules/turnos/datos/origen/mapear.ts:142',
       'apps/web/src/modules/turnos/datos/origen/mapear.ts:207',
       'apps/web/src/modules/turnos/datos/origen/__tests__/horarios.test.ts:1',
+    ],
+  }),
+
+  // ─── Alquileres en producción (Alan, 23/11) ─────────────────────────────────
+  entrada({
+    modulo: 'alquileres', fecha: F23, slug: 'demo-en-produccion-para-superadmin', tipo: 'tarea', quien: 'Alan',
+    titulo: 'La demo de Alquileres se puede ver en producción, solo como superadmin',
+    foco: 'Las seis páginas de /alquileres-demo dejaron de dar 404 en producción y pasan por una compuerta: en desarrollo se ven sin más; en producción piden sesión de superadmin. Llevan noindex y están fuera de robots.txt.',
+    que: `Etapa 0 del plan para probar Alquileres en producción (\`docs/superpowers/plans/2026-11-23-alquileres-en-produccion.md\`), pedido de Alan del 23/11.
+
+- **La compuerta** (\`modules/alquileres/demo/SoloEquipo.tsx\`): envuelve las seis páginas. En producción (y en staging) usa \`RequireAuth\` de superadmin: sin sesión, el servidor devuelve solo la pantalla de carga y manda al login.
+- **Buscadores:** \`noindex\` en todas y \`/alquileres-demo\` en el \`Disallow\` de \`robots.txt\`.
+- **Cómo entrar:** el botón "Abrir la demo" de esta pantalla (Módulos → Alquileres), o \`/alquileres-demo\`.
+- **Resguardo:** un test recorre \`pages/alquileres-demo\` y falla si una página no pasa por la compuerta.
+- **Verificado:** con un build de producción y en orbita.site sin sesión, el HTML no trae nada de la demo. La entrada con sesión de superadmin no se probó en la sesión de trabajo: la confirma Alan.
+
+Si Turnos o Gimnasio quieren abrir la suya, es la misma pieza.`,
+    archivos: [
+      'apps/web/src/modules/alquileres/demo/SoloEquipo.tsx:1',
+      'apps/web/src/modules/alquileres/demo/acceso.ts:1',
+      'apps/web/src/modules/alquileres/demo/__tests__/acceso.test.ts:1',
+      'apps/web/src/pages/alquileres-demo/panel.tsx:1',
+      'apps/web/src/pages/robots.txt.ts:36',
+    ],
+  }),
+  entrada({
+    modulo: 'alquileres', fecha: F23, slug: 'negocio-real-de-estadia', tipo: 'tarea', quien: 'Alan',
+    titulo: 'El primer negocio real de Alquileres: se crea desde Superadmin y su panel guarda en la API',
+    foco: 'Desde Módulos → Alquileres se crea un negocio de alojamiento por noche (oculto de buscadores, con cortesía). Su dueño entra a <slug>.orbita.site/panel y carga propiedades, precios, reglas, reservas a mano y bloqueos, que se guardan en el motor de reservas. El alta pública sigue en "Próximamente".',
+    que: `Etapa 1 del plan para probar Alquileres en producción, pedido de Alan del 23/11. Ale aprobó tocar \`/panel\` (dato de Alan).
+
+**Crear el negocio** (solo superadmin): \`POST /platform/businesses/alquileres\`. Arma lo mismo que el alta (sucursal, roles con permisos, dueño, configs) con \`industry: "alquileres"\` y el rubro en \`subrubros\`, \`hiddenFromSearch\`, cortesía por un año y la config de reservas con confirmación manual. Queda en el log de superadmin, sin la contraseña. Por ahora, solo rubros de alojamiento por noche.
+
+**Rutas:** \`/panel\` manda a los negocios de Alquileres a \`/panel/alquileres\` (\`lib/reservas/destinoPanel.ts\`); para Tienda no cambia nada. Turnos y Gimnasio pueden sumar su rubro en ese mismo archivo.
+
+**El panel escribe** (\`datos/origen/escribir.ts\` y \`escriturasDe\` en \`api.ts\`):
+
+| Sección | Qué guarda |
+|---|---|
+| Propiedades | Crear, editar y quitar recursos \`ALOJAMIENTO\` |
+| Precios | El precio por noche de cada propiedad |
+| Reglas de reserva | Plazo de cancelación, noches mínimas, entrada y salida |
+| Pagos y señas | Porcentaje de seña y si se devuelve |
+| Calendario | Reserva a mano (con "ya pagó la seña"), registrar seña y saldo, confirmar, marcar realizada y cancelar |
+| Bloqueos | Bloquear y liberar fechas |
+
+Después de cada escritura el panel vuelve a cargar; si la API rechaza algo (noches recién tomadas, fechas bloqueadas), muestra su mensaje en vez de "guardado".
+
+**Lo que el panel real todavía no muestra:** Mensajes, Calendarios (.ics), Configuración y Equipo, alquiler por mes, temporadas, recargo de fin de semana, limpieza y la carga de fotos (va una de ejemplo). El precio es fijo por noche porque es lo que el servidor calcula hoy; lo demás llega con los cambios del motor. Canchas y salones siguen en la demo.
+
+**Decisiones de esta etapa:**
+- El dueño entra con la contraseña que elige el superadmin, sin cambio forzado: esa pantalla hoy vive en el panel de Tienda (Mi perfil).
+- Un bloqueo de fechas ocupa lo mismo que una estadía (de la hora de entrada del primer día a la de salida del último): quien sale el día que empieza el bloqueo no choca, y el último día queda libre para que entre otro.
+- El panel real usa el día de hoy; la demo sigue con su día fijo.
+
+**Verificado:** tests del front (1.392) y de la API en verde; contra la base de dev, un negocio creado con el servicio y, como su dueño, todas las escrituras del panel por la API (propiedad, config, reserva de 3 noches a $270.000 con seña de $135.000, 409 al pisar noches, pago, confirmar, bloqueo, cancelar). El panel dibujado con datos reales lo prueba Alan en producción.`,
+    archivos: [
+      'apps/api/src/platform/negocios-alquileres.service.ts:1',
+      'apps/api/src/platform/platform.controller.ts:222',
+      'apps/api/test/unit/platform.negocio-alquileres.unit-spec.ts:1',
+      'apps/web/src/modules/superadmin/CrearNegocioAlquileres.tsx:1',
+      'apps/web/src/lib/reservas/destinoPanel.ts:1',
+      'apps/web/src/pages/panel/alquileres.tsx:1',
+      'apps/web/src/modules/alquileres/datos/origen/escribir.ts:1',
+      'apps/web/src/modules/alquileres/datos/origen/api.ts:117',
+      'apps/web/src/modules/alquileres/admin/navegacion.ts:43',
     ],
   }),
 ]
