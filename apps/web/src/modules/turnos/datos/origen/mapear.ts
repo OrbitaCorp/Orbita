@@ -6,7 +6,7 @@
 // hoy (`dia`, 0 = hoy), de minutos desde las 00:00, de días de la semana con
 // el lunes en 0 y de estados en minúscula. La API habla de fechas AAAA-MM-DD de
 // Argentina, del domingo en 0 y de estados en mayúscula. Acá se traduce.
-import type { Bloqueo, CrearBloqueo, GuardarRecurso, GuardarServicio, HorarioSemanal, Recurso as RecursoApi, Reserva, Servicio as ServicioApi, TipoRecurso, Tramo } from '@/lib/reservasApi/tipos'
+import type { Bloqueo, Config, CrearBloqueo, GuardarConfig, GuardarRecurso, GuardarServicio, HorarioSemanal, Recurso as RecursoApi, Reserva, Servicio as ServicioApi, TipoRecurso, Tramo } from '@/lib/reservasApi/tipos'
 import { diasEntre, sumarDias, fechaNumerica, type ISO } from '@/lib/reservas/fechas'
 import { aMinutos, cruzar, diasAbiertos, diasTxt, hhmm, tramosDe, tramosDelDia, tramosTxt, type Semana } from '@/modules/turnos/horario'
 import { COLORES_EQUIPO } from '@/modules/turnos/datos/equipo'
@@ -227,6 +227,59 @@ export function errorDiasCerrados(v: DiasCerrados, semana: Semana): { titulo: st
   }
   return null
 }
+
+// ─── Reglas de reserva ───────────────────────────────────────────────────────
+
+/** Las reglas de la pantalla que la config de la API sabe guardar. */
+export interface ReglasApi {
+  minAnt: number
+  maxAnt: number
+  buffer: number
+  confirmacion: 'auto' | 'manual'
+  sena: boolean
+  senaPct: number
+  reprogramar: boolean
+  reproHoras: number
+  reproMax: number
+  limite: number
+  espera: boolean
+  cancelaHasta: number
+}
+
+/**
+ * La config como la pantalla. En la API "sin seña" es 0% y "sin reprogramar" es
+ * 0 veces; la pantalla los lleva con su llave, y al prenderla propone un valor:
+ * la seña típica del rubro y 2 veces.
+ */
+export const reglasDeConfig = (c: Config, senaDelRubro: number): ReglasApi => ({
+  minAnt: c.anticipacionMinimaMinutos,
+  maxAnt: c.anticipacionMaximaDias,
+  buffer: c.margenMinutos,
+  confirmacion: c.confirmacion === 'MANUAL' ? 'manual' : 'auto',
+  sena: c.senaPorcentaje > 0,
+  senaPct: c.senaPorcentaje || senaDelRubro || 30,
+  reprogramar: c.reprogramacionesMaximas > 0,
+  reproHoras: c.reprogramacionHastaHoras,
+  reproMax: c.reprogramacionesMaximas || 2,
+  limite: c.maximoActivasPorCliente,
+  espera: c.listaDeEspera,
+  cancelaHasta: c.cancelacionHastaHoras,
+})
+
+/** Lo que se manda al guardar. No lleva el horario: ese se guarda desde Horarios. */
+export const configDeReglas = (r: ReglasApi): GuardarConfig => ({
+  modulo: 'TURNOS',
+  anticipacionMinimaMinutos: r.minAnt,
+  anticipacionMaximaDias: r.maxAnt,
+  margenMinutos: r.buffer,
+  confirmacion: r.confirmacion === 'manual' ? 'MANUAL' : 'AUTOMATICA',
+  senaPorcentaje: r.sena ? r.senaPct : 0,
+  reprogramacionHastaHoras: r.reproHoras,
+  reprogramacionesMaximas: r.reprogramar ? r.reproMax : 0,
+  maximoActivasPorCliente: r.limite,
+  listaDeEspera: r.espera,
+  cancelacionHastaHoras: r.cancelaHasta,
+})
 
 // ─── Catálogo ────────────────────────────────────────────────────────────────
 

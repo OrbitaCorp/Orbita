@@ -145,7 +145,7 @@ const TURNOS = plan('turnos', 'Turnos', 'Mateo',
     documentada(t('2026-11-10', 'Mateo', 'Equipo sobre /reservas/recursos como PROFESIONAL, con horario propio y sus servicios', 'Cada profesional es un recurso con horario y servicios; pausarlo lo saca de la disponibilidad'), 'auditoria.turnos.2026-11-19-equipo-y-espacios-sobre-la-api'),
     documentada(t('2026-11-11', 'Mateo', 'Espacios (sala, cabina, box) como recursos ESPACIO', 'Un espacio se crea y se asigna; la disponibilidad lo respeta'), 'auditoria.turnos.2026-11-19-equipo-y-espacios-sobre-la-api'),
     documentada(t('2026-11-12', 'Mateo', 'Horarios y feriados del negocio sobre la config y los bloqueos', 'Cambiar el horario semanal o cargar un feriado cambia GET disponibilidad en el acto'), 'auditoria.turnos.2026-11-23-horarios-y-feriados-sobre-la-api'),
-    t('2026-11-13', 'Mateo', 'Reglas de reserva (anticipación, cancelación, seña, tope por persona) sobre la config', 'Cada regla guardada se refleja en lo que acepta POST /retener del sitio'),
+    documentada(t('2026-11-13', 'Mateo', 'Reglas de reserva (anticipación, cancelación, seña, tope por persona) sobre la config', 'Cada regla guardada se refleja en lo que acepta POST /retener del sitio'), 'auditoria.turnos.2026-11-23-reglas-sobre-la-api'),
     // Semana 3 · agenda y reservas del panel (el 20/11 es feriado)
     t('2026-11-16', 'Mateo', 'Agenda del día por profesional sobre GET /reservas y la disponibilidad', 'La agenda muestra las reservas reales del día con su estado y los huecos libres'),
     t('2026-11-17', 'Mateo', 'Nueva reserva a mano desde el panel (POST /reservas) con cliente, servicio, profesional y horario', 'La reserva aparece en la agenda y el cliente recibe su email'),

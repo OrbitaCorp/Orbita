@@ -161,12 +161,14 @@ describe('Modulos — modelo', () => {
   it('una entrada cargada en el navegador se suma a su módulo y documenta su tarea; si repite una key del código, vale la del código', () => {
     const nueva: Entrada = { ...ENTRADAS[0], key: 'auditoria.turnos.2026-11-05-rubros-revisados', modulo: 'turnos', transversal: false, titulo: 'Rubros revisados', origen: 'navegador' }
     const repetida: Entrada = { ...ENTRADAS[0], titulo: 'Otra con la misma key', origen: 'navegador' }
-    const estado = conEstado({ nuevas: [nueva, repetida], vinculos: { 'turnos.t9': nueva.key } })
+    // Una tarea que todavía no tenga entrada: las documentadas avanzan a medida que se hacen.
+    const libre = armarModulo(DEF.turnos, datos(conEstado({})), '2026-11-06').tareas.find((t) => !t.entrada)!.tarea.id
+    const estado = conEstado({ nuevas: [nueva, repetida], vinculos: { [`turnos.${libre}`]: nueva.key } })
     const entradas = todasLasEntradas(estado)
     expect(entradas.filter((e) => e.key === ENTRADAS[0].key)).toEqual([ENTRADAS[0]])
     const tur = armarModulo(DEF.turnos, datos(estado), '2026-11-06')
     expect(tur.entradas.some((e) => e.key === nueva.key)).toBe(true)
-    expect(tur.tareas.find((t) => t.tarea.id === 't9')).toMatchObject({ estado: 'por-confirmar', entrada: nueva })
+    expect(tur.tareas.find((t) => t.tarea.id === libre)).toMatchObject({ estado: 'por-confirmar', entrada: nueva })
   })
 
   it('1 mes: 4 semanas, las 5 y 6 van a la 3 y las 7 y 8 a la 4 al mismo día de la semana, la estadía afuera', () => {
