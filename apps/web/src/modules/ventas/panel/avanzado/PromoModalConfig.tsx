@@ -27,8 +27,10 @@ import {
 import { toastEsError } from '@/lib/utils'
 import { currentSlug, tenantUrl } from '@/lib/tenant'
 import { fechaDeVigencia } from '../descuentos/utils'
+import { FORMATOS_ANUNCIO, type FormatoAnuncio } from '@/modules/ventas/promos/catalogo'
+import { GrillaFormatos, SelectorDiseno, SubirFoto, VistaPreviaAnuncio } from '@/modules/ventas/promos/PanelPromos'
 
-const CONFIG_VACIA = { title: '', message: '', badge: '', code: '', ctaText: '', ctaLink: '', isActive: false, startDate: '', endDate: '' }
+const CONFIG_VACIA = { title: '', message: '', badge: '', code: '', ctaText: '', ctaLink: '', isActive: false, startDate: '', endDate: '', format: 'barra' as FormatoAnuncio, design: 'tienda', imageUrl: '' }
 
 export default function PromoModalConfig({ onVolver }: { onVolver: () => void }) {
     const [cargando, setCargando] = useState(true)
@@ -49,6 +51,9 @@ export default function PromoModalConfig({ onVolver }: { onVolver: () => void })
     const [ctaTexto, setCtaTexto] = useState('')
     const [ctaLink, setCtaLink] = useState('')
     const [activo, setActivo] = useState(false)
+    const [formato, setFormato] = useState<FormatoAnuncio>('barra')
+    const [diseno, setDiseno] = useState('tienda')
+    const [foto, setFoto] = useState<string | null>(null)
     // Vigencia opcional ("desde"/"hasta", 'YYYY-MM-DD' o '' si no hay límite)
     // — mismo criterio que JuegosConfig.tsx: cargar fechas nuevas, o volver
     // a activar el modal, cuenta como relanzamiento de cara al storefront
@@ -71,6 +76,8 @@ export default function PromoModalConfig({ onVolver }: { onVolver: () => void })
                         // El backend devuelve ISO completo — RangoFechasPicker espera solo 'YYYY-MM-DD'.
                         // fechaDeVigencia: el fin es 23:59 de Argentina (en UTC, ya el día siguiente).
                         startDate: m.startDate ? fechaDeVigencia(m.startDate) : '', endDate: m.endDate ? fechaDeVigencia(m.endDate) : '',
+                        // Sin formato guardado es la ventana de siempre, que es lo que hoy ve su tienda.
+                        format: (m.format ?? 'centro') as FormatoAnuncio, design: m.design ?? 'tienda', imageUrl: m.imageUrl ?? '',
                     }
                     : CONFIG_VACIA
                 setTitulo(cargado.title)
@@ -82,6 +89,9 @@ export default function PromoModalConfig({ onVolver }: { onVolver: () => void })
                 setActivo(cargado.isActive)
                 setDesde(cargado.startDate)
                 setHasta(cargado.endDate)
+                setFormato(cargado.format)
+                setDiseno(cargado.design)
+                setFoto(cargado.imageUrl || null)
                 setOriginal(JSON.stringify(cargado))
             })
             .catch(e => setError(e instanceof ApiError ? e.message : 'No se pudo cargar la configuración'))
@@ -105,7 +115,7 @@ export default function PromoModalConfig({ onVolver }: { onVolver: () => void })
     // "hasta" posterior a "desde" — mismo criterio que valida el backend.
     const vigenciaValida = (desde === '' && hasta === '') || (desde !== '' && hasta !== '' && hasta > desde)
     const valoresValidos = titulo.trim() !== '' && vigenciaValida
-    const hayCambios = original !== '' && JSON.stringify({ title: titulo, message: mensaje, badge, code: codigo, ctaText: ctaTexto, ctaLink, isActive: activo, startDate: desde, endDate: hasta }) !== original
+    const hayCambios = original !== '' && JSON.stringify({ title: titulo, message: mensaje, badge, code: codigo, ctaText: ctaTexto, ctaLink, isActive: activo, startDate: desde, endDate: hasta, format: formato, design: diseno, imageUrl: foto ?? '' }) !== original
     const estado = estadoVigencia(desde, hasta)
 
     async function guardarModal() {
@@ -122,11 +132,15 @@ export default function PromoModalConfig({ onVolver }: { onVolver: () => void })
                 isActive: activo,
                 startDate: desde || undefined,
                 endDate: hasta || undefined,
+                format: formato,
+                design: diseno,
+                imageUrl: foto,
             })
             setGuardado(res)
             setOriginal(JSON.stringify({
                 title: res.title, message: res.message ?? '', badge: res.badge ?? '', code: res.code ?? '', ctaText: res.ctaText ?? '', ctaLink: res.ctaLink ?? '', isActive: res.isActive,
                 startDate: res.startDate ? fechaDeVigencia(res.startDate) : '', endDate: res.endDate ? fechaDeVigencia(res.endDate) : '',
+                format: res.format ?? 'centro', design: res.design ?? 'tienda', imageUrl: res.imageUrl ?? '',
             }))
             setDesde(res.startDate ? fechaDeVigencia(res.startDate) : '')
             setHasta(res.endDate ? fechaDeVigencia(res.endDate) : '')
@@ -157,8 +171,10 @@ export default function PromoModalConfig({ onVolver }: { onVolver: () => void })
     return (
         <div style={pageWrap}>
             <style>{`
-                @media (max-width: 900px) {
+                .promo-der { position: sticky; top: 14px; }
+                @media (max-width: 1180px) {
                     .promo-modal-cols { grid-template-columns: minmax(0,1fr) !important; }
+                    .promo-der { position: static; order: -1; }
                 }
                 @media (max-width: 768px) {
                     /* Dos campos por fila dejan ~140px cada uno: etiquetas como
@@ -175,7 +191,7 @@ export default function PromoModalConfig({ onVolver }: { onVolver: () => void })
                 <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Modales de anuncios</h1>
             </div>
             <div style={{ fontSize: 14, color: 'var(--color-muted)', margin: '0 0 22px' }}>
-                Un aviso que aparece como modal la primera vez que alguien entra a tu tienda — 2x1, bienvenida con descuento, o cualquier anuncio puntual.
+                Un aviso que aparece la primera vez que alguien entra a tu tienda. Elegí la forma y el diseño, y miralo antes de activarlo.
             </div>
 
             {error && (
@@ -191,8 +207,22 @@ export default function PromoModalConfig({ onVolver }: { onVolver: () => void })
                     <SkeletonText width="100%" height={40} style={{ marginTop: 14 }} />
                 </Card>
             ) : (
-                <div className="promo-modal-cols" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 300px', gap: 16, alignItems: 'start' }}>
-                    {/* ── Columna principal: el formulario ── */}
+                <div className="promo-modal-cols" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,520px)', gap: 24, alignItems: 'start' }}>
+                    {/* ── Columna principal: formato, diseño y formulario ── */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+                    <Card padding="md">
+                        <div style={tituloSeccion}>Formato</div>
+                        <div style={ayudaSeccion}>Dónde aparece y cuánto ocupa.</div>
+                        <GrillaFormatos formatos={FORMATOS_ANUNCIO} valor={formato} onCambio={setFormato} />
+                    </Card>
+                    <Card padding="md">
+                        <div style={tituloSeccion}>Diseño</div>
+                        <div style={ayudaSeccion}>Los colores de tu tienda o una temática.</div>
+                        <div className="promo-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'center' }}>
+                            <SelectorDiseno valor={diseno} onCambio={setDiseno} />
+                            <SubirFoto url={foto} onCambio={setFoto} onError={setToast} />
+                        </div>
+                    </Card>
                     <Card padding="md">
                         <CfgField label="Título" value={titulo} onChange={setTitulo} placeholder="¡2x1 en toda la tienda!" />
                         <CfgField label="Mensaje (opcional)" value={mensaje} onChange={setMensaje} area placeholder="Válido hasta agotar stock, en toda la tienda." />
@@ -254,8 +284,15 @@ export default function PromoModalConfig({ onVolver }: { onVolver: () => void })
                             <InfoTooltip texto="Empieza una campaña nueva: el aviso le vuelve a aparecer a todo el mundo, incluso a quien ya lo cerró. No cambia nada más de la configuración." />
                         </div>
                     </Card>
+                    </div>
 
-                    {/* ── Sidebar: resumen ── */}
+                    {/* ── Vista previa y resumen ── */}
+                    <div className="promo-der" style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+                    <VistaPreviaAnuncio
+                        formato={formato}
+                        diseno={diseno}
+                        anuncio={{ title: titulo, message: mensaje, badge, code: codigo, ctaText: ctaTexto, imageUrl: foto }}
+                    />
                     <Card padding="md">
                         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 12 }}>Resumen</div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
@@ -285,6 +322,7 @@ export default function PromoModalConfig({ onVolver }: { onVolver: () => void })
                             </a>
                         )}
                     </Card>
+                    </div>
                 </div>
             )}
 
@@ -355,7 +393,9 @@ function DirtyHint({ show }: { show: boolean }) {
     )
 }
 
-const pageWrap: React.CSSProperties = { padding: '24px 32px 64px', maxWidth: 1280, width: '100%', margin: '0 auto', boxSizing: 'border-box' }
+const pageWrap: React.CSSProperties = { padding: '24px 32px 64px', maxWidth: 1400, width: '100%', margin: '0 auto', boxSizing: 'border-box' }
+const tituloSeccion: React.CSSProperties = { fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }
+const ayudaSeccion: React.CSSProperties = { fontSize: 12.5, color: 'var(--color-muted)', margin: '1px 0 12px' }
 const linkVerModal: React.CSSProperties = {
     display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 600,
     color: 'var(--color-primary)', textDecoration: 'none',

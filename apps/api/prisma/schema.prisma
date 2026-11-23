@@ -2198,6 +2198,12 @@ model Game {
   // termina la partida, solo consume un intento (ver GamesPlayService).
   maxAttempts Int @default(5) @map("max_attempts")
 
+  // Diseño elegido por el dueño (ids en src/common/disenos-promos.ts). null =
+  // el dibujo original del juego en una ventana al centro: ninguna tienda
+  // cambia de aspecto hasta que elija otro.
+  theme        String?
+  presentation String?
+
   // Se incrementa cada vez que el juego pasa de inactivo a activo, cada vez
   // que se le carga una vigencia (startDate/endDate) distinta de la que
   // tenía, o al tocar el botón dedicado "mostrar de nuevo a quienes lo
@@ -2252,6 +2258,12 @@ model PromoModal {
   code    String? // código a mostrar (copiable), texto libre, opcional
   ctaText String? @map("cta_text") // vacío → "Ver catálogo" en el storefront
   ctaLink String? @map("cta_link") // path interno o URL completa, mismo criterio que hero slides
+
+  // Formato (barra, cupón, pantalla…), colores y foto del anuncio. Ids en
+  // src/common/disenos-promos.ts. null en `format` = la ventana de siempre.
+  format   String?
+  design   String?
+  imageUrl String? @map("image_url")
 
   // Mismo mecanismo de "campaña" que Game (ver campaignVersion ahí arriba)
   // — se incrementa al reactivar, al cargar vigencia nueva, o con
@@ -2370,6 +2382,12 @@ model CountdownConfig {
   // Hoy se guarda siempre en true: la sección ES la cuenta regresiva que el
   // dueño prende desde Descuentos.
   showProductsOnHome Boolean @default(true) @map("show_products_on_home")
+
+  // Formato y colores de la oferta en la portada (src/common/disenos-promos.ts).
+  // Quedan en la fila al cambiar de descuento: el dueño no los vuelve a elegir
+  // en cada oferta. null = la cartelera de siempre.
+  format String?
+  design String?
 
   // El descuento que tiene la cuenta regresiva. Solo uno por negocio (la
   // portada tiene un solo reloj): prenderla en otro descuento mueve esta

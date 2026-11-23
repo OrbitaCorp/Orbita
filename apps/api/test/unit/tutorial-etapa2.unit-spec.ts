@@ -124,9 +124,9 @@ describe('GET /business/tutorial: cumplidas de la segunda etapa', () => {
     expect(await cumplidasDe({ plantillas: 1 })).toEqual(['plantillas']);
   });
 
-  it('plantillas: una vidriera (SHOWCASE) la tiene cumplida aunque no tenga ninguna — Mensajes le da 403', async () => {
-    // `postventa` también viene de arriba en SHOWCASE (ver su propio test).
-    expect(await cumplidasDe({ mode: 'SHOWCASE' })).toEqual(['plantillas', 'postventa']);
+  it('plantillas: una vidriera (SHOWCASE) también las arma — tiene Mensajes para WhatsApp e Instagram', async () => {
+    // `postventa` sí viene de arriba en SHOWCASE (ver su propio test).
+    expect(await cumplidasDe({ mode: 'SHOWCASE' })).toEqual(['postventa']);
   });
 
   it('descuentos: con algún descuento o cupón vivo (los dos viven en discounts)', async () => {
@@ -197,7 +197,7 @@ describe('GET /business/tutorial: cumplidas de la segunda etapa', () => {
   });
 
   it('postventa: una vidriera (SHOWCASE) la tiene cumplida — no vende, no tiene devoluciones', async () => {
-    expect(await cumplidasDe({ mode: 'SHOWCASE' })).toEqual(['plantillas', 'postventa']);
+    expect(await cumplidasDe({ mode: 'SHOWCASE' })).toEqual(['postventa']);
   });
 
   it('herramientas, reportes y plan no se detectan nunca: se tildan a mano', async () => {

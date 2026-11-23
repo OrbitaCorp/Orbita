@@ -2,7 +2,6 @@ import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get,
 import { ConfigService } from '@nestjs/config';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
-import { FullModeOnly } from '../common/decorators/full-mode-only.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
@@ -61,21 +60,18 @@ export class InstagramController {
   // Bandeja de mensajes directos (Difusión → Mensajes). A diferencia de conectar y publicar, atender los
   // mensajes lo puede hacer todo el equipo, igual que en el módulo de Mensajes.
   @Get('inbox')
-  @FullModeOnly()
   async charlas(@CurrentBusiness() ctx: AuthContext) {
     const { businessId } = assertMemberContext(ctx);
     return this.bandeja.listar(businessId);
   }
 
   @Get('inbox/unread-count')
-  @FullModeOnly()
   async noLeidas(@CurrentBusiness() ctx: AuthContext) {
     const { businessId } = assertMemberContext(ctx);
     return this.bandeja.noLeidas(businessId);
   }
 
   @Get('inbox/:id/messages')
-  @FullModeOnly()
   async mensajesDeCharla(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
     const { businessId } = assertMemberContext(ctx);
     return this.bandeja.mensajes(businessId, id);
@@ -83,7 +79,6 @@ export class InstagramController {
 
   // Texto, foto (campo `file`) o las dos cosas.
   @Post('inbox/:id/messages')
-  @FullModeOnly()
   @UseInterceptors(FileInterceptor('file', SUBIDA_IMAGEN))
   async responderCharla(
     @CurrentBusiness() ctx: AuthContext,
@@ -97,7 +92,6 @@ export class InstagramController {
 
   // Mandar la ficha de un producto (su foto y el enlace corto de la tienda).
   @Post('inbox/:id/product')
-  @FullModeOnly()
   async enviarProducto(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: EnviarProductoDto) {
     const { businessId } = assertMemberContext(ctx);
     return this.bandeja.enviarProducto(businessId, id, dto.productId);
@@ -105,7 +99,6 @@ export class InstagramController {
 
   // Los datos y los pedidos de la persona de la charla.
   @Get('inbox/:id/customer')
-  @FullModeOnly()
   async clienteDeCharla(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
     const { businessId } = assertMemberContext(ctx);
     return this.bandeja.cliente(businessId, id);
@@ -113,7 +106,6 @@ export class InstagramController {
 
   // Unir esta persona con un cliente que ya existía.
   @Post('inbox/:id/link')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   async vincularCliente(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: VincularClienteDto) {
     const { businessId } = assertMemberContext(ctx);
@@ -123,7 +115,6 @@ export class InstagramController {
   // Orbi en este chat: ON lo enciende (también lo reactiva si estaba pausado o derivado), OFF lo deja para una persona.
   // Como en la bandeja de Mensajes, lo puede hacer todo el equipo.
   @Patch('inbox/:id/bot')
-  @FullModeOnly()
   async orbiEnCharla(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: ChatBotDto) {
     const { businessId } = assertMemberContext(ctx);
     return this.bot.cambiarEstadoDelChat(businessId, id, dto.estado);
@@ -131,7 +122,6 @@ export class InstagramController {
 
   // Orbi atendiendo los mensajes directos (paquete Avanzado): su configuración y lo que va gastado del cupo del mes.
   @Get('bot')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   async estadoDelBot(@CurrentBusiness() ctx: AuthContext) {
     const { businessId } = assertMemberContext(ctx);
@@ -140,7 +130,6 @@ export class InstagramController {
   }
 
   @Patch('bot')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   async guardarBot(@CurrentBusiness() ctx: AuthContext, @Body() dto: CambiosDeOrbiDto) {
     const { businessId } = assertMemberContext(ctx);
@@ -149,7 +138,6 @@ export class InstagramController {
   }
 
   @Patch('inbox/:id')
-  @FullModeOnly()
   async marcarCharla(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: MarcarLeidaDto) {
     const { businessId } = assertMemberContext(ctx);
     return this.bandeja.marcarLeida(businessId, id, dto.leida);
@@ -157,7 +145,6 @@ export class InstagramController {
 
   // Programar una publicación: sale sola a la hora elegida.
   @Post('posts/schedule')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   async programar(@CurrentBusiness() ctx: AuthContext, @Body() dto: ProgramarPublicacionDto) {
     const { businessId, memberId } = assertMemberContext(ctx);
@@ -168,7 +155,6 @@ export class InstagramController {
 
   // Guardar una publicación a medias.
   @Post('posts/draft')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   async guardarBorrador(@CurrentBusiness() ctx: AuthContext, @Body() dto: BorradorPublicacionDto) {
     const { businessId, memberId } = assertMemberContext(ctx);
@@ -177,7 +163,6 @@ export class InstagramController {
 
   // Una programada vuelve a borrador.
   @Post('posts/:id/unschedule')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   async desprogramar(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
     const { businessId } = assertMemberContext(ctx);
@@ -187,7 +172,6 @@ export class InstagramController {
 
   // Borra un borrador o una programada.
   @Delete('posts/:id')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   async descartar(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Query('conservar') conservar?: string) {
     const { businessId } = assertMemberContext(ctx);
@@ -197,7 +181,6 @@ export class InstagramController {
 
   // Lo publicado y lo programado de un mes (?mes=2026-10), para el calendario.
   @Get('posts/calendar')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   async calendario(@CurrentBusiness() ctx: AuthContext, @Query('mes') mes?: string) {
     const { businessId } = assertMemberContext(ctx);
@@ -212,7 +195,6 @@ export class InstagramController {
 
   // Publicaciones ya armadas por Orbi a partir de las métricas.
   @Get('orbi/sugeridas')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   @Throttle({ default: { limit: 8, ttl: 60000 } })
   async orbiSugeridas(@CurrentBusiness() ctx: AuthContext, @Query('refrescar') refrescar?: string) {
@@ -223,7 +205,6 @@ export class InstagramController {
 
   // Ajustes: respuestas automáticas de mensajes y moderación de comentarios.
   @Get('settings')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   async ajustesDelNegocio(@CurrentBusiness() ctx: AuthContext) {
     const { businessId } = assertMemberContext(ctx);
@@ -232,7 +213,6 @@ export class InstagramController {
   }
 
   @Put('settings')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   async guardarAjustes(@CurrentBusiness() ctx: AuthContext, @Body() dto: AjustesInstagramDto) {
     const { businessId } = assertMemberContext(ctx);
@@ -242,7 +222,6 @@ export class InstagramController {
 
   // Ideas de qué publicar (productos de la tienda que todavía no se mostraron en Instagram).
   @Get('posts/ideas')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   async ideas(@CurrentBusiness() ctx: AuthContext) {
     const { businessId } = assertMemberContext(ctx);
@@ -252,7 +231,6 @@ export class InstagramController {
 
   // Orbi escribe el texto de una publicación (3 versiones y hashtags). Es una sugerencia: no publica nada.
   @Post('orbi/texto')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   async orbiTexto(@CurrentBusiness() ctx: AuthContext, @Body() dto: RedactarTextoDto) {
@@ -263,7 +241,6 @@ export class InstagramController {
 
   // Orbi sugiere cómo responder un comentario o un mensaje directo (lo atiende todo el equipo).
   @Post('orbi/respuesta')
-  @FullModeOnly()
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   async orbiRespuesta(@CurrentBusiness() ctx: AuthContext, @Body() dto: SugerirRespuestaDto) {
     const { businessId } = assertMemberContext(ctx);
@@ -272,7 +249,6 @@ export class InstagramController {
 
   // Orbi explica las estadísticas en palabras simples.
   @Get('orbi/lectura')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   async orbiLectura(@CurrentBusiness() ctx: AuthContext, @Query('dias') dias?: string) {
@@ -283,7 +259,6 @@ export class InstagramController {
 
   // Historial de lo publicado desde Órbita (Difusión → Publicaciones).
   @Get('posts')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   async historial(@CurrentBusiness() ctx: AuthContext) {
     const { businessId } = assertMemberContext(ctx);
@@ -294,7 +269,6 @@ export class InstagramController {
   // Publica en Instagram la foto de un producto con el texto que escribió el dueño. Es una acción con
   // efecto afuera de Órbita (queda a la vista de los seguidores): solo propietario/admin.
   @Post('posts')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   async publicar(@CurrentBusiness() ctx: AuthContext, @Body() dto: CrearPublicacionDto) {
     const { businessId, memberId } = assertMemberContext(ctx);
@@ -304,7 +278,6 @@ export class InstagramController {
   // Un video (o una foto grande) tarda en procesarse en Instagram: el panel vuelve a llamar acá cada pocos
   // segundos hasta que la publicación queda publicada o falla.
   @Post('posts/:id/continuar')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   async continuar(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
     const { businessId } = assertMemberContext(ctx);
@@ -314,7 +287,6 @@ export class InstagramController {
 
   // Foto subida desde la computadora (para sumar a una publicación).
   @Post('media/foto')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   @UseInterceptors(FileInterceptor('file', SUBIDA_IMAGEN))
   async subirFoto(@CurrentBusiness() ctx: AuthContext, @UploadedFile() file?: Express.Multer.File) {
@@ -325,7 +297,6 @@ export class InstagramController {
 
   // Dirección firmada para que el navegador suba un video directo al almacenamiento.
   @Post('media/video')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   async prepararVideo(@CurrentBusiness() ctx: AuthContext, @Body() dto: SubirVideoDto) {
     const { businessId } = assertMemberContext(ctx);
@@ -335,7 +306,6 @@ export class InstagramController {
 
   // Comentarios de las últimas publicaciones (Difusión → Comentarios).
   @Get('comments')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   async comentarios(@CurrentBusiness() ctx: AuthContext) {
     const { businessId } = assertMemberContext(ctx);
@@ -345,7 +315,6 @@ export class InstagramController {
 
   // Responder un comentario queda a la vista pública: solo propietario/admin.
   @Post('comments/:id/reply')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   async responder(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: ResponderComentarioDto) {
     const { businessId } = assertMemberContext(ctx);
@@ -354,7 +323,6 @@ export class InstagramController {
   }
 
   @Post('comments/:id/hide')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   async ocultar(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: OcultarComentarioDto) {
     const { businessId } = assertMemberContext(ctx);
@@ -364,7 +332,6 @@ export class InstagramController {
 
   // Resumen de la cuenta de los últimos 7 o 28 días (Difusión → Estadísticas).
   @Get('insights')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   async estadisticas(@CurrentBusiness() ctx: AuthContext, @Query('dias') dias?: string) {
     const { businessId } = assertMemberContext(ctx);
@@ -374,7 +341,6 @@ export class InstagramController {
 
   // Qué tipo de publicación y qué momento funciona mejor en la cuenta (Difusión → Estadísticas).
   @Get('insights/rendimiento')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   async rendimiento(@CurrentBusiness() ctx: AuthContext) {
     const { businessId } = assertMemberContext(ctx);
@@ -383,7 +349,6 @@ export class InstagramController {
   }
 
   @Get('connection')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   async estado(@CurrentBusiness() ctx: AuthContext) {
     const { businessId } = assertMemberContext(ctx);
@@ -393,7 +358,6 @@ export class InstagramController {
 
   // El dueño deja su @usuario para que el equipo lo sume como evaluador de la app.
   @Post('access-request')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   async pedirAcceso(@CurrentBusiness() ctx: AuthContext, @Body() dto: SolicitarAccesoDto) {
     const { businessId, memberId } = assertMemberContext(ctx);
@@ -402,7 +366,6 @@ export class InstagramController {
 
   // Devuelve la dirección del login de Instagram: el panel redirige ahí al dueño.
   @Post('connect')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   async conectar(@CurrentBusiness() ctx: AuthContext, @Req() req: { headers: { origin?: string } }, @Body() dto: ConectarInstagramDto) {
     const member = assertMemberContext(ctx);
@@ -413,7 +376,6 @@ export class InstagramController {
   }
 
   @Delete('connection')
-  @FullModeOnly()
   @Roles('owner', 'admin')
   async desconectar(@CurrentBusiness() ctx: AuthContext) {
     const { businessId } = assertMemberContext(ctx);

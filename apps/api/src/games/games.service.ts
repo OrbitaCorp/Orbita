@@ -69,6 +69,8 @@ export class GamesService {
         endDate,
         ...(dto.timeLimitSeconds != null ? { timeLimitSeconds: dto.timeLimitSeconds } : {}),
         ...(dto.maxAttempts != null ? { maxAttempts: dto.maxAttempts } : {}),
+        ...(dto.theme !== undefined ? { theme: dto.theme } : {}),
+        ...(dto.presentation !== undefined ? { presentation: dto.presentation } : {}),
       },
       update: {
         name: dto.name ?? null,
@@ -79,6 +81,9 @@ export class GamesService {
         endDate,
         ...(dto.timeLimitSeconds != null ? { timeLimitSeconds: dto.timeLimitSeconds } : {}),
         ...(dto.maxAttempts != null ? { maxAttempts: dto.maxAttempts } : {}),
+        // Cambiar el diseño no es una campaña nueva: quien ya jugó no vuelve a jugar.
+        ...(dto.theme !== undefined ? { theme: dto.theme } : {}),
+        ...(dto.presentation !== undefined ? { presentation: dto.presentation } : {}),
         ...(reactivando || vigenciaNueva ? { campaignVersion: { increment: 1 } } : {}),
       },
     });
@@ -172,6 +177,8 @@ export class GamesService {
     maxPercent: unknown;
     timeLimitSeconds: number;
     maxAttempts: number;
+    theme?: string | null;
+    presentation?: string | null;
     campaignVersion: number;
     startDate: Date | null;
     endDate: Date | null;
@@ -185,6 +192,8 @@ export class GamesService {
       maxPercent: Number(game.maxPercent),
       timeLimitSeconds: game.timeLimitSeconds,
       maxAttempts: game.maxAttempts,
+      theme: game.theme ?? null,
+      presentation: game.presentation ?? null,
       campaignVersion: game.campaignVersion,
       startDate: game.startDate ? game.startDate.toISOString() : null,
       endDate: game.endDate ? game.endDate.toISOString() : null,

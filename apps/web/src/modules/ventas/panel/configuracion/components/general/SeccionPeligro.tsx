@@ -3,6 +3,7 @@ import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Modal } from '@/design-system/components/Modal'
 import { ApiError, pauseBusiness, changeBusinessMode, panelCancelBusiness, panelReactivateFromCancellation } from '@/lib/api'
+import { useAuth } from '@/hooks/useAuth'
 import { ErrorInline } from './comunes'
 import type { ConfigGeneralState } from './useConfigGeneral'
 
@@ -42,6 +43,7 @@ function DetalleExpandible({ pregunta, children }: { pregunta: string; children:
 
 // Zona peligrosa: pausar la tienda, pasarla a vidriera digital o eliminar el espacio.
 export function SeccionPeligro({ cfg, onToast }: { cfg: ConfigGeneralState; onToast: (m: string) => void }) {
+    const { cambiarModoDelNegocio } = useAuth()
     const {
         isPaused, setIsPaused, modo, setModo, cancelledAt, setCancelledAt,
         scheduledDeletionAt, setScheduledDeletionAt, guardando, setGuardando, errores, setErrores,
@@ -74,6 +76,7 @@ export function SeccionPeligro({ cfg, onToast }: { cfg: ConfigGeneralState; onTo
         try {
             const r = await changeBusinessMode(nuevo)
             setModo(r.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL')
+            cambiarModoDelNegocio(r.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL')
             onToast(r.mode === 'SHOWCASE' ? 'Tu tienda ahora es una vidriera digital' : 'Tu tienda ahora es una tienda online completa')
         } catch (e) {
             const msg = e instanceof ApiError ? e.message : 'Error inesperado'

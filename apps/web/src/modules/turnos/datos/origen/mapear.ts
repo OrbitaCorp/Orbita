@@ -6,11 +6,11 @@
 // hoy (`dia`, 0 = hoy), de minutos desde las 00:00, de días de la semana con
 // el lunes en 0 y de estados en minúscula. La API habla de fechas AAAA-MM-DD de
 // Argentina, del domingo en 0 y de estados en mayúscula. Acá se traduce.
-import type { HorarioSemanal, Recurso as RecursoApi, Reserva, Servicio as ServicioApi, TipoRecurso, Tramo } from '@/lib/reservasApi/tipos'
+import type { GuardarRecurso, GuardarServicio, HorarioSemanal, Recurso as RecursoApi, Reserva, Servicio as ServicioApi, TipoRecurso, Tramo } from '@/lib/reservasApi/tipos'
 import { diasEntre, sumarDias, fechaNumerica, type ISO } from '@/lib/reservas/fechas'
 import { diasAbiertos, diasTxt, tramosDe, tramosTxt, type Semana } from '@/modules/turnos/horario'
 import { COLORES_EQUIPO } from '@/modules/turnos/datos/equipo'
-import type { Cliente, EstadoTurno, Recurso, RubroTurnos } from '@/modules/turnos/datos'
+import { semanaDeRecurso, type Cliente, type EstadoTurno, type Recurso, type RubroTurnos } from '@/modules/turnos/datos'
 import type { ServicioBase, TurnoAgenda } from '@/modules/turnos/datos/agenda'
 
 const NOMBRES_DIA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
@@ -90,9 +90,42 @@ export function recursoDeApi(r: RecursoApi, rubro: RubroTurnos, semana: Semana, 
   return { id: r.id, nombre: r.nombre, rol, color, ...agendaDeHorario(r.horario, semana) }
 }
 
+/**
+ * El horario de una agenda del panel como lo guarda la API: null si es el del
+ * negocio (todos los días que abre, sin horario propio), así un cambio de
+ * horario del negocio le llega sola. Si no, día por día lo que de verdad
+ * atiende: el horario del negocio recortado a sus días y a su horario propio.
+ */
+export function horarioDeRecurso(r: Recurso, semana: Semana): HorarioSemanal | null {
+  const abiertos = diasAbiertos(semana)
+  const todos = abiertos.length === r.atiende.length && abiertos.every(d => r.atiende.includes(d))
+  return !r.horario && todos ? null : horarioDeSemana(semanaDeRecurso(r, semana))
+}
+
+/**
+ * Lo que se manda al crear o editar una agenda. El rol que se lee debajo del
+ * nombre, el color y, si es de una persona, su rol del equipo van en `datos`:
+ * la API no los tiene como campos. Turnos es de a uno: cupo 1.
+ */
+export function recursoParaApi(r: Recurso, rubro: RubroTurnos, semana: Semana, rolId?: string): GuardarRecurso {
+  return {
+    modulo: 'TURNOS', tipo: tipoDeAgenda(rubro), nombre: r.nombre, cupo: 1,
+    horario: horarioDeRecurso(r, semana),
+    datos: { rol: r.rol, color: r.color, ...(rolId ? { rolId } : {}) },
+  }
+}
+
+/** El rol del equipo de quien es esa agenda, si el panel lo guardó. */
+export const rolIdDeApi = (r: RecursoApi): string | null => (typeof r.datos?.rolId === 'string' ? r.datos.rolId : null)
+
 /** Un servicio de la API como lo maneja el panel. Uno inactivo es uno pausado. */
 export const servicioDeApi = (s: ServicioApi): ServicioBase => ({
   id: s.id, nombre: s.nombre, duracion: s.duracionMinutos, precio: s.precio, online: s.reservableOnline, ...(s.activo ? {} : { pausado: true }),
+})
+
+/** Lo que se manda al crear o editar un servicio: todos los campos que maneja el panel, así editar no deja nada viejo. */
+export const servicioParaApi = (s: ServicioBase): GuardarServicio => ({
+  modulo: 'TURNOS', nombre: s.nombre, duracionMinutos: s.duracion, precio: s.precio, reservableOnline: s.online, activo: !s.pausado,
 })
 
 // ─── Agenda ──────────────────────────────────────────────────────────────────

@@ -16,9 +16,11 @@
 // las junta. El origen por defecto es la demo, así /turnos-demo sigue igual;
 // el panel real de un negocio monta <OrigenTurnosProvider origen={origenApi}>.
 //
-// Por ahora el origen solo LEE. Lo que se edita (dar un turno, pausar un
-// servicio, sumar a alguien) sigue en el estado de PanelTurnos y se conecta a
-// la API sección por sección (semanas 2 y 3 del plan). Configuración y
+// Las escrituras se conectan sección por sección (semanas 2 y 3 del plan).
+// Servicios ya guarda en el origen (`servicios`, 19/11), y también las agendas
+// de Equipo y Espacios (`agendas`): en la demo queda en memoria y en la API va
+// a /reservas/servicios y /reservas/recursos. Lo demás que se edita (dar un
+// turno, los roles, cómo cobra cada uno) sigue en el estado de PanelTurnos. Configuración y
 // Avanzado leen sus datos adentro de cada pantalla (useRubroDemo,
 // useNegocioDemo): se pasan al origen cuando se conectan las reglas y los
 // horarios (13/11). El mapa completo, con lo que el backend no cubre, está en
@@ -53,10 +55,40 @@ export interface DatosPanel {
   agenda: FuenteAgenda
 }
 
+/**
+ * Lo que el panel guarda de los servicios. Pausar es editar con `pausado`.
+ * Cada escritura devuelve el servicio como quedó (al crear, con el id que le
+ * dio el origen); si falla, el error trae el mensaje para mostrar.
+ */
+export interface EscrituraServicios {
+  /** `orden`: la posición en la lista; uno nuevo va al final. */
+  crear(s: ServicioBase, orden: number): Promise<ServicioBase>
+  editar(s: ServicioBase): Promise<ServicioBase>
+  borrar(id: string): Promise<void>
+}
+
+/** Con qué se guarda una agenda: el rubro dice si es de una persona o un espacio; la semana, cuál es el horario del negocio. */
+export interface CtxAgenda { rubro: RubroTurnos; semana: Semana; rolId?: string }
+
+/**
+ * Lo que el panel guarda de las agendas: las de las personas que atienden
+ * (Equipo, rubros por profesional) y los espacios (Espacios, por sala o
+ * cabina). Igual que los servicios, cada escritura devuelve la agenda como
+ * quedó; al crear, con el id del origen.
+ */
+export interface EscrituraAgendas {
+  crear(r: Recurso, ctx: CtxAgenda & { orden: number }): Promise<Recurso>
+  editar(r: Recurso, ctx: CtxAgenda): Promise<Recurso>
+  /** La API no borra una agenda con reservas por delante: el error lo dice. */
+  borrar(id: string): Promise<void>
+}
+
 export interface OrigenTurnos {
   tipo: 'demo' | 'api'
   /** Lo de cada sección, junto. Si falla, el error trae el mensaje para mostrar. */
   cargar(rubro: RubroTurnos): Promise<DatosPanel>
+  servicios: EscrituraServicios
+  agendas: EscrituraAgendas
 }
 
 const Contexto = createContext<OrigenTurnos>(origenDemo)

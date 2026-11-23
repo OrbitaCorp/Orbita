@@ -318,7 +318,9 @@ export class DiscountsService {
       return discount;
     });
 
-    if (dto.countdown !== undefined) await this.countdown.aplicar(businessId, creado, dto.countdown);
+    if (dto.countdown !== undefined) {
+      await this.countdown.aplicar(businessId, creado, dto.countdown, { format: dto.countdownFormat, design: dto.countdownDesign });
+    }
 
     await this.audit?.registrar({
       businessId, memberId, entityType: 'discount', entityId: creado.id, action: 'CREATE',
@@ -377,6 +379,7 @@ export class DiscountsService {
         businessId,
         { id, name: dto.name, endDate: vigenciaDe(dto).endDate },
         prender && !!dto.endDate && dto.scope !== 'TICKET',
+        { format: dto.countdownFormat, design: dto.countdownDesign },
       );
     }
 

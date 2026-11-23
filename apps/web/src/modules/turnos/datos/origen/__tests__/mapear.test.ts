@@ -11,6 +11,7 @@ import {
   porDia, recursoDeApi, semanaDeHorario, servicioDeApi, turnoDeApi,
 } from '../mapear'
 import { origenDemo } from '../demo'
+import { equipoApi } from '../api'
 
 const HOY = '2026-11-13'
 const barberia = rubroPorKey('barberia')
@@ -147,5 +148,13 @@ describe('origen de la demo', () => {
       expect(d.agenda.delDia(0, d.recursos, semana)).toEqual(turnosDelDia(rubro, d.recursos, semana, 0))
       expect(d.agenda.delDia(-3, d.recursos, semana)).toEqual(turnosDelDia(rubro, d.recursos, semana, -3))
     }
+  })
+})
+
+describe('el equipo de la API', () => {
+  it('toma el rol del equipo que el panel guardó en la agenda, si es uno de fábrica', () => {
+    const recursos = ['a', 'b', 'c'].map(id => ({ id, nombre: id, rol: 'Barbero', color: '#3B82F6', atiende: [0, 1, 2, 3, 4, 5], horario: '', dias: 'Lun a sáb' }))
+    const { personas } = equipoApi(barberia, recursos, { a: 'dueno', b: 'aprendiz', c: 'inventado' })
+    expect(personas.map(p => p.rolId)).toEqual(['dueno', 'aprendiz', 'profesional'])
   })
 })

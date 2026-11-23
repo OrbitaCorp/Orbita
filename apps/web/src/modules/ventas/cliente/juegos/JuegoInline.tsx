@@ -33,7 +33,8 @@ import {
     startGameSession, finishGameSession, getActiveGames, claimGameSession,
     StorefrontApiError, type GameStartResponse,
 } from '@/lib/storefront/api'
-import { ESCENAS, ALTO_ESCENA, ANCHO_DISENO, ESCALA_MAX, TijeraIcon, type EscenaConfig, type EstadoTiro } from './escenas'
+import { ALTO_ESCENA, ANCHO_DISENO, ESCALA_MAX, TijeraIcon, type EscenaConfig, type EstadoTiro } from './escenas'
+import { escenaDe } from '@/modules/ventas/promos/escenasTematicas'
 
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; color?: string }>
 
@@ -147,21 +148,27 @@ interface Props {
     // login con Google (ver returnTo más abajo) — salta directo a la fase
     // 'reclamando' en vez de la lógica normal de intro/ya_jugado/declinado.
     sessionIdReclamo?: string
+    // Temática elegida por el dueño. Sin ella, el dibujo original del juego.
+    tema?: string | null
+    // Vista previa del panel: se juega con esta configuración y TODO queda en
+    // este componente. No pide nada a la API, no crea sesión ni descuento, no
+    // escribe localStorage y no cuenta en las métricas.
+    prueba?: { percentPerWin: number; maxPercent: number; maxAttempts: number; timeLimitSeconds: number }
 }
 
-export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo }: Props) {
+export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo, tema: temaVisual, prueba }: Props) {
     // (el botón "Ir de compras" tiene su propio useRouter() — ver
     // BotonIrDeCompras — es la única navegación que hacía falta acá)
     const tema = TEMAS[tipo] ?? TEMA_DEFAULT
     // La ambientación (fondo, objetivo, proyectil) de ESTA mecánica — ver
     // escenas.tsx. Cae a la de básquet si el `tipo` no matchea ninguna, mismo
     // criterio que TEMA_DEFAULT: nunca dejar el modal en blanco.
-    const escena = ESCENAS[tipo] ?? ESCENAS.HOOP
+    const escena = escenaDe(tipo, temaVisual)
     const { status, user } = useAuth()
     // Declarado acá arriba (no donde se usa por primera vez en el render,
     // más abajo) porque el efecto de auto-reclamo lo necesita en sus
     // dependencias — ver comentario ahí.
-    const yaLogueado = status === 'authenticated' && user?.type === 'customer'
+    const yaLogueado = !prueba && status === 'authenticated' && user?.type === 'customer'
 
     const [fase, setFase] = useState<Fase>('cargando')
     const [sesion, setSesion] = useState<GameStartResponse | null>(null)
@@ -187,9 +194,11 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
     // omite por completo si esto es un reclamo (no hace falta).
     // maxPercent/maxAttempts vienen del mismo pedido y solo se usan para
     // anunciar el premio en la intro, antes de arrancar.
-    const [activo, setActivo] = useState<{ encontrado: boolean; campaignVersion: number | null; maxPercent: number | null; maxAttempts: number | null } | null>(null)
+    const [activo, setActivo] = useState<{ encontrado: boolean; campaignVersion: number | null; maxPercent: number | null; maxAttempts: number | null } | null>(
+        prueba ? { encontrado: true, campaignVersion: null, maxPercent: prueba.maxPercent, maxAttempts: prueba.maxAttempts } : null,
+    )
     useEffect(() => {
-        if (!slug || !tipo || sessionIdReclamo) return
+        if (prueba || !slug || !tipo || sessionIdReclamo) return
         let cancelado = false
         getActiveGames(slug)
             .then(games => {
@@ -207,6 +216,8 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
             // ya maneja el error real de "no disponible" al tocar Jugar.
             .catch(() => { if (!cancelado) setActivo({ encontrado: true, campaignVersion: null, maxPercent: null, maxAttempts: null }) })
         return () => { cancelado = true }
+        // `prueba` se fija al montar: la vista previa remonta con `key` al cambiar.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [slug, tipo, sessionIdReclamo])
 
     // Chequeo del lado del cliente (ver comentario de arriba sobre el
@@ -217,6 +228,7 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
     // (relanzamiento, decisión del dueño) vuelve a habilitar el juego para
     // los tres casos por igual.
     useEffect(() => {
+        if (prueba) { setFase('intro'); return }
         if (!slug || !tipo) return
         if (sessionIdReclamo) { setFase('reclamando'); return }
         if (!activo) return
@@ -231,6 +243,7 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
             if (yaPerdio(slug, tipo, activo.campaignVersion)) { setFase('ya_jugado'); return }
         }
         setFase('intro')
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [slug, tipo, activo, sessionIdReclamo])
 
     // Reclamo — se dispara una sola vez al entrar en fase 'reclamando'. Se
@@ -275,6 +288,17 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
     }, [fase, slug, sesion, resultado, codigoGanado, yaLogueado])
 
     async function arrancar() {
+        if (prueba) {
+            setResultado(null)
+            setSesion({
+                sessionId: 'vista-previa', gameName: null, percentPerWin: prueba.percentPerWin, maxPercent: prueba.maxPercent,
+                timeLimitMs: prueba.timeLimitSeconds * 1000, maxAttempts: prueba.maxAttempts,
+            })
+            setIntento(0)
+            setHistorial([])
+            setFase('jugando')
+            return
+        }
         if (!slug) return
         try {
             const s = await startGameSession(slug, tipo)
@@ -289,6 +313,13 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
     }
 
     async function terminar(aciertos: number) {
+        if (prueba && sesion) {
+            // Misma cuenta que GamesPlayService#finishSession, sin tocar la API.
+            const ganado = Math.min(aciertos * sesion.percentPerWin, sesion.maxPercent)
+            setResultado({ status: ganado > 0 ? 'WON' : 'LOST', discountPercent: ganado > 0 ? ganado : null })
+            setFase('resultado')
+            return
+        }
         if (!slug || !sesion) return
         // Pedido explícito del dueño: apenas termina el último tiro, mostrar
         // un círculo de carga hasta tener el resultado real — antes se
@@ -437,7 +468,7 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
                             </div>
                         </div>
                     </div>
-                    <h2 style={{ fontSize: 21, fontWeight: 800, color: 'var(--color-text)', margin: '0 0 7px', letterSpacing: '-0.02em' }}>{tema.titulo}</h2>
+                    <h2 style={{ fontSize: 21, fontWeight: 800, color: 'var(--color-text)', margin: '0 0 7px', letterSpacing: '-0.02em', fontFamily: 'var(--promo-fuente, inherit)' }}>{tema.titulo}</h2>
                     <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: '0 0 16px', maxWidth: 360, lineHeight: 1.6 }}>
                         {tema.instrucciones}
                     </p>
@@ -504,9 +535,14 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
                             <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--color-success-bg)', display: 'grid', placeItems: 'center', marginBottom: 14 }}>
                                 <PartyPopper size={28} strokeWidth={1.5} color="var(--color-success)" />
                             </div>
-                            <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-text)', margin: '0 0 6px' }}>¡Ganaste {resultado.discountPercent}% de descuento!</h2>
+                            <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-text)', margin: '0 0 6px', fontFamily: 'var(--promo-fuente, inherit)' }}>¡Ganaste {resultado.discountPercent}% de descuento!</h2>
 
-                            {codigoGanado ? (
+                            {prueba ? (
+                                <>
+                                    <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: '0 0 16px', maxWidth: 320, lineHeight: 1.6 }}>Es una vista previa: no se creó ningún cupón ni quedó registrada la jugada.</p>
+                                    <button onClick={arrancar} style={btnPrimario}>Jugar de nuevo</button>
+                                </>
+                            ) : codigoGanado ? (
                                 <>
                                     <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: '0 0 14px' }}>Ya se aplicó a tu cuenta: usá este código en el checkout. También te lo mandamos por mail, por las dudas.</p>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', maxWidth: 300, marginBottom: 8 }}>
@@ -547,7 +583,8 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
                     ) : (
                         <>
                             <h2 style={{ fontSize: 19, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 6px' }}>No llegaste esta vez</h2>
-                            <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: 0, maxWidth: 300 }}>Gracias por jugar, estate atento a la próxima.</p>
+                            <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: prueba ? '0 0 16px' : 0, maxWidth: 300 }}>{prueba ? 'Así lo ve quien no acierta ningún tiro.' : 'Gracias por jugar, estate atento a la próxima.'}</p>
+                            {prueba && <button onClick={arrancar} style={btnPrimario}>Jugar de nuevo</button>}
                         </>
                     )}
                 </>
@@ -976,7 +1013,8 @@ function GoogleIcon() {
 }
 
 const btnPrimario: React.CSSProperties = {
-    width: '100%', maxWidth: 300, height: 48, borderRadius: 10, background: 'var(--color-primary)', color: '#fff',
+    // on-primary y no #fff: hay temáticas con botón claro (Carnaval, Halloween).
+    width: '100%', maxWidth: 300, height: 48, borderRadius: 10, background: 'var(--color-primary)', color: 'var(--color-on-primary, #fff)',
     border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 700,
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
     boxShadow: '0 8px 20px -6px var(--color-primary)', transition: 'transform 120ms ease, box-shadow 120ms ease',

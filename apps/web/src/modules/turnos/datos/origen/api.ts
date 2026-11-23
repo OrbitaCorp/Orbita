@@ -6,7 +6,8 @@
 // backend" de Auditoría):
 // - Catálogo: las agendas son los recursos PROFESIONAL (rubros por
 //   profesional) o ESPACIO (por sala o cabina), y los servicios, con los
-//   pausados (inactivos) incluidos.
+//   pausados (inactivos) incluidos. Los servicios también se guardan acá
+//   (crear, editar, pausar y borrar, 19/11).
 // - Agenda: el horario del negocio sale de la config de Turnos y los turnos de
 //   las reservas de dos meses para atrás y dos para adelante, lo mismo que mira
 //   el panel (Ganancias del mes pasado, historial de cada cliente).
@@ -23,7 +24,7 @@ import type { Cliente, Recurso, RubroTurnos } from '@/modules/turnos/datos'
 import type { Semana } from '@/modules/turnos/horario'
 import type { ServicioBase } from '@/modules/turnos/datos/agenda'
 import { rolesDe, type Persona, type Rol } from '@/modules/turnos/datos/equipo'
-import { ahoraArgentina, clientesDeReservas, porDia, recursoDeApi, semanaDeHorario, servicioDeApi, tipoDeAgenda } from './mapear'
+import { ahoraArgentina, clientesDeReservas, porDia, recursoDeApi, recursoParaApi, rolIdDeApi, semanaDeHorario, servicioDeApi, servicioParaApi, tipoDeAgenda } from './mapear'
 import type { DatosPanel, FuenteAgenda, OrigenTurnos } from './index'
 
 /** Cuántos días para cada lado de hoy trae la agenda: los mismos que arma el panel. */
@@ -38,12 +39,19 @@ export async function semanaApi(): Promise<Semana> {
 }
 
 /** Catálogo: las agendas del modo del rubro (con su horario propio) y todos los servicios. */
-export async function catalogoApi(rubro: RubroTurnos, semana: Semana): Promise<{ recursos: Recurso[]; servicios: ServicioBase[] }> {
+export async function catalogoApi(rubro: RubroTurnos, semana: Semana): Promise<{ recursos: Recurso[]; servicios: ServicioBase[]; rolIds: Record<string, string> }> {
   const [recursos, servicios] = await Promise.all([panel.recursos('TURNOS'), panel.servicios('TURNOS', true)])
   const tipo = tipoDeAgenda(rubro)
+  const propios = recursos.filter(r => r.tipo === tipo).sort((a, b) => a.orden - b.orden)
+  const rolIds: Record<string, string> = {}
+  for (const r of propios) {
+    const rolId = rolIdDeApi(r)
+    if (rolId) rolIds[r.id] = rolId
+  }
   return {
-    recursos: recursos.filter(r => r.tipo === tipo).sort((a, b) => a.orden - b.orden).map((r, i) => recursoDeApi(r, rubro, semana, i)),
+    recursos: propios.map((r, i) => recursoDeApi(r, rubro, semana, i)),
     servicios: servicios.sort((a, b) => a.orden - b.orden).map(servicioDeApi),
+    rolIds,
   }
 }
 
@@ -85,14 +93,18 @@ export function agendaApi(reservas: Reserva[], semana: Semana, hoy: ISO, minutos
 /** Clientes: los que reservaron en la ventana de la agenda. */
 export const clientesApi = (reservas: Reserva[]): Cliente[] => clientesDeReservas(reservas)
 
-/** Equipo: quien atiende (rubros por profesional), con el rol de fábrica "Profesional". */
-export function equipoApi(rubro: RubroTurnos, recursos: Recurso[]): { personas: Persona[]; roles: Rol[] } {
+/**
+ * Equipo: quien atiende (rubros por profesional), con el rol que el panel guardó en su agenda
+ * (si es uno de los de fábrica del rubro) o "Profesional".
+ */
+export function equipoApi(rubro: RubroTurnos, recursos: Recurso[], rolIds: Record<string, string> = {}): { personas: Persona[]; roles: Rol[] } {
+  const roles = rolesDe(rubro)
   const personas: Persona[] = rubro.modo !== 'profesional' ? [] : recursos.map(r => ({
-    id: `p-${r.id}`, nombre: r.nombre, rolId: 'profesional', email: '', telefono: '', color: r.color, recursoId: r.id,
+    id: `p-${r.id}`, nombre: r.nombre, rolId: roles.some(x => x.id === rolIds[r.id]) ? rolIds[r.id] : 'profesional', email: '', telefono: '', color: r.color, recursoId: r.id,
     // Cómo cobra cada uno no está en la API todavía: null es "lo que factura queda para el negocio".
     pago: null,
   }))
-  return { personas, roles: rolesDe(rubro) }
+  return { personas, roles }
 }
 
 export const origenApi: OrigenTurnos = {
@@ -105,10 +117,27 @@ export const origenApi: OrigenTurnos = {
       reservasEntre(sumarDias(hoy, -VENTANA_DIAS), sumarDias(hoy, VENTANA_DIAS)),
     ])
     return {
-      ...catalogo,
+      recursos: catalogo.recursos,
+      servicios: catalogo.servicios,
       clientes: clientesApi(reservas),
-      ...equipoApi(rubro, catalogo.recursos),
+      ...equipoApi(rubro, catalogo.recursos, catalogo.rolIds),
       agenda: agendaApi(reservas, semana, hoy, minutos),
     }
+  },
+  // /reservas/servicios (exige el permiso reservas.config). Borrar es una baja: las reservas ya
+  // dadas conservan la foto del servicio. La API rechaza un nombre repetido con su mensaje.
+  servicios: {
+    crear: async (s, orden) => servicioDeApi(await panel.crearServicio({ ...servicioParaApi(s), orden })),
+    editar: async s => servicioDeApi(await panel.editarServicio(s.id, servicioParaApi(s))),
+    borrar: async id => { await panel.borrarServicio(id) },
+  },
+  // /reservas/recursos: PROFESIONAL o ESPACIO según el rubro. Editar no manda `orden` ni
+  // `memberId`, así quedan como estaban. Borrar es una baja que la API rechaza si hay reservas por delante.
+  agendas: {
+    crear: async (r, { rubro, semana, rolId, orden }) =>
+      recursoDeApi(await panel.crearRecurso({ ...recursoParaApi(r, rubro, semana, rolId), orden }), rubro, semana, orden),
+    editar: async (r, { rubro, semana, rolId }) =>
+      recursoDeApi(await panel.editarRecurso(r.id, recursoParaApi(r, rubro, semana, rolId)), rubro, semana, 0),
+    borrar: async id => { await panel.borrarRecurso(id) },
   },
 }

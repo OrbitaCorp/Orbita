@@ -717,7 +717,7 @@ export const CAPITULOS: Capitulo[] = [
                     { label: 'Llevá X, pagá Y', texto: 'El 2x1 y el 3x2 de toda la vida: se arma solo en el carrito, sin código.' },
                     { label: 'Comprá X, obtenés Z', texto: 'Compra un producto y se lleva otro gratis, con % o con monto fijo. Sirve para mover algo que no rota o para hacer probar un producto nuevo.' },
                     { label: 'Por volumen', texto: 'Escalas: de 3 a 5 unidades tanto, de 6 en adelante más. Para mayoristas o productos de consumo.' },
-                    { label: 'Oferta relámpago', texto: 'Un % que termina a una hora exacta y se muestra en tu portada con un reloj en cuenta regresiva. Requiere el paquete Avanzado.' },
+                    { label: 'Oferta relámpago', texto: 'Un % que termina a una hora exacta y se muestra en tu portada con un reloj en cuenta regresiva. Elegís cómo se ve (cartel con productos, reloj grande, tablero de números, un producto protagonista, reloj en cada producto, tira o marquesina) y sus colores, con una vista previa al lado. Requiere el paquete Avanzado.' },
                 ] },
             ],
         },
@@ -982,7 +982,7 @@ export const CAPITULOS: Capitulo[] = [
                 { tipo: 'parrafo', texto: 'Lo que cambia la tienda entera. Está separada del resto y con avisos claros justamente para que nadie la toque de pasada. La ve quien tiene el permiso **Editar configuración**, pero las tres acciones las hace solo el propietario.' },
                 { tipo: 'lista', items: [
                     '**Pausar tienda**: nadie la ve ni te compra hasta que la reactivás. Tus datos, productos y pedidos quedan intactos, y vos seguís entrando al panel. Mientras está pausada, el mismo lugar dice **Reactivar tienda**.',
-                    '**Pasar a vidriera digital**: la tienda queda como catálogo, sin carrito ni pago online; tus clientes te consultan por WhatsApp. Se vuelve con **Pasar a tienda online completa**. No se puede si tenés pedidos online sin resolver.',
+                    '**Pasar a vidriera digital**: la tienda queda como catálogo, sin carrito ni pago online; tus clientes te consultan por WhatsApp. Se vuelve con **Pasar a tienda online completa**. No se puede si tenés pedidos online sin resolver. En la vidriera el menú deja de mostrar lo que solo sirve con checkout: **Cupones** y **Cancelaciones y devoluciones** de Configuración. Al volver a la tienda online completa reaparecen. **Mensajes** y **Difusión** siguen: conectás WhatsApp e Instagram, respondés desde la bandeja y Orbi puede contestar las consultas; lo que no hace en una vidriera es tomar pedidos, la compra la cerrás vos.',
                     '**Eliminar espacio**: la tienda se pausa al instante y tenés 60 días para arrepentirte con **Reactivar espacio**. Pasado ese plazo se borra todo y no hay vuelta atrás.',
                 ] },
                 { tipo: 'nota', variante: 'aviso', texto: 'Antes de tocar algo de acá, abrí el "¿Qué pasa si…?" de cada opción: te explica exactamente qué cambia y qué se pierde.' },
@@ -1011,12 +1011,12 @@ export const CAPITULOS: Capitulo[] = [
             id: 'funciones-avanzado', titulo: 'Qué trae',
             bloques: [
                 { tipo: 'campos', items: [
-                    { label: 'Juegos con premio', texto: 'Mini-juegos de habilidad (encestar, meter un gol). Vos definís cuánto descuento se gana por acierto y el tope. El descuento se crea solo, sin pasar por el módulo de Descuentos.' },
-                    { label: 'Modales de anuncios', texto: 'Avisos grandes que aparecen en el momento justo en tu tienda: una bienvenida con descuento, un anuncio de temporada.' },
+                    { label: 'Juegos con premio', texto: 'Mini-juegos de habilidad (encestar, meter un gol). Vos definís cuánto descuento se gana por acierto y el tope. El descuento se crea solo, sin pasar por el módulo de Descuentos. Cada juego puede tener una **temática** (Navidad, San Valentín, Halloween y otras de temporada, o estilos como Papel o Pizarra) y aparecer como ventana, panel al costado u hoja desde abajo. La **vista previa** se juega de verdad antes de lanzarlo: no gasta premios ni queda registrada.' },
+                    { label: 'Modales de anuncios', texto: 'Avisos que aparecen en tu tienda: una bienvenida con descuento, un anuncio de temporada. Elegís el **formato** (barra flotante, ventana, foto y texto, tarjeta en la esquina, cinta, hoja inferior, cupón, pantalla completa o pestaña lateral), los colores o una temática, y una foto opcional, con una vista previa en computadora y celular.' },
                     { label: '2x1 y 3x2', texto: 'La promo "llevá X, pagá Y" aplicada sola en el carrito, sin código, con un cartel en la tarjeta del producto.' },
                     { label: 'Plantillas de Home', texto: 'Diseños alternativos para la **portada** de tu tienda. El resto — catálogo, checkout, perfil — queda igual. Se prueban con [[Ver cómo queda]] antes de aplicar. Los colores y la tipografía son de la plantilla y no se cambian; lo que se muestra lo decidís vos. Con la plantilla puesta, en la pestaña **Contenido** prendés y apagás las filas de productos (Destacados, Nuevos ingresos, Recomendados, Top ventas), la sección de categorías, el anuncio de arriba, la barra de búsqueda, el WhatsApp, las opiniones de clientes y los cartelitos de las tarjetas (Nuevo, Oferta con el porcentaje y Últimas unidades), y cargás el banner parallax, las marcas y el video. Una fila sin productos no aparece aunque esté prendida. Tres de ellas (Base, Carbón y Bloque) son gratis con cualquier plan: se activan desde Configuración → Apariencia → Plantillas por defecto, igual que las demás si tenés el paquete.' },
                     { label: 'Prueba social', texto: 'Notificaciones tipo "Fulano compró tal producto", armadas con pedidos **reales** de tu tienda. Nunca con datos inventados.' },
-                    { label: 'Oferta relámpago', texto: 'Un descuento que dura poco y se muestra en tu tienda con un reloj en cuenta regresiva. Se arma desde Descuentos, como cualquier otro, y se prende o apaga desde acá.' },
+                    { label: 'Oferta relámpago', texto: 'Un descuento que dura poco y se muestra en tu tienda con un reloj en cuenta regresiva. Se arma desde Descuentos, como cualquier otro, ahí mismo se elige su diseño, y se prende o apaga desde acá.' },
                 ] },
             ],
         },

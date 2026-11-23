@@ -1,4 +1,5 @@
-import { IsBoolean, IsInt, IsISO8601, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsISO8601, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { PRESENTACIONES_JUEGO, TEMATICAS_PROMO } from '../../common/disenos-promos';
 
 export class UpsertGameDto {
   @IsOptional() @IsString() @MaxLength(60) name?: string;
@@ -23,4 +24,7 @@ export class UpsertGameDto {
   // ninguna de las dos, el juego no tiene límite de fechas (solo isActive).
   @IsOptional() @IsISO8601() startDate?: string;
   @IsOptional() @IsISO8601() endDate?: string;
+  // Temática y forma de aparecer. Ausentes = no tocar lo que ya estaba.
+  @IsOptional() @IsIn([...TEMATICAS_PROMO]) theme?: string;
+  @IsOptional() @IsIn([...PRESENTACIONES_JUEGO]) presentation?: string;
 }

@@ -79,6 +79,8 @@ interface AuthContextValue {
   updateAvatar: (avatarUrl: string | null) => void
   // El admin de plataforma ya eligió una contraseña propia: saca la marca de temporal en memoria (sin volver a loguear).
   marcarContrasenaPropia: () => void
+  // Zona peligrosa cambió el modo de venta (checkout ↔ vidriera): el menú del panel lo lee de acá.
+  cambiarModoDelNegocio: (mode: 'FULL' | 'SHOWCASE') => void
   forgotPassword: (email: string) => Promise<void>
   verifyResetCode: (email: string, code: string) => Promise<void>
   resetPassword: (email: string, code: string, newPassword: string) => Promise<{ userType: 'MEMBER' | 'CUSTOMER' | 'PLATFORM_ADMIN' }>
@@ -226,6 +228,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser((prev) => (prev?.type === 'platform_admin' ? { ...prev, admin: { ...prev.admin, hasTempPassword: false } } : prev))
   }, [])
 
+  const cambiarModoDelNegocio = useCallback((mode: 'FULL' | 'SHOWCASE'): void => {
+    setUser((prev) => (prev?.type === 'member' ? { ...prev, business: { ...prev.business, mode } } : prev))
+  }, [])
+
   const logout = useCallback(async (): Promise<void> => {
     // El chat de Orbi (y su stream en curso) es de quien se va. Hoy el logout
     // del panel recarga la página, pero el POS comparte terminal entre
@@ -300,7 +306,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ status, user, login, verifyPlatformAdminCode, register, logout, updateAvatar, marcarContrasenaPropia, forgotPassword, verifyResetCode, resetPassword }}>
+    <AuthContext.Provider value={{ status, user, login, verifyPlatformAdminCode, register, logout, updateAvatar, marcarContrasenaPropia, cambiarModoDelNegocio, forgotPassword, verifyResetCode, resetPassword }}>
       {children}
     </AuthContext.Provider>
   )

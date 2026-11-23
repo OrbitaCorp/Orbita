@@ -19,6 +19,8 @@ import { VigenciaForm } from './components/VigenciaForm'
 import { LinkDescuentoSection } from './components/LinkDescuentoSection'
 import { ConfigOfertaRelampago } from './components/ConfigOfertaRelampago'
 import { PreviewRelampago } from './components/PreviewRelampago'
+import { useCountdownSettings } from './hooks/useCountdownSettings'
+import type { FormatoOferta } from '@/modules/ventas/promos/catalogo'
 import { PreviewPOS } from './components/PreviewPOS'
 import { ResumenSidebar } from './components/ResumenSidebar'
 import { AccionesGuardado } from './components/AccionesGuardado'
@@ -118,6 +120,14 @@ export function DescuentosCrear({ id, onVolver }: Props) {
 
   const esRelampago = state.tipo === 'oferta_relampago'
 
+  // Diseño de la oferta en la portada: queda guardado de una oferta a la otra,
+  // así que arranca con el último elegido.
+  const ajustesRelampago = useCountdownSettings().data
+  const [formatoOferta, setFormatoOferta] = useState<FormatoOferta | null>(null)
+  const [disenoOferta, setDisenoOferta] = useState<string | null>(null)
+  const formatoOfertaActual = formatoOferta ?? (ajustesRelampago?.format as FormatoOferta | null | undefined) ?? 'cartelera'
+  const disenoOfertaActual = disenoOferta ?? ajustesRelampago?.design ?? 'tienda'
+
   const handleSubmit = async () => {
     setErrorEnvio(null)
     const errores = validarDescuentoForm(state, !!id)
@@ -166,6 +176,8 @@ export function DescuentosCrear({ id, onVolver }: Props) {
       // dueño tenga que prender — no tiene sentido en alcance ticket (no hay
       // productos puntuales que mostrar), así que se apaga solo en ese caso.
       linkActive: state.alcance !== 'ticket',
+      formatoOferta: esRelampago ? formatoOfertaActual : undefined,
+      disenoOferta: esRelampago ? disenoOfertaActual : undefined,
     }
     try {
       if (id) {
@@ -189,7 +201,7 @@ export function DescuentosCrear({ id, onVolver }: Props) {
   // El preview lateral: la cartelera de la portada para la oferta relámpago,
   // el ticket para todo lo demás.
   const preview = esRelampago ? (
-    <PreviewRelampago nombre={state.nombre} valor={state.valor} fechaFin={state.fechaFin} horaFin={state.horaFinRelampago} cantidadProductos={state.alcance === 'producto' ? state.productosIds.length : state.categoriasIds.length * 3} />
+    <PreviewRelampago nombre={state.nombre} valor={state.valor} fechaFin={state.fechaFin} horaFin={state.horaFinRelampago} cantidadProductos={state.alcance === 'producto' ? state.productosIds.length : state.categoriasIds.length * 3} formato={formatoOfertaActual} diseno={disenoOfertaActual} />
   ) : (
     <PreviewPOS nombre={state.nombre} tipo={state.tipo} aplicacion={state.aplicacion} valor={state.valor} llevaCantidad={state.llevaCantidad} pagaCantidad={state.pagaCantidad} montoMinimo={state.montoMinimo} />
   )
@@ -255,7 +267,7 @@ export function DescuentosCrear({ id, onVolver }: Props) {
                 <ConfigPorcentajeProducto valor={state.valor} alcance={state.alcance} productosIds={state.productosIds} categoriasIds={state.categoriasIds} onChangeValor={d('valor')} onChangeAlcance={d('alcance') as (a: AlcanceDescuento) => void} onChangeProductos={d('productosIds')} onChangeCategorias={d('categoriasIds')} errores={state.errores} />
               )}
               {t === 'oferta_relampago' && (
-                <ConfigOfertaRelampago editandoId={id} valor={state.valor} alcance={state.alcance} productosIds={state.productosIds} categoriasIds={state.categoriasIds} onChangeValor={d('valor')} onChangeAlcance={d('alcance') as (a: AlcanceDescuento) => void} onChangeProductos={d('productosIds')} onChangeCategorias={d('categoriasIds')} errores={state.errores} />
+                <ConfigOfertaRelampago formato={formatoOfertaActual} diseno={disenoOfertaActual} onChangeFormato={setFormatoOferta} onChangeDiseno={setDisenoOferta} editandoId={id} valor={state.valor} alcance={state.alcance} productosIds={state.productosIds} categoriasIds={state.categoriasIds} onChangeValor={d('valor')} onChangeAlcance={d('alcance') as (a: AlcanceDescuento) => void} onChangeProductos={d('productosIds')} onChangeCategorias={d('categoriasIds')} errores={state.errores} />
               )}
               {t === 'monto_fijo_producto' && (
                 <ConfigMontoFijoProducto valor={state.valor} alcance={state.alcance} productosIds={state.productosIds} categoriasIds={state.categoriasIds} onChangeValor={d('valor')} onChangeAlcance={d('alcance') as (a: AlcanceDescuento) => void} onChangeProductos={d('productosIds')} onChangeCategorias={d('categoriasIds')} errores={state.errores} />

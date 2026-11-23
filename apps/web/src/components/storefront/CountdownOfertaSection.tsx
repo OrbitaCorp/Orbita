@@ -32,6 +32,8 @@ import type { Producto } from '@/lib/storefront/types'
 import { fmt } from '@/lib/storefront/utils'
 import { Skeleton } from '@/design-system/components/Skeleton'
 import { useAhora } from '@/hooks/useAhora'
+import { OfertaDisenada } from '@/modules/ventas/promos/OfertaDisenada'
+import { cargarFuenteTematica, resolverDiseno } from '@/modules/ventas/promos/catalogo'
 
 type Props = {
   slug: string
@@ -131,6 +133,8 @@ export function CountdownOfertaSection({ slug, badges }: Props) {
     el.scrollBy({ left: dir * (el.clientWidth - 24), behavior: suave ? 'smooth' : 'auto' })
   }
 
+  useEffect(() => { cargarFuenteTematica(cfg?.design) }, [cfg?.design])
+
   const fin = cfg ? new Date(cfg.endDate).getTime() : null
   const ahora = useAhora(!!discountId, 1000, fin ?? undefined)
   const restante = fin !== null && ahora !== null ? fin - ahora : null
@@ -151,11 +155,39 @@ export function CountdownOfertaSection({ slug, badges }: Props) {
   const n = productos?.length ?? 4
   const disposicion = n === 1 ? 'uno' : n === 2 ? 'dos' : n > 4 ? 'fila' : 'grilla'
 
+  // Otro formato elegido por el dueño. La cartelera de abajo sigue siendo el
+  // caso por defecto: una tienda que no eligió nada se ve igual que siempre.
+  if (cfg.format && cfg.format !== 'cartelera') {
+    return (
+      <section className="sf-w sf-of" aria-label={`Oferta relámpago: ${cfg.title}. Termina el ${fechaLarga(cfg.endDate)}.`}>
+        <style>{ESTILOS}</style>
+        <OfertaDisenada
+          formato={cfg.format}
+          diseno={cfg.design}
+          titulo={cfg.title}
+          off={off}
+          restanteMs={restante}
+          productos={productos ?? []}
+          hrefOferta={`${base}/oferta/${discountId}`}
+          hrefProducto={id => `${base}/producto/${id}`}
+          enlace={(destino, contenido, clase) => <Link href={destino} className={clase}>{contenido}</Link>}
+        />
+      </section>
+    )
+  }
+
+  // Colores de la cartelera: se pisan los tokens solo dentro de este bloque.
+  const conDiseno = cfg.design && cfg.design !== 'tienda' ? resolverDiseno(cfg.design) : null
+  const coloresCartelera = conDiseno ? ({
+    '--color-primary': conDiseno.card, '--color-on-primary': conDiseno.tx,
+    ...(conDiseno.tematica ? { '--sf-of-fuente': conDiseno.fuente } : {}),
+  } as React.CSSProperties) : undefined
+
   return (
     <section className="sf-w sf-of" aria-labelledby="sf-of-titulo">
       <style>{ESTILOS}</style>
 
-      <div className="sf-of-caja">
+      <div className="sf-of-caja" style={coloresCartelera}>
         {/* ── El cartel ─────────────────────────────────────────────────────
             Color de marca liso (sin degradé) y el descuento como dato más
             grande: es lo primero que tiene que leerse. El reloj va aria-hidden
@@ -297,7 +329,7 @@ const ESTILOS = `
 .sf-of-kicker { margin: 0; font-size: 13px; font-weight: 500; opacity: 0.8; }
 .sf-of-titulo {
   margin: 4px 0 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2;
-  overflow-wrap: anywhere;
+  overflow-wrap: anywhere; font-family: var(--sf-of-fuente, inherit);
 }
 .sf-of-off {
   margin: 14px 0 0; font-size: 44px; font-weight: 800; letter-spacing: -0.04em; line-height: 1;

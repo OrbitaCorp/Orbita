@@ -814,6 +814,9 @@ export type StorefrontActiveCountdown = {
   ctaText: string | null
   ctaLink: string | null
   placement: 'HOME' | 'ALL_PAGES'
+  // Cómo se dibuja en la portada. null o ausente: la cartelera de siempre.
+  format?: string | null
+  design?: string | null
   isActive: boolean
   // Descuento REAL que gestiona este módulo (opcional: el countdown también
   // sirve de cartel solo). Con `discountId` la portada puede pedir sus
@@ -884,7 +887,7 @@ export function startGameSession(slug: string, type: string) {
 // aviso "Jugá y ganá" en el home. Sin auth, es de lectura pública.
 // maxPercent/maxAttempts se usan en la pantalla de intro del juego para
 // anunciar el premio antes de jugar ("N rondas · hasta X% OFF").
-export type ActiveGame = { type: string; name: string | null; campaignVersion: number; maxPercent: number; maxAttempts: number }
+export type ActiveGame = { type: string; name: string | null; campaignVersion: number; maxPercent: number; maxAttempts: number; theme?: string | null; presentation?: string | null }
 export function getActiveGames(slug: string) {
   return storefrontRequest<ActiveGame[]>(`/${slug}/games/active`)
 }
@@ -899,6 +902,11 @@ export type ActivePromoModal = {
   code: string | null
   ctaText: string | null
   ctaLink: string | null
+  // Opcionales: la API puede ir un deploy atrás del front. Sin `format`, la
+  // ventana de siempre.
+  format?: string | null
+  design?: string | null
+  imageUrl?: string | null
   campaignVersion: number
 }
 export function getActivePromoModal(slug: string) {
