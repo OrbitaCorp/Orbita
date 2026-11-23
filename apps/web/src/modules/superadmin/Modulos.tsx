@@ -1,9 +1,10 @@
 import {
   useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, type KeyboardEvent as TeclaEvent, type ReactNode,
 } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/router'
 import {
-  AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, CircleDashed, Clock, Compass, Copy, FilePlus2, Folder, Laptop, Plus, Save, Share2, Undo2, X,
+  AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, CircleDashed, Clock, Compass, Copy, FilePlus2, Folder, Laptop, Plus, Save, Share2, Undo2, X,
 } from 'lucide-react'
 import { Chip, Empty, ErrorBox, PageHeader, btnGhost, btnPrimary, inputStyle } from './ui'
 import { MarkdownInforme, MD_CSS, srcSeguro } from './MarkdownInforme'
@@ -762,6 +763,12 @@ function VistaModulo(p: PropsVista) {
             Responsable: <strong style={{ color: 'var(--color-body)' }}>{m.plan?.responsable ?? m.def.persona ?? 'Sin responsable'}</strong>
             {m.plan && <> · Fin estimado {larga(m.fin)}</>}
           </p>
+          {/* La demo de Alquileres está abierta en producción solo para superadmin (modules/alquileres/demo/SoloEquipo). */}
+          {m.def.slug === 'alquileres' && (
+            <Link href="/alquileres-demo" style={{ ...btnGhost, display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 10, textDecoration: 'none' }}>
+              Abrir la demo <ArrowRight size={15} strokeWidth={2} aria-hidden />
+            </Link>
+          )}
         </div>
         {m.plan && (
           <div>

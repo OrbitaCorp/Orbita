@@ -3,13 +3,15 @@ import Head from 'next/head'
 import { useRouter } from 'next/router'
 import type { GetServerSideProps } from 'next'
 import { BarraDemo } from '@/modules/alquileres/demo/BarraDemo'
+import { SoloEquipo } from '@/modules/alquileres/demo/SoloEquipo'
 import { useNegocio } from '@/modules/alquileres/demo/useNegocio'
 import Reserva from '@/modules/alquileres/storefront/Reserva'
 
-export const getServerSideProps: GetServerSideProps = async () =>
-  process.env.NODE_ENV === 'production' ? { notFound: true } : { props: {} }
+// Se sigue sirviendo desde el servidor (no estática): así ?tipo= y ?vista= llegan en el primer pintado.
+// Quién la puede ver lo decide SoloEquipo: en producción, solo superadmin.
+export const getServerSideProps: GetServerSideProps = async () => ({ props: {} })
 
-export default function Page() {
+function Contenido() {
   const router = useRouter()
   const { tipo, negocio, reservas, reservar, hidratado } = useNegocio()
   return (
@@ -21,4 +23,8 @@ export default function Page() {
       <Reserva key={`${tipo}:${router.asPath}:${hidratado}`} negocio={negocio} reservas={reservas} onReservar={(r, c) => reservar(tipo, r, c)} />
     </>
   )
+}
+
+export default function Page() {
+  return <SoloEquipo><Contenido /></SoloEquipo>
 }

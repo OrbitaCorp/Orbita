@@ -79,7 +79,7 @@ export function BarraDemo() {
       </Link>
       {hayCambios
         ? <button type="button" className="ald-alta" onClick={reiniciar} title="Borrar lo cargado en la demo y volver a los datos de ejemplo"><span>Con cambios tuyos</span><X size={14} aria-hidden /></button>
-        : <span className="ald-pildora">Vista previa local</span>}
+        : <span className="ald-pildora">Vista previa interna</span>}
       <nav ref={navRef} aria-label="Pantallas de la demo">
         {PANTALLAS.map(p => (
           <Link key={p.href} href={{ pathname: p.href, query: { tipo } }} aria-current={router.pathname === p.href ? 'page' : undefined}>{p.label}</Link>

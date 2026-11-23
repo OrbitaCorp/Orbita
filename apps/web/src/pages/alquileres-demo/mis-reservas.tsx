@@ -2,13 +2,15 @@
 import Head from 'next/head'
 import type { GetServerSideProps } from 'next'
 import { BarraDemo } from '@/modules/alquileres/demo/BarraDemo'
+import { SoloEquipo } from '@/modules/alquileres/demo/SoloEquipo'
 import { useNegocio } from '@/modules/alquileres/demo/useNegocio'
 import MisReservas from '@/modules/alquileres/storefront/MisReservas'
 
-export const getServerSideProps: GetServerSideProps = async () =>
-  process.env.NODE_ENV === 'production' ? { notFound: true } : { props: {} }
+// Se sigue sirviendo desde el servidor (no estática): así ?tipo= y ?vista= llegan en el primer pintado.
+// Quién la puede ver lo decide SoloEquipo: en producción, solo superadmin.
+export const getServerSideProps: GetServerSideProps = async () => ({ props: {} })
 
-export default function Page() {
+function Contenido() {
   const { tipo, negocio, reservas, cambiarReserva } = useNegocio()
   return (
     <>
@@ -17,4 +19,8 @@ export default function Page() {
       <MisReservas key={tipo} negocio={negocio} reservas={reservas} onCancelar={id => cambiarReserva(id, { estado: 'cancelada' })} />
     </>
   )
+}
+
+export default function Page() {
+  return <SoloEquipo><Contenido /></SoloEquipo>
 }

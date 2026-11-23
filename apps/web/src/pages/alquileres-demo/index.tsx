@@ -1,16 +1,17 @@
-// DEMO INTERNA — índice del módulo Alquileres (localhost; en producción da 404).
+// DEMO INTERNA — índice del módulo Alquileres (en producción, solo para superadmin).
 // Tres negocios de ejemplo, uno por modo, y las pantallas de cada uno.
 import Head from 'next/head'
 import Link from 'next/link'
 import type { GetServerSideProps } from 'next'
 import { ArrowRight, LayoutDashboard, Store, CalendarCheck, Rocket, Users } from 'lucide-react'
 import { BarraDemo } from '@/modules/alquileres/demo/BarraDemo'
+import { SoloEquipo } from '@/modules/alquileres/demo/SoloEquipo'
 import { NEGOCIOS_DEMO, TIPOS, TIPOS_ORDEN } from '@/modules/alquileres/datos'
 import { EstiloReservas } from '@/design-system/reservas/estilo'
 
-// Solo en localhost, igual que /turnos-demo: en producción no existe.
-export const getServerSideProps: GetServerSideProps = async () =>
-  process.env.NODE_ENV === 'production' ? { notFound: true } : { props: {} }
+// Se sigue sirviendo desde el servidor (no estática): así ?tipo= y ?vista= llegan en el primer pintado.
+// Quién la puede ver lo decide SoloEquipo: en producción, solo superadmin.
+export const getServerSideProps: GetServerSideProps = async () => ({ props: {} })
 
 const PANTALLAS = [
   { href: '/alquileres-demo/onboarding', label: 'Alta', Icon: Rocket, texto: 'El alta única de Órbita con Alquileres elegido: qué alquilás, lo que alquilás, tu negocio y tu página.' },
@@ -20,15 +21,15 @@ const PANTALLAS = [
   { href: '/alquileres-demo/mis-reservas', label: 'Mis reservas', Icon: Users, texto: 'Lo que reservó el cliente, con cancelación dentro del plazo.' },
 ]
 
-export default function AlquileresDemo() {
+function Contenido() {
   return (
     <>
-      <Head><title>Alquileres · Vista previa local</title></Head>
+      <Head><title>Alquileres · Vista previa interna</title></Head>
       <EstiloReservas />
       <BarraDemo />
       <main className="rv" style={{ minHeight: 'calc(100vh - 40px)', background: 'var(--color-surface)' }}>
         <div className="rv-pagina" style={{ maxWidth: 1040 }}>
-          <span className="rv-rotulo">Alquileres · Vista previa local</span>
+          <span className="rv-rotulo">Alquileres · Vista previa interna</span>
           <h1 className="rv-h1" style={{ fontSize: 32, marginTop: 8 }}>Tres formas de alquilar, un solo módulo</h1>
           <p className="rv-bajada" style={{ fontSize: 15 }}>Por hora, por bloque (uno o varios salones) o por período, por noche o por mes. Todo es visual y con datos de ejemplo: no llama a la API ni guarda nada fuera de este navegador. Elegí un negocio y recorré sus pantallas.</p>
           <div className="rv-grid rv-grid--3" style={{ marginTop: 24 }}>
@@ -66,4 +67,8 @@ export default function AlquileresDemo() {
       </main>
     </>
   )
+}
+
+export default function Page() {
+  return <SoloEquipo><Contenido /></SoloEquipo>
 }
