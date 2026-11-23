@@ -13,6 +13,7 @@ import { pesos } from '@/lib/reservas/precio'
 import { agruparNoches, motivoNoReservable, motivoNoReservableMes, nochesEntre, precioEstadia, precioMensual, primeraEntradaLibre, salidaMaxima, nochesOcupadas } from '@/lib/reservas/estadia'
 import { AHORA, HOY, aperturaDe, bloquesLibresEn, capital, cuenta, esMensual, mesesTxt, nochesTxt, ocupadoDelDia, palabrasDe, rangosOcupados, rubroPorKey, type NegocioAlquiler, type Propiedad, type Reserva } from '../datos'
 import { CalendarioRango, type Rango } from '@/design-system/reservas/Calendario'
+import { politicaCancelacion } from '../datos/textos'
 import { Campo, Modal, Selector } from '@/design-system/reservas/piezas'
 import Sitio, { Horarios, Mapa, lineaNoches, ruta } from './Sitio'
 
@@ -171,6 +172,7 @@ function Salones({ negocio, reservas }: P) {
                   <h3>{s.nombre}</h3>
                   <span className="als-tarjeta-sub">{s.detalle || `Hasta ${s.capacidad} personas`}</span>
                   <span className="als-precio">{pesos(Math.min(...s.paquetes.map(p => p.precio)))} <small>el paquete, desde</small></span>
+                  {s.deposito > 0 && <span className="als-tarjeta-sub">Depósito de garantía de {pesos(s.deposito)}, aparte: se devuelve al terminar.</span>}
                 </div>
               </Link>
             ))}
@@ -399,7 +401,7 @@ function ComoFunciona({ negocio }: { negocio: NegocioAlquiler }) {
     { Icon: MousePointerClick,
       titulo: t === 'cancha' ? `Elegís ${palabras.genero === 'm' ? 'el' : 'la'} ${palabras.unidad} y el horario` : t === 'bloque' ? (varios ? `Elegís el ${palabras.unidad}, la fecha y el bloque` : 'Elegís la fecha y el bloque') : soloMes ? `Elegís ${palabras.genero === 'm' ? 'el' : 'la'} ${palabras.unidad} y desde cuándo` : `Elegís ${palabras.genero === 'm' ? 'el' : 'la'} ${palabras.unidad} y las fechas`,
       texto: t === 'cancha' ? `Ves los horarios libres de cada ${palabras.unidad} y podés tomar varias horas seguidas.` : t === 'bloque' ? 'Después el paquete según los invitados y los extras que quieras.' : soloMes ? 'Con la fecha de entrada y los meses ves el precio final.' : 'Con la entrada y la salida ves el precio final, limpieza incluida.' },
-    { Icon: CalendarCheck, titulo: negocio.senaPct ? `Confirmás con la seña del ${negocio.senaPct}%` : 'Confirmás al instante', texto: negocio.senaPct ? 'El resto se paga en el lugar. Si cancelás a tiempo, se devuelve.' : 'Sin seña: la reserva queda confirmada en el momento.' },
+    { Icon: CalendarCheck, titulo: negocio.senaPct ? `Confirmás con la seña del ${negocio.senaPct}%` : 'Confirmás al instante', texto: negocio.senaPct ? `El resto se paga en el lugar. ${politicaCancelacion(negocio)}` : 'Sin seña: la reserva queda confirmada en el momento.' },
     { Icon: Sparkles, titulo: 'Te llega la confirmación', texto: 'Con el código, el horario y la dirección. Podés agregarla a tu calendario.' },
   ]
   return (

@@ -4,10 +4,11 @@
 // La ficha abierta viaja en ?cliente=: el buscador del header la abre desde
 // cualquier parte.
 import { useState } from 'react'
-import { ArrowRight, CalendarCheck, Contact, Search, UserPlus } from 'lucide-react'
+import { ArrowRight, CalendarCheck, Contact, MessageCircle, Phone, Search, UserPlus } from 'lucide-react'
 import { MESES, fechaCorta, hhmm, moverMes, partes, rangoTxt } from '@/lib/reservas/fechas'
 import { pesos } from '@/lib/reservas/precio'
 import { ESTADO_RESERVA, HOY, capital, duracionEstadiaTxt, fechaDeReserva, palabrasDe, unidadPorId, type Cliente, type NegocioAlquiler, type Reserva } from '../datos'
+import { linkLlamar, linkWhatsApp } from '../datos/textos'
 import { Chip, Encabezado, Kpi, Modal, Sigla, Vacio } from '@/design-system/reservas/piezas'
 
 interface P {
@@ -84,7 +85,12 @@ export default function Clientes({ negocio, reservas, clientes, abierto, onAbrir
         </div>
       )}
       {fila && (
-        <Modal titulo={fila.c.nombre} bajada={`${fila.c.telefono}${fila.c.email ? ` · ${fila.c.email}` : ''}`} onCerrar={() => onAbrir(null)} pie={<button type="button" className="rv-btn" onClick={() => onAbrir(null)}>Cerrar</button>}>
+        <Modal titulo={fila.c.nombre} bajada={`${fila.c.telefono}${fila.c.email ? ` · ${fila.c.email}` : ''}`} onCerrar={() => onAbrir(null)} pie={<>
+          {/* WhatsApp y llamar desde la ficha: el dueño le escribe al cliente sin copiar el número. */}
+          {linkWhatsApp(fila.c.telefono) && <a className="rv-btn rv-modal-izq" href={linkWhatsApp(fila.c.telefono, `Hola ${fila.c.nombre.split(' ')[0]}`) ?? undefined} target="_blank" rel="noopener noreferrer"><MessageCircle size={15} aria-hidden /> WhatsApp</a>}
+          {linkLlamar(fila.c.telefono) && <a className="rv-btn" href={linkLlamar(fila.c.telefono) ?? undefined}><Phone size={15} aria-hidden /> Llamar</a>}
+          <button type="button" className="rv-btn" onClick={() => onAbrir(null)}>Cerrar</button>
+        </>}>
           {fila.c.nota && <p className="rv-nota" style={{ marginBottom: 12 }}>{fila.c.nota}</p>}
           <style>{CSS_FICHA}</style>
           <dl className="alcl-resumen">

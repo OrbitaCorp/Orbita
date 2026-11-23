@@ -23,6 +23,7 @@ import { AHORA, HOY, aperturaDe, bloqueoEn, bloquesDe, bloquesLibresEn, capital,
 import { CalendarioDia, CalendarioRango, type Rango } from '@/design-system/reservas/Calendario'
 import { Campo, Area, Selector } from '@/design-system/reservas/piezas'
 import Sitio, { lineaNoches, ruta } from './Sitio'
+import { politicaCancelacion } from '../datos/textos'
 
 interface P { negocio: NegocioAlquiler; reservas: ReservaT[]; onReservar: (r: ReservaT, c: Cliente) => void }
 
@@ -73,6 +74,7 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
   // Sin useMemo: react-compiler memoiza solo, y a mano no se podía (las listas se arman en cada render).
   const unidad = tipo === 'cancha' ? negocio.unidades.find(u => u.id === unidadId) ?? null : null
   const salon = tipo === 'bloque' ? salonDe(negocio, unidadId ?? undefined) ?? null : null
+  const depositoSalon = salon?.deposito ?? 0
   const propiedad = tipo === 'estadia' ? negocio.propiedades.find(p => p.id === unidadId) ?? null : null
   const mensual = !!propiedad && esMensual(propiedad) && !!propiedad.mensual
   const paquete = salon?.paquetes.find(p => p.id === paqueteId) ?? null
@@ -425,7 +427,7 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
             )}
 
             {actual === 'pago' && (
-              <Bloque refTitulo={titulo} titulo="Confirmá con la seña" sub={`Pagás ${pesos(sena)} ahora y ${pesos(total - sena)} ${mensual ? 'mes a mes' : 'en el lugar'}. Si cancelás ${negocio.cancelaHastaHoras >= 24 ? `hasta ${negocio.cancelaHastaHoras / 24} ${negocio.cancelaHastaHoras / 24 === 1 ? 'día' : 'días'}` : `hasta ${negocio.cancelaHastaHoras} h`} antes, se devuelve.`}>
+              <Bloque refTitulo={titulo} titulo="Confirmá con la seña" sub={`Pagás ${pesos(sena)} ahora y ${pesos(total - sena)} ${mensual ? 'mes a mes' : 'en el lugar'}.${depositoSalon ? ` Además, el día del evento se entrega un depósito de garantía de ${pesos(depositoSalon)}, que se devuelve al terminar.` : ''} ${politicaCancelacion(negocio)}`}>
                 <div className="rv-card rv-card--pad" style={{ background: 'var(--color-surface)' }}>
                   <div className="rv-rotulo">Vista previa: no se cobra nada</div>
                   <p style={{ margin: '8px 0 14px', fontSize: 14 }}>En el producto real, acá se abre Mercado Pago con el monto de la seña.</p>
@@ -445,6 +447,8 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
                 {tipo === 'estadia' && (rangoCompleto || precioMes) && <div><dt>{mensual ? 'Personas' : 'Huéspedes'}</dt><dd>{datos.huespedes}</dd></div>}
                 {precio?.detalle.map(([k, v]) => <div key={k}><dt>{k}</dt><dd className="rv-num">{pesos(v)}</dd></div>)}
                 {mensual && precioMes && propiedad.mensual!.deposito > 0 && <div><dt>Depósito, aparte</dt><dd className="rv-num">{pesos(propiedad.mensual!.deposito)}</dd></div>}
+                {/* El depósito del salón se dice antes de pagar la seña: antes aparecía recién en la confirmación. */}
+                {depositoSalon > 0 && <div><dt>Depósito, aparte (se devuelve)</dt><dd className="rv-num">{pesos(depositoSalon)}</dd></div>}
               </dl>
               <div className="alr-total"><span>Total</span><b className="rv-num">{precio ? pesos(total) : '—'}</b></div>
               {sena > 0 && <div className="alr-total" style={{ fontWeight: 500, color: 'var(--color-muted)' }}><span>Seña ahora</span><span className="rv-num">{pesos(sena)}</span></div>}
@@ -590,6 +594,8 @@ export const CSS_RESERVA = `
   /* La hora elegida (data-elegido: la franja es un radio nativo) y, con dos o tres turnos seguidos, las que quedan adentro. */
   .alr .rv-franja[data-elegido='true'] { background: var(--color-primary); color: var(--color-on-primary); border-color: transparent; }
   .alr .rv-franja[data-elegido='true'] small { color: inherit; opacity: 0.85; }
+  /* Una hora tomada: sin fondo y con borde punteado. Con el fondo del tema (verde claro en canchas) parecía libre. */
+  .alr .rv-franja[data-deshabilitado='true'] { background: transparent; border-style: dashed; color: var(--color-subtle); }
   .alr .rv-franja[data-en-rango='true'] { background: var(--color-primary-bg); border-color: var(--color-primary); color: var(--chip-primary-fg); }
   .alr .rv-franja[data-en-rango='true'] small { color: inherit; }
   .alr-total { display: flex; justify-content: space-between; gap: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--color-border); font-size: 15px; font-weight: 700; color: var(--color-text); }

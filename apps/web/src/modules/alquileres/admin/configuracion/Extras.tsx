@@ -9,6 +9,7 @@ import { pesos, type Extra } from '@/lib/reservas/precio'
 import { BarraGuardar, Campo, Nota, Vacio } from '@/design-system/reservas/piezas'
 import { HOY, TIPOS, cuenta, type Reserva } from '../../datos'
 import { PaginaForm, idNuevo, igual, num, type Form } from './comun'
+import { milesTxt } from '../../datos/textos'
 
 export default function Extras({ negocio, reservas, onGuardar }: Form & { reservas: Reserva[] }) {
   const enSalon = negocio.tipo === 'bloque'
@@ -33,7 +34,7 @@ export default function Extras({ negocio, reservas, onGuardar }: Form & { reserv
                 <div key={e.id} style={{ paddingBottom: 12, borderBottom: '1px solid var(--color-border)' }}>
                   <div className="alc-fila alc-fila--extra">
                     <Campo label="Nombre" value={e.nombre} onChange={x => editar(e.id, { nombre: x })} />
-                    <Campo label="Precio" prefijo="$" value={String(e.precio)} onChange={x => editar(e.id, { precio: num(x) })} inputMode="numeric" />
+                    <Campo label="Precio" prefijo="$" value={milesTxt(e.precio)} onChange={x => editar(e.id, { precio: num(x) })} inputMode="numeric" />
                     <button type="button" className="rv-btn rv-btn--icono" onClick={() => setLista(lista.filter(x => x.id !== e.id))} aria-label={`Quitar ${e.nombre}`}><Trash2 size={16} /></button>
                   </div>
                   <p className="ala-pie-nota" style={{ marginTop: 8 }}>{origen.some(x => x.id === e.id) ? (veces(e.id) ? `Pedido ${cuenta(veces(e.id), 'vez', 'veces')} · ${pesos(veces(e.id) * e.precio)} en total` : 'Nadie lo pidió todavía') : 'Nuevo: todavía nadie lo vio'}.</p>

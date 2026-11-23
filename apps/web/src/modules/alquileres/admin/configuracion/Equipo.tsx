@@ -6,6 +6,7 @@ import { Plus, Trash2, UserPlus } from 'lucide-react'
 import { Campo, Chip, EtiquetaDemo, Modal, Seccion, Selector, Sigla } from '@/design-system/reservas/piezas'
 import { ROLES, TIPOS, rolDe, type Persona, type RolEquipo } from '../../datos'
 import { PaginaForm, idNuevo, type Form } from './comun'
+import { BotonConfirmar } from '../piezas'
 
 type Opcion = 'encargado' | 'encargada' | 'recepcion'
 const OPCIONES: { id: Opcion; label: string; rol: RolEquipo; genero?: 'f' }[] = [
@@ -42,7 +43,7 @@ export default function Equipo({ negocio, onGuardar }: Form) {
                   <span className="rv-item-titulo">{p.nombre} <Chip tono={p.rol === 'dueno' ? 'primario' : 'gris'}>{rolDe(p)}</Chip>{i === 0 && <Chip tono="borde">Sos vos</Chip>}</span>
                   <span className="rv-item-sub">{[p.telefono, p.email].filter(Boolean).join(' · ') || 'Sin contacto cargado'}</span>
                 </span>
-                {p.rol !== 'dueno' && <button type="button" className="rv-btn rv-btn--sm" onClick={() => quitar(p)}><Trash2 size={15} aria-hidden /> Quitar</button>}
+                {p.rol !== 'dueno' && <BotonConfirmar pregunta={`¿Sacar a ${p.nombre.split(' ')[0]} del panel?`} si="Sí, sacar" onConfirmar={() => quitar(p)}><Trash2 size={15} aria-hidden /> Quitar</BotonConfirmar>}
               </div>
             ))}
           </div>

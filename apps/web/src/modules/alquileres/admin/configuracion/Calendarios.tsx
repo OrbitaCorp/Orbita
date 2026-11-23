@@ -12,6 +12,7 @@ import { EtiquetaDemo, Campo, Nota, Seccion, Selector } from '@/design-system/re
 import { HOY, TIPOS, cuenta, palabrasDe, unidadesDe, type Bloqueo, type CalendarioExterno, type NegocioAlquiler, type Reserva } from '../../datos'
 import { deCalendario } from '../../datos/negocio'
 import { PaginaForm, idNuevo } from './comun'
+import { BotonConfirmar } from '../piezas'
 
 interface P {
   negocio: NegocioAlquiler
@@ -90,7 +91,7 @@ export default function Calendarios({ negocio, reservas, onCalendario, onQuitarC
                       <Link2 size={16} aria-hidden style={{ color: 'var(--color-muted)', flexShrink: 0 }} />
                       {/* El título se parte en dos renglones si hace falta: cortado con "…" no se leía a qué propiedad va. */}
                       <span className="rv-item-cuerpo"><span className="rv-item-titulo" style={{ whiteSpace: 'normal' }}>{c.nombre} → {unidades.find(u => u.id === c.unidadId)?.nombre}</span><span className="rv-item-sub">Última sincronización: {fechaCorta(c.ultimaSync)} · {suyos.length} {suyos.length === 1 ? 'bloqueo' : 'bloqueos'}</span></span>
-                      <button type="button" className="rv-btn rv-btn--sm" onClick={() => onQuitarCalendario(c.id)}><Trash2 size={15} aria-hidden /> Quitar</button>
+                      <BotonConfirmar pregunta={`¿Quitar? Sus ${suyos.length} ${suyos.length === 1 ? 'bloqueo se libera' : 'bloqueos se liberan'}.`} onConfirmar={() => onQuitarCalendario(c.id)}><Trash2 size={15} aria-hidden /> Quitar</BotonConfirmar>
                     </div>
                     {suyos.length > 0
                       ? <ul className="alc-bloqueos" aria-label={`Bloqueos que trae ${c.nombre}`}>{suyos.map(b => <li key={b.id}><span>{rangoTxt(b.desde, b.hasta)}</span><span>{b.motivo}</span></li>)}</ul>

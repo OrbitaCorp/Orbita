@@ -11,15 +11,17 @@
 // desde cualquier parte del panel. El modal de agendar a mano (NuevaReserva)
 // también lo abre Qué hay libre, con lo elegido ya puesto.
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { ArrowRight, Ban, Check, ChevronLeft, ChevronRight, Lock, Plus, Wallet } from 'lucide-react'
+import { ArrowRight, Ban, Check, ChevronLeft, ChevronRight, Lock, MessageCircle, Phone, Plus, Wallet } from 'lucide-react'
 import { MESES, diasDelMes, duracionTxt, fechaCorta, fechaLarga, fechaRelativa, hhmm, mesTxt, moverMes, partes, rangoTxt, sumarDias, diaSemana, diasEntre, type ISO } from '@/lib/reservas/fechas'
 import { consecutivasDesde, franjasDelDia } from '@/lib/reservas/disponibilidad'
 import { pesos, precioBloque, precioTurnosSeguidos } from '@/lib/reservas/precio'
 import { motivoNoReservable, motivoNoReservableMes, nochesOcupadas, precioEstadia, precioMensual, salidaMaxima } from '@/lib/reservas/estadia'
 import { AHORA, ESTADO_RESERVA, HOY, aperturaDe, bloqueoEn, bloquesDe, bloquesLibresEn, capital, clientePorId, cuenta, duracionEstadiaTxt, esMensual, fechaDeReserva, mesesTxt, ocupadoDelDia, palabrasDe, rangosOcupados, reservasDelDia, salonDe, senaPara, tituloEvento, unidadPorId, type Bloqueo, type Cliente, type NegocioAlquiler, type Reserva } from '../datos'
 import { CalendarioDia, CalendarioRango, type Rango } from '@/design-system/reservas/Calendario'
-import { Area, Campo, Chip, Encabezado, Modal, Nota, Selector, Sigla, Vacio } from '@/design-system/reservas/piezas'
+import { Area, Campo, Chip, Encabezado, FilaSwitch, Modal, Nota, Selector, Sigla, Vacio } from '@/design-system/reservas/piezas'
+import { linkLlamar, linkWhatsApp } from '../datos/textos'
 import { BloquearDia, BloquearFechas } from './Bloquear'
+import { BotonConfirmar } from './piezas'
 
 interface P {
   negocio: NegocioAlquiler
@@ -194,7 +196,7 @@ function AgendaCanchas({ negocio, reservas, clientes, onAbrir, onNueva, onQuitar
           {bloqueadas.map(g => (
             <Nota key={g.ids.join()} tono="aviso">
               <span style={{ flex: 1, minWidth: 0 }}><b>{g.nombres.length === negocio.unidades.length ? `Todas las ${palabras.unidades}` : g.nombres.join(', ')}</b>: no se puede reservar este día ({g.motivo}).{g.dueno ? '' : ' Vino de un calendario externo: se quita en Configuración.'}</span>
-              {g.dueno && <button type="button" className="rv-btn rv-btn--sm" onClick={() => g.ids.forEach(id => onQuitarBloqueo(id))}>Quitar</button>}
+              {g.dueno && <BotonConfirmar pregunta="¿Quitar el bloqueo?" onConfirmar={() => g.ids.forEach(id => onQuitarBloqueo(id))}>Quitar</BotonConfirmar>}
             </Nota>
           ))}
         </div>
@@ -303,7 +305,7 @@ function AgendaSalones({ negocio, reservas, clientes, onAbrir, onNueva, onQuitar
             <div style={{ marginBottom: 10 }}>
               <Nota tono="aviso">
                 <span style={{ flex: 1, minWidth: 0 }}>Día bloqueado: {bloqueoDia.motivo}. Nadie puede reservar {varios ? s.nombre : `el ${palabras.unidad}`} ese día.{bloqueoDia.origen === 'ical' ? ' Vino de un calendario externo: se quita en Configuración.' : ''}</span>
-                {bloqueoDia.origen === 'dueno' && <button type="button" className="rv-btn rv-btn--sm" onClick={() => onQuitarBloqueo(bloqueoDia.id)}>Quitar</button>}
+                {bloqueoDia.origen === 'dueno' && <BotonConfirmar pregunta="¿Quitar el bloqueo?" onConfirmar={() => onQuitarBloqueo(bloqueoDia.id)}>Quitar</BotonConfirmar>}
               </Nota>
             </div>
           )}
@@ -444,7 +446,7 @@ function Ocupacion({ negocio, reservas, clientes, onAbrir, onNueva, onQuitarBloq
       </div>
       {bloqueo && (
         <Modal titulo="Fechas bloqueadas" onCerrar={() => setBloqueoAbierto(null)}
-          pie={<><button type="button" className="rv-btn" onClick={() => setBloqueoAbierto(null)}>Cerrar</button>{bloqueo.origen === 'dueno' && <button type="button" className="rv-btn rv-btn--peligro" onClick={() => { onQuitarBloqueo(bloqueo.id); setBloqueoAbierto(null) }}>Quitar el bloqueo</button>}</>}>
+          pie={<><button type="button" className="rv-btn" onClick={() => setBloqueoAbierto(null)}>Cerrar</button>{bloqueo.origen === 'dueno' && <BotonConfirmar className="rv-btn rv-btn--peligro" pregunta="¿Quitar? Esas fechas quedan libres." onConfirmar={() => { onQuitarBloqueo(bloqueo.id); setBloqueoAbierto(null) }}>Quitar el bloqueo</BotonConfirmar>}</>}>
           <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>{rangoTxt(bloqueo.desde, bloqueo.hasta)}</p>
           <p style={{ margin: '6px 0 0', fontSize: 14 }}>{bloqueo.motivo}</p>
           <p className="rv-ayuda" style={{ marginTop: 8 }}>{bloqueo.origen === 'ical' ? 'Vino de un calendario externo: se quita desconectando el calendario en Configuración.' : 'Lo pusiste vos. Mientras esté, nadie puede reservar esas fechas.'}</p>
@@ -479,24 +481,56 @@ export function Detalle({ negocio, reserva: r, cliente, onCerrar, onCambiar }: {
   const notas = ev?.notas ?? r.nota
   // En el salón el título es el evento y el salón va en la bajada, para saber en cuál es.
   const bajada = ev && negocio.salones.length > 1 && u ? `${u.nombre} · ${cuando}` : cuando
+  // Lo que no se deshace se pregunta antes, en el mismo pie: cancelar, y cerrar una reserva con saldo sin registrar.
+  const [preguntando, setPreguntando] = useState<null | 'cancelar' | 'realizada'>(null)
+  const debeSaldo = !r.saldoPagado && saldo > 0
+  const realizar = (cobrado: boolean) => {
+    onCambiar(r.id, { estado: 'completada', ...(cobrado ? { saldoPagado: true } : {}) }, mensual ? 'Contrato terminado.' : cobrado || !debeSaldo ? 'Marcada como realizada.' : `Marcada como realizada. El saldo de ${pesos(saldo)} sigue en "Por cobrar".`)
+    onCerrar()
+  }
+  const quien = cliente?.nombre ?? palabrasDe(negocio).cliente
+  const whatsapp = cliente?.telefono ? linkWhatsApp(cliente.telefono, `Hola ${cliente.nombre.split(' ')[0]}, te escribimos de ${negocio.nombre} por tu ${ev ? 'evento' : 'reserva'} (${cuando}).`) : null
+  const llamar = cliente?.telefono ? linkLlamar(cliente.telefono) : null
+  const pie = preguntando === 'cancelar' ? (
+    <>
+      <span className="rv-modal-izq rv-ayuda" style={{ color: 'var(--color-text)' }}><b>¿Cancelar {mensual ? 'el contrato' : ev ? 'el evento' : 'la reserva'} de {quien}?</b> El lugar queda libre.{r.senaPagada && r.sena > 0 ? ` La seña de ${pesos(r.sena)} ya está cobrada: si corresponde devolverla, hacelo por fuera.` : ''}</span>
+      <button type="button" className="rv-btn" onClick={() => setPreguntando(null)} autoFocus>No, volver</button>
+      <button type="button" className="rv-btn rv-btn--peligro" onClick={() => { onCambiar(r.id, { estado: 'cancelada' }, 'Reserva cancelada. El lugar quedó libre.'); onCerrar() }}><Ban size={15} aria-hidden /> Sí, cancelar</button>
+    </>
+  ) : preguntando === 'realizada' ? (
+    <>
+      <span className="rv-modal-izq rv-ayuda" style={{ color: 'var(--color-text)' }}><b>¿Se cobró el saldo de {pesos(saldo)}?</b></span>
+      <button type="button" className="rv-btn" onClick={() => realizar(false)}>No, sigue pendiente</button>
+      <button type="button" className="rv-btn rv-btn--primario" onClick={() => realizar(true)} autoFocus><Check size={15} aria-hidden /> Sí, se cobró</button>
+    </>
+  ) : (
+    <>
+      {r.estado === 'pendiente' && <button type="button" className="rv-btn rv-btn--primario" onClick={() => onCambiar(r.id, { estado: 'confirmada', senaPagada: true }, `Seña de ${pesos(r.sena)} registrada. Reserva confirmada.`)}><Wallet size={15} aria-hidden /> Registrar seña {pesos(r.sena)}</button>}
+      {r.estado === 'confirmada' && debeSaldo && <button type="button" className="rv-btn" onClick={() => onCambiar(r.id, { saldoPagado: true }, `Saldo de ${pesos(saldo)} registrado.`)}><Wallet size={15} aria-hidden /> Registrar saldo {pesos(saldo)}</button>}
+      {r.estado === 'confirmada' && r.deposito && !r.depositoRegistrado ? <button type="button" className="rv-btn" onClick={() => onCambiar(r.id, { depositoRegistrado: true }, `Depósito de ${pesos(r.deposito ?? 0)} registrado.`)}><Lock size={15} aria-hidden /> Registrar depósito</button> : null}
+      {r.estado === 'confirmada' && <button type="button" className="rv-btn rv-btn--primario" onClick={() => (debeSaldo && !mensual ? setPreguntando('realizada') : realizar(true))}><Check size={15} aria-hidden /> {mensual ? 'Terminar contrato' : 'Marcar realizada'}</button>}
+      {/* Cancelar va último: abajo de todo en celular, a la izquierda en escritorio (ala-ultimo). */}
+      {activa && <button type="button" className="rv-btn rv-btn--peligro ala-ultimo" onClick={() => setPreguntando('cancelar')}><Ban size={15} aria-hidden /> Cancelar {mensual ? 'contrato' : 'reserva'}</button>}
+      {!activa && <button type="button" className="rv-btn" onClick={onCerrar}>Cerrar</button>}
+    </>
+  )
   return (
     <Modal titulo={ev ? tituloEvento(ev) : u?.nombre ?? negocio.nombre} bajada={bajada} onCerrar={onCerrar} ancho={560}
-      pie={<>
-        {activa && <button type="button" className="rv-btn rv-btn--peligro rv-modal-izq" onClick={() => { onCambiar(r.id, { estado: 'cancelada' }, 'Reserva cancelada. El lugar quedó libre.'); onCerrar() }}><Ban size={15} aria-hidden /> Cancelar {mensual ? 'contrato' : 'reserva'}</button>}
-        {r.estado === 'pendiente' && <button type="button" className="rv-btn rv-btn--primario" onClick={() => onCambiar(r.id, { estado: 'confirmada', senaPagada: true }, `Seña de ${pesos(r.sena)} registrada. Reserva confirmada.`)}><Wallet size={15} aria-hidden /> Registrar seña {pesos(r.sena)}</button>}
-        {r.estado === 'confirmada' && !r.saldoPagado && saldo > 0 && <button type="button" className="rv-btn" onClick={() => onCambiar(r.id, { saldoPagado: true }, `Saldo de ${pesos(saldo)} registrado.`)}><Wallet size={15} aria-hidden /> Registrar saldo {pesos(saldo)}</button>}
-        {r.estado === 'confirmada' && r.deposito && !r.depositoRegistrado ? <button type="button" className="rv-btn" onClick={() => onCambiar(r.id, { depositoRegistrado: true }, `Depósito de ${pesos(r.deposito ?? 0)} registrado.`)}><Lock size={15} aria-hidden /> Registrar depósito</button> : null}
-        {r.estado === 'confirmada' && <button type="button" className="rv-btn rv-btn--primario" onClick={() => { onCambiar(r.id, { estado: 'completada', saldoPagado: true }, mensual ? 'Contrato terminado.' : 'Marcada como realizada.'); onCerrar() }}><Check size={15} aria-hidden /> {mensual ? 'Terminar contrato' : 'Marcar realizada'}</button>}
-        {!activa && <button type="button" className="rv-btn" onClick={onCerrar}>Cerrar</button>}
-      </>}>
+      pie={pie}>
       <div className="rv-fila" style={{ marginBottom: 12 }}>
         <Chip tono={ESTADO_RESERVA[r.estado].tono}>{ESTADO_RESERVA[r.estado].label}</Chip>
         <span className="rv-rotulo">Código {r.id.slice(-6).toUpperCase()}</span>
       </div>
       <div className="rv-fila" style={{ marginBottom: 10, flexWrap: 'nowrap' }}>
         <Sigla nombre={cliente?.nombre ?? '?'} />
-        <div style={{ minWidth: 0 }}><b style={{ color: 'var(--color-text)' }}>{cliente?.nombre ?? '—'}</b><div className="rv-ayuda">{cliente?.telefono}{cliente?.email ? ` · ${cliente.email}` : ''}</div></div>
+        <div style={{ minWidth: 0, flex: 1 }}><b style={{ color: 'var(--color-text)' }}>{cliente?.nombre ?? '—'}</b><div className="rv-ayuda">{cliente?.telefono}{cliente?.email ? ` · ${cliente.email}` : ''}</div></div>
       </div>
+      {(whatsapp || llamar) && (
+        <div className="rv-fila" style={{ marginBottom: 10 }}>
+          {whatsapp && <a className="rv-btn rv-btn--sm" href={whatsapp} target="_blank" rel="noopener noreferrer"><MessageCircle size={15} aria-hidden /> WhatsApp</a>}
+          {llamar && <a className="rv-btn rv-btn--sm" href={llamar}><Phone size={15} aria-hidden /> Llamar</a>}
+        </div>
+      )}
       {ev ? (
         <>
           <div className="rv-rotulo" style={{ margin: '14px 0 2px' }}>Ficha del evento</div>
@@ -538,7 +572,10 @@ export function NuevaReserva({ negocio, reservas, clientes, pre, onCerrar, onRes
   const palabras = palabrasDe(negocio)
   // Nombre del grupo de radios de los horarios.
   const prefijo = useId()
-  const [clienteId, setClienteId] = useState(clientes[0]?.id ?? '')
+  // Sin nadie elegido de entrada: antes arrancaba con el primero de la lista y una reserva podía quedar a nombre de otro.
+  const [clienteId, setClienteId] = useState('')
+  const [buscar, setBuscar] = useState('')
+  const [yaPago, setYaPago] = useState(false)
   const [nuevoNombre, setNuevoNombre] = useState('')
   const [nuevoTel, setNuevoTel] = useState('')
   const [unidadId, setUnidadId] = useState(pre.unidadId ?? (tipo === 'cancha' ? negocio.unidades[0]?.id : tipo === 'estadia' ? negocio.propiedades[0]?.id : negocio.salones[0]?.id) ?? '')
@@ -558,12 +595,16 @@ export function NuevaReserva({ negocio, reservas, clientes, pre, onCerrar, onRes
   const [huespedes, setHuespedes] = useState('2')
   const [error, setError] = useState('')
 
+  const q = buscar.trim().toLowerCase()
+  const qTel = q.replace(/\D/g, '')
+  const filtrados = q ? clientes.filter(c => c.id === clienteId || c.nombre.toLowerCase().includes(q) || (qTel !== '' && c.telefono.replace(/\D/g, '').includes(qTel))) : clientes
   const unidad = negocio.unidades.find(u => u.id === unidadId)
   const s = tipo === 'bloque' ? salonDe(negocio, unidadId) : undefined
   const prop = negocio.propiedades.find(p => p.id === unidadId)
   const mensual = !!prop && esMensual(prop) && !!prop.mensual
   const bloqueoDia = bloqueoEn(negocio, unidadId, fecha)
-  const franjas = tipo === 'cancha' && unidad ? franjasDelDia(aperturaDe(negocio, fecha), ocupadoDelDia(negocio, reservas, unidad.id, fecha), { paso: negocio.pasoMin, duracion: negocio.duracionMin }) : []
+  // Como en el sitio: hoy no se ofrecen los horarios que ya pasaron.
+  const franjas = tipo === 'cancha' && unidad ? franjasDelDia(aperturaDe(negocio, fecha), ocupadoDelDia(negocio, reservas, unidad.id, fecha), { paso: negocio.pasoMin, duracion: negocio.duracionMin, desde: fecha === HOY ? AHORA : undefined }) : []
   // Como en el sitio: desde la hora elegida, solo las franjas seguidas que siguen libres; si no, se pisaría otra reserva.
   const maxSeguidas = hora === '' ? negocio.maxFranjas : Math.max(1, consecutivasDesde(franjas, hora, negocio.maxFranjas))
   const seguidas = Math.min(horas, maxSeguidas)
@@ -590,7 +631,9 @@ export function NuevaReserva({ negocio, reservas, clientes, pre, onCerrar, onRes
     const cliente: Cliente | undefined = clienteId === 'nuevo' ? { id: idNuevo('ka'), nombre: nuevoNombre.trim(), telefono: nuevoTel.trim() } : clientePorId(clienteId, clientes)
     if (!cliente) { setError(`Elegí a quién es la reserva.`); return }
     if (clienteId === 'nuevo' && cliente.nombre.length < 3) { setError(`Escribí el nombre del ${palabras.cliente}.`); return }
-    const base = { id: idNuevo('n'), unidadId, clienteId: cliente.id, creada: HOY, extras: extrasElegidos, total, sena, senaPagada: false, saldoPagado: false, estado: (sena > 0 ? 'pendiente' : 'confirmada') as Reserva['estado'], nota: notas.trim() || undefined }
+    // "Ya pagó la seña": lo que se cobró en el mostrador o por transferencia nace confirmado.
+    const senaYa = sena > 0 && yaPago
+    const base = { id: idNuevo('n'), unidadId, clienteId: cliente.id, creada: HOY, extras: extrasElegidos, total, sena, senaPagada: senaYa, saldoPagado: false, estado: (sena > 0 && !senaYa ? 'pendiente' : 'confirmada') as Reserva['estado'], nota: notas.trim() || undefined }
     if (tipo === 'cancha') {
       if (hora === '') { setError('Elegí un horario.'); return }
       if (!franjas.some(f => f.inicio === hora && f.libre)) { setError('Ese horario ya está tomado. Elegí otro.'); return }
@@ -628,7 +671,9 @@ export function NuevaReserva({ negocio, reservas, clientes, pre, onCerrar, onRes
         <button type="button" className="rv-btn rv-btn--primario" onClick={guardar}><Check size={15} aria-hidden /> Agendar</button>
       </>}>
       <div className="rv-pila alg-nueva">
-        <Selector label={capital(palabras.cliente)} valor={clienteId} onChange={setClienteId} opciones={[...clientes.map(c => ({ id: c.id, label: `${c.nombre} · ${c.telefono}` })), { id: 'nuevo', label: '+ Alguien nuevo' }]} />
+        {/* Primero "Alguien nuevo" (lo más común por teléfono) y, con muchos, un buscador por nombre o teléfono. */}
+        {clientes.length > 8 && <Campo label={`Buscar ${palabras.cliente}`} value={buscar} onChange={setBuscar} placeholder="Nombre o teléfono" ayuda={buscar ? `${cuenta(filtrados.length, 'coincide', 'coinciden')}.` : undefined} />}
+        <Selector label={capital(palabras.cliente)} valor={clienteId} onChange={setClienteId} opciones={[{ id: '', label: 'Elegí a quién' }, { id: 'nuevo', label: '+ Alguien nuevo' }, ...filtrados.map(c => ({ id: c.id, label: `${c.nombre} · ${c.telefono}` }))]} />
         {clienteId === 'nuevo' && <div className="rv-dos"><Campo label="Nombre" value={nuevoNombre} onChange={setNuevoNombre} /><Campo label="Celular" value={nuevoTel} onChange={setNuevoTel} inputMode="tel" /></div>}
         {tipo === 'cancha' && (
           <>
@@ -710,6 +755,7 @@ export function NuevaReserva({ negocio, reservas, clientes, pre, onCerrar, onRes
             )}
           </>
         )}
+        {sena > 0 && <FilaSwitch titulo={`Ya pagó la seña (${pesos(sena)})`} ayuda="Si la cobraste en el lugar o por transferencia: la reserva queda confirmada." on={yaPago} onChange={setYaPago} />}
         <Area label={tipo === 'bloque' ? 'Notas del evento (opcional)' : 'Nota (opcional)'} value={notas} onChange={setNotas} maxLength={300} placeholder={tipo === 'bloque' ? 'Temática, alergias, horario de la torta…' : ''} />
         {error && <p className="rv-error" role="alert" style={{ margin: 0 }}>{error}</p>}
       </div>

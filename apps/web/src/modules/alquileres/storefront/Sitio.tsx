@@ -16,12 +16,13 @@
 // siempre no llegaban a 4.5:1 (AA).
 import type { ReactNode } from 'react'
 import Link from 'next/link'
-import { ArrowRight, MapPin, Phone } from 'lucide-react'
+import { ArrowRight, MapPin, MessageCircle, Phone } from 'lucide-react'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 import { hhmm, DIAS_CORTOS } from '@/lib/reservas/fechas'
 import { pesos } from '@/lib/reservas/precio'
 import type { GrupoNoches } from '@/lib/reservas/estadia'
 import { palabrasDe, type NegocioAlquiler, type TipoAlquiler } from '../datos'
+import { linkLlamar, linkWhatsApp } from '../datos/textos'
 import { EstiloReservas } from '@/design-system/reservas/estilo'
 import { BotonTema, useModoSitio } from '@/design-system/reservas/modoSitio'
 
@@ -240,7 +241,12 @@ export default function Sitio({ negocio, pagina, cta, children }: Props) {
       </header>
       <main className="als-main">{children}</main>
       <footer className="als-cont als-pie">
-        <span><Phone size={13} aria-hidden style={{ verticalAlign: '-2px', marginRight: 5 }} />{negocio.telefono} · <MapPin size={13} aria-hidden style={{ verticalAlign: '-2px', marginRight: 4 }} />{negocio.direccion}, {negocio.ciudad}</span>
+        {/* El teléfono se toca: llama, y al lado WhatsApp con el mensaje armado (el canal de estos negocios). */}
+        <span>
+          <a href={linkLlamar(negocio.telefono) ?? undefined}><Phone size={13} aria-hidden style={{ verticalAlign: '-2px', marginRight: 5 }} />{negocio.telefono}</a>
+          {linkWhatsApp(negocio.telefono) && <> · <a href={linkWhatsApp(negocio.telefono, `Hola, te escribo desde la página de ${negocio.nombre}.`) ?? undefined} target="_blank" rel="noopener noreferrer"><MessageCircle size={13} aria-hidden style={{ verticalAlign: '-2px', marginRight: 5 }} />WhatsApp</a></>}
+          {' · '}<MapPin size={13} aria-hidden style={{ verticalAlign: '-2px', marginRight: 4 }} />{negocio.direccion}, {negocio.ciudad}
+        </span>
         <span>Reservas con <a href="https://orbita.site" target="_blank" rel="noreferrer"><OrbitaLogo size={14} animated={false} /> Órbita</a></span>
       </footer>
       {cta && (

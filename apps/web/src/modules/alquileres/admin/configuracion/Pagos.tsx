@@ -9,12 +9,12 @@ import { BarraGuardar, Campo, Chip, FilaSwitch, Nota, Seccion, Selector } from '
 import { FORMAS_PAGO, TIPOS, palabrasDe, type FormaPago, type NegocioAlquiler } from '../../datos'
 import type { Vista } from '../navegacion'
 import { PaginaForm, igual, num, type Form } from './comun'
+import { BotonConfirmar } from '../piezas'
+import { SENA_A_TIEMPO as A_TIEMPO, SENA_TARDE as TARDE, milesTxt } from '../../datos/textos'
 import { plazoTxt } from './Reglas'
 
 const de = (n: NegocioAlquiler) => ({ senaPct: n.senaPct, pagos: n.pagos, depositos: Object.fromEntries(n.salones.map(s => [s.id, s.deposito])) as Record<string, number> })
 
-const A_TIEMPO = { devolver: 'se devuelve la seña entera', credito: 'la seña queda como crédito para otra reserva' }
-const TARDE = { pierde: 'se pierde la seña', mitad: 'se devuelve la mitad de la seña', credito: 'la seña queda como crédito para otra reserva' }
 
 export default function Pagos({ negocio, onGuardar, onIr }: Form & { onIr: (vista: Vista) => void }) {
   const [v, setV] = useState(de(negocio))
@@ -71,7 +71,7 @@ export default function Pagos({ negocio, onGuardar, onIr }: Form & { onIr: (vist
                 <span className="rv-item-sub">{v.pagos.mpConectado ? 'La seña se cobra online al reservar y va directo a tu cuenta.' : 'Te lleva a Mercado Pago, aceptás y volvés. Hasta entonces, la seña se registra a mano.'}</span>
               </span>
               {v.pagos.mpConectado
-                ? <button type="button" className="rv-btn rv-btn--sm" onClick={() => conectar(false)}><Unplug size={14} aria-hidden /> Desconectar</button>
+                ? <BotonConfirmar pregunta="¿Desconectar? Las señas se van a registrar a mano." si="Sí, desconectar" onConfirmar={() => conectar(false)}><Unplug size={14} aria-hidden /> Desconectar</BotonConfirmar>
                 : <button type="button" className="rv-btn rv-btn--primario" onClick={() => conectar(true)}><PlugZap size={15} aria-hidden /> Conectar Mercado Pago</button>}
             </div>
           )}
@@ -81,7 +81,7 @@ export default function Pagos({ negocio, onGuardar, onIr }: Form & { onIr: (vist
         {tipo === 'bloque' && (
           <Seccion titulo="Depósito de garantía" bajada={`Se entrega el día del evento y se devuelve al terminar. Solo se registra: no se cobra desde Órbita.${negocio.salones.length > 1 ? ` Cada ${palabras.unidad} tiene el suyo.` : ''}`}>
             <div className="rv-dos">
-              {negocio.salones.map(s => <Campo key={s.id} label={negocio.salones.length > 1 ? s.nombre : 'Depósito'} prefijo="$" value={String(v.depositos[s.id] ?? 0)} onChange={x => setV({ ...v, depositos: { ...v.depositos, [s.id]: num(x) } })} inputMode="numeric" ayuda="0 = no se pide." />)}
+              {negocio.salones.map(s => <Campo key={s.id} label={negocio.salones.length > 1 ? s.nombre : 'Depósito'} prefijo="$" value={milesTxt(v.depositos[s.id] ?? 0)} onChange={x => setV({ ...v, depositos: { ...v.depositos, [s.id]: num(x) } })} inputMode="numeric" ayuda="0 = no se pide." />)}
             </div>
           </Seccion>
         )}

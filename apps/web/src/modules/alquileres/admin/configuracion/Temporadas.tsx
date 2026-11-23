@@ -11,6 +11,7 @@ import { precioNoche, temporadaDe, type TarifaEstadia, type TarifaMensual, type 
 import { BarraGuardar, Campo, Seccion, Selector } from '@/design-system/reservas/piezas'
 import { HOY, TIPOS, capital, esMensual, palabrasDe, type Propiedad } from '../../datos'
 import { PaginaForm, idNuevo, igual, num, type Form } from './comun'
+import { milesTxt } from '../../datos/textos'
 
 /**
  * El tinte de una temporada en el calendario: un solo color (el acento), más
@@ -47,8 +48,8 @@ export default function Temporadas({ negocio, onGuardar }: Form) {
         <div className="rv-pila">
           <Seccion titulo="Precio por mes" bajada={`${p.nombre} se alquila por mes: un precio fijo por mes y un depósito que se entrega al entrar. Sin temporadas ni limpieza. Los meses mínimos y máximos están en Reglas de reserva.`}>
             <div className="rv-dos">
-              <Campo label="Precio por mes" prefijo="$" value={String(p.mensual.precioMes)} onChange={x => mensual({ precioMes: num(x) })} inputMode="numeric" />
-              <Campo label="Depósito de garantía" prefijo="$" value={String(p.mensual.deposito)} onChange={x => mensual({ deposito: num(x) })} inputMode="numeric" ayuda="Se registra, no se cobra desde Órbita. 0 = no se pide." />
+              <Campo label="Precio por mes" prefijo="$" value={milesTxt(p.mensual.precioMes)} onChange={x => mensual({ precioMes: num(x) })} inputMode="numeric" />
+              <Campo label="Depósito de garantía" prefijo="$" value={milesTxt(p.mensual.deposito)} onChange={x => mensual({ deposito: num(x) })} inputMode="numeric" ayuda="Se registra, no se cobra desde Órbita. 0 = no se pide." />
             </div>
           </Seccion>
         </div>
@@ -57,9 +58,9 @@ export default function Temporadas({ negocio, onGuardar }: Form) {
         <div className="rv-pila">
           <Seccion titulo="Precio base" bajada="Lo que vale una noche fuera de temporada.">
             <div className="rv-grid rv-grid--3">
-              <Campo label="Precio por noche" prefijo="$" value={String(p.tarifa.precioNoche)} onChange={x => tarifa({ precioNoche: num(x) })} inputMode="numeric" />
+              <Campo label="Precio por noche" prefijo="$" value={milesTxt(p.tarifa.precioNoche)} onChange={x => tarifa({ precioNoche: num(x) })} inputMode="numeric" />
               <Selector label="Fin de semana" ayuda="Recargo de las noches del viernes y del sábado." valor={p.tarifa.finDeSemanaPct} onChange={x => tarifa({ finDeSemanaPct: x })} opciones={[0, 10, 15, 20, 30].map(n => ({ id: n, label: n ? `+${n}%` : 'Sin recargo' }))} />
-              <Campo label="Limpieza" prefijo="$" value={String(p.tarifa.limpieza)} onChange={x => tarifa({ limpieza: num(x) })} inputMode="numeric" ayuda="Fija, una vez por estadía." />
+              <Campo label="Limpieza" prefijo="$" value={milesTxt(p.tarifa.limpieza)} onChange={x => tarifa({ limpieza: num(x) })} inputMode="numeric" ayuda="Fija, una vez por estadía." />
             </div>
           </Seccion>
           <Seccion titulo="Temporadas" bajada={p.tarifa.temporadas.length > 1 ? 'Si dos se pisan, vale la más corta (por ejemplo, Carnaval adentro de la alta).' : 'Un precio distinto por noche entre dos fechas.'}
@@ -73,7 +74,7 @@ export default function Temporadas({ negocio, onGuardar }: Form) {
                   <Campo label="Nombre" value={t.nombre} onChange={x => temporada(t.id, { nombre: x })} />
                   <Campo label="Desde" type="date" value={t.desde} onChange={x => x && temporada(t.id, { desde: x })} />
                   <Campo label="Hasta" type="date" value={t.hasta} onChange={x => x && temporada(t.id, { hasta: x })} />
-                  <Campo label="Por noche" prefijo="$" value={String(t.precioNoche)} onChange={x => temporada(t.id, { precioNoche: num(x) })} inputMode="numeric" />
+                  <Campo label="Por noche" prefijo="$" value={milesTxt(t.precioNoche)} onChange={x => temporada(t.id, { precioNoche: num(x) })} inputMode="numeric" />
                   <button type="button" className="rv-btn rv-btn--icono" onClick={() => tarifa({ temporadas: p.tarifa.temporadas.filter(y => y.id !== t.id) })} aria-label={`Quitar ${t.nombre}`}><Trash2 size={16} /></button>
                 </div>
               ))}

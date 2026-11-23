@@ -8,6 +8,7 @@ import { conAjuste, pesos, redondearCien } from '@/lib/reservas/precio'
 import { BarraGuardar, Campo } from '@/design-system/reservas/piezas'
 import { HOY, TIPOS, cadaUna, capital, cuenta, palabrasDe, type Reserva, type Unidad } from '../../datos'
 import { PaginaForm, idNuevo, igual, num, type Form } from './comun'
+import { milesTxt } from '../../datos/textos'
 
 export default function Canchas({ negocio, reservas, onGuardar }: Form & { reservas: Reserva[] }) {
   const palabras = palabrasDe(negocio)
@@ -32,7 +33,7 @@ export default function Canchas({ negocio, reservas, onGuardar }: Form & { reser
               <div className="alc-fila">
                 <Campo label="Nombre" value={u.nombre} onChange={x => editar(u.id, { nombre: x })} />
                 <Campo label="Detalle" value={u.detalle} onChange={x => editar(u.id, { detalle: x })} placeholder={negocio.rubro === 'canchas' ? 'Fútbol 5 · techada' : 'Qué tiene, para cuántos'} />
-                <Campo label="Por hora" prefijo="$" value={String(u.tarifaHora)} onChange={x => editar(u.id, { tarifaHora: num(x) })} inputMode="numeric" />
+                <Campo label="Por hora" prefijo="$" value={milesTxt(u.tarifaHora)} onChange={x => editar(u.id, { tarifaHora: num(x) })} inputMode="numeric" />
                 <button type="button" className="rv-btn rv-btn--icono" onClick={() => setLista(lista.filter(x => x.id !== u.id))} aria-label={`Quitar ${u.nombre}`} disabled={lista.length <= 1}><Trash2 size={16} /></button>
               </div>
               <p className="ala-pie-nota">
