@@ -10,6 +10,8 @@ import { ListBusinessesQueryDto } from './dto/list-businesses-query.dto';
 import { ListBusinessContactsQueryDto } from './dto/list-business-contacts-query.dto';
 import { SuspendBusinessDto } from './dto/suspend-business.dto';
 import { GrantCompDto, UpdateCompDto } from './dto/grant-comp.dto';
+import { CrearNegocioAlquileresDto } from './dto/crear-negocio-alquileres.dto';
+import { NegociosAlquileresService } from './negocios-alquileres.service';
 import { UpsertPlatformAdminDto } from './dto/upsert-platform-admin.dto';
 import { ResetAdminPasswordDto } from './dto/reset-admin-password.dto';
 import { ChangeOwnPasswordDto } from './dto/change-own-password.dto';
@@ -42,6 +44,8 @@ export class PlatformController {
     private readonly wizardAnalytics: WizardAnalyticsService,
     // Cómo ve Google a cada tienda (ver search-console/). Opcional por compatibilidad con specs unitarios.
     private readonly searchConsole?: SearchConsoleService,
+    // Crear negocios de Alquileres mientras el alta pública los tenga en "Próximamente". Opcional por los specs unitarios.
+    private readonly negociosAlquileres?: NegociosAlquileresService,
   ) {}
 
   // ── Analítica del wizard de onboarding ────────────────────────────────────
@@ -213,6 +217,15 @@ export class PlatformController {
   @SoloSuperadmin()
   cancelBusiness(@Req() req: RequestWithAdmin, @Param('businessId') businessId: string) {
     return this.platformService.cancelBusiness(req.user.adminId, businessId);
+  }
+
+  // Crea un negocio de Alquileres (oculto de buscadores y con cortesía).
+  @Post('businesses/alquileres')
+  @SoloSuperadmin()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  createAlquileresBusiness(@Req() req: RequestWithAdmin, @Body() dto: CrearNegocioAlquileresDto) {
+    if (!this.negociosAlquileres) throw new ServiceUnavailableException('No se pueden crear negocios de Alquileres ahora.');
+    return this.negociosAlquileres.crear(req.user.adminId, dto);
   }
 
   @Post('subscriptions/:businessId/grant-comp')
