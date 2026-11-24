@@ -147,6 +147,10 @@ model Business {
   reservasHistorial    ReservaHistorial[]
   reservasEspera       ReservaEspera[]
   reservasBloqueos     ReservaBloqueo[]
+  // Gimnasio: lo que no es una reserva (planes, alumnos y el plan de cada alumno), ver el bloque al final.
+  gimnasioPlanes       GimnasioPlan[]
+  gimnasioAlumnos      GimnasioAlumno[]
+  gimnasioAbonos       GimnasioSuscripcion[]
 
   @@map("businesses")
 }
@@ -668,6 +672,7 @@ model Customer {
   personalDiscounts Discount[]
   gameSessions      GameSession[]
   reservas          Reserva[]
+  gimnasioAlumnos   GimnasioAlumno[]
 
   @@unique([businessId, email])
   @@unique([businessId, googleId])
@@ -4166,4 +4171,111 @@ model ReservaBloqueo {
 
   @@index([businessId, modulo, inicio])
   @@map("reservas_bloqueos")
+}
+
+// ─── Gimnasio ────────────────────────────────────────────────────────────────
+// Lo que el módulo Gimnasio guarda y NO es una reserva: los planes, los alumnos
+// y el plan de cada alumno (decisión del 16/11/2026: tablas propias, al lado
+// del motor de reservas y sin tocarlo). Las clases, los lugares y la lista de
+// espera son del motor (reservas_*).
+//
+// Las clases que un alumno usó de su plan no se guardan acá: cada reserva dice
+// con qué se pagó en su campo libre (`reservas.datos.gimnasio`: pago y
+// suscripcionId) y de ahí se cuentan. Así el saldo de un pack no puede
+// desfasarse de lo reservado: si la reserva se cancela, la clase vuelve sola.
+
+enum GimnasioPlanTipo {
+  PRUEBA
+  SUELTA
+  PACK
+  MEMBRESIA
+}
+
+enum GimnasioSuscripcionEstado {
+  VIGENTE
+  CANCELADA
+}
+
+// Lo que el negocio vende: la clase de prueba, la clase suelta, un pack de N
+// clases o una membresía (con tope semanal, o libre).
+model GimnasioPlan {
+  id           String           @id @default(uuid())
+  businessId   String           @map("business_id")
+  tipo         GimnasioPlanTipo
+  nombre       String           @db.VarChar(80)
+  precio       Decimal          @default(0) @db.Decimal(12, 2)
+  /// Pack: cuántas clases trae.
+  clases       Int?
+  /// Membresía: clases por semana; 0 = libre.
+  porSemana    Int?             @map("por_semana")
+  /// Cuántos días vale desde que arranca.
+  vigenciaDias Int              @map("vigencia_dias")
+  /// Se ofrece en el sitio.
+  activo       Boolean          @default(true)
+  orden        Int              @default(0)
+  /// Borrado blando: un plan que alguien ya compró no desaparece de su historial.
+  eliminadoEn  DateTime?        @map("eliminado_en")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  business      Business              @relation(fields: [businessId], references: [id])
+  suscripciones GimnasioSuscripcion[]
+
+  @@index([businessId, eliminadoEn])
+  @@map("gimnasio_planes")
+}
+
+// Un alumno (o socio) del negocio: la ficha de cliente que el motor de reservas
+// ya vincula a cada reserva por celular o email, con lo propio de Gimnasio.
+model GimnasioAlumno {
+  id         String  @id @default(uuid())
+  businessId String  @map("business_id")
+  clienteId  String  @map("cliente_id")
+  nota       String? @db.VarChar(500)
+  /// Día de alta, AAAA-MM-DD de Argentina.
+  alta       String  @db.VarChar(10)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  business      Business              @relation(fields: [businessId], references: [id])
+  cliente       Customer              @relation(fields: [clienteId], references: [id])
+  suscripciones GimnasioSuscripcion[]
+
+  @@unique([businessId, clienteId])
+  @@map("gimnasio_alumnos")
+}
+
+// El plan de un alumno: una fila por compra o renovación. Guarda una foto del
+// plan (si después cambia el precio o las clases del plan, lo ya vendido no
+// cambia) y desde y hasta qué día vale.
+model GimnasioSuscripcion {
+  id                String                    @id @default(uuid())
+  businessId        String                    @map("business_id")
+  alumnoId          String                    @map("alumno_id")
+  planId            String                    @map("plan_id")
+  tipo              GimnasioPlanTipo
+  nombre            String                    @db.VarChar(80)
+  precio            Decimal                   @default(0) @db.Decimal(12, 2)
+  clases            Int?
+  porSemana         Int?                      @map("por_semana")
+  /// AAAA-MM-DD de Argentina, los dos días incluidos.
+  desde             String                    @db.VarChar(10)
+  hasta             String                    @db.VarChar(10)
+  estado            GimnasioSuscripcionEstado @default(VIGENTE)
+  /// La suscripción que esta continúa, si es una renovación del mismo plan.
+  renuevaId         String?                   @map("renueva_id")
+  creadaPorMemberId String?                   @map("creada_por_member_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  business Business       @relation(fields: [businessId], references: [id])
+  alumno   GimnasioAlumno @relation(fields: [alumnoId], references: [id], onDelete: Cascade)
+  plan     GimnasioPlan   @relation(fields: [planId], references: [id])
+
+  @@index([businessId, alumnoId, hasta])
+  @@index([businessId, desde])
+  @@map("gimnasio_suscripciones")
 }

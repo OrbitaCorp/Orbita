@@ -902,6 +902,15 @@ export class ReservasService {
   }
 
   /**
+   * La ficha de cliente de una persona, por su email o su teléfono (si no está, la crea); null si no trae
+   * ninguno de los dos o si no se pudo. Es la misma que queda vinculada a sus reservas: la usan los módulos que
+   * guardan algo propio de cada cliente al lado del motor (los alumnos de Gimnasio).
+   */
+  fichaDe(businessId: string, cliente: DatosCliente): Promise<string | null> {
+    return this.vincularCliente(businessId, cliente);
+  }
+
+  /**
    * Busca la ficha del cliente por email o teléfono y, si no está, la crea.
    * Es una comodidad para las pantallas de Clientes: si falla, la reserva
    * sigue con su propia foto del cliente (nombre, teléfono, email).

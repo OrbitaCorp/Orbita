@@ -128,7 +128,15 @@ cliente con su `modulo` y sus tipos de recurso.
   El panel guarda **una clase de la grilla por recurso** (una sesión semanal), con lo propio del
   módulo en `datos.gimnasio` (actividad, color, profe y sala): así cada clase tiene su cupo y su
   profe. Desde el panel también anota en la espera y le da el lugar a quien espera (`POST espera`,
-  `POST espera/:id/lugar`). Planes, pases y socios siguen siendo del módulo (no son reservas).
+  `POST espera/:id/lugar`). Planes, pases y alumnos no son reservas: viven en su propio módulo,
+  al lado de este (`../gimnasio`, con su README), que anota con qué se pagó cada lugar en
+  `datos.gimnasio` de la reserva y cuenta de ahí las clases usadas de un pack.
+
+**Un módulo que guarda lo suyo al lado del motor** (hoy, Gimnasio) lo usa por sus servicios, que
+`ReservasModule` exporta: crea las reservas con `ReservasService.crear` (el cupo, el candado y la
+clave de idempotencia siguen siendo de acá), busca o crea la ficha de cliente con
+`ReservasService.fichaDe` y deja lo propio en el campo libre `datos`, bajo su nombre. No escribe
+en las tablas de reglas del motor ni cambia el estado de una reserva por su cuenta.
 
 **La lista de espera es por sesión de horario fijo.** Hoy la usa Gimnasio (`CLASE`). En Turnos no
 alcanza: la espera no guarda el servicio, así que un `PROFESIONAL` sin duración propia responde
