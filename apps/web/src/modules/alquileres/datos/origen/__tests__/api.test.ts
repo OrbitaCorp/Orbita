@@ -102,9 +102,9 @@ describe('cargarApi con recursos desactivados', () => {
 })
 
 describe('lo que el panel real escribe en la API (estadía)', () => {
-  it('lee un precio fijo por noche: sin limpieza ni recargo hasta que el servidor los calcule', async () => {
+  it('lee la tarifa completa de la propiedad: el servidor cobra con la misma cuenta', async () => {
     const { datos } = await conCabana()
-    expect(datos.negocio.propiedades[0].tarifa).toEqual({ precioNoche: 85000, temporadas: [], finDeSemanaPct: 0, limpieza: 0, minNoches: 2 })
+    expect(datos.negocio.propiedades[0].tarifa).toEqual({ precioNoche: 85000, temporadas: [], finDeSemanaPct: 20, limpieza: 15000, minNoches: 2 })
   })
 
   it('guardar las propiedades crea las nuevas, edita las que cambiaron, borra las que se quitaron y recarga', async () => {

@@ -49,12 +49,16 @@ export interface Config {
   listaDeEspera: boolean
   margenMinutos: number
   horario: HorarioSemanal
+  /** Lo propio de cada módulo: el motor lo guarda sin interpretar. Lo que esté en `publico` lo ve el sitio. */
+  datos?: Record<string, unknown> | null
 }
 
 /** Lo que el sitio público ve de la config. */
 export type ConfigPublica = Pick<Config,
   'modulo' | 'confirmacion' | 'retencionMinutos' | 'anticipacionMinimaMinutos' | 'anticipacionMaximaDias' | 'cancelacionHastaHoras'
   | 'reprogramacionHastaHoras' | 'reprogramacionesMaximas' | 'senaPorcentaje' | 'senaReembolsable' | 'listaDeEspera' | 'horario'>
+  /** Lo que el módulo puso en `datos.publico` de la config (el alias para transferir, el WhatsApp…). */
+  & { publico?: Record<string, unknown> | null }
 
 export interface Recurso {
   id: string
@@ -117,6 +121,8 @@ export interface Reserva {
   notaInterna?: string | null
   servicio: ServicioFoto | null
   extras: Extra[] | null
+  /** Lo propio de cada módulo: cuántos huéspedes vienen, por dónde llegó la reserva… */
+  datos?: Record<string, unknown> | null
   precio: number
   sena: number
   pagado: number
@@ -257,6 +263,8 @@ export interface Pedido {
   cantidad?: number
   extras?: string[]
   notas?: string
+  /** Lo propio del módulo (hasta 2.000 caracteres): el motor lo guarda sin interpretar. */
+  datos?: Record<string, unknown>
 }
 
 /** Sitio, paso 1. `clave`: un uuid por intento (repetirlo devuelve la misma reserva). */

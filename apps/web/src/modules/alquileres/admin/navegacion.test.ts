@@ -94,8 +94,8 @@ describe('el panel real (con la API) muestra solo lo que ya guarda de verdad', (
     const ids = seccionesDe('estadia', undefined, true).map(s => s.id)
     expect(ids).toEqual(['reservas', 'disponibilidad', 'clientes', 'ingresos', 'propiedades', 'temporadas', 'bloqueos', 'reglas', 'pagos'])
   })
-  it('Temporadas se llama Precios: por ahora hay un precio por noche', () => {
-    expect(seccionesDe('estadia', undefined, true).find(s => s.id === 'temporadas')?.label).toBe('Precios')
+  it('Temporadas se llama igual que en la demo: el servidor ya cobra por temporada', () => {
+    expect(seccionesDe('estadia', undefined, true).find(s => s.id === 'temporadas')?.label).toBe('Temporadas y precios')
     expect(seccionesDe('estadia').find(s => s.id === 'temporadas')?.label).toBe('Temporadas y precios')
   })
   it('un link a una sección que el panel real no tiene vuelve a la agenda', () => {

@@ -13,13 +13,15 @@ import { BotonConfirmar } from '../piezas'
 import { SENA_A_TIEMPO as A_TIEMPO, SENA_TARDE as TARDE, milesTxt } from '../../datos/textos'
 import { plazoTxt } from './Reglas'
 
-const de = (n: NegocioAlquiler) => ({ senaPct: n.senaPct, pagos: n.pagos, depositos: Object.fromEntries(n.salones.map(s => [s.id, s.deposito])) as Record<string, number> })
+const de = (n: NegocioAlquiler) => ({ senaPct: n.senaPct, pagos: n.pagos, telefono: n.telefono, depositos: Object.fromEntries(n.salones.map(s => [s.id, s.deposito])) as Record<string, number> })
 
 
 /**
  * `real`: el panel de un negocio de verdad. Queda lo que la API guarda hoy: el
- * porcentaje de seña y si se devuelve al cancelar a tiempo. Las formas de pago,
- * el alias y "si cancelan tarde" llegan con los cambios del motor (etapa 3).
+ * porcentaje de seña, si se devuelve al cancelar a tiempo y lo que el sitio le
+ * muestra a quien pidió una reserva para coordinar la seña (WhatsApp, alias y
+ * titular). Todavía no se cobra online, así que no hay formas de pago que
+ * elegir ni Mercado Pago que conectar; "si cancelan tarde" tampoco se guarda.
  */
 export default function Pagos({ negocio, onGuardar, onIr, real = false }: Form & { onIr: (vista: Vista) => void; real?: boolean }) {
   const [v, setV] = useState(de(negocio))
@@ -41,14 +43,14 @@ export default function Pagos({ negocio, onGuardar, onIr, real = false }: Form &
     ? { que: `una hora de ${negocio.unidades[0]?.nombre ?? 'cancha'} con ${negocio.extras[0]?.nombre.toLowerCase() ?? 'un extra'}`, base: negocio.unidades[0]?.tarifaHora ?? 0, total: (negocio.unidades[0]?.tarifaHora ?? 0) + (negocio.extras[0]?.precio ?? 0) }
     : tipo === 'bloque'
       ? { que: `${negocio.salones[0]?.paquetes[0]?.nombre.toLowerCase() ?? 'un paquete'} con ${negocio.extras[0]?.nombre ?? 'un extra'}`, base: negocio.salones[0]?.paquetes[0]?.precio ?? 0, total: (negocio.salones[0]?.paquetes[0]?.precio ?? 0) + (negocio.extras[0]?.precio ?? 0) }
-      : { que: `dos noches en ${negocio.propiedades[0]?.nombre ?? 'una propiedad'}${real ? '' : ' más la limpieza'}`, base: (negocio.propiedades[0]?.tarifa.precioNoche ?? 0) * 2, total: (negocio.propiedades[0]?.tarifa.precioNoche ?? 0) * 2 + (negocio.propiedades[0]?.tarifa.limpieza ?? 0) }
+      : { que: `dos noches en ${negocio.propiedades[0]?.nombre ?? 'una propiedad'}${(negocio.propiedades[0]?.tarifa.limpieza ?? 0) > 0 ? ' más la limpieza' : ''}`, base: (negocio.propiedades[0]?.tarifa.precioNoche ?? 0) * 2, total: (negocio.propiedades[0]?.tarifa.precioNoche ?? 0) * 2 + (negocio.propiedades[0]?.tarifa.limpieza ?? 0) }
   const senaEjemplo = senaDe(v.pagos.senaSobre === 'base' ? ejemplo.base : ejemplo.total, v.senaPct)
   const baseTxt = tipo === 'cancha' ? `Solo ${palabras.genero === 'm' ? 'el' : 'la'} ${palabras.unidad} (sin extras)` : tipo === 'bloque' ? 'Solo el paquete (sin extras)' : negocio.propiedades.some(x => x.modalidad === 'mes') ? 'Solo las noches o el primer mes' : 'Solo las noches (sin limpieza)'
 
-  const guardar = () => onGuardar({ senaPct: v.senaPct, pagos: v.pagos, ...(tipo === 'bloque' ? { salones: negocio.salones.map(s => ({ ...s, deposito: v.depositos[s.id] ?? s.deposito })) } : {}) }, 'Pagos guardados')
+  const guardar = () => onGuardar({ senaPct: v.senaPct, pagos: v.pagos, ...(real ? { telefono: v.telefono } : {}), ...(tipo === 'bloque' ? { salones: negocio.salones.map(s => ({ ...s, deposito: v.depositos[s.id] ?? s.deposito })) } : {}) }, 'Pagos guardados')
 
   return (
-    <PaginaForm rotulo={TIPOS[tipo].label} titulo="Pagos y señas" bajada={real ? 'Cuánto se paga al reservar y qué pasa con la seña si cancelan.' : 'Cuánto se paga al reservar, cómo te pagan y qué pasa con la seña si cancelan.'}>
+    <PaginaForm rotulo={TIPOS[tipo].label} titulo="Pagos y señas" bajada={real ? 'Cuánto se paga al reservar, cómo te la hacen llegar y qué pasa con la seña si cancelan.' : 'Cuánto se paga al reservar, cómo te pagan y qué pasa con la seña si cancelan.'}>
       <div className="rv-pila">
         <Seccion titulo="Seña" bajada="Lo que se paga al reservar. El resto, en el lugar.">
           <div className="rv-dos">
@@ -57,6 +59,16 @@ export default function Pagos({ negocio, onGuardar, onIr, real = false }: Form &
           </div>
           <p className="ala-pie-nota">{v.senaPct === 0 ? 'Sin seña: la reserva queda confirmada en el momento y todo se paga en el lugar.' : `Por ejemplo, ${ejemplo.que}: total ${pesos(ejemplo.total)}, seña ${pesos(senaEjemplo)}${senaEjemplo < ejemplo.total ? ` y ${pesos(ejemplo.total - senaEjemplo)} en el lugar` : ''}.`}</p>
         </Seccion>
+
+        {real && (
+          <Seccion titulo="Para coordinar la seña" bajada="Todavía no se cobra online: quien pide una reserva en tu sitio ve estos datos para escribirte y transferirte. Vos la confirmás cuando llega la plata.">
+            <Campo label="WhatsApp para reservas" value={v.telefono} onChange={x => setV({ ...v, telefono: x })} inputMode="tel" autoComplete="tel" placeholder="Con código de área" ayuda="Tu sitio ofrece escribirte acá, con el código de la reserva ya armado." />
+            <div className="rv-dos" style={{ marginTop: 14 }}>
+              <Campo label="Alias para transferir" value={v.pagos.alias} onChange={x => setPagos({ alias: x })} autoComplete="off" ayuda="Opcional. Sin alias, el sitio pide que te escriban." />
+              <Campo label="Titular de la cuenta" value={v.pagos.titular} onChange={x => setPagos({ titular: x })} ayuda="Para que sepan que le transfieren a quien corresponde." />
+            </div>
+          </Seccion>
+        )}
 
         {!real && <Seccion titulo="Formas de pago" bajada="Se muestran al reservar, para que lleguen sabiendo cómo pagar.">
           <FilaSwitch titulo={FORMAS_PAGO.efectivo.label} ayuda={FORMAS_PAGO.efectivo.ayuda} on={tiene('efectivo')} onChange={x => forma('efectivo', x)} />

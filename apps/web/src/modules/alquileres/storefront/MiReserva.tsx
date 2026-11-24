@@ -107,6 +107,7 @@ export default function MiReserva({ slug, token, negocio }: P) {
   const entrada = r.fecha
   const salida = fechaArgentina(r.fin)
   const noches = nochesEntre(entrada, salida)
+  const huespedes = typeof r.datos?.huespedes === 'number' ? r.datos.huespedes : 0
   const activa = r.estado === 'PENDIENTE' || r.estado === 'CONFIRMADA' || r.estado === 'RETENIDA'
   const faltaSena = r.estado === 'PENDIENTE' && r.sena > 0 && r.pagado < r.sena
   const estado = ESTADO[r.estado]
@@ -158,7 +159,8 @@ export default function MiReserva({ slug, token, negocio }: P) {
           <div><dt>Salida</dt><dd>{fechaLarga(salida)}, hasta las {hhmm(minutosArgentina(r.fin))}</dd></div>
           <div><dt>Estadía</dt><dd>{nochesTxt(noches)}</dd></div>
           {donde && <div><dt>Dónde</dt><dd>{donde}</dd></div>}
-          {r.notas && <div><dt>Detalle</dt><dd>{r.notas}</dd></div>}
+          {huespedes > 0 && <div><dt>Huéspedes</dt><dd>{huespedes}</dd></div>}
+          {r.notas && <div><dt>Tu nota</dt><dd>{r.notas}</dd></div>}
         </dl>
         <dl className="alr-ticket alm-plata">
           <div><dt>Total</dt><dd className="rv-num">{pesos(r.precio)}</dd></div>

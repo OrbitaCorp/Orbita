@@ -49,8 +49,7 @@ const SIN_API: Vista[] = ['mensajes', 'calendarios', 'configuracion']
 export function seccionesDe(tipo: TipoAlquiler, palabras: Pick<Palabras, 'unidades' | 'clientes'> = DE_FABRICA[tipo], real = false): SeccionNav[] {
   const todas = todasLasSecciones(tipo, palabras)
   if (!real) return todas
-  // Sin temporadas hasta que el servidor las calcule: por ahora, un precio por noche.
-  return todas.filter(s => !SIN_API.includes(s.id)).map(s => (s.id === 'temporadas' ? { ...s, label: 'Precios' } : s))
+  return todas.filter(s => !SIN_API.includes(s.id))
 }
 
 function todasLasSecciones(tipo: TipoAlquiler, palabras: Pick<Palabras, 'unidades' | 'clientes'>): SeccionNav[] {

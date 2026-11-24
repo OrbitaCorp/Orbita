@@ -72,7 +72,7 @@ describe('reservarEnSitio', () => {
   it('manda el pedido sin precio y devuelve la reserva con su código, su token y si quedó pendiente', async () => {
     api.reservar.mockResolvedValue(deLaApi)
     const res = await reservarEnSitio('monte', pedido)
-    expect(api.reservar).toHaveBeenCalledWith({ modulo: 'ALQUILERES', recursoId: 'p1', fecha: '2026-12-10', fechaHasta: '2026-12-13', clave: 'k-1', cliente: { nombre: 'Ana Ríos', telefono: '0000 55-0101' }, notas: '2 huéspedes' })
+    expect(api.reservar).toHaveBeenCalledWith({ modulo: 'ALQUILERES', recursoId: 'p1', fecha: '2026-12-10', fechaHasta: '2026-12-13', clave: 'k-1', cliente: { nombre: 'Ana Ríos', telefono: '0000 55-0101' }, datos: { huespedes: 2, canal: 'sitio' } })
     expect(res).toMatchObject({ ok: true, hecha: { codigo: 'HKA4NR', token: 'tok-1', pendiente: true, reserva: { unidadId: 'p1', entrada: '2026-12-10', salida: '2026-12-13', total: 270000, sena: 135000, huespedes: 2 } } })
   })
 

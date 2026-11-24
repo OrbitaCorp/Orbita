@@ -193,6 +193,7 @@ export function reservaDeApi(r: ReservaApi, tipo: TipoAlquiler): Reserva | null 
     ? { entrada: r.fecha, salida: fechaArgentina(r.fin) }
     : { fecha: r.fecha, inicio: r.inicioMinutos, fin: r.finMinutos }
   const nota = r.notaInterna ?? r.notas ?? undefined
+  const huespedes = comoDatos(r.datos).huespedes
   return {
     id: r.id,
     unidadId: r.recursoId,
@@ -207,6 +208,7 @@ export function reservaDeApi(r: ReservaApi, tipo: TipoAlquiler): Reserva | null 
     senaPagada: r.sena > 0 && r.pagado >= r.sena,
     saldoPagado: r.pagado >= r.precio,
     ...(nota ? { nota } : {}),
+    ...(tipo === 'estadia' && esNumero(huespedes) && huespedes > 0 ? { huespedes } : {}),
   }
 }
 
@@ -235,12 +237,20 @@ export function bloqueosDeNoches(n: Pick<Noches, 'recursoId' | 'ocupadas'>): Blo
 }
 
 /**
- * Por ahora el servidor cobra un precio fijo por noche. Hasta que calcule
- * temporadas, fin de semana y limpieza (etapa 3 del plan), ni el panel ni el
- * sitio las aplican aunque estén guardadas: así el total que se muestra es el
- * que se cobra.
+ * El servidor cobra una estadía noche por noche con la misma cuenta que las
+ * pantallas (temporadas, fin de semana y limpieza: apps/api/src/reservas/dominio/estadia.ts).
+ * Lo que todavía no sabe cobrar es el alquiler por mes: en un negocio real
+ * toda propiedad se alquila por noche.
  */
-export const soloPrecioBase = (p: Propiedad): Propiedad => ({ ...p, modalidad: 'noche', tarifa: { ...p.tarifa, temporadas: [], finDeSemanaPct: 0, limpieza: 0 } })
+export const soloPorNoche = (p: Propiedad): Propiedad => ({ ...p, modalidad: 'noche' })
+
+/** Lo que el negocio deja ver en su sitio para coordinar la seña (`datos.publico` de la config de reservas). */
+export interface PublicoDeConfig { alias: string; titular: string; telefono: string }
+
+/** Lee `publico` con cuidado: lo que falte o no sea texto queda vacío. */
+export function publicoDeConfig(publico: unknown): PublicoDeConfig {
+  return { alias: campo(publico, 'alias', esTexto, ''), titular: campo(publico, 'titular', esTexto, ''), telefono: campo(publico, 'telefono', esTexto, '') }
+}
 
 // ─── El negocio ──────────────────────────────────────────────────────────────
 
@@ -284,11 +294,17 @@ export interface DatosNegocioApi {
 }
 
 /** Lo que se usa de la config: está tanto en la del panel como en la pública del sitio. */
-export type ConfigDelNegocio = Pick<Config, 'horario' | 'senaPorcentaje' | 'cancelacionHastaHoras' | 'senaReembolsable'>
+export type ConfigDelNegocio = Pick<Config, 'horario' | 'senaPorcentaje' | 'cancelacionHastaHoras' | 'senaReembolsable'> & {
+  /** Panel: el `datos` entero de la config. */
+  datos?: unknown
+  /** Sitio: lo único que la config pública deja ver. */
+  publico?: unknown
+}
 
 /** El negocio del panel a partir de lo que trae la API. `recursos` ya viene filtrado por el modo. */
 export function negocioDeApi(p: { tipo: TipoAlquiler; rubro: string; negocio: DatosNegocioApi; config: ConfigDelNegocio; recursos: Recurso[]; servicios: Servicio[]; bloqueos: BloqueoApi[] }): NegocioAlquiler {
   const { tipo, config } = p
+  const publico = publicoDeConfig(config.publico ?? comoDatos(config.datos).publico)
   const recursos = [...p.recursos].sort((a, b) => a.orden - b.orden)
   const canchas = tipo === 'cancha' ? recursos : []
   const salones = tipo === 'bloque' ? recursos.map(r => salonDeApi(r, p.servicios)) : []
@@ -303,7 +319,8 @@ export function negocioDeApi(p: { tipo: TipoAlquiler; rubro: string; negocio: Da
     rubro: p.rubro,
     nombre: p.negocio.nombre,
     descripcion: p.negocio.descripcion ?? '',
-    telefono: p.negocio.telefono ?? '',
+    // El WhatsApp para reservas que cargó en su panel; si no, el del negocio.
+    telefono: publico.telefono || (p.negocio.telefono ?? ''),
     direccion: p.negocio.direccion ?? '',
     ciudad: p.negocio.ciudad ?? '',
     latLng: propiedades[0]?.latLng ?? IGUAZU,
@@ -324,7 +341,7 @@ export function negocioDeApi(p: { tipo: TipoAlquiler; rubro: string; negocio: Da
     bloqueos: bloqueosDeApi(p.bloqueos, recursos.map(r => r.id)),
     calendariosExternos: [],
     mensajes: mensajesDeFabrica(tipo),
-    pagos: { senaSobre: 'total', formas: ['efectivo', 'transferencia'], alias: '', titular: '', mpConectado: false, cancelaATiempo: config.senaReembolsable ? 'devolver' : 'pierde', cancelaTarde: 'pierde' },
+    pagos: { senaSobre: 'total', formas: ['efectivo', 'transferencia'], alias: publico.alias, titular: publico.titular, mpConectado: false, cancelaATiempo: config.senaReembolsable ? 'devolver' : 'pierde', cancelaTarde: 'pierde' },
     equipo: [],
   }
 }
@@ -343,7 +360,8 @@ export interface TiendaDelSitio {
  * El negocio como lo ve un visitante, armado solo con lo público: la config de
  * la tienda, la de reservas, los recursos activos y las noches ocupadas de cada
  * propiedad (que entran como bloqueos sin nombre: el sitio no conoce las
- * reservas de otros). La dirección del negocio es la de su primera propiedad.
+ * reservas de otros). La dirección del negocio es la de su primera propiedad;
+ * el WhatsApp y el alias, los que cargó en su panel (`publico` de la config).
  */
 export function negocioDelSitio(p: { tienda: TiendaDelSitio; config: ConfigDelNegocio; recursos: Recurso[]; noches: Pick<Noches, 'recursoId' | 'ocupadas'>[] }): { tipo: TipoAlquiler; negocio: NegocioAlquiler } {
   const { tienda } = p
@@ -359,7 +377,7 @@ export function negocioDelSitio(p: { tienda: TiendaDelSitio; config: ConfigDelNe
       logo: tienda.appearance?.logoUrl,
     },
   })
-  const propiedades = armado.propiedades.map(soloPrecioBase)
+  const propiedades = armado.propiedades.map(soloPorNoche)
   const ids = new Set(recursos.map(r => r.id))
   return {
     tipo,
@@ -369,7 +387,8 @@ export function negocioDelSitio(p: { tienda: TiendaDelSitio; config: ConfigDelNe
       direccion: propiedades[0]?.direccion ?? '',
       ciudad: propiedades[0]?.ciudad ?? '',
       bloqueos: p.noches.filter(n => ids.has(n.recursoId)).flatMap(bloqueosDeNoches),
-      pagos: { ...armado.pagos, alias: tienda.payment?.transferAlias ?? '', titular: tienda.payment?.transferHolder ?? '' },
+      // El alias que cargó en su panel de Alquileres; si no cargó ninguno, el de la tienda (si tiene).
+      pagos: armado.pagos.alias ? armado.pagos : { ...armado.pagos, alias: tienda.payment?.transferAlias ?? '', titular: tienda.payment?.transferHolder ?? '' },
     },
   }
 }

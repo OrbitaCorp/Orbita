@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Bloqueo as BloqueoApi, Config, Recurso, Reserva as ReservaApi, Servicio } from '@/lib/reservasApi/tipos'
 import {
-  aperturaDeHorario, bloqueosDeApi, bloqueosDeNoches, clienteIdDe, clientesDeReservas, estadoDeApi, fechaArgentina, negocioDeApi,
+  aperturaDeHorario, bloqueosDeApi, bloqueosDeNoches, clienteIdDe, publicoDeConfig, clientesDeReservas, estadoDeApi, fechaArgentina, negocioDeApi,
   negocioDelSitio, propiedadDeApi, reservaDeApi, salonDeApi, tipoDeRecurso, tipoDeRubro, unidadDeApi,
 } from '../mapear'
 
@@ -248,9 +248,20 @@ describe('negocioDelSitio', () => {
     expect(negocio.pagos).toMatchObject({ alias: 'monte.cabanas', titular: 'Monte SRL' })
   })
 
-  it('muestra el precio que cobra el servidor: fijo por noche, sin temporadas, fin de semana ni limpieza', () => {
+  it('muestra la tarifa completa, que es la que cobra el servidor: temporadas, fin de semana y limpieza', () => {
     const { negocio } = negocioDelSitio({ tienda, config: config(), recursos: [alojamiento('p1')], noches: [] })
-    expect(negocio.propiedades[0].tarifa).toEqual({ precioNoche: 90000, temporadas: [], finDeSemanaPct: 0, limpieza: 0, minNoches: 2 })
+    expect(negocio.propiedades[0].tarifa).toEqual({ precioNoche: 90000, temporadas: [{ id: 't', nombre: 'Alta', desde: '2026-12-20', hasta: '2027-01-10', precioNoche: 150000 }], finDeSemanaPct: 20, limpieza: 8000, minNoches: 2 })
+  })
+
+  it('una propiedad guardada como "por mes" se ofrece por noche: el servidor todavía no cobra por mes', () => {
+    const { negocio } = negocioDelSitio({ tienda, config: config(), recursos: [alojamiento('p1', { modalidad: 'mes', mensual: { precioMes: 500000, minMeses: 3, maxMeses: 12, deposito: 0 } })], noches: [] })
+    expect(negocio.propiedades[0].modalidad).toBe('noche')
+  })
+
+  it('el WhatsApp y el alias que el negocio cargó en su panel mandan sobre los de la tienda', () => {
+    const { negocio } = negocioDelSitio({ tienda, config: { ...config(), publico: { alias: 'cabanas.reservas', titular: 'Ana Monte', telefono: '0000 15-1111' } }, recursos: [alojamiento('p1')], noches: [] })
+    expect(negocio.telefono).toBe('0000 15-1111')
+    expect(negocio.pagos).toMatchObject({ alias: 'cabanas.reservas', titular: 'Ana Monte' })
   })
 
   it('sin nombre de tienda usa el del negocio; sin contacto ni alias, quedan vacíos', () => {
@@ -266,5 +277,29 @@ describe('negocioDelSitio', () => {
     const { negocio } = negocioDelSitio({ tienda, config: config(), recursos: [alojamiento('p1'), recurso({ id: 'c1', tipo: 'CANCHA' })], noches: [] })
     expect(negocio.propiedades.map(p => p.id)).toEqual(['p1'])
     expect(negocio.unidades).toEqual([])
+  })
+})
+
+describe('lo propio de Alquileres en los campos libres', () => {
+  it('cuántos huéspedes vienen sale de datos de la reserva, solo en una estadía y si es un número', () => {
+    const base = { fecha: '2026-11-20', fin: '2026-11-22T13:00:00.000Z' }
+    expect(reservaDeApi(reserva({ ...base, datos: { huespedes: 3, canal: 'sitio' } }), 'estadia')?.huespedes).toBe(3)
+    expect(reservaDeApi(reserva({ ...base, datos: { huespedes: 'tres' } }), 'estadia')).not.toHaveProperty('huespedes')
+    expect(reservaDeApi(reserva({ ...base, datos: null }), 'estadia')).not.toHaveProperty('huespedes')
+    expect(reservaDeApi(reserva({ datos: { huespedes: 3 } }), 'cancha')).not.toHaveProperty('huespedes')
+  })
+  it('publicoDeConfig lee con cuidado: lo que falta o no es texto queda vacío', () => {
+    expect(publicoDeConfig({ alias: 'a.b', titular: 7 })).toEqual({ alias: 'a.b', titular: '', telefono: '' })
+    expect(publicoDeConfig(null)).toEqual({ alias: '', titular: '', telefono: '' })
+    expect(publicoDeConfig(['alias'])).toEqual({ alias: '', titular: '', telefono: '' })
+  })
+  it('el panel lee el alias y el WhatsApp de datos.publico de su config', () => {
+    const n = negocioDeApi({
+      tipo: 'estadia', rubro: 'cabana', negocio: { nombre: 'Monte', slug: 'monte', telefono: null },
+      config: config({ datos: { publico: { alias: 'monte.cabanas', titular: 'Monte SRL', telefono: '0000 15-0000' }, mensajes: {} } }),
+      recursos: [], servicios: [], bloqueos: [],
+    })
+    expect(n.telefono).toBe('0000 15-0000')
+    expect(n.pagos).toMatchObject({ alias: 'monte.cabanas', titular: 'Monte SRL' })
   })
 })

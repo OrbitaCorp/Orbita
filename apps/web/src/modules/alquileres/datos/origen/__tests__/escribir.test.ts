@@ -47,9 +47,9 @@ describe('configDeCambio', () => {
 
 describe('pedidoDeReserva', () => {
   const r: Reserva = { id: 'n1', unidadId: 'p1', clienteId: 'k', estado: 'pendiente', creada: '2026-11-23', entrada: '2026-12-04', salida: '2026-12-07', huespedes: 3, extras: [], total: 255000, sena: 76500, senaPagada: false, saldoPagado: false, nota: 'Llegan tarde' }
-  it('una estadía va con entrada, salida, el cliente y la nota; el precio lo pone el servidor', () => {
+  it('una estadía va con entrada, salida, el cliente, la nota y cuántos vienen; el precio lo pone el servidor', () => {
     const p = pedidoDeReserva(r, { id: 'k', nombre: 'Ana Ríos', telefono: '3757 55-0101', email: 'ana@ejemplo.com' })
-    expect(p).toEqual({ modulo: 'ALQUILERES', recursoId: 'p1', fecha: '2026-12-04', fechaHasta: '2026-12-07', cliente: { nombre: 'Ana Ríos', telefono: '3757 55-0101', email: 'ana@ejemplo.com' }, notaInterna: 'Llegan tarde · 3 huéspedes', estado: 'PENDIENTE' })
+    expect(p).toEqual({ modulo: 'ALQUILERES', recursoId: 'p1', fecha: '2026-12-04', fechaHasta: '2026-12-07', cliente: { nombre: 'Ana Ríos', telefono: '3757 55-0101', email: 'ana@ejemplo.com' }, notaInterna: 'Llegan tarde', datos: { huespedes: 3 }, estado: 'PENDIENTE' })
     expect(p).not.toHaveProperty('precio')
   })
   it('si ya pagó la seña nace confirmada', () => {
@@ -93,12 +93,36 @@ describe('pedidoDelSitio', () => {
 
   it('pide las noches con la clave del intento y sin precio: lo calcula el servidor', () => {
     const p = pedidoDelSitio(base)
-    expect(p).toEqual({ modulo: 'ALQUILERES', recursoId: 'p1', fecha: '2026-12-10', fechaHasta: '2026-12-13', clave: 'k-1', cliente: { nombre: 'Ana Ríos', telefono: '0000 55-0101' }, notas: '3 huéspedes' })
+    expect(p).toEqual({ modulo: 'ALQUILERES', recursoId: 'p1', fecha: '2026-12-10', fechaHasta: '2026-12-13', clave: 'k-1', cliente: { nombre: 'Ana Ríos', telefono: '0000 55-0101' }, datos: { huespedes: 3, canal: 'sitio' } })
     expect(p).not.toHaveProperty('precio')
   })
-  it('manda el email solo si lo escribieron, y la nota después de los huéspedes', () => {
+  it('manda el email y la nota solo si los escribieron; los huéspedes van aparte', () => {
     const p = pedidoDelSitio({ ...base, email: ' ana@example.com ', notas: ' Llegamos tarde ', huespedes: 1 })
     expect(p.cliente).toEqual({ nombre: 'Ana Ríos', telefono: '0000 55-0101', email: 'ana@example.com' })
-    expect(p.notas).toBe('1 huésped · Llegamos tarde')
+    expect(p.notas).toBe('Llegamos tarde')
+    expect(p.datos).toEqual({ huespedes: 1, canal: 'sitio' })
+  })
+})
+
+describe('configDeCambio: lo que el sitio muestra para coordinar la seña', () => {
+  const pagos = NEGOCIOS_DEMO.estadia.pagos
+  const actual = { negocio: { telefono: '', pagos: { ...pagos, alias: '', titular: '' } }, datos: null }
+
+  it('el alias, el titular y el WhatsApp van a datos.publico, recortados', () => {
+    const c = configDeCambio({ telefono: ' 0000 15-0000 ', pagos: { ...pagos, alias: ' monte.cabanas ', titular: 'Monte SRL' } }, actual)
+    expect(c?.datos).toEqual({ publico: { alias: 'monte.cabanas', titular: 'Monte SRL', telefono: '0000 15-0000' } })
+  })
+  it('conserva lo demás que tenga guardado la config, adentro y afuera de publico', () => {
+    const guardado = { mensajes: { confirmada: 'Hola' }, publico: { alias: 'viejo', horario: 'de 9 a 18' } }
+    const c = configDeCambio({ pagos: { ...pagos, alias: 'nuevo', titular: '' } }, { negocio: { telefono: '0000 15-0000', pagos: { ...pagos, alias: 'viejo', titular: '' } }, datos: guardado })
+    expect(c?.datos).toEqual({ mensajes: { confirmada: 'Hola' }, publico: { alias: 'nuevo', titular: '', telefono: '0000 15-0000', horario: 'de 9 a 18' } })
+  })
+  it('si nada de eso cambió, no manda datos (un cambio de seña no los pisa)', () => {
+    const c = configDeCambio({ senaPct: 40, pagos: { ...pagos, alias: '', titular: '' } }, actual)
+    expect(c).not.toHaveProperty('datos')
+    expect(c).toMatchObject({ senaPorcentaje: 40 })
+  })
+  it('sin saber qué hay guardado no toca datos', () => {
+    expect(configDeCambio({ telefono: '0000 15-0000' })).toBeNull()
   })
 })

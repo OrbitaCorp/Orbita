@@ -20,7 +20,7 @@ const MENSUAL_INICIAL = { precioMes: 400000, minMeses: 1, maxMeses: 12, deposito
 /** Una foto de ejemplo para una propiedad recién creada en el panel real, hasta que exista la carga de fotos. */
 const FOTO_DE_EJEMPLO = '/plantillas/casa-interior.jpg'
 
-/** `real`: el panel de un negocio de verdad. Por ahora solo por noche, sin limpieza ni carga de fotos. */
+/** `real`: el panel de un negocio de verdad. Por ahora solo por noche y sin carga de fotos (la limpieza y las temporadas van en Temporadas y precios). */
 export default function Propiedades({ negocio, onGuardar, onIr, real = false }: Form & { onIr: (vista: Vista) => void; real?: boolean }) {
   const palabras = palabrasDe(negocio)
   const [lista, setLista] = useState<Propiedad[]>(negocio.propiedades)

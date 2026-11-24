@@ -212,7 +212,7 @@ export default function Panel() {
           {vista === 'salones' && <Salones key={k} negocio={negocio} reservas={reservas} onGuardar={onGuardar} onIr={irA} />}
           {vista === 'paquetes' && <Paquetes key={k} negocio={negocio} reservas={reservas} onGuardar={onGuardar} />}
           {vista === 'propiedades' && <Propiedades key={kForm} negocio={negocio} onGuardar={onGuardar} onIr={irA} real={real} />}
-          {vista === 'temporadas' && <Temporadas key={kForm} negocio={negocio} onGuardar={onGuardar} soloBase={real} />}
+          {vista === 'temporadas' && <Temporadas key={kForm} negocio={negocio} onGuardar={onGuardar} />}
           {vista === 'reglas' && <Reglas key={kForm} negocio={negocio} onGuardar={onGuardar} onIr={irA} />}
           {vista === 'bloqueos' && <Bloqueos key={k} negocio={negocio} reservas={reservas} onBloqueo={bloquear} onQuitarBloqueo={quitarBloqueo} onIr={irA} />}
           {vista === 'mensajes' && <Mensajes key={k} negocio={negocio} reservas={reservas} clientes={clientes} onGuardar={onGuardar} onAviso={avisar} />}

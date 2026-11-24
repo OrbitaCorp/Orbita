@@ -3004,4 +3004,51 @@ El sitio no conoce las reservas de otros: las noches ocupadas entran como bloque
       'apps/web/src/lib/reservasApi/cliente.ts:41',
     ],
   }),
+  entrada({
+    modulo: 'alquileres', fecha: F23, slug: 'motor-precio-de-estadia-y-campos-libres', tipo: 'tarea', quien: 'Alan',
+    titulo: 'El motor de reservas cobra la estadía por temporada y guarda lo propio de cada módulo',
+    foco: 'Tres cambios en el motor que comparten Turnos, Alquileres y Gimnasio: una estadía se cobra noche por noche (temporadas, recargo de viernes y sábado, limpieza); la reserva y la config tienen un campo libre `datos`; y bloquear fechas pide gestionar reservas, no configurarlas. En Alquileres vuelve Temporadas y precios, y el dueño carga el WhatsApp y el alias para coordinar la seña.',
+    que: `Etapa 3 del plan para probar Alquileres en producción. Son los puntos 3 (solo la estadía), 4 y 7 de la decisión "lo que Alquileres le pide al backend compartido", aprobados por Ale según Alan (23/11).
+
+**1. El precio de una estadía, en el servidor** (\`dominio/estadia.ts\`). Es la misma cuenta que \`apps/web/src/lib/reservas/estadia.ts\`, con los mismos casos de prueba:
+
+- Cada noche vale el precio del recurso o el de su temporada; si dos temporadas se pisan, manda la más corta.
+- Viernes y sábado llevan el recargo, redondeado a los cien.
+- La limpieza se suma una vez por estadía.
+- La tarifa se lee de \`datos.tarifa\` del recurso, con cuidado: una temporada sin fechas o con precio negativo no se aplica.
+- **Sin tarifa cargada, un alojamiento vale lo de antes** (precio por noches). Canchas, salones, turnos y clases no cambian.
+
+**2. Campo libre \`datos\`** en \`Reserva\` y en \`ReservaConfig\` (migración \`20261124120000_reservas_datos\`: dos columnas opcionales, sin default). El motor lo guarda sin interpretar.
+
+| Dónde | Tope | Quién lo ve |
+|---|---|---|
+| Reserva (\`datos\` del pedido) | 2.000 caracteres: también llega desde el sitio | El panel y quien tiene el enlace de la reserva |
+| Config (\`PUT /reservas/config\`) | 20.000 caracteres | El panel entero; el sitio, solo lo que esté en \`datos.publico\` (sale como \`publico\`) |
+
+**3. Bloqueos:** \`POST\` y \`DELETE /reservas/bloqueos\` piden \`reservas.manage\` en lugar de \`reservas.config\`, para que un encargado pueda cerrar un día.
+
+**Qué usa Alquileres de esto:**
+- **Temporadas y precios** vuelve al panel real con todo: precio base, fin de semana, limpieza y temporadas. El sitio muestra el detalle noche por noche y el total coincide con el de la reserva.
+- **Pagos y señas** suma "Para coordinar la seña": WhatsApp para reservas, alias y titular. Van a \`datos.publico\` de la config, y el sitio los muestra en la confirmación y en "Mi reserva".
+- **Cuántos huéspedes vienen** va en \`datos\` de la reserva (\`{ huespedes, canal }\`), ya no mezclado en la nota.
+
+**Para Turnos y Gimnasio:** no tienen que hacer nada. Si quieren usar \`datos\`, ya está en \`lib/reservasApi/tipos.ts\` (\`Config.datos\`, \`ConfigPublica.publico\`, \`Reserva.datos\`, \`Pedido.datos\`).
+
+**Lo que quedó afuera:** precios por horario de canchas, alquiler por mes, cambiar las fechas desde "Mi reserva", calendarios externos y seña online. Una reserva con precio puesto a mano que se reprograma se recalcula con la tarifa, como ya pasaba.
+
+**Verificado:** tests de la API y del front en verde. Contra la base de dev, por la API: viernes a lunes da $316.000 (dos noches con 20 % de recargo, una base y $10.000 de limpieza) con seña de $158.000; dos noches en temporada, $310.000; los dos topes rechazan; lo interno de la config no sale al sitio. En pantalla, con un Chrome sin ventana: el panel guarda el alias y sigue ahí al recargar, y el sitio muestra el mismo total y el alias en la confirmación. El permiso nuevo de bloqueos no se probó con un encargado real.`,
+    archivos: [
+      'apps/api/src/reservas/dominio/estadia.ts:1',
+      'apps/api/src/reservas/dominio/estadia.spec.ts:1',
+      'apps/api/src/reservas/reservas.service.ts:165',
+      'apps/api/prisma/migrations/20261124120000_reservas_datos/migration.sql:1',
+      'apps/api/src/reservas/dto/comunes.dto.ts:15',
+      'apps/api/src/reservas/reservas.types.ts:174',
+      'apps/api/src/reservas/reservas-panel.controller.ts:116',
+      'apps/api/src/reservas/README.md:72',
+      'apps/web/src/lib/reservasApi/tipos.ts:53',
+      'apps/web/src/modules/alquileres/datos/origen/escribir.ts:60',
+      'apps/web/src/modules/alquileres/admin/configuracion/Pagos.tsx:64',
+    ],
+  }),
 ]

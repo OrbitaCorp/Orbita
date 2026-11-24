@@ -13,8 +13,9 @@
 //   estadía), en tramos de 90 días: la API acepta hasta 93 por pedido.
 // - Los bloqueos de ese mismo rango y los clientes, que salen de las reservas.
 //
-// Escribe lo de la estadía por noche (escriturasDe): propiedades, reglas y
-// seña, reservas a mano, pagos, cambios de estado y bloqueos. Cada escritura
+// Escribe lo de la estadía por noche (escriturasDe): propiedades con su
+// tarifa (temporadas, fin de semana, limpieza), reglas y seña, el alias y el
+// WhatsApp para coordinarla, reservas a mano, pagos, cambios de estado y bloqueos. Cada escritura
 // le pide a la API y vuelve a cargar, así el panel muestra siempre lo que
 // quedó guardado. Canchas y salones todavía no escriben.
 import { useCallback, useEffect, useEffectEvent, useState } from 'react'
@@ -24,7 +25,7 @@ import { panel } from '@/lib/reservasApi/cliente'
 import type { Reserva as ReservaApi } from '@/lib/reservasApi/tipos'
 import { sumarDias, type ISO } from '@/lib/reservas/fechas'
 import { NEGOCIOS_DEMO } from '../index'
-import { clientesDeReservas, fechaArgentina, negocioDeApi, reservaDeApi, soloPrecioBase, tipoDeRecurso, tipoDeRubro } from './mapear'
+import { clientesDeReservas, fechaArgentina, negocioDeApi, reservaDeApi, soloPorNoche, tipoDeRecurso, tipoDeRubro } from './mapear'
 import { bloqueoParaApi, cambiosDePropiedades, configDeCambio, idDeBloqueo, pasosDeCambio, pedidoDeReserva, recursoDePropiedad } from './escribir'
 import type { DatosPanelAlquiler, Escrituras, OrigenAlquileres } from './index'
 
@@ -66,7 +67,11 @@ export async function reservasEntre(desde: ISO, hasta: ISO): Promise<ReservaApi[
 }
 
 /** Lo que trae una carga: lo que el panel dibuja y, para escribir, las reservas tal como las tiene la API. */
-export type CargaApi = Pick<DatosPanelAlquiler, 'tipo' | 'negocio' | 'reservas' | 'clientes'> & { reservasApi: ReservaApi[] }
+export type CargaApi = Pick<DatosPanelAlquiler, 'tipo' | 'negocio' | 'reservas' | 'clientes'> & {
+  reservasApi: ReservaApi[]
+  /** El campo libre de la config, tal como está guardado: al escribir se conserva lo que el panel no toca. */
+  datosConfig: Record<string, unknown> | null
+}
 
 /** Todo lo que el panel necesita del negocio con sesión. Sin config de Alquileres, el negocio todavía no lo usa. */
 export async function cargarApi(hoy: ISO): Promise<CargaApi> {
@@ -94,10 +99,11 @@ export async function cargarApi(hoy: ISO): Promise<CargaApi> {
   })
   return {
     tipo,
-    negocio: { ...armado, propiedades: armado.propiedades.map(soloPrecioBase) },
+    negocio: { ...armado, propiedades: armado.propiedades.map(soloPorNoche) },
     reservas: delModo.map(r => reservaDeApi(r, tipo)).filter(r => r !== null),
     clientes: clientesDeReservas(delModo),
     reservasApi: delModo,
+    datosConfig: config.datos ?? null,
   }
 }
 
@@ -126,7 +132,7 @@ export function escriturasDe(d: CargaApi, recargar: () => Promise<void>): Escrit
         for (const id of c.borrar) await panel.borrarRecurso(id)
         hizoAlgo = true
       }
-      const config = configDeCambio(cambio)
+      const config = configDeCambio(cambio, { negocio: d.negocio, datos: d.datosConfig })
       if (config) { await panel.guardarConfig(config); hizoAlgo = true }
       if (!hizoAlgo) throw new Error(NO_SE_GUARDA)
       await recargar()
@@ -166,7 +172,7 @@ export function escriturasDe(d: CargaApi, recargar: () => Promise<void>): Escrit
 }
 
 /** Mientras llega lo de verdad, el panel muestra su silueta: lo de abajo no se ve, solo le da forma. */
-const VACIO: CargaApi = { tipo: 'cancha', negocio: { ...NEGOCIOS_DEMO.cancha, nombre: '', unidades: [], salones: [], propiedades: [], bloqueos: [], equipo: [] }, reservas: [], clientes: [], reservasApi: [] }
+const VACIO: CargaApi = { tipo: 'cancha', negocio: { ...NEGOCIOS_DEMO.cancha, nombre: '', unidades: [], salones: [], propiedades: [], bloqueos: [], equipo: [] }, reservas: [], clientes: [], reservasApi: [], datosConfig: null }
 
 const hoyReal = () => fechaArgentina(new Date().toISOString())
 const mensajeDe = (e: unknown) => (e instanceof Error && e.message ? e.message : 'No pudimos traer los datos del panel.')

@@ -27,8 +27,7 @@ function tinteDe(t: Temporada, base: number): string {
 /** "$98.000" no entra en una celda de 46 px: "98k", y el precio entero queda en el aria-label. */
 const corto = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(n))
 
-/** `soloBase`: el panel real, donde por ahora el servidor cobra un precio fijo por noche (sin temporadas, fin de semana ni limpieza). */
-export default function Temporadas({ negocio, onGuardar, soloBase = false }: Form & { soloBase?: boolean }) {
+export default function Temporadas({ negocio, onGuardar }: Form) {
   const [lista, setLista] = useState<Propiedad[]>(negocio.propiedades)
   const [abierta, setAbierta] = useState(lista[0]?.id ?? '')
   const [mes, setMes] = useState<ISO>(HOY)
@@ -41,7 +40,7 @@ export default function Temporadas({ negocio, onGuardar, soloBase = false }: For
   const nuevaTemporada = (nombre: string, factor: number) => p && tarifa({ temporadas: [...p.tarifa.temporadas, { id: idNuevo('t'), nombre, desde: sumarDias(HOY, 30), hasta: sumarDias(HOY, 90), precioNoche: Math.round((p.tarifa.precioNoche * factor) / 1000) * 1000 }] })
   const celdas = grillaMes(partes(mes).anio, partes(mes).mes)
   return (
-    <PaginaForm rotulo={TIPOS.estadia.label} titulo={soloBase ? 'Precios' : 'Temporadas y precios'} bajada={soloBase ? `El precio por noche de cada ${palabras.unidad}.` : `Por ${palabras.unidad}: el precio base por noche, el recargo del fin de semana, la limpieza y las temporadas, o el precio por mes y el depósito. El calendario muestra qué rige cada día.`}>
+    <PaginaForm rotulo={TIPOS.estadia.label} titulo="Temporadas y precios" bajada={`Por ${palabras.unidad}: el precio base por noche, el recargo del fin de semana, la limpieza y las temporadas, o el precio por mes y el depósito. El calendario muestra qué rige cada día.`}>
       <div className="rv-seg" role="group" aria-label={capital(palabras.unidad)} style={{ marginBottom: 14, maxWidth: '100%', overflowX: 'auto' }}>
         {lista.map(x => <button key={x.id} type="button" aria-pressed={x.id === abierta} onClick={() => setAbierta(x.id)}>{x.nombre}</button>)}
       </div>
@@ -57,15 +56,13 @@ export default function Temporadas({ negocio, onGuardar, soloBase = false }: For
       )}
       {p && !esMensual(p) && (
         <div className="rv-pila">
-          <Seccion titulo={soloBase ? 'Precio por noche' : 'Precio base'} bajada={soloBase ? 'Todas las noches valen lo mismo: el total de una estadía es este precio por la cantidad de noches.' : 'Lo que vale una noche fuera de temporada.'}>
+          <Seccion titulo="Precio base" bajada="Lo que vale una noche fuera de temporada.">
             <div className="rv-grid rv-grid--3">
               <Campo label="Precio por noche" prefijo="$" value={milesTxt(p.tarifa.precioNoche)} onChange={x => tarifa({ precioNoche: num(x) })} inputMode="numeric" />
-              {!soloBase && <Selector label="Fin de semana" ayuda="Recargo de las noches del viernes y del sábado." valor={p.tarifa.finDeSemanaPct} onChange={x => tarifa({ finDeSemanaPct: x })} opciones={[0, 10, 15, 20, 30].map(n => ({ id: n, label: n ? `+${n}%` : 'Sin recargo' }))} />}
-              {!soloBase && <Campo label="Limpieza" prefijo="$" value={milesTxt(p.tarifa.limpieza)} onChange={x => tarifa({ limpieza: num(x) })} inputMode="numeric" ayuda="Fija, una vez por estadía." />}
+              <Selector label="Fin de semana" ayuda="Recargo de las noches del viernes y del sábado." valor={p.tarifa.finDeSemanaPct} onChange={x => tarifa({ finDeSemanaPct: x })} opciones={[0, 10, 15, 20, 30].map(n => ({ id: n, label: n ? `+${n}%` : 'Sin recargo' }))} />
+              <Campo label="Limpieza" prefijo="$" value={milesTxt(p.tarifa.limpieza)} onChange={x => tarifa({ limpieza: num(x) })} inputMode="numeric" ayuda="Fija, una vez por estadía." />
             </div>
-            {soloBase && <p className="ala-pie-nota">Las temporadas, el recargo de fin de semana y la limpieza llegan en la próxima etapa.</p>}
           </Seccion>
-          {!soloBase && <>
           <Seccion titulo="Temporadas" bajada={p.tarifa.temporadas.length > 1 ? 'Si dos se pisan, vale la más corta (por ejemplo, Carnaval adentro de la alta).' : 'Un precio distinto por noche entre dos fechas.'}
             acciones={<span className="rv-fila" style={{ gap: 6 }}>
               <button type="button" className="rv-btn rv-btn--sm" onClick={() => nuevaTemporada('Temporada alta', 1.4)}><Plus size={14} aria-hidden /> Alta</button>
@@ -110,7 +107,6 @@ export default function Temporadas({ negocio, onGuardar, soloBase = false }: For
               {p.tarifa.finDeSemanaPct > 0 && <span>Viernes y sábados +{p.tarifa.finDeSemanaPct}%</span>}
             </div>
           </Seccion>
-          </>}
         </div>
       )}
       <BarraGuardar cambiado={cambiado} onDescartar={() => { setLista(negocio.propiedades); setAbierta(negocio.propiedades[0]?.id ?? '') }} onGuardar={() => onGuardar({ propiedades: lista })} />

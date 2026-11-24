@@ -51,19 +51,32 @@ export function cambiosDePropiedades(antes: Propiedad[], despues: Propiedad[]): 
   }
 }
 
-/** Lo que un cambio del negocio le toca a la config de reservas, o null si no le toca nada. */
-export function configDeCambio(cambio: Partial<NegocioAlquiler>): GuardarConfig | null {
+/**
+ * Lo que un cambio del negocio le toca a la config de reservas, o null si no
+ * le toca nada. `actual` es lo que hay guardado: el alias, el titular y el
+ * WhatsApp viven en `datos.publico` de la config, y `datos` se guarda entero,
+ * así que lo demás que tenga adentro se conserva.
+ */
+export function configDeCambio(cambio: Partial<NegocioAlquiler>, actual?: { negocio: Pick<NegocioAlquiler, 'telefono' | 'pagos'>; datos: Record<string, unknown> | null }): GuardarConfig | null {
   const c: GuardarConfig = { modulo: 'ALQUILERES' }
   if (cambio.cancelaHastaHoras !== undefined) { c.cancelacionHastaHoras = cambio.cancelaHastaHoras; c.reprogramacionHastaHoras = cambio.cancelaHastaHoras }
   if (cambio.senaPct !== undefined) c.senaPorcentaje = cambio.senaPct
   if (cambio.pagos) c.senaReembolsable = cambio.pagos.cancelaATiempo === 'devolver'
+  if (actual && (cambio.pagos || cambio.telefono !== undefined)) {
+    const antes = { alias: actual.negocio.pagos.alias, titular: actual.negocio.pagos.titular, telefono: actual.negocio.telefono }
+    const ahora = { alias: (cambio.pagos?.alias ?? antes.alias).trim(), titular: (cambio.pagos?.titular ?? antes.titular).trim(), telefono: (cambio.telefono ?? antes.telefono).trim() }
+    if (ahora.alias !== antes.alias || ahora.titular !== antes.titular || ahora.telefono !== antes.telefono) {
+      const previo = actual.datos?.publico
+      c.datos = { ...actual.datos, publico: { ...(previo && typeof previo === 'object' && !Array.isArray(previo) ? previo : {}), ...ahora } }
+    }
+  }
   return Object.keys(c).length > 1 ? c : null
 }
 
 /** Una reserva cargada a mano en el panel, como pedido a la API. */
 export function pedidoDeReserva(r: Reserva, cliente: Cliente): CrearDesdePanel {
   if (!r.entrada || !r.salida) throw new Error('Por ahora el panel guarda solo estadías por noche.')
-  const nota = [r.nota, r.huespedes ? `${r.huespedes} ${r.huespedes === 1 ? 'huésped' : 'huéspedes'}` : ''].filter(Boolean).join(' · ')
+  const nota = r.nota?.trim()
   return {
     modulo: 'ALQUILERES',
     recursoId: r.unidadId,
@@ -71,6 +84,8 @@ export function pedidoDeReserva(r: Reserva, cliente: Cliente): CrearDesdePanel {
     fechaHasta: r.salida,
     cliente: { nombre: cliente.nombre, ...(cliente.telefono ? { telefono: cliente.telefono } : {}), ...(cliente.email ? { email: cliente.email } : {}) },
     ...(nota ? { notaInterna: nota } : {}),
+    // Cuántos vienen va en el campo libre de la reserva, no mezclado con la nota.
+    ...(r.huespedes ? { datos: { huespedes: r.huespedes } } : {}),
     estado: r.estado === 'confirmada' ? 'CONFIRMADA' : 'PENDIENTE',
   }
 }
@@ -132,11 +147,11 @@ export interface PedidoSitio {
 
 /**
  * El pedido de un visitante como lo recibe POST /storefront/:slug/reservas/reservar.
- * Sin precio: lo calcula el servidor. Cuántos vienen va en la nota, hasta que
- * la reserva tenga dónde guardarlo (etapa 3 del plan).
+ * Sin precio: lo calcula el servidor. Cuántos vienen y por dónde llegó la
+ * reserva van en su campo libre (`datos`).
  */
 export function pedidoDelSitio(p: PedidoSitio): Reservar {
-  const notas = [`${p.huespedes} ${p.huespedes === 1 ? 'huésped' : 'huéspedes'}`, p.notas.trim()].filter(Boolean).join(' · ')
+  const notas = p.notas.trim()
   const email = p.email.trim()
   return {
     modulo: 'ALQUILERES',
@@ -145,6 +160,7 @@ export function pedidoDelSitio(p: PedidoSitio): Reservar {
     fechaHasta: p.salida,
     clave: p.clave,
     cliente: { nombre: p.nombre.trim(), telefono: p.telefono.trim(), ...(email ? { email } : {}) },
-    notas,
+    ...(notas ? { notas } : {}),
+    datos: { huespedes: p.huespedes, canal: 'sitio' },
   }
 }
