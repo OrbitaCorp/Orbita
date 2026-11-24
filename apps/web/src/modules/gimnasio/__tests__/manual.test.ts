@@ -3,7 +3,7 @@
 // únicos. Si una pantalla cambia un botón y el manual no, esto falla.
 import { describe, expect, it } from 'vitest'
 import { fileURLToPath } from 'node:url'
-import { textosDePantallas } from '@/lib/manual/contrato'
+import { botonesQueFaltan } from '@/lib/manual/contrato'
 import { botonesDelManual, manualDeModuloParaOrbi } from '@/lib/manual/modulos'
 import { MANUAL_GIMNASIO } from '../manual'
 
@@ -11,10 +11,11 @@ const PANEL = fileURLToPath(new URL('../admin', import.meta.url))
 
 describe('manual de Gimnasio', () => {
     it('cada botón que nombra existe en el panel de Gimnasio', () => {
-        const textos = textosDePantallas(PANEL)
         const botones = botonesDelManual(MANUAL_GIMNASIO)
         expect(botones.length).toBeGreaterThan(10)
-        expect(botones.filter(b => !textos.has(b))).toEqual([])
+        expect(botonesQueFaltan(botones, PANEL)).toEqual([])
+        // El contrato muerde: un botón que no existe se detecta, y uno que termina en "…" se reconoce.
+        expect(botonesQueFaltan(['Un botón que no existe', 'Actividad nueva…'], PANEL)).toEqual(['Un botón que no existe'])
     })
 
     it('para Orbi: un tema por id, con el módulo adelante y en texto plano', () => {

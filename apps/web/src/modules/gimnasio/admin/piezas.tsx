@@ -8,8 +8,11 @@ import { useId, type CSSProperties } from 'react'
 import { Check } from 'lucide-react'
 import type { NegocioGym } from '../datos'
 
-/** Lo que recibe cada pantalla de configuración: el negocio y cómo guardar un cambio (con el aviso que se muestra). */
-export interface PropsConfig { negocio: NegocioGym; onGuardar: (cambio: Partial<NegocioGym>, aviso?: string, detalle?: string) => void }
+/**
+ * Lo que recibe cada pantalla de configuración: el negocio y cómo guardar un cambio (con el aviso que se muestra).
+ * Guardar contesta si salió bien: quien abre un formulario encima (Días sin clases) no lo cierra hasta saberlo.
+ */
+export interface PropsConfig { negocio: NegocioGym; onGuardar: (cambio: Partial<NegocioGym>, aviso?: string, detalle?: string) => Promise<boolean> }
 
 export const CSS_PANEL = `
   /* ── Muestras de color (radios de verdad: Tab entra una vez, las flechas eligen) ── */
@@ -28,6 +31,10 @@ export const CSS_PANEL = `
   .gip-franja > svg { flex-shrink: 0; }
   .gip-franja > span { flex: 1; min-width: 0; }
   .gip-franja b { font-weight: 600; }
+  /* La última lectura falló: en el tono de aviso, con el botón de actualizar al lado (abajo, a lo ancho, en celular). */
+  .gip-franja[data-tono='aviso'] { color: var(--chip-warning-fg); background: var(--color-warning-bg); flex-wrap: wrap; }
+  .gip-franja[data-tono='aviso'] > .rv-btn { flex-shrink: 0; }
+  @media (max-width: 560px) { .gip-franja[data-tono='aviso'] > span { flex-basis: calc(100% - 26px); } .gip-franja[data-tono='aviso'] > .rv-btn { flex: 1 1 100%; min-height: 44px; } }
 
   /* ── Guardando en la API: sin clics hasta que llega lo nuevo; se atenúa recién si tarda (una lectura rápida no parpadea) ── */
   .gip-seccion[data-ocupado] { pointer-events: none; cursor: progress; }

@@ -10,7 +10,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "61b1233594f94c6b",
+  "version": "a6d087dac83d2b6c",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -1065,6 +1065,13 @@ export const MANUAL_GENERADO: ManualGenerado = {
           "texto": "Todo está en la barra de la izquierda, agrupado en Hoy, Negocio y Reservas, más Calendarios y Configuración.\n\n- Clases: Las clases de cada día con quién viene, el check-in y la lista de espera, y la grilla semanal.\n- Alumnos o socios: Cada persona con su plan, cuándo vence y su asistencia.\n- Ingresos: Lo que entró por planes y clases sueltas, mes contra mes.\n- Equipo: Quién da cada actividad y su color en la grilla.\n- Actividades y salas: Lo que se dicta, con su duración y su cupo, y dónde.\n- Planes y precios: Clase de prueba, clase suelta, packs y membresías.\n- Reglas de reserva: Hasta cuántos días antes se reserva y hasta cuándo se cancela.\n- Días sin clases: Feriados, vacaciones o cierres.\n- Recordatorios y mensajes: Los mensajes que les llegan a los alumnos.\n- Pagos: Cómo cobra el negocio.\n\nArriba a la derecha está la campanita: avisa las clases de hoy con gente esperando lugar, las que ya están completas, los planes que vencen en los próximos días y las clases de la grilla que quedaron sin profe. Cada aviso lleva directo a la clase o a la ficha.\n\nDato: Clases y Días sin clases ya guardan en el sistema de reservas del negocio. Mientras se conecta el resto, una franja arriba avisa cuando una sección todavía no guarda: lo que se cambie ahí no queda guardado."
         },
         {
+          "id": "gimnasio.datos-viejos",
+          "capitulo": "El panel de Gimnasio",
+          "titulo": "Si el panel avisa que no pudo actualizar",
+          "pista": "se cortó internet, los datos están viejos, no carga",
+          "texto": "El panel se actualiza solo: cada minuto vuelve a leer el día que estás mirando, así lo que alguien reserva desde el sitio aparece sin tocar nada.\n\nSi arriba aparece una franja que dice No pudimos actualizar los datos, la última lectura falló (se cortó la conexión o el servidor no contestó) y lo que ves puede estar viejo. Tocá \"Actualizar\" antes de seguir.\n\nDato: Mientras el panel guarda un cambio, la pantalla queda un momento sin poder tocarse: es para que no se anote o se libere algo sobre datos viejos."
+        },
+        {
           "id": "gimnasio.clases-del-dia",
           "capitulo": "Clases",
           "titulo": "Las clases del día",
@@ -1083,14 +1090,14 @@ export const MANUAL_GENERADO: ManualGenerado = {
           "capitulo": "Clases",
           "titulo": "La lista de espera",
           "pista": "clase llena, cómo pasa el que espera",
-          "texto": "Con la clase llena, el botón dice \"A la lista de espera\": la persona queda esperando, en el orden en que llegó, y el panel avisa en qué lugar de la lista quedó.\n\nCuando alguien libera su lugar, el primero de la lista pasa solo y queda anotado; el aviso dice quién pasó. Si aparece un lugar sin que nadie cancele (por ejemplo, le subiste el cupo a la clase), tocá \"Darle el lugar\" al lado de quien quieras.\n\nPara sacar a alguien de la lista, tocá la cruz al lado de su nombre."
+          "texto": "Con la clase llena, el botón dice \"A la lista de espera\": la persona queda esperando, en el orden en que llegó, y el panel avisa en qué lugar de la lista quedó.\n\nCuando alguien libera su lugar, el primero de la lista pasa solo y queda anotado; el aviso dice quién pasó. Si aparece un lugar sin que nadie cancele (por ejemplo, le subiste el cupo a la clase), tocá \"Darle el lugar\" al lado de quien quieras.\n\nPara sacar a alguien de la lista, tocá la cruz al lado de su nombre y confirmá con \"Sacar de la lista\": pierde su lugar en la fila y, si después quiere volver, entra al final. \"Volver\" lo deja como estaba.\n\nDato: En un día marcado sin clases, o en una clase que ya empezó, no se le da el lugar a nadie."
         },
         {
           "id": "gimnasio.liberar-lugar",
           "capitulo": "Clases",
           "titulo": "Liberar un lugar",
           "pista": "sacar a alguien de una clase, cancelar su lugar",
-          "texto": "En la clase abierta, la cruz al lado de un anotado libera su lugar. Si había gente esperando, el primero de la lista lo toma en el acto.\n\nDato: Una clase que ya terminó no libera lugares: ahí se marca la asistencia."
+          "texto": "1. Abrí la clase: Desde Clases, tocá la clase del día que corresponda.\n2. Tocá la cruz: Está al lado del nombre de la persona. El panel pregunta antes de hacer nada.\n3. Confirmá: Tocá \"Liberar el lugar\". Si había gente esperando, el primero de la lista lo toma en el acto y el aviso dice quién pasó. \"Volver\" cierra sin liberar nada.\n\nOjo: En el sistema de reservas del negocio, liberar un lugar no se puede deshacer: la reserva queda cancelada y, si la persona dejó su email, le llega el aviso. Si fue un error, hay que anotarla de nuevo.\n\nDato: Una clase que ya terminó no libera lugares: ahí se marca la asistencia."
         },
         {
           "id": "gimnasio.asistencia",
@@ -1104,14 +1111,14 @@ export const MANUAL_GENERADO: ManualGenerado = {
           "capitulo": "La grilla semanal",
           "titulo": "Crear y cambiar las clases de la semana",
           "pista": "agregar una clase nueva, cambiar el horario, el cupo, el profe o la sala",
-          "texto": "En Clases, \"Grilla semanal\" muestra una columna por día con sus clases: hora, actividad, profe, cupo y qué tan llena estuvo en las últimas cuatro semanas.\n\n1. Nueva: Tocá \"Nueva clase\" arriba, o \"Clase\" al pie del día que quieras.\n2. Completala: Actividad, día, hora, profe, sala y cupo (cuántos lugares tiene; si se pasa, el resto queda en lista de espera).\n3. Guardá: Tocá \"Guardar\": se repite todas las semanas el mismo día y a la misma hora, y se ve en el sitio al instante.\n\nPara cambiar una, tocala en la grilla, cambiá lo que haga falta y tocá \"Guardar\". Para sacarla, \"Quitar\". \"Cancelar\" cierra sin guardar.\n\n- Dos clases no pueden pisarse en la misma sala, y la clase tiene que caer dentro del horario del negocio.\n- El cupo no puede bajar de los lugares que ya están tomados en una fecha que viene: el panel dice qué día.\n- Una clase con lugares reservados por delante no cambia de día, de hora ni de duración, y no se quita: primero hay que liberar esos lugares (o esperar a que pasen)."
+          "texto": "En Clases, \"Grilla semanal\" muestra una columna por día con sus clases: hora, actividad, profe, cupo y qué tan llena estuvo en las últimas cuatro semanas.\n\n1. Nueva: Tocá \"Nueva clase\" arriba, o \"Clase\" al pie del día que quieras.\n2. Completala: Actividad, día, hora, profe, sala y cupo (cuántos lugares tiene; si se pasa, el resto queda en lista de espera).\n3. Guardá: Tocá \"Guardar\": se repite todas las semanas el mismo día y a la misma hora, y se ve en el sitio al instante.\n\nEn el sistema de reservas del negocio, si la actividad, el profe o la sala todavía no existen se escriben ahí mismo: en Actividad elegí \"Actividad nueva…\" y poné su nombre y su duración; en Profe, \"Alguien nuevo…\"; en Sala, \"Sala nueva…\". Quedan en la lista para las próximas clases.\n\nDato: El formulario queda abierto hasta que la clase se guardó. Si el sistema rechaza el cambio (se pisa con otra clase, tiene lugares tomados), lo dice y lo que cargaste no se pierde.\n\nPara cambiar una, tocala en la grilla, cambiá lo que haga falta y tocá \"Guardar\". Para sacarla, \"Quitar\". \"Cancelar\" cierra sin guardar.\n\n- Dos clases no pueden pisarse en la misma sala, y la clase tiene que caer dentro del horario del negocio.\n- El cupo no puede bajar de los lugares que ya están tomados en una fecha que viene: el panel dice qué día.\n- Una clase con lugares reservados por delante no cambia de día, de hora ni de duración, y no se quita: primero hay que liberar esos lugares (o esperar a que pasen)."
         },
         {
           "id": "gimnasio.feriados",
           "capitulo": "Días sin clases",
           "titulo": "Cargar un feriado o unas vacaciones",
           "pista": "cerrar un día, feriado, vacaciones, mantenimiento",
-          "texto": "1. Abrí la sección: Reservas → Días sin clases.\n2. Cargá los días: Tocá \"Agregar días\", elegí desde y hasta qué día (los dos incluidos) y escribí el motivo: se muestra en el sitio ese día.\n3. Guardá: Tocá \"Agregar\". Esos días no se puede reservar y en Clases se ven sin clases.\n\nOjo: Lo que ya estaba reservado esos días no se cancela solo: al guardar, el aviso dice cuántas reservas quedaron adentro para que les escribas.\n\nPara volver a abrir esos días, tocá \"Quitar\" al lado del que cargaste. Los que vienen de un calendario externo se quitan desde Calendarios."
+          "texto": "1. Abrí la sección: Reservas → Días sin clases.\n2. Cargá los días: Tocá \"Agregar días\", elegí desde y hasta qué día (los dos incluidos) y escribí el motivo: se muestra en el sitio ese día.\n3. Guardá: Tocá \"Agregar\". Esos días no se puede reservar y en Clases se ven sin clases.\n\nOjo: Lo que ya estaba reservado esos días no se cancela solo. El formulario avisa cuántas reservas hay antes de guardar y, al guardar, cuántas quedaron adentro.\n\nDespués, cada día sin clases que todavía tiene reservas lo dice en su fila (\"3 reservas siguen en pie\"). Tocá \"Ver el día\" para ir a ese día en Clases: ahí se ven las clases que quedaron con gente, para avisarles y liberar sus lugares.\n\nPara volver a abrir esos días, tocá \"Quitar\" al lado del que cargaste. Los que vienen de un calendario externo se quitan desde Calendarios."
         }
       ]
     }

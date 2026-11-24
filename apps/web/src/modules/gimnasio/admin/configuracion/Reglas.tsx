@@ -17,14 +17,18 @@ const CSS = `
   .grg-regla p { margin: 2px 0 0; font-size: 13px; line-height: 1.5; color: var(--color-muted); }
 `
 
-const SOLAS: { Icon: LucideIcon; titulo: string; texto: string }[] = [
-  { Icon: Hourglass, titulo: 'La lista de espera avanza sola', texto: 'Cuando alguien cancela una clase llena, el primero que esperaba pasa a reservado y se le avisa. Si le subís el cupo a una clase, pasan los que entren.' },
+/**
+ * Lo que el sistema hace solo. Subirle el cupo a una clase no es igual en la demo y con la API (Capacidades.
+ * esperaPasaAlSubirCupo): en la demo pasan los que entren; con la API, el lugar se les da desde la clase.
+ */
+const solas = (esperaPasaAlSubirCupo: boolean): { Icon: LucideIcon; titulo: string; texto: string }[] => [
+  { Icon: Hourglass, titulo: 'La lista de espera avanza sola', texto: `Cuando alguien cancela una clase llena, el primero que esperaba pasa a reservado y se le avisa. ${esperaPasaAlSubirCupo ? 'Si le subís el cupo a una clase, pasan los que entren.' : 'Si le subís el cupo a una clase, no pasan solos: abrí la clase de ese día y tocá «Darle el lugar».'}` },
   { Icon: Ticket, titulo: 'El pack se descuenta al reservar', texto: 'Una clase reservada con pack resta una. Si se cancela a tiempo, vuelve; fuera de plazo, no.' },
   { Icon: Gift, titulo: 'La clase de prueba vale una vez por persona', texto: 'Se reconoce por el celular o el email, aunque reserve como alguien nuevo.' },
   { Icon: Repeat, titulo: 'La membresía respeta su tope semanal', texto: 'Con 2 por semana, la tercera clase de esa semana no entra con el plan: se puede pagar aparte como clase suelta.' },
 ]
 
-export default function Reglas({ negocio, onGuardar }: PropsConfig) {
+export default function Reglas({ negocio, onGuardar, esperaPasaAlSubirCupo }: PropsConfig & { esperaPasaAlSubirCupo: boolean }) {
   const b = useBorrador({ anticipacionDias: negocio.anticipacionDias, cancelaHastaHoras: negocio.cancelaHastaHoras, checkInMin: negocio.checkInMin })
   const v = b.v
   return (
@@ -41,7 +45,7 @@ export default function Reglas({ negocio, onGuardar }: PropsConfig) {
         </Seccion>
         <Seccion titulo="Lo que pasa solo" bajada="Reglas del sistema: no se configuran, pero conviene saberlas.">
           <div className="grg-reglas">
-            {SOLAS.map(s => (
+            {solas(esperaPasaAlSubirCupo).map(s => (
               <div key={s.titulo} className="grg-regla">
                 <span className="grg-ico" aria-hidden><s.Icon size={16} strokeWidth={1.7} /></span>
                 <div style={{ minWidth: 0 }}><b>{s.titulo}</b><p>{s.texto}</p></div>

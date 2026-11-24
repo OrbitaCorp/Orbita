@@ -28,9 +28,14 @@ function useVistaDemo(rubro: RubroGym): VistaGimnasio {
     tipo: 'demo', negocio, socios, inscripciones, reloj: RELOJ_DEMO,
     usuario: { nombre: negocio.dueno.nombre, rol: negocio.dueno.rol },
     listo: hidratado, ocupado: false, error: null, reintentar: () => {},
+    // Todo vive en este navegador: nunca hay una lectura que pueda fallar.
+    desactualizado: false, actualizar: () => {},
     guarda: () => true,
-    puede: { corregirAsistencia: true },
+    // La demo tiene sus secciones de Actividades y salas y de Equipo, la lista de espera avanza sola al subir
+    // el cupo (datos/negocio.ts) y nada de lo que se hace le llega a nadie: se puede deshacer anotando de nuevo.
+    puede: { corregirAsistencia: true, catalogoEnLaClase: false, esperaPasaAlSubirCupo: true, liberarEsDefinitivo: false },
     verFecha: () => {},
+    leidoHasta: null,
     acciones: {
       configurar: async cambio => {
         // Con lo que está en el almacén ahora (no con lo del último render): dos guardados seguidos no se pisan.

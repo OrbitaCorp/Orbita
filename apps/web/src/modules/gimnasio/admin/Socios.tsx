@@ -9,7 +9,8 @@ import { useRouter } from 'next/router'
 import { ArrowRight, BellRing, Check, MessageCircle, Plus, Search, UserCheck, UserMinus, UserX } from 'lucide-react'
 import { diasEntre, fechaCorta, fechaLarga, hhmm, mesTxt, sumarDias } from '@/lib/reservas/fechas'
 import { pesos } from '@/lib/reservas/precio'
-import { ESTADO_INSCRIPCION, ESTADO_PLAN, HOY, actividadDe, colorDe, estadoPlanDe, planDe, rubroPorKey, type EstadoPlan, type Inscripcion, type NegocioGym, type Socio } from '../datos'
+import { ESTADO_INSCRIPCION, ESTADO_PLAN, actividadDe, colorDe, estadoPlanDe, planDe, rubroPorKey, type EstadoPlan, type Inscripcion, type NegocioGym, type Socio } from '../datos'
+import { useReloj } from '../datos/reloj'
 import { Campo, Chip, Encabezado, Kpi, Modal, Nota, Selector, Sigla, Vacio } from '@/design-system/reservas/piezas'
 
 interface P {
@@ -61,6 +62,8 @@ const PAGINA = 25
 
 export default function Socios({ negocio, inscripciones, socios, onAgregar, onCambiar, onAvisar }: P) {
   const router = useRouter()
+  // El día de hoy sale del reloj del origen: el fijo de la demo o el de verdad con la API.
+  const { hoy } = useReloj()
   const r = rubroPorKey(negocio.rubro)
   const [filtro, setFiltroEstado] = useState<Filtro>('todos')
   const [q, setQEstado] = useState('')
@@ -83,12 +86,12 @@ export default function Socios({ negocio, inscripciones, socios, onAgregar, onCa
   }, [inscripciones])
   const filas = useMemo(() => socios.map(s => {
     const suyas = porSocio.get(s.id) ?? []
-    const ultimas30 = suyas.filter(i => i.fecha >= sumarDias(HOY, -30) && i.fecha <= HOY)
+    const ultimas30 = suyas.filter(i => i.fecha >= sumarDias(hoy, -30) && i.fecha <= hoy)
     const vino = ultimas30.filter(i => i.estado === 'asistio').length
     const falto = ultimas30.filter(i => i.estado === 'ausente').length
-    const estado = estadoPlanDe(s)
+    const estado = estadoPlanDe(s, hoy)
     return { s, estado, vino, falto, asistencia: vino + falto ? Math.round((vino / (vino + falto)) * 100) : null, suyas }
-  }), [socios, porSocio])
+  }), [socios, porSocio, hoy])
   const orden: Record<EstadoPlan, number> = { 'por-vencer': 0, vencido: 1, agotado: 1, vigente: 2, 'sin-plan': 3 }
   const visibles = filas
     .filter(f => filtro === 'todos' || (filtro === 'vencido' ? f.estado === 'vencido' || f.estado === 'agotado' : f.estado === filtro))
@@ -147,7 +150,7 @@ export default function Socios({ negocio, inscripciones, socios, onAgregar, onCa
                   <tr key={f.s.id}>
                     <td data-label="Nombre"><span className="rv-fila" style={{ gap: 10, flexWrap: 'nowrap' }}><Sigla nombre={f.s.nombre} color={colorDe(f.s.nombre)} size={32} /><span style={{ minWidth: 0 }}><span className="gso-nombre">{f.s.nombre}</span><span className="rv-ayuda" style={{ fontWeight: 400 }}>{f.s.telefono}</span></span></span></td>
                     <td data-label="Plan"><span className="rv-fila" style={{ gap: 6, flexWrap: 'nowrap' }}><Chip tono={ESTADO_PLAN[f.estado].tono}>{ESTADO_PLAN[f.estado].label}</Chip><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{plan?.nombre ?? '—'}</span></span></td>
-                    <td data-label="Vence">{f.s.vence ? <span className="gso-vence" data-estado={f.estado === 'agotado' ? 'vencido' : f.estado}>{fechaCorta(f.s.vence)}{f.estado === 'por-vencer' ? ` · en ${diasEntre(HOY, f.s.vence)} d` : ''}</span> : '—'}</td>
+                    <td data-label="Vence">{f.s.vence ? <span className="gso-vence" data-estado={f.estado === 'agotado' ? 'vencido' : f.estado}>{fechaCorta(f.s.vence)}{f.estado === 'por-vencer' ? ` · en ${diasEntre(hoy, f.s.vence)} d` : ''}</span> : '—'}</td>
                     {/* El número en mono va en su span: en la tarjeta de celular el rótulo de la celda (::before) quedaba en mono también. */}
                     <td data-label="Le quedan"><span className="rv-num">{f.s.clasesRestantes !== null ? `${f.s.clasesRestantes} clases` : plan?.porSemana ? `${plan.porSemana}/sem` : plan ? 'libre' : '—'}</span></td>
                     <td data-label="Asistencia 30 d">{f.asistencia !== null ? `${f.asistencia}% · ${f.vino} ${f.vino === 1 ? 'clase' : 'clases'}` : <span className="rv-muted">sin clases</span>}</td>
@@ -172,6 +175,7 @@ export default function Socios({ negocio, inscripciones, socios, onAgregar, onCa
 }
 
 function Ficha({ negocio, socio: s, estado, suyas, vino, falto, onCerrar, onCambiar, onAvisar }: { negocio: NegocioGym; socio: Socio; estado: EstadoPlan; suyas: Inscripcion[]; vino: number; falto: number; onCerrar: () => void; onCambiar: P['onCambiar']; onAvisar: P['onAvisar'] }) {
+  const { hoy } = useReloj()
   const plan = planDe(negocio, s.planId)
   // Se asigna un pack o una membresía: la prueba y la suelta son de una sola clase, no son un plan del socio.
   const asignables = negocio.planes.filter(p => p.tipo === 'pack' || p.tipo === 'membresia')
@@ -182,7 +186,7 @@ function Ficha({ negocio, socio: s, estado, suyas, vino, falto, onCerrar, onCamb
   const asignar = () => {
     const p = planDe(negocio, renovar)
     if (!p) return
-    onCambiar(s.id, { planId: p.id, desde: HOY, vence: sumarDias(HOY, p.vigenciaDias), clasesRestantes: p.tipo === 'pack' ? p.clases ?? null : null, probo: true }, `${p.nombre} asignado a ${nombre}`, `Hasta el ${fechaCorta(sumarDias(HOY, p.vigenciaDias))}. El cobro se registra a mano.`)
+    onCambiar(s.id, { planId: p.id, desde: hoy, vence: sumarDias(hoy, p.vigenciaDias), clasesRestantes: p.tipo === 'pack' ? p.clases ?? null : null, probo: true }, `${p.nombre} asignado a ${nombre}`, `Hasta el ${fechaCorta(sumarDias(hoy, p.vigenciaDias))}. El cobro se registra a mano.`)
   }
   // El aviso de vencimiento es la plantilla de Recordatorios y mensajes; mandarlo acá es simulado.
   const avisable = estado === 'por-vencer' || estado === 'vencido' || estado === 'agotado'
@@ -228,6 +232,7 @@ function Ficha({ negocio, socio: s, estado, suyas, vino, falto, onCerrar, onCamb
 }
 
 function NuevoSocio({ negocio, socioTxt, onCerrar, onAgregar }: { negocio: NegocioGym; socioTxt: string; onCerrar: () => void; onAgregar: (s: Socio) => void }) {
+  const { hoy } = useReloj()
   const [nombre, setNombre] = useState('')
   const [telefono, setTelefono] = useState('')
   const [email, setEmail] = useState('')
@@ -237,7 +242,7 @@ function NuevoSocio({ negocio, socioTxt, onCerrar, onAgregar }: { negocio: Negoc
     if (nombre.trim().length < 3) { setError('Escribí nombre y apellido.'); return }
     if (telefono.replace(/\D/g, '').length < 8) { setError('Escribí un celular con código de área.'); return }
     const p = planDe(negocio, planId || null)
-    onAgregar({ id: `sn${Date.now().toString(36)}`, nombre: nombre.trim(), telefono: telefono.trim(), email: email.trim() || undefined, planId: p?.id ?? null, desde: p ? HOY : null, vence: p ? sumarDias(HOY, p.vigenciaDias) : null, clasesRestantes: p?.tipo === 'pack' ? p.clases ?? null : null, probo: false, alta: HOY })
+    onAgregar({ id: `sn${Date.now().toString(36)}`, nombre: nombre.trim(), telefono: telefono.trim(), email: email.trim() || undefined, planId: p?.id ?? null, desde: p ? hoy : null, vence: p ? sumarDias(hoy, p.vigenciaDias) : null, clasesRestantes: p?.tipo === 'pack' ? p.clases ?? null : null, probo: false, alta: hoy })
   }
   return (
     <Modal titulo={`Sumar ${socioTxt.toLowerCase()}`} bajada="Para quien se anota en el mostrador. Después reserva desde el sitio con su celular." onCerrar={onCerrar}

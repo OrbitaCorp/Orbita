@@ -41,3 +41,15 @@ export function textosDePantallas(dir: string): Set<string> {
     }
     return textos
 }
+
+/**
+ * Los botones de un manual que ninguna pantalla de la carpeta muestra con ese
+ * nombre (vacío si están todos). El nombre del manual se compara igual que el
+ * texto de la pantalla (normalizar): sin eso, un botón que termina en "…"
+ * ("Actividad nueva…") nunca coincidía con el suyo, que se guarda sin los
+ * puntos.
+ */
+export function botonesQueFaltan(botones: string[], dir: string): string[] {
+    const textos = textosDePantallas(dir)
+    return botones.filter(b => !textos.has(normalizar(b)))
+}

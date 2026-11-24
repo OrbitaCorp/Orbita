@@ -296,10 +296,20 @@ export interface Inscripcion {
   planId: string | null
   /** Lugares que ocupa (alguien que viene con una amiga ocupa dos). Sin el dato, uno. */
   cantidad?: number
+  /**
+   * El nombre con el que se anotó, si esta inscripción lo trae (las de la API).
+   * Dos personas pueden compartir celular (una madre que anota a sus dos hijos)
+   * y entonces comparten ficha: cada lugar se muestra con su propio nombre, no
+   * con el de la ficha.
+   */
+  nombre?: string
 }
 
 /** Los lugares que ocupa una inscripción. */
 export const lugaresDe = (i: Pick<Inscripcion, 'cantidad'>) => i.cantidad ?? 1
+
+/** Cómo se llama quien ocupa una inscripción: el nombre con el que se anotó o, si no lo trae, el de su ficha. */
+export const nombreDeInscripcion = (i: Pick<Inscripcion, 'nombre'>, socio: Pick<Socio, 'nombre'> | undefined): string => i.nombre?.trim() || socio?.nombre || '—'
 
 // ─── Negocio de ejemplo de cada rubro ────────────────────────────────────────
 

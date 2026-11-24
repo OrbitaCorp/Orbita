@@ -15,7 +15,9 @@
 // - Cada reserva es una inscripción y cada persona en la lista de espera, una
 //   inscripción en estado 'espera'. Los socios salen de esas mismas filas, uno
 //   por persona (su ficha, su celular o su email), hasta que los alumnos
-//   tengan su lugar en la API.
+//   tengan su lugar en la API. Cada inscripción conserva el nombre con el que
+//   se anotó: dos personas con el mismo celular comparten ficha (una madre que
+//   anota a sus dos hijos) y en la clase cada lugar se ve con su nombre.
 // - Los días: la API cuenta el domingo como 0; el panel, el lunes. Las horas
 //   son minutos de Argentina en los dos.
 import type { AnotarseEnEspera, Bloqueo, Cliente, Config, CrearBloqueo, CrearDesdePanel, Espera, GuardarRecurso, HorarioSemanal, Recurso, Reserva, Tramo } from '@/lib/reservasApi/tipos'
@@ -210,9 +212,11 @@ const llave = (recursoId: string, fecha: ISO, inicio: number) => `${recursoId}|$
 export function inscripcionDeReserva(r: Reserva, clases: Map<string, string>, ahora: Date): Inscripcion | null {
   const estado = estadoDeReserva(r, ahora)
   if (!estado) return null
-  // Si la clase cambió de día u hora, la reserva queda en su horario viejo: sin clase en la grilla, no se dibuja.
+  // Una reserva de un horario que la clase ya no tiene (se movió después) queda con el id de su recurso: si el recurso
+  // tiene una sola sesión, ese id es el de la clase y la reserva se sigue viendo en su fecha, con la clase de ahora. La
+  // API no deja mover una clase con lugares tomados por delante, así que esto le pasa solo a lo que ya pasó.
   const claseId = clases.get(llave(r.recursoId, r.fecha, r.inicioMinutos)) ?? r.recursoId
-  return { id: r.id, claseId, fecha: r.fecha, socioId: personaDe(r), estado, creada: r.creadaEn, planId: null, cantidad: r.cantidad }
+  return { id: r.id, claseId, fecha: r.fecha, socioId: personaDe(r), estado, creada: r.creadaEn, planId: null, cantidad: r.cantidad, nombre: r.clienteNombre }
 }
 
 const PREFIJO_ESPERA = 'espera:'
@@ -220,9 +224,12 @@ const PREFIJO_ESPERA = 'espera:'
 export const esEspera = (inscripcionId: string) => inscripcionId.startsWith(PREFIJO_ESPERA)
 export const idDeEspera = (inscripcionId: string) => inscripcionId.slice(PREFIJO_ESPERA.length)
 
+/** El día (de Argentina) del horario que alguien espera. */
+export const fechaDeEspera = (e: Pick<Espera, 'inicio'>): ISO => relojArgentina(new Date(e.inicio)).hoy
+
 export function inscripcionDeEspera(e: Espera, clases: Map<string, string>): Inscripcion {
   const { hoy: fecha, ahora: inicio } = relojArgentina(new Date(e.inicio))
-  return { id: `${PREFIJO_ESPERA}${e.id}`, claseId: clases.get(llave(e.recursoId, fecha, inicio)) ?? e.recursoId, fecha, socioId: personaDe(e), estado: 'espera', creada: e.createdAt, planId: null }
+  return { id: `${PREFIJO_ESPERA}${e.id}`, claseId: clases.get(llave(e.recursoId, fecha, inicio)) ?? e.recursoId, fecha, socioId: personaDe(e), estado: 'espera', creada: e.createdAt, planId: null, nombre: e.clienteNombre }
 }
 
 /** Las reservas y la espera como inscripciones (las vencidas sin confirmar, afuera). */
@@ -282,21 +289,28 @@ export function horarioSinSesion(previo: HorarioSemanal | null | undefined, viej
 
 /**
  * El recurso que guarda una clase de la grilla: uno nuevo, o el que ya la
- * tenía con la clase cambiada. Nombre y duración son los de la actividad; el
- * resto de `datos` del recurso (lo de otros) se respeta.
+ * tenía con la clase cambiada. El nombre es el de la actividad. La duración
+ * también, salvo que la clase ya existiera y siga con la misma actividad: ahí
+ * se conserva la del recurso (tocarle el cupo a una clase de 90 minutos no la
+ * deja en los 60 de otra clase de la misma actividad). Del resto de `datos`
+ * del recurso, y de lo que haya adentro de `datos.gimnasio` y el panel no
+ * maneja, no se pierde nada.
  */
 export function recursoParaClase(clase: ClaseSemanal, negocio: Pick<NegocioGym, 'actividades' | 'profes'>, previo?: { recurso: Recurso; clase: ClaseSemanal }): GuardarRecurso {
   const act = negocio.actividades.find(a => a.id === clase.actividadId)
-  const duracion = act?.duracion ?? 60
+  const mismaActividad = !!previo && previo.clase.actividadId === clase.actividadId
+  const duracion = (mismaActividad ? previo.recurso.duracionMinutos : null) ?? act?.duracion ?? 60
   const profe = negocio.profes.find(p => p.id === clase.profeId)
   const gimnasio: DatosGimnasio = { actividadId: clase.actividadId, color: act?.color ?? '', profeId: clase.profeId, profe: profe?.nombre ?? '', sala: clase.sala }
+  const crudo = previo?.recurso.datos?.gimnasio
+  const deAntes = crudo && typeof crudo === 'object' ? (crudo as Record<string, unknown>) : {}
   return {
     modulo: MODULO, tipo: 'CLASE',
-    nombre: act?.nombre ?? 'Clase',
+    nombre: act?.nombre ?? previo?.recurso.nombre ?? 'Clase',
     cupo: clase.cupo,
     duracionMinutos: duracion,
     horario: horarioConSesion(previo?.recurso.horario, previo ? previo.clase : null, { dia: clase.dia, inicio: clase.inicio, fin: clase.inicio + duracion }),
-    datos: { ...(previo?.recurso.datos ?? {}), gimnasio: { ...gimnasio } },
+    datos: { ...(previo?.recurso.datos ?? {}), gimnasio: { ...deAntes, ...gimnasio } },
   }
 }
 
@@ -337,7 +351,11 @@ export function clienteDeSocio(s: Pick<Socio, 'nombre' | 'telefono' | 'email'>):
   return { nombre: s.nombre.trim(), ...(telefono ? { telefono } : {}), ...(email ? { email } : {}) }
 }
 
-/** Una inscripción hecha desde el panel como reserva confirmada. `clave`: un uuid por intento (dos clics no dan dos lugares). */
+/**
+ * Una inscripción hecha desde el panel como reserva confirmada. `clave` es un uuid por intento: si ese mismo pedido se
+ * manda dos veces (la red lo repite), la API devuelve la misma reserva. Dos clics en "Anotar" no llegan a ser dos
+ * pedidos: el formulario se vacía con el primero.
+ */
 export function pedidoDeInscripcion(i: Pick<Inscripcion, 'fecha' | 'cantidad'>, clase: ClaseSemanal, socio: Pick<Socio, 'nombre' | 'telefono' | 'email'>, clave: string): CrearDesdePanel {
   return { modulo: MODULO, recursoId: recursoDeClase(clase.id), fecha: i.fecha, inicioMinutos: clase.inicio, cantidad: lugaresDe(i), cliente: clienteDeSocio(socio), estado: 'CONFIRMADA', clave }
 }

@@ -12,7 +12,8 @@ import { useMemo, useState } from 'react'
 import { BellRing, HandCoins, Percent, UserCheck } from 'lucide-react'
 import { DIAS_SEMANA, diaSemana, diasEntre, fechaCorta, minFecha, rangoTxt, sumarDias, type ISO } from '@/lib/reservas/fechas'
 import { pesos } from '@/lib/reservas/precio'
-import { HOY, cupoDe, estadoPlanDe, planDe, rubroPorKey, type Inscripcion, type NegocioGym, type Socio } from '../datos'
+import { cupoDe, estadoPlanDe, planDe, rubroPorKey, type Inscripcion, type NegocioGym, type Socio } from '../datos'
+import { useReloj } from '../datos/reloj'
 import { Barras, Encabezado, Kpi, Segmentado } from '@/design-system/reservas/piezas'
 
 type Periodo = 'mes' | 'anterior' | 'trimestre'
@@ -62,10 +63,10 @@ function ventasEntre(negocio: NegocioGym, socios: Socio[], inscripciones: Inscri
  * también. Antes de `primerDia` (el primer día con historial: la demo trae un mes para atrás,
  * y un negocio real lo tiene desde que usa Órbita) la grilla no cuenta: si no, el período
  * anterior salía en cero y la variación inventaba una suba. Sin clases con historial, `total`
- * es null y no se compara.
+ * es null y no se compara. `hoy` es el día del reloj del origen: lo que todavía no pasó no cuenta.
  */
-function ocupacionEntre(negocio: NegocioGym, inscripciones: Inscripcion[], desde: ISO, hasta: ISO, primerDia: ISO) {
-  const fin = hasta < HOY ? hasta : HOY
+function ocupacionEntre(negocio: NegocioGym, inscripciones: Inscripcion[], desde: ISO, hasta: ISO, primerDia: ISO, hoy: ISO) {
+  const fin = hasta < hoy ? hasta : hoy
   const porActividad = new Map<string, { anotados: number; cupo: number }>()
   let anotados = 0, cupo = 0
   for (let f = desde < primerDia ? primerDia : desde; f <= fin; f = sumarDias(f, 1)) {
@@ -84,21 +85,23 @@ const variacion = (ahora: number, antes: number) => ((ahora - antes) / antes) * 
 
 export default function Ingresos({ negocio, inscripciones, socios }: { negocio: NegocioGym; inscripciones: Inscripcion[]; socios: Socio[] }) {
   const r = rubroPorKey(negocio.rubro)
+  // El día de hoy sale del reloj del origen: el fijo de la demo o el de verdad con la API.
+  const { hoy } = useReloj()
   const [periodo, setPeriodo] = useState<Periodo>('mes')
   // El período elegido y, para comparar, el anterior: el mes pasado para este mes, los tres
   // meses de antes para el trimestre. Si el período todavía corre, se compara el mismo tramo
   // (lo que va de noviembre contra el 1 al 14 de octubre, no contra octubre entero: a mitad
   // de mes, "Ingresos" daba una caída del 40 % que no existía).
   const { desde, hasta, desdeAnt, hastaAnt } = useMemo(() => {
-    const primero = `${HOY.slice(0, 7)}-01`
+    const primero = `${hoy.slice(0, 7)}-01`
     const finMes = (p: string) => sumarDias(`${sumarDias(p, 32).slice(0, 7)}-01`, -1)
     let d = primero, h = finMes(primero), dAnt = mesAnterior(primero)
     if (periodo === 'anterior') { d = mesAnterior(primero); h = finMes(d); dAnt = mesAnterior(d) }
     // Este mes y los dos anteriores (con -62 días desde el 1 se caía en el cuarto mes).
     if (periodo === 'trimestre') { d = mesAnterior(mesAnterior(primero)); dAnt = mesAnterior(mesAnterior(mesAnterior(d))) }
     const hAnt = sumarDias(d, -1)
-    return { desde: d, hasta: h, desdeAnt: dAnt, hastaAnt: h <= HOY ? hAnt : minFecha(hAnt, sumarDias(dAnt, diasEntre(d, HOY))) }
-  }, [periodo])
+    return { desde: d, hasta: h, desdeAnt: dAnt, hastaAnt: h <= hoy ? hAnt : minFecha(hAnt, sumarDias(dAnt, diasEntre(d, hoy))) }
+  }, [periodo, hoy])
   /** "1 al 14 de octubre": con qué se compara, en las notas de los indicadores. */
   const comparado = rangoTxt(desdeAnt, hastaAnt)
 
@@ -106,19 +109,19 @@ export default function Ingresos({ negocio, inscripciones, socios }: { negocio: 
   const ventasAnt = useMemo(() => ventasEntre(negocio, socios, inscripciones, desdeAnt, hastaAnt), [negocio, socios, inscripciones, desdeAnt, hastaAnt])
   const total = ventas.reduce((s, v) => s + v.monto, 0)
   const totalAnt = ventasAnt.reduce((s, v) => s + v.monto, 0)
-  const activos = socios.filter(s => ['vigente', 'por-vencer'].includes(estadoPlanDe(s))).length
+  const activos = socios.filter(s => ['vigente', 'por-vencer'].includes(estadoPlanDe(s, hoy))).length
   // Quiénes estaban al día cuando arrancó el período: desde su alta venían renovando, y su plan de ahora venció después de esa fecha.
   const activosAlInicio = socios.filter(s => s.planId && s.vence && s.vence >= desde && (s.alta ?? s.desde ?? '9999') <= desde).length
-  const vencen = socios.filter(s => estadoPlanDe(s) === 'por-vencer').length
+  const vencen = socios.filter(s => estadoPlanDe(s, hoy) === 'por-vencer').length
   // El primer día con historial: antes no hay nada que comparar (ver ocupacionEntre).
-  const primerDia = useMemo(() => inscripciones.reduce((m, i) => (i.fecha < m ? i.fecha : m), HOY), [inscripciones])
-  const ocupacion = useMemo(() => ocupacionEntre(negocio, inscripciones, desde, hasta, primerDia), [negocio, inscripciones, desde, hasta, primerDia])
-  const ocupacionAnt = useMemo(() => ocupacionEntre(negocio, inscripciones, desdeAnt, hastaAnt, primerDia), [negocio, inscripciones, desdeAnt, hastaAnt, primerDia])
+  const primerDia = useMemo(() => inscripciones.reduce((m, i) => (i.fecha < m ? i.fecha : m), hoy), [inscripciones, hoy])
+  const ocupacion = useMemo(() => ocupacionEntre(negocio, inscripciones, desde, hasta, primerDia, hoy), [negocio, inscripciones, desde, hasta, primerDia, hoy])
+  const ocupacionAnt = useMemo(() => ocupacionEntre(negocio, inscripciones, desdeAnt, hastaAnt, primerDia, hoy), [negocio, inscripciones, desdeAnt, hastaAnt, primerDia, hoy])
 
   // Las semanas del período hasta la de hoy: las que vienen todavía no vendieron nada y en cero parecían una caída.
   const semanas = useMemo(() => {
     const out: { rotulo: string; valor: number }[] = []
-    const tope = hasta < HOY ? hasta : HOY
+    const tope = hasta < hoy ? hasta : hoy
     let lunes = sumarDias(desde, -diaSemana(desde))
     while (lunes <= tope) {
       const fin = sumarDias(lunes, 7)
@@ -126,20 +129,20 @@ export default function Ingresos({ negocio, inscripciones, socios }: { negocio: 
       lunes = fin
     }
     return out
-  }, [ventas, desde, hasta])
+  }, [ventas, desde, hasta, hoy])
   const porPlan = negocio.planes.filter(p => p.precio > 0).map(p => ({ id: p.id, nombre: p.nombre, valor: ventas.filter(v => v.planId === p.id).reduce((s, v) => s + v.monto, 0) })).sort((a, b) => b.valor - a.valor)
   const maxPlan = Math.max(1, ...porPlan.map(p => p.valor))
   const porActividad = negocio.actividades.map(a => { const k = ocupacion.porActividad.get(a.id); return { id: a.id, nombre: a.nombre, pct: k?.cupo ? Math.round((k.anotados / k.cupo) * 100) : 0, clases: negocio.clases.filter(c => c.actividadId === a.id).length } }).sort((a, b) => b.pct - a.pct)
   // Asistencia por día de la semana en el período: quién vino sobre quién tenía que venir. Para ver qué día se falta más.
   const porDia = useMemo(() => {
-    const fin = hasta < HOY ? hasta : HOY
+    const fin = hasta < hoy ? hasta : hoy
     const delPeriodo = inscripciones.filter(i => i.fecha >= desde && i.fecha <= fin && (i.estado === 'asistio' || i.estado === 'ausente'))
     return [0, 1, 2, 3, 4, 5, 6].filter(d => negocio.clases.some(c => c.dia === d)).map(d => {
       const del = delPeriodo.filter(i => diaSemana(i.fecha) === d)
       const vino = del.filter(i => i.estado === 'asistio').length
       return { id: d, nombre: DIAS_SEMANA[d], pct: del.length ? Math.round((vino / del.length) * 100) : 0, vino, total: del.length }
     })
-  }, [inscripciones, negocio.clases, desde, hasta])
+  }, [inscripciones, negocio.clases, desde, hasta, hoy])
 
   return (
     <div className="rv-pagina">

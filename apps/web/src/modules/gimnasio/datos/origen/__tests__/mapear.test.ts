@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 import type { Bloqueo, Config, Espera, Recurso, Reserva } from '@/lib/reservasApi/tipos'
 import { COLORES_ACTIVIDAD, negocioDe, rubroPorKey, type ClaseSemanal } from '../../index'
 import {
-  actividadesDe, aperturaDeHorario, bloqueoParaApi, bloqueosDeApi, claveApi, clasesDeRecurso, datosGimnasio, diaPanel, estadoDeReserva, horarioConSesion,
+  actividadesDe, aperturaDeHorario, bloqueoParaApi, bloqueosDeApi, claveApi, clasesDeRecurso, datosGimnasio, diaPanel, estadoDeReserva, fechaDeEspera, horarioConSesion,
   horarioSinSesion, inscripcionesDeApi, negocioDeApi, pedidoDeInscripcion, personaDe, planDeBloqueos, planDeGrilla, profesDe, recursoDeClase, recursoParaClase,
   salasDe, sociosDeApi,
 } from '../mapear'
@@ -154,6 +154,23 @@ describe('Gimnasio sobre la API · inscripciones y socios', () => {
     expect(ins[2].creada).toBe('2026-11-15T20:00:00.000Z')
   })
 
+  it('cada lugar conserva el nombre con el que se anotó: dos personas con el mismo celular comparten ficha, no nombre', () => {
+    // Una madre anota a sus dos hijos con su celular: es una sola persona para el panel (la misma ficha).
+    const ins = inscripcionesDeApi(
+      [reserva({ clienteNombre: 'Tomi Paz' }), reserva({ id: 'res2', clienteNombre: 'Juli Paz' })],
+      [espera({ clienteNombre: 'Mora Paz', clienteTelefono: '3757 55-0101' })],
+      clasesDeRecurso(recurso()), AHORA,
+    )
+    expect(new Set(ins.map(i => i.socioId)).size).toBe(1)
+    expect(ins.map(i => i.nombre)).toEqual(['Tomi Paz', 'Juli Paz', 'Mora Paz'])
+  })
+
+  it('el día de quien espera es el de Argentina: una clase de las 22:30 no cae en el día siguiente', () => {
+    // 01:30 UTC del martes 17 son las 22:30 del lunes 16 en Argentina.
+    expect(fechaDeEspera({ inicio: '2026-11-17T01:30:00.000Z' })).toBe(LUNES)
+    expect(fechaDeEspera({ inicio: '2026-11-17T03:00:00.000Z' })).toBe('2026-11-17')
+  })
+
   it('una reserva en un horario donde ya no hay clase no cae en ninguna clase de ese día', () => {
     const clases = clasesDeRecurso(recurso({ horario: { '2': [[1140, 1200]] } })) // la clase pasó al martes
     const [i] = inscripcionesDeApi([reserva()], [], clases, AHORA)
@@ -197,6 +214,24 @@ describe('Gimnasio sobre la API · lo que se manda', () => {
     expect(r.horario).toEqual({ '3': [[1140, 1200]], '4': [[600, 660]] })
     expect(r.cupo).toBe(15)
     expect(r.datos).toEqual({ otro: 'se queda', gimnasio: { actividadId: 'a1', color: '#7C3AED', profeId: '', profe: '', sala: 'Box' } })
+  })
+
+  it('tocarle el cupo a una clase no le cambia la duración: sigue la del recurso mientras no cambie de actividad', () => {
+    // Una clase de WOD de 90 minutos (la actividad dice 60): al subirle el cupo sigue durando 90.
+    const previo = recurso({ duracionMinutos: 90, horario: { '1': [[1140, 1230]] } })
+    const r = recursoParaClase(clase({ cupo: 20 }), negocio, { recurso: previo, clase: clase() })
+    expect(r).toMatchObject({ cupo: 20, duracionMinutos: 90, horario: { '1': [[1140, 1230]] } })
+    // Si pasa a otra actividad, toma la duración de esa actividad.
+    const otra = recursoParaClase(clase({ actividadId: 'a2' }), negocio, { recurso: previo, clase: clase() })
+    expect(otra).toMatchObject({ nombre: 'Open box', duracionMinutos: 90, horario: { '1': [[1140, 1230]] } })
+    expect(recursoParaClase(clase({ actividadId: 'a1' }), negocio, { recurso: recurso({ duracionMinutos: 45 }), clase: clase({ actividadId: 'a2' }) }).duracionMinutos).toBe(60)
+  })
+
+  it('lo que haya en datos.gimnasio y el panel no maneja no se pierde al editar; sin la actividad en la lista, el nombre sigue siendo el del recurso', () => {
+    const previo = recurso({ nombre: 'Funcional', datos: { gimnasio: { actividadId: 'a-borrada', nivel: 'inicial', color: '#111111' } } })
+    const r = recursoParaClase(clase({ actividadId: 'a-borrada', cupo: 8 }), negocio, { recurso: previo, clase: clase({ actividadId: 'a-borrada' }) })
+    expect(r.nombre).toBe('Funcional')
+    expect(r.datos).toEqual({ gimnasio: { nivel: 'inicial', actividadId: 'a-borrada', color: '', profeId: 'p1', profe: 'Nico Paz', sala: 'Box' } })
   })
 
   it('la grilla nueva dice qué crear, qué cambiar y qué quitar; lo igual no se toca', () => {

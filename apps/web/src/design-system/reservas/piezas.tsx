@@ -248,8 +248,10 @@ export function useAviso(): [(titulo: string, descripcion?: string, variante?: '
     setToast({ id: ++serie.current, titulo, descripcion, variante })
     timer.current = setTimeout(() => setToast(null), variante === 'error' ? 6000 : 3200)
   }
+  // El Toast ya es un role="alert": el que lo envuelve no es otra región viva (anidadas, el lector de pantalla
+  // leía el aviso dos veces).
   const nodo = toast ? (
-    <div key={toast.id} className="rv-toast" role={toast.variante === 'error' ? 'alert' : undefined} aria-live={toast.variante === 'error' ? 'assertive' : 'polite'}>
+    <div key={toast.id} className="rv-toast">
       <Toast variant={toast.variante} title={toast.titulo} description={toast.descripcion} onClose={() => setToast(null)} />
     </div>
   ) : null
