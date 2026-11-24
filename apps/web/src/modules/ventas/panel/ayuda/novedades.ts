@@ -42,6 +42,40 @@ export interface Novedad {
 
 export const NOVEDADES: readonly Novedad[] = [
     {
+        // Le aparece a todos los dueños: sin el paquete, el botón lleva a
+        // Avanzado con las tarjetas bloqueadas y "Ver qué incluye".
+        id: '2026-11-tematicas-promos',
+        etiqueta: 'Nuevo',
+        modulo: 'Avanzado',
+        titulo: 'Juegos, anuncios y ofertas con el diseño de cada temporada',
+        descripcion: 'Con el paquete Avanzado, tus promos ya no se ven iguales a las de otras tiendas: elegí una temática como Navidad, San Valentín o Halloween, y la forma en que aparece cada anuncio.',
+        puntos: [
+            '19 temáticas para tus juegos con premio',
+            'Probá el juego antes de lanzarlo, sin gastar premios',
+            '9 formatos de anuncio, como barra con foto o cupón',
+            '7 diseños para la oferta relámpago',
+        ],
+        imagenes: [
+            {
+                src: '/novedades/promos-tematicas.svg',
+                epigrafe: 'El mismo juego, con la temática que elijas',
+            },
+            {
+                src: '/novedades/promos-vista-previa.svg',
+                epigrafe: 'Jugalo vos antes de lanzarlo',
+            },
+            {
+                src: '/novedades/promos-formatos.svg',
+                epigrafe: 'Anuncios y ofertas en varios formatos',
+            },
+        ],
+        irA: {
+            texto: 'Ver los diseños',
+            seccion: 'avanzado',
+            query: { vista: 'juegos' },
+        },
+    },
+    {
         id: '2026-11-actualizar-precios-excel',
         etiqueta: 'Nuevo',
         modulo: 'Productos',
