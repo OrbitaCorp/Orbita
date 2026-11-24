@@ -14,6 +14,8 @@ export const ACTION_LABELS: Record<string, string> = {
   reactivate_business: 'Reactivar negocio',
   hide_business_from_search: 'Ocultar de Google y del directorio',
   show_business_in_search: 'Volver a mostrar en Google y el directorio',
+  mark_business_test: 'Marcar como negocio de prueba',
+  unmark_business_test: 'Quitar la marca de negocio de prueba',
   tiktok_connect: 'Conectar la cuenta de TikTok de Órbita',
   tiktok_publish: 'Publicar un video en TikTok',
   tiktok_draft: 'Enviar un video a los borradores de TikTok',

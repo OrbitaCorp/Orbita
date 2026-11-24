@@ -9,6 +9,9 @@ export class ListBusinessesQueryDto {
   // Estado operativo del negocio (derivado de isActive/isPaused).
   @IsOptional() @IsIn(['draft', 'active', 'paused']) status?: 'draft' | 'active' | 'paused';
 
+  // Reales (por defecto), de prueba (Business.isTest o la demo) o todos juntos.
+  @IsOptional() @IsIn(['reales', 'pruebas', 'todos']) tipo?: 'reales' | 'pruebas' | 'todos';
+
   @IsOptional() @IsIn(['FULL', 'SHOWCASE']) mode?: 'FULL' | 'SHOWCASE';
 
   // Estado de la suscripción del negocio.

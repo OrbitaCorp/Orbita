@@ -28,6 +28,13 @@ import { CreatePriceCampaignDto, UpdatePriceCampaignDto, UpdatePlanPricesDto } f
 import { SubscriptionsService, type PlanKey } from '../subscriptions/subscriptions.service';
 import { PlatformAdminLogService } from './platform-admin-log.service';
 
+// Negocios que cuentan como clientes en las métricas del superadmin. Los de
+// prueba del equipo (Business.isTest) y la demo pública (isDemo) siguen
+// funcionando, pero no entran al resumen, a las series, a las suscripciones ni
+// a los listados que se leen como "los negocios de la plataforma".
+export const SOLO_REALES = { isTest: false, isDemo: false } satisfies Prisma.BusinessWhereInput;
+const SOLO_DE_PRUEBA: Prisma.BusinessWhereInput = { OR: [{ isTest: true }, { isDemo: true }] };
+
 const DAYS_30_MS = 30 * 24 * 60 * 60 * 1000;
 
 // Mismo alfabeto que las temporales de Equipo: sin 0/O, 1/l/I, que se confunden al copiarlas de un mail.
@@ -98,19 +105,21 @@ export class PlatformService {
       customDomainsBySource,
       domainsExpiringSoon,
       newLast30,
+      testBusinesses,
     ] = await this.prisma.$transaction([
-      this.prisma.business.count(),
-      this.prisma.business.count({ where: { isActive: true, isPaused: false } }),
-      this.prisma.business.count({ where: { isActive: true, isPaused: true } }),
-      this.prisma.business.count({ where: { isActive: false } }),
-      this.prisma.business.groupBy({ by: ['mode'], _count: { _all: true }, orderBy: { mode: 'asc' } }),
-      this.prisma.business.groupBy({ by: ['industry'], _count: { _all: true }, orderBy: { industry: 'asc' } }),
-      this.prisma.subscription.groupBy({ by: ['status'], _count: { _all: true }, orderBy: { status: 'asc' } }),
-      this.prisma.subscription.groupBy({ by: ['origin'], _count: { _all: true }, orderBy: { origin: 'asc' } }),
-      this.prisma.subscription.aggregate({ _sum: { amount: true }, where: { status: 'ACTIVE', origin: 'PAID' } }),
-      this.prisma.customDomain.groupBy({ by: ['source'], _count: { _all: true }, orderBy: { source: 'asc' } }),
-      this.prisma.customDomain.count({ where: { source: 'PURCHASED', expiresAt: { lte: soon30, gte: now } } }),
-      this.prisma.business.count({ where: { createdAt: { gte: since30 } } }),
+      this.prisma.business.count({ where: SOLO_REALES }),
+      this.prisma.business.count({ where: { ...SOLO_REALES, isActive: true, isPaused: false } }),
+      this.prisma.business.count({ where: { ...SOLO_REALES, isActive: true, isPaused: true } }),
+      this.prisma.business.count({ where: { ...SOLO_REALES, isActive: false } }),
+      this.prisma.business.groupBy({ by: ['mode'], where: SOLO_REALES, _count: { _all: true }, orderBy: { mode: 'asc' } }),
+      this.prisma.business.groupBy({ by: ['industry'], where: SOLO_REALES, _count: { _all: true }, orderBy: { industry: 'asc' } }),
+      this.prisma.subscription.groupBy({ by: ['status'], where: { business: SOLO_REALES }, _count: { _all: true }, orderBy: { status: 'asc' } }),
+      this.prisma.subscription.groupBy({ by: ['origin'], where: { business: SOLO_REALES }, _count: { _all: true }, orderBy: { origin: 'asc' } }),
+      this.prisma.subscription.aggregate({ _sum: { amount: true }, where: { status: 'ACTIVE', origin: 'PAID', business: SOLO_REALES } }),
+      this.prisma.customDomain.groupBy({ by: ['source'], where: { business: SOLO_REALES }, _count: { _all: true }, orderBy: { source: 'asc' } }),
+      this.prisma.customDomain.count({ where: { source: 'PURCHASED', expiresAt: { lte: soon30, gte: now }, business: SOLO_REALES } }),
+      this.prisma.business.count({ where: { ...SOLO_REALES, createdAt: { gte: since30 } } }),
+      this.prisma.business.count({ where: SOLO_DE_PRUEBA }),
     ]);
 
     // El tipado de `_count` en groupBy dentro de $transaction se ensancha
@@ -129,6 +138,8 @@ export class PlatformService {
         paused: pausedBusinesses,
         draft: draftBusinesses,
         newLast30Days: newLast30,
+        // Aparte de los de arriba: no están sumados en ninguna cifra.
+        test: testBusinesses,
         byMode: toMap(byMode, 'mode'),
         byIndustry: (byIndustry as readonly unknown[])
           .map((row) => ({ industry: String((row as Record<string, unknown>).industry), count: countOf(row) }))
@@ -156,6 +167,9 @@ export class PlatformService {
     const limit = q.limit ?? 20;
 
     const where: Prisma.BusinessWhereInput = {};
+    // Por defecto solo los reales; los de prueba se piden aparte (o todos juntos).
+    const tipo = q.tipo ?? 'reales';
+    if (tipo === 'reales') Object.assign(where, SOLO_REALES);
     if (q.search) {
       where.OR = [
         { name: { contains: q.search, mode: 'insensitive' } },
@@ -170,9 +184,12 @@ export class PlatformService {
     if (q.subscription === 'NONE') where.subscription = { is: null };
     else if (q.subscription) where.subscription = { status: q.subscription };
 
-    const [rows, total] = await this.prisma.$transaction([
+    // El OR del buscador y el OR de "de prueba" no pueden convivir en el mismo nivel.
+    const filtro: Prisma.BusinessWhereInput = tipo === 'pruebas' ? { AND: [where, SOLO_DE_PRUEBA] } : where;
+
+    const [rows, total, reales, pruebas] = await this.prisma.$transaction([
       this.prisma.business.findMany({
-        where,
+        where: filtro,
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
@@ -187,13 +204,16 @@ export class PlatformService {
           _count: { select: { products: true, orders: true, customers: true } },
         },
       }),
-      this.prisma.business.count({ where }),
+      this.prisma.business.count({ where: filtro }),
+      this.prisma.business.count({ where: SOLO_REALES }),
+      this.prisma.business.count({ where: SOLO_DE_PRUEBA }),
     ]);
 
     return {
       data: rows.map((b) => ({
         id: b.id,
         name: b.name,
+        esPrueba: b.isTest || b.isDemo,
         subdomain: b.subdomain,
         industry: b.industry,
         mode: b.mode,
@@ -215,6 +235,7 @@ export class PlatformService {
       total,
       page,
       limit,
+      tipos: { reales, pruebas },
     };
   }
 
@@ -293,6 +314,9 @@ export class PlatformService {
       // Moderación: la tienda sigue en línea pero Órbita no la ofrece a Google ni al directorio.
       hiddenFromSearch: business.hiddenFromSearch,
       hiddenFromSearchReason: business.hiddenFromSearchReason,
+      // De prueba: sigue funcionando pero no cuenta en las métricas (ver SOLO_REALES).
+      isTest: business.isTest,
+      isDemo: business.isDemo,
       operatesPhysical: business.operatesPhysical,
       operatesOnline: business.operatesOnline,
       teamSize: business.teamSize,
@@ -359,10 +383,12 @@ export class PlatformService {
   async listDomains() {
     const [businesses, customDomains] = await this.prisma.$transaction([
       this.prisma.business.findMany({
+        where: SOLO_REALES,
         select: { id: true, name: true, subdomain: true, mode: true, isActive: true, isPaused: true },
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.customDomain.findMany({
+        where: { business: SOLO_REALES },
         include: { business: { select: { id: true, name: true } } },
         orderBy: { createdAt: 'desc' },
       }),
@@ -397,7 +423,7 @@ export class PlatformService {
   // ── Dueños (cross-negocio) ──────────────────────────────────────────────────
   async listOwners() {
     const owners = await this.prisma.member.findMany({
-      where: { role: { name: 'owner' } },
+      where: { role: { name: 'owner' }, business: SOLO_REALES },
       include: {
         business: {
           select: {
@@ -469,6 +495,7 @@ export class PlatformService {
   // ── Suscripciones (cross-negocio) ───────────────────────────────────────────
   async listSubscriptions() {
     const subs = await this.prisma.subscription.findMany({
+      where: { business: SOLO_REALES },
       include: { business: { select: { id: true, name: true, subdomain: true } } },
       orderBy: { updatedAt: 'desc' },
     });
@@ -584,6 +611,21 @@ export class PlatformService {
           targetId: businessId,
           details: dto.reason ? { reason: dto.reason } : undefined,
         },
+      });
+    });
+    return { ok: true };
+  }
+
+  // Negocio de prueba del equipo: no cuenta en las métricas del superadmin y
+  // aparece en su pestaña aparte. Reversible; queda en el registro.
+  async setTest(adminId: string, businessId: string, esPrueba: boolean) {
+    const business = await this.prisma.business.findUnique({ where: { id: businessId }, select: { id: true, isDemo: true } });
+    if (!business) throw new NotFoundException('Negocio no encontrado');
+    if (business.isDemo) throw new BadRequestException('La demo pública ya está aparte de los reales: no hace falta marcarla.');
+    await this.prisma.$transaction(async (tx) => {
+      await tx.business.update({ where: { id: businessId }, data: { isTest: esPrueba } });
+      await tx.platformAdminLog.create({
+        data: { adminId, action: esPrueba ? 'mark_business_test' : 'unmark_business_test', targetType: 'business', targetId: businessId },
       });
     });
     return { ok: true };
@@ -786,8 +828,8 @@ export class PlatformService {
     const { from, keys } = this.emptyDayBuckets(days);
 
     const [businesses, subscriptions] = await this.prisma.$transaction([
-      this.prisma.business.findMany({ where: { createdAt: { gte: from } }, select: { createdAt: true } }),
-      this.prisma.subscription.findMany({ where: { createdAt: { gte: from }, origin: 'PAID' }, select: { createdAt: true } }),
+      this.prisma.business.findMany({ where: { ...SOLO_REALES, createdAt: { gte: from } }, select: { createdAt: true } }),
+      this.prisma.subscription.findMany({ where: { createdAt: { gte: from }, origin: 'PAID', business: SOLO_REALES }, select: { createdAt: true } }),
     ]);
 
     const buckets = new Map(keys.map((k) => [k, { businesses: 0, subscriptions: 0 }]));
@@ -802,7 +844,7 @@ export class PlatformService {
     const { from, keys } = this.emptyDayBuckets(days);
 
     const payments = await this.prisma.subscriptionPayment.findMany({
-      where: { status: 'APPROVED', paidAt: { gte: from } },
+      where: { status: 'APPROVED', paidAt: { gte: from }, subscription: { business: SOLO_REALES } },
       select: { amount: true, paidAt: true },
     });
 

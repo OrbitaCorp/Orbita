@@ -457,6 +457,8 @@ export interface Overview {
     paused: number
     draft: number
     newLast30Days: number
+    /** Negocios de prueba y la demo: aparte, no están sumados en ninguna cifra de arriba. */
+    test: number
     byMode: Record<string, number>
     byIndustry: { industry: string; count: number }[]
   }
@@ -477,6 +479,8 @@ export interface Overview {
 export interface BusinessRow {
   id: string
   name: string
+  /** De prueba del equipo o la demo pública: no cuenta en las métricas. */
+  esPrueba: boolean
   subdomain: string
   industry: string
   mode: string
@@ -488,11 +492,15 @@ export interface BusinessRow {
   counts: { products: number; orders: number; customers: number }
 }
 
+export type TipoDeNegocios = 'reales' | 'pruebas'
+
 export interface BusinessList {
   data: BusinessRow[]
   total: number
   page: number
   limit: number
+  /** Cuántos hay de cada tipo, sin importar el filtro de la lista. */
+  tipos: { reales: number; pruebas: number }
 }
 
 export interface BusinessDetail {
@@ -507,6 +515,10 @@ export interface BusinessDetail {
   /** Moderación: la tienda sigue en línea, pero Órbita no la ofrece a Google ni al directorio. */
   hiddenFromSearch: boolean
   hiddenFromSearchReason: string | null
+  /** De prueba del equipo: sigue funcionando pero no cuenta en las métricas. */
+  isTest: boolean
+  /** La demo pública: ya está aparte de los reales y no se marca a mano. */
+  isDemo: boolean
   createdAt: string
   team: { id: string; name: string; email: string; role: string; status: string; lastAccessAt: string | null; emailVerified: boolean }[]
   branches: { id: string; name: string; isDefault: boolean }[]
@@ -1180,7 +1192,7 @@ function toQuery(params: Record<string, string | number | undefined | null>): st
 
 export const platformApi = {
   overview: () => getJSON<Overview>('/platform/overview'),
-  businesses: (params: { search?: string; status?: string; mode?: string; subscription?: string; page?: number; limit?: number } = {}) => {
+  businesses: (params: { search?: string; status?: string; mode?: string; subscription?: string; tipo?: TipoDeNegocios; page?: number; limit?: number } = {}) => {
     const qs = new URLSearchParams()
     Object.entries(params).forEach(([k, v]) => {
       if (v !== undefined && v !== '' && v !== null) qs.set(k, String(v))
@@ -1198,6 +1210,8 @@ export const platformApi = {
   instagramDeshabilitar: (businessId: string) => sendJSON<unknown>(`/platform/instagram/acceso/${businessId}/deshabilitar`, 'POST'),
   suspendBusiness: (id: string, reason?: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/suspend`, 'POST', { reason }),
   reactivateBusiness: (id: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/reactivate`, 'POST'),
+  markBusinessTest: (id: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/mark-test`, 'POST'),
+  unmarkBusinessTest: (id: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/unmark-test`, 'POST'),
   hideBusinessFromSearch: (id: string, reason?: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/hide-from-search`, 'POST', { reason }),
   showBusinessInSearch: (id: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/show-in-search`, 'POST'),
   businessSearchConsole: (id: string) => getJSON<GoogleResumen>(`/platform/businesses/${id}/search-console`),

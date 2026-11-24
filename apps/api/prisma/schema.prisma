@@ -42,6 +42,11 @@ model Business {
   // su localStorage; el servidor rechaza cualquier escritura pública sobre
   // este negocio (ver DemoGuard). Se marca a mano, nunca desde la app.
   isDemo                 Boolean   @default(false) @map("is_demo")
+  // Negocio de prueba del equipo (24/11/2026): sigue funcionando igual, pero no
+  // cuenta en las métricas del superadmin (resumen, series, suscripciones,
+  // seguimiento) y la lista de Negocios lo separa de los reales. Lo marca solo
+  // el superadmin, con registro en PlatformAdminLog; el dueño no lo ve.
+  isTest                 Boolean   @default(false) @map("is_test")
   // Moderación (06/10/2026): el equipo de Órbita saca la tienda de Google y del
   // directorio (orbita.site/tiendas) SIN suspenderla, así que la tienda sigue
   // vendiendo. Es la palanca para un caso dudoso o una denuncia que se está

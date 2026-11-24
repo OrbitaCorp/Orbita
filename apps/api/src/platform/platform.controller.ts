@@ -198,6 +198,19 @@ export class PlatformController {
     return this.searchConsole.sincronizarTienda(businessId);
   }
 
+  // Marcar o desmarcar un negocio como de prueba (no cuenta en las métricas).
+  @Post('businesses/:businessId/mark-test')
+  @SoloSuperadmin()
+  markTest(@Req() req: RequestWithAdmin, @Param('businessId') businessId: string) {
+    return this.platformService.setTest(req.user.adminId, businessId, true);
+  }
+
+  @Post('businesses/:businessId/unmark-test')
+  @SoloSuperadmin()
+  unmarkTest(@Req() req: RequestWithAdmin, @Param('businessId') businessId: string) {
+    return this.platformService.setTest(req.user.adminId, businessId, false);
+  }
+
   @Post('businesses/:businessId/show-in-search')
   @SoloSuperadmin()
   showInSearch(@Req() req: RequestWithAdmin, @Param('businessId') businessId: string) {
