@@ -22,7 +22,7 @@ import LayoutPanel, { type AvisoNav, type ItemBusqueda, type ItemNav } from '@/d
 import { Vacio, useAviso } from '@/design-system/reservas/piezas'
 import { SkeletonVista, useCargaSimulada, type FormaSkeleton } from '@/design-system/reservas/skeleton'
 import { DIAS_CORTOS, MESES_CORTOS, diaSemana, diasEntre, esISO, fechaCorta, hhmm, minFecha, partes, sumarDias, type ISO } from '@/lib/reservas/fechas'
-import { ESTADO_PLAN, clasesDelDia, clasesSinProfe, cupoDe, estadoPlanDe, planDe, type NegocioGym } from '../datos'
+import { ESTADO_PLAN, clasesDelDia, clasesSinProfe, cupoDe, estadoPlanDe, planActualDe, type NegocioGym } from '../datos'
 import { LIMITE_DIAS, useGimnasio, type Resultado, type SeccionGimnasio } from '../datos/origen'
 import { RelojProvider, type Reloj } from '../datos/reloj'
 import { useRubroDemo } from '../demo/BarraDemo'
@@ -127,7 +127,7 @@ export default function Panel() {
     ...porVencer.slice(0, 5).map(s => ({
       id: `vence-${s.id}`, Icon: BellRing, tono: 'primario' as const, nueva: !!s.vence && diasEntre(hoy, s.vence) <= 3, cuando: s.vence ? `Vence el ${fechaCorta(s.vence)}` : '',
       titulo: `El plan de ${s.nombre} vence en ${s.vence ? diasEntre(hoy, s.vence) : 0} días`,
-      detalle: `${planDe(negocio, s.planId)?.nombre ?? 'Plan'} · avisale para que renueve`,
+      detalle: `${planActualDe(negocio, s, hoy)?.nombre ?? 'Plan'} · avisale para que renueve`,
       onAbrir: () => ir('socios', undefined, { socio: s.id }),
     })),
     ...deHoy.filter(c => c.k.lleno && c.k.espera === 0 && c.inicio > ahora).map(c => ({
@@ -162,7 +162,7 @@ export default function Panel() {
       const estado = estadoPlanDe(s, hoy)
       return {
         id: `socio-${s.id}`, grupo: r.socios, titulo: s.nombre, Icon: Users,
-        detalle: `${s.telefono || 'Sin celular'} · ${ESTADO_PLAN[estado].label}${s.planId ? ` · ${planDe(negocio, s.planId)?.nombre ?? ''}` : ''}`,
+        detalle: [s.telefono || 'Sin celular', ESTADO_PLAN[estado].label, planActualDe(negocio, s, hoy)?.nombre].filter(Boolean).join(' · '),
         onElegir: () => ir('socios', undefined, { socio: s.id }),
       }
     }),
@@ -182,6 +182,8 @@ export default function Panel() {
   // Con la API, una franja dice que el panel es el de un negocio real y si la sección
   // que se mira todavía no guarda allá (se ve con lo que se puede armar de las reservas).
   // Si la última lectura falló, eso va primero: lo que se ve puede no ser lo que hay guardado.
+  const conectadas = items.filter(i => esVista(i.id) && g.guarda(i.id)).map(i => i.label)
+  const yaGuardan = conectadas.length > 1 ? `${conectadas.slice(0, -1).join(', ')} y ${conectadas[conectadas.length - 1]}` : conectadas[0] ?? ''
   const franja = g.tipo === 'api' && g.listo ? (
     g.desactualizado ? (
       <div className="gip-franja" data-tono="aviso" role="status">
@@ -193,7 +195,7 @@ export default function Panel() {
       <div className="gip-franja" role="status">
         {g.guarda(vista)
           ? <span><b>{negocio.nombre}</b> · conectado a la API de reservas: lo que cambies acá queda guardado.</span>
-          : <><CloudOff size={15} aria-hidden /><span><b>Esta sección todavía no guarda en la API.</b> Muestra lo que se puede armar con las reservas o datos de ejemplo; lo que cambies no queda guardado. Clases y Días sin clases ya guardan.</span></>}
+          : <><CloudOff size={15} aria-hidden /><span><b>Esta sección todavía no guarda en la API.</b> Muestra lo que se puede armar con las reservas o datos de ejemplo; lo que cambies no queda guardado. Ya guardan: {yaGuardan}.</span></>}
       </div>
     )
   ) : undefined
@@ -247,18 +249,21 @@ export default function Panel() {
             onCambiar={(id, cambio, msj) => hacer(acciones.cambiarInscripcion(id, cambio), msj)}
             onCancelar={(id, msj) => hacer(acciones.cancelar(id), msj ?? 'Lugar liberado')}
             onInscribir={(i, msj, nuevo) => hacer(acciones.inscribir(i, nuevo), msj ?? 'Anotado')}
+            onDefinirPago={(id, pago, msj) => hacer(acciones.definirPago(id, pago), msj ?? 'Listo')}
             onGuardarGrilla={(clases, msj, catalogo) => hacer(acciones.configurar({ clases, ...catalogo }), msj ?? 'Grilla guardada')} />
         )}
         {vista === 'socios' && (
-          <Socios key={rubro.key} negocio={negocio} inscripciones={inscripciones} socios={socios}
-            onAgregar={s => (g.guarda('socios') ? hacer(acciones.agregarSocio(s), 'Sumado', `${s.nombre} ya puede reservar.`) : noGuarda())}
-            onCambiar={(id, cambio, msj, detalle) => (g.guarda('socios') ? hacer(acciones.cambiarSocio(id, cambio), msj, detalle) : noGuarda())}
+          <Socios key={rubro.key} negocio={negocio} inscripciones={inscripciones} socios={socios} puede={g.puede}
+            onAgregar={s => (g.guarda('socios') ? hacer(acciones.agregarSocio(s), `${s.nombre.trim().split(/\s+/)[0]} ya está entre tus ${r.socios.toLowerCase()}`, 'Ya puede reservar.') : noGuarda())}
+            onAsignar={(s, plan) => (g.guarda('socios') ? hacer(acciones.asignarPlan(s.id, plan.id), `${plan.nombre} asignado a ${s.nombre.trim().split(/\s+/)[0]}`) : noGuarda())}
+            onQuitarPlan={(s, plan) => (g.guarda('socios') ? hacer(acciones.quitarPlan(s.id, plan.id), `${s.nombre.trim().split(/\s+/)[0]} ya no tiene ${plan.nombre}`) : noGuarda())}
             onAvisar={avisar} />
         )}
         {vista === 'ingresos' && <Ingresos key={rubro.key} negocio={negocio} inscripciones={inscripciones} socios={socios} />}
         {vista === 'equipo' && <Equipo key={rubro.key} negocio={negocio} onGuardar={guardarDesde('equipo')} />}
         {vista === 'actividades' && <Actividades key={rubro.key} negocio={negocio} onGuardar={guardarDesde('actividades')} onIrEquipo={() => ir('equipo')} />}
-        {vista === 'planes' && <Planes key={rubro.key} negocio={negocio} socios={socios} onGuardar={guardarDesde('planes')} />}
+        {/* La clave lleva los planes guardados: al guardar uno nuevo (la API le da su id) el formulario arranca de lo guardado. */}
+        {vista === 'planes' && <Planes key={`${rubro.key}:${negocio.planes.map(p => p.id).join()}`} negocio={negocio} socios={socios} onGuardar={guardarDesde('planes')} />}
         {vista === 'reglas' && <Reglas key={rubro.key} negocio={negocio} esperaPasaAlSubirCupo={g.puede.esperaPasaAlSubirCupo} onGuardar={guardarDesde('reglas')} />}
         {vista === 'bloqueos' && <Bloqueos key={rubro.key} negocio={negocio} inscripciones={inscripciones} leidoHasta={g.leidoHasta} onVerDia={dia => ir('clases', undefined, dia === hoy ? {} : { dia })} onGuardar={guardarDesde('bloqueos')} />}
         {vista === 'mensajes' && <Mensajes key={rubro.key} negocio={negocio} socios={socios} onGuardar={guardarDesde('mensajes')} onAvisar={avisar} />}

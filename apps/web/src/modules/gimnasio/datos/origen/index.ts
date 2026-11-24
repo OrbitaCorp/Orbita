@@ -15,12 +15,16 @@
 //   clases    la grilla (recursos CLASE), anotar, la lista de espera, liberar
 //             un lugar, presente y ausente                tareas del 09 al 12/11
 //   bloqueos  los días sin clases                         tarea del 13/11
-// El resto (alumnos, planes, equipo, actividades, reglas, mensajes, pagos…) se
-// ve con lo que se puede armar desde la API y todavía no guarda: el panel lo
-// avisa. Se conecta cuando se decida dónde viven planes, pases y alumnos.
+//   socios    los alumnos y el plan de cada uno           tarea del 17/11
+//   planes    planes y precios                            tarea del 18/11
+//   y con qué se paga cada lugar (el pack se descuenta)   tarea del 19/11
+// Las tres últimas van por la API propia de Gimnasio (gimnasioApi.ts), al lado
+// del motor de reservas. El resto (equipo, actividades, reglas, mensajes,
+// pagos…) se ve con lo que se puede armar desde la API y todavía no guarda:
+// el panel lo avisa.
 import { createContext, createElement, useContext, type ReactNode } from 'react'
 import type { ISO } from '@/lib/reservas/fechas'
-import type { Inscripcion, NegocioGym, RubroGym, Socio } from '../index'
+import type { Inscripcion, NegocioGym, Pago, RubroGym, Socio } from '../index'
 import type { Reloj } from '../reloj'
 import { origenDemo } from './demo'
 
@@ -47,14 +51,27 @@ export interface AccionesGimnasio {
    * `clases` pueden venir `actividades`, `profes` y `salas`: lo que se cargó ahí mismo, al armar una clase.
    */
   configurar(cambio: Partial<NegocioGym>): Promise<Resultado>
-  /** Anota a alguien en una clase, o en su lista de espera si `estado` es 'espera'. `socio` va si es alguien nuevo. */
+  /**
+   * Anota a alguien en una clase, o en su lista de espera si `estado` es 'espera'. `socio` va si es alguien nuevo.
+   * `i.pago` dice cómo se paga el lugar: con la API, 'plan' descuenta la clase del pack (y si no le queda, falla con
+   * el motivo); sin `pago`, se cobra aparte.
+   */
   inscribir(i: Inscripcion, socio?: Socio): Promise<Resultado>
   /** Presente ('asistio'), ausente, o darle el lugar a quien espera ('reservada'). */
   cambiarInscripcion(id: string, cambio: Partial<Inscripcion>): Promise<Resultado>
   /** Libera un lugar (si había lista de espera, el primero pasa solo) o saca a alguien de la espera. */
   cancelar(id: string): Promise<Resultado>
+  /** Dice (o corrige) cómo se paga un lugar que ya está reservado. Pasarlo al plan descuenta la clase. */
+  definirPago(inscripcionId: string, pago: Pago): Promise<Resultado>
+  /** Da de alta a alguien; si trae `planId`, arranca con ese plan. */
   agregarSocio(s: Socio): Promise<Resultado>
-  cambiarSocio(id: string, cambio: Partial<Socio>): Promise<Resultado>
+  /** Le asigna o le renueva un plan. El detalle del resultado dice hasta cuándo vale. */
+  asignarPlan(socioId: string, planId: string): Promise<Resultado>
+  /**
+   * Le quita un plan asignado por error. `planDeSocioId` dice cuál (con la API puede tener más de uno); sin eso, el
+   * que tiene hoy. Los lugares que ya reservó con ese plan siguen reservados.
+   */
+  quitarPlan(socioId: string, planDeSocioId?: string): Promise<Resultado>
 }
 
 /** Lo que el origen le da al panel. */
@@ -114,6 +131,23 @@ export interface Capacidades {
   esperaPasaAlSubirCupo: boolean
   /** Liberar un lugar cancela una reserva de verdad y le avisa a la persona: no tiene vuelta atrás. */
   liberarEsDefinitivo: boolean
+  /**
+   * Al anotar a alguien se elige cómo paga el lugar (con su plan, aparte o con la clase de prueba) y se puede cambiar
+   * después, desde la clase. Siempre, salvo con una API que todavía no tiene los planes de Gimnasio.
+   */
+  eligePago: boolean
+  /**
+   * Un lugar puede nacer sin definir cómo se paga: el de quien pasó de la lista de espera o reservó desde el sitio.
+   * Con la API (el plan se usa desde el panel); en la demo quien pasa de la espera usa el plan con el que se anotó.
+   */
+  pagoSinDefinir: boolean
+  /** El aviso de vencimiento por WhatsApp desde la ficha: la demo lo simula; con la API todavía no existe. */
+  avisoDeVencimiento: boolean
+  /**
+   * Renovar antes de que venza continúa el plan (arranca cuando termina el que tiene) y un pack nuevo convive con el
+   * anterior: lo resuelve la API. En la demo, el plan nuevo arranca hoy y pisa al que había.
+   */
+  renovarContinua: boolean
 }
 
 export interface OrigenGimnasio {
