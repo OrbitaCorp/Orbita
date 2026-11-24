@@ -17,6 +17,14 @@ import { calabaza, circ, corazon, escaparTexto, estrella, flor, huevo } from './
 // resaltar pasa al color de la tinta.
 const acento = (p: PaletaEscena) => (p.a === '#FFFFFF' ? p.t : p.a)
 
+// La red se dibuja sobre el cielo: en Navidad la tinta es oscura y el cielo
+// también, y la red desaparecía. Va la de las dos tintas que más se despegue.
+const brillo = (h: string) => [1, 3, 5].reduce((s, i) => s + parseInt(h.slice(i, i + 2), 16), 0) / 3
+function tintaRed(p: PaletaEscena) {
+    const [clara, oscura] = brillo(p.t) > brillo(p.b) ? [p.t, p.b] : [p.b, p.t]
+    return brillo(p.cielo) < 128 ? clara : oscura
+}
+
 function pieza(t: Tematica) {
     const p = t.p
     switch (t.pieza) {
@@ -58,14 +66,14 @@ const JUEGOS: Record<string, Juego> = {
         instruccion: 'Tocá la cancha para tirar', centro: 66, origenSvg: 46, amplitud: 36, destinoY: 180, pico: 110, picoFallo: 130, direccion: 'lanzar',
         suelo: p => `<rect y="238" width="400" height="52" fill="${p.suelo}"/><rect y="238" width="400" height="2.5" fill="${p.raya}"/><path d="M120 290Q200 250 280 290" stroke="${p.raya}" stroke-width="2" fill="none"/>`,
         obj: p => `<rect x="-48" y="-54" width="96" height="66" rx="4" fill="${p.b}" stroke="${p.t}" stroke-width="2"/><rect x="-16" y="-33" width="32" height="26" fill="none" stroke="${acento(p)}" stroke-width="3"/><rect x="-5" y="12" width="10" height="9" fill="${p.t}"/><path d="M-31 24A31 8 0 0 1 31 24" stroke="${acento(p)}" stroke-width="5" fill="none"/>`,
-        frente: p => `<path d="M31 24A31 8 0 0 1-31 24" stroke="${acento(p)}" stroke-width="5" fill="none"/><path d="M-29 28L-20 60M-15 31L-10 62M0 32V63M15 31L10 62M29 28L20 60M-25 43Q0 51 25 43" stroke="${p.t}" stroke-opacity=".65" stroke-width="1.5" fill="none"/>`,
+        frente: p => `<path d="M31 24A31 8 0 0 1-31 24" stroke="${acento(p)}" stroke-width="5" fill="none"/><path d="M-29 28L-20 60M-15 31L-10 62M0 32V63M15 31L10 62M29 28L20 60M-25 43Q0 51 25 43" stroke="${tintaRed(p)}" stroke-opacity=".65" stroke-width="1.5" fill="none"/>`,
         proyectil: proyectilPieza,
     },
     GOAL: {
         instruccion: 'Tocá la cancha para patear', centro: 126, origenSvg: 46, amplitud: 32, destinoY: 142, pico: 90, picoFallo: 112, direccion: 'lanzar',
         suelo: p => `<rect y="182" width="400" height="108" fill="${p.suelo}"/>${[0, 1, 2, 3, 4, 5].map(i => `<rect x="${i * 68}" y="182" width="34" height="108" fill="${p.suelo2}"/>`).join('')}<rect y="182" width="400" height="2.5" fill="${p.raya}"/><path d="M60 290L110 232H290L340 290" stroke="${p.raya}" stroke-width="2" fill="none"/>`,
         obj: () => '<rect x="-70" y="-44" width="140" height="100" fill="rgba(0,0,0,.22)"/>',
-        frente: p => `<g stroke="${p.t}" stroke-opacity=".45" stroke-width="1">${Array.from({ length: 13 }, (_, i) => `<path d="M${-66 + i * 11} -44V56"/>`).join('')}${Array.from({ length: 9 }, (_, i) => `<path d="M-70 ${-38 + i * 11}H70"/>`).join('')}</g><path d="M-70 56V-44H70V56" stroke="${p.b === '#24382F' ? p.t : p.b}" stroke-width="5" fill="none"/>`,
+        frente: p => `<g stroke="${tintaRed(p)}" stroke-opacity=".45" stroke-width="1">${Array.from({ length: 13 }, (_, i) => `<path d="M${-66 + i * 11} -44V56"/>`).join('')}${Array.from({ length: 9 }, (_, i) => `<path d="M-70 ${-38 + i * 11}H70"/>`).join('')}</g><path d="M-70 56V-44H70V56" stroke="${p.b === '#24382F' ? p.t : p.b}" stroke-width="5" fill="none"/>`,
         proyectil: proyectilPieza,
     },
     DART: {
