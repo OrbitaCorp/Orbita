@@ -155,7 +155,9 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
   // sus cambios. Se arman una vez para dos meses para atrás y dos para adelante:
   // la agenda del mes y las ganancias miran muchos días a la vez.
   const porDia = useMemo(() => {
-    const deOrigen = (dia: number): TurnoAgenda[] => (cargados ? cargados.agenda.delDia(dia, recursos, semana) : [])
+    // Un turno que el origen devolvió después de una acción (con la API, el mismo id) reemplaza al que trajo la carga.
+    const propios = new Set(agregados.map(t => t.id))
+    const deOrigen = (dia: number): TurnoAgenda[] => (cargados ? cargados.agenda.delDia(dia, recursos, semana).filter(t => !propios.has(t.id)) : [])
     const armar = (dia: number): TurnoAgenda[] => [...deOrigen(dia), ...agregados.filter(t => t.dia === dia)]
       .filter(t => !ocultos.includes(t.id) && recursos.some(r => r.id === t.recursoId))
       .map(t => ({ ...t, ...cambios[t.id] }))
@@ -261,8 +263,15 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
   const agendar = (pre: NuevoTurnoPre = {}) => { setAbiertoEn(null); setClienteSel(null); setNuevo(pre) }
 
   // ── Turnos ──
-  const cambiarEstado = (id: string, estado: EstadoTurno) => {
-    setCambios(c => ({ ...c, [id]: { ...c[id], estado } }))
+  // Con la API cada acción va al origen y el turno queda como lo devolvió (sin cambios locales encima).
+  const aplicar = (t: TurnoAgenda) => {
+    setAgregados(a => [...a.filter(x => x.id !== t.id), t])
+    setCambios(c => { const resto = { ...c }; delete resto[t.id]; return resto })
+  }
+  const cambiarEstado = async (id: string, estado: EstadoTurno) => {
+    if (origen.turnos) {
+      try { aplicar(await origen.turnos.estado(id, estado)) } catch (e) { noSePudo('No se cambió el turno', e); return }
+    } else setCambios(c => ({ ...c, [id]: { ...c[id], estado } }))
     const quien = abierto ? pila(abierto.clienteId) : ''
     if (estado === 'confirmado') avisar('Turno confirmado', quien ? `Le avisamos a ${quien}.` : undefined)
     else if (estado === 'completado') avisar('Turno atendido', 'Quedó en el historial.')
@@ -270,8 +279,16 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
     else if (estado === 'cancelado') avisar('Turno cancelado', 'El horario volvió a quedar libre.')
   }
   /** Mover un turno: a otro horario del mismo día, o a otro día (ahí deja el suyo y aparece en el nuevo). */
-  const moverTurno = (t: TurnoAgenda, aDia: number, inicio: number) => {
+  const moverTurno = async (t: TurnoAgenda, aDia: number, inicio: number) => {
     const quien = pila(t.clienteId)
+    if (origen.turnos) {
+      let movido: TurnoAgenda
+      try { movido = await origen.turnos.mover(t.id, aDia, inicio) } catch (e) { noSePudo('No se movió el turno', e); return }
+      aplicar(movido)
+      setAbiertoEn({ id: movido.id, dia: movido.dia ?? aDia })
+      avisar('Turno reprogramado', `Pasó ${aDia === 0 ? 'a hoy' : aDia === 1 ? 'a mañana' : `al ${fechaLarga(aDia).toLowerCase()}`}, ${horaTxt(inicio)}. Le avisamos a ${quien}.`)
+      return
+    }
     if (aDia === (t.dia ?? 0)) {
       setCambios(c => ({ ...c, [t.id]: { ...c[t.id], inicio, estado: 'confirmado' } }))
       avisar('Turno reprogramado', `Pasó a las ${horaTxt(inicio)}. Le avisamos a ${quien}.`)
@@ -283,11 +300,30 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
     setAbiertoEn({ id, dia: aDia })
     avisar('Turno reprogramado', `Pasó ${aDia === 0 ? 'a hoy' : aDia === 1 ? 'a mañana' : `al ${fechaLarga(aDia).toLowerCase()}`}, ${horaTxt(inicio)}. Le avisamos a ${quien}.`)
   }
-  const registrarSena = (t: TurnoAgenda) => {
-    setCambios(c => ({ ...c, [t.id]: { ...c[t.id], senaPagada: true } }))
+  const registrarSena = async (t: TurnoAgenda) => {
+    if (origen.turnos) {
+      try { aplicar(await origen.turnos.sena(t.id)) } catch (e) { noSePudo('No se registró la seña', e); return }
+    } else setCambios(c => ({ ...c, [t.id]: { ...c[t.id], senaPagada: true } }))
     avisar('Seña registrada', `${pesos(Math.round(t.precio * rubro.sena / 100))} de ${nombreDe(t.clienteId)}`)
   }
-  const crearTurno = (t: Omit<TurnoAgenda, 'id'>, clienteNuevo?: { nombre: string; telefono: string }) => {
+  const crearTurno = async (t: Omit<TurnoAgenda, 'id'>, clienteNuevo?: { nombre: string; telefono: string }) => {
+    if (origen.turnos) {
+      const existente = clientes.find(c => c.id === t.clienteId)
+      const quien = clienteNuevo ?? existente
+      if (!quien) { avisar('Falta a quién', 'Elegí a alguien de la lista o cargá uno nuevo.'); return }
+      const servicioId = servicios.find(s => s.nombre === t.servicio)?.id
+      let creado: TurnoAgenda
+      try {
+        creado = await origen.turnos.crear(t, { ...(existente && !clienteNuevo ? { id: existente.id } : {}), nombre: quien.nombre, telefono: tieneTelefono(quien.telefono) ? quien.telefono : undefined }, servicioId)
+      } catch (e) { noSePudo('No se dio el turno', e); return }
+      if (clienteNuevo && !clientes.some(c => c.id === creado.clienteId)) {
+        setClientes(cs => [...cs, { id: creado.clienteId, nombre: clienteNuevo.nombre, telefono: clienteNuevo.telefono || 'Sin teléfono', visitas: 0, ultima: '—', gastado: 0 }])
+      }
+      aplicar(creado)
+      setNuevo(null)
+      avisar('Turno agendado', `${quien.nombre} · ${cuandoTxt(creado.dia ?? 0)} a las ${horaTxt(creado.inicio)}`)
+      return
+    }
     const sello = ++serie.current
     const clienteId = clienteNuevo ? `c${sello}` : t.clienteId
     if (clienteNuevo) {

@@ -148,8 +148,8 @@ const TURNOS = plan('turnos', 'Turnos', 'Mateo',
     documentada(t('2026-11-13', 'Mateo', 'Reglas de reserva (anticipación, cancelación, seña, tope por persona) sobre la config', 'Cada regla guardada se refleja en lo que acepta POST /retener del sitio'), 'auditoria.turnos.2026-11-23-reglas-sobre-la-api'),
     // Semana 3 · agenda y reservas del panel (el 20/11 es feriado)
     t('2026-11-16', 'Mateo', 'Agenda del día por profesional sobre GET /reservas y la disponibilidad', 'La agenda muestra las reservas reales del día con su estado y los huecos libres'),
-    t('2026-11-17', 'Mateo', 'Nueva reserva a mano desde el panel (POST /reservas) con cliente, servicio, profesional y horario', 'La reserva aparece en la agenda y el cliente recibe su email'),
-    t('2026-11-18', 'Mateo', 'Confirmar, completar, marcar ausente, cancelar y reprogramar desde la agenda', 'Cada acción cambia el estado y el historial; un 409 se muestra con el mensaje de la API'),
+    documentada(t('2026-11-17', 'Mateo', 'Nueva reserva a mano desde el panel (POST /reservas) con cliente, servicio, profesional y horario', 'La reserva aparece en la agenda y el cliente recibe su email'), 'auditoria.turnos.2026-11-24-agenda-sobre-la-api'),
+    documentada(t('2026-11-18', 'Mateo', 'Confirmar, completar, marcar ausente, cancelar y reprogramar desde la agenda', 'Cada acción cambia el estado y el historial; un 409 se muestra con el mensaje de la API'), 'auditoria.turnos.2026-11-24-agenda-sobre-la-api'),
     t('2026-11-19', 'Mateo', 'Pagos: registrar seña y saldo (POST :id/pago) y el detalle de la reserva con su historial', 'El pago nunca supera el total; el detalle muestra cada cambio con quién y por qué'),
     t('2026-11-19', 'Mateo', 'Lista de espera del panel sobre /reservas/espera', 'Se ve quién espera cada horario y se lo puede quitar'),
     // Semana 4 · el sitio
