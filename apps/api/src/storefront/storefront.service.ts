@@ -390,6 +390,10 @@ export class StorefrontService {
         mode: business.mode,
         isActive: business.isActive,
         isPaused: business.isPaused,
+        // El rubro: con "alquileres", el sitio muestra las reservas en vez de la
+        // tienda (apps/web, pages/tienda/[slug]). Ya es público en el directorio.
+        industry: business.industry,
+        subrubros: business.subrubros,
       },
       appearance: appearance
         ? {
