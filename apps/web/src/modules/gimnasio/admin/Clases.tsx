@@ -626,18 +626,20 @@ function EditarClase({ negocio, inscripciones, clase, catalogoEnLaClase, onCerra
           <Selector label="Día" valor={v.dia} onChange={d => setV({ ...v, dia: d })} opciones={dias} />
           <Selector label="Hora" valor={v.inicio} onChange={h => setV({ ...v, inicio: h })} opciones={horas.map(h => ({ id: h, label: hhmm(h) }))} />
         </div>
+        {/* Profe y sala, cada uno con el campo para escribir uno nuevo debajo del suyo: en celular (una sola columna) el
+            nombre queda pegado a su selector, y no después del otro. */}
         <div className="rv-dos">
-          {/* "Sin profe" existe para cuando alguien se fue del equipo: la clase sigue, y se le asigna otro después. */}
-          <Selector label="Profe" valor={v.profeId} onChange={id => setV({ ...v, profeId: id })} opciones={profes}
-            ayuda={creaProfe ? undefined : !v.profeId ? 'Queda sin profe: se ve así en la grilla y en el sitio hasta que asignes a alguien.' : profe && !creaActividad && !profe.actividades.includes(v.actividadId) ? `${profe.nombre} no tiene ${act?.nombre ?? 'esta actividad'} en Equipo; igual se puede.` : undefined} />
-          <Selector label="Sala" valor={v.sala} onChange={s => setV({ ...v, sala: s })} opciones={salas} />
-        </div>
-        {(creaProfe || creaSala) && (
-          <div className="rv-dos">
-            {creaProfe ? <Campo label="Nombre del profe" value={profeNuevo} onChange={setProfeNuevo} placeholder="Nombre y apellido" maxLength={60} autoComplete="off" /> : <span aria-hidden />}
-            {creaSala ? <Campo label="Nombre de la sala" value={salaNueva} onChange={setSalaNueva} placeholder="Salón principal, Box" maxLength={40} error={salaRepetida ? 'Esa sala ya existe: elegila en la lista de arriba.' : undefined} /> : <span aria-hidden />}
+          <div className="rv-pila">
+            {/* "Sin profe" existe para cuando alguien se fue del equipo: la clase sigue, y se le asigna otro después. */}
+            <Selector label="Profe" valor={v.profeId} onChange={id => setV({ ...v, profeId: id })} opciones={profes}
+              ayuda={creaProfe ? undefined : !v.profeId ? 'Queda sin profe: se ve así en la grilla y en el sitio hasta que asignes a alguien.' : profe && !creaActividad && !profe.actividades.includes(v.actividadId) ? `${profe.nombre} no tiene ${act?.nombre ?? 'esta actividad'} en Equipo; igual se puede.` : undefined} />
+            {creaProfe && <Campo label="Nombre del profe" value={profeNuevo} onChange={setProfeNuevo} placeholder="Nombre y apellido" maxLength={60} autoComplete="off" />}
           </div>
-        )}
+          <div className="rv-pila">
+            <Selector label="Sala" valor={v.sala} onChange={s => setV({ ...v, sala: s })} opciones={salas} />
+            {creaSala && <Campo label="Nombre de la sala" value={salaNueva} onChange={setSalaNueva} placeholder="Salón principal, Box" maxLength={40} error={salaRepetida ? 'Esa sala ya existe: elegila en la lista de arriba.' : undefined} />}
+          </div>
+        </div>
         <Campo label="Cupo" value={String(v.cupo)} onChange={x => setV({ ...v, cupo: Math.max(1, Number(x.replace(/\D/g, '')) || 1) })} inputMode="numeric" ayuda="Cuántos lugares tiene esta clase. Si se pasa, el resto queda en lista de espera."
           error={cupoCorto && tomado?.fecha ? `El ${fechaCorta(tomado.fecha)} ya hay ${tomado.lugares} lugares tomados: el cupo no puede ser menor.` : undefined} />
         {choca && <p className="rv-error" role="alert" style={{ margin: 0 }}>Se pisa con {actividadDe(negocio, choca.actividadId)?.nombre} de las {hhmm(choca.inicio)} en {choca.sala}.</p>}
