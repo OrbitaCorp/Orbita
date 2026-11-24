@@ -56,7 +56,7 @@ export function ListaDeTutoriales({ puedeEditar, setAviso }: { puedeEditar: bool
   const [modulo, setModulo] = useState<FiltroModulo>('TODOS')
   // La lista (y su resumen) se pide por módulo. Al cambiar de módulo no queda a la vista la del anterior mientras llega la
   // nueva: se ve el Loader, como en la primera carga. Al recargar el mismo módulo, la lista se queda en pantalla.
-  const { data: cargada, loading } = useFetch(
+  const { data: cargada, loading, error } = useFetch(
     async () => ({ modulo, lista: await platformApi.tutorialesLista(modulo === 'TODOS' ? undefined : modulo) }),
     [tick, modulo],
   )
@@ -120,12 +120,27 @@ export function ListaDeTutoriales({ puedeEditar, setAviso }: { puedeEditar: bool
   })
 
   // Los grupos son de cada módulo: el «Arrancar» de Gimnasio no se junta con el de Tienda.
-  const grupos = new Map<string, TutorialDeLaLista[]>()
-  for (const t of visibles) {
-    const clave = `${moduloDe(t)}/${t.grupo}`
-    grupos.set(clave, [...(grupos.get(clave) ?? []), t])
+  const agrupar = (lista: TutorialDeLaLista[]) => {
+    const mapa = new Map<string, TutorialDeLaLista[]>()
+    for (const t of lista) {
+      const clave = `${moduloDe(t)}/${t.grupo}`
+      mapa.set(clave, [...(mapa.get(clave) ?? []), t])
+    }
+    return mapa
   }
-  const r = data?.resumen
+  const grupos = agrupar(visibles)
+  // Cada grupo entero, también con los tutoriales que el filtro tapa: de ahí sale lo que dice su encabezado.
+  const gruposEnteros = agrupar(todosTutoriales)
+
+  // El resumen llega del servidor, ya del módulo pedido. La API de antes de los módulos no manda el módulo de cada tutorial
+  // ni filtra por él: su resumen es el de toda la lista, así que con un módulo elegido se cuenta acá, sobre los que quedaron.
+  const apiSinModulos = (data?.tutoriales ?? []).some((t) => !t.modulo)
+  const cuantos = (estado: TutorialEstado) => todosTutoriales.filter((t) => t.estado === estado).length
+  const r = !data
+    ? undefined
+    : modulo !== 'TODOS' && apiSinModulos
+      ? { total: todosTutoriales.length, hechos: cuantos('HECHO'), enRevision: cuantos('EN_REVISION'), enProceso: cuantos('EN_PROCESO'), faltan: cuantos('FALTA') }
+      : data.resumen
   const conVideo = todosTutoriales.filter((t) => t.youtubeId).length
 
   // Solo se tildan los que se pueden cambiar a mano y se ven ahora: si uno pasa a «en revisión» o lo tapa el filtro, se suelta solo.
@@ -214,8 +229,10 @@ export function ListaDeTutoriales({ puedeEditar, setAviso }: { puedeEditar: bool
         })}
       </div>
 
-      {/* El Loader es solo para la primera carga (y al cambiar de módulo): al recargar la lista se queda en pantalla, con su scroll y su selección. */}
-      {!data && loading ? <Loader /> : !data ? (
+      {/* Mientras no hay lista de este módulo se ve el Loader: en la primera carga y al cambiar de módulo (ahí hay un render con
+          la lista del módulo anterior y sin `loading` todavía, que antes caía en el error). El error, que se anuncia como
+          alerta, sale solo si el pedido falló. Al recargar, la lista se queda en pantalla, con su scroll y su selección. */}
+      {!data && !error ? <Loader /> : !data ? (
         <ErrorBox msg="No se pudo leer la lista de tutoriales." action={<button type="button" onClick={recargar} style={btnGhostSm}>Reintentar</button>} />
       ) : (
         <>
@@ -323,6 +340,11 @@ export function ListaDeTutoriales({ puedeEditar, setAviso }: { puedeEditar: bool
                 const nombre = delModulo === 'tienda' ? grupo : `${grupo} (${NOMBRE_MODULO[delModulo]})`
                 const delGrupo = items.filter((t) => t.estado !== 'EN_REVISION')
                 const grupoCompleto = delGrupo.length > 0 && delGrupo.every((t) => seleccion.has(t.id))
+                // «Prioridad alta» y «opcional» son de cada tutorial: el encabezado lo dice solo si lo son todos los del
+                // grupo; si lo son algunos, cada fila que lo es lleva su chip.
+                const entero = gruposEnteros.get(clave) ?? items
+                const todosPrioridad = entero.every((t) => t.prioridadAlta)
+                const todosOpcionales = entero.every((t) => t.opcional)
                 return (
                   <section key={clave} aria-label={nombre}>
                     <h3 style={{ margin: '0 0 6px', padding: '0 10px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
@@ -331,8 +353,8 @@ export function ListaDeTutoriales({ puedeEditar, setAviso }: { puedeEditar: bool
                       )}
                       <span>
                         {grupo}
-                        {items[0].prioridadAlta && <span style={{ marginLeft: 8, fontWeight: 400, color: 'var(--color-muted)' }}>· prioridad alta</span>}
-                        {items[0].opcional && <span style={{ marginLeft: 8, fontWeight: 400, color: 'var(--color-muted)' }}>· opcionales (sirven también como promo)</span>}
+                        {todosPrioridad && <span style={{ marginLeft: 8, fontWeight: 400, color: 'var(--color-muted)' }}>· prioridad alta</span>}
+                        {todosOpcionales && <span style={{ marginLeft: 8, fontWeight: 400, color: 'var(--color-muted)' }}>· opcionales (sirven también como promo)</span>}
                       </span>
                     </h3>
                     {items.map((t) => {
@@ -366,6 +388,9 @@ export function ListaDeTutoriales({ puedeEditar, setAviso }: { puedeEditar: bool
                             </div>
                           </div>
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                            {/* Solo cuando en el grupo no lo son todos: si lo son, ya lo dice el encabezado. */}
+                            {t.prioridadAlta && !todosPrioridad && <Chip text="prioridad alta" tone="red" />}
+                            {t.opcional && !todosOpcionales && <Chip text="opcional" tone="gray" />}
                             {/* De qué módulo es: solo en los que no son de Tienda, que es lo que había siempre. */}
                             {moduloDe(t) !== 'tienda' && <Chip text={NOMBRE_MODULO[moduloDe(t)]} tone="violet" />}
                             {t.youtubeId && (

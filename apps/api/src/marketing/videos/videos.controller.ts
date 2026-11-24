@@ -83,7 +83,8 @@ export class VideosController {
 
 // La lista de tutoriales (qué hay y qué falta). La actualiza el Claude de cada persona por el conector; acá se mira y se corrige.
 // Cada tutorial es de un módulo: ?modulo=tienda|turnos|alquileres|gimnasio filtra la lista y el resumen (uno desconocido es 400).
-// Los de un módulo nuevo se cargan por el conector (tutoriales_crear), no desde el panel.
+// Los de un módulo nuevo se cargan por el conector (tutoriales_crear), no desde el panel; el título y el grupo también se
+// corrigen solo por el conector (tutoriales_actualizar): este PATCH no los recibe. No hay borrado.
 @UseGuards(PlatformAdminGuard)
 @SuperadminYMarketing()
 @Controller('platform/marketing/tutoriales')
@@ -102,8 +103,9 @@ export class TutorialesController {
 }
 
 // «Ver tutorial» → Video, en el panel de cada tienda: los tutoriales con link de YouTube y en qué pantallas se ofrecen.
-// Lo lee cualquier member (es el mismo contenido para todas las tiendas). Sin ?modulo= son los de Tienda, como siempre; el
-// panel de un módulo nuevo pide los suyos con ?modulo=turnos|alquileres|gimnasio.
+// Lo lee cualquier member (es el mismo contenido para todas las tiendas). Sin ?modulo= son los de Tienda, como siempre. Los
+// paneles de Turnos, Alquileres y Gimnasio todavía no tienen el botón «Ver tutorial»: cuando lo tengan, piden los suyos con
+// ?modulo=turnos|alquileres|gimnasio.
 @Controller('business/tutoriales-video')
 export class TutorialesPanelController {
   constructor(private readonly tutoriales: TutorialesService) {}

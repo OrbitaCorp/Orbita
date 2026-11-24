@@ -585,8 +585,20 @@ Código en `src/marketing/videos/`; tablas `marketing_videos`, `marketing_video_
   `20261116120000_marketing_tutoriales_modulo`, aditiva e idempotente: los que existían quedan como `tienda`). El responsable de
   cada módulo nuevo carga su lista con `tutoriales_crear` (queda FALTA, al final de su grupo; `tutorial_crear` en el registro de
   acciones); `tutoriales_listar`, `tutoriales_actualizar`, `GET /platform/marketing/tutoriales` y el PATCH aceptan `modulo` (uno
-  desconocido es 400). Fuera de Tienda cada pantalla empieza con `<modulo>/` (`gimnasio/clases`). `GET /business/tutoriales-video`
-  sin `?modulo=` devuelve solo los de Tienda, igual que antes. El conector pasa a tener 14 herramientas.
+  desconocido es 400). Fuera de Tienda cada pantalla empieza con `<modulo>/` (`gimnasio/clases`) y admite un tramo más que las
+  de Tienda (`gimnasio/configuracion/equipo/invitar`); en Tienda ninguna puede empezar con el prefijo de otro módulo.
+  `GET /business/tutoriales-video` sin `?modulo=` devuelve solo los de Tienda, igual que antes. El conector tiene 14 herramientas.
+  **Lo cargado se corrige, no se borra:** `tutoriales_actualizar` acepta también `titulo` y `grupo` (solo por el conector: el
+  PATCH no los recibe) y no hay borrado ni por REST ni por el conector. Los grupos se emparejan sin mirar mayúsculas ni acentos, y
+  la respuesta de `tutoriales_crear` (y la de `tutoriales_actualizar` cuando cambia de grupo o de módulo) trae `grupoNuevo`
+  (true si abrió un grupo que no existía en ese módulo). Un tutorial se ubica por su título con una comparación exacta sin
+  distinguir mayúsculas (`lower("titulo") = lower($1)`; con el `mode: 'insensitive'` de Prisma, que arma un ILIKE, «%» y «_»
+  eran comodines). Todo lo que toca un título o un lugar de la lista (crear; actualizar con `titulo`, `grupo` o `modulo`) corre en
+  una transacción que empieza con `pg_advisory_xact_lock(hashtext('marketing_tutoriales'))`: dos altas a la vez no quedan en el
+  mismo lugar ni con el mismo título. Nada de esto lleva migración.
+  **El «Ver tutorial» de los paneles de Turnos, Alquileres y Gimnasio todavía no existe:** hoy solo el panel de Tienda pide
+  `GET /business/tutoriales-video` (sin `?modulo=`). El link y las pantallas de un tutorial de otro módulo quedan guardados;
+  cuando el panel de ese módulo tenga el botón, los pide con `?modulo=<módulo>`.
 - **Aviso por correo a TODO el equipo (solo marketing; los tutoriales no avisan):** cuando entra un video, un correo (por Resend, con el diseño de Órbita) a los superadmins
   ACTIVOS con correo `@orbita.site` u `@orbita-corp.com` (`MCP_DOMINIOS_PERMITIDOS`) y también a su correo personal si lo cargó:
   «Hay N videos nuevos para ver y comentar», con los títulos y un botón al panel (el texto no habla de aprobaciones). Sale **uno por
