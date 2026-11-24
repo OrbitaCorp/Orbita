@@ -5,7 +5,7 @@
 // Por ahora, solo estadía por noche (etapa 1 del plan
 // docs/superpowers/plans/2026-11-23-alquileres-en-produccion.md). El precio no
 // viaja nunca: lo calcula el servidor (precio por noche × noches).
-import type { CrearBloqueo, CrearDesdePanel, GuardarConfig, GuardarRecurso, Reserva as ReservaApi } from '@/lib/reservasApi/tipos'
+import type { CrearBloqueo, CrearDesdePanel, GuardarConfig, GuardarRecurso, Reserva as ReservaApi, Reservar } from '@/lib/reservasApi/tipos'
 import type { Bloqueo, Cliente, NegocioAlquiler, Propiedad, Reserva } from '../index'
 
 /** Una propiedad como recurso ALOJAMIENTO: lo que el servidor usa para reservar va en sus campos; lo descriptivo, en `datos`. */
@@ -113,3 +113,38 @@ export function bloqueoParaApi(b: Bloqueo, propiedad: Pick<Propiedad, 'checkIn' 
 
 /** El id de la API de un bloqueo del panel (uno de todo el negocio se muestra como "<id>:<unidad>", ver mapear.ts). */
 export const idDeBloqueo = (id: string) => id.split(':')[0]
+
+// ─── El sitio público ────────────────────────────────────────────────────────
+
+/** Lo que un visitante completa para reservar una estadía. */
+export interface PedidoSitio {
+  propiedadId: string
+  entrada: string
+  salida: string
+  nombre: string
+  telefono: string
+  email: string
+  notas: string
+  huespedes: number
+  /** Un uuid por intento: si el pedido se repite (doble toque, reintento), el servidor devuelve la misma reserva. */
+  clave: string
+}
+
+/**
+ * El pedido de un visitante como lo recibe POST /storefront/:slug/reservas/reservar.
+ * Sin precio: lo calcula el servidor. Cuántos vienen va en la nota, hasta que
+ * la reserva tenga dónde guardarlo (etapa 3 del plan).
+ */
+export function pedidoDelSitio(p: PedidoSitio): Reservar {
+  const notas = [`${p.huespedes} ${p.huespedes === 1 ? 'huésped' : 'huéspedes'}`, p.notas.trim()].filter(Boolean).join(' · ')
+  const email = p.email.trim()
+  return {
+    modulo: 'ALQUILERES',
+    recursoId: p.propiedadId,
+    fecha: p.entrada,
+    fechaHasta: p.salida,
+    clave: p.clave,
+    cliente: { nombre: p.nombre.trim(), telefono: p.telefono.trim(), ...(email ? { email } : {}) },
+    notas,
+  }
+}

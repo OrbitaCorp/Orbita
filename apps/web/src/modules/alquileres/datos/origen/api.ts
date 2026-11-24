@@ -23,8 +23,8 @@ import { panelGetBusiness } from '@/lib/api'
 import { panel } from '@/lib/reservasApi/cliente'
 import type { Reserva as ReservaApi } from '@/lib/reservasApi/tipos'
 import { sumarDias, type ISO } from '@/lib/reservas/fechas'
-import { NEGOCIOS_DEMO, type Propiedad } from '../index'
-import { clientesDeReservas, fechaArgentina, negocioDeApi, reservaDeApi, tipoDeRecurso, tipoDeRubro } from './mapear'
+import { NEGOCIOS_DEMO } from '../index'
+import { clientesDeReservas, fechaArgentina, negocioDeApi, reservaDeApi, soloPrecioBase, tipoDeRecurso, tipoDeRubro } from './mapear'
 import { bloqueoParaApi, cambiosDePropiedades, configDeCambio, idDeBloqueo, pasosDeCambio, pedidoDeReserva, recursoDePropiedad } from './escribir'
 import type { DatosPanelAlquiler, Escrituras, OrigenAlquileres } from './index'
 
@@ -67,13 +67,6 @@ export async function reservasEntre(desde: ISO, hasta: ISO): Promise<ReservaApi[
 
 /** Lo que trae una carga: lo que el panel dibuja y, para escribir, las reservas tal como las tiene la API. */
 export type CargaApi = Pick<DatosPanelAlquiler, 'tipo' | 'negocio' | 'reservas' | 'clientes'> & { reservasApi: ReservaApi[] }
-
-/**
- * Por ahora el servidor cobra un precio fijo por noche. Hasta que calcule
- * temporadas, fin de semana y limpieza (etapa 3 del plan), el panel no las
- * aplica aunque estén guardadas: así el total que muestra es el que se cobra.
- */
-const soloPrecioBase = (p: Propiedad): Propiedad => ({ ...p, modalidad: 'noche', tarifa: { ...p.tarifa, temporadas: [], finDeSemanaPct: 0, limpieza: 0 } })
 
 /** Todo lo que el panel necesita del negocio con sesión. Sin config de Alquileres, el negocio todavía no lo usa. */
 export async function cargarApi(hoy: ISO): Promise<CargaApi> {

@@ -32,8 +32,20 @@ export class ReservasApiError extends Error {
   get esConflicto() { return this.status === 409 }
 }
 
-/** Un uuid por intento de reserva: se manda como `clave` y, si hay que reintentar, se repite el mismo. */
-export const claveDeIntento = (): string => crypto.randomUUID()
+/**
+ * Un uuid por intento de reserva: se manda como `clave` y, si hay que
+ * reintentar, se repite el mismo. `crypto.randomUUID` solo existe en un
+ * contexto seguro (https o localhost): en un subdominio por http, como
+ * <slug>.orbita.local en desarrollo, se arma el v4 con getRandomValues.
+ */
+export function claveDeIntento(): string {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  const b = crypto.getRandomValues(new Uint8Array(16))
+  b[6] = (b[6] & 0x0f) | 0x40
+  b[8] = (b[8] & 0x3f) | 0x80
+  const h = [...b].map(x => x.toString(16).padStart(2, '0')).join('')
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`
+}
 
 /** Arma el query string sin los valores vacíos; las listas van separadas por coma. */
 export function query(params: object): string {
@@ -52,6 +64,9 @@ async function leer<T>(res: Response): Promise<T> {
   if (!res.ok) throw new ReservasApiError(res.status, mensajeDeError(res.status, body))
   return body as T
 }
+
+/** Lo que devuelve cancelar: la reserva, con `sena` diciendo qué pasó con la seña (pisa el monto). */
+export type Cancelada = Omit<Reserva, 'sena'> & { sena: SenaAlCancelar }
 
 const json = (body: unknown): RequestInit => ({ method: 'POST', body: JSON.stringify(body) })
 
@@ -98,7 +113,7 @@ export const panel = {
   confirmar: (id: string, datos: CambioDeEstado = {}) => delPanel<Reserva>(`/${id}/confirmar`, json(datos)),
   completar: (id: string, datos: CambioDeEstado = {}) => delPanel<Reserva>(`/${id}/completar`, json(datos)),
   ausente: (id: string, datos: CambioDeEstado = {}) => delPanel<Reserva>(`/${id}/ausente`, json(datos)),
-  cancelar: (id: string, datos: Cancelar = {}) => delPanel<Reserva & { sena: SenaAlCancelar; promovida: Reserva | null }>(`/${id}/cancelar`, json(datos)),
+  cancelar: (id: string, datos: Cancelar = {}) => delPanel<Cancelada & { promovida: Reserva | null }>(`/${id}/cancelar`, json(datos)),
   reprogramar: (id: string, datos: Reprogramar) => delPanel<Reserva>(`/${id}/reprogramar`, json(datos)),
   pago: (id: string, datos: Pago) => delPanel<Reserva>(`/${id}/pago`, json(datos)),
   nota: (id: string, notaInterna: string | null) => delPanel<Reserva>(`/${id}/nota`, { method: 'PATCH', body: JSON.stringify({ notaInterna }) }),
@@ -127,7 +142,7 @@ export const sitio = (slug: string) => ({
   reservar: (datos: Reservar) => delSitio<ReservaConToken>(slug, '/reservar', json(datos)),
 
   miReserva: (token: string) => delSitio<MiReserva>(slug, `/mi/${token}`),
-  cancelar: (token: string, datos: Cancelar = {}) => delSitio<Reserva & { sena: SenaAlCancelar }>(slug, `/mi/${token}/cancelar`, json(datos)),
+  cancelar: (token: string, datos: Cancelar = {}) => delSitio<Cancelada>(slug, `/mi/${token}/cancelar`, json(datos)),
   reprogramar: (token: string, datos: Reprogramar) => delSitio<Reserva>(slug, `/mi/${token}/reprogramar`, json(datos)),
 
   anotarseEnEspera: (datos: AnotarseEnEspera) => delSitio<MiEspera & { token: string }>(slug, '/espera', json(datos)),

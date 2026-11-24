@@ -9,6 +9,7 @@ import { esSlugDemo } from '@/lib/demo/modo'
 import { temaDePlantilla } from '@/modules/ventas/cliente/inicio/plantillaReal'
 import type { Tema } from '@/modules/ventas/panel/avanzado/plantillas/tipos'
 import { esNavegadorMovil } from '@/hooks/useMovilPlantilla'
+import { esDeAlquileres } from '@/lib/reservas/destinoPanel'
 
 // Marca/branding de la tienda que el loader necesita para pintarse bien.
 // Viaja serializado en `pageProps` (vía __NEXT_DATA__), así que está
@@ -142,7 +143,7 @@ const noEncontrado = (e: unknown) => e instanceof StorefrontApiError && (e.statu
 const TITULOS_DE_RUTA: [RegExp, string][] = [
   [/\/carrito(\/|$)/, 'Carrito'], [/\/checkout(\/|$)/, 'Finalizar compra'], [/\/login(\/|$)/, 'Ingresar'],
   [/\/registro(\/|$)/, 'Crear cuenta'], [/\/forgot-password(\/|$)/, 'Recuperar contraseña'], [/\/perfil(\/|$)/, 'Mi cuenta'],
-  [/\/pedido(\/|$)/, 'Mi pedido'], [/\/legales\/denunciar(\/|$)/, 'Denunciar esta tienda'], [/\/legales(\/|$)/, 'Información legal'], [/\/descuentos(\/|$)/, 'Descuento'], [/\/oferta(\/|$)/, 'Oferta'],
+  [/\/pedido(\/|$)/, 'Mi pedido'], [/\/mi-reserva(\/|$)/, 'Mi reserva'], [/\/reserva(\/|$)/, 'Reservar'], [/\/legales\/denunciar(\/|$)/, 'Denunciar esta tienda'], [/\/legales(\/|$)/, 'Información legal'], [/\/descuentos(\/|$)/, 'Descuento'], [/\/oferta(\/|$)/, 'Oferta'],
 ]
 const tituloDeRuta = (url: string | undefined) => TITULOS_DE_RUTA.find(([re]) => re.test((url ?? '').split('?')[0]))?.[1]
 
@@ -338,7 +339,30 @@ export function crearGetServerSideProps(tipo: TipoPagina | null = null): GetServ
     tipo, slug: slug ?? '', nombre: storeMeta?.nombre ?? slug ?? 'Tienda', cfg: cfgOk, estado: storeStatus, esNavegacion,
   })
 
-  return { props: { __storefront: true, __storeMeta: storeMeta, __storeStatus: storeStatus, __homeTemplate: homeTemplate, __temaPlantilla: temaPlantilla, __movil: movil, __seo: seo } }
+  // El rubro del negocio (null si la config no llegó): con "alquileres", el sitio
+  // es el de reservas y no la tienda (pages/tienda/[slug]/index.tsx). El slug va
+  // con él porque esas páginas lo necesitan desde el primer render.
+  const industry = cfgOk?.business.industry ?? null
+
+  return { props: { __storefront: true, __storeMeta: storeMeta, __storeStatus: storeStatus, __homeTemplate: homeTemplate, __temaPlantilla: temaPlantilla, __movil: movil, __seo: seo, __industry: industry, __slug: slug } }
+  }
+}
+
+/**
+ * Para las páginas que solo existen en el sitio de un negocio de Alquileres
+ * (/reserva, /mi-reserva/<token>): en cualquier otro negocio son un 404, tenga
+ * el rubro que tenga (los negocios viejos lo tienen vacío). Si la config no
+ * llegó a tiempo no se puede saber: se sirve igual y la página, que pide sus
+ * datos desde el navegador, avisa si no hay nada para reservar.
+ */
+export function soloAlquileres(base: GetServerSideProps): GetServerSideProps {
+  return async (ctx) => {
+    const res = await base(ctx)
+    if (!('props' in res)) return res
+    const props = (await res.props) as { __industry?: string | null; __storeMeta?: StoreMetaSSR | null }
+    // __storeMeta solo viene cuando la config llegó: recién ahí se sabe de qué rubro es.
+    if (props.__storeMeta && !esDeAlquileres(props.__industry)) return { notFound: true }
+    return res
   }
 }
 
@@ -350,3 +374,11 @@ export const getServerSidePropsInicio = crearGetServerSideProps('inicio')
 export const getServerSidePropsCatalogo = crearGetServerSideProps('catalogo')
 export const getServerSidePropsCategoria = crearGetServerSideProps('categoria')
 export const getServerSidePropsProducto = crearGetServerSideProps('producto')
+export const getServerSidePropsAlquileres = soloAlquileres(crearGetServerSideProps())
+/** Como la anterior, con el token del enlace personal entre las props (ya resuelto para el primer render). */
+export const getServerSidePropsMiReserva: GetServerSideProps = async (ctx) => {
+  const res = await getServerSidePropsAlquileres(ctx)
+  if (!('props' in res)) return res
+  const token = typeof ctx.params?.token === 'string' ? ctx.params.token : null
+  return { props: { ...(await res.props), token } }
+}

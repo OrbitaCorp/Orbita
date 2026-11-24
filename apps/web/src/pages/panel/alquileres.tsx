@@ -21,18 +21,12 @@ import { RequireAuth } from '@/lib/auth/RequireAuth'
 import { esDeAlquileres } from '@/lib/reservas/destinoPanel'
 import { PageLoader } from '@/components/PageLoader'
 import Panel from '@/modules/alquileres/admin/Panel'
-import { usarHoyReal } from '@/modules/alquileres/datos'
+import { ahoraEnArgentina, usarHoyReal } from '@/modules/alquileres/datos'
 import { OrigenAlquileresProvider } from '@/modules/alquileres/datos/origen'
 import { origenApi } from '@/modules/alquileres/datos/origen/api'
 
 // Desde el servidor (no estática): así ?vista= y ?tab= llegan en el primer pintado.
 export const getServerSideProps: GetServerSideProps = async () => ({ props: {} })
-
-/** El día y los minutos de ahora en Argentina (UTC−3), como los usa el panel. */
-function ahoraEnArgentina(): [string, number] {
-  const d = new Date(Date.now() - 3 * 60 * 60 * 1000)
-  return [d.toISOString().slice(0, 10), d.getUTCHours() * 60 + d.getUTCMinutes()]
-}
 
 function SoloAlquileres() {
   const { user } = useAuth()

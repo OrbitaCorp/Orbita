@@ -42,6 +42,12 @@ export function usarHoyReal(fecha: ISO, minutos: number) {
   AHORA = minutos
 }
 
+/** El día y los minutos de ahora en Argentina (UTC−3, sin horario de verano), como los usan las pantallas. */
+export function ahoraEnArgentina(): [ISO, number] {
+  const d = new Date(Date.now() - 3 * 60 * 60 * 1000)
+  return [d.toISOString().slice(0, 10), d.getUTCHours() * 60 + d.getUTCMinutes()]
+}
+
 // ─── Modos ───────────────────────────────────────────────────────────────────
 
 export type TipoAlquiler = 'cancha' | 'bloque' | 'estadia'

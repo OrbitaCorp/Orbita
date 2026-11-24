@@ -16,10 +16,10 @@
 //   F12 equipo y roles             equipo = []
 // Todo lo descriptivo de una propiedad o de un salón vive en `datos` del
 // recurso y se lee con cuidado: un campo con otro tipo toma su default.
-import type { Bloqueo as BloqueoApi, Config, Estado, Recurso, Reserva as ReservaApi, Servicio } from '@/lib/reservasApi/tipos'
+import type { Bloqueo as BloqueoApi, Config, Estado, Noches, Recurso, Reserva as ReservaApi, Servicio } from '@/lib/reservasApi/tipos'
 import type { Extra } from '@/lib/reservas/precio'
 import type { Temporada, TarifaMensual } from '@/lib/reservas/estadia'
-import type { ISO } from '@/lib/reservas/fechas'
+import { sumarDias, type ISO } from '@/lib/reservas/fechas'
 import {
   RUBROS_ALQUILERES, TIPOS_PROPIEDAD, mensajesDeFabrica,
   type Apertura, type Bloqueo, type Cliente, type EstadoReserva, type NegocioAlquiler, type Paquete, type Propiedad,
@@ -218,6 +218,30 @@ export function bloqueosDeApi(bs: BloqueoApi[], unidadIds: string[]): Bloqueo[] 
   })
 }
 
+/**
+ * Las noches ocupadas de una propiedad (lo único que el sitio público sabe de
+ * las reservas ajenas) como bloqueos sin nombre: las noches seguidas se juntan
+ * en un rango [desde, hasta), que es como las pantallas calculan lo ocupado.
+ */
+export function bloqueosDeNoches(n: Pick<Noches, 'recursoId' | 'ocupadas'>): Bloqueo[] {
+  const noches = [...new Set(n.ocupadas)].sort()
+  const rangos: Bloqueo[] = []
+  for (const noche of noches) {
+    const ultimo = rangos[rangos.length - 1]
+    if (ultimo && ultimo.hasta === noche) ultimo.hasta = sumarDias(noche, 1)
+    else rangos.push({ id: `ocupado:${n.recursoId}:${noche}`, unidadId: n.recursoId, desde: noche, hasta: sumarDias(noche, 1), motivo: 'Ocupado', origen: 'dueno' })
+  }
+  return rangos
+}
+
+/**
+ * Por ahora el servidor cobra un precio fijo por noche. Hasta que calcule
+ * temporadas, fin de semana y limpieza (etapa 3 del plan), ni el panel ni el
+ * sitio las aplican aunque estén guardadas: así el total que se muestra es el
+ * que se cobra.
+ */
+export const soloPrecioBase = (p: Propiedad): Propiedad => ({ ...p, modalidad: 'noche', tarifa: { ...p.tarifa, temporadas: [], finDeSemanaPct: 0, limpieza: 0 } })
+
 // ─── El negocio ──────────────────────────────────────────────────────────────
 
 const TODOS_LOS_DIAS = [0, 1, 2, 3, 4, 5, 6]
@@ -259,8 +283,11 @@ export interface DatosNegocioApi {
   logo?: string | null
 }
 
+/** Lo que se usa de la config: está tanto en la del panel como en la pública del sitio. */
+export type ConfigDelNegocio = Pick<Config, 'horario' | 'senaPorcentaje' | 'cancelacionHastaHoras' | 'senaReembolsable'>
+
 /** El negocio del panel a partir de lo que trae la API. `recursos` ya viene filtrado por el modo. */
-export function negocioDeApi(p: { tipo: TipoAlquiler; rubro: string; negocio: DatosNegocioApi; config: Config; recursos: Recurso[]; servicios: Servicio[]; bloqueos: BloqueoApi[] }): NegocioAlquiler {
+export function negocioDeApi(p: { tipo: TipoAlquiler; rubro: string; negocio: DatosNegocioApi; config: ConfigDelNegocio; recursos: Recurso[]; servicios: Servicio[]; bloqueos: BloqueoApi[] }): NegocioAlquiler {
   const { tipo, config } = p
   const recursos = [...p.recursos].sort((a, b) => a.orden - b.orden)
   const canchas = tipo === 'cancha' ? recursos : []
@@ -299,5 +326,50 @@ export function negocioDeApi(p: { tipo: TipoAlquiler; rubro: string; negocio: Da
     mensajes: mensajesDeFabrica(tipo),
     pagos: { senaSobre: 'total', formas: ['efectivo', 'transferencia'], alias: '', titular: '', mpConectado: false, cancelaATiempo: config.senaReembolsable ? 'devolver' : 'pierde', cancelaTarde: 'pierde' },
     equipo: [],
+  }
+}
+
+// ─── El sitio público ────────────────────────────────────────────────────────
+
+/** Lo que el sitio usa de la config pública de la tienda (GET /storefront/:slug). */
+export interface TiendaDelSitio {
+  business: { name: string; subdomain: string; subrubros?: string[] | null }
+  appearance: { storeName: string | null; tagline: string | null; logoUrl: string | null } | null
+  contact: { whatsapp: string | null } | null
+  payment: { transferAlias: string | null; transferHolder: string | null } | null
+}
+
+/**
+ * El negocio como lo ve un visitante, armado solo con lo público: la config de
+ * la tienda, la de reservas, los recursos activos y las noches ocupadas de cada
+ * propiedad (que entran como bloqueos sin nombre: el sitio no conoce las
+ * reservas de otros). La dirección del negocio es la de su primera propiedad.
+ */
+export function negocioDelSitio(p: { tienda: TiendaDelSitio; config: ConfigDelNegocio; recursos: Recurso[]; noches: Pick<Noches, 'recursoId' | 'ocupadas'>[] }): { tipo: TipoAlquiler; negocio: NegocioAlquiler } {
+  const { tienda } = p
+  const { tipo, rubro } = tipoDeRubro(tienda.business.subrubros)
+  const recursos = p.recursos.filter(r => r.activo && r.tipo === tipoDeRecurso(tipo))
+  const armado = negocioDeApi({
+    tipo, rubro, config: p.config, recursos, servicios: [], bloqueos: [],
+    negocio: {
+      nombre: tienda.appearance?.storeName?.trim() || tienda.business.name,
+      slug: tienda.business.subdomain,
+      telefono: tienda.contact?.whatsapp,
+      descripcion: tienda.appearance?.tagline,
+      logo: tienda.appearance?.logoUrl,
+    },
+  })
+  const propiedades = armado.propiedades.map(soloPrecioBase)
+  const ids = new Set(recursos.map(r => r.id))
+  return {
+    tipo,
+    negocio: {
+      ...armado,
+      propiedades,
+      direccion: propiedades[0]?.direccion ?? '',
+      ciudad: propiedades[0]?.ciudad ?? '',
+      bloqueos: p.noches.filter(n => ids.has(n.recursoId)).flatMap(bloqueosDeNoches),
+      pagos: { ...armado.pagos, alias: tienda.payment?.transferAlias ?? '', titular: tienda.payment?.transferHolder ?? '' },
+    },
   }
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Reserva as ReservaApi } from '@/lib/reservasApi/tipos'
 import { NEGOCIOS_DEMO, type Bloqueo, type Propiedad, type Reserva } from '../../index'
-import { bloqueoParaApi, cambiosDePropiedades, configDeCambio, idDeBloqueo, pasosDeCambio, pedidoDeReserva, recursoDePropiedad } from '../escribir'
+import { bloqueoParaApi, cambiosDePropiedades, configDeCambio, idDeBloqueo, pasosDeCambio, pedidoDeReserva, pedidoDelSitio, recursoDePropiedad } from '../escribir'
 import { propiedadDeApi } from '../mapear'
 
 const PROP: Propiedad = { ...NEGOCIOS_DEMO.estadia.propiedades[0], id: 'p1', nombre: 'Cabaña Arrayán', modalidad: 'noche', checkIn: 900, checkOut: 600, tarifa: { precioNoche: 85000, temporadas: [], finDeSemanaPct: 0, limpieza: 0, minNoches: 2 } }
@@ -85,5 +85,20 @@ describe('bloqueos', () => {
   it('el id que muestra el panel vuelve al id del bloqueo de la API', () => {
     expect(idDeBloqueo('abc-123')).toBe('abc-123')
     expect(idDeBloqueo('abc-123:p1')).toBe('abc-123')
+  })
+})
+
+describe('pedidoDelSitio', () => {
+  const base = { propiedadId: 'p1', entrada: '2026-12-10', salida: '2026-12-13', nombre: '  Ana Ríos ', telefono: ' 0000 55-0101 ', email: '', notas: '', huespedes: 3, clave: 'k-1' }
+
+  it('pide las noches con la clave del intento y sin precio: lo calcula el servidor', () => {
+    const p = pedidoDelSitio(base)
+    expect(p).toEqual({ modulo: 'ALQUILERES', recursoId: 'p1', fecha: '2026-12-10', fechaHasta: '2026-12-13', clave: 'k-1', cliente: { nombre: 'Ana Ríos', telefono: '0000 55-0101' }, notas: '3 huéspedes' })
+    expect(p).not.toHaveProperty('precio')
+  })
+  it('manda el email solo si lo escribieron, y la nota después de los huéspedes', () => {
+    const p = pedidoDelSitio({ ...base, email: ' ana@example.com ', notas: ' Llegamos tarde ', huespedes: 1 })
+    expect(p.cliente).toEqual({ nombre: 'Ana Ríos', telefono: '0000 55-0101', email: 'ana@example.com' })
+    expect(p.notas).toBe('1 huésped · Llegamos tarde')
   })
 })

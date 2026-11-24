@@ -82,7 +82,9 @@ export type HomeTemplateData = {
 }
 
 export type StorefrontConfigResponse = {
-  business: { id: string; name: string; subdomain: string; mode: string; isActive: boolean; isPaused: boolean }
+  // `industry` y `subrubros` son opcionales: una API anterior a ese cambio no los
+  // manda (y entonces el sitio es la tienda, como siempre).
+  business: { id: string; name: string; subdomain: string; mode: string; isActive: boolean; isPaused: boolean; industry?: string | null; subrubros?: string[] | null }
   appearance: {
     storeName: string | null
     tagline: string | null

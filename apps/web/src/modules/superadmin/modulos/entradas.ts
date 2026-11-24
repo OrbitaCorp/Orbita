@@ -2951,4 +2951,57 @@ Después de cada escritura el panel vuelve a cargar; si la API rechaza algo (noc
       'apps/web/src/modules/alquileres/admin/navegacion.ts:43',
     ],
   }),
+  entrada({
+    modulo: 'alquileres', fecha: F23, slug: 'sitio-publico-de-estadia', tipo: 'tarea', quien: 'Alan',
+    titulo: 'El sitio público de un negocio de estadía reserva de verdad',
+    foco: 'En <slug>.orbita.site, un negocio de Alquileres muestra su sitio de reservas en lugar de la tienda: propiedades con su precio y sus noches ocupadas, pedido de reserva sin registrarse y un enlace personal para verla o cancelarla. Todavía no cobra online: la reserva queda pendiente y el dueño la confirma desde el panel cuando recibe la seña.',
+    que: `Etapa 2 del plan para probar Alquileres en producción (\`docs/superpowers/plans/2026-11-23-alquileres-en-produccion.md\`). Solo alojamiento por noche.
+
+**Qué ve cada negocio.** La config pública del sitio (\`GET /storefront/:slug\`) ahora trae el rubro (\`industry\` y \`subrubros\`). Con "alquileres", la portada es el sitio de reservas; con cualquier otro rubro, o si el dato no llegó, la tienda de siempre. \`/reserva\` y \`/mi-reserva/<token>\` dan 404 en un negocio que no es de Alquileres.
+
+**Las pantallas son las de la demo** (\`modules/alquileres/storefront\`), con otro origen de datos y otros links: un contexto (\`rutas.ts\`) le dice a cada una si está en la demo o en un sitio real.
+
+| En el sitio | De dónde sale |
+|---|---|
+| Nombre, logo, WhatsApp y alias | La config pública de la tienda |
+| Seña, cancelación y si confirma el dueño | \`GET .../reservas/config\` |
+| Propiedades | \`GET .../reservas/recursos\` |
+| Noches ocupadas | \`GET .../reservas/disponibilidad/noches\`, hasta un año, en pedidos de 180 días |
+| Reservar | \`POST .../reservas/reservar\`, con una clave por intento |
+| Mi reserva y cancelar | \`GET .../reservas/mi/:token\` y \`POST .../mi/:token/cancelar\` |
+
+El sitio no conoce las reservas de otros: las noches ocupadas entran como bloqueos sin nombre.
+
+**Decisiones de esta etapa:**
+- **Reserva en un paso** (\`reservar\`) y no retener y después confirmar: en una cabaña casi no hay disputa por las fechas, y así no quedan retenciones abandonadas tapando el calendario del dueño. La clave del intento evita duplicar con un doble toque o un reintento; un 409 vuelve a elegir fechas con el calendario al día.
+- **Sin paso de pago.** Todavía no se cobra online: la confirmación dice que el negocio la confirma al recibir la seña y ofrece escribirle por WhatsApp. Si el negocio tiene alias cargado, se muestra.
+- **Sin "Mis reservas".** No hay cuenta: cada reserva se ve con su enlace personal. El navegador recuerda la última para ofrecer "Mi reserva" en el menú.
+- **Cuántos huéspedes vienen va en la nota**, hasta que la reserva tenga dónde guardarlo (etapa 3).
+- El precio es el fijo por noche, igual que en el panel: es lo que cobra el servidor.
+
+**Lo que todavía no hace:**
+- Cambiar las fechas desde "Mi reserva": la disponibilidad pública no deja excluir la reserva propia, así que por ahora se le pide al negocio.
+- Canchas y salones en el sitio real (siguen en la demo).
+- El aviso de cookies es el de la plataforma y habla de "tienda" y "carrito".
+- El negocio de Alquileres todavía no carga su teléfono ni su alias desde su panel: sin esos datos, el sitio dice que el negocio se va a comunicar.
+- \`plan.ts\` no cambió: las tareas del 30/11 al 03/12 quedan a medias (falta canchas, salones, reprogramar y revisar los emails).
+
+**De paso:** \`claveDeIntento\` (el cliente compartido de reservas) ya no depende de \`crypto.randomUUID\`, que no existe por http en un subdominio de desarrollo; y el tipo de la respuesta de cancelar estaba mal declarado (\`sena\` es qué pasó con la seña, no un monto). Le sirve también a Turnos y a Gimnasio.
+
+**Verificado:** tests del front y de la API en verde. En local contra la base de dev, con un Chrome sin ventana a 390 px y a 1280 px: portada, ficha, pedido de reserva de 3 noches ($270.000, seña de $135.000) que queda pendiente, "Mi reserva", cancelación y enlace inexistente; un negocio de Tienda sigue mostrando su tienda y da 404 en \`/reserva\`. El email de la reserva no se revisó.`,
+    archivos: [
+      'apps/api/src/storefront/storefront.service.ts:395',
+      'apps/web/src/pages/tienda/[slug]/index.tsx:1',
+      'apps/web/src/pages/tienda/[slug]/reserva.tsx:1',
+      'apps/web/src/pages/tienda/[slug]/mi-reserva/[token].tsx:1',
+      'apps/web/src/lib/storefront/forceSSR.ts:358',
+      'apps/web/src/lib/reservas/destinoPanel.ts:21',
+      'apps/web/src/modules/alquileres/storefront/SitioReal.tsx:1',
+      'apps/web/src/modules/alquileres/storefront/rutas.ts:1',
+      'apps/web/src/modules/alquileres/storefront/MiReserva.tsx:1',
+      'apps/web/src/modules/alquileres/datos/origen/sitio.ts:1',
+      'apps/web/src/modules/alquileres/datos/origen/mapear.ts:348',
+      'apps/web/src/lib/reservasApi/cliente.ts:41',
+    ],
+  }),
 ]

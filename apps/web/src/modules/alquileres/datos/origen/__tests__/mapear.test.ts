@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { Bloqueo as BloqueoApi, Config, Recurso, Reserva as ReservaApi, Servicio } from '@/lib/reservasApi/tipos'
 import {
-  aperturaDeHorario, bloqueosDeApi, clienteIdDe, clientesDeReservas, estadoDeApi, fechaArgentina, negocioDeApi,
-  propiedadDeApi, reservaDeApi, salonDeApi, tipoDeRecurso, tipoDeRubro, unidadDeApi,
+  aperturaDeHorario, bloqueosDeApi, bloqueosDeNoches, clienteIdDe, clientesDeReservas, estadoDeApi, fechaArgentina, negocioDeApi,
+  negocioDelSitio, propiedadDeApi, reservaDeApi, salonDeApi, tipoDeRecurso, tipoDeRubro, unidadDeApi,
 } from '../mapear'
 
 const recurso = (r: Partial<Recurso> = {}): Recurso => ({
@@ -206,5 +206,65 @@ describe('negocioDeApi', () => {
     expect(n.equipo).toEqual([])
     expect(n.calendariosExternos).toEqual([])
     expect(n.telefono).toBe('')
+  })
+})
+
+describe('bloqueosDeNoches', () => {
+  it('junta las noches seguidas en un rango que termina el día en que ya se puede entrar', () => {
+    const b = bloqueosDeNoches({ recursoId: 'p1', ocupadas: ['2026-12-10', '2026-12-11', '2026-12-12', '2026-12-20'] })
+    expect(b.map(x => [x.unidadId, x.desde, x.hasta])).toEqual([['p1', '2026-12-10', '2026-12-13'], ['p1', '2026-12-20', '2026-12-21']])
+  })
+  it('no depende del orden ni de noches repetidas, y sin noches no hay nada', () => {
+    expect(bloqueosDeNoches({ recursoId: 'p1', ocupadas: ['2026-12-11', '2026-12-10', '2026-12-11'] }).map(x => [x.desde, x.hasta])).toEqual([['2026-12-10', '2026-12-12']])
+    expect(bloqueosDeNoches({ recursoId: 'p1', ocupadas: [] })).toEqual([])
+  })
+  it('cruza el fin de mes', () => {
+    expect(bloqueosDeNoches({ recursoId: 'p1', ocupadas: ['2026-12-31', '2027-01-01'] }).map(x => [x.desde, x.hasta])).toEqual([['2026-12-31', '2027-01-02']])
+  })
+})
+
+describe('negocioDelSitio', () => {
+  const tienda = {
+    business: { name: 'Cabañas del Monte SRL', subdomain: 'cabanas-del-monte', subrubros: ['cabana'] },
+    appearance: { storeName: 'Cabañas del Monte', tagline: 'A diez minutos de las Cataratas', logoUrl: null },
+    contact: { whatsapp: '0000 15-0000' },
+    payment: { transferAlias: 'monte.cabanas', transferHolder: 'Monte SRL' },
+  }
+  const alojamiento = (id: string, datos: Record<string, unknown> = {}) => recurso({
+    id, tipo: 'ALOJAMIENTO', nombre: `Cabaña ${id}`, precio: 90000, duracionMinutos: null,
+    datos: { nochesMinimas: 2, fotos: ['/a.jpg'], direccion: 'Ruta 12 km 5', ciudad: 'Puerto Iguazú', tarifa: { temporadas: [{ id: 't', nombre: 'Alta', desde: '2026-12-20', hasta: '2027-01-10', precioNoche: 150000 }], finDeSemanaPct: 20, limpieza: 8000 }, ...datos },
+  })
+
+  it('arma el negocio de estadía con lo público: nombre, contacto, propiedades y noches ocupadas', () => {
+    const { tipo, negocio } = negocioDelSitio({
+      tienda, config: config({ senaPorcentaje: 30, cancelacionHastaHoras: 48 }),
+      recursos: [alojamiento('p1'), alojamiento('p2')],
+      noches: [{ recursoId: 'p1', ocupadas: ['2026-12-10', '2026-12-11'] }, { recursoId: 'p2', ocupadas: [] }],
+    })
+    expect(tipo).toBe('estadia')
+    expect(negocio).toMatchObject({ nombre: 'Cabañas del Monte', descripcion: 'A diez minutos de las Cataratas', slug: 'cabanas-del-monte', telefono: '0000 15-0000', direccion: 'Ruta 12 km 5', ciudad: 'Puerto Iguazú', senaPct: 30 })
+    expect(negocio.propiedades.map(p => p.id)).toEqual(['p1', 'p2'])
+    expect(negocio.bloqueos.map(b => [b.unidadId, b.desde, b.hasta])).toEqual([['p1', '2026-12-10', '2026-12-12']])
+    expect(negocio.pagos).toMatchObject({ alias: 'monte.cabanas', titular: 'Monte SRL' })
+  })
+
+  it('muestra el precio que cobra el servidor: fijo por noche, sin temporadas, fin de semana ni limpieza', () => {
+    const { negocio } = negocioDelSitio({ tienda, config: config(), recursos: [alojamiento('p1')], noches: [] })
+    expect(negocio.propiedades[0].tarifa).toEqual({ precioNoche: 90000, temporadas: [], finDeSemanaPct: 0, limpieza: 0, minNoches: 2 })
+  })
+
+  it('sin nombre de tienda usa el del negocio; sin contacto ni alias, quedan vacíos', () => {
+    const { negocio } = negocioDelSitio({
+      tienda: { business: tienda.business, appearance: null, contact: null, payment: null },
+      config: config(), recursos: [alojamiento('p1', { direccion: '', ciudad: '' })], noches: [],
+    })
+    expect(negocio).toMatchObject({ nombre: 'Cabañas del Monte SRL', descripcion: '', telefono: '', direccion: '', ciudad: '' })
+    expect(negocio.pagos.alias).toBe('')
+  })
+
+  it('deja afuera lo que no es del modo del negocio', () => {
+    const { negocio } = negocioDelSitio({ tienda, config: config(), recursos: [alojamiento('p1'), recurso({ id: 'c1', tipo: 'CANCHA' })], noches: [] })
+    expect(negocio.propiedades.map(p => p.id)).toEqual(['p1'])
+    expect(negocio.unidades).toEqual([])
   })
 })
