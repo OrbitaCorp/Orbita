@@ -122,6 +122,8 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
   const [personas, setPersonas] = useState<Persona[]>([])
   const [cargados, setCargados] = useState<DatosPanel | null>(null)
   const [semanaGuardada, setSemanaGuardada] = useState<Semana | null>(null)
+  // El equipo como quedó guardado en el origen (JSON), para saber cuándo hay que volver a guardarlo.
+  const [equipoGuardado, setEquipoGuardado] = useState<string | null>(null)
   if (carga.datos && carga.datos !== cargados) {
     // Se ajusta durante el render (no en un efecto), así la primera pantalla ya sale con los datos.
     setCargados(carga.datos)
@@ -131,6 +133,7 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
     setRoles(carga.datos.roles)
     setPersonas(carga.datos.personas)
     setSemanaGuardada(null)
+    setEquipoGuardado(JSON.stringify({ personas: carga.datos.personas, roles: carga.datos.roles }))
   }
   // El horario del negocio. En la demo cambia apenas se guarda otro en Configuración → Horarios;
   // con la API, es el que devolvió el último guardado o, si no, el que trajo la carga.
@@ -347,6 +350,20 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
   const aBase = (s: ServicioPanel, pausado = s.estado === 'pausado'): ServicioBase =>
     ({ id: s.id, nombre: s.nombre, duracion: s.duracion, precio: s.precio, online: s.online, ...(pausado ? { pausado: true } : {}) })
   const noSePudo = (titulo: string, e: unknown) => avisar(titulo, e instanceof Error && e.message ? e.message : 'Probá de nuevo en un rato.')
+
+  // El equipo (personas, roles, cómo cobra cada uno) se guarda solo cuando cambia, en el origen
+  // que lo sepa guardar (la API, en `datos` de la config). Se espera medio segundo para juntar
+  // los cambios seguidos; si falla, el aviso lo dice y el próximo cambio vuelve a intentar.
+  const guardarEquipo = useEffectEvent((json: string) => {
+    origen.equipo?.guardar(personas, roles).then(() => setEquipoGuardado(json), (e: unknown) => noSePudo('No se guardó el equipo', e))
+  })
+  useEffect(() => {
+    if (!origen.equipo || equipoGuardado === null) return
+    const json = JSON.stringify({ personas, roles })
+    if (json === equipoGuardado) return
+    const t = setTimeout(() => guardarEquipo(json), 500)
+    return () => clearTimeout(t)
+  }, [origen.equipo, personas, roles, equipoGuardado])
   const guardarServicio = async (s: ServicioPanel, silencio?: boolean) => {
     const antes = servicios.find(x => x.id === s.id)
     let guardado: ServicioBase
@@ -409,8 +426,7 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
   // roles no tienen dónde guardarse en la API todavía: quedan en este panel
   // hasta que estén las cuentas del equipo (faltante 4 del mapa de Turnos).
   const sinCuentas = (conAgenda: boolean) => (enDemo ? 'Demo: no se mandó ninguna invitación.'
-    : conAgenda ? 'Su agenda quedó guardada. La invitación y sus datos llegan con las cuentas del equipo.'
-      : 'Por ahora queda solo en este panel: quien no atiende se guarda cuando estén las cuentas del equipo.')
+    : `${conAgenda ? 'Su agenda y sus datos quedaron guardados' : 'Quedó guardado en tu equipo'}. La invitación para que entre con su cuenta llega con las cuentas del equipo.`)
   const guardarPersona = async (p: Persona, agenda: Agenda | null) => {
     const era = personas.some(x => x.id === p.id)
     let persona = p

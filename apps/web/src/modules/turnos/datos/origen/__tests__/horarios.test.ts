@@ -22,7 +22,7 @@ vi.mock('@/lib/reservasApi/cliente', () => ({
 
 const { origenApi } = await import('../api')
 const {
-  MARCA_VACACIONES, bloqueosDeDia, diasCerradosDeBloqueos, errorDiasCerrados, horarioDeSemana, mismoHorario, recortarHorario, semanaDeHorario,
+  MARCA_VACACIONES, agendaDeHorario, bloqueosDeDia, diasCerradosDeBloqueos, errorDiasCerrados, horarioDeRecurso, horarioDeSemana, recortarHorario, semanaDeHorario,
 } = await import('../mapear')
 type DiasCerrados = import('../mapear').DiasCerrados
 
@@ -50,9 +50,19 @@ describe('recortar un horario propio al del negocio', () => {
     const negocio: HorarioSemanal = { 1: PARTIDO, 6: [[540, 780]] }
     expect(recortarHorario(propio, negocio)).toEqual({ 1: [[600, 780], [960, 1100]] })
   })
-  it('compara horarios sin importar los días vacíos', () => {
-    expect(mismoHorario({ 1: PARTIDO, 2: [] }, { 1: PARTIDO })).toBe(true)
-    expect(mismoHorario({ 1: PARTIDO }, { 1: [[540, 780]] })).toBe(false)
+})
+
+describe('el horario propio se guarda sin recortar', () => {
+  const r = (atiende: number[], horario = '') => ({ id: 'r', nombre: 'Nico', rol: 'Barbero', color: '#000', atiende, horario, dias: '' })
+  it('todos los días del negocio y sin horario propio: null', () => {
+    expect(horarioDeRecurso(r([0, 1, 2, 3, 4, 5]), semana)).toBeNull()
+  })
+  it('algunos días con el horario del negocio: todo el día, y la API lo cruza', () => {
+    expect(horarioDeRecurso(r([1, 3]), semana)).toEqual({ 2: [[0, 1440]], 4: [[0, 1440]] })
+    expect(agendaDeHorario({ 2: [[0, 1440]], 4: [[0, 1440]] }, semana)).toMatchObject({ atiende: [1, 3], horario: '' })
+  })
+  it('con horario propio: el suyo tal cual, aunque el negocio cierre antes', () => {
+    expect(horarioDeRecurso(r([0, 5], '16:00 – 22:00'), semana)).toEqual({ 1: [[960, 1320]], 6: [[960, 1320]] })
   })
 })
 
@@ -111,28 +121,22 @@ describe('qué no se puede guardar', () => {
 describe('guardar la semana', () => {
   const nueva = semanaDeHorario({ 1: PARTIDO, 2: PARTIDO, 3: PARTIDO, 4: PARTIDO, 5: PARTIDO, 6: [[540, 780]] })
 
-  it('guarda la config y recorta solo los horarios propios que cambian', async () => {
-    const lista = [
-      agenda('a', 'Martín', null),
-      agenda('b', 'Nico', { 1: [[960, 1200]], 6: [[540, 780], [960, 1200]] }),
-      agenda('c', 'Lucas', { 1: [[540, 780]] }),
-    ]
-    recursos.mockResolvedValue(lista)
+  it('guarda solo la config: las agendas no se reescriben', async () => {
+    recursos.mockResolvedValue([agenda('a', 'Martín', null), agenda('b', 'Nico', { 1: [[960, 1200]], 6: [[540, 780], [960, 1200]] })])
     guardarConfig.mockResolvedValue({})
-    editarRecurso.mockResolvedValue({})
     const r = await horarios.guardarSemana(nueva, barberia)
     expect(guardarConfig).toHaveBeenCalledWith({ modulo: 'TURNOS', horario: horarioDeSemana(nueva) })
-    expect(editarRecurso).toHaveBeenCalledTimes(1)
-    expect(editarRecurso).toHaveBeenCalledWith('b', { modulo: 'TURNOS', tipo: 'PROFESIONAL', nombre: 'Nico', horario: { 1: [[960, 1200]], 6: [[540, 780]] } })
-    expect(r).toMatchObject({ ajustadas: ['Nico'], sinAjustar: [] })
-    expect(r.recursos).toHaveLength(3)
+    expect(editarRecurso).not.toHaveBeenCalled()
+    expect(r).toMatchObject({ sinDias: [] })
+    expect(r.recursos).toHaveLength(2)
   })
 
-  it('si alguien quedaría sin días no escribe nada y dice quién', async () => {
+  it('avisa quién no atiende ningún día con el horario nuevo', async () => {
     recursos.mockResolvedValue([agenda('b', 'Nico', { 6: [[960, 1200]] })])
-    await expect(horarios.guardarSemana(nueva, barberia)).rejects.toThrow('Nico se queda sin días')
-    expect(guardarConfig).not.toHaveBeenCalled()
-    expect(editarRecurso).not.toHaveBeenCalled()
+    guardarConfig.mockResolvedValue({})
+    const r = await horarios.guardarSemana(nueva, barberia)
+    expect(guardarConfig).toHaveBeenCalled()
+    expect(r.sinDias).toEqual(['Nico'])
   })
 })
 

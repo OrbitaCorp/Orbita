@@ -43,6 +43,45 @@ export function errorDeHorario(h: unknown, opciones: { sesiones?: boolean } = {}
 }
 
 /** Los tramos abiertos de un día concreto (ordenados y sin pisarse). Vacío = cerrado. */
+/**
+ * Los tipos cuyo horario propio va DENTRO del horario del negocio: la agenda de
+ * un profesional o de una cabina (Turnos). Si el negocio achica su horario,
+ * ellos también; si lo agranda, vuelven a atender lo suyo. En los demás tipos
+ * el horario propio vale tal cual: una cancha o una clase pueden abrir cuando
+ * el negocio "no abre".
+ */
+const DENTRO_DEL_NEGOCIO: ReadonlySet<string> = new Set(['PROFESIONAL', 'ESPACIO']);
+
+/** Lo que dos listas de tramos tienen en común. */
+function cruzarTramos(a: Tramo[], b: Tramo[]): Tramo[] {
+  const out: Tramo[] = [];
+  for (const [a0, a1] of a) for (const [b0, b1] of b) {
+    const desde = Math.max(a0, b0);
+    const hasta = Math.min(a1, b1);
+    if (hasta > desde) out.push([desde, hasta]);
+  }
+  return out.sort((x, y) => x[0] - y[0]);
+}
+
+/**
+ * El horario con el que se reserva un recurso: el suyo o, sin horario propio,
+ * el del negocio. En Turnos el propio se cruza día por día con el del negocio
+ * (DENTRO_DEL_NEGOCIO); así un feriado de horario o un cambio de horario del
+ * negocio le llega solo, sin reescribir cada agenda.
+ */
+export function horarioEfectivo(
+  tipo: string, propio: HorarioSemanal | null | undefined, negocio: HorarioSemanal | null | undefined,
+): HorarioSemanal | null {
+  if (!propio) return negocio ?? null;
+  if (!negocio || !DENTRO_DEL_NEGOCIO.has(tipo)) return propio;
+  const h: HorarioSemanal = {};
+  for (const d of DIAS) {
+    const tramos = cruzarTramos(propio[d] ?? [], negocio[d] ?? []);
+    if (tramos.length) h[d] = tramos;
+  }
+  return h;
+}
+
 export function aperturaDelDia(h: HorarioSemanal | null | undefined, fecha: string): Tramo[] {
   if (!h) return [];
   const dia = String(diaDeSemana(fecha)) as keyof HorarioSemanal;

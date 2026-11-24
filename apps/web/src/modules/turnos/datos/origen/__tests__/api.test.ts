@@ -13,6 +13,8 @@ vi.mock('@/lib/reservasApi/cliente', () => ({
   panel: {
     agenda: (f: unknown) => agenda(f),
     crearRecurso: (d: unknown) => crearRecurso(d),
+    // Al crear una agenda se mira la grilla guardada en la config.
+    config: async () => ({ horario: {}, datos: null }),
     editarRecurso: (id: string, d: unknown) => editarRecurso(id, d),
     crearServicio: (d: unknown) => crearServicio(d),
     editarServicio: (id: string, d: unknown) => editarServicio(id, d),

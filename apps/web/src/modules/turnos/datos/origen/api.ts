@@ -26,9 +26,10 @@ import type { ServicioBase } from '@/modules/turnos/datos/agenda'
 import { rolesDe, type Persona, type Rol } from '@/modules/turnos/datos/equipo'
 import {
   ahoraArgentina, bloqueoDeVacaciones, bloqueosDeDia, claveDeDia, claveDeVacaciones, clientesDeReservas, configDeReglas, diasCerradosDeBloqueos, horarioDeSemana,
-  mismoHorario, porDia, recortarHorario, recursoDeApi, recursoParaApi, reglasDeConfig, rolIdDeApi, semanaDeHorario, servicioDeApi, servicioParaApi, tipoDeAgenda,
+  porDia, recortarHorario, recursoDeApi, recursoParaApi, reglasDeConfig, rolIdDeApi, semanaDeHorario, servicioDeApi, servicioParaApi, tipoDeAgenda,
 } from './mapear'
 import type { DatosPanel, FuenteAgenda, OrigenTurnos } from './index'
+import { conCambios, extrasDeDatos, leerDatos } from './datosConfig'
 
 /** Cuántos días para cada lado de hoy trae la agenda: los mismos que arma el panel. */
 export const VENTANA_DIAS = 62
@@ -36,9 +37,14 @@ const POR_PAGINA = 100
 
 /** El horario del negocio, de la config de Turnos. Sin config, el negocio todavía no usa Turnos. */
 export async function semanaApi(): Promise<Semana> {
+  return semanaDeHorario((await configApi()).horario)
+}
+
+/** La config de Turnos; sin config, el negocio todavía no usa Turnos. */
+export async function configApi() {
   const config = await panel.config('TURNOS')
   if (!config) throw new Error('Este negocio todavía no tiene Turnos configurado.')
-  return semanaDeHorario(config.horario)
+  return config
 }
 
 /** Catálogo: las agendas del modo del rubro (con su horario propio) y todos los servicios. */
@@ -97,24 +103,30 @@ export function agendaApi(reservas: Reserva[], semana: Semana, hoy: ISO, minutos
 export const clientesApi = (reservas: Reserva[]): Cliente[] => clientesDeReservas(reservas)
 
 /**
- * Equipo: quien atiende (rubros por profesional), con el rol que el panel guardó en su agenda
- * (si es uno de los de fábrica del rubro) o "Profesional".
+ * Equipo: el que el panel guardó en `datos` de la config (personas, roles y cómo cobra cada
+ * uno), con sus agendas al día: quien apunta a una agenda que ya no está la pierde, y una
+ * agenda sin persona (creada antes, o desde otro lado) suma a quien atiende ahí, con el rol
+ * guardado en la agenda (si es uno de los de fábrica del rubro) o "Profesional".
  */
-export function equipoApi(rubro: RubroTurnos, recursos: Recurso[], rolIds: Record<string, string> = {}): { personas: Persona[]; roles: Rol[] } {
-  const roles = rolesDe(rubro)
-  const personas: Persona[] = rubro.modo !== 'profesional' ? [] : recursos.map(r => ({
+export function equipoApi(rubro: RubroTurnos, recursos: Recurso[], rolIds: Record<string, string> = {}, guardado?: { personas: Persona[]; roles: Rol[] }): { personas: Persona[]; roles: Rol[] } {
+  const roles = guardado?.roles.length ? guardado.roles : rolesDe(rubro)
+  const ids = new Set(recursos.map(r => r.id))
+  const conocidas = (guardado?.personas ?? []).map(p => (p.recursoId && !ids.has(p.recursoId) ? { ...p, recursoId: undefined } : p))
+  const conAgenda = new Set(conocidas.map(p => p.recursoId).filter(Boolean))
+  const nuevas: Persona[] = rubro.modo !== 'profesional' ? [] : recursos.filter(r => !conAgenda.has(r.id)).map(r => ({
     id: `p-${r.id}`, nombre: r.nombre, rolId: roles.some(x => x.id === rolIds[r.id]) ? rolIds[r.id] : 'profesional', email: '', telefono: '', color: r.color, recursoId: r.id,
     // Cómo cobra cada uno no está en la API todavía: null es "lo que factura queda para el negocio".
     pago: null,
   }))
-  return { personas, roles }
+  return { personas: [...conocidas, ...nuevas], roles }
 }
 
 export const origenApi: OrigenTurnos = {
   tipo: 'api',
   async cargar(rubro): Promise<DatosPanel> {
     const { hoy, minutos } = ahoraArgentina()
-    const semana = await semanaApi()
+    const config = await configApi()
+    const semana = semanaDeHorario(config.horario)
     const [catalogo, reservas] = await Promise.all([
       catalogoApi(rubro, semana),
       reservasEntre(sumarDias(hoy, -VENTANA_DIAS), sumarDias(hoy, VENTANA_DIAS)),
@@ -123,7 +135,7 @@ export const origenApi: OrigenTurnos = {
       recursos: catalogo.recursos,
       servicios: catalogo.servicios,
       clientes: clientesApi(reservas),
-      ...equipoApi(rubro, catalogo.recursos, catalogo.rolIds),
+      ...equipoApi(rubro, catalogo.recursos, catalogo.rolIds, leerDatos(config.datos).turnos.equipo),
       agenda: agendaApi(reservas, semana, hoy, minutos),
     }
   },
@@ -137,29 +149,26 @@ export const origenApi: OrigenTurnos = {
   // /reservas/recursos: PROFESIONAL o ESPACIO según el rubro. Editar no manda `orden` ni
   // `memberId`, así quedan como estaban. Borrar es una baja que la API rechaza si hay reservas por delante.
   agendas: {
-    crear: async (r, { rubro, semana, rolId, orden }) =>
-      recursoDeApi(await panel.crearRecurso({ ...recursoParaApi(r, rubro, semana, rolId), orden }), rubro, semana, orden),
+    async crear(r, { rubro, semana, rolId, orden }) {
+      // Una agenda nueva arranca con la grilla del negocio (Reglas de reserva).
+      const grilla = leerDatos((await configApi()).datos).turnos.grilla
+      return recursoDeApi(await panel.crearRecurso({ ...recursoParaApi(r, rubro, semana, rolId), orden, ...(grilla ? { pasoMinutos: grilla } : {}) }), rubro, semana, orden)
+    },
     editar: async (r, { rubro, semana, rolId }) =>
       recursoDeApi(await panel.editarRecurso(r.id, recursoParaApi(r, rubro, semana, rolId)), rubro, semana, 0),
     borrar: async id => { await panel.borrarRecurso(id) },
   },
   horarios: {
     async guardarSemana(semana, rubro) {
+      // Solo la config: la API cruza el horario propio de cada agenda con este al dar
+      // disponibilidad, así que nadie se reescribe. Se avisa quién se queda sin días.
       const negocio = horarioDeSemana(semana)
-      // La API no cruza el horario propio de una agenda con el del negocio: se recorta acá.
-      // Se mira antes de escribir: una agenda no puede quedar sin días (la API lo rechaza).
-      const conPropio = (await panel.recursos('TURNOS')).flatMap(r => (r.horario ? [{ r, propio: r.horario, nuevo: recortarHorario(r.horario, negocio) }] : []))
-      const sinDias = conPropio.filter(x => !Object.keys(x.nuevo).length).map(x => x.r.nombre)
-      if (sinDias.length) throw new Error(`Con este horario, ${sinDias.join(', ')} ${sinDias.length === 1 ? 'se queda' : 'se quedan'} sin días para atender. Cambiá primero su agenda.`)
       await panel.guardarConfig({ modulo: 'TURNOS', horario: negocio })
-      const cambian = conPropio.filter(x => !mismoHorario(x.propio, x.nuevo))
-      const hechos = await Promise.allSettled(cambian.map(({ r, nuevo }) => panel.editarRecurso(r.id, { modulo: 'TURNOS', tipo: r.tipo, nombre: r.nombre, horario: nuevo })))
+      const tipo = tipoDeAgenda(rubro)
+      const propias = (await panel.recursos('TURNOS')).filter(r => r.tipo === tipo)
+      const sinDias = propias.filter(r => r.horario && !Object.keys(recortarHorario(r.horario, negocio)).length).map(r => r.nombre)
       const { recursos } = await catalogoApi(rubro, semana)
-      return {
-        semana, recursos,
-        ajustadas: cambian.filter((_, i) => hechos[i].status === 'fulfilled').map(x => x.r.nombre),
-        sinAjustar: cambian.filter((_, i) => hechos[i].status === 'rejected').map(x => x.r.nombre),
-      }
+      return { semana, recursos, sinDias }
     },
     diasCerrados: async () => diasCerradosDeBloqueos(await panel.bloqueos('TURNOS', ahoraArgentina().hoy)),
     async guardarDiasCerrados(antes, despues) {
@@ -185,10 +194,26 @@ export const origenApi: OrigenTurnos = {
   },
   reglas: {
     async leer(rubro) {
-      const config = await panel.config('TURNOS')
-      if (!config) throw new Error('Este negocio todavía no tiene Turnos configurado.')
-      return reglasDeConfig(config, rubro.sena)
+      const config = await configApi()
+      return { reglas: reglasDeConfig(config, rubro.sena), extras: extrasDeDatos(config.datos) }
     },
-    guardar: async (reglas, rubro) => reglasDeConfig(await panel.guardarConfig(configDeReglas(reglas)), rubro.sena),
+    async guardar(reglas, extras, rubro) {
+      // `datos` se reemplaza entero: se arma desde lo último guardado, cambiando solo lo de Reglas.
+      const config = await configApi()
+      const { grilla, ...publico } = extras
+      await panel.guardarConfig({ ...configDeReglas(reglas), datos: conCambios(config.datos, { publico, turnos: { grilla } }) })
+      // La grilla la aplica el motor como el paso de cada agenda.
+      if (leerDatos(config.datos).turnos.grilla !== grilla) {
+        const tipo = tipoDeAgenda(rubro)
+        const agendas = (await panel.recursos('TURNOS')).filter(r => r.tipo === tipo && r.pasoMinutos !== grilla)
+        await Promise.all(agendas.map(r => panel.editarRecurso(r.id, { modulo: 'TURNOS', tipo: r.tipo, nombre: r.nombre, pasoMinutos: grilla })))
+      }
+    },
+  },
+  equipo: {
+    async guardar(personas, roles) {
+      const config = await configApi()
+      await panel.guardarConfig({ modulo: 'TURNOS', datos: conCambios(config.datos, { turnos: { equipo: { personas, roles } } }) })
+    },
   },
 }

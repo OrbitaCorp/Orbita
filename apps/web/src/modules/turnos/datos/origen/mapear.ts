@@ -10,7 +10,7 @@ import type { Bloqueo, Config, CrearBloqueo, GuardarConfig, GuardarRecurso, Guar
 import { diasEntre, sumarDias, fechaNumerica, type ISO } from '@/lib/reservas/fechas'
 import { aMinutos, cruzar, diasAbiertos, diasTxt, hhmm, tramosDe, tramosDelDia, tramosTxt, type Semana } from '@/modules/turnos/horario'
 import { COLORES_EQUIPO } from '@/modules/turnos/datos/equipo'
-import { semanaDeRecurso, type Cliente, type EstadoTurno, type Recurso, type RubroTurnos } from '@/modules/turnos/datos'
+import { type Cliente, type EstadoTurno, type Recurso, type RubroTurnos } from '@/modules/turnos/datos'
 import type { ServicioBase, TurnoAgenda } from '@/modules/turnos/datos/agenda'
 
 const NOMBRES_DIA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
@@ -69,15 +69,22 @@ export function agendaDeHorario(propio: HorarioSemanal | null, semana: Semana): 
   }
   const atiende: number[] = []
   for (let i = 0; i < 7; i++) if (propio[claveApi(i)]?.length) atiende.push(i)
-  const delNegocio = atiende.every(i => igualesTramos(propio[claveApi(i)] ?? [], tramosDe(semana[i]?.[1]) as Tramo[]))
+  // "Todo el día" es "el horario del negocio": la API lo cruza con el del negocio. Lo que se
+  // guardó antes del 24/11 traía el del negocio copiado, y se lee igual.
+  const delNegocio = atiende.every(i => {
+    const t = propio[claveApi(i)] ?? []
+    return igualesTramos(t, TODO_EL_DIA) || igualesTramos(t, tramosDe(semana[i]?.[1]) as Tramo[])
+  })
   const primero = atiende.length ? propio[claveApi(atiende[0])] ?? [] : []
   return { atiende, horario: delNegocio ? '' : tramosTxt(primero), dias: diasTxt(atiende) }
 }
 
+const TODO_EL_DIA: Tramo[] = [[0, 1440]]
+
 /**
- * Un horario propio recortado al del negocio, día por día. La API no los cruza
- * (una agenda con horario propio usa solo el suyo), y el panel promete que el
- * propio va "dentro" del del negocio: si el negocio achica, se recorta acá.
+ * Un horario propio recortado al del negocio, día por día: lo mismo que hace
+ * la API al dar disponibilidad en Turnos (horarioEfectivo, dominio/horario.ts).
+ * El panel lo usa para avisar quién se queda sin días con un horario nuevo.
  */
 export function recortarHorario(propio: HorarioSemanal, negocio: HorarioSemanal): HorarioSemanal {
   const h: HorarioSemanal = {}
@@ -89,14 +96,6 @@ export function recortarHorario(propio: HorarioSemanal, negocio: HorarioSemanal)
   return h
 }
 
-/** Si dos horarios abren igual todos los días. */
-export function mismoHorario(a: HorarioSemanal, b: HorarioSemanal): boolean {
-  for (let i = 0; i < 7; i++) {
-    const clave = claveApi(i)
-    if (!igualesTramos(a[clave] ?? [], b[clave] ?? [])) return false
-  }
-  return true
-}
 
 // ─── Feriados y vacaciones ───────────────────────────────────────────────────
 //
@@ -299,14 +298,19 @@ export function recursoDeApi(r: RecursoApi, rubro: RubroTurnos, semana: Semana, 
 
 /**
  * El horario de una agenda del panel como lo guarda la API: null si es el del
- * negocio (todos los días que abre, sin horario propio), así un cambio de
- * horario del negocio le llega sola. Si no, día por día lo que de verdad
- * atiende: el horario del negocio recortado a sus días y a su horario propio.
+ * negocio (todos los días que abre, sin horario propio). Si no, sus días con
+ * su horario propio o, si no tiene, "todo el día". Se guarda sin recortar: la
+ * API lo cruza con el del negocio al dar disponibilidad (desde el 24/11), así
+ * que si el negocio cambia su horario, la agenda lo sigue sola.
  */
 export function horarioDeRecurso(r: Recurso, semana: Semana): HorarioSemanal | null {
   const abiertos = diasAbiertos(semana)
   const todos = abiertos.length === r.atiende.length && abiertos.every(d => r.atiende.includes(d))
-  return !r.horario && todos ? null : horarioDeSemana(semanaDeRecurso(r, semana))
+  if (!r.horario && todos) return null
+  const tramos = r.horario ? (tramosDe(r.horario) as Tramo[]) : TODO_EL_DIA
+  const h: HorarioSemanal = {}
+  for (const d of [...r.atiende].sort((x, y) => x - y)) if (tramos.length) h[claveApi(d)] = tramos
+  return h
 }
 
 /**

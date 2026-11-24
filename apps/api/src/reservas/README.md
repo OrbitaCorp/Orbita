@@ -32,6 +32,9 @@ el 26/10 y no se reemplaza: este módulo lo cubre para los tres.
   cuántas horas antes se cancela o reprograma, seña (porcentaje y si se devuelve), tope de
   reservas activas por persona, lista de espera, margen entre reservas y el **horario semanal**
   por defecto (`{ "1": [[540, 1080]], … }`, 0 = domingo, minutos de Argentina).
+  Un recurso sin horario propio usa ese; con horario propio, en Turnos (`PROFESIONAL`,
+  `ESPACIO`) se cruza día por día con el del negocio, y en los demás tipos vale tal cual
+  (`horarioEfectivo`, `dominio/horario.ts`, desde el 24/11).
 - **`ReservaRecurso`**: lo que se reserva. `tipo` dice de qué módulo es: `PROFESIONAL` y
   `ESPACIO` (Turnos), `CANCHA`, `SALON` y `ALOJAMIENTO` (Alquileres), `CLASE` (Gimnasio). Tiene
   `cupo` (1 = exclusivo; solo una clase puede tener más), duración y paso de la franja, margen,

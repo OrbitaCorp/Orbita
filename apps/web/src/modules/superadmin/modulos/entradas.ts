@@ -3642,4 +3642,54 @@ El negocio de prueba queda creado, con una propiedad y sin reservas activas.`,
       'apps/web/src/modules/alquileres/admin/Panel.tsx:183',
     ],
   }),
+  entrada({
+    modulo: 'turnos', fecha: F24, slug: 'donde-vive-lo-que-el-motor-no-tiene', tipo: 'decisión', quien: 'Mateo',
+    titulo: 'Dónde vive lo que el motor no tiene: horario propio, reglas extra y equipo',
+    foco: 'Mateo resolvió los tres pendientes de Turnos sobre el backend. En Turnos, el horario propio de una agenda va dentro del del negocio, y lo cruza el motor. Las reglas extra van en `datos` de la config: lo que ve el sitio en `publico`, lo del panel en `turnos`. El equipo también va en `datos` hasta que existan las cuentas del equipo, que van sobre Member. Del motor compartido solo cambió el cruce de horario, y solo para PROFESIONAL y ESPACIO: Alquileres y Gimnasio quedan igual.',
+    que: `Pedido de Mateo el 24/11: "los pendientes con Ale, hacelo vos con la mejor recomendación, prácticas y escalabilidad". Implementado y probado el mismo día contra la API local.
+
+**1. El horario propio va dentro del del negocio, y lo cruza el motor.**
+
+- **Qué cambió en el motor:** \`horarioEfectivo\` (\`dominio/horario.ts\`) cruza día por día el horario propio de una agenda PROFESIONAL o ESPACIO con el del negocio, al dar disponibilidad y al reservar. CANCHA, SALON, ALOJAMIENTO y CLASE siguen usando el suyo tal cual: una cancha o una clase pueden abrir cuando el negocio "no abre".
+- **Qué cambió en el panel:** ya no recorta ni reescribe agendas al guardar Horarios. Guarda cada agenda como es (sus días, y su horario o "todo el día") y avisa quién se queda sin días.
+- **Por qué:** el recorte del panel se perdía. Si el negocio achicaba y después volvía a agrandar, la agenda no volvía sola. Ahora la regla vive en un solo lugar, el motor, y vale igual para el panel, el sitio y cualquier cliente futuro de la API.
+- **Probado:** con el sábado solo a la mañana, Nico (16 a 20) queda cerrado el sábado sin que se toque su agenda. Al volver a abrir el sábado a la tarde, recupera sus 8 franjas.
+
+**2. Las reglas extra van en \`datos\` de la config.**
+
+Usa el campo libre que sumó Alan (\`ReservaConfig.datos\`, 23/11), sin migración propia. Lo de Turnos se lee y se escribe en \`datos/origen/datosConfig.ts\`:
+
+- **\`datos.publico\`** (lo ve el sitio, en la config pública): elegir profesional y "Cualquiera", qué datos del paciente se piden (DNI, obra social, motivo), tolerancia, qué pasa con la seña fuera de plazo y la cuenta de clientes con sus beneficios.
+- **\`datos.turnos\`** (solo el panel): la grilla. El motor ya la sabe aplicar: se escribe como \`pasoMinutos\` de cada agenda, y una agenda nueva arranca con ella.
+- **Cómo se escribe:** el motor reemplaza \`datos\` entero, así que cada pantalla lee lo último guardado y cambia solo su parte (\`conCambios\`). Las claves que no son de Turnos se conservan. Lo que se lee se valida campo por campo y lo que no tiene forma vale lo de fábrica.
+- **Lo que no se guardó, a propósito:**
+  - **La seña de monto fijo** sigue sin dejar guardar, porque el motor cobra en porcentaje y el sitio cobraría otra cosa. Sumarla es una columna del motor, para cuando un rubro la pida de verdad.
+  - **"Pedir seña a quien faltó" y "tiempo para aceptar un lugar"** no se muestran con la API: el motor no los hace (le da el lugar al primero de la lista en el acto). Una opción que no hace nada confunde más que no tenerla.
+- **Probado:** con la grilla de 15, Martín pasa de 16 a 30 franjas el martes y las tres agendas quedan con paso 15. La config pública muestra \`publico\` y al releer vuelve igual.
+
+**3. El equipo va en \`datos\` ahora, y sobre Member cuando haya cuentas.**
+
+- **Ahora (fase A):** las personas, los roles y cómo cobra cada uno se guardan en \`datos.turnos.equipo\`. El panel lo guarda solo cuando cambia, con medio segundo de espera para juntar cambios seguidos. Al leer, quien apunta a una agenda borrada la suelta, y una agenda sin persona suma a quien atiende ahí. Con esto Ganancias deja de estar vacía con la API.
+- **Por qué no una tabla nueva ya:** un negocio de Turnos tiene pocas personas (entra holgado en el tope de 20.000 caracteres) y todavía nadie del equipo entra con su cuenta. Una tabla propia sería un segundo sistema de personas al lado de Member.
+- **Fase B (las cuentas del equipo):**
+  - Cada persona pasa a ser un \`Member\` del negocio, con la invitación que ya existe (\`/aceptar-invitacion\`), y su agenda la apunta con \`memberId\`.
+  - Los roles de Turnos pasan a \`Role\` con permisos nuevos de alcance "lo propio" (ver solo su agenda, sus clientes y sus ganancias), aplicados en la API y no solo en el panel.
+  - Cómo cobra cada uno sale de \`datos\` a un lugar que solo lean quienes tienen permiso de ver ganancias. Hoy \`datos\` lo lee cualquiera con \`reservas.view\`, y hoy eso es solo el dueño. **Tiene que estar resuelto antes de invitar al primer empleado.**
+
+**Del motor compartido** cambió solo el cruce de horario (con sus tests), y el README de reservas lo dice. Lo demás usa lo que ya existía (\`datos\`, \`pasoMinutos\`). El negocio de prueba ahora vuelve a las reglas de fábrica y sin \`datos\` en cada corrida del seed.`,
+    decision: 'En Turnos, el horario propio de una agenda va dentro del horario del negocio y lo cruza el motor (solo PROFESIONAL y ESPACIO). Las reglas que el motor no tiene van en datos de la config: lo que ve el sitio en datos.publico y la grilla en datos.turnos, que se aplica como paso de cada agenda. El equipo va en datos.turnos.equipo hasta las cuentas del equipo, que van sobre Member con permisos de alcance propio. La seña fija y las reglas que el motor no hace no se ofrecen con la API.',
+    porque: 'Decidido por Mateo el 24/11/2026: delegó los pendientes pidiendo la mejor práctica y que escale. Cada regla vive en un solo lugar: lo que aplica el motor, en el motor; lo que es de Turnos, en su espacio de la config, sin un sistema de personas paralelo a Member. El cambio al motor compartido es chico, va con tests y no cambia nada para Alquileres ni Gimnasio.',
+    archivos: [
+      'apps/api/src/reservas/dominio/horario.ts:46',
+      'apps/api/src/reservas/disponibilidad.service.ts:74',
+      'apps/api/src/reservas/dominio/horario.spec.ts:1',
+      'apps/web/src/modules/turnos/datos/origen/datosConfig.ts:1',
+      'apps/web/src/modules/turnos/datos/origen/api.ts:1',
+      'apps/web/src/modules/turnos/datos/origen/mapear.ts:1',
+      'apps/web/src/modules/turnos/admin/configuracion/Reservas.tsx:1',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:1',
+      'apps/web/src/modules/turnos/datos/origen/__tests__/datosConfig.test.ts:1',
+      'apps/api/prisma/seed-turnos-prueba.ts:161',
+    ],
+  }),
 ]

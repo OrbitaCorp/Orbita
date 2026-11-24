@@ -33,6 +33,7 @@ import type { Semana } from '@/modules/turnos/horario'
 import type { ServicioBase, TurnoAgenda } from '@/modules/turnos/datos/agenda'
 import type { Persona, Rol } from '@/modules/turnos/datos/equipo'
 import type { DiasCerrados, ReglasApi } from './mapear'
+import type { ExtrasReglas } from './datosConfig'
 import { origenDemo } from './demo'
 
 /**
@@ -91,10 +92,8 @@ export interface SemanaGuardada {
   semana: Semana
   /** Las agendas con el horario nuevo. */
   recursos: Recurso[]
-  /** Quienes tenían horario propio y se recortaron al nuevo. */
-  ajustadas: string[]
-  /** A quienes no se les pudo recortar: siguen con el horario de antes. */
-  sinAjustar: string[]
+  /** Quienes, con su horario propio, no atienden ningún día del horario nuevo. */
+  sinDias: string[]
 }
 
 /**
@@ -103,7 +102,7 @@ export interface SemanaGuardada {
  * queda en la pantalla, por eso solo los usa el origen de la API.
  */
 export interface EscrituraHorarios {
-  /** Falla, sin tocar nada, si alguien con horario propio quedaría sin ningún día. */
+  /** Las agendas no se tocan: la API cruza cada horario propio con el del negocio. */
   guardarSemana(semana: Semana, rubro: RubroTurnos): Promise<SemanaGuardada>
   /** Lo guardado de hoy en adelante. */
   diasCerrados(): Promise<DiasCerrados>
@@ -113,8 +112,18 @@ export interface EscrituraHorarios {
 
 /** Las reglas de reserva que guarda la config (Reservas → Reglas). Como Horarios, solo en la API. */
 export interface EscrituraReglas {
-  leer(rubro: RubroTurnos): Promise<ReglasApi>
-  guardar(reglas: ReglasApi, rubro: RubroTurnos): Promise<ReglasApi>
+  /** Las de la config y las que viven en su `datos` (las que falten, de fábrica). */
+  leer(rubro: RubroTurnos): Promise<{ reglas: ReglasApi; extras: Partial<ExtrasReglas> }>
+  /** Una sola escritura de la config; si cambia la grilla, también el paso de cada agenda. */
+  guardar(reglas: ReglasApi, extras: ExtrasReglas, rubro: RubroTurnos): Promise<void>
+}
+
+/**
+ * El equipo (personas, roles y cómo cobra cada uno) mientras no existan las
+ * cuentas del equipo: vive en `datos` de la config, solo para el panel.
+ */
+export interface EscrituraEquipo {
+  guardar(personas: Persona[], roles: Rol[]): Promise<void>
 }
 
 export interface OrigenTurnos {
@@ -125,6 +134,7 @@ export interface OrigenTurnos {
   agendas: EscrituraAgendas
   horarios?: EscrituraHorarios
   reglas?: EscrituraReglas
+  equipo?: EscrituraEquipo
 }
 
 const Contexto = createContext<OrigenTurnos>(origenDemo)
