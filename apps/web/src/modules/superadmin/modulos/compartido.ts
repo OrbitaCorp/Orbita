@@ -4,8 +4,8 @@
 // compartido, en qué carpetas se guardan las reglas y que si alguien actualiza
 // algo ahí lo actualiza para los tres, para que cada responsable lo sepa antes
 // de tocar. Los tres módulos siguen siendo independientes (ninguno importa de
-// otro; eslint lo marca); lo que comparten vive en estas cuatro carpetas y en
-// ningún otro lado.
+// otro; eslint lo marca y un test lo bloquea, modules/__tests__/independencia.test.ts);
+// lo que comparten vive en estas carpetas y en ningún otro lado.
 //
 // Es contenido escrito a mano, como el plan: la pantalla lo muestra en la lista
 // de módulos y dentro de cada módulo (Modulos.tsx, <Compartido>). El test de
@@ -58,6 +58,14 @@ export const CARPETAS_COMPARTIDAS: CarpetaCompartida[] = [
     usan: 'Los paneles y los sitios de Turnos, Alquileres y Gimnasio, y el alta.',
     reglas: 'apps/web/src/design-system/reservas/estilo.tsx',
     probar: 'cd apps/web && pnpm typecheck && pnpm test, y mirar los tres paneles (/turnos-demo, /alquileres-demo, /gimnasio-demo)',
+  },
+  {
+    ruta: 'apps/web/src/lib/manual/',
+    nombre: 'El vocabulario del manual de Orbi',
+    que: 'Con qué escribe cada módulo su manual (modules/<módulo>/manual.ts): los bloques (párrafos, pasos, notas, campos), los [[botones]] con su nombre exacto y el contrato que comprueba, en un test, que cada botón que nombra el manual existe en las pantallas. El generador junta los manuales en el artefacto que lee la API. Es solo texto: ningún módulo llama a Orbi.',
+    usan: 'Gimnasio (ya tiene su manual); Turnos y Alquileres, cuando escriban el suyo.',
+    reglas: '.claude/rules/modulos.md',
+    probar: 'cd apps/web && pnpm exec vitest run src/lib/manual src/modules/orbi/manual, y pnpm manual:generar si cambió un manual',
   },
 ]
 

@@ -287,7 +287,7 @@ const GIMNASIO = plan('gimnasio', 'Gimnasio', 'Ale',
     documentada(t('2026-11-12', 'Ale', 'Cancelar, marcar ausente y completar lugares desde la clase del día', 'Cada acción cambia el estado y el historial; un 409 se muestra con el mensaje de la API'), 'auditoria.gimnasio.2026-11-12-liberar-presente-ausente'),
     documentada(t('2026-11-13', 'Ale', 'Días sin clases y feriados sobre /reservas/bloqueos', 'Un bloqueo saca las sesiones de la grilla y avisa cuántas reservas afecta'), 'auditoria.gimnasio.2026-11-13-dias-sin-clases'),
     // Semana 3 · alumnos, planes y pases (el 20/11 es feriado)
-    t('2026-11-16', 'Ale', 'Definir dónde viven planes, pases y alumnos (propuesta: tablas propias de Gimnasio en la API, fuera de reservas)', 'Decisión registrada en Auditoría con el modelo elegido'),
+    documentada(t('2026-11-16', 'Ale', 'Definir dónde viven planes, pases y alumnos (propuesta: tablas propias de Gimnasio en la API, fuera de reservas)', 'Decisión registrada en Auditoría con el modelo elegido'), 'auditoria.gimnasio.2026-11-16-planes-pases-alumnos'),
     t('2026-11-17', 'Ale', 'Alumnos sobre la API según lo decidido: alta, plan vigente y vencimiento', 'Un alumno creado en el panel tiene plan y fecha de vencimiento en la base'),
     t('2026-11-18', 'Ale', 'Planes (mensual, pase libre, por cantidad de clases) sobre la API', 'Los tres tipos de plan se crean y se muestran con su precio'),
     t('2026-11-19', 'Ale', 'Pases que se descuentan al reservar un lugar y renovación del plan', 'Reservar descuenta un pase; sin pases no deja reservar; renovar extiende el vencimiento'),

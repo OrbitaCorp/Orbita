@@ -6,9 +6,9 @@ Turnos, Alquileres y Gimnasio son módulos separados (decisión de Ale, 26/10/20
 importa código de otro. Cada uno tiene sus datos, su sitio público, su panel y sus pasos del alta,
 y se puede cambiar, borrar o pasar a otra persona sin tocar a los demás.
 
-Hoy los tres son demos que corren en el navegador, con datos de ejemplo, y lo que la persona cambia
-queda guardado en ese navegador (localStorage); el backend compartido ya existe (ver más abajo) y
-cada módulo se conecta cuando su responsable lo hace.
+Cada módulo tiene su demo, que corre en el navegador con datos de ejemplo (lo que la persona cambia
+queda guardado en ese navegador), y su conexión al backend compartido (ver más abajo), que avanza
+al ritmo de su responsable: el estado de cada uno está en Superadmin → Módulos.
 
 ## Entonces, ¿por qué se comparte esto?
 
@@ -55,8 +55,12 @@ Un cambio acá le llega a todos los que lo usan: corré `pnpm exec vitest run sr
   (`apps/api/src/reservas`, contrato en su README): qué se reserva, cuándo, con qué cupo, en qué
   estado está y las reglas que lo mantienen íntegro aunque dos personas toquen el botón a la vez.
   En la web lo usan por el cliente tipado `src/lib/reservasApi/` (`panel` y `sitio(slug)`), cada uno
-  con su `modulo`: sigue sin haber imports entre módulos. Las demos todavía corren con datos del
-  navegador hasta que cada responsable conecte su módulo (tareas del plan en Módulos).
+  con su `modulo`: sigue sin haber imports entre módulos. Cada pantalla le pide sus datos a un
+  "origen" propio del módulo (la demo o la API), así la demo sigue igual mientras se conecta.
+- **El manual de Orbi:** cada módulo escribe el suyo con el vocabulario de `src/lib/manual/` (sin
+  importar a Tienda) y el generador los junta. Es solo texto: ningún módulo llama a Orbi.
+- **La regla se cumple sola:** eslint marca un import entre módulos como error y
+  `src/modules/__tests__/independencia.test.ts` lo bloquea en el CI.
 - La sección **Módulos** del superadmin sigue sin API: es solo visual. El plan de trabajo y la
   auditoría de los tres viven en `src/modules/superadmin/modulos/` y lo que se marca queda en el
   navegador. Ahí están juntos porque es la gestión del equipo, quién hace qué y para cuándo, no una

@@ -4,7 +4,8 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import type { ManualDeModulo } from '@/lib/manual/modulos'
+import { botonesQueFaltan } from '@/lib/manual/contrato'
+import { botonesDelManual, manualDeModuloParaOrbi, type ManualDeModulo } from '@/lib/manual/modulos'
 import { armarManualParaOrbi } from '@/modules/ventas/panel/manual/paraOrbi'
 import { MANUAL_GIMNASIO } from '@/modules/gimnasio/manual'
 import { MANUALES_DE_MODULOS, aArchivoTs, armarArtefacto } from './artefacto'
@@ -43,9 +44,33 @@ describe('artefacto de Orbi (manual.generated.ts)', () => {
         expect(armarArtefacto([...DE_PRUEBA, MANUAL_GIMNASIO]).version).not.toBe(armarArtefacto([MANUAL_GIMNASIO]).version)
     })
 
-    it('ningún manual de módulo ni la librería importan a Tienda', () => {
-        for (const archivo of ['modules/gimnasio/manual.ts', 'lib/manual/bloques.ts', 'lib/manual/modulos.ts']) {
+    // Las tres que siguen valen para el manual de cualquier módulo que se sume a MANUALES_DE_MODULOS: quien
+    // escriba el de Turnos o el de Alquileres queda cubierto sin copiar nada.
+    it('ningún manual de módulo ni la librería importan a otro módulo', () => {
+        const archivos = [...MANUALES_DE_MODULOS.map(m => `modules/${m.modulo}/manual.ts`), 'lib/manual/bloques.ts', 'lib/manual/modulos.ts', 'lib/manual/contrato.ts']
+        for (const archivo of archivos) {
             expect(readFileSync(`${SRC}${archivo}`, 'utf8'), archivo).not.toMatch(/from ['"]@\/modules\//)
+        }
+    })
+
+    it('cada botón que nombra el manual de un módulo existe, con ese nombre, en las pantallas de ese módulo', () => {
+        for (const m of MANUALES_DE_MODULOS) {
+            expect(botonesQueFaltan(botonesDelManual(m), `${SRC}modules/${m.modulo}`), `manual de ${m.nombre}`).toEqual([])
+        }
+    })
+
+    it('cada módulo aparece una sola vez y sus temas no repiten id ni quedan vacíos', () => {
+        expect(new Set(MANUALES_DE_MODULOS.map(m => m.modulo)).size).toBe(MANUALES_DE_MODULOS.length)
+        for (const m of MANUALES_DE_MODULOS) {
+            const temas = manualDeModuloParaOrbi(m).temas
+            expect(temas.length, m.nombre).toBeGreaterThan(0)
+            expect(new Set(temas.map(t => t.id)).size, `ids repetidos en ${m.nombre}`).toBe(temas.length)
+            for (const t of temas) {
+                expect(t.id.startsWith(`${m.modulo}.`), t.id).toBe(true)
+                expect(t.texto.trim().length, t.id).toBeGreaterThan(40)
+                // Para Orbi es texto plano: sin los [[ ]] ni las ** del manual.
+                expect(t.texto, t.id).not.toMatch(/\*\*|\[\[|\]\]/)
+            }
         }
     })
 })
