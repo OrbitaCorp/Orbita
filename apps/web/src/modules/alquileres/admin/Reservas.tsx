@@ -16,7 +16,7 @@ import { MESES, diasDelMes, duracionTxt, fechaCorta, fechaLarga, fechaRelativa, 
 import { consecutivasDesde, franjasDelDia } from '@/lib/reservas/disponibilidad'
 import { pesos, precioBloque, precioTurnosSeguidos } from '@/lib/reservas/precio'
 import { motivoNoReservable, motivoNoReservableMes, nochesOcupadas, precioEstadia, precioMensual, salidaMaxima } from '@/lib/reservas/estadia'
-import { AHORA, ESTADO_RESERVA, HOY, aperturaDe, bloqueoEn, bloquesDe, bloquesLibresEn, capital, clientePorId, cuenta, duracionEstadiaTxt, esMensual, fechaDeReserva, mesesTxt, ocupadoDelDia, palabrasDe, rangosOcupados, reservasDelDia, salonDe, senaPara, tituloEvento, unidadPorId, type Bloqueo, type Cliente, type NegocioAlquiler, type Reserva } from '../datos'
+import { AHORA, codigoDe, ESTADO_RESERVA, HOY, aperturaDe, bloqueoEn, bloquesDe, bloquesLibresEn, capital, clientePorId, cuenta, duracionEstadiaTxt, esMensual, fechaDeReserva, mesesTxt, ocupadoDelDia, palabrasDe, rangosOcupados, reservasDelDia, salonDe, senaPara, tituloEvento, unidadPorId, type Bloqueo, type Cliente, type NegocioAlquiler, type Reserva } from '../datos'
 import { CalendarioDia, CalendarioRango, type Rango } from '@/design-system/reservas/Calendario'
 import { Area, Campo, Chip, Encabezado, FilaSwitch, Modal, Nota, Selector, Sigla, Vacio } from '@/design-system/reservas/piezas'
 import { linkLlamar, linkWhatsApp } from '../datos/textos'
@@ -519,7 +519,7 @@ export function Detalle({ negocio, reserva: r, cliente, onCerrar, onCambiar }: {
       pie={pie}>
       <div className="rv-fila" style={{ marginBottom: 12 }}>
         <Chip tono={ESTADO_RESERVA[r.estado].tono}>{ESTADO_RESERVA[r.estado].label}</Chip>
-        <span className="rv-rotulo">Código {r.id.slice(-6).toUpperCase()}</span>
+        <span className="rv-rotulo">Código {codigoDe(r)}</span>
       </div>
       <div className="rv-fila" style={{ marginBottom: 10, flexWrap: 'nowrap' }}>
         <Sigla nombre={cliente?.nombre ?? '?'} />

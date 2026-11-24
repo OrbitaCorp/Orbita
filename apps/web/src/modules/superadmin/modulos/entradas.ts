@@ -165,6 +165,7 @@ const F19 = '2026-11-19'
 const F18 = '2026-11-18'
 // Lunes 23/11: Horarios y feriados de Turnos, y Alquileres en producción (la demo para superadmin y el primer negocio real).
 const F23 = '2026-11-23'
+const F24 = '2026-11-24'
 
 export const ENTRADAS: Entrada[] = [
   // ─── Transversal · la sección Módulos ───────────────────────────────────────
@@ -3049,6 +3050,42 @@ El sitio no conoce las reservas de otros: las noches ocupadas entran como bloque
       'apps/web/src/lib/reservasApi/tipos.ts:53',
       'apps/web/src/modules/alquileres/datos/origen/escribir.ts:60',
       'apps/web/src/modules/alquileres/admin/configuracion/Pagos.tsx:64',
+    ],
+  }),
+  entrada({
+    modulo: 'alquileres', fecha: F24, slug: 'prueba-en-produccion-de-estadia', tipo: 'tarea', quien: 'Alan',
+    titulo: 'Prueba en producción de Alquileres: de crear el negocio a cancelar una reserva',
+    foco: 'El recorrido completo de un alojamiento por noche funciona en producción, con un negocio de prueba (prueba-alquileres, oculto de buscadores). Apareció un error: el panel mostraba un código de reserva distinto al que recibe el huésped. Quedó corregido.',
+    que: `Hecha en producción el 24/11, con la sesión de superadmin de Alan y un negocio creado para la prueba.
+
+| Paso | Resultado |
+|---|---|
+| \`/alquileres-demo\` con sesión de superadmin | Abre el panel y el sitio de ejemplo |
+| Crear el negocio desde Módulos → Alquileres | Creado; el dueño entra y llega a \`/panel/alquileres\` |
+| Cargar una propiedad | Guardada, sigue ahí al recargar |
+| Temporadas y precios: $90.000, +20 % el fin de semana, $10.000 de limpieza y una temporada alta | Guardado |
+| Pagos y señas: WhatsApp, alias y titular | Guardado |
+| Sitio público | Con \`noindex\`, la propiedad, su precio y el pie con el contacto |
+| Reservar de viernes a lunes | Total $316.000 y seña $94.800 (30 %), igual en el sitio y en el panel |
+| Confirmación y "Mi reserva" | Con el alias, el botón de WhatsApp, los huéspedes y la nota |
+| El enlace con la forma de los emails (\`/mi-reserva/<token>\`) | Abre la misma reserva |
+| Registrar la seña en el panel | La reserva pasa a confirmada; el huésped lo ve |
+| Cancelar desde "Mi reserva" | Cancelada, con "te devuelven la seña" |
+
+**Lo que apareció:**
+- **El código de la reserva no coincidía:** el huésped recibió uno y el panel mostraba otro, armado con el id interno. Ahora el panel usa el código de la API (\`codigoDe\`).
+- **Guardar tarda unos segundos y el panel no decía nada** mientras tanto: ahora avisa "Guardando…".
+- La ficha de una reserva futura ofrece "Marcar realizada" (el servidor lo rechaza hasta que pase la fecha). Queda anotado.
+- El aviso de cookies sigue hablando de "tienda" y "carrito".
+
+**No se probó:** el email de la reserva (se reservó sin email), el permiso de bloqueos con un encargado y el celular (la prueba fue en escritorio; en dev se había probado a 390 px).
+
+El negocio de prueba queda creado, con una propiedad y sin reservas activas.`,
+    archivos: [
+      'apps/web/src/modules/alquileres/datos/index.ts:775',
+      'apps/web/src/modules/alquileres/datos/origen/mapear.ts:199',
+      'apps/web/src/modules/alquileres/admin/Reservas.tsx:522',
+      'apps/web/src/modules/alquileres/admin/Panel.tsx:183',
     ],
   }),
 ]

@@ -196,6 +196,7 @@ export function reservaDeApi(r: ReservaApi, tipo: TipoAlquiler): Reserva | null 
   const huespedes = comoDatos(r.datos).huespedes
   return {
     id: r.id,
+    codigo: r.codigo,
     unidadId: r.recursoId,
     clienteId: clienteIdDe(r),
     estado,

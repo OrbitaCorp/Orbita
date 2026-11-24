@@ -181,6 +181,8 @@ export default function Panel() {
   // En la demo la escritura es al instante; con la API es un pedido que puede fallar. El aviso sale
   // cuando terminó: "guardado" si salió bien, o el motivo de la API si no (un 409, una regla del negocio).
   const hacer = (accion: () => void | Promise<void>, texto?: string, detalle?: string) => {
+    // En un negocio real guardar tarda (va a la API y vuelve a cargar): se dice mientras tanto, y el resultado lo reemplaza.
+    if (real) avisar('Guardando…')
     Promise.resolve().then(accion).then(
       () => { if (texto) avisar(texto, detalle) },
       (e: unknown) => avisar('No se pudo guardar', e instanceof Error && e.message ? e.message : 'Probá de nuevo.'),

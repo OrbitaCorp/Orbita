@@ -26,7 +26,7 @@ import { consecutivasDesde, franjasDelDia } from '@/lib/reservas/disponibilidad'
 import { pesos, precioBloque, precioPorHora, precioTurnosSeguidos } from '@/lib/reservas/precio'
 import { agruparNoches, motivoNoReservable, motivoNoReservableMes, nochesEntre, precioEstadia, precioMensual, primeraEntradaLibre, salidaMaxima, nochesOcupadas } from '@/lib/reservas/estadia'
 import { descargarICS, generarICS } from '@/lib/reservas/ics'
-import { AHORA, HOY, aperturaDe, bloqueoEn, bloquesDe, bloquesLibresEn, capital, cuenta, duracionEstadiaTxt, esMensual, mesesTxt, nochesTxt, ocupadoDelDia, palabrasDe, rangosOcupados, salonDe, senaPara, type Cliente, type NegocioAlquiler, type Reserva as ReservaT } from '../datos'
+import { AHORA, codigoDe, HOY, aperturaDe, bloqueoEn, bloquesDe, bloquesLibresEn, capital, cuenta, duracionEstadiaTxt, esMensual, mesesTxt, nochesTxt, ocupadoDelDia, palabrasDe, rangosOcupados, salonDe, senaPara, type Cliente, type NegocioAlquiler, type Reserva as ReservaT } from '../datos'
 import { CalendarioDia, CalendarioRango, type Rango } from '@/design-system/reservas/Calendario'
 import { Campo, Area, Selector } from '@/design-system/reservas/piezas'
 import Sitio, { lineaNoches } from './Sitio'
@@ -556,7 +556,7 @@ function Confirmacion({ negocio, reserva: r, datos }: { negocio: NegocioAlquiler
   const { ruta } = useSitio()
   const tipo = negocio.tipo
   const palabras = palabrasDe(negocio)
-  const codigo = r.id.slice(-6).toUpperCase()
+  const codigo = codigoDe(r)
   const unidad = tipo === 'cancha' ? negocio.unidades.find(u => u.id === r.unidadId) : tipo === 'estadia' ? negocio.propiedades.find(p => p.id === r.unidadId) : salonDe(negocio, r.unidadId)
   const cuando = r.entrada && r.salida ? `${rangoTxt(r.entrada, r.salida)} · ${duracionEstadiaTxt(r)}` : r.fecha && r.inicio !== undefined && r.fin !== undefined ? `${fechaLarga(r.fecha)} · ${hhmm(r.inicio)} a ${hhmm(r.fin)}` : ''
   const calendario = () => {

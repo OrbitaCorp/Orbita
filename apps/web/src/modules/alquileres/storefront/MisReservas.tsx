@@ -8,7 +8,7 @@ import { ArrowRight, CalendarPlus, Check, Clock, MapPin, X } from 'lucide-react'
 import { diasEntre, fechaLarga, hhmm, rangoTxt } from '@/lib/reservas/fechas'
 import { pesos } from '@/lib/reservas/precio'
 import { descargarICS, generarICS } from '@/lib/reservas/ics'
-import { AHORA, ESTADO_RESERVA, HOY, capital, cuenta, duracionEstadiaTxt, fechaDeReserva, palabrasDe, unidadPorId, type NegocioAlquiler, type Reserva } from '../datos'
+import { AHORA, codigoDe, ESTADO_RESERVA, HOY, capital, cuenta, duracionEstadiaTxt, fechaDeReserva, palabrasDe, unidadPorId, type NegocioAlquiler, type Reserva } from '../datos'
 import { Modal, Chip, useAviso } from '@/design-system/reservas/piezas'
 import Sitio, { ruta } from './Sitio'
 import { CSS_RESERVA } from './Reserva'
@@ -64,7 +64,7 @@ export default function MisReservas({ negocio, reservas, onCancelar }: P) {
     const nombre = unidadPorId(negocio, r.unidadId)?.nombre ?? negocio.nombre
     const ev = r.entrada && r.salida ? { uid: `${r.id}@orbita`, titulo: `${nombre} · ${negocio.nombre}`, fecha: r.entrada, hasta: r.salida, lugar: `${negocio.direccion}, ${negocio.ciudad}` }
       : { uid: `${r.id}@orbita`, titulo: `${nombre} · ${negocio.nombre}`, inicio: { fecha: r.fecha ?? HOY, minuto: r.inicio ?? 0 }, fin: { fecha: r.fecha ?? HOY, minuto: r.fin ?? 0 }, lugar: `${negocio.direccion}, ${negocio.ciudad}` }
-    descargarICS(generarICS([ev], { nombre: negocio.nombre }), `reserva-${r.id.slice(-6)}`)
+    descargarICS(generarICS([ev], { nombre: negocio.nombre }), `reserva-${codigoDe(r)}`)
   }
 
   return (
@@ -99,7 +99,7 @@ export default function MisReservas({ negocio, reservas, onCancelar }: P) {
                     </div>
                     <div className="alm-codigo">
                       <div className="rv-rotulo">Código</div>
-                      <b className="rv-num">{r.id.slice(-6).toUpperCase()}</b>
+                      <b className="rv-num">{codigoDe(r)}</b>
                       <div style={{ fontSize: 13, marginTop: 6 }}>{pesos(r.total)}{r.sena > 0 ? <> · {r.senaPagada ? `seña ${pesos(r.sena)} pagada` : 'seña pendiente'}</> : null}</div>
                     </div>
                   </div>

@@ -341,6 +341,8 @@ export const tituloEvento = (e?: Evento) => (!e ? 'Evento' : e.edad ? `Cumple de
 
 export interface Reserva {
   id: string
+  /** El código que recibió quien reservó. Lo pone la API; en la demo no viene y sale del id (codigoDe). */
+  codigo?: string
   /** La cancha, el salón o la propiedad. */
   unidadId: string
   clienteId: string
@@ -764,3 +766,10 @@ export const fechaDeReserva = (r: Reserva): ISO => r.entrada ?? r.fecha ?? HOY
 /** Reservas del día, ordenadas por hora (por hora y por bloque). */
 export const reservasDelDia = (reservas: Reserva[], fecha: ISO) =>
   reservas.filter(r => r.fecha === fecha && r.estado !== 'cancelada').sort((a, b) => (a.inicio ?? 0) - (b.inicio ?? 0))
+
+/**
+ * El código de una reserva, el mismo en el panel y en lo que ve quien reservó:
+ * "decime tu código" tiene que dar con la reserva. En un negocio real es el
+ * que generó la API; en la demo, las últimas seis letras del id.
+ */
+export const codigoDe = (r: Pick<Reserva, 'id' | 'codigo'>): string => r.codigo ?? r.id.slice(-6).toUpperCase()

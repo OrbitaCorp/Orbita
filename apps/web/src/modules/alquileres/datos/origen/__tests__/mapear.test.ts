@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { codigoDe } from '../../index'
 import type { Bloqueo as BloqueoApi, Config, Recurso, Reserva as ReservaApi, Servicio } from '@/lib/reservasApi/tipos'
 import {
   aperturaDeHorario, bloqueosDeApi, bloqueosDeNoches, clienteIdDe, publicoDeConfig, clientesDeReservas, estadoDeApi, fechaArgentina, negocioDeApi,
@@ -301,5 +302,16 @@ describe('lo propio de Alquileres en los campos libres', () => {
     })
     expect(n.telefono).toBe('0000 15-0000')
     expect(n.pagos).toMatchObject({ alias: 'monte.cabanas', titular: 'Monte SRL' })
+  })
+})
+
+describe('el código de una reserva', () => {
+  it('en un negocio real es el que generó la API: el mismo que recibió quien reservó', () => {
+    const r = reservaDeApi(reserva({ id: '7676e461-8209-46d0-a39b-6282f2bdf09b', codigo: 'Q2R4PS' }), 'cancha')
+    expect(r?.codigo).toBe('Q2R4PS')
+    expect(codigoDe(r!)).toBe('Q2R4PS')
+  })
+  it('en la demo, que no tiene código, sale del id', () => {
+    expect(codigoDe({ id: 'n1abcdef' })).toBe('ABCDEF')
   })
 })
