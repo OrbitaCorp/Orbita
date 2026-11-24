@@ -184,9 +184,14 @@ export class ReservasPublicoController {
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async anotarse(@Param('slug') slug: string, @CurrentBusiness() ctx: AuthContext | undefined, @Body() dto: AnotarseEnEsperaDto) {
     const businessId = await this.negocioAbierto(slug);
-    const e = await this.reservas.anotarseEnEspera(businessId, dto, this.clienteDe(ctx, businessId));
+    const { espera: e, yaEstaba } = await this.reservas.anotarseEnEspera(businessId, dto, this.clienteDe(ctx, businessId));
     const { posicion } = await this.reservas.posicionEnEspera(businessId, e.tokenAcceso);
-    return { id: e.id, token: e.tokenAcceso, estado: e.estado, posicion, inicio: e.inicio.toISOString(), fin: e.fin.toISOString() };
+    // El enlace personal se entrega una sola vez, al anotarse. Si llegan el mail o el celular de
+    // alguien que ya estaba en la lista (la misma persona de nuevo, o cualquiera que los conozca),
+    // se contesta que ya está y en qué lugar, pero el enlace no se repite: con él se la saca de la
+    // lista y, cuando toma el lugar, se llega a su reserva. El sitio guarda el que recibió la
+    // primera vez; si lo perdió, el negocio la saca desde el panel.
+    return { id: e.id, token: yaEstaba ? null : e.tokenAcceso, yaEstaba, estado: e.estado, posicion, inicio: e.inicio.toISOString(), fin: e.fin.toISOString() };
   }
 
   @Get('espera/:token')

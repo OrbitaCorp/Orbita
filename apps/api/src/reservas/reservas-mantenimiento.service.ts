@@ -36,4 +36,26 @@ export class ReservasMantenimientoService {
     if (r.count > 0) this.logger.log(`Reservas retenidas vencidas: ${r.count}`);
     return { vencidas: r.count };
   }
+
+  /**
+   * Saca de la lista de espera a quien esperaba un horario que ya empezó:
+   * nadie le va a dar ese lugar (el motor no promueve en un horario que ya
+   * empezó) y, sin esto, la fila queda "esperando" para siempre. Devuelve
+   * cuántas cerró.
+   */
+  async cerrarEsperasPasadas(ahora = new Date()): Promise<{ cerradas: number }> {
+    const pasadas = await this.prisma.reservaEspera.findMany({
+      where: { estado: 'ESPERANDO', inicio: { lte: ahora } },
+      select: { id: true, businessId: true },
+      take: 500,
+    });
+    if (pasadas.length === 0) return { cerradas: 0 };
+    // El where repite el estado: si justo tomó el lugar entre la lectura y acá, no se toca.
+    const r = await this.prisma.reservaEspera.updateMany({
+      where: { id: { in: pasadas.map((p) => p.id) }, estado: 'ESPERANDO', inicio: { lte: ahora } },
+      data: { estado: 'CANCELADA' },
+    });
+    if (r.count > 0) this.logger.log(`Esperas de horarios que ya empezaron, cerradas: ${r.count}`);
+    return { cerradas: r.count };
+  }
 }

@@ -169,9 +169,9 @@ export class ReservasPanelController {
   @RequirePermission('reservas.manage')
   async anotarEnEspera(@CurrentBusiness() ctx: AuthContext, @Body() dto: AnotarseEnEsperaDto) {
     const m = assertMemberContext(ctx);
-    const e = await this.reservas.anotarseEnEspera(m.businessId, dto, undefined, new Date(), { modo: 'panel', memberId: m.memberId });
-    const { posicion } = await this.reservas.posicionEnEspera(m.businessId, e.tokenAcceso);
-    return { ...esperaDto(e), posicion };
+    const { espera } = await this.reservas.anotarseEnEspera(m.businessId, dto, undefined, new Date(), { modo: 'panel', memberId: m.memberId });
+    const { posicion } = await this.reservas.posicionEnEspera(m.businessId, espera.tokenAcceso);
+    return { ...esperaDto(espera), posicion };
   }
 
   /** "Darle el lugar": la persona pasa de la lista a una reserva confirmada, si entra. */

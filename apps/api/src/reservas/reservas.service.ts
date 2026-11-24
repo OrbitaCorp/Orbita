@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Prisma, Reserva, ReservaActor, ReservaEstado, ReservaEspera, ReservaModulo, ReservaOrigen } from '@prisma/client';
+import { Prisma, Reserva, ReservaActor, ReservaConfig, ReservaEstado, ReservaEspera, ReservaModulo, ReservaOrigen, ReservaRecurso } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { describeError } from '../common/utils/describe-error.util';
@@ -11,6 +11,7 @@ import { aperturaDelDia, sesionesDelDia } from './dominio/horario';
 import { extrasElegidos, precioTotal, sena as calcularSena, type ExtraElegido } from './dominio/precio';
 import { diasEntre, esFecha, fechaYMinutos, instante } from './dominio/tiempo';
 import { generarCodigo, generarToken } from './dominio/codigos';
+import { tomarRecurso as tomarFilaDelRecurso, type FilaRecurso } from './candado';
 import type { PedidoReservaDto } from './dto/reservas.dto';
 import { PoliticaDto } from './reservas.types';
 
@@ -50,10 +51,21 @@ interface PedidoResuelto {
   servicio: { id: string; nombre: string; duracionMinutos: number; precio: number } | null;
 }
 
-interface FilaRecurso { id: string; cupo: number; activo: boolean; nombre: string }
+/**
+ * Lo que hace falta del recurso para darle un lugar a alguien de la lista de
+ * espera. El margen es el que cuenta una reserva nueva (0 en una clase). El
+ * cupo y si está activo no van acá: salen de la fila tomada con el candado.
+ */
+type RecursoDeEspera = { id: string; precio: Prisma.Decimal; modulo: ReservaModulo; margenMinutos: number };
 
-/** Lo que hace falta del recurso para darle un lugar a alguien de la lista de espera. */
-type RecursoDeEspera = { id: string; cupo: number; precio: Prisma.Decimal; modulo: ReservaModulo };
+/** Por qué en un horario no se le da el lugar a nadie, aunque quede cupo. */
+type TrabaDeLugar = 'ya-empezo' | 'pausado' | 'bloqueado';
+
+/** Lo que se le dice al negocio en cada caso ('pausado' lleva el nombre del recurso: se arma donde se usa). */
+const MENSAJE_TRABA: Record<Exclude<TrabaDeLugar, 'pausado'>, string> = {
+  'ya-empezo': 'Ese horario ya empezó: si la persona vino, anotala directo.',
+  bloqueado: 'Ese horario está bloqueado por el negocio.',
+};
 
 const INTENTOS_CODIGO = 5;
 const HORA_MS = 3_600_000;
@@ -296,7 +308,9 @@ export class ReservasService {
   /**
    * Cancela y, si el negocio tiene lista de espera, le da el lugar al primero
    * que esperaba por ese mismo horario (dentro de la misma transacción, con el
-   * recurso tomado: nadie se mete en el medio).
+   * recurso tomado: nadie se mete en el medio). No pasa nadie si el horario ya
+   * empezó, si el recurso está pausado o si ese horario quedó bloqueado: la
+   * persona recibiría un "es tuyo" que no puede usar.
    */
   async cancelar(
     businessId: string,
@@ -322,7 +336,7 @@ export class ReservasService {
 
     const resultado = await this.prisma.$transaction(
       async (tx) => {
-        await this.tomarRecurso(tx, businessId, recurso.id);
+        const fila = await this.tomarRecurso(tx, businessId, recurso.id);
         const cambio = await tx.reserva.updateMany({
           where: { id: r.id, businessId, estado: { in: [...OCUPAN] }, ...(o.version ? { version: o.version } : {}) },
           data: { estado: 'CANCELADA', canceladaEn: ahora, canceladaPor: o.actor, motivoCancelacion: o.motivo ?? null, retenidaHasta: null, version: { increment: 1 } },
@@ -331,7 +345,9 @@ export class ReservasService {
         await tx.reservaHistorial.create({
           data: { businessId, reservaId: r.id, de: r.estado, a: 'CANCELADA', quien: o.actor, memberId: o.memberId ?? null, motivo: o.motivo ?? null, datos: { sena, pagado: Number(r.pagado) } },
         });
-        const promovida = config.listaDeEspera && r.estado !== 'RETENIDA' ? await this.promoverEspera(tx, businessId, recurso, r.inicio, r.fin, config.senaPorcentaje, ahora) : null;
+        const promovida = config.listaDeEspera && r.estado !== 'RETENIDA'
+          ? await this.promoverEspera(tx, businessId, this.recursoDeEspera(recurso, config), fila, r.inicio, r.fin, config.senaPorcentaje, ahora)
+          : null;
         const reserva = await tx.reserva.findFirstOrThrow({ where: { id: r.id, businessId } });
         return { reserva, promovida };
       },
@@ -548,8 +564,10 @@ export class ReservasService {
         ? { OR: [{ clienteNombre: { contains: q.q, mode: 'insensitive' } }, { clienteTelefono: { contains: q.q } }, { clienteEmail: { contains: q.q, mode: 'insensitive' } }, { codigo: { equals: q.q.toUpperCase() } }] }
         : {}),
     };
+    // El id desempata: todas las reservas de una clase empiezan a la misma hora y, sin un orden
+    // total, una página podría repetir o saltear una fila que la anterior ya mostró.
     const [data, total] = await this.prisma.$transaction([
-      this.prisma.reserva.findMany({ where, orderBy: { inicio: 'asc' }, skip: (page - 1) * limit, take: limit }),
+      this.prisma.reserva.findMany({ where, orderBy: [{ inicio: 'asc' }, { id: 'asc' }], skip: (page - 1) * limit, take: limit }),
       this.prisma.reserva.count({ where }),
     ]);
     return { data, total, page, limit };
@@ -574,8 +592,13 @@ export class ReservasService {
    * Anota a alguien en la lista de espera de un horario lleno. Desde el sitio
    * se anota la persona (modo 'publico': vale la anticipación del negocio);
    * desde el panel la anota el negocio (modo 'panel': un horario de hoy se
-   * puede anotar hasta que empieza) y queda en audit_logs. Si ya estaba
-   * esperando ese horario, devuelve la misma fila.
+   * puede anotar hasta que empieza) y queda en audit_logs.
+   *
+   * Hace falta un teléfono o un email: es con lo que se le avisa y con lo que
+   * se la reconoce. Si ya estaba esperando ese horario, devuelve la misma fila
+   * y `yaEstaba: true` (el sitio no repite su enlace personal: ver
+   * ReservasPublicoController). La búsqueda y el alta van con el recurso
+   * tomado: dos pedidos a la vez de la misma persona dejan una sola fila.
    */
   async anotarseEnEspera(
     businessId: string,
@@ -583,59 +606,76 @@ export class ReservasService {
     clienteId?: string,
     ahora = new Date(),
     o: { modo?: Modo; memberId?: string } = {},
-  ): Promise<ReservaEspera> {
+  ): Promise<{ espera: ReservaEspera; yaEstaba: boolean }> {
     const config = await this.catalogo.configOFalla(businessId, d.modulo);
     if (!config.listaDeEspera) throw new BadRequestException('Este negocio no tiene lista de espera.');
+    const email = d.cliente.email?.trim().toLowerCase() || null;
+    const telefono = d.cliente.telefono?.trim() || null;
+    if (!email && !telefono && !clienteId) throw new BadRequestException('Hace falta un teléfono o un email para avisarle cuando se libere un lugar.');
     const dia = await this.disponibilidad.delDia(businessId, { modulo: d.modulo, recursoId: d.recursoId, fecha: d.fecha }, o.modo ?? 'publico', ahora);
     const franja = dia.franjas.find((f) => f.inicioMinutos === d.inicioMinutos);
     if (!franja) throw new BadRequestException('Ese horario no existe o ya pasó.');
     if (franja.libres > 0) throw new BadRequestException('Todavía hay lugar en ese horario: reservá directo.');
     const inicio = instante(d.fecha, franja.inicioMinutos);
     const fin = instante(d.fecha, franja.finMinutos);
-    const email = d.cliente.email?.toLowerCase() ?? null;
-    const yaEsta = await this.prisma.reservaEspera.findFirst({
-      where: {
-        businessId, recursoId: d.recursoId, inicio, estado: 'ESPERANDO',
-        OR: [...(email ? [{ clienteEmail: email }] : []), ...(d.cliente.telefono ? [{ clienteTelefono: d.cliente.telefono }] : []), ...(clienteId ? [{ clienteId }] : [])],
-      },
-    });
-    if (yaEsta) return yaEsta;
+    const quien: Prisma.ReservaEsperaWhereInput[] = [
+      ...(email ? [{ clienteEmail: email }] : []),
+      ...(telefono ? [{ clienteTelefono: telefono }] : []),
+      ...(clienteId ? [{ clienteId }] : []),
+    ];
+    const yaEspera = (db: Db) => db.reservaEspera.findFirst({ where: { businessId, recursoId: d.recursoId, inicio, estado: 'ESPERANDO', OR: quien } });
+    const yaEsta = await yaEspera(this.prisma);
+    if (yaEsta) return { espera: yaEsta, yaEstaba: true };
     const vinculado = clienteId ?? (await this.vincularCliente(businessId, d.cliente));
-    const creada = await this.prisma.reservaEspera.create({
-      data: {
-        businessId, modulo: d.modulo, recursoId: d.recursoId, inicio, fin, clienteId: vinculado,
-        clienteNombre: d.cliente.nombre, clienteTelefono: d.cliente.telefono ?? null, clienteEmail: email, tokenAcceso: generarToken(),
+    const resultado = await this.prisma.$transaction(
+      async (tx) => {
+        await this.tomarRecurso(tx, businessId, d.recursoId);
+        const repetida = await yaEspera(tx);
+        if (repetida) return { espera: repetida, yaEstaba: true };
+        const creada = await tx.reservaEspera.create({
+          data: {
+            businessId, modulo: d.modulo, recursoId: d.recursoId, inicio, fin, clienteId: vinculado,
+            clienteNombre: d.cliente.nombre, clienteTelefono: telefono, clienteEmail: email, tokenAcceso: generarToken(),
+          },
+        });
+        return { espera: creada, yaEstaba: false };
       },
-    });
-    if (o.memberId) {
-      await this.audit?.registrar({ businessId, memberId: o.memberId, entityType: 'reserva_espera', entityId: creada.id, action: 'CREATE', changes: [{ field: 'clienteNombre', before: null, after: creada.clienteNombre }] });
+      { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, maxWait: 5000, timeout: 15000 },
+    );
+    if (!resultado.yaEstaba && o.memberId) {
+      await this.audit?.registrar({ businessId, memberId: o.memberId, entityType: 'reserva_espera', entityId: resultado.espera.id, action: 'CREATE', changes: [{ field: 'clienteNombre', before: null, after: resultado.espera.clienteNombre }] });
     }
-    return creada;
+    return resultado;
   }
 
   /**
    * El negocio le da el lugar a alguien de la lista de espera (el botón "Darle
    * el lugar" del panel). Hace falta cuando se libera un lugar sin que nadie
    * cancele: le subieron el cupo a la clase o venció una retenida; al
-   * cancelar, el primero ya pasa solo. Mismo candado y misma cuenta que una
-   * reserva nueva: si no entra, 409 y la persona sigue esperando. Repetirlo
-   * devuelve la reserva que ya tomó.
+   * cancelar, el primero ya pasa solo. Mismo candado y mismas reglas que una
+   * reserva nueva en ese horario: si no queda lugar (contando el margen entre
+   * reservas), 409 y la persona sigue esperando; si el horario ya empezó, está
+   * bloqueado o el recurso está pausado, 400. Repetirlo devuelve la reserva
+   * que ya tomó.
    */
   async darLugarDesdeEspera(businessId: string, esperaId: string, memberId: string, ahora = new Date()): Promise<Reserva> {
     const espera = await this.prisma.reservaEspera.findFirst({ where: { id: esperaId, businessId } });
     if (!espera) throw new NotFoundException('Esa persona no está en la lista de espera.');
-    if (espera.estado === 'TOMADA' && espera.reservaId) return this.porIdOFalla(businessId, espera.reservaId);
+    if (espera.estado === 'TOMADA' && espera.reservaId) return this.reservaDeEsperaTomada(businessId, espera.reservaId);
     if (espera.estado !== 'ESPERANDO') throw new ConflictException('Esa persona ya salió de la lista de espera.');
-    if (espera.inicio <= ahora) throw new BadRequestException('Ese horario ya empezó: si la persona vino, anotala directo.');
+    if (espera.inicio <= ahora) throw new BadRequestException(MENSAJE_TRABA['ya-empezo']);
     const config = await this.catalogo.configOFalla(businessId, espera.modulo);
     const recurso = await this.catalogo.recurso(businessId, espera.recursoId);
+    const deEspera = this.recursoDeEspera(recurso, config);
     let reserva: Reserva;
     try {
       reserva = await this.prisma.$transaction(
         async (tx) => {
-          await this.tomarRecurso(tx, businessId, recurso.id);
+          const fila = await this.tomarRecurso(tx, businessId, recurso.id);
           await this.vencerRetenidasDe(tx, businessId, recurso.id, ahora);
-          const r = await this.tomarLugarDeEspera(tx, businessId, recurso, espera, config.senaPorcentaje, ahora, { quien: 'NEGOCIO', origen: 'PANEL', memberId });
+          const traba = await this.trabaDeLugar(tx, businessId, deEspera, fila, espera.inicio, espera.fin, ahora);
+          if (traba) throw new BadRequestException(traba === 'pausado' ? `${fila.nombre} no está disponible por el momento.` : MENSAJE_TRABA[traba]);
+          const r = await this.tomarLugarDeEspera(tx, businessId, deEspera, fila.cupo, espera, config.senaPorcentaje, ahora, { quien: 'NEGOCIO', origen: 'PANEL', memberId });
           if (r === 'sin-lugar') throw new ConflictException('No queda lugar en ese horario.');
           if (r === 'ya-no-espera') throw new ConflictException('Esa persona ya salió de la lista de espera.');
           return r;
@@ -645,7 +685,7 @@ export class ReservasService {
     } catch (e) {
       // Dos clics, o la promovió una cancelación en el medio: si ya tiene su lugar, es ese.
       const ahoraEsta = await this.prisma.reservaEspera.findFirst({ where: { id: esperaId, businessId } });
-      if (ahoraEsta?.estado === 'TOMADA' && ahoraEsta.reservaId) return this.porIdOFalla(businessId, ahoraEsta.reservaId);
+      if (ahoraEsta?.estado === 'TOMADA' && ahoraEsta.reservaId) return this.reservaDeEsperaTomada(businessId, ahoraEsta.reservaId);
       throw e;
     }
     await this.audit?.registrar({
@@ -654,6 +694,19 @@ export class ReservasService {
     });
     void this.avisos.lugarTomado(reserva, recurso.nombre);
     return reserva;
+  }
+
+  /**
+   * La reserva que ya tomó alguien de la espera. Si después se canceló, repetir
+   * "darle el lugar" no la revive: se avisa, para que el panel no dé por
+   * anotada a una persona que quedó sin lugar y fuera de la lista.
+   */
+  private async reservaDeEsperaTomada(businessId: string, reservaId: string): Promise<Reserva> {
+    const r = await this.porIdOFalla(businessId, reservaId);
+    if (r.estado === 'CANCELADA' || r.estado === 'VENCIDA') {
+      throw new ConflictException('Esa persona ya tuvo su lugar y esa reserva se canceló. Si quiere venir, anotala de nuevo.');
+    }
+    return r;
   }
 
   async posicionEnEspera(businessId: string, token: string): Promise<{ espera: ReservaEspera; posicion: number | null; reserva: Reserva | null }> {
@@ -666,38 +719,68 @@ export class ReservasService {
     return { espera, posicion, reserva };
   }
 
+  /**
+   * Sale de la lista (la persona con su enlace, o el negocio con el id).
+   * Repetirlo no falla. Si ya había tomado su lugar, 409: lo que queda por
+   * hacer es cancelar esa reserva, no sacarla de una lista en la que ya no está.
+   */
   async salirDeEspera(businessId: string, quien: { token: string } | { id: string }, memberId?: string): Promise<{ ok: true }> {
     const where = 'token' in quien ? { tokenAcceso: quien.token, businessId } : { id: quien.id, businessId };
     const r = await this.prisma.reservaEspera.updateMany({ where: { ...where, estado: 'ESPERANDO' }, data: { estado: 'CANCELADA' } });
     if (r.count === 0) {
-      const existe = await this.prisma.reservaEspera.findFirst({ where, select: { id: true } });
-      if (!existe) throw new NotFoundException('No estás en ninguna lista de espera.');
+      const fila = await this.prisma.reservaEspera.findFirst({ where, select: { id: true, estado: true } });
+      if (!fila) throw new NotFoundException('No estás en ninguna lista de espera.');
+      if (fila.estado === 'TOMADA') {
+        throw new ConflictException('token' in quien ? 'Ya tenés tu lugar: si no vas a ir, cancelá la reserva.' : 'Esa persona ya tiene su lugar: si no viene, liberá su lugar desde la reserva.');
+      }
+      return { ok: true };
     }
     if (memberId && 'id' in quien) await this.audit?.registrar({ businessId, memberId, entityType: 'reserva_espera', entityId: quien.id, action: 'DELETE' });
     return { ok: true };
   }
 
-  async listarEspera(businessId: string, modulo: ReservaModulo, recursoId?: string, fecha?: string) {
+  /**
+   * Quiénes esperan. Con `fecha`, los de ese día (el que sea); sin fecha, los
+   * de hoy en adelante: quien esperó un horario que ya pasó no vuelve en cada
+   * lectura del panel.
+   */
+  async listarEspera(businessId: string, modulo: ReservaModulo, recursoId?: string, fecha?: string, ahora = new Date()) {
+    if (fecha !== undefined && !esFecha(fecha)) throw new BadRequestException('Esa fecha no existe.');
+    const inicio = fecha
+      ? { gte: instante(fecha, 0), lt: instante(fecha, 24 * 60) }
+      : { gte: instante(fechaYMinutos(ahora).fecha, 0) };
     return this.prisma.reservaEspera.findMany({
-      where: {
-        businessId, modulo, estado: 'ESPERANDO',
-        ...(recursoId ? { recursoId } : {}),
-        ...(fecha ? { inicio: { gte: instante(fecha, 0), lt: instante(fecha, 24 * 60) } } : {}),
-      },
+      where: { businessId, modulo, estado: 'ESPERANDO', ...(recursoId ? { recursoId } : {}), inicio },
       orderBy: [{ inicio: 'asc' }, { createdAt: 'asc' }],
     });
   }
 
   // ─── Lo privado ───────────────────────────────────────────────────────────
 
-  /** SELECT … FOR UPDATE sobre el recurso: serializa todo lo que lo toca hasta que la transacción termina. */
-  private async tomarRecurso(tx: Prisma.TransactionClient, businessId: string, recursoId: string): Promise<FilaRecurso> {
-    const filas = await tx.$queryRaw<FilaRecurso[]>`
-      SELECT "id", "cupo", "activo", "nombre" FROM "reservas_recursos"
-      WHERE "id" = ${recursoId} AND "business_id" = ${businessId} AND "eliminado_en" IS NULL
-      FOR UPDATE`;
-    if (filas.length === 0) throw new NotFoundException('Ese recurso no existe.');
-    return filas[0];
+  /** El candado del recurso (ver candado.ts): serializa todo lo que lo toca hasta que la transacción termina. */
+  private tomarRecurso(tx: Prisma.TransactionClient, businessId: string, recursoId: string): Promise<FilaRecurso> {
+    return tomarFilaDelRecurso(tx, businessId, recursoId);
+  }
+
+  /** Lo que la lista de espera necesita del recurso, con el margen que cuenta una reserva nueva. */
+  private recursoDeEspera(recurso: ReservaRecurso, config: ReservaConfig): RecursoDeEspera {
+    return { id: recurso.id, precio: recurso.precio, modulo: recurso.modulo, margenMinutos: DisponibilidadService.margenDe(recurso, config) };
+  }
+
+  /**
+   * Con el recurso ya tomado: por qué en ese horario no se le da el lugar a
+   * nadie aunque quede cupo, o null si se puede. Son las mismas reglas que
+   * frenan una reserva nueva (resolverPedido): que no haya empezado, que el
+   * recurso esté activo y que el negocio no lo haya bloqueado.
+   */
+  private async trabaDeLugar(tx: Prisma.TransactionClient, businessId: string, recurso: RecursoDeEspera, fila: FilaRecurso, inicio: Date, fin: Date, ahora: Date): Promise<TrabaDeLugar | null> {
+    if (inicio <= ahora) return 'ya-empezo';
+    if (!fila.activo) return 'pausado';
+    const bloqueo = await tx.reservaBloqueo.findFirst({
+      where: { businessId, modulo: recurso.modulo, OR: [{ recursoId: null }, { recursoId: recurso.id }], inicio: { lt: fin }, fin: { gt: inicio } },
+      select: { id: true },
+    });
+    return bloqueo ? 'bloqueado' : null;
   }
 
   /** Vence las retenidas pasadas de un recurso, adentro de la transacción: un lugar a medias no bloquea a nadie. */
@@ -732,14 +815,18 @@ export class ReservasService {
 
   /**
    * El primero que esperaba por ese horario toma el lugar que se liberó. Con el
-   * recurso ya tomado. Si justo salió de la lista (o ya lo promovió otro
-   * camino), pasa el siguiente.
+   * recurso ya tomado (`fila` es lo que devolvió el candado). Si justo salió de
+   * la lista (o ya lo promovió otro camino), pasa el siguiente. No pasa nadie
+   * si en ese horario hoy no se podría reservar (ver trabaDeLugar): quien
+   * espera recibiría un "es tuyo" de una clase que ya empezó o de un día que
+   * el negocio cerró.
    */
-  private async promoverEspera(tx: Prisma.TransactionClient, businessId: string, recurso: RecursoDeEspera, inicio: Date, fin: Date, senaPorcentaje: number, ahora: Date): Promise<Reserva | null> {
+  private async promoverEspera(tx: Prisma.TransactionClient, businessId: string, recurso: RecursoDeEspera, fila: FilaRecurso, inicio: Date, fin: Date, senaPorcentaje: number, ahora: Date): Promise<Reserva | null> {
+    if (await this.trabaDeLugar(tx, businessId, recurso, fila, inicio, fin, ahora)) return null;
     for (let intento = 0; intento < 5; intento++) {
       const espera = await tx.reservaEspera.findFirst({ where: { businessId, recursoId: recurso.id, inicio, fin, estado: 'ESPERANDO' }, orderBy: { createdAt: 'asc' } });
       if (!espera) return null;
-      const r = await this.tomarLugarDeEspera(tx, businessId, recurso, espera, senaPorcentaje, ahora, { quien: 'SISTEMA', origen: 'TIENDA' });
+      const r = await this.tomarLugarDeEspera(tx, businessId, recurso, fila.cupo, espera, senaPorcentaje, ahora, { quien: 'SISTEMA', origen: 'TIENDA' });
       if (r === 'sin-lugar') return null;
       if (r !== 'ya-no-espera') return r;
     }
@@ -749,32 +836,40 @@ export class ReservasService {
   /**
    * Con el recurso ya tomado: si entra un lugar más en el horario de la
    * espera, la persona lo toma (reserva CONFIRMADA con sus datos y el precio
-   * del recurso) y la espera queda TOMADA. La fila de la espera se reclama
-   * antes de crear nada (compare-and-set sobre ESPERANDO): si la persona salió
-   * de la lista en el medio, no se crea ninguna reserva.
+   * del recurso) y la espera queda TOMADA. Cuenta como una reserva nueva
+   * (verificarLugar): contra el cupo de la fila tomada y con el margen entre
+   * reservas del recurso. La fila de la espera se reclama antes de crear nada
+   * (compare-and-set sobre ESPERANDO): si la persona salió de la lista en el
+   * medio, no se crea ninguna reserva.
    */
   private async tomarLugarDeEspera(
     tx: Prisma.TransactionClient,
     businessId: string,
     recurso: RecursoDeEspera,
+    cupo: number,
     espera: ReservaEspera,
     senaPorcentaje: number,
     ahora: Date,
     por: { quien: ReservaActor; origen: ReservaOrigen; memberId?: string },
   ): Promise<Reserva | 'sin-lugar' | 'ya-no-espera'> {
     const { inicio, fin } = espera;
+    const margenMs = recurso.margenMinutos * 60_000;
     const ocupadas = await tx.reserva.findMany({
-      where: { businessId, recursoId: recurso.id, inicio: { lt: fin }, fin: { gt: inicio }, OR: [{ estado: { in: ['PENDIENTE', 'CONFIRMADA'] } }, { estado: 'RETENIDA', retenidaHasta: { gte: ahora } }] },
+      where: {
+        businessId, recursoId: recurso.id,
+        inicio: { lt: new Date(fin.getTime() + margenMs) }, fin: { gt: new Date(inicio.getTime() - margenMs) },
+        OR: [{ estado: { in: ['PENDIENTE', 'CONFIRMADA'] } }, { estado: 'RETENIDA', retenidaHasta: { gte: ahora } }],
+      },
       select: { cantidad: true },
     });
-    if (ocupadas.reduce((s, o) => s + o.cantidad, 0) + 1 > recurso.cupo) return 'sin-lugar';
+    if (ocupadas.reduce((s, o) => s + o.cantidad, 0) + 1 > cupo) return 'sin-lugar';
     const reclamada = await tx.reservaEspera.updateMany({ where: { id: espera.id, businessId, estado: 'ESPERANDO' }, data: { estado: 'TOMADA' } });
     if (reclamada.count === 0) return 'ya-no-espera';
     const precio = Number(recurso.precio);
     const reserva = await tx.reserva.create({
       data: {
         businessId, modulo: recurso.modulo, recursoId: recurso.id, codigo: generarCodigo(), tokenAcceso: generarToken(),
-        estado: 'CONFIRMADA', origen: por.origen, inicio, fin, fecha: fechaYMinutos(inicio).fecha, cantidad: 1, exclusivo: recurso.cupo === 1,
+        estado: 'CONFIRMADA', origen: por.origen, inicio, fin, fecha: fechaYMinutos(inicio).fecha, cantidad: 1, exclusivo: cupo === 1,
         clienteId: espera.clienteId, clienteNombre: espera.clienteNombre, clienteTelefono: espera.clienteTelefono, clienteEmail: espera.clienteEmail,
         precio, sena: calcularSena(precio, senaPorcentaje), confirmadaEn: ahora, creadaPorMemberId: por.memberId ?? null,
       },

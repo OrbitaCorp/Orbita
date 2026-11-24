@@ -70,9 +70,14 @@ export class DisponibilidadService {
     return {
       config, recurso, servicio, duracionBase: base, duracion,
       paso: recurso.pasoMinutos ?? base,
-      margen: recurso.tipo === 'CLASE' ? 0 : (recurso.margenMinutos ?? config.margenMinutos),
+      margen: DisponibilidadService.margenDe(recurso, config),
       horario: (recurso.horario ?? config.horario) as HorarioSemanal | null,
     };
+  }
+
+  /** Los minutos que hay que dejar entre dos reservas de un recurso: el suyo o el del negocio; una clase no lleva. */
+  static margenDe(recurso: Pick<ReservaRecurso, 'tipo' | 'margenMinutos'>, config: Pick<ReservaConfig, 'margenMinutos'>): number {
+    return recurso.tipo === 'CLASE' ? 0 : (recurso.margenMinutos ?? config.margenMinutos);
   }
 
   /** Desde qué minuto del día se ofrece algo: hoy, desde ahora (+ anticipación mínima en el sitio); un día pasado, nada. */

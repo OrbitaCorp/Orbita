@@ -14,7 +14,7 @@
 import { authedFetch } from '@/lib/auth/authClient'
 import { mensajeDeError } from '@/lib/api'
 import type {
-  AnotarseEnEspera, Bloqueo, CambioDeEstado, Cancelar, Config, ConfigPublica, Confirmar, CrearBloqueo, CrearDesdePanel,
+  AnotadaEnEspera, AnotarseEnEspera, Bloqueo, CambioDeEstado, Cancelar, Config, ConfigPublica, Confirmar, CrearBloqueo, CrearDesdePanel,
   DisponibilidadDia, DisponibilidadRango, Espera, FiltroAgenda, GuardarConfig, GuardarRecurso, GuardarServicio, Historial, MiEspera,
   MiReserva, Modulo, Noches, Pago, Paginado, Recurso, Reprogramar, Reserva, ReservaConToken, Reservar, Resumen, Retener, SenaAlCancelar,
   Servicio,
@@ -80,7 +80,12 @@ export const panel = {
 
   recursos: (modulo: Modulo, inactivos = false) => delPanel<Recurso[]>(`/recursos${query({ modulo, inactivos: inactivos || undefined })}`),
   crearRecurso: (datos: GuardarRecurso) => delPanel<Recurso>('/recursos', json(datos)),
+  /**
+   * En una clase con lugares tomados por delante la API responde 400 (con la fecha) si el cupo baja de lo ya tomado o si se
+   * le saca o se le mueve una sesión que tiene reservas. El panel puede avisarlo antes, pero la que decide es la API.
+   */
   editarRecurso: (id: string, datos: GuardarRecurso) => delPanel<Recurso>(`/recursos/${id}`, { method: 'PUT', body: JSON.stringify(datos) }),
+  /** Con reservas por delante, 400: hay que moverlas o cancelarlas antes. */
   borrarRecurso: (id: string) => delPanel<{ ok: true }>(`/recursos/${id}`, { method: 'DELETE' }),
 
   servicios: (modulo: Modulo, inactivos = false) => delPanel<Servicio[]>(`/servicios${query({ modulo, inactivos: inactivos || undefined })}`),
@@ -111,11 +116,20 @@ export const panel = {
   pago: (id: string, datos: Pago) => delPanel<Reserva>(`/${id}/pago`, json(datos)),
   nota: (id: string, notaInterna: string | null) => delPanel<Reserva>(`/${id}/nota`, { method: 'PATCH', body: JSON.stringify({ notaInterna }) }),
 
+  /** Quiénes esperan. Con `fecha`, los de ese día; sin fecha, los de hoy en adelante (quien esperó un horario que ya pasó no vuelve). */
   espera: (modulo: Modulo, recursoId?: string, fecha?: string) => delPanel<Espera[]>(`/espera${query({ modulo, recursoId, fecha })}`),
-  /** El negocio anota a alguien en la espera de un horario lleno (hasta que empieza). Si ya estaba, devuelve la misma. */
+  /**
+   * El negocio anota a alguien en la espera de un horario lleno (hasta que empieza). Hace falta un teléfono o un email.
+   * Si ya estaba, devuelve la misma fila.
+   */
   anotarEnEspera: (datos: AnotarseEnEspera) => delPanel<Espera & { posicion: number | null }>('/espera', json(datos)),
-  /** "Darle el lugar": pasa de la espera a una reserva confirmada si entra; si no, 409 con el mensaje. */
+  /**
+   * "Darle el lugar": pasa de la espera a una reserva confirmada con las reglas de una reserva nueva. 409 si no queda
+   * lugar o si la persona ya salió de la lista; 400 si el horario ya empezó, está bloqueado o el recurso está pausado.
+   * Repetirlo devuelve la misma reserva.
+   */
   darLugar: (id: string) => delPanel<Reserva>(`/espera/${id}/lugar`, json({})),
+  /** Saca a alguien de la lista. Repetirlo no falla; si ya tomó su lugar, 409 (lo que queda es cancelar esa reserva). */
   quitarDeEspera: (id: string) => delPanel<{ ok: true }>(`/espera/${id}`, { method: 'DELETE' }),
 }
 
@@ -142,7 +156,8 @@ export const sitio = (slug: string) => ({
   cancelar: (token: string, datos: Cancelar = {}) => delSitio<Cancelada>(slug, `/mi/${token}/cancelar`, json(datos)),
   reprogramar: (token: string, datos: Reprogramar) => delSitio<Reserva>(slug, `/mi/${token}/reprogramar`, json(datos)),
 
-  anotarseEnEspera: (datos: AnotarseEnEspera) => delSitio<MiEspera & { token: string }>(slug, '/espera', json(datos)),
+  /** Guardá el `token` de la respuesta: viene una sola vez. Si la persona ya esperaba ese horario llega `yaEstaba: true` y `token: null`. */
+  anotarseEnEspera: (datos: AnotarseEnEspera) => delSitio<AnotadaEnEspera>(slug, '/espera', json(datos)),
   miEspera: (token: string) => delSitio<MiEspera>(slug, `/espera/${token}`),
   salirDeEspera: (token: string) => delSitio<{ ok: true }>(slug, `/espera/${token}`, { method: 'DELETE' }),
 })

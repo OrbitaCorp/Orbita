@@ -33,6 +33,7 @@ describe('Reservas (e2e)', () => {
   let businessId: string;
   let canchaId: string;
   let claseId: string;
+  let yogaId: string;
   // Un día futuro cualquiera, lejos del "ahora" del test.
   const hoy = fechaYMinutos(new Date()).fecha;
   const dia = sumarDias(hoy, 5);
@@ -81,7 +82,7 @@ describe('Reservas (e2e)', () => {
   });
 
   afterAll(async () => {
-    const recursos = [canchaId, claseId].filter(Boolean);
+    const recursos = [canchaId, claseId, yogaId].filter(Boolean);
     if (recursos.length) {
       const reservas = await prisma.reserva.findMany({ where: { businessId, recursoId: { in: recursos } }, select: { id: true } });
       const ids = reservas.map((r) => r.id);
@@ -344,6 +345,97 @@ describe('Reservas (e2e)', () => {
       expect(dos.body.id).toBe(uno.body.id);
       const disp = await http().get(`${PUBLICO}/disponibilidad`).query({ modulo: 'GIMNASIO', recursoId: claseId, fecha: dia });
       expect(disp.body.franjas.find((f: { inicioMinutos: number }) => f.inicioMinutos === 600)).toMatchObject({ libres: 0, cupo: 4 });
+    });
+  });
+
+  // Una clase aparte (cupo 2), llena y con gente esperando, en un día que los tests de arriba no usan.
+  describe('lo que el motor cuida aunque el panel no esté mirando', () => {
+    const fecha = sumarDias(hoy, 7);
+    const yoga = (over: Record<string, unknown> = {}) => ({ modulo: 'GIMNASIO', recursoId: yogaId, fecha, inicioMinutos: 600, ...over });
+    const reservarYoga = (nombre: string) => http().post(`${PUBLICO}/reservar`).send(yoga({ clave: uuid(), cliente: { nombre, email: mail(nombre.toLowerCase().replace(/\s+/g, '-')) } }));
+    const esperarYoga = (nombre: string, email = mail(nombre.toLowerCase().replace(/\s+/g, '-'))) => http().post(`${PUBLICO}/espera`).send(yoga({ cliente: { nombre, email } }));
+    const esperandoYoga = () => http().get(`${PANEL}/espera`).set(employee()).query({ modulo: 'GIMNASIO', recursoId: yogaId, fecha });
+    const editarYoga = (cambio: Record<string, unknown>) => http().put(`${PANEL}/recursos/${yogaId}`).set(owner()).send({ modulo: 'GIMNASIO', tipo: 'CLASE', nombre: '[e2e] Yoga', ...cambio });
+    let anotadas: string[] = [];
+
+    beforeAll(async () => {
+      const creada = await http().post(`${PANEL}/recursos`).set(owner()).send({ modulo: 'GIMNASIO', tipo: 'CLASE', nombre: '[e2e] Yoga', duracionMinutos: 60, cupo: 2, horario: SESIONES });
+      expect(creada.status).toBe(201);
+      yogaId = creada.body.id;
+      const uno = await reservarYoga('Yoga Uno');
+      const dos = await reservarYoga('Yoga Dos');
+      expect([uno.status, dos.status]).toEqual([201, 201]);
+      anotadas = [uno.body.id, dos.body.id];
+    });
+
+    it('el enlace personal de la espera se entrega una sola vez: mandar de nuevo el mail de quien ya espera no lo repite', async () => {
+      const primera = await esperarYoga('Espera Uno');
+      expect(primera.status).toBe(201);
+      expect(primera.body).toMatchObject({ yaEstaba: false, posicion: 1, estado: 'ESPERANDO' });
+      expect(typeof primera.body.token).toBe('string');
+      expect(primera.body.token.length).toBeGreaterThanOrEqual(20);
+      // Otra persona (o la misma, de nuevo) manda ese mail: se le dice que ya está y en qué lugar, sin el enlace.
+      const otraVez = await esperarYoga('Alguien Más', mail('espera-uno'));
+      expect(otraVez.status).toBe(201);
+      expect(otraVez.body).toMatchObject({ id: primera.body.id, yaEstaba: true, posicion: 1, token: null });
+      const segunda = await esperarYoga('Espera Dos');
+      expect(segunda.body).toMatchObject({ yaEstaba: false, posicion: 2 });
+      expect((await esperandoYoga()).body).toHaveLength(2);
+    });
+
+    it('anotar en la espera sin los datos de contacto es un 400, no un error del servidor', async () => {
+      const sinCliente = await http().post(`${PANEL}/espera`).set(employee()).send(yoga());
+      expect(sinCliente.status).toBe(400);
+      const soloNombre = await http().post(`${PANEL}/espera`).set(employee()).send(yoga({ cliente: { nombre: 'Sin Contacto' } }));
+      expect(soloNombre.status).toBe(400);
+      expect(soloNombre.body.message).toMatch(/teléfono o un email/);
+      expect((await esperandoYoga()).body).toHaveLength(2);
+    });
+
+    it('con lugares tomados, la API no deja bajarle el cupo por debajo, sacarle la sesión ni borrar la clase', async () => {
+      const menosCupo = await editarYoga({ cupo: 1 });
+      expect(menosCupo.status).toBe(400);
+      expect(menosCupo.body.message).toMatch(/El cupo no puede bajar a 1/);
+      // Le queda solo la sesión de la tarde: la de las 10, que tiene las dos reservas, se estaría sacando.
+      const soloTarde = Object.fromEntries(['0', '1', '2', '3', '4', '5', '6'].map((d) => [d, [[1140, 1200]]]));
+      const sinSesion = await editarYoga({ horario: soloTarde });
+      expect(sinSesion.status).toBe(400);
+      expect(sinSesion.body.message).toMatch(/2 reservas por delante en un horario que estás sacando o moviendo/);
+      const borrar = await http().delete(`${PANEL}/recursos/${yogaId}`).set(owner());
+      expect(borrar.status).toBe(400);
+      // La clase quedó como estaba: cupo 2, llena.
+      const disp = await http().get(`${PUBLICO}/disponibilidad`).query(yoga());
+      expect(disp.body.franjas.find((f: { inicioMinutos: number }) => f.inicioMinutos === 600)).toMatchObject({ libres: 0, cupo: 2 });
+    });
+
+    it('un lugar nuevo y dos personas esperando: darles el lugar a las dos a la vez se lo da a una sola', async () => {
+      const masCupo = await editarYoga({ cupo: 3 });
+      expect(masCupo.status).toBe(200);
+      const lista = await esperandoYoga();
+      expect(lista.body).toHaveLength(2);
+      const respuestas = await Promise.all(lista.body.map((e: { id: string }) => http().post(`${PANEL}/espera/${e.id}/lugar`).set(employee()).send({})));
+      expect(respuestas.map((r) => r.status).sort()).toEqual([201, 409]);
+      expect(respuestas.find((r) => r.status === 409)!.body.message).toMatch(/No queda lugar/);
+      const disp = await http().get(`${PUBLICO}/disponibilidad`).query(yoga());
+      expect(disp.body.franjas.find((f: { inicioMinutos: number }) => f.inicioMinutos === 600)).toMatchObject({ libres: 0, cupo: 3 });
+      // La otra persona sigue esperando.
+      expect((await esperandoYoga()).body).toHaveLength(1);
+    });
+
+    it('en un horario que el negocio bloqueó no pasa nadie de la espera: ni al cancelar ni con "darle el lugar"', async () => {
+      const bloqueo = await http().post(`${PANEL}/bloqueos`).set(owner()).send({ modulo: 'GIMNASIO', recursoId: yogaId, fechaDesde: fecha, minutoDesde: 540, minutoHasta: 720, motivo: 'Feriado' });
+      expect(bloqueo.status).toBe(201);
+      expect(bloqueo.body.afectadas).toBe(3);
+      const [queda] = (await esperandoYoga()).body as { id: string }[];
+      // El negocio cancela una de las reservas que quedaron adentro: se libera un lugar, pero el día está cerrado.
+      const cancelada = await http().post(`${PANEL}/${anotadas[0]}/cancelar`).set(employee()).send({ motivo: 'Feriado' });
+      expect(cancelada.status).toBe(201);
+      expect(cancelada.body).toMatchObject({ estado: 'CANCELADA', promovida: null });
+      const darLugar = await http().post(`${PANEL}/espera/${queda.id}/lugar`).set(employee()).send({});
+      expect(darLugar.status).toBe(400);
+      expect(darLugar.body.message).toMatch(/bloqueado/);
+      const sigue = await esperandoYoga();
+      expect(sigue.body.map((e: { id: string }) => e.id)).toEqual([queda.id]);
     });
   });
 });

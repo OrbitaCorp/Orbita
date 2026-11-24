@@ -5,7 +5,7 @@ import { MailService } from '../mail/mail.service';
 import { escaparHtml } from '../common/utils/html';
 import { fmtPesos } from '../common/utils/pesos';
 import { describeError } from '../common/utils/describe-error.util';
-import { fechaYMinutos, hhmm } from './dominio/tiempo';
+import { cuandoEs } from './dominio/tiempo';
 
 // Los avisos por email de una reserva: confirmada, pendiente, cancelada,
 // reprogramada, y el lugar que se liberó para alguien de la lista de espera.
@@ -22,8 +22,6 @@ export const RUTA_MI_RESERVA: Record<ReservaModulo, string> = {
 };
 
 const QUE: Record<ReservaModulo, string> = { TURNOS: 'turno', ALQUILERES: 'reserva', GIMNASIO: 'lugar' };
-
-const fechaLarga = new Intl.DateTimeFormat('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', weekday: 'long', day: 'numeric', month: 'long' });
 
 interface Negocio { id: string; name: string; subdomain: string }
 
@@ -42,12 +40,7 @@ export class ReservasAvisosService {
 
   /** "lunes 10 de noviembre de 09:30 a 10:00" */
   static cuando(r: Pick<Reserva, 'inicio' | 'fin'>): string {
-    const dia = fechaLarga.format(r.inicio);
-    const ini = fechaYMinutos(r.inicio).minutos;
-    const fin = ini + Math.round((r.fin.getTime() - r.inicio.getTime()) / 60_000);
-    // Más de un día (un alojamiento): se dice por días.
-    if (fin - ini >= 24 * 60) return `del ${dia} al ${fechaLarga.format(r.fin)}`;
-    return `${dia} de ${hhmm(ini)} a ${hhmm(fin)}`;
+    return cuandoEs(r);
   }
 
   private async negocio(businessId: string): Promise<Negocio | null> {

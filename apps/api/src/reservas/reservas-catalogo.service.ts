@@ -3,9 +3,10 @@ import { Prisma, ReservaConfig, ReservaModulo, ReservaRecurso, ReservaRecursoTip
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CrearBloqueoDto, UpsertConfigDto, UpsertRecursoDto, UpsertServicioDto } from './dto/catalogo.dto';
-import { errorDeHorario } from './dominio/horario';
-import { esFecha, instante, MINUTOS_DIA } from './dominio/tiempo';
+import { errorDeHorario, sesionesDelDia, type HorarioSemanal } from './dominio/horario';
+import { cuandoEs, esFecha, fechaYMinutos, instante, MINUTOS_DIA } from './dominio/tiempo';
 import { OCUPAN } from './dominio/estados';
+import { tomarRecurso, TRANSACCION_CON_CANDADO } from './candado';
 
 // Lo que el negocio configura para reservar: las reglas (config), qué se
 // reserva (recursos), qué se elige antes (servicios) y cuándo no se reserva
@@ -129,12 +130,28 @@ export class ReservasCatalogoService {
     return creado;
   }
 
-  async editarRecurso(businessId: string, memberId: string, id: string, dto: UpsertRecursoDto): Promise<ReservaRecurso> {
-    const antes = await this.recurso(businessId, id);
-    if (antes.modulo !== dto.modulo) throw new BadRequestException('Un recurso no cambia de módulo.');
-    this.validarRecurso(dto, antes);
-    await this.prisma.reservaRecurso.updateMany({ where: { id, businessId }, data: this.datosRecurso(dto) });
-    const despues = await this.recurso(businessId, id);
+  /**
+   * Edita un recurso con su candado tomado, como una reserva nueva: nadie
+   * reserva en el medio. En una clase, lo reservado se cuida acá y no solo en
+   * el panel, que puede estar mirando datos viejos (ver cuidarLoReservado).
+   */
+  async editarRecurso(businessId: string, memberId: string, id: string, dto: UpsertRecursoDto, ahora = new Date()): Promise<ReservaRecurso> {
+    const leido = await this.recurso(businessId, id);
+    if (leido.modulo !== dto.modulo) throw new BadRequestException('Un recurso no cambia de módulo.');
+    this.validarRecurso(dto, leido);
+    const config = await this.configOFalla(businessId, leido.modulo);
+    const { antes, despues } = await this.prisma.$transaction(
+      async (tx) => {
+        await tomarRecurso(tx, businessId, id);
+        // Con el candado puesto se vuelve a leer: es contra esto que se compara, no contra lo de antes de esperar.
+        const antes = await tx.reservaRecurso.findFirstOrThrow({ where: { id, businessId } });
+        this.validarRecurso(dto, antes);
+        if (antes.tipo === 'CLASE') await this.cuidarLoReservado(tx, businessId, antes, dto, config, ahora);
+        await tx.reservaRecurso.updateMany({ where: { id, businessId }, data: this.datosRecurso(dto) });
+        return { antes, despues: await tx.reservaRecurso.findFirstOrThrow({ where: { id, businessId } }) };
+      },
+      TRANSACCION_CON_CANDADO,
+    );
     await this.audit?.registrar({
       businessId, memberId, entityType: 'reserva_recurso', entityId: id, action: 'UPDATE',
       changes: AuditService.diferencias(antes as unknown as Record<string, unknown>, despues as unknown as Record<string, unknown>, CAMPOS_RECURSO),
@@ -142,14 +159,77 @@ export class ReservasCatalogoService {
     return despues;
   }
 
-  /** Borrado blando. Con reservas futuras que ocupan lugar no se borra: hay que moverlas o cancelarlas antes. */
+  /**
+   * Lo que no se le hace a una clase que tiene lugares tomados por delante:
+   * bajarle el cupo por debajo de lo ya tomado en alguna fecha, o sacarle (o
+   * moverle) una sesión que tiene reservas. Con el recurso ya tomado. Solo
+   * mira las reservas que están en una sesión del horario actual: una que el
+   * negocio cargó fuera de horario no frena el cambio.
+   */
+  private async cuidarLoReservado(tx: Prisma.TransactionClient, businessId: string, actual: ReservaRecurso, dto: UpsertRecursoDto, config: ReservaConfig, ahora: Date): Promise<void> {
+    const bajaElCupo = dto.cupo !== undefined && dto.cupo < actual.cupo;
+    const cambiaElHorario = dto.horario !== undefined;
+    if (!bajaElCupo && !cambiaElHorario) return;
+    const porDelante = await tx.reserva.findMany({
+      where: { businessId, recursoId: actual.id, fin: { gt: ahora }, OR: [{ estado: { in: ['PENDIENTE', 'CONFIRMADA'] } }, { estado: 'RETENIDA', retenidaHasta: { gte: ahora } }] },
+      select: { inicio: true, fin: true, cantidad: true },
+      orderBy: { inicio: 'asc' },
+    });
+    if (porDelante.length === 0) return;
+
+    // Los lugares tomados en cada fecha de cada sesión.
+    const porSesion = new Map<number, { inicio: Date; fin: Date; lugares: number; reservas: number }>();
+    for (const r of porDelante) {
+      const s = porSesion.get(r.inicio.getTime()) ?? { inicio: r.inicio, fin: r.fin, lugares: 0, reservas: 0 };
+      porSesion.set(r.inicio.getTime(), { ...s, lugares: s.lugares + r.cantidad, reservas: s.reservas + 1 });
+    }
+    const sesiones = [...porSesion.values()];
+
+    if (bajaElCupo) {
+      const llena = sesiones.reduce((a, b) => (b.lugares > a.lugares ? b : a));
+      if (llena.lugares > dto.cupo!) {
+        throw new BadRequestException(
+          `El cupo no puede bajar a ${dto.cupo}: la clase del ${cuandoEs(llena)} ya tiene ${llena.lugares} ${llena.lugares === 1 ? 'lugar tomado' : 'lugares tomados'}.`,
+        );
+      }
+    }
+    if (cambiaElHorario) {
+      const viejo = (actual.horario ?? config.horario) as HorarioSemanal | null;
+      const nuevo = (dto.horario ?? config.horario) as HorarioSemanal | null;
+      const estaEn = (h: HorarioSemanal | null, inicio: Date) => {
+        const { fecha, minutos } = fechaYMinutos(inicio);
+        return sesionesDelDia(h, fecha).some((sesion) => sesion[0] === minutos);
+      };
+      const sinSesion = sesiones.filter((s) => estaEn(viejo, s.inicio) && !estaEn(nuevo, s.inicio));
+      if (sinSesion.length > 0) {
+        const reservas = sinSesion.reduce((n, s) => n + s.reservas, 0);
+        throw new BadRequestException(
+          `Esa clase tiene ${reservas} ${reservas === 1 ? 'reserva por delante' : 'reservas por delante'} en un horario que estás sacando o moviendo (la primera, el ${cuandoEs(sinSesion[0])}). Movelas o cancelalas antes.`,
+        );
+      }
+    }
+  }
+
+  /**
+   * Borrado blando. Con reservas futuras que ocupan lugar no se borra: hay que
+   * moverlas o cancelarlas antes. La cuenta y el borrado van con el recurso
+   * tomado: nadie reserva entre una cosa y la otra.
+   */
   async borrarRecurso(businessId: string, memberId: string, id: string, ahora = new Date()): Promise<{ ok: true }> {
     await this.recurso(businessId, id);
-    const futuras = await this.prisma.reserva.count({ where: { businessId, recursoId: id, estado: { in: [...OCUPAN] }, fin: { gt: ahora } } });
-    if (futuras > 0) {
-      throw new BadRequestException(`Tiene ${futuras} ${futuras === 1 ? 'reserva por delante' : 'reservas por delante'}. Movelas o cancelalas antes de borrarlo.`);
-    }
-    await this.prisma.reservaRecurso.updateMany({ where: { id, businessId }, data: { eliminadoEn: ahora, activo: false } });
+    await this.prisma.$transaction(
+      async (tx) => {
+        await tomarRecurso(tx, businessId, id);
+        const futuras = await tx.reserva.count({
+          where: { businessId, recursoId: id, fin: { gt: ahora }, OR: [{ estado: { in: ['PENDIENTE', 'CONFIRMADA'] } }, { estado: 'RETENIDA', retenidaHasta: { gte: ahora } }] },
+        });
+        if (futuras > 0) {
+          throw new BadRequestException(`Tiene ${futuras} ${futuras === 1 ? 'reserva por delante' : 'reservas por delante'}. Movelas o cancelalas antes de borrarlo.`);
+        }
+        await tx.reservaRecurso.updateMany({ where: { id, businessId }, data: { eliminadoEn: ahora, activo: false } });
+      },
+      TRANSACCION_CON_CANDADO,
+    );
     await this.audit?.registrar({ businessId, memberId, entityType: 'reserva_recurso', entityId: id, action: 'DELETE' });
     return { ok: true };
   }

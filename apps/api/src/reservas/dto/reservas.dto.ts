@@ -1,10 +1,14 @@
 import { ReservaEstado, ReservaModulo } from '@prisma/client';
 import { Transform, Type } from 'class-transformer';
 import {
-  ArrayMaxSize, IsArray, IsBoolean, IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min,
+  ArrayMaxSize, IsArray, IsBoolean, IsDefined, IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min,
   ValidateNested,
 } from 'class-validator';
 import { ClienteDto, MENSAJE_FECHA, MENSAJE_MODULO, PaginacionDto, RE_FECHA, recortar } from './comunes.dto';
+
+// Un `cliente` que no vino no se valida solo: @ValidateNested saltea lo que falta. Sin @IsDefined el pedido
+// pasaba y el service terminaba leyendo `cliente.email` de undefined (un 500 en vez de un 400).
+const MENSAJE_SIN_CLIENTE = 'Faltan los datos de contacto: el nombre y un teléfono o un email.';
 
 // Qué se quiere reservar: el recurso, el día y la hora (minutos de Argentina),
 // y según el tipo: el servicio (Turnos), cuántas franjas seguidas (canchas),
@@ -55,7 +59,7 @@ export class RetenerDto extends PedidoReservaDto {
 
 /** Sitio público, paso 2: confirmar la retenida con los datos de contacto. */
 export class ConfirmarRetenidaDto {
-  @ValidateNested() @Type(() => ClienteDto)
+  @IsDefined({ message: MENSAJE_SIN_CLIENTE }) @ValidateNested() @Type(() => ClienteDto)
   cliente!: ClienteDto;
 
   @Transform(recortar) @IsOptional() @IsString() @MaxLength(500)
@@ -64,7 +68,7 @@ export class ConfirmarRetenidaDto {
 
 /** Sitio público, en un paso: reservar con los datos ya cargados. */
 export class ReservarDto extends RetenerDto {
-  @ValidateNested() @Type(() => ClienteDto)
+  @IsDefined({ message: MENSAJE_SIN_CLIENTE }) @ValidateNested() @Type(() => ClienteDto)
   cliente!: ClienteDto;
 }
 
@@ -238,7 +242,7 @@ export class AnotarseEnEsperaDto {
   @IsInt() @Min(0) @Max(1439)
   inicioMinutos!: number;
 
-  @ValidateNested() @Type(() => ClienteDto)
+  @IsDefined({ message: MENSAJE_SIN_CLIENTE }) @ValidateNested() @Type(() => ClienteDto)
   cliente!: ClienteDto;
 }
 

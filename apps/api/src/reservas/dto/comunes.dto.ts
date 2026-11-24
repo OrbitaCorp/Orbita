@@ -49,7 +49,9 @@ export class PaginacionDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(100)
+  // Hasta 500 por página: un panel que arma varias semanas (la grilla de Gimnasio, la agenda de
+  // Turnos) las trae en pocos pedidos y no se acerca al tope de pedidos por minuto de la API.
+  @Max(500)
   limit?: number;
 }
 
