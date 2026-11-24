@@ -30,12 +30,18 @@ export interface EstadoAyuda {
     silenciadoHasta: number
     /** Modo prueba: cuántas categorías y productos había al empezar el paso, para notar cuando se crea uno. */
     pruebaBase: { categorias: number; productos: number } | null
+    /** IDs de novedades del panel (novedades.ts) que ya se mostraron en este dispositivo. */
+    novedadesVistas: string[]
+    /** Novedad → cuándo (ms epoch) se leyó en este dispositivo. Vence 3 días después (ver novedadesVigentes). */
+    novedadesLeidasEn: Record<string, number>
 }
+
+export const EVENTO_CAMBIO_AYUDA = 'orbita:cambio-ayuda'
 
 export const ESTADO_AYUDA_VACIO: EstadoAyuda = {
     vistos: [], pospuestoHasta: 0, enCurso: false, esperaCorreo: false,
     sabe: [], posponer: {}, ultimaSugerencia: 0, prueba: null, pruebaElegida: false,
-    descartadasSeguidas: 0, silenciadoHasta: 0, pruebaBase: null,
+    descartadasSeguidas: 0, silenciadoHasta: 0, pruebaBase: null, novedadesVistas: [], novedadesLeidasEn: {},
 }
 
 /** "Más tarde" calla los primeros pasos un día. */
@@ -68,6 +74,8 @@ export function parsear(crudo: string | null): EstadoAyuda {
             pruebaBase: typeof o?.pruebaBase?.categorias === 'number' && typeof o.pruebaBase.productos === 'number'
                 ? { categorias: o.pruebaBase.categorias, productos: o.pruebaBase.productos }
                 : null,
+            novedadesVistas: Array.isArray(o?.novedadesVistas) ? o.novedadesVistas.filter((s): s is string => typeof s === 'string') : [],
+            novedadesLeidasEn: soloNumeros(o?.novedadesLeidasEn),
         }
     } catch {
         return ESTADO_AYUDA_VACIO
@@ -85,5 +93,6 @@ export function leerAyuda(negocioId: string): EstadoAyuda {
 export function guardarAyuda(negocioId: string, estado: EstadoAyuda): void {
     try {
         window.localStorage.setItem(clave(negocioId), JSON.stringify(estado))
+        if (typeof window !== 'undefined') window.dispatchEvent(new Event(EVENTO_CAMBIO_AYUDA))
     } catch { /* sin storage: el aviso se repetirá, nada más */ }
 }

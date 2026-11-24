@@ -8,6 +8,7 @@ import { pesos } from '@/lib/reservas/precio'
 import { Area, BarraGuardar, Campo, Vacio } from '@/design-system/reservas/piezas'
 import { TIPOS, capital, cuenta, palabrasDe, type Paquete, type Reserva, type Salon } from '../../datos'
 import { PaginaForm, idNuevo, igual, num, type Form } from './comun'
+import { milesTxt } from '../../datos/textos'
 
 export default function Paquetes({ negocio, reservas, onGuardar }: Form & { reservas: Reserva[] }) {
   const palabras = palabrasDe(negocio)
@@ -42,7 +43,7 @@ export default function Paquetes({ negocio, reservas, onGuardar }: Form & { rese
                 <div className="alc-fila alc-fila--paquete">
                   <Campo label="Nombre" value={p.nombre} onChange={x => editar(p.id, { nombre: x })} />
                   <Campo label="Hasta" value={String(p.hastaInvitados)} onChange={x => editar(p.id, { hastaInvitados: num(x) })} inputMode="numeric" error={p.hastaInvitados > capacidad ? `${s?.nombre ?? 'El salón'} es para ${capacidad}` : undefined} />
-                  <Campo label="Precio" prefijo="$" value={String(p.precio)} onChange={x => editar(p.id, { precio: num(x) })} inputMode="numeric" />
+                  <Campo label="Precio" prefijo="$" value={milesTxt(p.precio)} onChange={x => editar(p.id, { precio: num(x) })} inputMode="numeric" />
                   <button type="button" className="rv-btn rv-btn--icono" onClick={() => setLista(lista.filter(x => x.id !== p.id))} aria-label={`Quitar ${p.nombre}`} disabled={lista.length <= 1}><Trash2 size={16} /></button>
                 </div>
                 {/* Uno por renglón. Se guarda el texto tal cual mientras se escribe (si no, el renglón vacío del Enter desaparecía) y se limpia al guardar. */}

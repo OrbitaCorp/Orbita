@@ -13,7 +13,7 @@ import type { AccionesHome, ItemPie, Producto, Slide, Tema } from './tipos'
 export const CSS = `
 @keyframes pl-marquee { from { transform: translateX(0) } to { transform: translateX(-50%) } }
 @keyframes pl-fade { from { opacity: 0 } to { opacity: 1 } }
-.pl-marquee-track { display: inline-flex; white-space: nowrap; animation: pl-marquee 26s linear infinite; }
+.pl-marquee-track { display: inline-flex; white-space: nowrap; animation: pl-marquee 60s linear infinite; }
 
 .pl-card { transition: transform .38s cubic-bezier(.2,.7,.3,1), box-shadow .38s; }
 .pl-card:hover { transform: translateY(-7px); }
@@ -324,13 +324,50 @@ export function Titulo({ t, volanta, texto, centrado, accion, movil, onAccion }:
   )
 }
 
+// Velocidad de las carteleras de las plantillas, la misma que la barra de
+// anuncios clásica (AnnouncementBar.tsx). Antes la vuelta duraba 26 s fijos
+// sin importar el largo del texto: lo que recorre es la mitad del track (el
+// mensaje repetido), así que un anuncio largo, como el de varios ítems de la
+// demo de regalería, pasaba a más de 600 px/s y no se llegaba a leer
+// (reportado 17/11). Ahora se mide el track y la duración sale de acá.
+const VELOCIDAD_MARQUEE_PX_S = 45
+
+/**
+ * La pista que corre en una cartelera: `mitad` dos veces seguidas, y la
+ * animación recorre exactamente una (ver `pl-marquee`), así el bucle no salta.
+ * La duración se calcula con el ancho medido; antes de medir (el HTML del
+ * servidor) se estima por la cantidad de letras, para que no arranque rápido.
+ */
+export function PistaMarquee({ mitad }: { mitad: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [duracion, setDuracion] = useState(() => Math.max(15, (mitad.length * 7) / VELOCIDAD_MARQUEE_PX_S))
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const medir = () => {
+      const ancho = el.scrollWidth
+      if (ancho) setDuracion(Math.max(15, ancho / 2 / VELOCIDAD_MARQUEE_PX_S))
+    }
+    medir()
+    const obs = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(medir) : null
+    obs?.observe(el)
+    return () => obs?.disconnect()
+  }, [mitad])
+  return (
+    <div ref={ref} className="pl-marquee-track" style={{ animationDuration: `${duracion.toFixed(1)}s` }}>
+      <span>{mitad}</span><span>{mitad}</span>
+    </div>
+  )
+}
+
 export function Marquee({ t, texto }: { t: Tema; texto: string }) {
+  // Copias suficientes para llenar una pantalla ancha (~2560 px) aunque el
+  // texto sea corto; con uno largo alcanza con pocas.
   const bloque = `${texto}   `
+  const copias = Math.min(10, Math.max(2, Math.ceil(2600 / (bloque.length * 7))))
   return (
     <div style={{ background: t.text, color: t.bg, padding: '9px 0', fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', overflow: 'hidden' }}>
-      <div className="pl-marquee-track">
-        <span>{bloque.repeat(10)}</span><span>{bloque.repeat(10)}</span>
-      </div>
+      <PistaMarquee mitad={bloque.repeat(copias)} />
     </div>
   )
 }

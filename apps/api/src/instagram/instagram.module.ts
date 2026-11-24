@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { CostsModule } from '../platform/costs/costs.module';
+import { AtencionOrbiModule } from '../orbi/atencion/atencion.module';
+import { InstagramBotService } from './instagram-bot.service';
 import { InstagramAdminController } from './instagram-admin.controller';
 import { InstagramAjustesService } from './instagram-ajustes.service';
 import { InstagramBandejaService } from './instagram-bandeja.service';
@@ -13,9 +15,9 @@ import { InstagramWebhookController } from './instagram-webhook.controller';
 import { InstagramService } from './instagram.service';
 
 @Module({
-  imports: [CostsModule],
+  imports: [CostsModule, AtencionOrbiModule], // AtencionOrbiModule: Orbi atiende los mensajes directos (lo mismo que en WhatsApp)
   controllers: [InstagramController, InstagramWebhookController, InstagramAdminController],
-  providers: [InstagramService, InstagramPublicacionesService, InstagramMediosService, InstagramComentariosService, InstagramEstadisticasService, InstagramBandejaService, InstagramOrbiService, InstagramAjustesService],
+  providers: [InstagramService, InstagramPublicacionesService, InstagramMediosService, InstagramComentariosService, InstagramEstadisticasService, InstagramBandejaService, InstagramOrbiService, InstagramAjustesService, InstagramBotService],
   exports: [InstagramService, InstagramPublicacionesService, InstagramComentariosService, InstagramMediosService, InstagramEstadisticasService], // ConversationsService responde por Instagram; el cron renueva los tokens; el super panel (Marketing) usa el resto
 })
 export class InstagramModule {}

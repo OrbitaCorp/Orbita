@@ -122,7 +122,8 @@ const RUBROS = [
 // Empleado. "admin" ya no se crea: tenía exactamente los mismos permisos que
 // owner, así que eran el mismo rol con dos nombres — decisión del equipo,
 // una sola palabra ("Propietario") para el acceso total en toda la app.
-const ROLE_PERMISSIONS: Record<string, string[]> = {
+// Exportados: los reusa NegociosAlquileresService (crear un negocio desde Superadmin).
+export const ROLE_PERMISSIONS: Record<string, string[]> = {
   owner: PERMISSIONS.map((p) => p.code),
   // Mensajes iba abierto a cualquier miembro sin permiso — el Empleado lo
   // suma acá para no perder ese acceso ahora que sí se verifica. Avanzado NO
@@ -136,7 +137,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   ],
 };
 
-const ROLE_DEFS = [
+export const ROLE_DEFS = [
   // Colores identificatorios de cada rol. Van en el puntito del chip, no como
   // color de texto: antes el propietario era negro puro y en oscuro no se leía.
   { name: 'owner', color: '#3B82F6' },

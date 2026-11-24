@@ -1,6 +1,6 @@
 // Franja de la tienda demo (arriba de todo, en todas las páginas de las dos
-// tiendas de la demo): dice que es una demo y deja pasar de la tienda de ropa
-// a la de tecnología y al revés (lib/demo/modo.ts, TIENDAS_DEMO). Cada tienda
+// tiendas de la demo): dice que es una demo y deja pasar de una tienda a otra
+// (ropa, tecnología y regalería: TIENDAS_DEMO en lib/demo/modo.ts). Cada tienda
 // es su propio negocio y subdominio, así que cambiar es navegar a la portada
 // de la otra: los productos no son los mismos y no hay una "página
 // equivalente". El panel de la demo es uno solo (el de Nébula Tech).
@@ -78,5 +78,8 @@ const CSS = `
   .dm-corto{display:inline}
   .dm-op{padding:0 10px}
 }
+/* Con tres tiendas no entra todo en un teléfono angosto: el título se va y
+   quedan el selector y el panel. */
+@media (max-width:440px){.dm-titulo{display:none}.dm-op{padding:0 8px}}
 @media (prefers-reduced-motion:reduce){.dm-op,.dm-panel{transition:none}}
 `

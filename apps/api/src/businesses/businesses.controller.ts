@@ -4,7 +4,6 @@ import { SUBIDA_IMAGEN } from '../common/utils/subida-imagen';
 import { SUBIDA_VIDEO } from '../common/utils/subida-video';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
-import { RequiresAddon } from '../common/decorators/requires-addon.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
@@ -90,15 +89,21 @@ export class BusinessesController {
   // Apariencia, la acción es del módulo Avanzado (mismo criterio que
   // games/promo-modal/social-proof/two-for-one/countdown-settings
   // .controller.ts).
+  //
+  // Los dos gates (add-on y permiso) dependen de QUÉ plantilla se pide, así que
+  // no van como decoradores sino adentro (ver puedeElegirPlantilla):
+  //   · una paga exige el add-on Avanzado y advanced.manage — sin el add-on,
+  //     un negocio en plan Base podía dejarse una plantilla paga aplicada de
+  //     forma permanente (auditoría interna 09/09, ítem `api.common`,
+  //     verificación 5);
+  //   · una libre (HOME_TEMPLATES_LIBRES) o volver a la clásica (null) es
+  //     editar la apariencia: alcanza con config.edit o advanced.manage, con
+  //     cualquier plan. Volver a la clásica sin el add-on también destraba a
+  //     un negocio al que se le venció el paquete con una paga puesta.
   @Post('storefront-config/home-template')
-  @RequirePermission('advanced.manage')
-  // Las plantillas de Home son una funcion del paquete Avanzado (panel ->
-  // Avanzado -> Plantillas), pero el endpoint no lo exigia: cualquier negocio
-  // en plan Base podia dejarse una plantilla paga aplicada de forma
-  // permanente (auditoria interna 09/09, item `api.common`, verificacion 5).
-  @RequiresAddon('ADVANCED')
-  setHomeTemplate(@CurrentBusiness() ctx: AuthContext, @Body() dto: SetHomeTemplateDto) {
+  async setHomeTemplate(@CurrentBusiness() ctx: AuthContext, @Body() dto: SetHomeTemplateDto) {
     const member = assertMemberContext(ctx);
+    await this.businessesService.puedeElegirPlantilla(member, dto.template);
     return this.businessesService.setHomeTemplate(member.businessId, dto);
   }
 

@@ -4,12 +4,18 @@
 // cada elección a lo que va a leer el que reserva: es la mejor forma de que el
 // dueño entienda qué está configurando sin leer ayudas.
 //
-// Casi todo acá es una demo (se "guarda" en memoria). Las excepciones son la
-// cuenta de clientes con sus beneficios y la política de cancelación y
-// llegadas tarde: eso vive en el negocio de la demo (datos/negocio.ts) y el
-// sitio, la reserva, "Mis turnos" y los Términos lo leen de ahí, así que al
-// guardar se ve de verdad del otro lado.
-import { useState, type ReactNode } from 'react'
+// En la demo casi todo se "guarda" en memoria. Las excepciones son la cuenta de
+// clientes con sus beneficios y la política de cancelación y llegadas tarde:
+// eso vive en el negocio de la demo (datos/negocio.ts) y el sitio, la reserva,
+// "Mis turnos" y los Términos lo leen de ahí.
+//
+// En un negocio real, lo que la config de la API sabe guardar va ahí
+// (origen.reglas): anticipación, margen, confirmación, seña en porcentaje,
+// cancelación, reprogramación, tope por persona y lista de espera. Lo demás
+// (la grilla, la seña fija, elegir profesional, la tolerancia, los datos del
+// paciente, la cuenta de clientes) todavía no tiene dónde vivir: es el
+// faltante 2 del mapa de Turnos, y la barra de guardar lo dice.
+import { useEffect, useState, type ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import {
   CalendarClock, BadgeCheck, Wallet, RotateCcw, Repeat, Users, Hourglass, IdCard, UserX,
@@ -18,8 +24,11 @@ import {
 import { esSalud, pesos, duracionTxt, horaTxt } from '@/modules/turnos/datos'
 import { beneficiosTxt, plazoTxt, politicaTxt, useNegocioDemo, type BeneficiosCuenta, type PoliticaReserva } from '@/modules/turnos/datos/negocio'
 import { temaDe } from '@/modules/turnos/storefront/tema'
-import { Encabezado, SecCard, Segmentado, Selector, Campo, Dos, FilaSwitch, Divisor, BotonBorde, Rotulo, OpcionTarjeta, type PropsTab } from './ui'
+import { Encabezado, SecCard, Segmentado, Selector, Campo, Dos, FilaSwitch, Divisor, BotonBorde, Rotulo, OpcionTarjeta, Vacio, type PropsTab } from './ui'
 import { BarraGuardar, useBorrador } from '@/design-system/reservas/piezas'
+import { SkeletonVista } from '@/design-system/reservas/skeleton'
+import { useOrigenTurnos, type EscrituraReglas } from '@/modules/turnos/datos/origen'
+import type { ReglasApi } from '@/modules/turnos/datos/origen/mapear'
 import { vozDe, cap } from './datos'
 
 const ANT_MIN = [{ id: 0, label: 'Sin mínimo' }, { id: 60, label: '1 hora' }, { id: 120, label: '2 horas' }, { id: 240, label: '4 horas' }, { id: 720, label: '12 horas' }, { id: 1440, label: '1 día' }]
@@ -32,6 +41,9 @@ const TOLERANCIAS = [0, 5, 10, 15, 20, 30].map(m => ({ id: m, label: m ? `${m} m
 const LIMITE = [{ id: 0, label: 'Sin límite' }, { id: 1, label: '1 a la vez' }, { id: 2, label: '2 a la vez' }, { id: 3, label: '3 a la vez' }, { id: 5, label: '5 a la vez' }]
 const BIENVENIDA = [0, 5, 10, 15, 20].map(p => ({ id: p, label: p ? `${p}% de descuento` : 'No ofrecer' }))
 const SELLOS = [0, 5, 6, 8, 10].map(n => ({ id: n, label: n ? `Premio a los ${n} sellos` : 'No ofrecer' }))
+/** Con la API puede venir un valor que no está en la lista (cargado de otro lado): se suma para no mostrar otro. */
+const conActual = (opciones: { id: number; label: string }[], valor: number, label: string) =>
+  (opciones.some(o => o.id === valor) ? opciones : [...opciones, { id: valor, label }].sort((a, b) => a.id - b.id))
 
 const CSS = `
   .tuc-politica { padding: 16px 18px; border-radius: var(--rv-r-sm); background: var(--color-surface); border: 1px solid var(--color-border); border-left: 3px solid var(--color-primary); }
@@ -61,7 +73,39 @@ interface Reglas {
   obraSocial: boolean; dni: boolean; motivo: boolean
 }
 
-export default function Reservas({ rubro, avisar }: PropsTab) {
+export default function Reservas(props: PropsTab) {
+  const { reglas } = useOrigenTurnos()
+  return reglas ? <ReservasApi {...props} reglas={reglas} /> : <FormReglas {...props} />
+}
+
+/** Con la API: trae las reglas guardadas antes de mostrar el formulario. */
+function ReservasApi({ reglas, ...props }: PropsTab & { reglas: EscrituraReglas }) {
+  const { rubro } = props
+  const [estado, setEstado] = useState<{ guardadas: ReglasApi | null; error: string | null }>({ guardadas: null, error: null })
+  const [vuelta, setVuelta] = useState(0)
+  // Una vez por rubro y por intento: el rubro cambia de objeto al guardar otras pantallas.
+  const clave = rubro.key
+  useEffect(() => {
+    let vivo = true
+    reglas.leer(rubro).then(
+      guardadas => { if (vivo) setEstado({ guardadas, error: null }) },
+      (e: unknown) => { if (vivo) setEstado({ guardadas: null, error: e instanceof Error && e.message ? e.message : 'No pudimos traer las reglas.' }) },
+    )
+    return () => { vivo = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reglas, clave, vuelta])
+  if (estado.error) {
+    return (
+      <div className="rv-pagina">
+        <Vacio Icon={CalendarClock} titulo="No pudimos abrir las reglas" accion={<BotonBorde onClick={() => { setEstado({ guardadas: null, error: null }); setVuelta(n => n + 1) }}>Reintentar</BotonBorde>}>{estado.error}</Vacio>
+      </div>
+    )
+  }
+  if (!estado.guardadas) return <SkeletonVista forma="formulario" nombre="Reglas de reserva" />
+  return <FormReglas {...props} api={{ reglas, guardadas: estado.guardadas }} />
+}
+
+function FormReglas({ rubro, avisar, api }: PropsTab & { api?: { reglas: EscrituraReglas; guardadas: ReglasApi } }) {
   const voz = vozDe(rubro)
   const salud = esSalud(rubro)
   const b = useBorrador<Reglas>(() => ({
@@ -71,7 +115,9 @@ export default function Reservas({ rubro, avisar }: PropsTab) {
     sena: rubro.sena > 0, senaTipo: 'pct' as 'pct' | 'fijo', senaPct: rubro.sena || 30, senaFijo: '5000',
     reprogramar: true, reproHoras: 12, reproMax: 2,
     limite: 2, espera: rubro.modo === 'profesional', esperaMin: 30, ausentes: true,
-    obraSocial: salud, dni: salud, motivo: salud && rubro.key !== 'psico',
+    // El motivo de la consulta va apagado en todos los rubros de salud (alcance en salud, 15/11).
+    obraSocial: salud, dni: salud, motivo: false,
+    ...(api ? (({ cancelaHasta, ...resto }) => { void cancelaHasta; return resto })(api.guardadas) : {}),
   }))
   const v = b.v
   const ejemplo = rubro.servicios.find(s => s.precio > 0) ?? rubro.servicios[0]
@@ -82,15 +128,21 @@ export default function Reservas({ rubro, avisar }: PropsTab) {
   // demo (que llega del navegador recién después de hidratar, por eso no se copia
   // a un estado al montar).
   const { demo, guardar: guardarDemo } = useNegocioDemo()
+  // Con la API no se escribe en el negocio de la demo: lo guardado queda acá, y el plazo de
+  // cancelación sale de la config.
+  const [baseApi, setBaseApi] = useState(() => (api ? { cuentas: demo.cuentas, politica: { ...demo.politica, cancelaHasta: api.guardadas.cancelaHasta } } : null))
+  const cuentasGuardadas = baseApi?.cuentas ?? demo.cuentas
+  const politicaGuardada = baseApi?.politica ?? demo.politica
+  const [guardando, setGuardando] = useState(false)
   const [cuentasBorrador, setCuentasBorrador] = useState<BeneficiosCuenta | null>(null)
-  const cuentas = cuentasBorrador ?? demo.cuentas
-  const cuentasDirty = cuentasBorrador !== null && JSON.stringify(cuentasBorrador) !== JSON.stringify(demo.cuentas)
+  const cuentas = cuentasBorrador ?? cuentasGuardadas
+  const cuentasDirty = cuentasBorrador !== null && JSON.stringify(cuentasBorrador) !== JSON.stringify(cuentasGuardadas)
   const ponerCuenta = (cambio: Partial<BeneficiosCuenta>) => setCuentasBorrador({ ...cuentas, ...cambio })
 
   // La política de cancelación y llegadas tarde: mismo patrón que la cuenta.
   const [politicaBorrador, setPoliticaBorrador] = useState<PoliticaReserva | null>(null)
-  const politica = politicaBorrador ?? demo.politica
-  const politicaDirty = politicaBorrador !== null && JSON.stringify(politicaBorrador) !== JSON.stringify(demo.politica)
+  const politica = politicaBorrador ?? politicaGuardada
+  const politicaDirty = politicaBorrador !== null && JSON.stringify(politicaBorrador) !== JSON.stringify(politicaGuardada)
   const ponerPolitica = (cambio: Partial<PoliticaReserva>) => setPoliticaBorrador({ ...politica, ...cambio })
   const textos = politicaTxt(politica)
   const copiarPolitica = () => {
@@ -99,7 +151,29 @@ export default function Reservas({ rubro, avisar }: PropsTab) {
   }
 
   const seAplica = cuentasDirty || politicaDirty
+  // La API solo guarda la seña en porcentaje: con monto fijo no se deja guardar.
+  const senaFijaSinApi = !!api && v.sena && v.senaTipo === 'fijo'
+  const guardarEnApi = async ({ reglas }: NonNullable<typeof api>) => {
+    setGuardando(true)
+    try {
+      await reglas.guardar({
+        minAnt: v.minAnt, maxAnt: v.maxAnt, buffer: v.buffer, confirmacion: v.confirmacion, sena: v.sena, senaPct: v.senaPct,
+        reprogramar: v.reprogramar, reproHoras: v.reproHoras, reproMax: v.reproMax, limite: v.limite, espera: v.espera,
+        cancelaHasta: politica.cancelaHasta,
+      }, rubro)
+    } catch (e) {
+      avisar('No se guardaron las reglas', e instanceof Error && e.message ? e.message : 'Probá de nuevo en un rato.')
+      setGuardando(false)
+      return
+    }
+    setGuardando(false)
+    b.guardar()
+    setBaseApi({ cuentas, politica })
+    setCuentasBorrador(null); setPoliticaBorrador(null)
+    avisar('Reglas guardadas', `Ya valen para las reservas nuevas de tu sitio. ${SOLO_EN_PANEL}`)
+  }
   const guardar = () => {
+    if (api) { void guardarEnApi(api); return }
     b.guardar()
     if (seAplica) guardarDemo({ cuentas, politica })
     setCuentasBorrador(null); setPoliticaBorrador(null)
@@ -117,14 +191,14 @@ export default function Reservas({ rubro, avisar }: PropsTab) {
 
           <SecCard titulo="Cuándo se puede reservar" Icon={CalendarClock} bajada="La ventana en la que tu agenda acepta reservas.">
             <Dos>
-              <Selector label="Anticipación mínima" ayuda={`Evita ${voz.turnos} de último momento.`} valor={v.minAnt} opciones={ANT_MIN} onChange={x => b.set('minAnt', x)} />
-              <Selector label="Hasta cuánto antes" ayuda="Qué tan lejos se ve la agenda." valor={v.maxAnt} opciones={ANT_MAX} onChange={x => b.set('maxAnt', x)} />
+              <Selector label="Anticipación mínima" ayuda={`Evita ${voz.turnos} de último momento.`} valor={v.minAnt} opciones={conActual(ANT_MIN, v.minAnt, `${v.minAnt} min`)} onChange={x => b.set('minAnt', x)} />
+              <Selector label="Hasta cuánto antes" ayuda="Qué tan lejos se ve la agenda." valor={v.maxAnt} opciones={conActual(ANT_MAX, v.maxAnt, `${v.maxAnt} días`)} onChange={x => b.set('maxAnt', x)} />
             </Dos>
             <Rotulo ayuda={`Cada cuánto arrancan los ${voz.turnos}: 9:00, 9:${v.grilla === 15 ? '15' : '30'}…`}>Horarios disponibles cada</Rotulo>
             <Segmentado label="Horarios disponibles cada" valor={v.grilla} onChange={x => b.set('grilla', x)} opciones={grillas.map(g => ({ id: g, label: duracionTxt(g) }))} />
             <div style={{ height: 16 }} />
             <Rotulo ayuda={`Tiempo libre entre un ${voz.turno} y el siguiente para limpiar, ordenar o respirar.`}>Margen entre {voz.turnos}</Rotulo>
-            <Segmentado label={`Margen entre ${voz.turnos}`} valor={v.buffer} onChange={x => b.set('buffer', x)} opciones={[0, 5, 10, 15].map(m => ({ id: m, label: m ? `${m} min` : 'Sin margen' }))} />
+            <Segmentado label={`Margen entre ${voz.turnos}`} valor={v.buffer} onChange={x => b.set('buffer', x)} opciones={[...new Set([0, 5, 10, 15, v.buffer])].sort((x, y) => x - y).map(m => ({ id: m, label: m ? `${m} min` : 'Sin margen' }))} />
           </SecCard>
 
           <SecCard titulo="Confirmación" Icon={BadgeCheck} bajada="Qué pasa apenas alguien reserva.">
@@ -185,13 +259,13 @@ export default function Reservas({ rubro, avisar }: PropsTab) {
 
           <SecCard titulo="Cancelaciones y cambios" Icon={RotateCcw} bajada="Hasta cuándo se puede cancelar o mover, y qué pasa con la seña.">
             <Dos>
-              <Selector label="Se cancela sin cargo" ayuda="A tiempo, la seña se devuelve al mismo medio de pago." valor={politica.cancelaHasta} opciones={PLAZOS} onChange={x => ponerPolitica({ cancelaHasta: x })} />
+              <Selector label="Se cancela sin cargo" ayuda="A tiempo, la seña se devuelve al mismo medio de pago." valor={politica.cancelaHasta} opciones={conActual(PLAZOS, politica.cancelaHasta, `${politica.cancelaHasta} horas antes`)} onChange={x => ponerPolitica({ cancelaHasta: x })} />
               <Selector label={politica.cancelaHasta > 0 ? 'Fuera de plazo o si falta, la seña…' : 'Si falta, la seña…'} ayuda="Lo lee antes de pagar y en los Términos." valor={politica.senaFueraDePlazo} opciones={FUERA} onChange={x => ponerPolitica({ senaFueraDePlazo: x })} />
             </Dos>
             <FilaSwitch Icon={Repeat} titulo="Permitir reprogramar" ayuda={`Desde el link del recordatorio, sin escribirte. La seña pasa al nuevo ${voz.turno}.`} on={v.reprogramar} onChange={x => b.set('reprogramar', x)}>
               <Dos>
-                <Selector label="Hasta" valor={v.reproHoras} opciones={CANCEL_H} onChange={x => b.set('reproHoras', x)} />
-                <Selector label="Cuántas veces" valor={v.reproMax} opciones={[1, 2, 3].map(n => ({ id: n, label: n === 1 ? '1 vez' : `${n} veces` }))} onChange={x => b.set('reproMax', x)} />
+                <Selector label="Hasta" valor={v.reproHoras} opciones={conActual(CANCEL_H, v.reproHoras, `${v.reproHoras} horas antes`)} onChange={x => b.set('reproHoras', x)} />
+                <Selector label="Cuántas veces" valor={v.reproMax} opciones={conActual([1, 2, 3].map(n => ({ id: n, label: n === 1 ? '1 vez' : `${n} veces` })), v.reproMax, `${v.reproMax} veces`)} onChange={x => b.set('reproMax', x)} />
               </Dos>
             </FilaSwitch>
           </SecCard>
@@ -212,7 +286,7 @@ export default function Reservas({ rubro, avisar }: PropsTab) {
           </SecCard>
 
           <SecCard titulo="Límites y lista de espera" Icon={ShieldCheck} bajada="Para repartir mejor los horarios más pedidos.">
-            <Selector label={`${cap(voz.turnos)} activos por ${voz.cliente}`} ayuda="Para que nadie acapare los mejores horarios." valor={v.limite} opciones={LIMITE} onChange={x => b.set('limite', x)} />
+            <Selector label={`${cap(voz.turnos)} activos por ${voz.cliente}`} ayuda="Para que nadie acapare los mejores horarios." valor={v.limite} opciones={conActual(LIMITE, v.limite, `${v.limite} a la vez`)} onChange={x => b.set('limite', x)} />
             <FilaSwitch Icon={Hourglass} titulo="Lista de espera" ayuda={`Si un horario está lleno, se anotan. Cuando alguien cancela, le ofrecemos el lugar al primero por WhatsApp.`} on={v.espera} onChange={x => b.set('espera', x)}>
               <Rotulo>Tiempo para aceptar el lugar</Rotulo>
               <Segmentado label="Tiempo para aceptar el lugar" valor={v.esperaMin} onChange={x => b.set('esperaMin', x)} opciones={[15, 30, 60].map(m => ({ id: m, label: duracionTxt(m) }))} />
@@ -224,7 +298,7 @@ export default function Reservas({ rubro, avisar }: PropsTab) {
             <SecCard titulo="Datos del paciente" Icon={IdCard} bajada="Qué se pide al reservar. Se guarda en la ficha del paciente, solo la ven vos y tu equipo.">
               <FilaSwitch titulo="Obra social o prepaga" ayuda="Con número de afiliado. Podés marcar cuáles atendés." on={v.obraSocial} onChange={x => b.set('obraSocial', x)} />
               <FilaSwitch titulo="DNI" on={v.dni} onChange={x => b.set('dni', x)} />
-              <FilaSwitch titulo="Motivo de la consulta" ayuda="Campo opcional, texto libre." on={v.motivo} onChange={x => b.set('motivo', x)} />
+              <FilaSwitch titulo="Motivo de la consulta" ayuda="Opcional. Si lo prendés, pedí que no escriban un diagnóstico: alcanza con “control” o “primera consulta”." on={v.motivo} onChange={x => b.set('motivo', x)} />
             </SecCard>
           )}
         </div>
@@ -234,10 +308,14 @@ export default function Reservas({ rubro, avisar }: PropsTab) {
         </aside>
       </div>
 
-      <BarraGuardar cambiado={b.cambiado || seAplica} onDescartar={descartar} onGuardar={guardar} />
+      <BarraGuardar cambiado={b.cambiado || seAplica} onDescartar={descartar} onGuardar={guardar}
+        motivo={guardando ? 'Guardando…' : senaFijaSinApi ? 'La seña de monto fijo todavía no se guarda: usá porcentaje.' : undefined}
+        nota={api ? SOLO_EN_PANEL : undefined} />
     </div>
   )
 }
+
+const SOLO_EN_PANEL = 'La grilla, elegir profesional, la tolerancia, los datos pedidos y la cuenta de clientes todavía no se guardan.'
 
 const AHORA = 10 * 60 // la demo "está" a las 10:00
 

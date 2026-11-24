@@ -99,7 +99,7 @@ describe('Cambiar la contraseña', () => {
   it('GET /me no devuelve el hash ni flags internos', async () => {
     const { svc } = cuenta();
     const perfil = await svc.getProfile('c-1');
-    expect(Object.keys(perfil).sort()).toEqual(['avatarUrl', 'birthDate', 'dni', 'email', 'emailVerified', 'firstName', 'id', 'lastName', 'phone']);
+    expect(Object.keys(perfil).sort()).toEqual(['avatarUrl', 'birthDate', 'email', 'emailVerified', 'firstName', 'id', 'lastName', 'phone']);
   });
 });
 
@@ -110,7 +110,6 @@ describe('DTOs de la cuenta', () => {
     expect(plainToInstance(UpdateMeDto, { email: ' Ana@X.com ' }).email).toBe('ana@x.com');
     expect(await props(UpdateMeDto, { firstName: '' })).toContain('firstName');
     expect(await props(UpdateMeDto, { phone: 'x'.repeat(41) })).toContain('phone');
-    expect(await props(UpdateMeDto, { dni: 'x'.repeat(31) })).toContain('dni');
     expect(await props(UpdateMeDto, { firstName: 'Ana', lastName: null, email: null, phone: null })).toEqual([]);
     expect(await props(ChangePasswordDto, { currentPassword: 'x'.repeat(129), newPassword: 'NuevaClave123' })).toContain('currentPassword');
     expect(await props(ChangePasswordDto, { currentPassword: CLAVE, newPassword: 'x'.repeat(129) })).toContain('newPassword');

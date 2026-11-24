@@ -85,7 +85,7 @@ export class CountdownService {
       this.estaHabilitada(businessId),
       this.prisma.countdownConfig.findUnique({
         where: { businessId },
-        select: { isActive: true, discount: { select: { id: true, name: true, startDate: true, endDate: true, isActive: true, deletedAt: true } } },
+        select: { isActive: true, format: true, design: true, discount: { select: { id: true, name: true, startDate: true, endDate: true, isActive: true, deletedAt: true } } },
       }),
     ]);
     const d = cfg?.isActive ? cfg.discount : null;
@@ -106,7 +106,9 @@ export class CountdownService {
     // vencer (programada o corriendo). Es lo que traba el interruptor y lo
     // que impide crear otra.
     const vigente = !!actual && actual.isActive && !!actual.endDate && new Date(actual.endDate).getTime() > ahora;
-    return { enabled, actual, vigente };
+    // Formato y colores elegidos: quedan aunque la oferta haya terminado, para
+    // que la próxima arranque con el mismo diseño.
+    return { enabled, actual, vigente, format: cfg?.format ?? null, design: cfg?.design ?? null };
   }
 
   // Prender o apagar el interruptor. Apagar NO toca la fila de
@@ -143,6 +145,8 @@ export class CountdownService {
       ctaText: cfg.ctaText,
       ctaLink: cfg.ctaLink,
       placement: cfg.placement,
+      format: cfg.format,
+      design: cfg.design,
       isActive: cfg.isActive,
       // El id del descuento viaja al storefront: es lo que usa la sección de
       // la portada para pedir sus productos (GET /storefront/:slug/products

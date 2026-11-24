@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Mail, Phone, User, IdCard, ArrowRight, ChevronLeft, Lock, LogIn } from 'lucide-react'
+import { Mail, Phone, User, ArrowRight, ChevronLeft, Lock, LogIn } from 'lucide-react'
 import { CheckoutStepper } from '@/components/storefront/CheckoutStepper'
 import { ProdImage } from '@/components/storefront/Thumb'
 import { Skeleton, SkeletonText } from '@/design-system/components/Skeleton'
@@ -57,7 +57,6 @@ export default function CheckoutDatos() {
   const [apellido, setApellido] = useState('')
   const [email, setEmail]       = useState('')
   const [telefono, setTelefono] = useState('')
-  const [dni, setDni]           = useState('')
   useEffect(() => {
     if (!cliente) return
     setNombre(prev => prev || cliente.firstName)
@@ -65,7 +64,7 @@ export default function CheckoutDatos() {
     setEmail(prev => prev || (cliente.email ?? ''))
   }, [cliente])
 
-  // Teléfono y DNI no viven en el AuthUser liviano de arriba (solo nombre/
+  // El teléfono no vive en el AuthUser liviano de arriba (solo nombre/
   // apellido/email/avatar) — se traen del perfil completo (/me) para no
   // obligar a retipearlos si el cliente ya los tiene cargados (de su perfil
   // o de una compra anterior). Si el perfil no los tiene, quedan vacíos y se
@@ -81,7 +80,6 @@ export default function CheckoutDatos() {
       if (cancelado) return
       perfilRef.current = p
       setTelefono(prev => prev || (p.phone ?? ''))
-      setDni(prev => prev || (p.dni ?? ''))
     }).catch(() => { /* sin perfil disponible: se sigue pidiendo a mano */ })
     return () => { cancelado = true }
   }, [cliente])
@@ -92,13 +90,14 @@ export default function CheckoutDatos() {
   // Teléfono obligatorio: el checkout coordina el envío por WhatsApp, sin
   // teléfono no hay forma de contactar al comprador para eso.
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  type CampoError = 'nombre' | 'apellido' | 'email' | 'telefono' | 'dni'
+  // El DNI se pedía hasta el 17/11: se sacó porque los compradores lo
+  // sentían de más y nada lo usaba.
+  type CampoError = 'nombre' | 'apellido' | 'email' | 'telefono'
   const [errores, setErrores] = useState<Partial<Record<CampoError, string>>>({})
   const nombreRef = useRef<HTMLInputElement>(null)
   const apellidoRef = useRef<HTMLInputElement>(null)
   const emailRef = useRef<HTMLInputElement>(null)
   const telefonoRef = useRef<HTMLInputElement>(null)
-  const dniRef = useRef<HTMLInputElement>(null)
 
   function campoOnChange(setter: (v: string) => void, campo: CampoError) {
     return (v: string) => {
@@ -114,7 +113,6 @@ export default function CheckoutDatos() {
     if (!email.trim()) next.email = 'Ingresá tu email'
     else if (!EMAIL_RE.test(email.trim())) next.email = 'Ese email no es válido'
     if (!telefono.trim()) next.telefono = 'Ingresá tu WhatsApp'
-    if (!dni.trim()) next.dni = 'Ingresá tu DNI'
     return next
   }
 
@@ -130,17 +128,16 @@ export default function CheckoutDatos() {
     if (!cliente) return
     const previo = perfilRef.current
     if (!previo) return
-    const cambios: Partial<Pick<MeProfile, 'firstName' | 'lastName' | 'email' | 'phone' | 'dni'>> = {}
+    const cambios: Partial<Pick<MeProfile, 'firstName' | 'lastName' | 'email' | 'phone'>> = {}
     if (nombre.trim() && nombre.trim() !== previo.firstName) cambios.firstName = nombre.trim()
     if (apellido.trim() !== (previo.lastName ?? '')) cambios.lastName = apellido.trim()
     if (email.trim() && email.trim() !== (previo.email ?? '')) cambios.email = email.trim()
     if (telefono.trim() !== (previo.phone ?? '')) cambios.phone = telefono.trim()
-    if (dni.trim() !== (previo.dni ?? '')) cambios.dni = dni.trim()
     if (Object.keys(cambios).length === 0) return
     // Best-effort: si falla (ej. email ya usado por otra cuenta de este
     // negocio) no hay que trabar el checkout por esto — el pedido igual
     // lleva los datos tipeados acá, solo no quedan guardados para la
-    // próxima. Ver CheckoutInput.buyer / OnlineOrderDetails.buyerDni.
+    // próxima. Ver CheckoutInput.buyer.
     meUpdateProfile(cambios).catch(() => { /* no bloquea el checkout */ })
   }
 
@@ -152,10 +149,9 @@ export default function CheckoutDatos() {
     if (next.apellido) { apellidoRef.current?.focus(); return }
     if (next.email) { emailRef.current?.focus(); return }
     if (next.telefono) { telefonoRef.current?.focus(); return }
-    if (next.dni) { dniRef.current?.focus(); return }
     if (slug) {
       saveCheckoutDraft(slug, {
-        buyer: { name: `${nombre.trim()} ${apellido.trim()}`, email: email.trim(), phone: telefono.trim(), dni: dni.trim() },
+        buyer: { name: `${nombre.trim()} ${apellido.trim()}`, email: email.trim(), phone: telefono.trim() },
       })
     }
     sincronizarPerfil()
@@ -277,15 +273,12 @@ export default function CheckoutDatos() {
                   <I ref={apellidoRef} value={apellido} onChange={campoOnChange(setApellido, 'apellido')} placeholder="Fernández" error={!!errores.apellido} />
                 </F>
               </div>
-              <div className="sf-co-3col" style={{ display: 'grid', gridTemplateColumns: '1.4fr 1.1fr 0.9fr', gap: 14 }}>
+              <div className="sf-co-3col" style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 14 }}>
                 <F label="Email" required error={errores.email}>
                   <I ref={emailRef} type="email" value={email} onChange={campoOnChange(setEmail, 'email')} placeholder="hola@mail.com" icon={<Mail size={15} strokeWidth={1.5} color="var(--color-subtle)" />} error={!!errores.email} />
                 </F>
                 <F label="Teléfono (WhatsApp)" required error={errores.telefono}>
                   <I ref={telefonoRef} type="tel" value={telefono} onChange={campoOnChange(setTelefono, 'telefono')} placeholder="+54 9 11..." icon={<Phone size={15} strokeWidth={1.5} color="var(--color-subtle)" />} error={!!errores.telefono} />
-                </F>
-                <F label="DNI" required error={errores.dni}>
-                  <I ref={dniRef} value={dni} onChange={campoOnChange(setDni, 'dni')} placeholder="30123456" icon={<IdCard size={15} strokeWidth={1.5} color="var(--color-subtle)" />} error={!!errores.dni} />
                 </F>
               </div>
             </div>

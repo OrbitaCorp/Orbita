@@ -56,7 +56,7 @@ describe('SearchService (unit)', () => {
     expect(prisma.order.findMany).not.toHaveBeenCalled();
   });
 
-  it('con permiso de clientes filtra por nombre/email/tel/dni y solo dentro del negocio', async () => {
+  it('con permiso de clientes filtra por nombre/email/tel y solo dentro del negocio', async () => {
     const prisma = makePrismaMock();
     const svc = new SearchService(prisma as any);
 
@@ -67,7 +67,8 @@ describe('SearchService (unit)', () => {
     expect(arg.where.businessId).toBe('biz-42');
     expect(arg.where.deletedAt).toBeNull();
     const campos = arg.where.OR.flatMap((o: any) => Object.keys(o));
-    expect(campos).toEqual(expect.arrayContaining(['firstName', 'lastName', 'email', 'phone', 'dni']));
+    expect(campos).toEqual(expect.arrayContaining(['firstName', 'lastName', 'email', 'phone']));
+    expect(campos).not.toContain('dni');
   });
 
   it('mapea el pedido a { orderNumber, customerName, total, ... } y arma nombre completo', async () => {

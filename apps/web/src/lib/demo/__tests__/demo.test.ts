@@ -141,6 +141,8 @@ describe('tiendas de la demo', () => {
     vi.resetModules()
     expect((await modo('demo-moda.orbita.site')).slugTiendaDemo()).toBe('demo-moda')
     vi.resetModules()
+    expect((await modo('demo-regalos.orbita.site')).slugTiendaDemo()).toBe('demo-regalos')
+    vi.resetModules()
     const otra = await modo('tienda1.orbita.site')
     expect(otra.slugTiendaDemo()).toBeNull()
     expect(otra.esTiendaDemo()).toBe(false)

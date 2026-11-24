@@ -166,6 +166,43 @@ describe('ProductImageSearchService — catálogo y descarga', () => {
     expect(usage.track).toHaveBeenCalledWith(expect.objectContaining({ providerSlug: 'serper', businessId: 'b1', category: 'search_query' }));
   });
 
+  describe('clave de respaldo de Serper', () => {
+    const conFoto = () => respuesta(200, {}, { images: [{ imageUrl: 'https://tienda.com/remera.jpg', title: 'Remera oversize negra', link: 'https://tienda.com/p', domain: 'tienda.com', imageWidth: 900, imageHeight: 900 }] })
+    const claveUsada = (i: number) => (global.fetch as jest.Mock).mock.calls[i][1].headers['X-API-KEY']
+    beforeEach(() => {
+      config.get.mockImplementation((k: string) => (k === 'SERPER_API_KEY' ? 'principal' : k === 'SERPER_API_KEY_RESPALDO' ? 'respaldo' : undefined))
+    })
+
+    it('sin créditos en la principal (HTTP 400 "Not enough credits"), sigue con la de respaldo y lo registra como cupo agotado', async () => {
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce(respuesta(400, {}, JSON.stringify({ message: 'Not enough credits', statusCode: 400 })))
+        .mockResolvedValueOnce(conFoto()) as any
+      const r = await service.searchCatalogImages({ name: 'Remera oversize negra', businessId: 'b1' })
+      expect(r).toHaveLength(1)
+      expect([claveUsada(0), claveUsada(1)]).toEqual(['principal', 'respaldo'])
+      expect(costs.reportQuotaExceeded).toHaveBeenCalledWith('serper', expect.stringContaining('principal'))
+      expect(usage.track).toHaveBeenCalledWith(expect.objectContaining({ category: 'quota_exceeded', metadata: expect.objectContaining({ clave: 'principal' }) }))
+    })
+
+    it('después, la principal agotada se saltea: la búsqueda siguiente va directo a la de respaldo', async () => {
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce(respuesta(400, {}, JSON.stringify({ message: 'Not enough credits', statusCode: 400 })))
+        .mockResolvedValueOnce(conFoto())
+        .mockResolvedValueOnce(conFoto()) as any
+      await service.searchCatalogImages({ name: 'Remera oversize negra', businessId: 'b1' })
+      await service.searchCatalogImages({ name: 'Remera oversize negra', businessId: 'b1' })
+      expect((global.fetch as jest.Mock).mock.calls).toHaveLength(3)
+      expect(claveUsada(2)).toBe('respaldo')
+    })
+
+    it('un 400 que no es de créditos (búsqueda mal armada) no gasta la de respaldo', async () => {
+      global.fetch = jest.fn().mockResolvedValue(respuesta(400, {}, JSON.stringify({ message: 'Query is required', statusCode: 400 }))) as any
+      await service.searchCatalogImages({ name: 'Remera oversize negra', businessId: 'b1' })
+      const aSerper = (global.fetch as jest.Mock).mock.calls.filter((c) => String(c[0]).includes('serper'))
+      expect(aSerper.map((c) => c[1].headers['X-API-KEY'])).toEqual(['principal'])
+    })
+  })
+
   it('descarga una foto y devuelve el buffer', async () => {
     global.fetch = jest.fn().mockResolvedValue(respuesta(200, { 'content-type': 'image/jpeg' }, Buffer.from([1, 2, 3]))) as any;
     const r = await service.descargarImagen('https://tienda.com/remera.jpg');
@@ -241,11 +278,11 @@ describe('ProductsController — fotos de la web en Importar Excel', () => {
     );
   });
 
-  it('no exige el paquete Avanzado (decisión del 12/11)', () => {
+  it('exige el paquete Avanzado', () => {
     const addon = (m: keyof ProductsController) =>
       Reflect.getMetadata(REQUIRES_ADDON_KEY, ProductsController.prototype[m] as object);
-    expect(addon('webImageSuggestions')).toBeUndefined();
-    expect(addon('addImageFromWeb')).toBeUndefined();
+    expect(addon('webImageSuggestions')).toBe('ADVANCED');
+    expect(addon('addImageFromWeb')).toBe('ADVANCED');
   });
 
   it('busca con los datos del producto guardado y consume el tope diario del negocio', async () => {

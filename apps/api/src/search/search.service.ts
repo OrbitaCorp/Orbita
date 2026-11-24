@@ -12,7 +12,7 @@ const MAX_INT_POSTGRES = 2_147_483_647;
 // (Fase 4 — Alex) La búsqueda global del header del panel.
 //
 // Busca con `contains` case-insensitive en los campos que el dueño realmente
-// usa para encontrar cosas: número de pedido, nombre/email/DNI del cliente,
+// usa para encontrar cosas: número de pedido, nombre/email/teléfono del cliente,
 // nombre/SKU/código de barras del producto, y nombre/código del descuento o
 // cupón. Cada grupo se saltea si el miembro no tiene el permiso de ver esa
 // sección (mismos códigos que usan los guards de cada módulo).
@@ -66,7 +66,7 @@ export class SearchService {
               businessId,
               deletedAt: null,
               AND: [soloClientesReales],
-              OR: [{ firstName: contains }, { lastName: contains }, { email: contains }, { phone: contains }, { dni: contains }],
+              OR: [{ firstName: contains }, { lastName: contains }, { email: contains }, { phone: contains }],
             },
             orderBy: { createdAt: 'desc' },
             take: LIMITE_POR_GRUPO,

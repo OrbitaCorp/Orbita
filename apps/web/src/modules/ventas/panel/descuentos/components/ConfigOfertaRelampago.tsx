@@ -23,6 +23,8 @@ import { useEstadoRelampago } from '../hooks/useEstadoRelampago'
 import { adminPath, currentSlug } from '@/lib/tenant'
 import { fmtFechaHora } from '../utils'
 import type { AlcanceDescuento } from '../types'
+import { FORMATOS_OFERTA, type FormatoOferta } from '@/modules/ventas/promos/catalogo'
+import { GrillaFormatos, SelectorDiseno } from '@/modules/ventas/promos/PanelPromos'
 
 interface Props {
   // Id del descuento en edición: si es el que ya tiene la oferta, no hay
@@ -37,9 +39,13 @@ interface Props {
   onChangeProductos: (ids: string[]) => void
   onChangeCategorias: (ids: string[]) => void
   errores?: Record<string, string>
+  formato: FormatoOferta
+  diseno: string
+  onChangeFormato: (f: FormatoOferta) => void
+  onChangeDiseno: (d: string) => void
 }
 
-export function ConfigOfertaRelampago({ editandoId, ...campos }: Props) {
+export function ConfigOfertaRelampago({ editandoId, formato, diseno, onChangeFormato, onChangeDiseno, ...campos }: Props) {
   const router = useRouter()
   const { estado, vigente } = useEstadoRelampago(editandoId)
 
@@ -85,6 +91,13 @@ export function ConfigOfertaRelampago({ editandoId, ...campos }: Props) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <style>{ESTILOS}</style>
       <ConfigPorcentajeProducto {...campos} />
+      <div>
+        <p className="cor-sub">Diseño en tu portada</p>
+        <GrillaFormatos formatos={FORMATOS_OFERTA} valor={formato} onCambio={onChangeFormato} />
+        <div style={{ maxWidth: 280, marginTop: 14 }}>
+          <SelectorDiseno valor={diseno} onCambio={onChangeDiseno} />
+        </div>
+      </div>
       <p className="cor-nota">
         <Timer size={13} strokeWidth={2.2} aria-hidden style={{ flexShrink: 0, marginTop: 2 }} />
         <span>Solo puede haber una oferta relámpago a la vez. Cuando llega la hora de fin, el reloj desaparece solo y el descuento deja de aplicarse.</span>
@@ -102,6 +115,7 @@ const ESTILOS = `
 .cor-aviso-texto { margin: 4px 0 0; font-size: 13px; line-height: 1.55; color: var(--color-body); max-width: 64ch; }
 .cor-cta { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; height: 36px; padding: 0 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; border: none; background: var(--color-primary); color: var(--color-on-primary); }
 .cor-cta:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.cor-sub { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--color-text); }
 .cor-nota { display: flex; gap: 8px; margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--color-muted); }
 .cor-nota[data-tipo="aviso"] { color: var(--color-warning); }
 `

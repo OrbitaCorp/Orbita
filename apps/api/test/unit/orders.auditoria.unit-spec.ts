@@ -97,7 +97,7 @@ describe('Listado del panel', () => {
 
 describe('Topes del alta (panel y checkout público)', () => {
   const props = async (cls: any, body: object) => (await validate(plainToInstance(cls, body))).map((e) => e.property);
-  const comprador = { name: 'Ana', email: 'ana@mail.com', phone: '1155556666', dni: '30111222' };
+  const comprador = { name: 'Ana', email: 'ana@mail.com', phone: '1155556666' };
 
   it('checkout: una cantidad enorme o cien y un renglones se rechazan', async () => {
     const base = { buyer: comprador, shippingMethod: 'PICKUP', paymentMethod: 'CASH' };

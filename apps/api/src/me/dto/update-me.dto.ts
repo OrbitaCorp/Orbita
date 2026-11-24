@@ -13,7 +13,6 @@ export class UpdateMeDto {
   @IsOptional() @IsString() @MaxLength(120) lastName?: string;
   @IsOptional() @NormalizedEmail() email?: string;
   @IsOptional() @IsString() @MaxLength(40) phone?: string;
-  @IsOptional() @IsString() @MaxLength(30) dni?: string;
   @IsOptional() @IsDateString() birthDate?: string;
 
   // Obligatoria solo si el email cambia de verdad (la pantalla de perfil manda

@@ -6,7 +6,8 @@ import { decidirPrimerosPasos, pasoInicial } from '../primerosPasos'
 import { ESTADO_AYUDA_VACIO, parsear } from '../almacen'
 import { puedeUsarModoPrueba, comandoDeQuery, cumplidasSimuladas, siguientePasoDePrueba } from '../acceso'
 import { INTERVALO_MS, SUGERENCIAS, claveDeSugerencia, elegirSugerencia } from '../sugerencias'
-import { agruparPorPantalla } from '../videos'
+import { VIDEOS_PROPIOS, agruparPorPantalla, sumarPropios } from '../videos'
+import { NOVEDADES, indiceInicialNovedades, novedadesSinVer, novedadesVigentes, leidaEn, LEIDAS_SIN_FECHA_DESDE, NOVEDAD_LEIDA_DURA_MS } from '../novedades'
 
 describe('recorrido por módulo', () => {
     it('las claves son secciones del panel o una vista de Configuración', () => {
@@ -236,5 +237,87 @@ describe('videos tutoriales', () => {
         expect(m.get('pedidos')).toEqual([{ titulo: 'Cargar una venta a mano', id: 'aaaaaaaaaaa' }, { titulo: 'Pedidos en lote', id: 'bbbbbbbbbbb' }])
         expect(m.get('pedidos/nuevo')).toEqual([{ titulo: 'Cargar una venta a mano', id: 'aaaaaaaaaaa' }])
         expect(m.get('clientes')).toBeUndefined()
+    })
+
+    it('los propios (R2) van después de los de la lista, sin repetirse, y aparecen aunque la lista no traiga nada', () => {
+        const propio = { titulo: 'WhatsApp en tu panel', id: 'r2:whatsapp', src: 'https://r2/w.mp4' }
+        const lista = agruparPorPantalla([{ titulo: 'Responder mensajes', youtubeId: 'ccccccccccc', pantallas: ['mensajes'] }])
+        const m = sumarPropios(lista, { mensajes: [propio], difusion: [{ ...propio, id: 'r2:difusion' }] })
+        expect(m.get('mensajes')?.map(v => v.id)).toEqual(['ccccccccccc', 'r2:whatsapp'])
+        expect(m.get('difusion')?.map(v => v.id)).toEqual(['r2:difusion'])
+        expect(sumarPropios(m, { mensajes: [propio] }).get('mensajes')?.length).toBe(2)
+    })
+
+    it('Mensajes y Difusión tienen su video propio, y su clave tiene recorrido (si no, «Ver tutorial» no abre)', () => {
+        for (const clave of Object.keys(VIDEOS_PROPIOS)) {
+            expect(recorridoDe(clave)).not.toBeNull()
+            for (const v of VIDEOS_PROPIOS[clave]) expect(v.src).toMatch(/^https:\/\/.+\.mp4$/)
+        }
+        expect(Object.keys(VIDEOS_PROPIOS).sort()).toEqual(['difusion', 'mensajes'])
+    })
+})
+
+describe('novedades del panel', () => {
+    it('cada novedad tiene id único, contenido completo, al menos una imagen y destino válido', () => {
+        const ids = NOVEDADES.map(n => n.id)
+        expect(new Set(ids).size).toBe(ids.length)
+        for (const n of NOVEDADES) {
+            expect(n.id.trim().length).toBeGreaterThan(0)
+            expect(n.titulo.trim().length).toBeGreaterThan(0)
+            expect(n.descripcion.trim().length).toBeGreaterThan(0)
+            expect(n.imagenes.length).toBeGreaterThan(0)
+            for (const img of n.imagenes) {
+                expect(img.src.trim().length).toBeGreaterThan(0)
+                expect(img.epigrafe.trim().length).toBeGreaterThan(0)
+            }
+            if (n.irA) {
+                expect(SECCIONES_DEL_PANEL as readonly string[]).toContain(n.irA.seccion)
+            }
+        }
+    })
+
+    it('novedadesSinVer e indiceInicialNovedades filtran y posicionan según novedadesVistas', () => {
+        expect(novedadesSinVer([])).toEqual([...NOVEDADES])
+        expect(indiceInicialNovedades([])).toBe(0)
+
+        if (NOVEDADES.length >= 2) {
+            expect(novedadesSinVer([NOVEDADES[0].id])).toEqual(NOVEDADES.slice(1))
+            expect(indiceInicialNovedades([NOVEDADES[0].id])).toBe(1)
+        }
+
+        const todasVistas = NOVEDADES.map(n => n.id)
+        expect(novedadesSinVer(todasVistas)).toEqual([])
+        expect(indiceInicialNovedades(todasVistas)).toBe(0)
+    })
+
+    it('parsear conserva novedadesVistas válidas y descarta valores inválidos', () => {
+        expect(parsear('{"novedadesVistas":["2026-11-orbi-barra",42,null,"otra"]}').novedadesVistas)
+            .toEqual(['2026-11-orbi-barra', 'otra'])
+        expect(parsear('{"novedadesVistas":"no-es-array"}').novedadesVistas).toEqual([])
+    })
+
+    describe('cuánto dura una novedad: hasta leerla, y 3 días más', () => {
+        const DIA = 24 * 60 * 60 * 1000
+        const lista = [{ ...NOVEDADES[0], id: 'a' }, { ...NOVEDADES[0], id: 'b' }]
+        const ahora = Date.parse('2026-12-10T12:00:00-03:00')
+
+        it('una sin leer no se va nunca, aunque pasen meses', () => {
+            expect(novedadesVigentes({ novedadesVistas: [], novedadesLeidasEn: {} }, ahora + 400 * DIA, lista).map(n => n.id)).toEqual(['a', 'b'])
+        })
+
+        it('leída, sigue 3 días y después se va', () => {
+            const leida = { novedadesVistas: ['a'], novedadesLeidasEn: { a: ahora } }
+            expect(novedadesVigentes(leida, ahora + 2 * DIA, lista).map(n => n.id)).toEqual(['a', 'b'])
+            expect(novedadesVigentes(leida, ahora + 3 * DIA, lista).map(n => n.id)).toEqual(['b'])
+        })
+
+        it('las "vistas" de antes del cambio (sin fecha) cuentan como leídas el día del cambio', () => {
+            expect(leidaEn('a', { novedadesVistas: ['a'], novedadesLeidasEn: {} })).toBe(LEIDAS_SIN_FECHA_DESDE)
+            expect(novedadesVigentes({ novedadesVistas: ['a'], novedadesLeidasEn: {} }, LEIDAS_SIN_FECHA_DESDE + NOVEDAD_LEIDA_DURA_MS, lista).map(n => n.id)).toEqual(['b'])
+        })
+
+        it('parsear guarda la fecha de lectura y descarta valores rotos', () => {
+            expect(parsear('{"novedadesLeidasEn":{"a":123,"otra":"x"}}').novedadesLeidasEn).toEqual({ a: 123 })
+        })
     })
 })

@@ -8,6 +8,7 @@ import type { BloqueReceta, Estante, Plantilla, Producto, AccionesHome } from '.
 import {
   Reveal, Foto, Estrellas, Card, Boton, Titulo, Marquee,
   HeaderCentrado, Carrusel, Pie, TONOS, AccionesTienda, navDe, navHover, MenuMovil,
+  PistaMarquee,
 } from './piezas'
 import { VariantesTexto } from '@/components/storefront/VariantesTexto'
 import { esAfirmacion, estanteDeSeccion, porDefectoDe, TITULOS_ESTANTE } from './secciones'
@@ -190,7 +191,11 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
       </div>
     )
   }
-  const cols = (d: number, m = 2) => `repeat(${movil ? m : d}, 1fr)`
+  // `minmax(0, 1fr)` y no `1fr`: con `1fr` la columna no baja del ancho
+  // mínimo de su contenido, y una tarjeta con un precio largo o el cartelito
+  // de la oferta ensanchaba la grilla más allá de la pantalla en un teléfono
+  // chico (hueco blanco a la derecha y scroll de costado, reportado 17/11).
+  const cols = (d: number, m = 2) => `repeat(${movil ? m : d}, minmax(0, 1fr))`
   // Cuántos entran en UNA fila de esa grilla. Va siempre de a pares con
   // `cols()`: si no coinciden, la fila queda con un hueco a la derecha o con
   // un producto colgado abajo.
@@ -389,7 +394,10 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
 
   const producto = (x: Producto, i: number, props: { sangre?: boolean; alto: number }) =>
     acciones?.renderProducto
-      ? <div key={x.slug ?? x.nombre}>{acciones.renderProducto(x, i, props)}</div>
+      // Alto completo: la tarjeta real ya pide `height: 100%`, pero sin esto
+      // su envoltorio medía lo que su contenido y, en las tiras, cada tarjeta
+      // quedaba de un alto distinto que la de al lado (reportado 17/11).
+      ? <div key={x.slug ?? x.nombre} style={{ height: '100%', minWidth: 0 }}>{acciones.renderProducto(x, i, props)}</div>
       : <Card key={x.nombre} p={x} t={t} sangre={props.sangre} alto={props.alto} onClick={abrir(x)} />
 
   // ── TIENDA ────────────────────────────────────────────────────────────────
@@ -1480,11 +1488,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
         {!!aviso && (
           <div style={{ padding: '9px 0', fontSize: 10.5, letterSpacing: '0.22em', textTransform: 'uppercase', color: t.primary, borderBottom: filete, overflow: 'hidden' }}>
             {avisoCartelera ? (
-              <div className="pl-marquee-track">
-                {[0, 1].map((k) => (
-                  <span key={k}>{`${aviso}   ·   `.repeat(6)}</span>
-                ))}
-              </div>
+              <PistaMarquee mitad={`${aviso}   ·   `.repeat(6)} />
             ) : (
               <div style={{ textAlign: 'center', padding: '0 12px' }}>{aviso}</div>
             )}
@@ -2434,9 +2438,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
         {!!aviso && (
           <div style={{ background: t.soft, padding: '9px 0', fontSize: 12, fontWeight: 700, color: t.primary, overflow: 'hidden' }}>
             {avisoCartelera ? (
-              <div className="pl-marquee-track">
-                {[0, 1].map((k) => <span key={k}>{`${aviso}   `.repeat(6)}</span>)}
-              </div>
+              <PistaMarquee mitad={`${aviso}   `.repeat(6)} />
             ) : (
               <div style={{ textAlign: 'center', padding: '0 12px' }}>{aviso}</div>
             )}
@@ -3000,9 +3002,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
         {!!aviso && (
           <div style={{ padding: '9px 0', fontSize: 10.5, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.primary, borderBottom: filete, background: t.soft, overflow: 'hidden' }}>
             {avisoCartelera ? (
-              <div className="pl-marquee-track">
-                {[0, 1].map((k) => <span key={k}>{`${aviso}   ·   `.repeat(6)}</span>)}
-              </div>
+              <PistaMarquee mitad={`${aviso}   ·   `.repeat(6)} />
             ) : (
               <div style={{ textAlign: 'center', padding: '0 12px' }}>{aviso}</div>
             )}

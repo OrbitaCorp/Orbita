@@ -6,25 +6,44 @@
 // Se puede entrar con algo ya elegido desde la portada (?unidad=, ?salon=,
 // ?fecha=, ?hora=, ?paquete=, ?propiedad=, ?entrada=, ?salida=, ?meses=).
 //
-// Se reserva sin registrarse: nombre y celular alcanzan. El "pago" de la seña
-// es simulado. Al confirmar, la reserva queda guardada en el navegador y
-// aparece en "Mis reservas" y en el panel del negocio. Todo el cálculo de
+// Se reserva sin registrarse: nombre y celular alcanzan. Todo el cálculo de
 // disponibilidad y precio es de lib/reservas.
+//
+// En la demo el "pago" de la seña es simulado y la reserva queda guardada en
+// el navegador (aparece en "Mis reservas" y en el panel de ejemplo).
+//
+// En el sitio de un negocio real (prop `enviar`, por ahora solo estadía por
+// noche) el pedido va a la API: no hay paso de pago, porque todavía no se cobra
+// online. La reserva nace pendiente o confirmada según el negocio, y la
+// confirmación da el enlace personal para verla o cancelarla. Si las noches se
+// ocuparon mientras tanto, se vuelve a elegir fechas con el calendario al día.
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { ArrowRight, CalendarPlus, Check, ChevronLeft, Lock, MessageCircle, Users } from 'lucide-react'
+import { ArrowRight, CalendarPlus, Check, ChevronLeft, Clock, Lock, MessageCircle, Users } from 'lucide-react'
 import { duracionTxt, esISO, fechaLarga, hhmm, rangoTxt, sumarDias, diaSemana, fechaCorta, type ISO } from '@/lib/reservas/fechas'
 import { consecutivasDesde, franjasDelDia } from '@/lib/reservas/disponibilidad'
 import { pesos, precioBloque, precioPorHora, precioTurnosSeguidos } from '@/lib/reservas/precio'
 import { agruparNoches, motivoNoReservable, motivoNoReservableMes, nochesEntre, precioEstadia, precioMensual, primeraEntradaLibre, salidaMaxima, nochesOcupadas } from '@/lib/reservas/estadia'
 import { descargarICS, generarICS } from '@/lib/reservas/ics'
-import { AHORA, HOY, aperturaDe, bloqueoEn, bloquesDe, bloquesLibresEn, capital, cuenta, duracionEstadiaTxt, esMensual, mesesTxt, nochesTxt, ocupadoDelDia, palabrasDe, rangosOcupados, salonDe, senaPara, type Cliente, type NegocioAlquiler, type Reserva as ReservaT } from '../datos'
+import { AHORA, codigoDe, HOY, aperturaDe, bloqueoEn, bloquesDe, bloquesLibresEn, capital, cuenta, duracionEstadiaTxt, esMensual, mesesTxt, nochesTxt, ocupadoDelDia, palabrasDe, rangosOcupados, salonDe, senaPara, type Cliente, type NegocioAlquiler, type Reserva as ReservaT } from '../datos'
 import { CalendarioDia, CalendarioRango, type Rango } from '@/design-system/reservas/Calendario'
 import { Campo, Area, Selector } from '@/design-system/reservas/piezas'
-import Sitio, { lineaNoches, ruta } from './Sitio'
+import Sitio, { lineaNoches } from './Sitio'
+import { rutaMiReserva, useSitio } from './rutas'
+import { linkWhatsApp, politicaCancelacion } from '../datos/textos'
+import type { PedidoSitio } from '../datos/origen/escribir'
+// Solo los tipos: el sitio real (SitioReal.tsx) es quien habla con la API.
+import type { HechaEnSitio as ReservaHecha, ResultadoDelPedido as ResultadoPedido } from '../datos/origen/sitio'
 
-interface P { negocio: NegocioAlquiler; reservas: ReservaT[]; onReservar: (r: ReservaT, c: Cliente) => void }
+interface P {
+  negocio: NegocioAlquiler
+  reservas: ReservaT[]
+  /** La demo: guarda la reserva en el navegador. */
+  onReservar?: (r: ReservaT, c: Cliente) => void
+  /** El sitio real: manda el pedido a la API (la clave del intento la pone quien lo manda). */
+  enviar?: (p: Omit<PedidoSitio, 'clave'>) => Promise<ResultadoPedido>
+}
 
 type PasoId = 'unidad' | 'cuando' | 'paquete' | 'extras' | 'datos' | 'pago'
 
@@ -35,8 +54,9 @@ const DATOS_VACIOS: Datos = { nombre: '', telefono: '', email: '', notas: '', ag
 
 const q1 = (v: unknown) => (typeof v === 'string' ? v : '')
 
-export default function Reserva({ negocio, reservas, onReservar }: P) {
+export default function Reserva({ negocio, reservas, onReservar, enviar }: P) {
   const router = useRouter()
+  const { real, ultimoDia, confirmaElNegocio } = useSitio()
   // Nombre de cada grupo de radios y prefijo de los ids que los nombran y describen.
   const prefijo = useId()
   const tipo = negocio.tipo
@@ -68,11 +88,15 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
   const [intento, setIntento] = useState(false)
   const [enviando, setEnviando] = useState(false)
   const [hecha, setHecha] = useState<ReservaT | null>(null)
+  // Sitio real: la reserva como la devolvió la API y lo que respondió si falló.
+  const [hechaReal, setHechaReal] = useState<ReservaHecha | null>(null)
+  const [fallo, setFallo] = useState<string | null>(null)
 
   // ── Lo elegido ──
   // Sin useMemo: react-compiler memoiza solo, y a mano no se podía (las listas se arman en cada render).
   const unidad = tipo === 'cancha' ? negocio.unidades.find(u => u.id === unidadId) ?? null : null
   const salon = tipo === 'bloque' ? salonDe(negocio, unidadId ?? undefined) ?? null : null
+  const depositoSalon = salon?.deposito ?? 0
   const propiedad = tipo === 'estadia' ? negocio.propiedades.find(p => p.id === unidadId) ?? null : null
   const mensual = !!propiedad && esMensual(propiedad) && !!propiedad.mensual
   const paquete = salon?.paquetes.find(p => p.id === paqueteId) ?? null
@@ -112,7 +136,7 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
     if (tipo === 'estadia' && propiedad && !mensual && rangoCompleto && !motivoRango) {
       const p = precioEstadia(rango.entrada!, rango.salida!, propiedad.tarifa)
       // Una línea por precio: con temporada o fin de semana, un subtotal solo no explicaba el total.
-      return { total: p.total, base: p.subtotal, detalle: [...agruparNoches(p.noches).map(lineaNoches), ['Limpieza', p.limpieza]] }
+      return { total: p.total, base: p.subtotal, detalle: [...agruparNoches(p.noches).map(lineaNoches), ...(p.limpieza > 0 ? [['Limpieza', p.limpieza] as [string, number]] : [])] }
     }
     return null
   }
@@ -122,7 +146,8 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
 
   // ── Pasos ──
   // La Seña figura desde el principio si el negocio la cobra: antes aparecía recién al tener un total y la barra de pasos crecía en el medio.
-  const conSena = negocio.senaPct > 0 && (!precio || sena > 0)
+  // En el sitio real todavía no se cobra online: la seña se coordina después, con la reserva ya tomada.
+  const conSena = !enviar && negocio.senaPct > 0 && (!precio || sena > 0)
   const pasos: PasoId[] = tipo === 'cancha' ? ['unidad', 'cuando', ...(listaExtras.length ? ['extras' as PasoId] : []), 'datos', ...(conSena ? ['pago' as PasoId] : [])]
     : tipo === 'bloque' ? [...(unSalon ? [] : ['unidad' as PasoId]), 'cuando', 'paquete', ...(listaExtras.length ? ['extras' as PasoId] : []), 'datos', ...(conSena ? ['pago' as PasoId] : [])]
       : ['unidad', 'cuando', 'datos', ...(conSena ? ['pago' as PasoId] : [])]
@@ -162,6 +187,20 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
     confirmar()
   }
   const confirmar = () => {
+    if (enviar) {
+      if (!propiedad || !rango.entrada || !rango.salida) return
+      setEnviando(true)
+      setFallo(null)
+      enviar({ propiedadId: propiedad.id, entrada: rango.entrada, salida: rango.salida, nombre: datos.nombre, telefono: datos.telefono, email: datos.email, notas: datos.notas, huespedes: Number(datos.huespedes || 1) })
+        .then(res => {
+          if (res.ok) { setHechaReal(res.hecha); return }
+          setFallo(res.mensaje)
+          // Las noches se ocuparon: a elegir otras, con el calendario que el sitio acaba de volver a pedir.
+          if (res.ocupado) { setRango({ entrada: null, salida: null }); setPaso(Math.max(0, pasos.indexOf('cuando'))) }
+        }, () => setFallo('No pudimos mandar tu pedido. Probá de nuevo.'))
+        .finally(() => setEnviando(false))
+      return
+    }
     setEnviando(true)
     window.setTimeout(() => {
       const id = `n${Date.now().toString(36)}`
@@ -175,12 +214,13 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
           : mensual && precioMes
             ? { ...base, entrada: precioMes.entrada, salida: precioMes.salida, meses: precioMes.meses, huespedes: Number(datos.huespedes || 1), deposito: propiedad.mensual!.deposito || undefined, depositoRegistrado: false }
             : { ...base, entrada: rango.entrada ?? HOY, salida: rango.salida ?? sumarDias(HOY, 1), huespedes: Number(datos.huespedes || 1) }
-      onReservar(r, cliente)
+      onReservar?.(r, cliente)
       setHecha(r)
       setEnviando(false)
     }, sena ? 1600 : 1000)
   }
 
+  if (hechaReal) return <ConfirmacionReal negocio={negocio} hecha={hechaReal} datos={datos} />
   if (hecha) return <Confirmacion negocio={negocio} reserva={hecha} datos={datos} />
 
   // ── Textos ──
@@ -195,7 +235,9 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
     cuando: mensual ? 'Elegí desde cuándo y cuántos meses' : tipo === 'estadia' ? 'Elegí entrada y salida para seguir' : tipo === 'bloque' ? 'Elegí fecha y bloque para seguir' : 'Elegí día y horario para seguir',
     paquete: 'Elegí un paquete y cuántos invitados vienen', extras: '', datos: '', pago: '',
   }
-  const textoBoton = actual === 'pago' ? `Pagar ${pesos(sena)}` : ultimo ? (mensual ? 'Confirmar alquiler' : 'Confirmar reserva') : pasos[paso + 1] === 'pago' ? 'Ir a pagar la seña' : 'Continuar'
+  const textoBoton = actual === 'pago' ? `Pagar ${pesos(sena)}` : ultimo ? (mensual ? 'Confirmar alquiler' : real && confirmaElNegocio ? 'Pedir la reserva' : 'Confirmar reserva') : pasos[paso + 1] === 'pago' ? 'Ir a pagar la seña' : 'Continuar'
+  // Más allá de la anticipación máxima del negocio no se puede reservar (sitio real).
+  const fuera = (f: ISO) => f < HOY || (ultimoDia !== null && f > ultimoDia)
 
   return (
     // En la barra del pie: lo que falta mientras no se pueda seguir (en el salón el nombre ya venía elegido y tapaba el aviso), y si no, el resumen.
@@ -208,6 +250,8 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
         <div className="alr-grilla">
           <div className="alr-paso">
             {paso > 0 && <button type="button" className="rv-btn rv-btn--fantasma rv-btn--sm" style={{ marginLeft: -12, marginBottom: 6 }} onClick={() => ir(paso - 1)} disabled={enviando}><ChevronLeft size={16} aria-hidden /> Volver</button>}
+            {/* Lo que respondió el servidor si el pedido no entró: arriba del paso, donde se sigue. */}
+            {fallo && <p className="rv-error" role="alert" style={{ margin: '0 0 14px' }}>{fallo}</p>}
 
             {/* Los grupos de opciones son radios de verdad (rv-card--radio del kit): una sola parada de
                 Tab, las flechas mueven y eligen, Espacio elige. Cada radio se nombra con el título de su
@@ -356,7 +400,7 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
               <Bloque refTitulo={titulo} titulo="¿Cuándo?" sub={`${propiedad.nombre} · entrada desde las ${hhmm(propiedad.checkIn)}, salida hasta las ${hhmm(propiedad.checkOut)}. Tocá el día de entrada y después el de salida.`}>
                 <div className="alr-dos">
                   <CalendarioRango mes={mes} onMes={setMes} hoy={HOY} rango={rango} onRango={setRango} minMes={HOY}
-                    estadoDe={f => ({ deshabilitado: f < HOY, ocupado: tomadas.has(f), aria: tomadas.has(f) ? 'ocupado' : undefined })}
+                    estadoDe={f => ({ deshabilitado: fuera(f), ocupado: tomadas.has(f), aria: tomadas.has(f) ? 'ocupado' : undefined })}
                     salidaMaxima={e => salidaMaxima(e, ocupadasProp)} />
                   <div>
                     {motivoRango && <p className="rv-error" role="alert" style={{ marginBottom: 12 }}>{motivoRango}</p>}
@@ -417,7 +461,7 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
                     <CampoR id="nombre" label="Nombre y apellido" value={datos.nombre} onChange={v => setDatos({ ...datos, nombre: v })} error={intento ? errores.nombre : undefined} autoComplete="name" />
                     <CampoR id="telefono" label="Celular" value={datos.telefono} onChange={v => setDatos({ ...datos, telefono: v })} error={intento ? errores.telefono : undefined} inputMode="tel" autoComplete="tel" placeholder="Con código de área" />
                   </div>
-                  <CampoR id="email" label="Email (opcional)" value={datos.email} onChange={v => setDatos({ ...datos, email: v })} error={intento ? errores.email : undefined} inputMode="email" autoComplete="email" ayuda="Para mandarte la confirmación." />
+                  <CampoR id="email" label="Email (opcional)" value={datos.email} onChange={v => setDatos({ ...datos, email: v })} error={intento ? errores.email : undefined} inputMode="email" autoComplete="email" ayuda={real ? 'Te mandamos ahí el enlace para ver o cancelar tu reserva.' : 'Para mandarte la confirmación.'} />
                   <Area label={tipo === 'bloque' ? 'Algo que tengamos que saber' : 'Notas (opcional)'} value={datos.notas} onChange={v => setDatos({ ...datos, notas: v })} placeholder={tipo === 'bloque' ? 'Temática, alergias, horario de la torta…' : ''} maxLength={300} />
                   <button type="submit" className="rv-sr">Continuar</button>
                 </form>
@@ -425,7 +469,7 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
             )}
 
             {actual === 'pago' && (
-              <Bloque refTitulo={titulo} titulo="Confirmá con la seña" sub={`Pagás ${pesos(sena)} ahora y ${pesos(total - sena)} ${mensual ? 'mes a mes' : 'en el lugar'}. Si cancelás ${negocio.cancelaHastaHoras >= 24 ? `hasta ${negocio.cancelaHastaHoras / 24} ${negocio.cancelaHastaHoras / 24 === 1 ? 'día' : 'días'}` : `hasta ${negocio.cancelaHastaHoras} h`} antes, se devuelve.`}>
+              <Bloque refTitulo={titulo} titulo="Confirmá con la seña" sub={`Pagás ${pesos(sena)} ahora y ${pesos(total - sena)} ${mensual ? 'mes a mes' : 'en el lugar'}.${depositoSalon ? ` Además, el día del evento se entrega un depósito de garantía de ${pesos(depositoSalon)}, que se devuelve al terminar.` : ''} ${politicaCancelacion(negocio)}`}>
                 <div className="rv-card rv-card--pad" style={{ background: 'var(--color-surface)' }}>
                   <div className="rv-rotulo">Vista previa: no se cobra nada</div>
                   <p style={{ margin: '8px 0 14px', fontSize: 14 }}>En el producto real, acá se abre Mercado Pago con el monto de la seña.</p>
@@ -445,15 +489,18 @@ export default function Reserva({ negocio, reservas, onReservar }: P) {
                 {tipo === 'estadia' && (rangoCompleto || precioMes) && <div><dt>{mensual ? 'Personas' : 'Huéspedes'}</dt><dd>{datos.huespedes}</dd></div>}
                 {precio?.detalle.map(([k, v]) => <div key={k}><dt>{k}</dt><dd className="rv-num">{pesos(v)}</dd></div>)}
                 {mensual && precioMes && propiedad.mensual!.deposito > 0 && <div><dt>Depósito, aparte</dt><dd className="rv-num">{pesos(propiedad.mensual!.deposito)}</dd></div>}
+                {/* El depósito del salón se dice antes de pagar la seña: antes aparecía recién en la confirmación. */}
+                {depositoSalon > 0 && <div><dt>Depósito, aparte (se devuelve)</dt><dd className="rv-num">{pesos(depositoSalon)}</dd></div>}
               </dl>
               <div className="alr-total"><span>Total</span><b className="rv-num">{precio ? pesos(total) : '—'}</b></div>
-              {sena > 0 && <div className="alr-total" style={{ fontWeight: 500, color: 'var(--color-muted)' }}><span>Seña ahora</span><span className="rv-num">{pesos(sena)}</span></div>}
+              {sena > 0 && <div className="alr-total" style={{ fontWeight: 500, color: 'var(--color-muted)' }}><span>{real ? 'Seña para confirmar' : 'Seña ahora'}</span><span className="rv-num">{pesos(sena)}</span></div>}
               {actual !== 'pago' && (
                 <button type="button" className="rv-btn rv-btn--primario rv-btn--lg rv-btn--ancho" style={{ marginTop: 14 }} onClick={siguiente} disabled={!listo[actual] || enviando} aria-busy={enviando}>
                   {enviando ? 'Reservando…' : textoBoton} {!enviando && <ArrowRight size={16} aria-hidden />}
                 </button>
               )}
               <p className="rv-ayuda alr-falta" style={{ minHeight: 20, margin: '8px 0 0', textAlign: 'center' }}>{listo[actual] ? '' : falta[actual]}</p>
+              {real && <p className="rv-ayuda" style={{ margin: '4px 0 0', textAlign: 'center' }}>No se cobra nada ahora.{sena > 0 ? ` La seña se coordina con ${negocio.nombre}.` : ''}</p>}
             </div>
           </aside>
         </div>
@@ -506,9 +553,10 @@ function validar(d: Datos, tipo: NegocioAlquiler['tipo'], hasta: number, maxHues
 // ─── Confirmación ────────────────────────────────────────────────────────────
 
 function Confirmacion({ negocio, reserva: r, datos }: { negocio: NegocioAlquiler; reserva: ReservaT; datos: Datos }) {
+  const { ruta } = useSitio()
   const tipo = negocio.tipo
   const palabras = palabrasDe(negocio)
-  const codigo = r.id.slice(-6).toUpperCase()
+  const codigo = codigoDe(r)
   const unidad = tipo === 'cancha' ? negocio.unidades.find(u => u.id === r.unidadId) : tipo === 'estadia' ? negocio.propiedades.find(p => p.id === r.unidadId) : salonDe(negocio, r.unidadId)
   const cuando = r.entrada && r.salida ? `${rangoTxt(r.entrada, r.salida)} · ${duracionEstadiaTxt(r)}` : r.fecha && r.inicio !== undefined && r.fin !== undefined ? `${fechaLarga(r.fecha)} · ${hhmm(r.inicio)} a ${hhmm(r.fin)}` : ''
   const calendario = () => {
@@ -544,6 +592,67 @@ function Confirmacion({ negocio, reserva: r, datos }: { negocio: NegocioAlquiler
           </div>
         </div>
         <p className="rv-ayuda" style={{ textAlign: 'center', marginTop: 14 }}>Es una demo: no se cobró nada ni se mandó ningún mensaje. {fechaCorta(HOY)}.</p>
+      </div>
+    </Sitio>
+  )
+}
+
+/**
+ * La confirmación en el sitio de un negocio real. Lo primero que se lee es en
+ * qué quedó (pendiente de la seña o confirmada) y qué falta hacer; después el
+ * código y el detalle. El enlace personal es la única llave de la reserva.
+ */
+function ConfirmacionReal({ negocio, hecha, datos }: { negocio: NegocioAlquiler; hecha: ReservaHecha; datos: Datos }) {
+  const r = hecha.reserva
+  const propiedad = negocio.propiedades.find(p => p.id === r.unidadId)
+  const cuando = r.entrada && r.salida ? `${rangoTxt(r.entrada, r.salida)} · ${nochesTxt(nochesEntre(r.entrada, r.salida))}` : ''
+  const donde = [propiedad?.direccion || negocio.direccion, propiedad?.ciudad || negocio.ciudad].filter(Boolean).join(', ')
+  const conSena = hecha.pendiente && r.sena > 0
+  const alias = negocio.pagos.alias
+  const wa = linkWhatsApp(negocio.telefono, `Hola, hice la reserva ${hecha.codigo} en ${negocio.nombre}: ${propiedad?.nombre ?? ''}, ${cuando}.${conSena ? ` Quiero pagar la seña de ${pesos(r.sena)}.` : ''}`)
+  const calendario = () => {
+    if (!r.entrada || !r.salida) return
+    descargarICS(generarICS([{ uid: `${r.id}@orbita`, titulo: `${propiedad?.nombre ?? negocio.nombre} · ${negocio.nombre}`, fecha: r.entrada, hasta: r.salida, lugar: donde }], { nombre: negocio.nombre }), `reserva-${hecha.codigo}`)
+  }
+  const titulo = useRef<HTMLHeadingElement>(null)
+  useEffect(() => { titulo.current?.focus({ preventScroll: true }); window.scrollTo({ top: 0 }) }, [])
+  return (
+    <Sitio negocio={negocio} pagina="reserva">
+      <style>{CSS_RESERVA}</style>
+      <div className="als-cont" style={{ maxWidth: 640, paddingTop: 32 }}>
+        <div className="rv-card rv-card--pad rv-entra" style={{ textAlign: 'center', padding: 28 }}>
+          <span className="alr-ok" data-pendiente={hecha.pendiente || undefined} aria-hidden>{hecha.pendiente ? <Clock size={26} strokeWidth={2.5} /> : <Check size={26} strokeWidth={3} />}</span>
+          <h1 ref={titulo} tabIndex={-1} className="rv-h1" style={{ marginTop: 14, outline: 'none' }}>{hecha.pendiente ? 'Recibimos tu pedido de reserva' : 'Tu reserva está confirmada'}</h1>
+          <p className="rv-bajada" style={{ margin: '10px auto 0' }}>
+            {hecha.pendiente
+              ? (conSena ? `Las fechas quedan tomadas a tu nombre. ${negocio.nombre} la confirma cuando reciba la seña de ${pesos(r.sena)}.` : `Las fechas quedan tomadas a tu nombre. ${negocio.nombre} te la confirma a la brevedad.`)
+              : `Te esperamos en ${negocio.nombre}.`}
+            {' '}{datos.email.trim() ? 'Te mandamos un email con el enlace para verla o cancelarla.' : 'Guardá el enlace de abajo: es la forma de verla o cancelarla.'}
+          </p>
+          <div className="alr-codigo"><span className="rv-rotulo">Código</span><b className="rv-num">{hecha.codigo}</b></div>
+          {conSena && (
+            <div className="alr-sena">
+              <b>Cómo pagar la seña</b>
+              {alias
+                ? <p>Transferí <span className="rv-num">{pesos(r.sena)}</span> al alias <span className="rv-num">{alias}</span>{negocio.pagos.titular ? ` (${negocio.pagos.titular})` : ''}{wa ? ' y mandá el comprobante por WhatsApp.' : '.'}</p>
+                : <p>{wa ? `Escribile a ${negocio.nombre} por WhatsApp y te pasa los datos para transferir.` : `${negocio.nombre} se va a comunicar con vos para coordinarla.`}</p>}
+              {wa && <a className="rv-btn rv-btn--primario rv-btn--ancho" href={wa} target="_blank" rel="noopener noreferrer"><MessageCircle size={16} aria-hidden /> Escribir por WhatsApp</a>}
+            </div>
+          )}
+          <dl className="alr-ticket" style={{ textAlign: 'left', marginTop: 20 }}>
+            <div><dt>{capital(palabrasDe(negocio).unidad)}</dt><dd>{propiedad?.nombre ?? negocio.nombre}</dd></div>
+            <div><dt>Cuándo</dt><dd>{cuando}</dd></div>
+            <div><dt>Huéspedes</dt><dd>{datos.huespedes}</dd></div>
+            <div><dt>Total</dt><dd className="rv-num">{pesos(r.total)}</dd></div>
+            {r.sena > 0 && <div><dt>Seña</dt><dd className="rv-num">{pesos(r.sena)}</dd></div>}
+            {r.sena > 0 && <div><dt>El resto, en el lugar</dt><dd className="rv-num">{pesos(r.total - r.sena)}</dd></div>}
+            {donde && <div><dt>Dónde</dt><dd>{donde}</dd></div>}
+          </dl>
+          <div className="rv-fila" style={{ justifyContent: 'center', marginTop: 20 }}>
+            <Link href={rutaMiReserva(negocio.slug, hecha.token)} className={`rv-btn${conSena && wa ? '' : ' rv-btn--primario'}`}><Users size={16} aria-hidden /> Ver mi reserva</Link>
+            <button type="button" className="rv-btn" onClick={calendario}><CalendarPlus size={16} aria-hidden /> Agregar al calendario</button>
+          </div>
+        </div>
       </div>
     </Sitio>
   )
@@ -590,12 +699,19 @@ export const CSS_RESERVA = `
   /* La hora elegida (data-elegido: la franja es un radio nativo) y, con dos o tres turnos seguidos, las que quedan adentro. */
   .alr .rv-franja[data-elegido='true'] { background: var(--color-primary); color: var(--color-on-primary); border-color: transparent; }
   .alr .rv-franja[data-elegido='true'] small { color: inherit; opacity: 0.85; }
+  /* Una hora tomada: sin fondo y con borde punteado. Con el fondo del tema (verde claro en canchas) parecía libre. */
+  .alr .rv-franja[data-deshabilitado='true'] { background: transparent; border-style: dashed; color: var(--color-subtle); }
   .alr .rv-franja[data-en-rango='true'] { background: var(--color-primary-bg); border-color: var(--color-primary); color: var(--chip-primary-fg); }
   .alr .rv-franja[data-en-rango='true'] small { color: inherit; }
   .alr-total { display: flex; justify-content: space-between; gap: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--color-border); font-size: 15px; font-weight: 700; color: var(--color-text); }
   .alr-ok { width: 56px; height: 56px; border-radius: 50%; display: inline-grid; place-items: center; background: var(--color-primary); color: var(--color-on-primary); }
   .alr-codigo { display: inline-flex; flex-direction: column; gap: 2px; margin-top: 18px; padding: 10px 18px; border-radius: 12px; background: var(--color-surface); }
   .alr-codigo b { font-size: 22px; letter-spacing: 0.12em; color: var(--color-text); }
+  /* Pendiente de la seña: el reloj, en el tono de aviso (no es un error ni está listo). */
+  .alr-ok[data-pendiente='true'] { background: var(--color-warning-bg); color: var(--chip-warning-fg); }
+  .alr-sena { margin-top: 18px; padding: 16px; border-radius: 12px; border: 1px solid var(--color-border); background: var(--color-surface); text-align: left; display: flex; flex-direction: column; gap: 10px; }
+  .alr-sena b { font-size: 15px; color: var(--color-text); }
+  .alr-sena p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--color-body); }
   @media (max-width: 960px) { .alr-dos { grid-template-columns: minmax(0, 1fr); } }
   @media (max-width: 860px) {
     .alr-grilla { grid-template-columns: minmax(0, 1fr); gap: 20px; }

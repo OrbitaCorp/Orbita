@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { SubscriptionsService } from '../src/subscriptions/subscriptions.service';
+import { CORTESIA_VENTANA_PAGO_DIAS, SubscriptionsService } from '../src/subscriptions/subscriptions.service';
 
 // Código de descuento al ACTIVAR el plan (Configuración → Suscripción): vale
 // solo para el primer cobro. La preapproval de MP se crea con el monto rebajado
@@ -112,6 +112,56 @@ describe('activatePlan con código de descuento', () => {
       where: { businessId: 'b1', status: { in: ['PENDING', 'ACTIVE', 'PAID'] } },
       data: { status: 'CLOSED' },
     });
+  });
+});
+
+describe('activatePlan en cortesía (COMP) por vencer', () => {
+  const DIA = 86_400_000;
+
+  it(`permite pagar por adelantado dentro de los últimos ${CORTESIA_VENTANA_PAGO_DIAS} días`, async () => {
+    const { service, prisma, preapproval } = armar();
+    prisma.subscription.findUnique.mockResolvedValue(
+      subVencida({
+        origin: 'COMP',
+        plan: 'standard',
+        nextPlan: 'mensual',
+        currentPeriodEnd: new Date(Date.now() + 2 * DIA),
+      }),
+    );
+
+    const r = await service.activatePlan('b1', 'm1');
+
+    expect(r.initPoint).toBe('https://mp/pagar');
+    expect(preapproval.create).toHaveBeenCalledTimes(1);
+  });
+
+  it(`rechaza si a la cortesía todavía le faltan más de ${CORTESIA_VENTANA_PAGO_DIAS} días`, async () => {
+    const { service, prisma, preapproval } = armar();
+    prisma.subscription.findUnique.mockResolvedValue(
+      subVencida({
+        origin: 'COMP',
+        plan: 'standard',
+        nextPlan: 'mensual',
+        currentPeriodEnd: new Date(Date.now() + (CORTESIA_VENTANA_PAGO_DIAS + 2) * DIA),
+      }),
+    );
+
+    await expect(service.activatePlan('b1', 'm1')).rejects.toBeInstanceOf(BadRequestException);
+    expect(preapproval.create).not.toHaveBeenCalled();
+  });
+
+  it('una cuenta paga (no cortesía) sigue sin poder activar antes del vencimiento', async () => {
+    const { service, prisma, preapproval } = armar();
+    prisma.subscription.findUnique.mockResolvedValue(
+      subVencida({
+        origin: 'PAID',
+        plan: 'mensual',
+        currentPeriodEnd: new Date(Date.now() + 2 * DIA),
+      }),
+    );
+
+    await expect(service.activatePlan('b1', 'm1')).rejects.toBeInstanceOf(BadRequestException);
+    expect(preapproval.create).not.toHaveBeenCalled();
   });
 });
 

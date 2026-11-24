@@ -18,7 +18,7 @@ const ROLES = [
         id: 'tienda',
         rol: 'Como cliente',
         titulo: 'La tienda',
-        texto: 'Recorré Nébula Moda: ropa, zapatillas y accesorios con talles, descuentos, carrito y un checkout completo con pago simulado. Y si querés, pasá a la de tecnología.',
+        texto: 'Recorré Nébula Moda: ropa, zapatillas y accesorios con talles, descuentos, carrito y un checkout completo con pago simulado. Y si querés, pasá a la de tecnología o a la de regalos.',
         cta: 'Ver la tienda',
         slug: DEMO_SLUG_TIENDA,
         path: '/',

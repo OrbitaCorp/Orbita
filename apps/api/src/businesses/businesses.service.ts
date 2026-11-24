@@ -23,7 +23,7 @@ import { BackgroundRemovalService } from '../background-removal/background-remov
 import { UpdateBusinessDto } from './dto/update-business.dto';
 import { UpdateBusinessConfigDto, CARRIERS, MAX_MONTO } from './dto/update-business-config.dto';
 import { UpdateStorefrontConfigDto } from './dto/update-storefront-config.dto';
-import { HOME_TEMPLATES_DISPONIBLES, SetHomeTemplateDto } from './dto/set-home-template.dto';
+import { HOME_TEMPLATES_DISPONIBLES, SetHomeTemplateDto, esPlantillaLibre } from './dto/set-home-template.dto';
 import { UpdateNotificationConfigDto } from './dto/update-notification-config.dto';
 import { NOTIFICATION_EVENTS } from '../notifications/notification-events';
 import { TutorialStateDto, UpdateTutorialDto } from './dto/update-tutorial.dto';
@@ -172,10 +172,9 @@ export class BusinessesService {
     if (nPedidos > 0) cumplidas.push('pedidos');
     if (nPedidosMovidos > 0) cumplidas.push('estados');
     if (nClientes > 0) cumplidas.push('clientes');
-    // Mensajería es solo de modo FULL (BusinessModeGuard responde 403 en
-    // SHOWCASE): a una vidriera no se la manda a una pantalla que no puede
-    // abrir — la tarea se da por cumplida y no molesta.
-    if (nPlantillas > 0 || business.mode === 'SHOWCASE') cumplidas.push('plantillas');
+    // Desde 2026-11 la vidriera también tiene Mensajes (vende por WhatsApp e
+    // Instagram): las plantillas le sirven igual que a una tienda con checkout.
+    if (nPlantillas > 0) cumplidas.push('plantillas');
     if (storefront && (storefront.homeTemplate !== null || tocada(storefront))) cumplidas.push('apariencia');
     if (config?.whatsapp?.trim() || config?.email?.trim() || config?.scheduleText?.trim()) cumplidas.push('contacto');
     if (config?.instagram?.trim() || config?.tiktok?.trim() || config?.facebook?.trim()) cumplidas.push('redes');
@@ -619,6 +618,19 @@ export class BusinessesService {
   // plantilla (el cupón de Vidriera) vive aparte, en homeTemplateData, y
   // tampoco se borra al cambiar de plantilla — si el dueño vuelve a la
   // anterior, se lo encuentra como lo había dejado.
+  // Los gates de setHomeTemplate (ver el controller). Mismos mensajes que
+  // PermissionsGuard y AddonGuard, que el panel ya reconoce.
+  async puedeElegirPlantilla(member: { businessId: string; roleName: string; permissions: string[] }, template: string | null) {
+    const libre = esPlantillaLibre(template);
+    const tiene = (p: string) => member.roleName === 'owner' || member.permissions.includes(p);
+    if (libre ? !(tiene('config.edit') || tiene('advanced.manage')) : !tiene('advanced.manage')) {
+      throw new ForbiddenException(`Permiso requerido: ${libre ? 'config.edit' : 'advanced.manage'}`);
+    }
+    if (!libre && !(await this.hasActiveAddon(member.businessId, 'ADVANCED'))) {
+      throw new ForbiddenException('ADDON_REQUIRED:ADVANCED');
+    }
+  }
+
   async setHomeTemplate(businessId: string, dto: SetHomeTemplateDto) {
     const current = await this.prisma.storefrontConfig.findUnique({ where: { businessId } });
     if (!current) throw new NotFoundException('Configuración de apariencia no encontrada');

@@ -15,12 +15,16 @@
 // que no van uno detrás del otro.
 
 import { Reveal, Seccion, Encabezado, Card, useVisible } from './Reveal';
+import { useState } from 'react';
+import { ClipVideo, ModalClip } from './ClipLoop';
 
+// Cada paso se MUESTRA con su clip (tomas reales: el alta, el alta de un producto con Orbi, la tienda en el
+// computadora y un pedido que entra, de punta a punta) y una sola línea de texto. Clic → el video completo en grande (pedido del dueño, 18/11: menos teoría, más práctica).
 const PASOS = [
-    { n: '01', titulo: 'Elegís tu rubro', texto: 'Indumentaria, ferretería, pet shop, electrónica y más. El panel se arma según lo que vendés: talles y colores, número de serie, o venta por kilo y metro.' },
-    { n: '02', titulo: 'Cargás tus productos', texto: 'Precios, fotos, stock y categorías por producto. Desde el mismo panel podés quitarle el fondo a las fotos, sin depender de otra herramienta.' },
-    { n: '03', titulo: 'Compartís tu link', texto: 'Tu tienda queda publicada en tu subdominio de Órbita, o en tu propio dominio si ya tenés uno. La compartís en Instagram, WhatsApp o donde ya te escriben tus clientes.' },
-    { n: '04', titulo: 'Cobrás y gestionás', texto: 'Los pedidos entran solos al panel, con su estado y el detalle de cada uno. Cobrás a tu manera, despachás y revisás tus reportes de ventas.' },
+    { n: '01', clip: 'paso-rubro', titulo: 'Elegís tu rubro', texto: 'El panel se arma según lo que vendés: talles y colores, número de serie, kilo o metro.' },
+    { n: '02', clip: 'paso-producto', titulo: 'Cargás tus productos', texto: 'Fotos, precio y stock. Con el paquete Avanzado, Orbi completa la ficha con una foto.' },
+    { n: '03', clip: 'paso-tienda', titulo: 'Compartís tu link', texto: 'Tu tienda queda lista en tu link de Órbita o en tu propio dominio.' },
+    { n: '04', clip: 'paso-pedido', titulo: 'Cobrás y gestionás', texto: 'Los pedidos entran solos al panel y los despachás desde ahí.' },
 ];
 
 /** Alto del tramo vertical entre dos pasos, en px. El hueco de la grilla en
@@ -80,18 +84,23 @@ function ConectorVertical() {
 }
 
 export function ComoFunciona() {
-    const { ref, visible } = useVisible<HTMLDivElement>();
+    const { ref } = useVisible<HTMLDivElement>();
+    const [abierto, setAbierto] = useState<number | null>(null);
 
     return (
         <Seccion id="como-funciona">
             <Encabezado
                 eyebrow="Cómo funciona"
                 titulo="Tu tienda,"
-                resalte="lista en tres pasos."
+                resalte="lista en cuatro pasos."
                 bajada="Sin instalar nada, sin contratar a nadie y sin tener que entender de tecnología."
             />
 
             <style>{`
+                .paso-ver { opacity: .0; transform: translateY(4px); transition: opacity 180ms ease, transform 180ms ease; }
+                .paso-video:hover .paso-ver, .paso-video:focus-visible .paso-ver { opacity: 1; transform: none; }
+                .paso-video:focus-visible { outline: 2px solid #93c5fd; outline-offset: -2px; }
+                @media (hover: none) { .paso-ver { opacity: 1; transform: none; } }
                 .oc-paso-punto {
                     position: absolute; top: 0; left: 50%;
                     width: 5px; height: 5px; border-radius: 999px;
@@ -110,58 +119,53 @@ export function ComoFunciona() {
 
                 @media (prefers-reduced-motion: reduce) {
                     .oc-paso-linea { transition: none !important; }
-                    .oc-paso-punto { animation: none !important; opacity: 0 !important; }
+                    .paso-ver { opacity: .0; transform: translateY(4px); transition: opacity 180ms ease, transform 180ms ease; }
+                .paso-video:hover .paso-ver, .paso-video:focus-visible .paso-ver { opacity: 1; transform: none; }
+                .paso-video:focus-visible { outline: 2px solid #93c5fd; outline-offset: -2px; }
+                @media (hover: none) { .paso-ver { opacity: 1; transform: none; } }
+                .oc-paso-punto { animation: none !important; opacity: 0 !important; }
                 }
             `}</style>
 
-            <div ref={ref} className="mt-16 grid grid-cols-1 gap-x-4 gap-y-12 sm:grid-cols-2 sm:gap-y-8 lg:grid-cols-4">
-                {/* h-full en toda la cadena (columna → Reveal → interior → Card): si
-                    alguno se queda sin altura completa, la tarjeta se encoge a su
-                    contenido y las cuatro quedan desparejas. */}
+            <div ref={ref} className="mt-14 grid grid-cols-1 gap-x-5 gap-y-12 sm:gap-y-6 md:grid-cols-2">
+                {/* En celular van en una columna y la línea punteada baja de un paso al siguiente
+                    (ConectorVertical); desde md, grilla de 2×2 con el clip grande en cada tarjeta. */}
                 {PASOS.map((p, i) => (
                     <div key={p.n} className="relative h-full">
-                        {/* La línea vertical cuelga de la columna y NO del Reveal: si
-                            estuviera adentro heredaría el fade de la tarjeta y se
-                            cargaría junto con ella en vez de después. */}
                         {i < PASOS.length - 1 && <ConectorVertical />}
-
-                        <Reveal delay={i * 130} className="relative h-full">
-                            {/* Tramo de la línea que sale de ESTE número hacia el
-                                siguiente. Al colgar de cada paso, siempre arranca y
-                                termina exactamente en el centro de los círculos, sin
-                                importar cuántas columnas entren en la pantalla. */}
-                            {i < PASOS.length - 1 && (
-                                <span
-                                    className="absolute hidden lg:block"
-                                    style={{
-                                        left: 'calc(50% + 28px)', width: 'calc(100% - 56px + 1rem)', top: 21, height: 1,
-                                        backgroundImage: 'linear-gradient(90deg, var(--oc-linea) 0 6px, transparent 6px 13px)',
-                                        backgroundSize: '13px 1px',
-                                        transformOrigin: 'left center',
-                                        transform: visible ? 'scaleX(1)' : 'scaleX(0)',
-                                        transition: `transform 700ms cubic-bezier(.22,1,.36,1) ${340 + i * 170}ms`,
-                                    }}
-                                    aria-hidden="true"
-                                />
-                            )}
-
-                            <div className="flex h-full flex-col items-center text-center">
-                                <span
-                                    className="grid h-[42px] w-[42px] place-items-center rounded-full text-[12.5px] font-black text-blue-200"
-                                    style={{ background: 'var(--oc-panel)', border: '1px solid var(--oc-accent-bd)', boxShadow: '0 0 26px var(--oc-accent-soft)' }}
+                        <Reveal delay={i * 120} className="relative h-full">
+                            <Card className="oc-card-hover flex h-full w-full flex-col overflow-hidden p-0 text-left">
+                                {/* El video del paso, rectangular; clic → completo y en grande */}
+                                <button
+                                    type="button" onClick={() => setAbierto(i)} aria-label={`Ver completo: ${p.titulo}`}
+                                    className="paso-video relative block w-full cursor-pointer overflow-hidden"
+                                    style={{ aspectRatio: '16 / 9', background: '#060B1E', border: 'none', padding: 0, borderBottom: '1px solid var(--oc-card-bd)' }}
                                 >
-                                    {p.n}
-                                </span>
-
-                                <Card className="oc-card-hover mt-5 h-full w-full p-6 text-left">
-                                    <h3 className="text-[16px] font-bold text-white">{p.titulo}</h3>
-                                    <p className="mt-2 text-[13.5px] leading-relaxed text-slate-400">{p.texto}</p>
-                                </Card>
-                            </div>
+                                    <ClipVideo nombre={p.clip} etiqueta={`${p.titulo}: ${p.texto}`} />
+                                    <span className="paso-ver absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-full px-3 text-[12.5px] font-semibold text-white"
+                                        style={{ height: 32, background: 'rgba(15,23,42,.72)', border: '1px solid rgba(255,255,255,.18)', backdropFilter: 'blur(6px)' }}>
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.14v13.72a1 1 0 0 0 1.52.85l10.29-6.86a1 1 0 0 0 0-1.7L9.52 4.29A1 1 0 0 0 8 5.14z" /></svg>
+                                        Ver completo
+                                    </span>
+                                </button>
+                                <div className="flex items-start gap-4 p-5 sm:p-6">
+                                    <span
+                                        className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-full text-[12px] font-black text-blue-200"
+                                        style={{ background: 'var(--oc-panel)', border: '1px solid var(--oc-accent-bd)', boxShadow: '0 0 22px var(--oc-accent-soft)' }}
+                                    >
+                                        {p.n}
+                                    </span>
+                                    <span>
+                                        <h3 className="text-[16px] font-bold text-white">{p.titulo}</h3>
+                                        <p className="mt-1 text-[13.5px] leading-relaxed text-slate-400">{p.texto}</p>
+                                    </span>
+                                </div>
+                            </Card>
                         </Reveal>
                     </div>
                 ))}
             </div>
+            {abierto !== null && <ModalClip nombre={PASOS[abierto].clip} titulo={`${PASOS[abierto].n} · ${PASOS[abierto].titulo}`} onCerrar={() => setAbierto(null)} />}
         </Seccion>
     );
 }

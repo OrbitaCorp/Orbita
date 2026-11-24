@@ -33,15 +33,19 @@ export class ReservasApiError extends Error {
 }
 
 /**
- * Lo que devuelve cancelar: la reserva, pero con `sena` diciendo qué pasó con
- * la seña (DEVUELTA, PERDIDA o SIN_SENA) en lugar del monto: la API pisa ese
- * campo. Como intersección con Reserva, `sena` quedaba number & string y el
- * tipo entero se reducía a never.
+ * Un uuid por intento de reserva: se manda como `clave` y, si hay que
+ * reintentar, se repite el mismo. `crypto.randomUUID` solo existe en un
+ * contexto seguro (https o localhost): en un subdominio por http, como
+ * <slug>.orbita.local en desarrollo, se arma el v4 con getRandomValues.
  */
-export type Cancelada = Omit<Reserva, 'sena'> & { sena: SenaAlCancelar }
-
-/** Un uuid por intento de reserva: se manda como `clave` y, si hay que reintentar, se repite el mismo. */
-export const claveDeIntento = (): string => crypto.randomUUID()
+export function claveDeIntento(): string {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  const b = crypto.getRandomValues(new Uint8Array(16))
+  b[6] = (b[6] & 0x0f) | 0x40
+  b[8] = (b[8] & 0x3f) | 0x80
+  const h = [...b].map(x => x.toString(16).padStart(2, '0')).join('')
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`
+}
 
 /** Arma el query string sin los valores vacíos; las listas van separadas por coma. */
 export function query(params: object): string {
@@ -60,6 +64,9 @@ async function leer<T>(res: Response): Promise<T> {
   if (!res.ok) throw new ReservasApiError(res.status, mensajeDeError(res.status, body))
   return body as T
 }
+
+/** Lo que devuelve cancelar: la reserva, con `sena` diciendo qué pasó con la seña (pisa el monto). */
+export type Cancelada = Omit<Reserva, 'sena'> & { sena: SenaAlCancelar }
 
 const json = (body: unknown): RequestInit => ({ method: 'POST', body: JSON.stringify(body) })
 

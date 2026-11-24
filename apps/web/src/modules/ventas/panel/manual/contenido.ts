@@ -440,7 +440,7 @@ export const CAPITULOS: Capitulo[] = [
                     { titulo: 'Completala', texto: 'Una fila por producto: nombre, categoría, precio, costo, stock, descripción y estado. Si tiene variantes, escribís el nombre de la variante (por ejemplo Color) y sus valores separados por coma (Rojo, Azul, Negro); con dos variantes se arman solas todas las combinaciones. El SKU se genera solo.' },
                     { titulo: 'Subila y revisá', texto: 'Arrastrás o elegís el archivo y ves la revisión: qué se va a crear, qué categorías nuevas aparecen y, si hay errores, en qué fila y columna están. Con errores no se importa nada: los corregís en el Excel y lo volvés a subir con [[Subir otro archivo]].' },
                     { titulo: 'Importá y sumá fotos', texto: 'Al confirmar se crean las categorías que faltaban y los productos. Al final podés ir cargando las fotos de cada uno sin salir del asistente, o tocar [[Seguir después]] y hacerlo desde cada producto.' },
-                    { titulo: 'Usá las fotos sugeridas', texto: 'En el paso Fotos, cada producto sin fotos trae una **foto sugerida de la web**, buscada por su nombre y su categoría. Con [[Usar esta foto]] queda guardada en tu tienda como una foto más; con [[Ver otras]] elegís entre otras opciones, y con [[Descartar]] la sacás y subís la tuya. Para ir más rápido, [[Usar las sugeridas de esta página]] guarda de una vez la sugerida de todos los productos de la página que todavía no tienen fotos.' },
+                    { titulo: 'Usá las fotos sugeridas', texto: 'Con el **paquete Avanzado**, en el paso Fotos cada producto sin fotos trae una **foto sugerida de la web**, buscada por su nombre y su categoría. Con [[Usar esta foto]] queda guardada en tu tienda como una foto más; con [[Ver otras]] elegís entre otras opciones, y con [[Descartar]] la sacás y subís la tuya. Para ir más rápido, [[Usar las sugeridas de esta página]] guarda de una vez la sugerida de todos los productos de la página que todavía no tienen fotos.' },
                 ] },
                 { tipo: 'nota', variante: 'dato', texto: 'Las fotos sugeridas se buscan por nombre, así que alguna puede no ser la del producto: revisalas antes de publicar. Nada se guarda hasta que tocás usar. Cada tienda tiene hasta 300 búsquedas de fotos por día; si se terminan, al día siguiente se renuevan y mientras tanto podés subir las tuyas.' },
                 { tipo: 'nota', variante: 'dato', texto: 'Si dejás el Estado vacío, el producto queda en Borrador: así podés importar todo, ponerle fotos y publicarlo cuando esté listo. Para que un producto salga Publicado tiene que tener stock.' },
@@ -497,7 +497,20 @@ export const CAPITULOS: Capitulo[] = [
         {
             id: 'exportar-catalogo', titulo: 'Exportar el catálogo',
             bloques: [
-                { tipo: 'parrafo', texto: '[[Exportar Excel]] baja el catálogo completo en .xlsx: sirve para revisar precios en planilla, pasarle la lista a alguien, o tener un respaldo antes de un cambio grande.' },
+                { tipo: 'parrafo', texto: '[[Exportar Excel]] baja el catálogo en .xlsx, con una fila por cada variante (cada talle, color o tamaño con su precio). Si filtraste la lista, baja solo lo filtrado. Sirve para revisar precios en planilla, pasarle la lista a alguien, tener un respaldo o cambiar los precios de todo junto.' },
+            ],
+        },
+        {
+            id: 'actualizar-precios', titulo: 'Cambiar muchos precios a la vez',
+            bloques: [
+                { tipo: 'parrafo', texto: 'Para actualizar los precios de todo el catálogo juntos (por ejemplo, cuando cambia la cotización), no hace falta entrar producto por producto. En Productos, tocá [[Actualizar precios]].' },
+                { tipo: 'pasos', items: [
+                    { titulo: 'Bajá el Excel', texto: 'Tocá [[Descargar Excel]]: trae tus productos con una fila por variante.' },
+                    { titulo: 'Cambiá los precios', texto: 'En el Excel cambiá solo la columna Precio. La columna Código no se toca: es la que dice qué producto es.' },
+                    { titulo: 'Subilo', texto: 'Volvé a [[Actualizar precios]] y tocá [[Subir Excel con precios nuevos]].' },
+                    { titulo: 'Revisá y guardá', texto: 'Antes de guardar se ve la lista de cambios. Arriba aparecen los precios que se duplican o caen a la mitad, por si se coló un cero de más o de menos. Al guardar, los precios nuevos ya se ven en la tienda.' },
+                ] },
+                { tipo: 'nota', variante: 'dato', texto: 'Solo cambia precios. El stock del Excel no se toca: es el de cuando lo bajaste, y si entre medio vendiste algo, pisarlo deshacería esas ventas. El stock se ajusta desde Inventario.' },
             ],
         },
     ],
@@ -588,6 +601,9 @@ export const CAPITULOS: Capitulo[] = [
                     'Con la ruedita de arriba de la lista ([[Respuestas automáticas]]) prendés un mensaje de **bienvenida** (sale una sola vez, cuando alguien te escribe por primera vez) y uno de **ausencia** (sale fuera de tu horario de atención, como mucho una vez cada 12 horas por persona). Orbi nunca contesta solo a un mensaje viejo ni al que escribiste vos.',
                     'Instagram solo permite responder dentro de las **24 horas** del último mensaje del cliente. El chat te dice hasta qué hora podés; pasado ese plazo la conversación se puede leer pero no responder, hasta que el cliente escriba de nuevo.',
                 ] },
+                { tipo: 'parrafo', texto: '**Orbi en Instagram** (función del paquete Avanzado): Orbi puede contestar tus mensajes directos por vos, igual que en WhatsApp. Les cuenta qué productos tenés, precios, ofertas, cupones y promos vigentes, talles y stock, formas de pago, envíos, retiro, cambios y en qué estado está su pedido, siempre con los datos reales de tu tienda; no inventa ni promete descuentos, y nunca comparte datos bancarios ni de otros clientes. Si se lo pedís, les manda la foto de un producto. Ante un reclamo, un problema de pago o cualquier duda, **te pasa la charla** y deja de contestar. Lo configurás con el botón [[Orbi en Instagram]] de arriba de la lista: lo prendés con el interruptor general, elegís si contesta **solo en las charlas que vos actives** (lo recomendado) o en **todas**, le dejás indicaciones (tono, promociones del mes) y ves cuánto llevás del **cupo del mes**, que es el mismo de Orbi en WhatsApp (podés ponerle a Instagram un tope propio más bajo). En Instagram no hay menú de opciones: Orbi conversa.' },
+                { tipo: 'parrafo', texto: '**Orbi puede tomar pedidos** también por Instagram: con ese interruptor, cuando alguien quiere comprar Orbi arma el pedido con los precios y el stock reales, le muestra un resumen con los botones **Confirmar pedido** y **Cambiar** (o responde "sí" / "cambiar"), y recién cuando confirma se crea el pedido, **pendiente**, para que vos coordines el pago y la entrega por la misma charla. Orbi nunca cobra ni pide datos de pago. Necesita que tu tienda venda online y tenga activado "Coordinar por WhatsApp" en Configuración → Pagos, y podés ponerle un tope de unidades y de monto por pedido. Como el cliente de Instagram no deja teléfono ni email, el pedido queda a su nombre y lo seguís por la charla, **dentro de las 24 horas** de su último mensaje.' },
+                { tipo: 'parrafo', texto: 'En cada charla, el botón [[Activar Orbi]] hace que Orbi conteste ahí (pasa a decir Orbi atiende; tocándolo de nuevo lo apagás). Sus mensajes llevan **Orbi** al lado de la hora. **Cuando escribís vos** (desde acá o desde la app de Instagram), Orbi se calla en esa charla y no vuelve solo: arriba del campo de texto queda el aviso con [[Reactivar Orbi]]. Lo mismo si Orbi te pasó la charla: en la lista la ves con **Necesita atención** hasta que lo reactives. Mientras Orbi atiende una charla no salen la bienvenida ni el mensaje de ausencia, porque contesta Orbi.' },
                 { tipo: 'nota', variante: 'tip', texto: 'Cuando hay mensajes sin leer, **Difusión** muestra el número en el menú de la izquierda.' },
             ],
             ir: { label: 'Ir a Mensajes de Instagram', seccion: 'difusion', query: { vista: 'mensajes' } },
@@ -692,7 +708,7 @@ export const CAPITULOS: Capitulo[] = [
                     { label: 'Llevá X, pagá Y', texto: 'El 2x1 y el 3x2 de toda la vida: se arma solo en el carrito, sin código.' },
                     { label: 'Comprá X, obtenés Z', texto: 'Compra un producto y se lleva otro gratis, con % o con monto fijo. Sirve para mover algo que no rota o para hacer probar un producto nuevo.' },
                     { label: 'Por volumen', texto: 'Escalas: de 3 a 5 unidades tanto, de 6 en adelante más. Para mayoristas o productos de consumo.' },
-                    { label: 'Oferta relámpago', texto: 'Un % que termina a una hora exacta y se muestra en tu portada con un reloj en cuenta regresiva. Requiere el paquete Avanzado.' },
+                    { label: 'Oferta relámpago', texto: 'Un % que termina a una hora exacta y se muestra en tu portada con un reloj en cuenta regresiva. Elegís cómo se ve (cartel con productos, reloj grande, tablero de números, un producto protagonista, reloj en cada producto, tira o marquesina) y sus colores, con una vista previa al lado. Requiere el paquete Avanzado.' },
                 ] },
             ],
         },
@@ -868,8 +884,10 @@ export const CAPITULOS: Capitulo[] = [
             bloques: [
                 { tipo: 'parrafo', texto: 'Cómo se ve tu tienda. Es la pantalla más larga de Configuración, y se divide en secciones:' },
                 { tipo: 'lista', items: [
+                    '**Plantillas por defecto**: combinaciones ya armadas de todo lo de esta pantalla (colores, modo claro u oscuro, tipografías, header, estilo del nombre o logo, diseño de los sliders, grilla, categorías, anuncio, WhatsApp y video). Tocás una y se completan esos controles de una; después podés cambiar cualquiera. No toca tus textos, fotos, logo ni lo que tenés prendido o apagado, y no se publica hasta que guardás. Las que traen el slider con imagen centrada la usan solo en los slides con foto sin fondo (PNG): los slides con una foto común quedan a imagen completa. **Clásica** es la apariencia con la que arranca toda tienda nueva.',
+                    '**Plantillas premium**: en la misma sección, portadas con un diseño propio. Tocás una, se abre su demo (en computadora y en celular) y con [[Usarla en mi tienda]] la activás ahí mismo. Base, Carbón y Bloque dicen **Gratis**: las usa cualquier plan. El resto viene con el paquete Avanzado; sin el paquete, la demo te avisa y te ofrece ver los planes.',
                     '**Identidad de marca**: logo y favicon.',
-                    '**Sliders del hero**: el carrusel de arriba de tu portada. Si no cargás ninguno, tu tienda muestra hasta tres automáticos, uno por categoría, con un texto genérico y un fondo de color; no se editan, y desaparecen apenas cargás el primero tuyo.',
+                    '**Sliders del hero**: el carrusel de arriba de tu portada. Si no cargás ninguno, tu tienda muestra hasta tres automáticos, uno por categoría, con un texto genérico y un fondo de color; no se editan, y desaparecen apenas cargás el primero tuyo. En cada slide con imagen completa elegís en **Posición del texto** dónde van el título y el botón (nueve lugares: arriba, al medio o abajo, a la izquierda, al centro o a la derecha); el velo oscuro se acomoda solo del lado del texto.',
                     '**Paleta de colores** y **Tipografía**: los colores y la letra de toda tu tienda, incluida la escala de texto.',
                     '**Diseño y layout**: cómo se acomoda el contenido.',
                     '**Banner con efecto parallax** y **Video en tu tienda**: las piezas grandes de la portada.',
@@ -884,7 +902,7 @@ export const CAPITULOS: Capitulo[] = [
                     { label: 'Guardar', texto: 'Los cambios quedan sin publicar hasta que tocás [[Guardar cambios]]. En el celular el botón está en la misma barra de abajo, junto a [[Descartar]], que vuelve todo a lo que ya estaba publicado.' },
                 ] },
                 { tipo: 'nota', variante: 'dato', texto: 'Algunos ajustes no tienen una parte propia que marcar en la portada: los colores, la tipografía y el tamaño del texto cambian toda la tienda, así que la vista previa solo te lleva al inicio. Y las opiniones de clientes se ven en la ficha de cada producto, no en la portada.' },
-                { tipo: 'nota', variante: 'dato', texto: 'Si activaste una plantilla de Home (paquete Avanzado), la Apariencia clásica queda bloqueada: la portada la manda la plantilla. Se puede volver a la apariencia original desde la galería de plantillas.' },
+                { tipo: 'nota', variante: 'dato', texto: 'Con una plantilla premium activa, los colores, las letras y el diseño de la portada los pone ella. Apariencia te muestra cuál está en uso y, abajo, el editor de su contenido (hero, header, textos y pie). Con [[Volver a la apariencia clásica]] tu tienda vuelve al home de siempre, sin perder nada.' },
             ],
             ir: { label: 'Abrir Apariencia', seccion: 'configuracion', query: { vista: 'apariencia' } },
         },
@@ -911,9 +929,9 @@ export const CAPITULOS: Capitulo[] = [
                     { label: 'Cancelación pedida', texto: 'Un cliente pidió cancelar un pedido ya confirmado.' },
                     { label: 'Devolución', texto: 'Un cliente inició una devolución.' },
                 ] },
-                { tipo: 'campos', titulo: 'Orbi en WhatsApp', items: [
-                    { label: 'Un chat necesita atención', texto: 'Orbi te pasó un chat de WhatsApp: un reclamo, una duda que no pudo resolver o alguien que pidió hablar con una persona. Te llega por la campana **y por email** (a lo sumo uno por chat cada 30 minutos), con el motivo, el último mensaje y el link al chat.' },
-                    { label: 'Pedido pendiente de Orbi', texto: 'Orbi tomó un pedido por WhatsApp y quedó pendiente: falta coordinar el pago y la entrega. También te llega por la campana **y por email**.' },
+                { tipo: 'campos', titulo: 'Orbi en WhatsApp e Instagram', items: [
+                    { label: 'Un chat necesita atención', texto: 'Orbi te pasó un chat de WhatsApp o de Instagram: un reclamo, una duda que no pudo resolver o alguien que pidió hablar con una persona. Te llega por la campana **y por email** (a lo sumo uno por chat cada 30 minutos), con el motivo, el último mensaje y el link al chat.' },
+                    { label: 'Pedido pendiente de Orbi', texto: 'Orbi tomó un pedido por WhatsApp o por Instagram y quedó pendiente: falta coordinar el pago y la entrega. También te llega por la campana **y por email**. Si es de Instagram, el aviso te recuerda que solo podés escribirle dentro de las 24 horas de su último mensaje.' },
                 ] },
                 { tipo: 'campos', titulo: 'Stock y clientes', items: [
                     { label: 'Stock crítico', texto: 'Un producto llegó a su stock mínimo.' },
@@ -955,7 +973,7 @@ export const CAPITULOS: Capitulo[] = [
                 { tipo: 'parrafo', texto: 'Lo que cambia la tienda entera. Está separada del resto y con avisos claros justamente para que nadie la toque de pasada. La ve quien tiene el permiso **Editar configuración**, pero las tres acciones las hace solo el propietario.' },
                 { tipo: 'lista', items: [
                     '**Pausar tienda**: nadie la ve ni te compra hasta que la reactivás. Tus datos, productos y pedidos quedan intactos, y vos seguís entrando al panel. Mientras está pausada, el mismo lugar dice **Reactivar tienda**.',
-                    '**Pasar a vidriera digital**: la tienda queda como catálogo, sin carrito ni pago online; tus clientes te consultan por WhatsApp. Se vuelve con **Pasar a tienda online completa**. No se puede si tenés pedidos online sin resolver.',
+                    '**Pasar a vidriera digital**: la tienda queda como catálogo, sin carrito ni pago online; tus clientes te consultan por WhatsApp. Se vuelve con **Pasar a tienda online completa**. No se puede si tenés pedidos online sin resolver. En la vidriera el menú deja de mostrar lo que solo sirve con checkout: **Cupones** y **Cancelaciones y devoluciones** de Configuración. Al volver a la tienda online completa reaparecen. **Mensajes** y **Difusión** siguen: conectás WhatsApp e Instagram, respondés desde la bandeja y Orbi puede contestar las consultas; lo que no hace en una vidriera es tomar pedidos, la compra la cerrás vos.',
                     '**Eliminar espacio**: la tienda se pausa al instante y tenés 60 días para arrepentirte con **Reactivar espacio**. Pasado ese plazo se borra todo y no hay vuelta atrás.',
                 ] },
                 { tipo: 'nota', variante: 'aviso', texto: 'Antes de tocar algo de acá, abrí el "¿Qué pasa si…?" de cada opción: te explica exactamente qué cambia y qué se pierde.' },
@@ -984,12 +1002,12 @@ export const CAPITULOS: Capitulo[] = [
             id: 'funciones-avanzado', titulo: 'Qué trae',
             bloques: [
                 { tipo: 'campos', items: [
-                    { label: 'Juegos con premio', texto: 'Mini-juegos de habilidad (encestar, meter un gol). Vos definís cuánto descuento se gana por acierto y el tope. El descuento se crea solo, sin pasar por el módulo de Descuentos.' },
-                    { label: 'Modales de anuncios', texto: 'Avisos grandes que aparecen en el momento justo en tu tienda: una bienvenida con descuento, un anuncio de temporada.' },
+                    { label: 'Juegos con premio', texto: 'Mini-juegos de habilidad (encestar, meter un gol). Vos definís cuánto descuento se gana por acierto y el tope. El descuento se crea solo, sin pasar por el módulo de Descuentos. Cada juego puede tener una **temática** (Navidad, San Valentín, Halloween y otras de temporada, o estilos como Papel o Pizarra) y aparecer como ventana, panel al costado u hoja desde abajo. La **vista previa** se juega de verdad antes de lanzarlo: no gasta premios ni queda registrada.' },
+                    { label: 'Modales de anuncios', texto: 'Avisos que aparecen en tu tienda: una bienvenida con descuento, un anuncio de temporada. Elegís el **formato** (barra flotante, ventana, foto y texto, tarjeta en la esquina, cinta, hoja inferior, cupón, pantalla completa o pestaña lateral), los colores o una temática, y una foto opcional, con una vista previa en computadora y celular.' },
                     { label: '2x1 y 3x2', texto: 'La promo "llevá X, pagá Y" aplicada sola en el carrito, sin código, con un cartel en la tarjeta del producto.' },
-                    { label: 'Plantillas de Home', texto: 'Diseños alternativos para la **portada** de tu tienda. El resto — catálogo, checkout, perfil — queda igual. Se prueban con [[Ver cómo queda]] antes de aplicar. Los colores y la tipografía son de la plantilla y no se cambian; lo que se muestra lo decidís vos. Con la plantilla puesta, en la pestaña **Contenido** prendés y apagás las filas de productos (Destacados, Nuevos ingresos, Recomendados, Top ventas), la sección de categorías, el anuncio de arriba, la barra de búsqueda, el WhatsApp, las opiniones de clientes y los cartelitos de las tarjetas (Nuevo, Oferta con el porcentaje y Últimas unidades), y cargás el banner parallax, las marcas y el video. Una fila sin productos no aparece aunque esté prendida.' },
+                    { label: 'Plantillas de Home', texto: 'Diseños alternativos para la **portada** de tu tienda. El resto — catálogo, checkout, perfil — queda igual. Se prueban con [[Ver cómo queda]] antes de aplicar. Los colores y la tipografía son de la plantilla y no se cambian; lo que se muestra lo decidís vos. Con la plantilla puesta, en la pestaña **Contenido** prendés y apagás las filas de productos (Destacados, Nuevos ingresos, Recomendados, Top ventas), la sección de categorías, el anuncio de arriba, la barra de búsqueda, el WhatsApp, las opiniones de clientes y los cartelitos de las tarjetas (Nuevo, Oferta con el porcentaje y Últimas unidades), y cargás el banner parallax, las marcas y el video. Una fila sin productos no aparece aunque esté prendida. Tres de ellas (Base, Carbón y Bloque) son gratis con cualquier plan: se activan desde Configuración → Apariencia → Plantillas por defecto, igual que las demás si tenés el paquete.' },
                     { label: 'Prueba social', texto: 'Notificaciones tipo "Fulano compró tal producto", armadas con pedidos **reales** de tu tienda. Nunca con datos inventados.' },
-                    { label: 'Oferta relámpago', texto: 'Un descuento que dura poco y se muestra en tu tienda con un reloj en cuenta regresiva. Se arma desde Descuentos, como cualquier otro, y se prende o apaga desde acá.' },
+                    { label: 'Oferta relámpago', texto: 'Un descuento que dura poco y se muestra en tu tienda con un reloj en cuenta regresiva. Se arma desde Descuentos, como cualquier otro, ahí mismo se elige su diseño, y se prende o apaga desde acá.' },
                 ] },
             ],
         },

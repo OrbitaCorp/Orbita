@@ -4,17 +4,14 @@ import { WhatsappWebhookController } from './whatsapp-webhook.controller';
 import { WhatsappMediosService } from './whatsapp-medios.service';
 import { WhatsappService } from './whatsapp.service';
 import { WhatsappBotService } from './whatsapp-bot.service';
-import { WhatsappBotPedidosService } from './whatsapp-bot-pedidos';
-import { StorefrontModule } from '../storefront/storefront.module';
-import { OrdersModule } from '../orders/orders.module';
-import { NotificationsModule } from '../notifications/notifications.module';
-import { llmAdapterDelBotProvider } from '../orbi/llm/llm-adapter.provider';
+import { AtencionOrbiModule } from '../orbi/atencion/atencion.module';
 
 @Module({
-  imports: [StorefrontModule, OrdersModule, NotificationsModule], // OrdersModule: Orbi crea pedidos; NotificationsModule: avisa al dueño // Orbi lee el catálogo y los datos de la tienda con el mismo servicio que la tienda pública
+  // AtencionOrbiModule: lo de Orbi que es igual en todos los canales (pedidos por chat, la cadena de IA del bot, el
+  // catálogo de la tienda y los avisos al dueño).
+  imports: [AtencionOrbiModule],
   controllers: [WhatsappController, WhatsappWebhookController],
-  // llmAdapterDelBotProvider: Groq → Workers AI (Cloudflare) → Gemini, del más barato al más caro.
-  providers: [WhatsappService, WhatsappMediosService, WhatsappBotService, WhatsappBotPedidosService, llmAdapterDelBotProvider],
+  providers: [WhatsappService, WhatsappMediosService, WhatsappBotService],
   exports: [WhatsappService, WhatsappBotService], // ConversationsService responde por WhatsApp; la bandeja enciende y apaga Orbi por chat
 })
 export class WhatsappModule {}

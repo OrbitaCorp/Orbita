@@ -33,6 +33,7 @@ import { SeccionCupon, SeccionEstadisticas, SeccionPie, SeccionTextos } from './
 import { SeccionPaleta, SeccionTipografia } from './components/apariencia/secciones/SeccionesDiseno'
 import { SeccionMarcas, SeccionParallax, SeccionVideo, SeccionWhatsapp } from './components/apariencia/secciones/SeccionesHome'
 import { SeccionesPlantilla } from './components/apariencia/secciones/SeccionesPlantilla'
+import { SeccionPlantillasPorDefecto } from './components/apariencia/secciones/SeccionPlantillasPorDefecto'
 import type { Apariencia as Ap } from './mock/apariencia.mock'
 
 interface AparienciaProps {
@@ -224,8 +225,18 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
         return <AparienciaSkeleton />
     }
 
+    // Con una plantilla de Home activa, los colores, las letras y el diseño los
+    // pone ella: arriba se dice cuál es (y cómo volver a la clásica), y abajo va
+    // el mismo editor de contenido que en Avanzado → Plantillas. Antes acá
+    // solo había un cartel que mandaba a Avanzado, y eso no le sirve al plan
+    // Base, que puede usar las plantillas libres (ver libres.ts) pero no
+    // entra a Avanzado.
     if (homeTemplate && !soloContenido) {
-        return <AparienciaBloqueada homeTemplate={homeTemplate} onVolvio={() => setHomeTemplateLocal(null)} onToast={onToast} />
+        return (
+            <AparienciaBloqueada homeTemplate={homeTemplate} onVolvio={() => setHomeTemplateLocal(null)} onToast={onToast}>
+                <Apariencia ir={ir} onToast={onToast} soloContenido />
+            </AparienciaBloqueada>
+        )
     }
 
     return (
@@ -301,6 +312,10 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
             <div className="ap-split">
                 {/* Controles */}
                 <div className="ap-controles" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+                    {/* Primero: es el punto de partida. Elegir una completa
+                        los controles de abajo, y desde ahí se ajusta. */}
+                    <SeccionPlantillasPorDefecto ap={ap} actualizar={actualizar} dirty={dirty} ir={ir} onToast={onToast} onPlantillaActivada={setHomeTemplateLocal} />
 
                     {heroCard}
 

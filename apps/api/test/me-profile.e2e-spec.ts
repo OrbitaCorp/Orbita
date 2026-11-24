@@ -67,13 +67,13 @@ describe('Me profile (e2e)', () => {
     expect(res.body).toHaveProperty('avatarUrl');
   });
 
-  it('actualiza nombre/telefono/fecha de nacimiento/DNI', async () => {
+  it('actualiza nombre/telefono/fecha de nacimiento (un DNI que llegue se ignora)', async () => {
     const res = await request(app.getHttpServer()).patch('/api/v1/me').set(auth(customerToken)).send({
       firstName: 'Nuevo Nombre', phone: '+54 9 11 0000-0000', birthDate: '1995-03-20', dni: '30111222',
     });
     expect(res.status).toBe(200);
     expect(res.body.firstName).toBe('Nuevo Nombre');
-    expect(res.body.dni).toBe('30111222');
+    expect(res.body).not.toHaveProperty('dni');
     expect(new Date(res.body.birthDate).getUTCFullYear()).toBe(1995);
   });
 

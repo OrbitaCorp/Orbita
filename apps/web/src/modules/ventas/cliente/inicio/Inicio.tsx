@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/router'
-import { ArrowRight, ArrowLeft, ChevronLeft, ChevronRight, X, Copy, Check } from 'lucide-react'
+import { ArrowRight, ChevronLeft, ChevronRight, Copy, Check } from 'lucide-react'
 import { StorefrontChrome } from '@/components/storefront/StorefrontChrome'
 import { useMovilPlantilla } from '@/hooks/useMovilPlantilla'
 import { useDeslizar } from '@/hooks/useDeslizar'
@@ -32,6 +32,8 @@ import { conOverrides, esPreview, usarOverridesPreview } from '@/lib/storefront/
 import { renderHeroBgPattern } from '@/components/storefront/heroPatterns'
 import { Skeleton, SkeletonText, SkeletonProductGrid } from '@/design-system/components/Skeleton'
 import JuegoInline, { TEMAS, yaGano, yaPerdio, estaDeclinado, declinadoKey } from '@/modules/ventas/cliente/juegos/JuegoInline'
+import { MarcoJuego as ModalJuego } from '@/modules/ventas/promos/MarcoJuego'
+import { AnuncioPromo } from '@/modules/ventas/promos/AnuncioPromo'
 // El mapa real de íconos vive junto al editor del panel (Categorias.tsx) —
 // ver catIcons.tsx para el porqué de compartirlo entre panel y storefront.
 import { CatIcon } from '@/modules/ventas/panel/catalogo/catIcons'
@@ -86,6 +88,10 @@ type PortadaCargada = {
     topVentas?: StorefrontProductItem[]
 }
 const PORTADAS = new Map<string, PortadaCargada>()
+
+// Con menos productos vendidos que esto, "Más vendidos" no aparece (ver
+// `todosTopVentas`).
+const MIN_TOP_VENTAS = 3
 
 export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { __homeTemplate?: string | null; __storeMeta?: { nombre?: string | null } | null } = {}) {
     const router = useRouter()
@@ -426,7 +432,11 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
     // grilla, que puede ser de tres, de cinco o una tira de seis. El home
     // clásico se queda con una fila de la grilla de Apariencia.
     const todosRecomendados = recomendados.map(p => toProducto(p, badgesEstante))
-    const todosTopVentas = topVentas.map(p => toProducto(p, badgesEstante))
+    // "Más vendidos" solo con MIN_TOP_VENTAS productos vendidos o más: con uno
+    // o dos el estante se veía vacío y no decía nada (pedido 17/11, nama-imp).
+    // Con menos se trata como una tienda sin ventas: el home clásico no lo
+    // muestra y las plantillas caen a lo que ya hacían sin ventas.
+    const todosTopVentas = topVentas.length >= MIN_TOP_VENTAS ? topVentas.map(p => toProducto(p, badgesEstante)) : []
     const estanteRecomendados = todosRecomendados.slice(0, porEstante)
     const estanteTopVentas = todosTopVentas.slice(0, porEstante)
     // Las plantillas de Home siguen recibiendo su "más vendidos" como antes
@@ -994,7 +1004,7 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
             {(ap?.showBestSellersSection ?? true) && estanteTopVentas.length > 0 && (
                 <section data-ap-sec="estante-topventas" className="sf-w" style={{ paddingBottom: 36 }}>
                     <SectionHead color="#F59E0B" eyebrow="Top ventas" titulo="Más vendidos" onVer={() => go('/catalogo?sort=bestselling')} />
-                    <EstanteProductos productos={estanteTopVentas} modoLista={modoListaEstante} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />
+                    <EstanteProductos productos={estanteTopVentas} modoLista={modoListaEstante} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} verTodos={estanteTopVentas.length < porEstante ? () => go('/catalogo?sort=bestselling') : undefined} />
                 </section>
             )}
 
@@ -1118,8 +1128,11 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
                 // picker — sin ninguna de las dos, se muestra el picker.
                 const tipoMostrado = reclamo ? reclamo.tipo : (juegoElegido ?? (elegibles.length === 1 ? elegibles[0].type : null))
                 const mostrarPicker = !reclamo && !tipoMostrado
+                const juegoMostrado = juegosActivos.find(g => g.type === tipoMostrado)
                 return (
                     <ModalJuego
+                        tema={mostrarPicker ? null : juegoMostrado?.theme}
+                        presentacion={juegoMostrado?.presentation}
                         titulo={reclamo ? 'Reclamá tu premio' : mostrarPicker ? '¡Jugá y ganá un descuento!' : (elegibles.find(g => g.type === tipoMostrado)?.name || TEMAS[tipoMostrado ?? '']?.titulo || 'Juego con premio')}
                         onVolver={!reclamo && juegoElegido ? () => setJuegoElegido(null) : undefined}
                         onCerrar={cerrarModal}
@@ -1127,7 +1140,7 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
                         {mostrarPicker ? (
                             <PickerJuegos juegos={elegibles} onElegir={setJuegoElegido} />
                         ) : (
-                            <JuegoInline slug={slug} tipo={tipoMostrado!} nombreTienda={tienda.nombre} sessionIdReclamo={reclamo?.sessionId} />
+                            <JuegoInline slug={slug} tipo={tipoMostrado!} nombreTienda={tienda.nombre} sessionIdReclamo={reclamo?.sessionId} tema={juegoMostrado?.theme} />
                         )}
                     </ModalJuego>
                 )
@@ -1139,9 +1152,19 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
                 muestre mientras el modal de juegos está en pantalla, este
                 chequeo acá es defensivo, por si algo cambia el orden. */}
             {modalPromo && promoActivo && !modalJuego && !reclamo && (
-                <ModalJuego titulo={promoActivo.title} onCerrar={cerrarModalPromo}>
-                    <PromoModalContenido promo={promoActivo} go={go} />
-                </ModalJuego>
+                promoActivo.format ? (
+                    <AnuncioPromo
+                        anuncio={promoActivo}
+                        formato={promoActivo.format}
+                        diseno={promoActivo.design}
+                        onCerrar={cerrarModalPromo}
+                        onCta={() => { cerrarModalPromo(); irACtaDe(promoActivo, go) }}
+                    />
+                ) : (
+                    <ModalJuego titulo={promoActivo.title} onCerrar={cerrarModalPromo}>
+                        <PromoModalContenido promo={promoActivo} go={go} />
+                    </ModalJuego>
+                )
             )}
 
             {!enDemo && !hayModalAbierto && (jugables.length > 0 || promoActivo) && (
@@ -1157,16 +1180,28 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
             )}
             {juegoDemo && (
                 <ModalJuego
+                    tema={juegoDemo.juego.theme}
+                    presentacion={juegoDemo.juego.presentation}
                     titulo={juegoDemo.juego.name || TEMAS[juegoDemo.juego.type]?.titulo || 'Juego con premio'}
                     onCerrar={() => setJuegoDemo(null)}
                 >
-                    <JuegoInline key={juegoDemo.vez} slug={slug} tipo={juegoDemo.juego.type} nombreTienda={tienda.nombre} />
+                    <JuegoInline key={juegoDemo.vez} slug={slug} tipo={juegoDemo.juego.type} nombreTienda={tienda.nombre} tema={juegoDemo.juego.theme} />
                 </ModalJuego>
             )}
             {anuncioDemo && (
-                <ModalJuego titulo={anuncioDemo.title} onCerrar={() => setAnuncioDemo(null)}>
-                    <PromoModalContenido promo={anuncioDemo} go={go} />
-                </ModalJuego>
+                anuncioDemo.format ? (
+                    <AnuncioPromo
+                        anuncio={anuncioDemo}
+                        formato={anuncioDemo.format}
+                        diseno={anuncioDemo.design}
+                        onCerrar={() => setAnuncioDemo(null)}
+                        onCta={() => { setAnuncioDemo(null); irACtaDe(anuncioDemo, go) }}
+                    />
+                ) : (
+                    <ModalJuego titulo={anuncioDemo.title} onCerrar={() => setAnuncioDemo(null)}>
+                        <PromoModalContenido promo={anuncioDemo} go={go} />
+                    </ModalJuego>
+                )
             )}
         </StorefrontChrome>
     )
@@ -1184,38 +1219,7 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
 // El mismo marco se reusa para el modal de anuncios (RBT-675, ver
 // PromoModalContenido más abajo) — el dueño ya adelantó que el criterio de
 // UX ("sin URL propia, todo en un modal") aplica igual ahí.
-function ModalJuego({ titulo, onVolver, onCerrar, children }: { titulo: string; onVolver?: () => void; onCerrar: () => void; children: React.ReactNode }) {
-    return (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-            <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)' }} />
-            {/* Ancho pensado para que la escena del juego llegue a su escala
-                máxima (ANCHO_DISENO × ESCALA_MAX = 600px) sin quedar
-                apretada contra el padding. Sigue siendo responsive:
-                width:100% + el padding:16 del overlay hacen que en un celular
-                angosto ocupe todo el ancho disponible en vez de desbordar, y
-                la escena de adentro se escala sola a lo que haya. */}
-            <div style={{ position: 'relative', width: '100%', maxWidth: 680, maxHeight: 'calc(100vh - 32px)', overflowY: 'auto', background: 'var(--color-bg)', borderRadius: 16, boxShadow: '0 24px 64px rgba(0,0,0,0.22)', padding: 'clamp(18px, 4.5vw, 32px)' }}>
-                {/* Grid de 3 columnas con los dos extremos del mismo ancho — así el
-                    título queda centrado de verdad contra el modal entero, no solo
-                    contra el espacio que le queda libre entre los botones (con flex
-                    simple, la X sin nada que la balancee del otro lado corría el
-                    título hacia la izquierda). */}
-                <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 28px', alignItems: 'center', gap: 8, marginBottom: 18 }}>
-                    {onVolver ? (
-                        <button onClick={onVolver} aria-label="Volver" style={modalIconBtn}>
-                            <ArrowLeft size={15} />
-                        </button>
-                    ) : <span />}
-                    <h2 style={{ fontSize: 16, fontWeight: 800, letterSpacing: '-0.01em', color: 'var(--color-text)', margin: 0, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{titulo}</h2>
-                    <button onClick={onCerrar} aria-label="Cerrar" style={modalIconBtn}>
-                        <X size={15} />
-                    </button>
-                </div>
-                {children}
-            </div>
-        </div>
-    )
-}
+// El marco vive en promos/MarcoJuego.tsx: la vista previa del panel usa el mismo.
 
 // ─── Selector de juego (solo cuando hay más de uno elegible a la vez) ──────────
 function PickerJuegos({ juegos, onElegir }: { juegos: ActiveGame[]; onElegir: (tipo: string) => void }) {
@@ -1249,16 +1253,20 @@ function PickerJuegos({ juegos, onElegir }: { juegos: ActiveGame[]; onElegir: (t
     )
 }
 
-const modalIconBtn: React.CSSProperties = {
-    width: 28, height: 28, borderRadius: 8, border: '1px solid var(--color-border)', background: 'transparent',
-    color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', flexShrink: 0,
-}
-
 // ─── Contenido del modal de anuncios (RBT-675) ─────────────────────────────────
 // Texto libre a propósito — no se ata a ningún Discount/Cupón real (el
 // motor no tiene "2x1" implementado, ver discount-engine.ts en el backend).
 // El botón "Copiar" es el mismo patrón (navigator.clipboard + 2s de aviso)
 // que ya usa JuegoInline.tsx para el código del premio de un juego.
+// El botón del anuncio solo lleva a rutas de ESTA tienda: la API ya descarta
+// los links externos (hallazgo ctalink-externo), y acá tampoco se sigue uno por
+// si ese filtro se afloja. go() viene atado al slug de la tienda.
+function irACtaDe(promo: ActivePromoModal, go: (path: string) => void) {
+    const link = promo.ctaLink?.trim()
+    if (!link || /^[a-z][a-z0-9+.-]*:/i.test(link) || link.startsWith('//')) { go('/catalogo'); return }
+    go(link.startsWith('/') ? link : `/${link}`)
+}
+
 function PromoModalContenido({ promo, go }: { promo: ActivePromoModal; go: (path: string) => void }) {
     const [copiado, setCopiado] = useState(false)
 
@@ -1268,14 +1276,7 @@ function PromoModalContenido({ promo, go }: { promo: ActivePromoModal; go: (path
         setTimeout(() => setCopiado(false), 2000)
     }
 
-    // El botón del modal solo lleva a rutas de ESTA tienda: la API ya descarta
-    // los links externos (hallazgo ctalink-externo), y acá tampoco se sigue
-    // uno por si ese filtro se afloja. go() viene atado al slug de la tienda.
-    function irACta() {
-        const link = promo.ctaLink?.trim()
-        if (!link || /^[a-z][a-z0-9+.-]*:/i.test(link) || link.startsWith('//')) { go('/catalogo'); return }
-        go(link.startsWith('/') ? link : `/${link}`)
-    }
+    const irACta = () => irACtaDe(promo, go)
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, textAlign: 'center', padding: '8px 4px 4px' }}>
@@ -1334,7 +1335,7 @@ function SectionHead({ color, eyebrow, titulo, onVer }: { color: string; eyebrow
 // componente de arriba; en ese caso se reusa el mismo ProductCard
 // layout="list" que ya usan Catalogo.tsx/Categoria.tsx, apilado en una sola
 // columna en vez de la grilla de .sf-g4 (que ya lee columnasDeGrilla).
-function EstanteProductos({ productos, modoLista, mode, transferPct }: { productos: Producto[]; modoLista: boolean; mode: 'FULL' | 'SHOWCASE'; transferPct: number | null }) {
+function EstanteProductos({ productos, modoLista, mode, transferPct, verTodos }: { productos: Producto[]; modoLista: boolean; mode: 'FULL' | 'SHOWCASE'; transferPct: number | null; verTodos?: () => void }) {
     if (modoLista) {
         return (
             <div className="sf-g4-lista">
@@ -1345,7 +1346,39 @@ function EstanteProductos({ productos, modoLista, mode, transferPct }: { product
     return (
         <div className="sf-g4">
             {productos.map(p => <ProductCard key={p.id} producto={p} mode={mode} transferPct={transferPct} />)}
+            {verTodos && <TarjetaVerTodos onClick={verTodos} />}
         </div>
+    )
+}
+
+// El lugar que sobra en una fila corta ("Más vendidos" con 3 en una grilla de
+// 4): una tarjeta del mismo tamaño que la de producto —la grilla la estira al
+// alto de la fila; el recuadro de arriba repite la foto 3:4 y el mismo radio—
+// que lleva al catálogo completo. Sobria a propósito: borde y texto, sin color
+// de acento (ver feedback de diseño "menos IA").
+function TarjetaVerTodos({ onClick }: { onClick: () => void }) {
+    return (
+        <button
+            type="button"
+            className="ds-hover"
+            onClick={onClick}
+            aria-label="Ver todos los productos"
+            style={{
+                display: 'flex', flexDirection: 'column', width: '100%', padding: 0, background: 'transparent',
+                border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+            }}
+        >
+            <span style={{
+                width: '100%', aspectRatio: '3 / 4', borderRadius: 16, border: '1px solid var(--color-border)',
+                background: 'var(--color-surface)', display: 'flex', flexDirection: 'column', alignItems: 'center',
+                justifyContent: 'center', gap: 10, color: 'var(--color-text)',
+            }}>
+                <span style={{ width: 44, height: 44, borderRadius: '50%', border: '1px solid var(--color-border)', display: 'grid', placeItems: 'center' }}>
+                    <ArrowRight size={18} strokeWidth={2} />
+                </span>
+                <span style={{ fontSize: 15, fontWeight: 600 }}>Ver todos</span>
+            </span>
+        </button>
     )
 }
 
@@ -1420,12 +1453,12 @@ function HeroCarousel({ slides, go, vidriera = false, primario = null }: { slide
                     // (Carrusel en piezas.tsx). Las variantes con imagen
                     // centrada/lateral no la piden: no fueron pensadas para
                     // un título tan grande al lado de una foto recortada.
-                    function textoBloque(align: 'left' | 'center', big = false) {
+                    function textoBloque(align: 'left' | 'center' | 'right', big = false) {
                         return (
                             // Textos y CTA más grandes — acompañan al hero más
                             // alto (pedido explícito del dueño, con una tienda
                             // de referencia de hero grande).
-                            <div style={{ ...(align === 'center' ? { textAlign: 'center' } : undefined), ...(big ? { maxWidth: 760 } : undefined) }}>
+                            <div style={{ ...(align !== 'left' ? { textAlign: align } : undefined), ...(big ? { maxWidth: 760 } : undefined) }}>
                                 <h1
                                     className={big ? 'sf-hero-title-vid' : undefined}
                                     style={{
@@ -1438,9 +1471,9 @@ function HeroCarousel({ slides, go, vidriera = false, primario = null }: { slide
                                     }}
                                 >{s.titulo}</h1>
                                 {s.subtitulo && (
-                                    <p style={{ fontSize: big ? 20 : 17, fontWeight: big ? 600 : 400, color: textoOscuro ? 'rgba(15,23,42,0.78)' : 'rgba(255,255,255,0.92)', lineHeight: 1.6, marginTop: big ? 8 : 18, maxWidth: 460, ...(align === 'center' ? { marginLeft: 'auto', marginRight: 'auto' } : {}) }}>{s.subtitulo}</p>
+                                    <p style={{ fontSize: big ? 20 : 17, fontWeight: big ? 600 : 400, color: textoOscuro ? 'rgba(15,23,42,0.78)' : 'rgba(255,255,255,0.92)', lineHeight: 1.6, marginTop: big ? 8 : 18, maxWidth: 460, ...(align === 'center' ? { marginLeft: 'auto', marginRight: 'auto' } : align === 'right' ? { marginLeft: 'auto' } : {}) }}>{s.subtitulo}</p>
                                 )}
-                                <div style={{ display: 'flex', gap: 10, marginTop: big ? 24 : 28, flexWrap: 'wrap', ...(align === 'center' ? { justifyContent: 'center' } : {}) }}>
+                                <div style={{ display: 'flex', gap: 10, marginTop: big ? 24 : 28, flexWrap: 'wrap', ...(align === 'center' ? { justifyContent: 'center' } : align === 'right' ? { justifyContent: 'flex-end' } : {}) }}>
                                     {big ? (
                                         // CTA de texto subrayado, sin botón — tal cual Carrusel
                                         // en panel/avanzado/plantillas/piezas.tsx.
@@ -1504,6 +1537,22 @@ function HeroCarousel({ slides, go, vidriera = false, primario = null }: { slide
                         )
                     }
 
+                    // Dónde va el texto (Apariencia → slide → "Posición del texto").
+                    // Antes era fijo a la izquierda y al medio, que sigue siendo
+                    // lo que cae para un slide guardado antes de que existiera
+                    // el campo. Vidriera no lo usa: su diseño lo fija ella.
+                    const lado: 'left' | 'center' | 'right' = vidriera ? 'left' : (s.textAlign === 'center' || s.textAlign === 'right' ? s.textAlign : 'left')
+                    const alto: 'top' | 'center' | 'bottom' = vidriera ? 'center' : (s.textVertical === 'top' || s.textVertical === 'bottom' ? s.textVertical : 'center')
+                    // Los velos que oscurecen "del lado del texto" (diagonal,
+                    // viñeta, color de marca, blanco) se dan vuelta con el
+                    // texto: si no, el texto a la derecha quedaba sobre la
+                    // parte sin velo de la foto. Con el texto al medio, el velo
+                    // se concentra en el centro.
+                    const xTexto = lado === 'left' ? 25 : lado === 'right' ? 75 : 50
+                    const yTexto = alto === 'top' ? 30 : alto === 'bottom' ? 70 : 50
+                    const deUnLado = (c0: string, c1: string, c2: string) => lado === 'center'
+                        ? `radial-gradient(70% 85% at 50% ${yTexto}%, ${c0} 0%, ${c1} 45%, ${c2} 80%)`
+                        : `linear-gradient(${lado === 'right' ? 260 : 100}deg, ${c0} 0%, ${c1} 36%, ${c2} 66%)`
                     // Velo diagonal: oscuro del lado del texto, transparente
                     // del otro — tal cual Carrusel en piezas.tsx. Vidriera lo
                     // usa siempre (su mock limpio no pasa por el campo de
@@ -1511,7 +1560,7 @@ function HeroCarousel({ slides, go, vidriera = false, primario = null }: { slide
                     // soloTexto en SlideItem de Apariencia.tsx); fuera de
                     // Vidriera es una de las opciones que elige el dueño
                     // (imageOverlay, Apariencia.tsx → "Overlay de imagen").
-                    const veloDiagonal = 'linear-gradient(100deg, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.58) 34%, rgba(0,0,0,0.12) 62%)'
+                    const veloDiagonal = deUnLado('rgba(0,0,0,0.88)', 'rgba(0,0,0,0.58)', 'rgba(0,0,0,0.12)')
                     // 'tint' = comportamiento de siempre (tinte parejo +
                     // puntos) y el default para slides guardados antes de
                     // que existiera este campo — no les cambia el diseño.
@@ -1521,41 +1570,56 @@ function HeroCarousel({ slides, go, vidriera = false, primario = null }: { slide
                         overlay === 'diagonal' ? veloDiagonal :
                         overlay === 'bottom' ? 'linear-gradient(to top, rgba(0,0,0,0.68) 0%, rgba(0,0,0,0.30) 42%, rgba(0,0,0,0) 75%)' :
                         overlay === 'top' ? 'linear-gradient(to bottom, rgba(0,0,0,0.68) 0%, rgba(0,0,0,0.30) 42%, rgba(0,0,0,0) 75%)' :
-                        // Viñeta: oscuro concentrado del lado del texto
-                        // (izquierda, ver textoBloque('left') más abajo),
-                        // se desvanece hacia la derecha — más suave y
-                        // redondeada que 'diagonal', sin un borde recto.
-                        overlay === 'radial' ? 'radial-gradient(60% 90% at 25% 50%, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.25) 45%, rgba(0,0,0,0) 75%)' :
+                        // Viñeta: oscuro concentrado donde está el texto, se
+                        // desvanece hacia afuera — más suave y redondeada que
+                        // 'diagonal', sin un borde recto.
+                        overlay === 'radial' ? `radial-gradient(60% 90% at ${xTexto}% ${yTexto}%, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.25) 45%, rgba(0,0,0,0) 75%)` :
                         // Único overlay a color: el primario del negocio en
-                        // vez de negro, mismo trazo diagonal que 'diagonal'.
-                        overlay === 'marca' ? 'linear-gradient(100deg, color-mix(in srgb, var(--color-primary) 82%, black) 0%, color-mix(in srgb, var(--color-primary) 45%, transparent) 40%, transparent 72%)' :
+                        // vez de negro, mismo trazo que 'diagonal'.
+                        overlay === 'marca' ? deUnLado('color-mix(in srgb, var(--color-primary) 82%, black)', 'color-mix(in srgb, var(--color-primary) 45%, transparent)', 'transparent') :
                         // Único overlay CLARO — pedido explícito con una
                         // tienda de referencia: velo blanco (en vez de negro)
                         // del lado del texto, se desvanece hacia la foto.
                         // Va de la mano con `textoOscuro` (más arriba): acá
                         // solo se pinta el velo, el texto pasa a oscuro aparte.
-                        overlay === 'blanco' ? 'linear-gradient(100deg, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.55) 38%, rgba(255,255,255,0.05) 68%)' :
+                        overlay === 'blanco' ? deUnLado('rgba(255,255,255,0.92)', 'rgba(255,255,255,0.55)', 'rgba(255,255,255,0.05)') :
                         'linear-gradient(rgba(15,23,42,0.55),rgba(15,23,42,0.55))' // 'tint'
+                    // La textura de puntos de 'tint' se borra del lado del texto.
+                    const mascaraPuntos = lado === 'right' ? 'linear-gradient(to left, transparent, black 60%)'
+                        : lado === 'center' ? 'radial-gradient(closest-side, transparent 40%, black)'
+                        : 'linear-gradient(to right, transparent, black 60%)'
                     return (
                         <div key={s.id} style={{ width: `${100 / n}%`, flexShrink: 0, display: 'flex' }}>
                             <div style={{
                                 position: 'relative', overflow: 'hidden',
                                 flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center',
-                                background: s.img
+                                // backgroundImage y no el atajo `background`: al
+                                // cambiar el velo o la foto, React reescribía el
+                                // atajo y eso borraba el backgroundSize de abajo
+                                // (que no cambia, así que no se volvía a poner).
+                                // Sin `cover` la foto se repetía en mosaico: se
+                                // veía dos veces en la vista previa del panel,
+                                // que recibe cada cambio en vivo (reportado con
+                                // captura, 17/11).
+                                backgroundImage: s.img
                                     ? (overlayGradient ? `${overlayGradient}, url(${s.img})` : `url(${s.img})`)
                                     : s.automatico ? degradeAutomatico('var(--color-primary)', i) : HERO_GRADS[i % HERO_GRADS.length],
-                                backgroundSize: 'cover', backgroundPosition: 'center',
+                                backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
                             }}>
                                 {/* Textura de puntos — solo con el overlay
                                     'tint' (comportamiento de siempre). Las
                                     demás opciones (diagonal, degradé, ninguno)
                                     son un velo limpio sin textura encima. */}
                                 {overlay === 'tint' && (
-                                    <div style={{ position: 'absolute', inset: 0, opacity: 0.40, backgroundImage: 'radial-gradient(rgba(255,255,255,0.18) 1px, transparent 1px)', backgroundSize: '22px 22px', maskImage: 'linear-gradient(to right, transparent, black 60%)', WebkitMaskImage: 'linear-gradient(to right, transparent, black 60%)' }} />
+                                    <div style={{ position: 'absolute', inset: 0, opacity: 0.40, backgroundImage: 'radial-gradient(rgba(255,255,255,0.18) 1px, transparent 1px)', backgroundSize: '22px 22px', maskImage: mascaraPuntos, WebkitMaskImage: mascaraPuntos }} />
                                 )}
 
-                                <div className="sf-hero-grid sf-hero-inner" style={{ gridTemplateColumns: '1fr' }}>
-                                    {textoBloque('left', vidriera)}
+                                <div className="sf-hero-grid sf-hero-inner" style={{
+                                    gridTemplateColumns: '1fr',
+                                    alignItems: alto === 'top' ? 'start' : alto === 'bottom' ? 'end' : 'center',
+                                    justifyItems: lado === 'left' ? 'start' : lado === 'right' ? 'end' : 'center',
+                                }}>
+                                    {textoBloque(lado, vidriera)}
                                 </div>
                             </div>
                         </div>

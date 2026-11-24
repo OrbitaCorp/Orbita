@@ -1,5 +1,6 @@
 import { MessageSquare } from 'lucide-react'
 import type { WhatsappEstado } from '@/lib/api'
+import { esVisitanteDemo } from '@/lib/demo/modo'
 import { IconoWhatsapp } from '../whatsapp/WhatsAppWeb'
 import type { CanalDeMensajes } from '../whatsapp/utilidades'
 
@@ -20,7 +21,9 @@ interface Props {
 export function SelectorDeCanal({ canal, onCanal, sinLeer, whatsapp }: Props) {
   const conectado = typeof whatsapp === 'object' && whatsapp.connected
   const lineaWhatsapp =
-    whatsapp === 'cargando' ? 'Mirando tu cuenta…'
+    // Demo pública: no se puede conectar (ver SoloConTienda); abajo está el video de cómo funciona.
+    esVisitanteDemo() ? 'En la demo: mirá cómo funciona'
+    : whatsapp === 'cargando' ? 'Mirando tu cuenta…'
       : whatsapp === 'no-disponible' ? 'Todavía no está disponible para tu negocio'
         : conectado ? `Conectado · ${whatsapp.displayPhone ?? whatsapp.phoneNumberId}`
           : 'Sin conectar · conectá tu cuenta de WhatsApp Business'

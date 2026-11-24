@@ -74,6 +74,40 @@ const productDetailInclude = {
 
 type ProductWithDetail = Prisma.ProductGetPayload<{ include: typeof productDetailInclude }>;
 
+/**
+ * El WHERE del listado de productos del panel (búsqueda, categoría y estado).
+ * Lo comparten el listado y el Excel de "Actualizar precios", así el archivo
+ * trae exactamente lo que el dueño está viendo filtrado.
+ */
+export function whereDelListado(businessId: string, query: Pick<FindProductsQueryDto, 'search' | 'categoryId' | 'status'>): Prisma.ProductWhereInput {
+  // "Sin stock" es un estado de la UI, no un ProductStatus: se traduce a
+  // "todas las variantes con todo su stock en cero". Pasarlo crudo como
+  // `status` reventaría el enum de Prisma.
+  const filtroEstado: Prisma.ProductWhereInput =
+    query.status === 'OUT_OF_STOCK'
+      ? { variants: { every: { showStock: true, stock: { every: { quantity: 0 } } } } } // las de stock en blanco (vidriera) no cuentan como "sin stock"
+      : query.status
+        ? { status: query.status }
+        : {};
+
+  // La búsqueda cubre nombre y SKU de cualquiera de sus variantes (RBT-304):
+  // el dueño busca tanto por lo que ve en la tienda como por el código interno.
+  return {
+    businessId,
+    deletedAt: null,
+    ...(query.categoryId ? { categoryId: query.categoryId } : {}),
+    ...filtroEstado,
+    ...(query.search
+      ? {
+          OR: [
+            { name: { contains: query.search, mode: 'insensitive' as const } },
+            { variants: { some: { sku: { contains: query.search, mode: 'insensitive' as const } } } },
+          ],
+        }
+      : {}),
+  };
+}
+
 @Injectable()
 export class ProductsService {
   constructor(
@@ -91,32 +125,7 @@ export class ProductsService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
 
-    // "Sin stock" es un estado de la UI, no un ProductStatus: se traduce a
-    // "todas las variantes con todo su stock en cero". Pasarlo crudo como
-    // `status` reventaría el enum de Prisma.
-    const filtroEstado: Prisma.ProductWhereInput =
-      query.status === 'OUT_OF_STOCK'
-        ? { variants: { every: { showStock: true, stock: { every: { quantity: 0 } } } } } // las de stock en blanco (vidriera) no cuentan como "sin stock"
-        : query.status
-          ? { status: query.status }
-          : {};
-
-    // La búsqueda cubre nombre y SKU de cualquiera de sus variantes (RBT-304):
-    // el dueño busca tanto por lo que ve en la tienda como por el código interno.
-    const where: Prisma.ProductWhereInput = {
-      businessId,
-      deletedAt: null,
-      ...(query.categoryId ? { categoryId: query.categoryId } : {}),
-      ...filtroEstado,
-      ...(query.search
-        ? {
-            OR: [
-              { name: { contains: query.search, mode: 'insensitive' as const } },
-              { variants: { some: { sku: { contains: query.search, mode: 'insensitive' as const } } } },
-            ],
-          }
-        : {}),
-    };
+    const where = whereDelListado(businessId, query);
 
     const [total, products] = await this.prisma.$transaction([
       this.prisma.product.count({ where }),

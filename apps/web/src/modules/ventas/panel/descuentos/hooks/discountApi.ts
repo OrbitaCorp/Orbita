@@ -146,6 +146,8 @@ export function detalleApiADescuento(d: ApiDiscountDetail): Descuento {
 // Shape que arma DescuentosCrear.tsx (alta y edición mandan el objeto
 // completo — el backend no soporta PATCH parcial, `update` reemplaza todo).
 export interface DescuentoInput {
+  formatoOferta?: string
+  disenoOferta?: string
   nombre: string
   tipo: TipoDescuento
   valor: number
@@ -190,5 +192,7 @@ export function descuentoInputAApi(input: DescuentoInput): ApiUpsertDiscountInpu
     // (y se la saca al que la tenía), false la apaga si era de este — así
     // cambiar el tipo de un descuento que la tenía la apaga solo.
     countdown: input.tipo === 'oferta_relampago',
+    countdownFormat: input.tipo === 'oferta_relampago' ? input.formatoOferta : undefined,
+    countdownDesign: input.tipo === 'oferta_relampago' ? input.disenoOferta : undefined,
   }
 }

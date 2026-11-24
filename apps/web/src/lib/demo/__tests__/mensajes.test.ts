@@ -10,7 +10,7 @@ const SEMBRADA = {
   lastMessage: { id: 'm-1', sender: 'CUSTOMER', text: 'Hola! Tienen stock?', orderId: null, createdAt: '2026-09-29T10:00:00.000Z' },
 }
 const MENSAJE_SEMBRADO = SEMBRADA.lastMessage
-const PERFIL = { id: 'cli-invitado', firstName: 'Invitado', lastName: 'Demo', email: 'invitado@demo.invalid', phone: null, dni: null, birthDate: null, avatarUrl: null, emailVerified: true }
+const PERFIL = { id: 'cli-invitado', firstName: 'Invitado', lastName: 'Demo', email: 'invitado@demo.invalid', phone: null, birthDate: null, avatarUrl: null, emailVerified: true }
 
 function entorno() {
   const datos = new Map<string, string>()

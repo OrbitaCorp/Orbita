@@ -203,7 +203,6 @@ export default function ClienteDetalle({ id, onVolver, irPedido, irNuevo, irRepo
         ['Nombre', nombre],
         ['Email', c.email ?? 'Sin email'],
         ['Teléfono', c.phone ?? 'Sin teléfono'],
-        ['DNI', c.dni ?? 'Sin DNI'],
         ['Cuenta', c.hasAccount ? 'Con cuenta en la tienda online' : 'Creado desde el panel (sin cuenta)'],
         ['Cliente desde', fechaCorta(c.createdAt)],
     ]
@@ -309,7 +308,7 @@ export default function ClienteDetalle({ id, onVolver, irPedido, irNuevo, irRepo
                         {tab === 'info' && filasInfo.map(([k, v], i) => (
                             <div key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, padding: '12px 0', borderBottom: i < filasInfo.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
                                 <span style={{ fontSize: 13, color: 'var(--color-muted)', flexShrink: 0 }}>{k}</span>
-                                <span style={{ fontSize: 13, color: 'var(--color-text)', textAlign: 'right', fontFamily: /Email|Teléfono|DNI|desde/.test(k) ? '"Geist Mono", monospace' : 'inherit' }}>{v}</span>
+                                <span style={{ fontSize: 13, color: 'var(--color-text)', textAlign: 'right', fontFamily: /Email|Teléfono|desde/.test(k) ? '"Geist Mono", monospace' : 'inherit' }}>{v}</span>
                             </div>
                         ))}
 

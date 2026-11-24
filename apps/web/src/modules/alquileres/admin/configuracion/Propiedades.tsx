@@ -5,7 +5,7 @@
 // Reglas de reserva; las fechas bloqueadas, en Bloqueos.
 import { useState } from 'react'
 import { ArrowRight, Plus, Trash2 } from 'lucide-react'
-import { Area, BarraGuardar, Campo, Nota, Seccion, Selector } from '@/design-system/reservas/piezas'
+import { Area, BarraGuardar, Campo, Nota, Seccion, Selector, Vacio } from '@/design-system/reservas/piezas'
 import { TIPOS, TIPOS_PROPIEDAD, capital, esMensual, palabrasDe, type Modalidad, type Propiedad } from '../../datos'
 import { Mapa } from '../../storefront/Sitio'
 import type { Vista } from '../navegacion'
@@ -17,7 +17,11 @@ const COMODIDADES = ['Wi-Fi', 'Aire acondicionado', 'Calefacción', 'Pileta', 'P
 /** Lo que trae una propiedad que pasa a alquilarse por mes y no tenía precio por mes: un valor para arrancar. */
 const MENSUAL_INICIAL = { precioMes: 400000, minMeses: 1, maxMeses: 12, deposito: 400000 }
 
-export default function Propiedades({ negocio, onGuardar, onIr }: Form & { onIr: (vista: Vista) => void }) {
+/** Una foto de ejemplo para una propiedad recién creada en el panel real, hasta que exista la carga de fotos. */
+const FOTO_DE_EJEMPLO = '/plantillas/casa-interior.jpg'
+
+/** `real`: el panel de un negocio de verdad. Por ahora solo por noche y sin carga de fotos (la limpieza y las temporadas van en Temporadas y precios). */
+export default function Propiedades({ negocio, onGuardar, onIr, real = false }: Form & { onIr: (vista: Vista) => void; real?: boolean }) {
   const palabras = palabrasDe(negocio)
   const [lista, setLista] = useState<Propiedad[]>(negocio.propiedades)
   const [abierta, setAbierta] = useState(lista[0]?.id ?? '')
@@ -27,7 +31,7 @@ export default function Propiedades({ negocio, onGuardar, onIr }: Form & { onIr:
   const cambiarModalidad = (m: Modalidad) => p && editar({ modalidad: m, mensual: m === 'mes' ? p.mensual ?? { ...MENSUAL_INICIAL } : p.mensual })
   const agregar = () => {
     const id = idNuevo('c')
-    setLista([...lista, { id, nombre: `${capital(palabras.unidad)} nueva`, tipo: 'Casa', modalidad: 'noche', descripcion: '', huespedes: 4, ambientes: 2, camas: 2, banos: 1, comodidades: ['Wi-Fi'], fotos: [negocio.fotoPortada], direccion: negocio.direccion, ciudad: negocio.ciudad, latLng: negocio.latLng, tarifa: { precioNoche: 50000, temporadas: [], finDeSemanaPct: 0, limpieza: 15000, minNoches: 1 }, checkIn: 15 * 60, checkOut: 10 * 60 }])
+    setLista([...lista, { id, nombre: `${capital(palabras.unidad)} nueva`, tipo: 'Casa', modalidad: 'noche', descripcion: '', huespedes: 4, ambientes: 2, camas: 2, banos: 1, comodidades: ['Wi-Fi'], fotos: [real ? FOTO_DE_EJEMPLO : negocio.fotoPortada], direccion: negocio.direccion, ciudad: negocio.ciudad, latLng: negocio.latLng, tarifa: { precioNoche: 50000, temporadas: [], finDeSemanaPct: 0, limpieza: real ? 0 : 15000, minNoches: 1 }, checkIn: 15 * 60, checkOut: 10 * 60 }])
     setAbierta(id)
   }
   return (
@@ -36,6 +40,7 @@ export default function Propiedades({ negocio, onGuardar, onIr }: Form & { onIr:
       <div className="rv-seg" role="group" aria-label={capital(palabras.unidad)} style={{ marginBottom: 14, maxWidth: '100%', overflowX: 'auto' }}>
         {lista.map(x => <button key={x.id} type="button" aria-pressed={x.id === abierta} onClick={() => setAbierta(x.id)}>{x.nombre}</button>)}
       </div>
+      {lista.length === 0 && <Vacio titulo={`Todavía no cargaste ${palabras.genero === 'm' ? 'ningún' : 'ninguna'} ${palabras.unidad}`} texto="Agregá lo que alquilás para empezar a tomar reservas." accion={<button type="button" className="rv-btn rv-btn--primario" onClick={agregar}><Plus size={15} aria-hidden /> Agregar {palabras.unidad}</button>} />}
       {p && (
         <div className="rv-pila">
           <Seccion titulo={`${capital(palabras.genero === 'm' ? 'el' : 'la')} ${palabras.unidad}`} bajada="Nombre, tipo, cómo se alquila y una descripción que invite.">
@@ -43,7 +48,7 @@ export default function Propiedades({ negocio, onGuardar, onIr }: Form & { onIr:
               <div className="rv-grid rv-grid--3">
                 <Campo label="Nombre" value={p.nombre} onChange={x => editar({ nombre: x })} />
                 <Selector label="Tipo" valor={p.tipo} onChange={x => editar({ tipo: x })} opciones={TIPOS_PROPIEDAD.map(t => ({ id: t, label: t }))} />
-                <Selector label="Se alquila" valor={p.modalidad} onChange={cambiarModalidad} opciones={[{ id: 'noche' as const, label: 'Por noche' }, { id: 'mes' as const, label: 'Por mes' }]} ayuda={esMensual(p) ? 'Una fecha y cuántos meses, con depósito.' : 'Entrada y salida, con temporadas.'} />
+                {!real && <Selector label="Se alquila" valor={p.modalidad} onChange={cambiarModalidad} opciones={[{ id: 'noche' as const, label: 'Por noche' }, { id: 'mes' as const, label: 'Por mes' }]} ayuda={esMensual(p) ? 'Una fecha y cuántos meses, con depósito.' : 'Entrada y salida, con temporadas.'} />}
               </div>
               <Area label="Descripción" value={p.descripcion} onChange={x => editar({ descripcion: x })} maxLength={400} />
               <div className="rv-grid rv-grid--4">
@@ -66,9 +71,9 @@ export default function Propiedades({ negocio, onGuardar, onIr }: Form & { onIr:
             <div className="alc-fotos">
               {p.fotos.map((f, i) => <img key={`${i}-${f}`} src={f} alt={`Foto ${i + 1} de ${p.nombre}`} loading="lazy" />)}
             </div>
-            <p className="ala-pie-nota">En la demo son fotos de ejemplo: no se cargan nuevas.</p>
+            <p className="ala-pie-nota">{real ? 'Por ahora va una foto de ejemplo: la carga de fotos propias llega en la próxima etapa.' : 'En la demo son fotos de ejemplo: no se cargan nuevas.'}</p>
           </Seccion>
-          <Seccion titulo="Ubicación" bajada="Así se ve en tu sitio. En la demo el punto del mapa no se mueve al cambiar la dirección.">
+          <Seccion titulo="Ubicación" bajada={real ? 'La dirección que se muestra en tu sitio. El punto del mapa todavía no se mueve al cambiarla.' : 'Así se ve en tu sitio. En la demo el punto del mapa no se mueve al cambiar la dirección.'}>
             <div className="rv-dos">
               <Campo label="Dirección" value={p.direccion} onChange={x => editar({ direccion: x })} />
               <Campo label="Ciudad" value={p.ciudad} onChange={x => editar({ ciudad: x })} />

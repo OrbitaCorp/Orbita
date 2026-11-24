@@ -110,7 +110,7 @@ export class GamesPlayService {
       // 15% OFF") — antes solo se sabían después de startSession, así que
       // el visitante tenía que arrancar a ciegas para enterarse de cuánto
       // podía ganar.
-      select: { type: true, name: true, campaignVersion: true, maxPercent: true, maxAttempts: true },
+      select: { type: true, name: true, campaignVersion: true, maxPercent: true, maxAttempts: true, theme: true, presentation: true },
       orderBy: { createdAt: 'asc' },
     });
     return games.map((g) => ({ ...g, maxPercent: Number(g.maxPercent) }));

@@ -36,6 +36,8 @@ export interface ProductoParaFotoWeb {
 export const MAX_FOTOS_CATALOGO = 6;
 const MIN_LADO_PX = 250;
 const MAX_REDIRECCIONES = 3;
+// Cuánto se saltea una clave de Serper que se quedó sin cupo antes de volver a probarla.
+const SERPER_PAUSA_AGOTADA_MS = 60 * 60 * 1000;
 const MAX_BYTES_FOTO = 10 * 1024 * 1024;
 // SVG no: no es una foto y sharp lo renderiza (otro intérprete más).
 const TIPOS_FOTO = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/avif', 'image/gif']);
@@ -61,6 +63,24 @@ export function textoPlano(str: string): string {
 
 function palabrasClave(str: string): string[] {
   return [...new Set(textoPlano(str).split(' ').filter((t) => t.length >= 3 && !PALABRAS_VACIAS.has(t)))];
+}
+
+/**
+ * Serper dijo que ESA clave no puede seguir: sin créditos (responde HTTP 400
+ * "Not enough credits", no 402), clave inválida (401/403) o límite (402/429).
+ * Con esto se pasa a la clave de respaldo (SERPER_API_KEY_RESPALDO) en vez de
+ * caer directo a Tavily/DuckDuckGo.
+ */
+export class SerperSinCupo extends Error {}
+
+/** ¿La respuesta de Serper es "esta clave no sirve más" (y no un error de la búsqueda)? */
+export function serperSinCupo(status: number, cuerpo: string): boolean {
+  return status === 401 || status === 402 || status === 403 || status === 429 || (status === 400 && /credit/i.test(cuerpo));
+}
+
+/** Las claves de Serper en el orden en que se usan: la principal y después la de respaldo. */
+export function clavesSerper(principal?: string | null, respaldo?: string | null): string[] {
+  return [...new Set([principal, respaldo].map((k) => (k ?? '').trim()).filter(Boolean))];
 }
 
 /**
@@ -206,6 +226,8 @@ export class ProductImageSearchService {
   private static readonly SOPORTE_EMAIL = 'soporte@orbita.site';
   private static readonly AVISO_COOLDOWN_MS = 12 * 60 * 60 * 1000;
   private readonly ultimoAviso = new Map<string, number>();
+  // Clave de Serper → hasta cuándo no se la vuelve a probar (se quedó sin cupo).
+  private readonly serperAgotadaHasta = new Map<string, number>();
 
   constructor(
     private readonly config: ConfigService,
@@ -281,17 +303,32 @@ export class ProductImageSearchService {
     filtrar: (candidatos: SuggestedImage[]) => SuggestedImage[],
     max: number,
   ): Promise<SuggestedImage[]> {
-    const serperKey = this.config.get<string>('SERPER_API_KEY');
-    if (serperKey) {
+    // Serper con dos claves (pedido 18/11): cuando la principal se queda sin
+    // créditos se sigue con SERPER_API_KEY_RESPALDO, y recién si las dos están
+    // agotadas se cae a Tavily/DuckDuckGo. Una clave agotada se saltea una hora
+    // (ver `serperAgotadaHasta`) para no gastar un pedido fallido ni mandar un
+    // aviso en cada búsqueda.
+    const claves = clavesSerper(this.config.get<string>('SERPER_API_KEY'), this.config.get<string>('SERPER_API_KEY_RESPALDO'));
+    const disponibles = claves.filter((k) => (this.serperAgotadaHasta.get(k) ?? 0) < Date.now());
+    for (const [i, clave] of disponibles.entries()) {
       try {
-        const filtradas = filtrar(await this.searchSerper(query, serperKey, businessId));
+        const filtradas = filtrar(await this.searchSerper(query, clave, businessId));
         if (filtradas.length > 0) {
           this.logger.log(`Serper devolvió ${filtradas.length} fotos para "${query}"`);
           return filtradas.slice(0, max);
         }
+        break; // la búsqueda anduvo y no trajo nada útil: otra clave daría lo mismo
       } catch (err) {
+        if (err instanceof SerperSinCupo) {
+          this.serperAgotadaHasta.set(clave, Date.now() + SERPER_PAUSA_AGOTADA_MS);
+          if (i < disponibles.length - 1) {
+            this.logger.warn(`Serper: la clave ${claves.indexOf(clave) === 0 ? 'principal' : 'de respaldo'} no tiene cupo, sigo con la siguiente`);
+            continue;
+          }
+        }
         this.logger.warn(`Error en búsqueda Serper, continuando con siguiente proveedor: ${err}`);
         void this.avisarProveedorCaido('Serper', err);
+        break;
       }
     }
 
@@ -473,10 +510,15 @@ export class ProductImageSearchService {
 
       if (!res.ok) {
         const errorText = await res.text().catch(() => '');
-        if (res.status === 401 || res.status === 402 || res.status === 429) {
+        // Sin créditos Serper contesta HTTP 400 "Not enough credits" (no 402):
+        // antes eso se registraba como un error de búsqueda cualquiera y el
+        // panel de costos nunca se enteraba de que la clave se había agotado.
+        const sinCupo = serperSinCupo(res.status, errorText);
+        const cual = clavesSerper(this.config.get<string>('SERPER_API_KEY'), this.config.get<string>('SERPER_API_KEY_RESPALDO')).indexOf(apiKey) === 1 ? 'respaldo' : 'principal';
+        if (sinCupo) {
           await this.costsService.reportQuotaExceeded(
             'serper',
-            `Límite de créditos alcanzado o key inválida (HTTP ${res.status}): ${errorText.slice(0, 120)}`,
+            `Clave ${cual}: sin créditos, inválida o con límite (HTTP ${res.status}): ${errorText.slice(0, 120)}`,
           );
           await this.usageMetering.track({
             providerSlug: 'serper',
@@ -484,7 +526,7 @@ export class ProductImageSearchService {
             category: 'quota_exceeded',
             quantity: 1,
             unit: 'errors',
-            metadata: { status: res.status, error: errorText.slice(0, 300) },
+            metadata: { status: res.status, clave: cual, error: errorText.slice(0, 300) },
           });
         } else {
           await this.usageMetering.track({
@@ -493,10 +535,11 @@ export class ProductImageSearchService {
             category: 'search_error',
             quantity: 1,
             unit: 'errors',
-            metadata: { status: res.status, error: errorText.slice(0, 300) },
+            metadata: { status: res.status, clave: cual, error: errorText.slice(0, 300) },
           });
         }
-        throw new Error(`Serper respondió con HTTP ${res.status}: ${errorText}`);
+        const mensaje = `Serper respondió con HTTP ${res.status}: ${errorText}`;
+        throw sinCupo ? new SerperSinCupo(mensaje) : new Error(mensaje);
       }
 
       // Registro exitoso de consumo

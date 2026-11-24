@@ -14,26 +14,23 @@
 // --color-muted va un punto más oscuro que el del panel: los textos
 // secundarios caen sobre los fondos tintados del tema y con el gris de
 // siempre no llegaban a 4.5:1 (AA).
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import Link from 'next/link'
-import { ArrowRight, MapPin, Phone } from 'lucide-react'
+import { ArrowRight, MapPin, MessageCircle, Phone } from 'lucide-react'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 import { hhmm, DIAS_CORTOS } from '@/lib/reservas/fechas'
 import { pesos } from '@/lib/reservas/precio'
 import type { GrupoNoches } from '@/lib/reservas/estadia'
 import { palabrasDe, type NegocioAlquiler, type TipoAlquiler } from '../datos'
+import { linkLlamar, linkWhatsApp } from '../datos/textos'
 import { EstiloReservas } from '@/design-system/reservas/estilo'
 import { BotonTema, useModoSitio } from '@/design-system/reservas/modoSitio'
+import { useSitio, type PaginaSitio } from './rutas'
 
-export type PaginaSitio = 'inicio' | 'reserva' | 'mis-reservas'
-
-const RUTAS: Record<PaginaSitio, string> = { inicio: '/alquileres-demo/negocio', reserva: '/alquileres-demo/reserva', 'mis-reservas': '/alquileres-demo/mis-reservas' }
-
-/** Link a una página del sitio, conservando el modo de la demo. */
-export function ruta(p: PaginaSitio, tipo: TipoAlquiler, q: Record<string, string> = {}, hash = '') {
-  const s = new URLSearchParams({ tipo, ...q }).toString()
-  return `${RUTAS[p]}?${s}${hash}`
-}
+// Los links salen del contexto (rutas.ts): la demo o el sitio de un negocio real.
+// `ruta` queda exportada para el panel de la demo, que linkea a su sitio de ejemplo.
+export { rutaDemo as ruta } from './rutas'
+export type { PaginaSitio }
 
 const TEMAS: Record<TipoAlquiler, string> = {
   cancha: '--color-primary: #15803D; --color-primary-h: #166534; --color-primary-bg: #DCFCE7; --chip-primary-fg: #166534; --color-surface: #F3F7F4; --color-surface-alt: #E8F0EA;',
@@ -178,6 +175,7 @@ export const CSS_SITIO = `
   /* Lo que se enfoca con el teclado (las flechas en las opciones de la reserva) no queda escondido
      debajo del header fijo: 40 de la tira de la demo más el header. */
   html:has(.als) { scroll-padding-top: 112px; }
+  html:has(.als[data-real='true']) { scroll-padding-top: 72px; }
   @media (max-width: 768px) {
     /* Ni detrás de la barra fija de reservar. */
     html:has(.als[data-cta='true']) { scroll-padding-bottom: calc(86px + env(safe-area-inset-bottom, 0px)); }
@@ -201,6 +199,8 @@ export const CSS_SITIO = `
     .als-hero-datos li { padding: 10px; } .als-hero-datos b { font-size: 17px; } .als-tarjetas { grid-template-columns: minmax(0, 1fr); } .als-comodidades { grid-template-columns: minmax(0, 1fr); }
     /* Con la barra de reservar al pie, el link del header sobra y le come el lugar al nombre del negocio. */
     .als[data-cta='true'] .als-nav a[data-accion] { display: none; }
+    /* Sitio real: el link de la página en la que ya se está no hace falta, y con dos links el nombre del negocio no entraba. */
+    .als[data-real='true'] .als-nav a[aria-current='page'] { display: none; }
   }
 `
 
@@ -214,16 +214,20 @@ interface Props {
 
 export default function Sitio({ negocio, pagina, cta, children }: Props) {
   const tipo = negocio.tipo
+  const { real, ruta, miReserva } = useSitio()
   const oscuro = useModoSitio('alquileres', false)
   const sigla = negocio.nombre.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase()
-  const nav: { id: PaginaSitio; label: string; fijo?: boolean }[] = [
-    { id: 'inicio', label: 'Inicio' },
-    { id: 'reserva', label: palabrasDe(negocio).verbo, fijo: true },
-    { id: 'mis-reservas', label: 'Mis reservas', fijo: true },
+  // En el sitio real no hay "Mis reservas" (no hay cuenta): si se reservó desde este navegador, va el enlace a esa reserva.
+  const nav: { id: PaginaSitio; label: string; href: string; fijo?: boolean }[] = [
+    { id: 'inicio', label: 'Inicio', href: ruta('inicio', tipo) },
+    { id: 'reserva', label: palabrasDe(negocio).verbo, href: ruta('reserva', tipo), fijo: true },
+    ...(real ? (miReserva ? [{ id: 'mis-reservas' as const, label: 'Mi reserva', href: miReserva, fijo: true }] : []) : [{ id: 'mis-reservas' as const, label: 'Mis reservas', href: ruta('mis-reservas', tipo), fijo: true }]),
   ]
   const ctaAncho = { flex: cta?.sub ? '0 0 auto' : 1 }
+  const donde = [negocio.direccion, negocio.ciudad].filter(Boolean).join(', ')
   return (
-    <div className="rv als" data-tipo={tipo} data-oscuro={oscuro || undefined} data-cta={cta ? true : undefined}>
+    // --rv-tope: en el sitio real no está la tira de la demo.
+    <div className="rv als" data-tipo={tipo} data-real={real || undefined} data-oscuro={oscuro || undefined} data-cta={cta ? true : undefined} style={real ? ({ '--rv-tope': '0px' } as CSSProperties) : undefined}>
       <EstiloReservas />
       <style>{CSS_SITIO}</style>
       <header className="als-header">
@@ -233,14 +237,20 @@ export default function Sitio({ negocio, pagina, cta, children }: Props) {
             <b>{negocio.nombre}</b>
           </Link>
           <nav className="als-nav" aria-label="Secciones del sitio">
-            {nav.map(n => <Link key={n.id} href={ruta(n.id, tipo)} aria-current={pagina === n.id ? 'page' : undefined} data-fijo={n.fijo || undefined} data-accion={n.id === 'reserva' || undefined}>{n.label}</Link>)}
+            {nav.map(n => <Link key={n.id} href={n.href} aria-current={pagina === n.id ? 'page' : undefined} data-fijo={n.fijo || undefined} data-accion={n.id === 'reserva' || undefined}>{n.label}</Link>)}
           </nav>
           <BotonTema modulo="alquileres" oscuro={oscuro} className="als-tema" />
         </div>
       </header>
       <main className="als-main">{children}</main>
       <footer className="als-cont als-pie">
-        <span><Phone size={13} aria-hidden style={{ verticalAlign: '-2px', marginRight: 5 }} />{negocio.telefono} · <MapPin size={13} aria-hidden style={{ verticalAlign: '-2px', marginRight: 4 }} />{negocio.direccion}, {negocio.ciudad}</span>
+        {/* El teléfono se toca: llama, y al lado WhatsApp con el mensaje armado (el canal de estos negocios). */}
+        {/* Un negocio real puede no haber cargado todavía el teléfono o la dirección: lo que falta no se muestra. */}
+        <span>
+          {negocio.telefono && <a href={linkLlamar(negocio.telefono) ?? undefined}><Phone size={13} aria-hidden style={{ verticalAlign: '-2px', marginRight: 5 }} />{negocio.telefono}</a>}
+          {linkWhatsApp(negocio.telefono) && <> · <a href={linkWhatsApp(negocio.telefono, `Hola, te escribo desde la página de ${negocio.nombre}.`) ?? undefined} target="_blank" rel="noopener noreferrer"><MessageCircle size={13} aria-hidden style={{ verticalAlign: '-2px', marginRight: 5 }} />WhatsApp</a></>}
+          {donde && <>{negocio.telefono ? ' · ' : ''}<MapPin size={13} aria-hidden style={{ verticalAlign: '-2px', marginRight: 4 }} />{donde}</>}
+        </span>
         <span>Reservas con <a href="https://orbita.site" target="_blank" rel="noreferrer"><OrbitaLogo size={14} animated={false} /> Órbita</a></span>
       </footer>
       {cta && (

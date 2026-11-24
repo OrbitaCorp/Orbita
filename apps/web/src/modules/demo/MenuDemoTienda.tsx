@@ -6,7 +6,7 @@
 // anuncios de muestra y otros textos.
 import type { ActiveGame, ActivePromoModal } from '@/lib/storefront/api'
 import { MenuPromociones } from '@/components/storefront/MenuPromociones'
-import { DEMO_SLUG_MODA } from '@/lib/demo/modo'
+import { DEMO_SLUG_MODA, DEMO_SLUG_REGALOS } from '@/lib/demo/modo'
 
 // Anuncios de muestra. La tienda real tiene UN modal de anuncio a la vez (el
 // primero de esta lista es el que está cargado en el panel de la demo); acá
@@ -93,6 +93,47 @@ export const ANUNCIOS_DEMO_MODA: ActivePromoModal[] = [
     },
 ]
 
+// Los de Nébula Regalos (DEMO_SLUG_REGALOS). El primero es el modal cargado
+// (MODAL_REGALOS en apps/api/prisma/demo/regalos/apariencia.ts).
+export const ANUNCIOS_DEMO_REGALOS: ActivePromoModal[] = [
+    {
+        title: '2x1 en tazas',
+        badge: '2x1',
+        message: 'Llevá dos tazas y pagá una, para vos y para regalar. El descuento se aplica solo en el carrito.',
+        code: null,
+        ctaText: 'Ver tazas',
+        ctaLink: '/catalogo?cat=tazas-y-mates',
+        campaignVersion: 1,
+    },
+    {
+        title: '15 % off en compras grandes',
+        badge: '15 % OFF',
+        message: 'En compras desde $150.000, usá este código en el checkout.',
+        code: 'REGALOS15',
+        ctaText: 'Empezar a comprar',
+        ctaLink: '/catalogo',
+        campaignVersion: 1,
+    },
+    {
+        title: '3x2 en velas',
+        badge: '3x2',
+        message: 'Velas de soja y difusores: llevá tres y pagá dos.',
+        code: null,
+        ctaText: 'Ver velas y aromas',
+        ctaLink: '/catalogo?cat=velas-y-aromas',
+        campaignVersion: 1,
+    },
+    {
+        title: 'Envío gratis a todo el país',
+        badge: 'Envío gratis',
+        message: 'En compras desde $250.000 el envío corre por nuestra cuenta, con Correo Argentino, Andreani u OCA.',
+        code: null,
+        ctaText: 'Ver catálogo',
+        ctaLink: '/catalogo',
+        campaignVersion: 1,
+    },
+]
+
 interface Props {
     slug: string
     juegos: ActiveGame[]
@@ -104,7 +145,7 @@ export function MenuDemoTienda({ slug, juegos, onJugar, onAnuncio }: Props) {
     return (
         <MenuPromociones
             juegos={juegos}
-            anuncios={slug === DEMO_SLUG_MODA ? ANUNCIOS_DEMO_MODA : ANUNCIOS_DEMO}
+            anuncios={slug === DEMO_SLUG_MODA ? ANUNCIOS_DEMO_MODA : slug === DEMO_SLUG_REGALOS ? ANUNCIOS_DEMO_REGALOS : ANUNCIOS_DEMO}
             onJugar={onJugar}
             onAnuncio={onAnuncio}
             etiqueta="Juegos y anuncios"

@@ -7,6 +7,7 @@ import { SocialProofController } from '../../src/social-proof/social-proof.contr
 import { TwoForOneController } from '../../src/two-for-one/two-for-one.controller';
 import { CountdownSettingsController } from '../../src/countdown/countdown-settings.controller';
 import { BusinessesController } from '../../src/businesses/businesses.controller';
+import { BusinessesService } from '../../src/businesses/businesses.service';
 
 // Gates de las funciones del paquete "Avanzado" (auditoría interna
 // 2026-09-09, verificaciones 2 y 5 del ítem `api.common`).
@@ -54,7 +55,6 @@ const ESCRITURAS: [string, new (...args: never[]) => object, string][] = [
   ['2x1 · prender/apagar', TwoForOneController, 'toggle'],
   ['2x1 · borrar', TwoForOneController, 'remove'],
   ['oferta relámpago · configurar', CountdownSettingsController, 'setEnabled'],
-  ['plantilla de Home · aplicar', BusinessesController, 'setHomeTemplate'],
 ];
 
 describe('Funciones pagas — gates de add-on y de permiso', () => {
@@ -76,5 +76,43 @@ describe('Funciones pagas — gates de add-on y de permiso', () => {
     ] as [new (...args: never[]) => object, string][]) {
       expect(gates(controller, metodo).addon).toBe('ADVANCED');
     }
+  });
+
+  // Las plantillas de Home no llevan decoradores: el gate depende de QUÉ
+  // plantilla se pide (las de HOME_TEMPLATES_LIBRES las usa cualquier plan).
+  // Se prueba la regla en sí, con un negocio con y sin el add-on.
+  describe('plantilla de Home · aplicar', () => {
+    const servicio = (conAddon: boolean) => {
+      const s = new BusinessesService({} as any, {} as any, {} as any, {} as any);
+      jest.spyOn(s, 'hasActiveAddon').mockResolvedValue(conAddon);
+      return s;
+    };
+    const duenio = { businessId: 'b', roleName: 'owner', permissions: [] as string[] };
+    const editor = { businessId: 'b', roleName: 'custom', permissions: ['config.edit'] };
+    const avanzado = { businessId: 'b', roleName: 'custom', permissions: ['advanced.manage'] };
+
+    it('el controller no lo deja librado a un decorador olvidado: lo chequea adentro', () => {
+      const { permiso, addon } = gates(BusinessesController, 'setHomeTemplate');
+      expect(permiso).toBeUndefined();
+      expect(addon).toBeUndefined();
+      expect(String(BusinessesController.prototype.setHomeTemplate)).toContain('puedeElegirPlantilla');
+    });
+
+    it('una paga exige el add-on Avanzado', async () => {
+      await expect(servicio(false).puedeElegirPlantilla(duenio, 'vidriera')).rejects.toThrow('ADDON_REQUIRED:ADVANCED');
+      await expect(servicio(true).puedeElegirPlantilla(duenio, 'vidriera')).resolves.toBeUndefined();
+    });
+
+    it('una paga exige advanced.manage aunque haya add-on', async () => {
+      await expect(servicio(true).puedeElegirPlantilla(editor, 'vidriera')).rejects.toThrow('advanced.manage');
+      await expect(servicio(true).puedeElegirPlantilla(avanzado, 'vidriera')).resolves.toBeUndefined();
+    });
+
+    it('una libre y volver a la clásica andan sin el add-on, con config.edit', async () => {
+      for (const t of ['base', 'carbon', 'bloque', null]) {
+        await expect(servicio(false).puedeElegirPlantilla(editor, t)).resolves.toBeUndefined();
+      }
+      await expect(servicio(false).puedeElegirPlantilla({ businessId: 'b', roleName: 'custom', permissions: [] }, 'base')).rejects.toThrow('config.edit');
+    });
   });
 });

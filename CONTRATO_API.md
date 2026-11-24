@@ -86,7 +86,7 @@ auto-creada). Tablas con `branch_id`: `orders`, `variant_stock`, `stock_movement
 Los endpoints marcados **Solo FULL** devuelven **`403`** con
 `{ error: "SHOWCASE_MODE", message: "Esta función requiere modo tienda online (FULL)." }`
 cuando el negocio está en modo SHOWCASE. Endpoints afectados: checkout/carrito, cupones
-públicos, mensajería, opiniones. Ver la lista consolidada al final del documento.
+públicos, chat de la cuenta del cliente, opiniones. Ver la lista consolidada al final del documento.
 
 ### Montos y fechas
 - **Montos:** number (serialización de `Decimal(12,2)`). Moneda por defecto ARS.
@@ -2074,8 +2074,11 @@ En modo SHOWCASE (vidriera digital) devuelven `403 { error: "SHOWCASE_MODE" }`:
 
 - **Checkout / carrito**: `POST /storefront/:slug/checkout`, `GET /storefront/:slug/orders/:orderNumber/tracking`
 - **Cupones**: `GET /storefront/:slug/coupons`, `GET /storefront/:slug/exclusive-discount/:code`
-- **Mensajería**: todo `Conversations + Messages` (`/conversations*`, `/me/conversation*`), todo
-  `Message Templates` (`/message-templates*`)
+- **Chat de la cuenta del cliente**: `/me/conversation*` (en SHOWCASE no hay cuenta de cliente)
+
+> Desde 2026-11 la mensajería del **panel** funciona en SHOWCASE: `/conversations*`,
+> `/message-templates*`, `/whatsapp*` e `/instagram*`. La vidriera vende por WhatsApp e Instagram;
+> Orbi responde consultas pero no toma pedidos (`OrbiPedidos.disponibilidad`).
 - **Opiniones**: todo `Reviews` (`POST /reviews`, `GET /products/:id/reviews`,
   `PATCH /reviews/:id/hide`, `GET /reviews/eligibility`)
 - **Pedidos del cliente**: `GET /me/orders`, `POST /me/orders/:id/return`, `POST /me/orders/:id/cancel`

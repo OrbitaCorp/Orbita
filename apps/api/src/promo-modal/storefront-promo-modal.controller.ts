@@ -38,6 +38,9 @@ export class StorefrontPromoModalController {
       // Un link externo guardado antes de que el DTO lo rechazara no llega a
       // la tienda: sin link, el botón lleva al catálogo.
       ctaLink: modal.ctaLink && RUTA_DE_LA_TIENDA.test(modal.ctaLink) ? modal.ctaLink : null,
+      format: modal.format,
+      design: modal.design,
+      imageUrl: modal.imageUrl,
       campaignVersion: modal.campaignVersion,
     };
   }

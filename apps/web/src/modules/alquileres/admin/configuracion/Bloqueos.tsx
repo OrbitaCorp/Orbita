@@ -5,9 +5,10 @@
 // desconectando el calendario en Calendarios (.ics).
 import { useState } from 'react'
 import { ArrowRight, Ban, Link2, Trash2 } from 'lucide-react'
-import { diasEntre, fechaCorta, rangoTxt } from '@/lib/reservas/fechas'
+import { textoBloqueo } from '../../datos/textos'
+import { BotonConfirmar } from '../piezas'
 import { Chip, Nota, Seccion, Vacio } from '@/design-system/reservas/piezas'
-import { HOY, TIPOS, capital, cuenta, palabrasDe, todasLasUnidades, unidadesDe, type Bloqueo, type NegocioAlquiler, type Reserva } from '../../datos'
+import { HOY, TIPOS, capital, cuenta, palabrasDe, todasLasUnidades, unidadesDe, type Bloqueo, type NegocioAlquiler, type Reserva, type TipoAlquiler } from '../../datos'
 import { BloquearDia, BloquearFechas } from '../Bloquear'
 import type { Vista } from '../navegacion'
 import { PaginaForm } from './comun'
@@ -24,14 +25,13 @@ interface P {
 interface Grupo { clave: string; ids: string[]; que: string; desde: string; hasta: string; motivo: string; origen: Bloqueo['origen'] }
 
 // Afuera de Bloqueos: definida adentro sería un componente nuevo en cada render y React la remontaría.
-function Fila({ g, onQuitar }: { g: Grupo; onQuitar: (ids: string[]) => void }) {
-  // Un bloqueo de un día ("Torneo interno", sábado 21) se lee como fecha; uno de varias noches, como rango.
-  const unDia = diasEntre(g.desde, g.hasta) === 1
+function Fila({ g, tipo, onQuitar }: { g: Grupo; tipo: TipoAlquiler; onQuitar: (ids: string[]) => void }) {
+  // En canchas y salones el fin se guarda sin incluir: "25 al 27" mostraba un día que no estaba bloqueado (textoBloqueo).
   return (
     <div className="rv-item" style={{ flexWrap: 'wrap' }}>
-      <span className="rv-num" style={{ flex: '0 0 auto', minWidth: 150, fontSize: 13.5, color: 'var(--color-text)' }}>{unDia ? fechaCorta(g.desde) : rangoTxt(g.desde, g.hasta)}</span>
+      <span className="rv-num" style={{ flex: '0 0 auto', minWidth: 150, fontSize: 13.5, color: 'var(--color-text)' }}>{textoBloqueo(g.desde, g.hasta, tipo)}</span>
       <span className="rv-item-cuerpo"><span className="rv-item-titulo" style={{ whiteSpace: 'normal' }}>{g.que}</span><span className="rv-item-sub">{g.motivo}</span></span>
-      {g.origen === 'ical' ? <Chip tono="gris"><Link2 size={12} aria-hidden /> Calendario externo</Chip> : <button type="button" className="rv-btn rv-btn--sm" onClick={() => onQuitar(g.ids)}><Trash2 size={15} aria-hidden /> Quitar</button>}
+      {g.origen === 'ical' ? <Chip tono="gris"><Link2 size={12} aria-hidden /> Calendario externo</Chip> : <BotonConfirmar pregunta="¿Quitar el bloqueo?" onConfirmar={() => onQuitar(g.ids)}><Trash2 size={15} aria-hidden /> Quitar</BotonConfirmar>}
     </div>
   )
 }
@@ -59,11 +59,11 @@ export default function Bloqueos({ negocio, reservas, onBloqueo, onQuitarBloqueo
       acciones={<button type="button" className="rv-btn rv-btn--primario" onClick={() => setAbrir(true)}><Ban size={15} aria-hidden /> {deDias ? 'Bloquear un día' : 'Bloquear fechas'}</button>}>
       <div className="rv-pila">
         <Seccion titulo="Próximos" bajada={proximos.length ? `${cuenta(proximos.length, 'bloqueo', 'bloqueos')} por delante.` : 'Nada bloqueado por delante.'}>
-          {proximos.length ? <div className="rv-lista">{proximos.map(g => <Fila key={g.clave} g={g} onQuitar={quitar} />)}</div> : <Vacio titulo={deDias ? 'Ningún día bloqueado' : 'Ninguna fecha bloqueada'} texto="Todo lo que abre se puede reservar." />}
+          {proximos.length ? <div className="rv-lista">{proximos.map(g => <Fila key={g.clave} g={g} tipo={tipo} onQuitar={quitar} />)}</div> : <Vacio titulo={deDias ? 'Ningún día bloqueado' : 'Ninguna fecha bloqueada'} texto="Todo lo que abre se puede reservar." />}
         </Seccion>
         {pasados.length > 0 && (
           <Seccion titulo="Pasados" bajada="Quedan como historial.">
-            <div className="rv-lista">{pasados.map(g => <Fila key={g.clave} g={g} onQuitar={quitar} />)}</div>
+            <div className="rv-lista">{pasados.map(g => <Fila key={g.clave} g={g} tipo={tipo} onQuitar={quitar} />)}</div>
           </Seccion>
         )}
         {negocio.calendariosExternos.length > 0 && (

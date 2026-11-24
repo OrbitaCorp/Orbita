@@ -13,20 +13,22 @@
 //
 // Todo lo que se toca acá vive en el almacén de la demo (datos/negocio.ts):
 // una reserva que se confirma en el panel se ve en "Mis reservas", y una que
-// se hace desde el sitio aparece acá (y en la campanita). No hay backend.
+// se hace desde el sitio aparece acá (y en la campanita). Eso es con el origen
+// de la demo, el de fábrica; el panel de un negocio real monta el origen de la
+// API de reservas (datos/origen), que por ahora solo lee.
 import { useEffect, useEffectEvent } from 'react'
 import { useRouter } from 'next/router'
 import { Ban, Building2, CalendarCheck, CalendarDays, CalendarSearch, Contact, HandCoins, Home, Link2, LogIn, LogOut, MessageSquare, Package, PartyPopper, Settings, ShieldCheck, Sparkles, Sun, Tag, Trophy, Wallet, type LucideIcon } from 'lucide-react'
 import LayoutPanel, { type AvisoNav, type ItemBusqueda, type ItemNav } from '@/design-system/reservas/LayoutPanel'
-import { useAviso } from '@/design-system/reservas/piezas'
+import { Nota, Vacio, useAviso } from '@/design-system/reservas/piezas'
 import { SkeletonVista, useCargaSimulada, type FormaSkeleton } from '@/design-system/reservas/skeleton'
 import { DIAS_CORTOS, MESES_CORTOS, diaSemana, fechaCorta, hhmm, partes, rangoTxt } from '@/lib/reservas/fechas'
 import { pesos } from '@/lib/reservas/precio'
 import { AHORA, HOY, capital, clientePorId, cuenta, duracionEstadiaTxt, fechaDeReserva, palabrasDe, reservasDelDia, rolDe, rubroPorKey, tituloEvento, unidadPorId, unidadesDe, type Bloqueo, type NegocioAlquiler, type Reserva } from '../datos'
 import { deCalendario } from '../datos/negocio'
-import { useNegocio } from '../demo/useNegocio'
+import { useOrigenAlquileres } from '../datos/origen'
 import { ruta } from '../storefront/Sitio'
-import { resolverRuta, seccionesDe, type TabConfiguracion, type Vista } from './navegacion'
+import { debeCorregirRuta, resolverRuta, seccionesDe, type TabConfiguracion, type Vista } from './navegacion'
 import { EstiloPanelAlquileres } from './piezas'
 import Reservas from './Reservas'
 import Disponibilidad from './Disponibilidad'
@@ -62,8 +64,8 @@ const FORMAS: Record<Vista, FormaSkeleton> = {
   reglas: 'formulario', bloqueos: 'formulario', mensajes: 'formulario', pagos: 'formulario', calendarios: 'formulario', configuracion: 'formulario',
 }
 
-/** El "hoy" de la demo en el header: "Sáb 14 nov · 10:40". */
-const FECHA = `${DIAS_CORTOS[diaSemana(HOY)]} ${partes(HOY).dia} ${MESES_CORTOS[partes(HOY).mes - 1]} · ${hhmm(AHORA)}`
+/** El "hoy" del header: "Sáb 14 nov · 10:40". Se arma al dibujar: en la demo es un día fijo, en el panel real es hoy (usarHoyReal). */
+const fechaDelHeader = () => `${DIAS_CORTOS[diaSemana(HOY)]} ${partes(HOY).dia} ${MESES_CORTOS[partes(HOY).mes - 1]} · ${hhmm(AHORA)}`
 
 /** "Cancha 2 · sáb 14 nov 17:00" o "Cabaña Arrayán · 14 al 19 de noviembre": dónde y cuándo, para los avisos y el buscador. */
 function cuandoDe(n: NegocioAlquiler, r: Reserva) {
@@ -73,18 +75,26 @@ function cuandoDe(n: NegocioAlquiler, r: Reserva) {
 
 export default function Panel() {
   const router = useRouter()
-  const n = useNegocio()
-  const { tipo, negocio, reservas, clientes, hidratado } = n
+  // Los datos salen del origen del contexto: la demo por defecto, la API en el panel de un negocio real (datos/origen).
+  const origen = useOrigenAlquileres()
+  const n = origen.useDatos()
+  const { tipo, negocio, reservas, clientes, listo } = n
   const [avisar, aviso] = useAviso()
   const palabras = palabrasDe(negocio)
-  // La espera fingida de la demo (ver skeleton.tsx) y lo guardado que el navegador lee después del primer pintado.
-  const cargando = useCargaSimulada() || !hidratado
+  // La espera fingida es solo de la demo (ver skeleton.tsx); con la API se espera a que lleguen los datos.
+  const simulada = useCargaSimulada()
+  const cargando = (origen.tipo === 'demo' && simulada) || !listo
   // Cada modo arranca con su propio estado de pantalla, y todo se vuelve a
-  // montar una vez cuando el navegador lee lo guardado: los formularios
-  // siembran su estado con el negocio, y al recargar se quedaban con el de ejemplo.
-  const k = `${tipo}:${hidratado ? 'guardado' : 'fabrica'}`
-  const secciones = seccionesDe(tipo, palabras)
-  const r = resolverRuta(router.query, tipo)
+  // montar una vez cuando llegan los datos (en la demo, cuando el navegador
+  // lee lo guardado): los formularios siembran su estado con el negocio, y al
+  // recargar se quedaban con el de ejemplo.
+  const k = `${tipo}:${listo ? 'guardado' : 'fabrica'}`
+  // El panel de un negocio real muestra solo lo que ya guarda en la API (navegacion.ts).
+  const real = origen.tipo === 'api'
+  // Los formularios siembran su estado con el negocio: después de guardar en la API se vuelven a montar con lo que quedó.
+  const kForm = `${k}:${n.version ?? 0}`
+  const secciones = seccionesDe(tipo, palabras, real)
+  const r = resolverRuta(router.query, tipo, real)
   const { vista, tab } = r
   const reservaAbierta = typeof router.query.reserva === 'string' ? router.query.reserva : null
   const clienteAbierto = typeof router.query.cliente === 'string' ? router.query.cliente : null
@@ -100,7 +110,8 @@ export default function Panel() {
   const ir = (id: string, t?: string) => irA(id as Vista, t as TabConfiguracion | undefined)
   // Un link viejo (?vista=configuracion&tab=reglas, ?vista=salon) o una sección de otro modo: la URL se reescribe una vez.
   const corregir = useEffectEvent(() => irA(r.vista, r.tab))
-  useEffect(() => { if (r.corregir) corregir() }, [r.corregir, r.vista, r.tab])
+  const hayQueCorregir = debeCorregirRuta(r, listo)
+  useEffect(() => { if (hayQueCorregir) corregir() }, [hayQueCorregir, r.vista, r.tab])
   const abrirReserva = (id: string | null) => {
     const { reserva: _r, ...resto } = router.query
     void _r
@@ -122,7 +133,7 @@ export default function Panel() {
   // ── La campanita: lo que pide atención hoy ──
   const avisos: AvisoNav[] = []
   // Lo que se reservó en la demo (desde el sitio o a mano) es la novedad de verdad: entra sin leer.
-  for (const x of (n.demo.reservas[tipo] ?? []).slice(-3).reverse()) {
+  for (const x of (n.demo?.reservas[tipo] ?? []).slice(-3).reverse()) {
     avisos.push({ id: `nueva-${x.id}`, Icon: CalendarCheck, titulo: `${x.meses ? 'Nuevo contrato' : 'Nueva reserva'}: ${nombre(x)}`, detalle: cuandoDe(negocio, x), cuando: `Hoy ${hhmm(AHORA)}`, nueva: true, onAbrir: () => verReserva(x.id) })
   }
   pendientes.slice(0, 3).forEach((x, i) => {
@@ -167,17 +178,30 @@ export default function Panel() {
   const usuario = dueno ? { id: dueno.id, nombre: dueno.nombre, rol: rolDe(dueno), color: '#2563EB' } : undefined
 
   // ── Lo que escriben las secciones ──
-  const onGuardar = (cambio: Partial<NegocioAlquiler>, texto?: string, detalle?: string) => { n.configurar(tipo, cambio); avisar(texto ?? 'Cambios guardados', detalle) }
-  const cambiar = (id: string, cambio: Partial<Reserva>, texto?: string) => { n.cambiarReserva(id, cambio); if (texto) avisar(texto) }
-  const reservar = (x: Reserva, c: Parameters<typeof n.reservar>[2]) => { n.reservar(tipo, x, c); avisar(x.meses ? 'Contrato agendado' : 'Reserva agendada', 'Ya figura en la agenda y en Mis reservas.') }
-  const bloquear = (b: Bloqueo) => { n.agregarBloqueo(tipo, b); avisar(tipo === 'estadia' ? 'Fechas bloqueadas' : 'Día bloqueado', tipo === 'estadia' ? 'No se van a poder reservar.' : 'No se va a poder reservar.') }
-  const quitarBloqueo = (id: string) => { n.quitarBloqueo(tipo, id); avisar('Bloqueo quitado') }
+  // En la demo la escritura es al instante; con la API es un pedido que puede fallar. El aviso sale
+  // cuando terminó: "guardado" si salió bien, o el motivo de la API si no (un 409, una regla del negocio).
+  const hacer = (accion: () => void | Promise<void>, texto?: string, detalle?: string) => {
+    // En un negocio real guardar tarda (va a la API y vuelve a cargar): se dice mientras tanto, y el resultado lo reemplaza.
+    if (real) avisar('Guardando…')
+    Promise.resolve().then(accion).then(
+      () => { if (texto) avisar(texto, detalle) },
+      (e: unknown) => avisar('No se pudo guardar', e instanceof Error && e.message ? e.message : 'Probá de nuevo.'),
+    )
+  }
+  const onGuardar = (cambio: Partial<NegocioAlquiler>, texto?: string, detalle?: string) => hacer(() => n.configurar(tipo, cambio), texto ?? 'Cambios guardados', detalle)
+  const cambiar = (id: string, cambio: Partial<Reserva>, texto?: string) => hacer(() => n.cambiarReserva(id, cambio), texto)
+  const reservar = (x: Reserva, c: Parameters<typeof n.reservar>[2]) => hacer(() => n.reservar(tipo, x, c), x.meses ? 'Contrato agendado' : 'Reserva agendada', real ? 'Ya figura en la agenda.' : 'Ya figura en la agenda y en Mis reservas.')
+  const bloquear = (b: Bloqueo) => hacer(() => n.agregarBloqueo(tipo, b), tipo === 'estadia' ? 'Fechas bloqueadas' : 'Día bloqueado', tipo === 'estadia' ? 'No se van a poder reservar.' : 'No se va a poder reservar.')
+  const quitarBloqueo = (id: string) => hacer(() => n.quitarBloqueo(tipo, id), 'Bloqueo quitado')
 
   return (
-    <LayoutPanel producto="Alquileres" negocio={negocio.nombre} rubro={rubroPorKey(negocio.rubro).label} fecha={FECHA} items={items} activo={vista} tab={tab} onIr={ir} sitio={ruta('inicio', tipo)}
+    <LayoutPanel producto="Alquileres" negocio={negocio.nombre} rubro={rubroPorKey(negocio.rubro).label} fecha={fechaDelHeader()} items={items} activo={vista} tab={tab} onIr={ir} sitio={real ? '/' : ruta('inicio', tipo)}
       avisos={cargando ? [] : avisos} busqueda={busqueda} buscar={`Buscar ${palabras.clientes === 'eventos' ? 'eventos' : palabras.clientes}, reservas o secciones`} usuario={usuario} cargando={cargando}>
       <EstiloPanelAlquileres />
-      {cargando ? <SkeletonVista forma={FORMAS[vista]} nombre={nombreVista} /> : (
+      {n.soloLectura && !n.error && <div style={{ marginBottom: 16 }}><Nota tono="info"><span>Prueba con la API: lo que cambies acá todavía no se guarda.</span></Nota></div>}
+      {n.error ? (
+        <Vacio titulo="No pudimos traer los datos del panel" texto={n.error} accion={<button type="button" className="rv-btn rv-btn--sm" onClick={n.reintentar}>Reintentar</button>} />
+      ) : cargando ? <SkeletonVista forma={FORMAS[vista]} nombre={nombreVista} /> : (
         <>
           {vista === 'reservas' && <Reservas key={k} negocio={negocio} reservas={reservas} clientes={clientes} reservaAbierta={reservaAbierta} onAbrirReserva={abrirReserva} onCambiar={cambiar} onReservar={reservar} onBloqueo={bloquear} onQuitarBloqueo={quitarBloqueo} />}
           {vista === 'disponibilidad' && <Disponibilidad key={k} negocio={negocio} reservas={reservas} clientes={clientes} onReservar={reservar} onCambiar={cambiar} />}
@@ -189,12 +213,12 @@ export default function Panel() {
           {vista === 'precios' && <Precios key={k} negocio={negocio} onGuardar={onGuardar} />}
           {vista === 'salones' && <Salones key={k} negocio={negocio} reservas={reservas} onGuardar={onGuardar} onIr={irA} />}
           {vista === 'paquetes' && <Paquetes key={k} negocio={negocio} reservas={reservas} onGuardar={onGuardar} />}
-          {vista === 'propiedades' && <Propiedades key={k} negocio={negocio} onGuardar={onGuardar} onIr={irA} />}
-          {vista === 'temporadas' && <Temporadas key={k} negocio={negocio} onGuardar={onGuardar} />}
-          {vista === 'reglas' && <Reglas key={k} negocio={negocio} onGuardar={onGuardar} onIr={irA} />}
+          {vista === 'propiedades' && <Propiedades key={kForm} negocio={negocio} onGuardar={onGuardar} onIr={irA} real={real} />}
+          {vista === 'temporadas' && <Temporadas key={kForm} negocio={negocio} onGuardar={onGuardar} />}
+          {vista === 'reglas' && <Reglas key={kForm} negocio={negocio} onGuardar={onGuardar} onIr={irA} />}
           {vista === 'bloqueos' && <Bloqueos key={k} negocio={negocio} reservas={reservas} onBloqueo={bloquear} onQuitarBloqueo={quitarBloqueo} onIr={irA} />}
           {vista === 'mensajes' && <Mensajes key={k} negocio={negocio} reservas={reservas} clientes={clientes} onGuardar={onGuardar} onAviso={avisar} />}
-          {vista === 'pagos' && <Pagos key={k} negocio={negocio} onGuardar={onGuardar} onIr={irA} />}
+          {vista === 'pagos' && <Pagos key={kForm} negocio={negocio} onGuardar={onGuardar} onIr={irA} real={real} />}
           {vista === 'calendarios' && <Calendarios key={k} negocio={negocio} reservas={reservas} onCalendario={(c, b) => { n.agregarCalendario(tipo, c, b); avisar('Calendario conectado', `${b.length} ${b.length === 1 ? 'fecha bloqueada' : 'fechas bloqueadas'}. Demo: sincronización simulada.`) }} onQuitarCalendario={id => { n.quitarCalendario(tipo, id); avisar('Calendario desconectado') }} />}
           {vista === 'configuracion' && tab === 'negocio' && <Negocio key={k} negocio={negocio} onGuardar={onGuardar} />}
           {vista === 'configuracion' && tab === 'horarios' && <Horarios key={k} negocio={negocio} onGuardar={onGuardar} />}

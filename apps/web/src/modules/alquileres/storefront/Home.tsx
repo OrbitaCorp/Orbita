@@ -13,13 +13,16 @@ import { pesos } from '@/lib/reservas/precio'
 import { agruparNoches, motivoNoReservable, motivoNoReservableMes, nochesEntre, precioEstadia, precioMensual, primeraEntradaLibre, salidaMaxima, nochesOcupadas } from '@/lib/reservas/estadia'
 import { AHORA, HOY, aperturaDe, bloquesLibresEn, capital, cuenta, esMensual, mesesTxt, nochesTxt, ocupadoDelDia, palabrasDe, rangosOcupados, rubroPorKey, type NegocioAlquiler, type Propiedad, type Reserva } from '../datos'
 import { CalendarioRango, type Rango } from '@/design-system/reservas/Calendario'
+import { linkWhatsApp, politicaCancelacion } from '../datos/textos'
 import { Campo, Modal, Selector } from '@/design-system/reservas/piezas'
-import Sitio, { Horarios, Mapa, lineaNoches, ruta } from './Sitio'
+import Sitio, { Horarios, Mapa, lineaNoches } from './Sitio'
+import { useSitio } from './rutas'
 
 interface P { negocio: NegocioAlquiler; reservas: Reserva[] }
 
 export default function Home({ negocio, reservas }: P) {
   const router = useRouter()
+  const { ruta } = useSitio()
   const tipo = negocio.tipo
   const palabras = palabrasDe(negocio)
   const propiedadId = typeof router.query.propiedad === 'string' ? router.query.propiedad : null
@@ -68,6 +71,7 @@ function datos(negocio: NegocioAlquiler, reservas: Reserva[]): { valor: string; 
 }
 
 function Hero({ negocio, reservas }: P) {
+  const { real, ruta, miReserva } = useSitio()
   const palabras = palabrasDe(negocio)
   return (
     <section className="als-hero">
@@ -81,7 +85,9 @@ function Hero({ negocio, reservas }: P) {
         </ul>
         <div className="als-hero-ctas">
           <Link href={ruta('reserva', negocio.tipo)} className="rv-btn rv-btn--primario rv-btn--lg">{palabras.verbo} <ArrowRight size={17} aria-hidden /></Link>
-          <Link href={ruta('mis-reservas', negocio.tipo)} className="rv-btn rv-btn--lg">Mis reservas</Link>
+          {real
+            ? miReserva && <Link href={miReserva} className="rv-btn rv-btn--lg">Mi reserva</Link>
+            : <Link href={ruta('mis-reservas', negocio.tipo)} className="rv-btn rv-btn--lg">Mis reservas</Link>}
         </div>
       </div>
     </section>
@@ -100,6 +106,7 @@ function Encabezado({ id, titulo, bajada, accion }: { id: string; titulo: string
 // ─── Canchas ─────────────────────────────────────────────────────────────────
 
 function Canchas({ negocio, reservas }: P) {
+  const { ruta } = useSitio()
   const palabras = palabrasDe(negocio)
   // Los próximos horarios libres de cada cancha: hoy lo que queda y, si no alcanza, mañana.
   const proximos = (unidadId: string) => {
@@ -143,6 +150,7 @@ function Canchas({ negocio, reservas }: P) {
 // ─── Salones ─────────────────────────────────────────────────────────────────
 
 function Salones({ negocio, reservas }: P) {
+  const { ruta } = useSitio()
   const palabras = palabrasDe(negocio)
   const varios = negocio.salones.length > 1
   if (negocio.salones.length === 0) return null
@@ -171,6 +179,7 @@ function Salones({ negocio, reservas }: P) {
                   <h3>{s.nombre}</h3>
                   <span className="als-tarjeta-sub">{s.detalle || `Hasta ${s.capacidad} personas`}</span>
                   <span className="als-precio">{pesos(Math.min(...s.paquetes.map(p => p.precio)))} <small>el paquete, desde</small></span>
+                  {s.deposito > 0 && <span className="als-tarjeta-sub">Depósito de garantía de {pesos(s.deposito)}, aparte: se devuelve al terminar.</span>}
                 </div>
               </Link>
             ))}
@@ -232,6 +241,7 @@ function Salones({ negocio, reservas }: P) {
 // ─── Propiedades ─────────────────────────────────────────────────────────────
 
 function Propiedades({ negocio }: { negocio: NegocioAlquiler }) {
+  const { ruta } = useSitio()
   const palabras = palabrasDe(negocio)
   const hayMes = negocio.propiedades.some(esMensual)
   const hayNoche = negocio.propiedades.some(p => !esMensual(p))
@@ -280,7 +290,10 @@ function Galeria({ fotos }: { fotos: string[] }) {
 }
 
 function DetallePropiedad({ negocio, reservas, propiedad: p }: P & { propiedad: Propiedad }) {
+  const { ruta, ultimoDia } = useSitio()
   const palabras = palabrasDe(negocio)
+  // Más allá de la anticipación máxima del negocio no se puede reservar (sitio real).
+  const fuera = (f: ISO) => f < HOY || (ultimoDia !== null && f > ultimoDia)
   const ocupadas = rangosOcupados(negocio, reservas, p.id)
   const tomadas = nochesOcupadas(ocupadas)
   const [mes, setMes] = useState<ISO>(HOY)
@@ -307,7 +320,7 @@ function DetallePropiedad({ negocio, reservas, propiedad: p }: P & { propiedad: 
         <Galeria fotos={p.fotos} />
         <div className="als-detalle">
           <div>
-            <span className="rv-rotulo">{p.tipo} · {p.ciudad}{mensual ? ' · por mes' : ''}</span>
+            <span className="rv-rotulo">{[p.tipo, p.ciudad].filter(Boolean).join(' · ')}{mensual ? ' · por mes' : ''}</span>
             <h1 className="rv-h1" style={{ fontSize: 30, marginTop: 6 }}>{p.nombre}</h1>
             <p style={{ fontSize: 15.5, lineHeight: 1.6, margin: '12px 0 0' }}>{p.descripcion}</p>
             <div className="rv-fila" style={{ marginTop: 16, gap: 16 }}>
@@ -316,15 +329,17 @@ function DetallePropiedad({ negocio, reservas, propiedad: p }: P & { propiedad: 
               <span className="rv-fila" style={{ gap: 6 }}><BedDouble size={16} aria-hidden /> {p.camas} {p.camas === 1 ? 'cama' : 'camas'}</span>
               <span className="rv-fila" style={{ gap: 6 }}><Bath size={16} aria-hidden /> {p.banos} {p.banos === 1 ? 'baño' : 'baños'}</span>
             </div>
-            <section className="als-sec" style={{ paddingTop: 28 }}>
-              <h2 className="rv-h2" style={{ marginBottom: 12 }}>Comodidades</h2>
-              <ul className="als-comodidades">{p.comodidades.map(c => <li key={c}><Check size={15} aria-hidden style={{ color: 'var(--color-primary)' }} /> {c}</li>)}</ul>
-            </section>
+            {p.comodidades.length > 0 && (
+              <section className="als-sec" style={{ paddingTop: 28 }}>
+                <h2 className="rv-h2" style={{ marginBottom: 12 }}>Comodidades</h2>
+                <ul className="als-comodidades">{p.comodidades.map(c => <li key={c}><Check size={15} aria-hidden style={{ color: 'var(--color-primary)' }} /> {c}</li>)}</ul>
+              </section>
+            )}
             <section className="als-sec" style={{ paddingTop: 28 }}>
               <h2 className="rv-h2" style={{ marginBottom: 12 }}>{mensual ? 'Cómo se alquila' : 'Entrada y salida'}</h2>
               {mensual
                 ? <p style={{ margin: 0 }}><Clock size={15} aria-hidden style={{ verticalAlign: '-2px' }} /> Por mes, de <b className="rv-num">{p.mensual!.minMeses}</b> a <b className="rv-num">{p.mensual!.maxMeses}</b> meses, a <b className="rv-num">{pesos(p.mensual!.precioMes)}</b> el mes. Se entra desde las <b className="rv-num">{hhmm(p.checkIn)}</b> y se sale hasta las <b className="rv-num">{hhmm(p.checkOut)}</b>.{p.mensual!.deposito ? <> Depósito de garantía de <b className="rv-num">{pesos(p.mensual!.deposito)}</b>: se entrega al entrar y se devuelve al salir.</> : ''}</p>
-                : <p style={{ margin: 0 }}><Clock size={15} aria-hidden style={{ verticalAlign: '-2px' }} /> Entrada desde las <b className="rv-num">{hhmm(p.checkIn)}</b> · Salida hasta las <b className="rv-num">{hhmm(p.checkOut)}</b>. Limpieza de <b className="rv-num">{pesos(p.tarifa.limpieza)}</b> por estadía.{p.tarifa.finDeSemanaPct ? ` Viernes y sábados llevan un ${p.tarifa.finDeSemanaPct}% más.` : ''}</p>}
+                : <p style={{ margin: 0 }}><Clock size={15} aria-hidden style={{ verticalAlign: '-2px' }} /> Entrada desde las <b className="rv-num">{hhmm(p.checkIn)}</b> · Salida hasta las <b className="rv-num">{hhmm(p.checkOut)}</b>.{p.tarifa.limpieza > 0 && <> Limpieza de <b className="rv-num">{pesos(p.tarifa.limpieza)}</b> por estadía.</>}{p.tarifa.finDeSemanaPct ? ` Viernes y sábados llevan un ${p.tarifa.finDeSemanaPct}% más.` : ''}</p>}
               {!mensual && p.tarifa.temporadas.length > 0 && (
                 <ul className="als-horarios" style={{ marginTop: 10 }}>
                   {p.tarifa.temporadas.map(t => <li key={t.id}><span>{t.nombre} · {rangoTxt(t.desde, t.hasta)}</span><span className="rv-num">{pesos(t.precioNoche)} la noche</span></li>)}
@@ -334,7 +349,7 @@ function DetallePropiedad({ negocio, reservas, propiedad: p }: P & { propiedad: 
             <section className="als-sec" style={{ paddingTop: 28 }}>
               <h2 className="rv-h2" style={{ marginBottom: 12 }}>Dónde queda</h2>
               <Mapa latLng={p.latLng} titulo={p.nombre} />
-              <p style={{ margin: '10px 0 0', fontSize: 14 }}><MapPin size={14} aria-hidden style={{ verticalAlign: '-2px' }} /> {p.direccion}, {p.ciudad}</p>
+              {(p.direccion || p.ciudad) && <p style={{ margin: '10px 0 0', fontSize: 14 }}><MapPin size={14} aria-hidden style={{ verticalAlign: '-2px' }} /> {[p.direccion, p.ciudad].filter(Boolean).join(', ')}</p>}
             </section>
           </div>
           <aside className="als-lateral rv-card rv-card--pad">
@@ -361,7 +376,7 @@ function DetallePropiedad({ negocio, reservas, propiedad: p }: P & { propiedad: 
                 <div className="als-precio" style={{ fontSize: 22 }}>{pesos(p.tarifa.precioNoche)} <small>la noche</small></div>
                 <p className="rv-ayuda" style={{ margin: '4px 0 14px' }}>Tocá el día de entrada y después el de salida.</p>
                 <CalendarioRango mes={mes} onMes={setMes} hoy={HOY} rango={rango} onRango={setRango} minMes={HOY}
-                  estadoDe={f => ({ deshabilitado: f < HOY, ocupado: tomadas.has(f), aria: tomadas.has(f) ? 'ocupado' : undefined })}
+                  estadoDe={f => ({ deshabilitado: fuera(f), ocupado: tomadas.has(f), aria: tomadas.has(f) ? 'ocupado' : undefined })}
                   salidaMaxima={e => salidaMaxima(e, ocupadas)} />
                 {motivo && <p className="rv-error" role="alert" style={{ marginTop: 10 }}>{motivo}</p>}
                 {precio && (
@@ -369,7 +384,7 @@ function DetallePropiedad({ negocio, reservas, propiedad: p }: P & { propiedad: 
                     <li style={{ color: 'var(--color-text)', fontWeight: 600 }}><span>{nochesTxt(nochesEntre(rango.entrada!, rango.salida!))} · {rangoTxt(rango.entrada!, rango.salida!)}</span></li>
                     {/* Una línea por precio: de dónde sale el total cuando hay temporada o fin de semana. */}
                     {agruparNoches(precio.noches).map(lineaNoches).map(([k, v]) => <li key={k}><span>{k}</span><span className="rv-num" style={{ flexShrink: 0 }}>{pesos(v)}</span></li>)}
-                    <li><span>Limpieza</span><span className="rv-num">{pesos(precio.limpieza)}</span></li>
+                    {precio.limpieza > 0 && <li><span>Limpieza</span><span className="rv-num">{pesos(precio.limpieza)}</span></li>}
                     <li style={{ fontWeight: 700, color: 'var(--color-text)' }}><span>Total</span><span className="rv-num">{pesos(precio.total)}</span></li>
                   </ul>
                 )}
@@ -391,6 +406,7 @@ const todasTxt = (genero: 'f' | 'm', unidades: string) => `${genero === 'm' ? 't
 // ─── Cómo funciona y ubicación ───────────────────────────────────────────────
 
 function ComoFunciona({ negocio }: { negocio: NegocioAlquiler }) {
+  const { real, confirmaElNegocio } = useSitio()
   const t = negocio.tipo
   const palabras = palabrasDe(negocio)
   const varios = negocio.salones.length > 1
@@ -398,9 +414,14 @@ function ComoFunciona({ negocio }: { negocio: NegocioAlquiler }) {
   const pasos = [
     { Icon: MousePointerClick,
       titulo: t === 'cancha' ? `Elegís ${palabras.genero === 'm' ? 'el' : 'la'} ${palabras.unidad} y el horario` : t === 'bloque' ? (varios ? `Elegís el ${palabras.unidad}, la fecha y el bloque` : 'Elegís la fecha y el bloque') : soloMes ? `Elegís ${palabras.genero === 'm' ? 'el' : 'la'} ${palabras.unidad} y desde cuándo` : `Elegís ${palabras.genero === 'm' ? 'el' : 'la'} ${palabras.unidad} y las fechas`,
-      texto: t === 'cancha' ? `Ves los horarios libres de cada ${palabras.unidad} y podés tomar varias horas seguidas.` : t === 'bloque' ? 'Después el paquete según los invitados y los extras que quieras.' : soloMes ? 'Con la fecha de entrada y los meses ves el precio final.' : 'Con la entrada y la salida ves el precio final, limpieza incluida.' },
-    { Icon: CalendarCheck, titulo: negocio.senaPct ? `Confirmás con la seña del ${negocio.senaPct}%` : 'Confirmás al instante', texto: negocio.senaPct ? 'El resto se paga en el lugar. Si cancelás a tiempo, se devuelve.' : 'Sin seña: la reserva queda confirmada en el momento.' },
-    { Icon: Sparkles, titulo: 'Te llega la confirmación', texto: 'Con el código, el horario y la dirección. Podés agregarla a tu calendario.' },
+      texto: t === 'cancha' ? `Ves los horarios libres de cada ${palabras.unidad} y podés tomar varias horas seguidas.` : t === 'bloque' ? 'Después el paquete según los invitados y los extras que quieras.' : soloMes ? 'Con la fecha de entrada y los meses ves el precio final.' : real ? 'Con la entrada y la salida ves el precio final.' : 'Con la entrada y la salida ves el precio final, limpieza incluida.' },
+    // En el sitio real todavía no se cobra online: la seña se coordina con el negocio, que confirma la reserva.
+    real && confirmaElNegocio
+      ? { Icon: CalendarCheck, titulo: negocio.senaPct ? `Pedís la reserva y pagás la seña del ${negocio.senaPct}%` : 'Pedís la reserva', texto: negocio.senaPct ? `Las fechas quedan tomadas a tu nombre y ${negocio.nombre} las confirma cuando recibe la seña. El resto se paga en el lugar. ${politicaCancelacion(negocio)}` : `Las fechas quedan tomadas a tu nombre y ${negocio.nombre} te las confirma.` }
+      : { Icon: CalendarCheck, titulo: negocio.senaPct ? `Confirmás con la seña del ${negocio.senaPct}%` : 'Confirmás al instante', texto: negocio.senaPct ? `El resto se paga en el lugar. ${politicaCancelacion(negocio)}` : 'Sin seña: la reserva queda confirmada en el momento.' },
+    real
+      ? { Icon: Sparkles, titulo: 'Te queda el enlace de tu reserva', texto: 'Con el código, las fechas y cómo cancelar. Si dejás tu email, también te llega ahí.' }
+      : { Icon: Sparkles, titulo: 'Te llega la confirmación', texto: 'Con el código, el horario y la dirección. Podés agregarla a tu calendario.' },
   ]
   return (
     <section className="als-sec" aria-labelledby="als-como">
@@ -413,18 +434,22 @@ function ComoFunciona({ negocio }: { negocio: NegocioAlquiler }) {
 }
 
 function Ubicacion({ negocio }: { negocio: NegocioAlquiler }) {
+  const { real } = useSitio()
+  const donde = [negocio.direccion, negocio.ciudad].filter(Boolean).join(', ')
+  const wa = linkWhatsApp(negocio.telefono, `Hola, te escribo desde la página de ${negocio.nombre}.`)
   return (
     <section className="als-sec" aria-labelledby="als-ubicacion">
       <Encabezado id="als-ubicacion" titulo="Dónde y cuándo" />
       <div className="als-ubicacion">
         <div>
           <Mapa latLng={negocio.latLng} titulo={negocio.nombre} />
-          <p style={{ margin: '10px 0 0', fontSize: 14 }}><MapPin size={14} aria-hidden style={{ verticalAlign: '-2px' }} /> {negocio.direccion}, {negocio.ciudad}</p>
+          {donde && <p style={{ margin: '10px 0 0', fontSize: 14 }}><MapPin size={14} aria-hidden style={{ verticalAlign: '-2px' }} /> {donde}</p>}
         </div>
         <div>
           <h3 className="rv-h3" style={{ marginBottom: 8 }}>{negocio.tipo === 'estadia' ? 'Atención' : 'Horarios'}</h3>
           {negocio.tipo === 'estadia'
-            ? <p style={{ margin: 0, fontSize: 14 }}>Respondemos todos los días de 9 a 21 h. La entrada y la salida de cada propiedad están en su ficha.</p>
+            // El horario de atención es de la demo: un negocio real todavía no lo carga.
+            ? <p style={{ margin: 0, fontSize: 14 }}>{real ? '' : 'Respondemos todos los días de 9 a 21 h. '}La entrada y la salida de cada propiedad están en su ficha.{real && wa ? <> ¿Dudas? <a href={wa} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', fontWeight: 600 }}>Escribinos por WhatsApp</a>.</> : null}</p>
             : <Horarios negocio={negocio} />}
         </div>
       </div>

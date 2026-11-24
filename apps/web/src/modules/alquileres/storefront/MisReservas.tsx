@@ -8,10 +8,11 @@ import { ArrowRight, CalendarPlus, Check, Clock, MapPin, X } from 'lucide-react'
 import { diasEntre, fechaLarga, hhmm, rangoTxt } from '@/lib/reservas/fechas'
 import { pesos } from '@/lib/reservas/precio'
 import { descargarICS, generarICS } from '@/lib/reservas/ics'
-import { AHORA, ESTADO_RESERVA, HOY, cuenta, duracionEstadiaTxt, fechaDeReserva, palabrasDe, unidadPorId, type NegocioAlquiler, type Reserva } from '../datos'
+import { AHORA, codigoDe, ESTADO_RESERVA, HOY, capital, cuenta, duracionEstadiaTxt, fechaDeReserva, palabrasDe, unidadPorId, type NegocioAlquiler, type Reserva } from '../datos'
 import { Modal, Chip, useAviso } from '@/design-system/reservas/piezas'
 import Sitio, { ruta } from './Sitio'
 import { CSS_RESERVA } from './Reserva'
+import { plazoTxt, politicaCancelacion, senaAlCancelar } from '../datos/textos'
 
 /** El cliente de la demo: el que hizo reservas desde el sitio, más Sofía (k1) como ejemplo. */
 const CLIENTE_DEMO = 'k1'
@@ -51,7 +52,7 @@ export default function MisReservas({ negocio, reservas, onCancelar }: P) {
     return dias * 24 + (empieza - AHORA) / 60
   }
   const aTiempo = (r: Reserva) => horasHasta(r) >= negocio.cancelaHastaHoras
-  const plazo = negocio.cancelaHastaHoras >= 24 ? `${negocio.cancelaHastaHoras / 24} ${negocio.cancelaHastaHoras / 24 === 1 ? 'día' : 'días'}` : `${negocio.cancelaHastaHoras} horas`
+  const plazo = plazoTxt(negocio.cancelaHastaHoras)
 
   const cuando = (r: Reserva) => r.entrada && r.salida ? `${rangoTxt(r.entrada, r.salida)} · ${duracionEstadiaTxt(r)}`
     : r.fecha && r.inicio !== undefined && r.fin !== undefined ? `${fechaLarga(r.fecha)} · ${hhmm(r.inicio)} a ${hhmm(r.fin)}` : ''
@@ -63,7 +64,7 @@ export default function MisReservas({ negocio, reservas, onCancelar }: P) {
     const nombre = unidadPorId(negocio, r.unidadId)?.nombre ?? negocio.nombre
     const ev = r.entrada && r.salida ? { uid: `${r.id}@orbita`, titulo: `${nombre} · ${negocio.nombre}`, fecha: r.entrada, hasta: r.salida, lugar: `${negocio.direccion}, ${negocio.ciudad}` }
       : { uid: `${r.id}@orbita`, titulo: `${nombre} · ${negocio.nombre}`, inicio: { fecha: r.fecha ?? HOY, minuto: r.inicio ?? 0 }, fin: { fecha: r.fecha ?? HOY, minuto: r.fin ?? 0 }, lugar: `${negocio.direccion}, ${negocio.ciudad}` }
-    descargarICS(generarICS([ev], { nombre: negocio.nombre }), `reserva-${r.id.slice(-6)}`)
+    descargarICS(generarICS([ev], { nombre: negocio.nombre }), `reserva-${codigoDe(r)}`)
   }
 
   return (
@@ -74,7 +75,8 @@ export default function MisReservas({ negocio, reservas, onCancelar }: P) {
         <div className="rv-entre" style={{ marginBottom: 18 }}>
           <div>
             <h1 className="rv-h1">Mis reservas</h1>
-            <p className="rv-bajada">Cancelás sin cargo hasta {plazo} antes{negocio.senaPct ? ': la seña se devuelve.' : '.'}</p>
+            {/* La misma política que el dueño configuró en Pagos y señas (datos/textos): antes acá decía otra cosa. */}
+            <p className="rv-bajada">{politicaCancelacion(negocio)}</p>
           </div>
           <Link href={ruta('reserva', tipo)} className="rv-btn rv-btn--primario">{palabras.verbo} <ArrowRight size={16} aria-hidden /></Link>
         </div>
@@ -97,14 +99,14 @@ export default function MisReservas({ negocio, reservas, onCancelar }: P) {
                     </div>
                     <div className="alm-codigo">
                       <div className="rv-rotulo">Código</div>
-                      <b className="rv-num">{r.id.slice(-6).toUpperCase()}</b>
+                      <b className="rv-num">{codigoDe(r)}</b>
                       <div style={{ fontSize: 13, marginTop: 6 }}>{pesos(r.total)}{r.sena > 0 ? <> · {r.senaPagada ? `seña ${pesos(r.sena)} pagada` : 'seña pendiente'}</> : null}</div>
                     </div>
                   </div>
                   <div className="rv-fila" style={{ marginTop: 14 }}>
                     <button type="button" className="rv-btn rv-btn--sm" onClick={() => calendario(r)}><CalendarPlus size={15} aria-hidden /> Agregar al calendario</button>
                     <button type="button" className="rv-btn rv-btn--sm rv-btn--peligro" onClick={() => setCancelar(r)}><X size={15} aria-hidden /> Cancelar</button>
-                    {!aTiempo(r) && <span className="rv-ayuda">Ya pasó el plazo: si cancelás, la seña no se devuelve.</span>}
+                    {!aTiempo(r) && r.sena > 0 && <span className="rv-ayuda">Ya pasó el plazo: si cancelás, {senaAlCancelar(negocio, false)}.</span>}
                   </div>
                 </article>
               )
@@ -135,13 +137,13 @@ export default function MisReservas({ negocio, reservas, onCancelar }: P) {
         <Modal titulo="¿Cancelar la reserva?" onCerrar={() => setCancelar(null)}
           pie={<>
             <button type="button" className="rv-btn" onClick={() => setCancelar(null)}>No, la dejo</button>
-            <button type="button" className="rv-btn rv-btn--primario" onClick={() => { onCancelar(cancelar.id); setCancelar(null); avisar('Reserva cancelada', aTiempo(cancelar) && cancelar.sena ? 'La seña se devuelve al mismo medio de pago.' : undefined) }}><Check size={16} aria-hidden /> Sí, cancelar</button>
+            <button type="button" className="rv-btn rv-btn--primario" onClick={() => { onCancelar(cancelar.id); setCancelar(null); avisar('Reserva cancelada', cancelar.sena ? `${capital(senaAlCancelar(negocio, aTiempo(cancelar)))}.` : undefined) }}><Check size={16} aria-hidden /> Sí, cancelar</button>
           </>}>
           <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>{unidadPorId(negocio, cancelar.unidadId)?.nombre ?? negocio.nombre} · {cuando(cancelar)}</p>
           <p style={{ margin: '10px 0 0', fontSize: 14, lineHeight: 1.6 }}>
             {aTiempo(cancelar)
-              ? `Estás a tiempo: ${cancelar.sena ? `la seña de ${pesos(cancelar.sena)} se devuelve` : 'no tiene costo'}. El lugar queda libre para otra persona.`
-              : `Ya pasó el plazo de ${plazo}: ${cancelar.sena ? 'la seña no se devuelve.' : 'el negocio puede cobrarte igual.'}`}
+              ? `Estás a tiempo: ${cancelar.sena ? `${senaAlCancelar(negocio, true)} (${pesos(cancelar.sena)})` : 'no tiene costo'}. El lugar queda libre para otra persona.`
+              : `Ya pasó el plazo de ${plazo}: ${cancelar.sena ? `${senaAlCancelar(negocio, false)} (${pesos(cancelar.sena)}).` : 'el negocio puede cobrarte igual.'}`}
           </p>
           {/* La demo vive en un día fijo: se dice cuál, porque el plazo se cuenta desde ahí. */}
           <p className="rv-ayuda" style={{ marginTop: 8 }}>En la demo, hoy es siempre el {fechaLarga(HOY).toLowerCase()} a las {hhmm(AHORA)}.</p>

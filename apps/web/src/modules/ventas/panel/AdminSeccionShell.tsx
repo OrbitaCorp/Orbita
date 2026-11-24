@@ -19,6 +19,10 @@ import { useRouter } from 'next/router'
 import AdminLayout from '@/layouts/AdminLayout'
 import type { ComponentType } from 'react'
 import type { SeccionDelPanel } from '@/modules/ventas/panel/secciones'
+import { useAuth } from '@/hooks/useAuth'
+import { Button } from '@/design-system/components/Button'
+import { adminPath } from '@/lib/tenant'
+import { esVidriera, soloConCheckout } from '@/modules/ventas/panel/vidriera'
 
 // componentMap: tabla de lookup moduloPadre → seccion → componente.
 // Las claves de `ventas` son exactamente SECCIONES_DEL_PANEL (secciones.ts): el
@@ -48,8 +52,29 @@ const componentMap: Record<string, Record<SeccionDelPanel, ComponentType>> = {
 // qué ofrecer "ir a Orbi" desde Orbi.
 const OrbiPagina = dynamic(() => import('@/modules/orbi/vistas/OrbiPagina'), { ssr: false })
 
+// Se entró por la URL (un link viejo, un favorito) a una pantalla que la
+// vidriera no usa: el menú ya no la muestra (vidriera.ts).
+function SoloConCheckout({ negocioId }: { negocioId: string }) {
+  const router = useRouter()
+  return (
+    <div style={{ maxWidth: 460, margin: '64px auto', padding: '0 16px' }}>
+      <h1 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>
+        Esto es para tiendas con checkout
+      </h1>
+      <p style={{ fontSize: 14, lineHeight: 1.55, color: 'var(--color-muted)', margin: '8px 0 20px' }}>
+        Tu tienda es una vidriera digital: los clientes ven el catálogo y te escriben por WhatsApp para comprar.
+        Si querés que paguen en la tienda, cambiala a checkout en Configuración → Zona peligrosa.
+      </p>
+      <Button variant="secondary" onClick={() => router.push(`${adminPath(negocioId, 'ventas', 'configuracion')}?vista=peligro`)}>
+        Ir a Zona peligrosa
+      </Button>
+    </div>
+  )
+}
+
 export default function AdminSeccionShell() {
-  const { slug } = useRouter().query
+  const { user } = useAuth()
+  const { slug, vista } = useRouter().query
   const partes = Array.isArray(slug) ? slug : []
   // Últimos dos segmentos siempre — con negocioId adelante (legacy) o sin él
   // (subdominio), moduloPadre/seccion quedan en la misma posición relativa.
@@ -60,6 +85,15 @@ export default function AdminSeccionShell() {
     : componentMap[moduloPadre as string]?.[seccion as SeccionDelPanel]
 
   if (!Componente) return <div>Página no encontrada</div>
+
+  if (user?.type === 'member' && esVidriera(user.business?.mode)
+    && soloConCheckout(seccion, typeof vista === 'string' ? vista : null)) {
+    return (
+      <AdminLayout>
+        <SoloConCheckout negocioId={user.business.id} />
+      </AdminLayout>
+    )
+  }
 
   return (
     <AdminLayout>

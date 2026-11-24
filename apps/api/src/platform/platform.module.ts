@@ -19,12 +19,13 @@ import { CorreoPlataformaController } from './correo/correo.controller';
 import { CorreoPlataformaService } from './correo/correo.service';
 import { SeguimientoController } from './seguimiento/seguimiento.controller';
 import { SeguimientoService } from './seguimiento/seguimiento.service';
+import { NegociosAlquileresService } from './negocios-alquileres.service';
 
 @Module({
   // PlatformAdminLogModule: registro en platform_admin_logs de los mails de
   // prueba (y, desde AuthModule, del login y el segundo factor).
   imports: [SubscriptionsModule, WizardAnalyticsModule, PlatformAdminLogModule, CostsModule, OrbiSaludModule, CupoOrbiModule, SearchConsoleModule],
   controllers: [PlatformController, PlatformAuditController, OrbiSaludController, OrbiUsoPlataformaController, ConversacionesPlataformaController, CorreoPlataformaController, SeguimientoController],
-  providers: [PlatformService, PlatformAuditService, OrbiUsoService, LecturaConversacionesService, CorreoPlataformaService, SeguimientoService],
+  providers: [PlatformService, NegociosAlquileresService, PlatformAuditService, OrbiUsoService, LecturaConversacionesService, CorreoPlataformaService, SeguimientoService],
 })
 export class PlatformModule {}

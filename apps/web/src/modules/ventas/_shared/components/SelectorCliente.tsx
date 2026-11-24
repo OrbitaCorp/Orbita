@@ -4,7 +4,6 @@ import { Search, UserPlus, X } from 'lucide-react'
 export interface ClienteBase {
   id: string
   nombre: string
-  dni: string
   telefono: string
   email?: string
 }
@@ -22,21 +21,21 @@ interface Props {
 export function SelectorCliente({ isOpen, clientes = [], onClose, onSeleccionar, onCrear }: Props) {
   const [vista, setVista] = useState<Vista>('buscar')
   const [busqueda, setBusqueda] = useState('')
-  const [form, setForm] = useState({ nombre: '', dni: '', telefono: '', email: '' })
+  const [form, setForm] = useState({ nombre: '', telefono: '', email: '' })
 
   if (!isOpen) return null
 
   const filtrados = clientes.filter((c) => {
     const q = busqueda.toLowerCase()
-    return c.nombre.toLowerCase().includes(q) || c.dni.includes(q) || c.telefono.includes(q)
+    return c.nombre.toLowerCase().includes(q) || c.telefono.includes(q)
   })
 
   const handleCrear = () => {
-    if (!form.nombre || !form.dni) return
+    if (!form.nombre) return
     onCrear?.({ ...form })
     const nuevoCliente: ClienteBase = { id: `cli-${Date.now()}`, ...form }
     onSeleccionar(nuevoCliente)
-    setForm({ nombre: '', dni: '', telefono: '', email: '' })
+    setForm({ nombre: '', telefono: '', email: '' })
     onClose()
   }
 
@@ -78,7 +77,7 @@ export function SelectorCliente({ isOpen, clientes = [], onClose, onSeleccionar,
           <>
             <div style={{ position: 'relative', marginBottom: 12 }}>
               <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-muted)' }} />
-              <input className="ds-field" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Nombre, DNI o teléfono..." style={{ ...inputStyle, paddingLeft: 32 }} autoFocus />
+              <input className="ds-field" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Nombre o teléfono..." style={{ ...inputStyle, paddingLeft: 32 }} autoFocus />
             </div>
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
               {filtrados.length === 0 ? (
@@ -90,7 +89,7 @@ export function SelectorCliente({ isOpen, clientes = [], onClose, onSeleccionar,
                   <button key={c.id} className="ds-hover" onClick={() => { onSeleccionar(c); onClose() }}
                     style={{ padding: '10px 14px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-surface)', textAlign: 'left', fontFamily: 'inherit' }}>
                     <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: 'var(--color-text)' }}>{c.nombre}</p>
-                    <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--color-muted)' }}>DNI {c.dni} · {c.telefono}</p>
+                    <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--color-muted)' }}>{c.telefono}</p>
                   </button>
                 ))
               )}
@@ -105,7 +104,6 @@ export function SelectorCliente({ isOpen, clientes = [], onClose, onSeleccionar,
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {[
               { key: 'nombre', label: 'Nombre *', placeholder: 'Juan Pérez' },
-              { key: 'dni', label: 'DNI *', placeholder: '12345678' },
               { key: 'telefono', label: 'Teléfono', placeholder: '+54 9 11 ...' },
               { key: 'email', label: 'Email', placeholder: 'opcional' },
             ].map(({ key, label, placeholder }) => (
@@ -114,8 +112,8 @@ export function SelectorCliente({ isOpen, clientes = [], onClose, onSeleccionar,
                 <input className="ds-field" value={form[key as keyof typeof form]} onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))} placeholder={placeholder} style={inputStyle} />
               </div>
             ))}
-            <button className="ds-hover" onClick={handleCrear} disabled={!form.nombre || !form.dni}
-              style={{ marginTop: 4, padding: '10px 0', borderRadius: 10, border: 'none', background: 'var(--color-primary)', color: '#fff', fontWeight: 600, fontSize: 14, cursor: !form.nombre || !form.dni ? 'not-allowed' : 'pointer', opacity: !form.nombre || !form.dni ? 0.5 : 1, fontFamily: 'inherit' }}>
+            <button className="ds-hover" onClick={handleCrear} disabled={!form.nombre}
+              style={{ marginTop: 4, padding: '10px 0', borderRadius: 10, border: 'none', background: 'var(--color-primary)', color: '#fff', fontWeight: 600, fontSize: 14, cursor: !form.nombre ? 'not-allowed' : 'pointer', opacity: !form.nombre ? 0.5 : 1, fontFamily: 'inherit' }}>
               Guardar y asociar
             </button>
           </div>

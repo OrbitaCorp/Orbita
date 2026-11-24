@@ -16,9 +16,13 @@
 // las junta. El origen por defecto es la demo, así /turnos-demo sigue igual;
 // el panel real de un negocio monta <OrigenTurnosProvider origen={origenApi}>.
 //
-// Por ahora el origen solo LEE. Lo que se edita (dar un turno, pausar un
-// servicio, sumar a alguien) sigue en el estado de PanelTurnos y se conecta a
-// la API sección por sección (semanas 2 y 3 del plan). Configuración y
+// Las escrituras se conectan sección por sección (semanas 2 y 3 del plan).
+// Servicios ya guarda en el origen (`servicios`, 19/11), y también las agendas
+// de Equipo y Espacios (`agendas`): en la demo queda en memoria y en la API va
+// a /reservas/servicios y /reservas/recursos. Horarios, feriados y vacaciones
+// van a la config y a los bloqueos (`horarios`, solo en la API). Lo demás que
+// se edita (dar un turno, los roles, cómo cobra cada uno) sigue en el estado de
+// PanelTurnos. Configuración y
 // Avanzado leen sus datos adentro de cada pantalla (useRubroDemo,
 // useNegocioDemo): se pasan al origen cuando se conectan las reglas y los
 // horarios (13/11). El mapa completo, con lo que el backend no cubre, está en
@@ -28,6 +32,7 @@ import type { Cliente, Recurso, RubroTurnos } from '@/modules/turnos/datos'
 import type { Semana } from '@/modules/turnos/horario'
 import type { ServicioBase, TurnoAgenda } from '@/modules/turnos/datos/agenda'
 import type { Persona, Rol } from '@/modules/turnos/datos/equipo'
+import type { DiasCerrados, ReglasApi } from './mapear'
 import { origenDemo } from './demo'
 
 /**
@@ -53,10 +58,73 @@ export interface DatosPanel {
   agenda: FuenteAgenda
 }
 
+/**
+ * Lo que el panel guarda de los servicios. Pausar es editar con `pausado`.
+ * Cada escritura devuelve el servicio como quedó (al crear, con el id que le
+ * dio el origen); si falla, el error trae el mensaje para mostrar.
+ */
+export interface EscrituraServicios {
+  /** `orden`: la posición en la lista; uno nuevo va al final. */
+  crear(s: ServicioBase, orden: number): Promise<ServicioBase>
+  editar(s: ServicioBase): Promise<ServicioBase>
+  borrar(id: string): Promise<void>
+}
+
+/** Con qué se guarda una agenda: el rubro dice si es de una persona o un espacio; la semana, cuál es el horario del negocio. */
+export interface CtxAgenda { rubro: RubroTurnos; semana: Semana; rolId?: string }
+
+/**
+ * Lo que el panel guarda de las agendas: las de las personas que atienden
+ * (Equipo, rubros por profesional) y los espacios (Espacios, por sala o
+ * cabina). Igual que los servicios, cada escritura devuelve la agenda como
+ * quedó; al crear, con el id del origen.
+ */
+export interface EscrituraAgendas {
+  crear(r: Recurso, ctx: CtxAgenda & { orden: number }): Promise<Recurso>
+  editar(r: Recurso, ctx: CtxAgenda): Promise<Recurso>
+  /** La API no borra una agenda con reservas por delante: el error lo dice. */
+  borrar(id: string): Promise<void>
+}
+
+/** Cómo quedó todo después de guardar el horario semanal. */
+export interface SemanaGuardada {
+  semana: Semana
+  /** Las agendas con el horario nuevo. */
+  recursos: Recurso[]
+  /** Quienes tenían horario propio y se recortaron al nuevo. */
+  ajustadas: string[]
+  /** A quienes no se les pudo recortar: siguen con el horario de antes. */
+  sinAjustar: string[]
+}
+
+/**
+ * El horario del negocio, los feriados y las vacaciones (Configuración →
+ * Horarios). La demo no los guarda acá: la semana va al navegador y lo demás
+ * queda en la pantalla, por eso solo los usa el origen de la API.
+ */
+export interface EscrituraHorarios {
+  /** Falla, sin tocar nada, si alguien con horario propio quedaría sin ningún día. */
+  guardarSemana(semana: Semana, rubro: RubroTurnos): Promise<SemanaGuardada>
+  /** Lo guardado de hoy en adelante. */
+  diasCerrados(): Promise<DiasCerrados>
+  /** Reemplaza solo lo que cambió. `hayTurnos`: quedaron turnos dados adentro (no se cancelan). */
+  guardarDiasCerrados(antes: DiasCerrados, despues: DiasCerrados): Promise<{ hayTurnos: boolean }>
+}
+
+/** Las reglas de reserva que guarda la config (Reservas → Reglas). Como Horarios, solo en la API. */
+export interface EscrituraReglas {
+  leer(rubro: RubroTurnos): Promise<ReglasApi>
+  guardar(reglas: ReglasApi, rubro: RubroTurnos): Promise<ReglasApi>
+}
+
 export interface OrigenTurnos {
   tipo: 'demo' | 'api'
   /** Lo de cada sección, junto. Si falla, el error trae el mensaje para mostrar. */
   cargar(rubro: RubroTurnos): Promise<DatosPanel>
+  servicios: EscrituraServicios
+  agendas: EscrituraAgendas
+  horarios?: EscrituraHorarios
+  reglas?: EscrituraReglas
 }
 
 const Contexto = createContext<OrigenTurnos>(origenDemo)

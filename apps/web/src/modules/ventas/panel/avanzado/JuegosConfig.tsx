@@ -25,7 +25,7 @@
 // donde ese modal aparece.
 
 import { useEffect, useState } from 'react'
-import { ArrowLeft, ArrowUpRight, Trophy, Goal, Crosshair, Fish, Flag, Scissors, Check, Award, X, RotateCcw, BarChart3, Info } from 'lucide-react'
+import { ArrowUpRight, Trophy, Goal, Crosshair, Fish, Flag, Scissors, Award, X, RotateCcw, BarChart3, Info } from 'lucide-react'
 import { Volver } from '../_shared/Volver'
 import type { ComponentType } from 'react'
 import { Card } from '@/design-system/components/Card'
@@ -41,6 +41,10 @@ import {
 import { toastEsError } from '@/lib/utils'
 import { currentSlug, tenantUrl } from '@/lib/tenant'
 import { fechaDeVigencia, hoyISO } from '../descuentos/utils'
+import { TEMAS } from '@/modules/ventas/cliente/juegos/JuegoInline'
+import { MiniEscena } from '@/modules/ventas/promos/escenasTematicas'
+import { GaleriaTematicas, VistaPreviaJuego } from '@/modules/ventas/promos/PanelPromos'
+import { PRESENTACIONES } from '@/modules/ventas/promos/catalogo'
 
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; color?: string }>
 type Tab = 'config' | 'reportes'
@@ -56,7 +60,7 @@ const MECANICAS: { tipo: string; label: string; desc: string; Icon: IconType }[]
     { tipo: 'CUT', label: 'Cortá el hilo', desc: 'Cortar el globo justo para que el descuento caiga en la caja.', Icon: Scissors },
 ]
 
-const CONFIG_VACIA = { name: '', isActive: false, percentPerWin: '1', maxPercent: '15', timeLimitSeconds: '4', maxAttempts: '5', startDate: '', endDate: '' }
+const CONFIG_VACIA = { name: '', isActive: false, percentPerWin: '1', maxPercent: '15', timeLimitSeconds: '4', maxAttempts: '5', startDate: '', endDate: '', theme: 'clasico', presentation: 'centro' }
 
 export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
     const [cargando, setCargando] = useState(true)
@@ -77,6 +81,8 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
     const [techo, setTecho] = useState('15')
     const [tiempoLimite, setTiempoLimite] = useState('4')
     const [intentos, setIntentos] = useState('5')
+    const [tematica, setTematica] = useState('clasico')
+    const [presentacion, setPresentacion] = useState('centro')
     // Vigencia opcional ("desde"/"hasta", 'YYYY-MM-DD' o '' si no hay
     // límite de fechas) — pedido explícito del dueño: poder relanzar el
     // mismo juego con fechas nuevas sin tener que tocar el toggle a mano.
@@ -123,6 +129,7 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                 // El backend devuelve ISO completo — RangoFechasPicker espera solo 'YYYY-MM-DD'.
                 // fechaDeVigencia: el fin es 23:59 de Argentina (en UTC, ya el día siguiente).
                 startDate: existente.startDate ? fechaDeVigencia(existente.startDate) : '', endDate: existente.endDate ? fechaDeVigencia(existente.endDate) : '',
+                theme: existente.theme ?? 'clasico', presentation: existente.presentation ?? 'centro',
             }
             : CONFIG_VACIA
         setNombre(cargado.name)
@@ -133,6 +140,8 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
         setIntentos(cargado.maxAttempts)
         setDesde(cargado.startDate)
         setHasta(cargado.endDate)
+        setTematica(cargado.theme)
+        setPresentacion(cargado.presentation)
         setOriginal(JSON.stringify(cargado))
     }, [tipoSeleccionado, configuradas])
 
@@ -183,8 +192,16 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
         && Number.isInteger(tiempoNum) && tiempoNum >= 1 && tiempoNum <= 30
         && Number.isInteger(intentosNum) && intentosNum >= 1 && intentosNum <= 20
         && vigenciaValida
-    const hayCambios = original !== '' && JSON.stringify({ name: nombre, isActive: activo, percentPerWin: porcentajeAcierto, maxPercent: techo, timeLimitSeconds: tiempoLimite, maxAttempts: intentos, startDate: desde, endDate: hasta }) !== original
+    const hayCambios = original !== '' && JSON.stringify({ name: nombre, isActive: activo, percentPerWin: porcentajeAcierto, maxPercent: techo, timeLimitSeconds: tiempoLimite, maxAttempts: intentos, startDate: desde, endDate: hasta, theme: tematica, presentation: presentacion }) !== original
     const estado = estadoVigencia(desde, hasta)
+    // La vista previa juega con lo que está en pantalla, sin guardar. Mientras
+    // un campo esté a medio escribir usa un valor jugable en vez de romperse.
+    const configPrueba = {
+        percentPerWin: porcentajeNum > 0 ? porcentajeNum : 1,
+        maxPercent: Math.max(techoNum > 0 ? techoNum : 15, porcentajeNum > 0 ? porcentajeNum : 1),
+        maxAttempts: Number.isInteger(intentosNum) && intentosNum >= 1 && intentosNum <= 20 ? intentosNum : 5,
+        timeLimitSeconds: Number.isInteger(tiempoNum) && tiempoNum >= 1 && tiempoNum <= 30 ? tiempoNum : 4,
+    }
 
     async function guardar() {
         if (!valoresValidos || !hayCambios || guardando) return
@@ -199,11 +216,14 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                 maxAttempts: intentosNum,
                 startDate: desde || undefined,
                 endDate: hasta || undefined,
+                theme: tematica,
+                presentation: presentacion,
             })
             setConfiguradas(prev => ({ ...prev, [tipoSeleccionado]: guardado }))
             setOriginal(JSON.stringify({
                 name: guardado.name ?? '', isActive: guardado.isActive, percentPerWin: String(guardado.percentPerWin), maxPercent: String(guardado.maxPercent), timeLimitSeconds: String(guardado.timeLimitSeconds), maxAttempts: String(guardado.maxAttempts),
                 startDate: guardado.startDate ? fechaDeVigencia(guardado.startDate) : '', endDate: guardado.endDate ? fechaDeVigencia(guardado.endDate) : '',
+                theme: guardado.theme ?? 'clasico', presentation: guardado.presentation ?? 'centro',
             }))
             setDesde(guardado.startDate ? fechaDeVigencia(guardado.startDate) : '')
             setHasta(guardado.endDate ? fechaDeVigencia(guardado.endDate) : '')
@@ -238,14 +258,26 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
     return (
         <div style={pageWrap}>
             <style>{`
-                @media (max-width: 900px) {
+                .juegos-mecanicas { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+                .juegos-mec { display: block; min-width: 0; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+                .juegos-mec-img { display: block; border-radius: 6px; overflow: hidden; box-shadow: inset 0 0 0 1px var(--color-border); }
+                .juegos-mec[aria-pressed=true] .juegos-mec-img { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+                .juegos-mec:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
+                .juegos-mec-n { display: block; margin-top: 5px; font-size: 12.5px; font-weight: 500; line-height: 1.25; color: var(--color-text); }
+                .juegos-mec[aria-pressed=true] .juegos-mec-n { font-weight: 600; }
+                .juegos-mec-a { display: block; font-size: 12px; color: var(--color-success); }
+                .juegos-op { min-height: 38px; padding: 0 13px; border: 1px solid var(--color-border); border-radius: 7px; background: none; color: var(--color-muted); font: inherit; font-size: 13px; cursor: pointer; }
+                .juegos-op:hover { color: var(--color-text); border-color: var(--color-border-strong); }
+                .juegos-op[aria-pressed=true] { border-color: var(--color-text); color: var(--color-text); font-weight: 600; }
+                .juegos-der { position: sticky; top: 14px; }
+                @media (max-width: 1180px) {
                     .juegos-cols { grid-template-columns: minmax(0,1fr) !important; }
+                    /* En una columna la vista previa va arriba: es lo que
+                       cambia cuando se toca una temática. */
+                    .juegos-der { position: static; order: -1; }
                 }
                 @media (max-width: 768px) {
-                    /* Las mecanicas en dos columnas quedaban de ~65px: el
-                       nombre del juego y su explicacion se apilaban letra por
-                       letra. Una por fila, con la explicacion al lado. */
-                    .juegos-mecanicas { grid-template-columns: minmax(0,1fr) !important; }
+                    .juegos-mecanicas { grid-template-columns: repeat(3, minmax(0, 1fr)); }
                     /* Dos campos numericos por fila entran; los de etiqueta
                        larga ("Techo maximo de descuento") no. */
                     .juegos-2col { grid-template-columns: minmax(0,1fr) !important; gap: 12px !important; }
@@ -259,7 +291,7 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                 <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Juegos con premio</h1>
             </div>
             <div style={{ fontSize: 14, color: 'var(--color-muted)', margin: '0 0 22px' }}>
-                Elegí una mecánica y configurala — ya está jugable de verdad en tu tienda. Podés tener varias activas a la vez.
+                Elegí un juego, dale una temática y probalo antes de lanzarlo.
             </div>
 
             {error && (
@@ -275,42 +307,40 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                     <SkeletonText width="100%" height={40} style={{ marginTop: 14 }} />
                 </Card>
             ) : (
-                <>
-                    <Card padding="md" style={{ marginBottom: 16 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 10 }}>Mecánica</div>
-                        <div className="juegos-mecanicas" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-                            {MECANICAS.map(m => {
-                                const activa = m.tipo === tipoSeleccionado
-                                const yaConfigurada = configuradas[m.tipo]
-                                return (
-                                    <button
-                                        key={m.tipo}
-                                        type="button"
-                                        onClick={() => setTipoSeleccionado(m.tipo)}
-                                        style={{
-                                            // Ancho de borde SIEMPRE 2px (solo cambia el color) — con un ancho
-                                            // distinto según el estado, la card crecía 1px al seleccionarla y
-                                            // corría todo lo que estaba debajo (bug reportado).
-                                            position: 'relative', borderRadius: 10, padding: 14, textAlign: 'left', cursor: 'pointer',
-                                            fontFamily: 'inherit', border: `2px solid ${activa ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                                            background: activa ? 'var(--color-primary-bg)' : 'var(--color-bg)',
-                                        }}
-                                    >
-                                        <m.Icon size={18} strokeWidth={1.8} color={activa ? 'var(--color-primary)' : 'var(--color-muted)'} />
-                                        <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)', marginTop: 8 }}>{m.label}</div>
-                                        <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 2 }}>{m.desc}</div>
-                                        {yaConfigurada?.isActive && (
-                                            <span style={{ position: 'absolute', top: 12, right: 12, display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, fontWeight: 700, color: 'var(--color-success)', background: 'var(--color-success-bg)', borderRadius: 999, padding: '2px 7px' }}>
-                                                <Check size={10} strokeWidth={2.5} /> Activo
-                                            </span>
-                                        )}
-                                    </button>
-                                )
-                            })}
-                        </div>
-                    </Card>
+                <div className="juegos-cols" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,520px)', gap: 24, alignItems: 'start' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+                        <Card padding="md">
+                            <div style={tituloSeccion}>Juego</div>
+                            <div style={ayudaSeccion}>Podés tener varios activos a la vez. Cada uno guarda su diseño.</div>
+                            <div className="juegos-mecanicas">
+                                {MECANICAS.map(m => {
+                                    const activa = m.tipo === tipoSeleccionado
+                                    return (
+                                        <button key={m.tipo} type="button" className="juegos-mec" aria-pressed={activa} title={m.desc} onClick={() => setTipoSeleccionado(m.tipo)}>
+                                            <span className="juegos-mec-img"><MiniEscena tipo={m.tipo} tema={configuradas[m.tipo]?.theme ?? 'clasico'} /></span>
+                                            <span className="juegos-mec-n">{m.label}</span>
+                                            {configuradas[m.tipo]?.isActive && <span className="juegos-mec-a">Activo</span>}
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        </Card>
 
-                    <div className="juegos-cols" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 300px', gap: 16, alignItems: 'start' }}>
+                        <Card padding="md">
+                            <div style={tituloSeccion}>Temática</div>
+                            <div style={ayudaSeccion}>El mismo juego con otra piel. Las de temporada aparecen según la fecha.</div>
+                            <GaleriaTematicas tipo={tipoSeleccionado} valor={tematica} onCambio={setTematica} />
+                        </Card>
+
+                        <Card padding="md">
+                            <div style={tituloSeccion}>Cómo aparece en la tienda</div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                                {PRESENTACIONES.map(f => (
+                                    <button key={f.id} type="button" className="juegos-op" aria-pressed={presentacion === f.id} onClick={() => setPresentacion(f.id)}>{f.nombre}</button>
+                                ))}
+                            </div>
+                        </Card>
+
                         {/* ── Columna principal: tabs Configuración / Reportes ── */}
                         <Card key={tipoSeleccionado} padding="md" style={{ padding: 0 }}>
                             <div role="tablist" aria-label="Secciones del juego" style={{ display: 'flex', gap: 4, padding: '0 20px', borderBottom: '1px solid var(--color-border)' }}>
@@ -461,6 +491,17 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                             </div>
                         </Card>
 
+                    </div>
+
+                    {/* ── Vista previa jugable y resumen ── */}
+                    <div className="juegos-der" style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+                        <VistaPreviaJuego
+                            tipo={tipoSeleccionado}
+                            tema={tematica}
+                            presentacion={presentacion}
+                            titulo={nombre.trim() || TEMAS[tipoSeleccionado]?.titulo || 'Juego con premio'}
+                            prueba={configPrueba}
+                        />
                         {/* ── Sidebar: resumen de la mecánica seleccionada ── */}
                         <Card padding="md">
                             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 12 }}>Resumen</div>
@@ -489,7 +530,7 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                             )}
                         </Card>
                     </div>
-                </>
+                </div>
             )}
 
             {toast && (
@@ -577,7 +618,9 @@ function DirtyHint({ show }: { show: boolean }) {
     )
 }
 
-const pageWrap: React.CSSProperties = { padding: '24px 32px 64px', maxWidth: 1280, width: '100%', margin: '0 auto', boxSizing: 'border-box' }
+const pageWrap: React.CSSProperties = { padding: '24px 32px 64px', maxWidth: 1400, width: '100%', margin: '0 auto', boxSizing: 'border-box' }
+const tituloSeccion: React.CSSProperties = { fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }
+const ayudaSeccion: React.CSSProperties = { fontSize: 12.5, color: 'var(--color-muted)', margin: '1px 0 12px' }
 const linkVerJuego: React.CSSProperties = {
     display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 600,
     color: 'var(--color-primary)', textDecoration: 'none',

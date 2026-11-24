@@ -297,4 +297,32 @@ Alternativas: dejarlo para después del ciclo (los 19 rubros ya cubren lugares y
       'apps/api/src/reservas/reservas.service.ts:301',
     ],
   }),
+
+  // ─── Del arranque de Alquileres sobre el backend (18/11/2026) ───────────────
+  decisionAbierta({
+    modulo: 'gimnasio', slug: 'lo-que-alquileres-pide-al-backend', decide: 'Ale', transversal: true, fecha: '2026-11-18',
+    titulo: 'Transversal: lo que Alquileres le pide al backend compartido, y cómo se reordena su plan',
+    simple: 'Para llevar Alquileres al motor de reservas hacen falta cambios en lo compartido (el precio en el servidor, un campo libre en la reserva y en la config, calendarios externos, permisos), y la estadía suma cosas que no están en el plan (Airbnb, Google Maps, seña online, estadísticas). Además, el plan de Alquileres va casi dos semanas atrasado.',
+    alcance: 'El backend compartido (`apps/api/src/reservas`, el schema y `lib/reservasApi`) y el plan de Alquileres en Módulos. Varias piezas las necesita también Turnos (campo libre en la config, clientes, Mis reservas). La decide Ale; Alan dice qué necesita y cuándo.',
+    foco: 'Alquileres terminó su arranque el 18/11 (mapa, capa de datos, negocios de prueba). Para seguir con canchas, salones y estadía necesita decisiones sobre el motor compartido y sobre el plan.',
+    propuesta: `En orden de importancia (el detalle de cada una está en \`docs/superpowers/specs/2026-11-18-alquileres-sobre-el-backend-design.md\`, § 6 y § 9):
+
+1. **Reordenar el plan:** comprimir canchas (23 al 27/11), salones (30/11 al 04/12) y estadía (07 al 11/12, con la sincronización de Airbnb real), el sitio (14 al 18/12) y lo demás del 21 al 23/12. Quedan afuera del ciclo la QA completa, el alquiler por mes, la seña online, el CSV de Airbnb, Google Maps y las estadísticas por canal.
+2. **Sumar lo nuevo de la estadía** (entrada de Alquileres del 18/11) en un ciclo 3, salvo la sincronización de Airbnb, que reemplaza la pantalla simulada de Calendarios.
+3. **El precio en el servidor:** precios por horario, temporadas, fin de semana, limpieza y por mes, en \`dominio/precio.ts\`, con los mismos tests que \`lib/reservas\`.
+4. **Un \`datos\` JSON en \`Reserva\` y en \`ReservaConfig\`:** dos migraciones chicas (el evento, los huéspedes, el canal y el depósito; los mensajes y las formas de pago). Turnos pide lo mismo para la config.
+5. **Calendarios externos:** una tabla nueva, \`origen\` y \`calendario_id\` en los bloqueos, una ruta pública con token para exportar y la sincronización colgada del job de cada 5 minutos.
+6. **Seña online:** el diseño propone dejar la reserva retenida (y no pendiente, como dice la decisión del 03/11) hasta el pago, porque una pendiente no vence; y una tabla de pagos de reservas para devolver y no cobrar dos veces.
+7. **Los bloqueos con el permiso \`reservas.manage\`** y no \`config\`, para que un encargado pueda cerrar un día.
+8. **Google Business Profile como pieza común de Órbita** y pedir ya el acceso a Google (tarda unas dos semanas). Hay que saber si Órbita tiene una ficha verificada con 60 días o más y desde qué cuenta se pide.
+9. **Las rutas de producción** de los tres módulos de reservas, con responsable y fecha: sin ellas el sitio no reserva de verdad. Tienen que estar antes del 14/12.`,
+    abierta: 'Casi todas tocan el motor que comparten los tres módulos o mueven plata, y la primera cambia el plan del ciclo, que armó Ale. Ninguna se destraba escribiendo código.',
+    origen: 'Sesión del 18/11/2026: el arranque de Alquileres (entradas "el mapa de Alquileres sobre el backend…" y "la estadía apunta al dueño chico…").',
+    archivos: [
+      'apps/api/src/reservas/dominio/precio.ts:1',
+      'apps/api/prisma/schema.prisma:3784',
+      'apps/api/src/reservas/reservas-panel.controller.ts:22',
+      'apps/web/src/modules/superadmin/modulos/plan.ts:187',
+    ],
+  }),
 ]

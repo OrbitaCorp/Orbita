@@ -14,6 +14,7 @@
 // sigue intacto para poder comparar los dos.
 
 import { useEffect, useState, type ReactNode } from 'react';
+import { BotonVideoUnDia } from '@/modules/landing/components/v2/VideoUnDia';
 
 // Acá abajo había un carrusel de testimonios, pero eran INVENTADOS: Órbita
 // todavía no tiene clientes con citas reales para mostrar, y una landing que
@@ -150,6 +151,13 @@ export function HeroCinematic() {
                         </svg>
                         Probá la demo
                     </a>
+                </div>
+
+                {/* El video «Un día con Órbita» (4 min): un acceso más chico que los dos
+                    botones, para no competir con «Crear tu espacio». Abre un modal
+                    (v2/VideoUnDia.tsx). */}
+                <div style={aparece(600)}>
+                    <BotonVideoUnDia />
                 </div>
             </div>
 

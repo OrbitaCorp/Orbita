@@ -166,6 +166,13 @@ const G11 = '2026-11-11'
 const G12 = '2026-11-12'
 // Lunes 16/11: la tabla rubro → sidebar de Turnos.
 const F16 = '2026-11-16'
+// Jueves 19/11: Servicios de Turnos guarda en la API.
+const F19 = '2026-11-19'
+// Miércoles 18/11: el arranque de Alquileres sobre el backend y la estadía para el dueño chico.
+const F18 = '2026-11-18'
+// Lunes 23/11: Horarios y feriados de Turnos, y Alquileres en producción (la demo para superadmin y el primer negocio real).
+const F23 = '2026-11-23'
+const F24 = '2026-11-24'
 
 export const ENTRADAS: Entrada[] = [
   // ─── Transversal · la sección Módulos ───────────────────────────────────────
@@ -2918,6 +2925,519 @@ ${comoQuedo('gimnasio', ['Días sin clases sobre la API · 1280', 'api-dias-sin-
       'apps/web/src/modules/gimnasio/datos/origen/api.ts:140',
       'apps/web/src/modules/gimnasio/datos/index.ts:585',
       'apps/api/src/reservas/reservas-catalogo.service.ts:259',
+    ],
+  }),
+
+  // ─── Ciclo 2 · Alquileres (Alan) ────────────────────────────────────────────
+  entrada({
+    modulo: 'alquileres', fecha: F18, slug: 'mapa-sobre-el-backend', tipo: 'tarea', quien: 'Alan',
+    titulo: 'El mapa de Alquileres sobre el backend compartido: cada pantalla con su ruta y lo que falta',
+    foco: 'Cada sección del panel y cada página del sitio de Alquileres, en sus tres modos (canchas, salones, estadía), con la ruta de /reservas que la cubre, y los 18 faltantes del backend con su propuesta. Lo compartido se habla con Ale antes de tocarlo.',
+    que: `Tarea del 05/11 del plan, hecha el 18/11 (casi dos semanas tarde contra el plan). El diseño completo está en \`docs/superpowers/specs/2026-11-18-alquileres-sobre-el-backend-design.md\`; esto es el resumen.
+
+**Panel, común a los tres modos** (rutas \`/api/v1/reservas/...\`, sesión del panel):
+
+| Sección | Lee | Escribe | Estado |
+|---|---|---|---|
+| Reservas o Calendario | \`GET /reservas\` (en tramos de 90 días), \`GET /:id\` | \`confirmar\`, \`completar\`, \`ausente\`, \`cancelar\`, \`reprogramar\`, \`nota\` | Cubre |
+| Nueva reserva a mano | \`GET /disponibilidad\` o \`/noches\` | \`POST /reservas\` | Cubre; el canal → F8 |
+| Qué hay libre | \`/disponibilidad\`, \`/rango\`, \`/noches\` | — | Cubre |
+| Clientes o Huéspedes | Las reservas, por persona | — | Parcial → F13 |
+| Ingresos | \`GET /resumen\` y las reservas | \`POST /:id/pago\` | Parcial: sin canal ni Airbnb |
+| Reglas de reserva | \`GET /config\` | \`PUT /config\` | Parcial → F11 |
+| Bloqueos | \`GET /bloqueos\` | \`POST\`, \`DELETE /bloqueos\` | Cubre; los del .ics → F9 |
+| Recordatorios y mensajes | — | — | Falta → F10 |
+| Pagos y señas | \`GET /config\` | \`PUT /config\` | Parcial → F11 y F15 |
+| Calendarios (.ics) | — | — | Falta: hoy simulado → F9 |
+| Configuración → Equipo | Miembros de Órbita | — | Parcial → F12 |
+
+**Panel, por modo:** canchas, extras y salones cubren (recursos \`CANCHA\` y \`SALON\`; los extras de la demo son del negocio y el motor los tiene por recurso). Faltan los precios por horario (F2), los paquetes (F3), las temporadas (F4) y el alquiler por mes (F5). Las propiedades cubren lo de reservar (\`ALOJAMIENTO\` con check-in, check-out y noches mínimas en \`datos\`).
+
+**Sitio** (\`/api/v1/storefront/:slug/reservas/...\`): portada, reserva de cancha y Mi reserva cubren; la de salón y la de estadía, parciales (F3, F4, F6, F15); Mis reservas con sesión falta (F14). La página \`/mi-reserva/<token>\` no existe todavía y los emails ya apuntan ahí.
+
+**Lo que el backend no cubre.** (c) = compartido: lo decide Ale, está en su decisión abierta del 18/11.
+
+1. **Rubro:** como Turnos, \`industry: "alquileres"\` y \`subrubros\`. Sin migración.
+2. **Precios por horario** de las canchas: el cálculo al servidor (c).
+3. **Paquetes por salón:** cada paquete es un servicio limitado a su salón. Probablemente sin tocar lo compartido.
+4. **Temporadas, fin de semana y limpieza:** el cálculo al servidor (c).
+5. **Por mes:** mismo alojamiento con \`modalidad: "mes"\`; lo de menor prioridad (c).
+6. **\`datos\` en la reserva** para el evento, los huéspedes, el canal y el depósito (c, migración).
+7. **Depósito de garantía:** se registra en \`datos\` de la reserva.
+8. **Canal de cada reserva** y el resumen por canal (c).
+9. **Calendarios externos de verdad** (c, migración y sincronización).
+10. **Plantillas de mensajes:** \`datos\` en la config, igual que pide Turnos (c).
+11. **Formas de pago y alias:** en la misma \`datos\`. En la primera versión la seña es un porcentaje del total y se pierde o no.
+12. **Roles:** los bloqueos piden \`reservas.config\`; propuesta: pasarlos a \`manage\` (c).
+13. **Clientes** y 14. **Mis reservas con sesión:** los mismos faltantes de Turnos, una sola solución (c).
+15. **Seña online con Mercado Pago y devolución:** la decisión abierta de Ale del 03/11 (c).
+16. **Recordatorio del día anterior:** idem (c).
+17. **Ficha de Google Maps:** pieza transversal (c).
+18. **Ingresos de Airbnb** por el CSV: tabla propia de Alquileres.
+
+**Lo que falta del lado del front:** las rutas de producción (igual que Turnos, una solución para los tres) y el "hoy" fijo de la demo (\`HOY = 2026-11-14\`).`,
+    archivos: [
+      'apps/api/src/reservas/reservas-panel.controller.ts:22',
+      'apps/api/src/reservas/reservas-publico.controller.ts:29',
+      'apps/api/src/reservas/dominio/precio.ts:1',
+      'apps/api/src/reservas/reservas-catalogo.service.ts:36',
+      'apps/web/src/modules/alquileres/admin/navegacion.ts:1',
+      'apps/web/src/modules/alquileres/datos/index.ts:1',
+      'apps/web/src/lib/reservas/estadia.ts:1',
+    ],
+  }),
+  entrada({
+    modulo: 'alquileres', fecha: F18, slug: 'capa-de-datos-por-origen', tipo: 'tarea', quien: 'Alan',
+    titulo: 'El panel de Alquileres lee de un origen: la demo o la API de reservas',
+    foco: 'Panel.tsx ya no llama a useNegocio(): le pide sus datos al origen del contexto. Por defecto la demo, así /alquileres-demo queda igual; el origen de la API trae el negocio, los recursos del modo, las reservas y los bloqueos, y por ahora solo lee.',
+    que: `Tarea del 06/11 del plan, hecha el 18/11. Mismo patrón que Turnos, sin importarlo (los módulos no se importan entre sí).
+
+- **El origen** (\`datos/origen/index.ts\`): \`useDatos()\` devuelve el negocio, las reservas, los clientes, si ya llegó, el error y las siete escrituras con las mismas firmas que el almacén de la demo. El panel lo toma del contexto; el de un negocio real monta \`<OrigenAlquileresProvider origen={origenApi}>\`.
+- **La demo** (\`demo.ts\`) envuelve \`useNegocio()\` tal cual. Hay un test que la compara con el almacén en los tres modos, y se probó a mano en el navegador (los tres modos y quitar un bloqueo).
+- **La API** (\`api.ts\`): el negocio y su modo salen de \`/business\` (el primer subrubro de Alquileres); los recursos activos del modo, los servicios (paquetes), los bloqueos y las reservas de medio año para cada lado (también las de un recurso desactivado), en tramos de 90 días pedidos de a uno por el límite de 60 pedidos por minuto. El panel no reescribe la URL hasta que llegan los datos (antes, un link a Propiedades terminaba en Reservas mientras cargaba). Sin config de Alquileres, el panel lo dice y ofrece Reintentar. Las escrituras todavía no llegan a la API: el panel lo avisa arriba.
+- **Las traducciones** (\`mapear.ts\`, con 21 tests): fechas de Argentina, estados (VENCIDA no se muestra; AUSENTE va como cancelada hasta que Ingresos lo resuelva), la apertura con el lunes en 0, un bloqueo de todo el negocio repartido en cada unidad, clientes sin ficha por teléfono, email o nombre, y lo que la API no guarda con su valor de fábrica (mensajes, pagos, equipo, calendarios).
+- **Para probarlo:** \`/panel/alquileres\` en local (no existe en producción), con los negocios de prueba de la entrada de hoy.
+- **Verificado:** typecheck y eslint de \`apps/web\` sin errores, tests de Alquileres en verde (47), y por un script las seis rutas que usa el origen con los tres dueños de prueba. El panel con datos reales no se vio pintado: el navegador de la sesión no dejaba abrir el subdominio ni llamar a la API local.`,
+    archivos: [
+      'apps/web/src/modules/alquileres/datos/origen/index.ts:1',
+      'apps/web/src/modules/alquileres/datos/origen/demo.ts:1',
+      'apps/web/src/modules/alquileres/datos/origen/api.ts:58',
+      'apps/web/src/modules/alquileres/datos/origen/mapear.ts:256',
+      'apps/web/src/modules/alquileres/datos/origen/__tests__/mapear.test.ts:1',
+      'apps/web/src/modules/alquileres/admin/Panel.tsx:79',
+      'apps/web/src/pages/panel/alquileres.tsx:1',
+    ],
+  }),
+  entrada({
+    modulo: 'alquileres', fecha: F18, slug: 'negocios-de-prueba', tipo: 'tarea', quien: 'Alan',
+    titulo: 'Un negocio de prueba por modo de Alquileres en la base de dev',
+    foco: 'pnpm seed:alquileres-prueba arma en dev canchas-prueba, salones-prueba y cabanas-prueba, con su config de Alquileres, bloqueos y reservas en todos los estados alrededor de hoy. Solo corre contra dev y se puede repetir.',
+    que: `Tarea del 05/11 del plan, hecha el 18/11. El plan pedía un negocio con una cancha; como cada negocio tiene un solo modo, son tres:
+
+| Negocio | Subrubro | Qué tiene |
+|---|---|---|
+| \`canchas-prueba\` | canchas | 4 canchas por hora con extras, unas 800 reservas (60 días atrás y 45 adelante: el panel las trae de a 100 y la API limita a 60 pedidos por minuto) |
+| \`salones-prueba\` | salon-cumples | 2 salones por bloque con 2 paquetes cada uno (servicios del salón), unas 220 reservas |
+| \`cabanas-prueba\` | cabana | 3 propiedades por noche (check-in 14:00, check-out 10:00, dos noches mínimas), unas 75 estadías |
+
+- Reservas entre 90 días atrás y 90 adelante (canchas, menos), sin pisarse, con seña del 30 %: las pasadas completadas, algunas ausentes o canceladas; las que vienen confirmadas, pendientes o canceladas. No hay retenidas ni vencidas.
+- Un par de bloqueos por negocio (uno de todo el negocio en canchas y salones, uno por propiedad en cabañas).
+- **Para entrar:** \`dueno@<slug>.invalid\`, con la contraseña de \`ALQUILERES_PRUEBA_PASSWORD\` del \`.env\` local de \`apps/api\` (no se imprime ni se commitea).
+- **Verificado:** el seed corrido dos veces contra dev con los mismos números, y login como los tres dueños con las rutas del panel respondiendo.`,
+    archivos: [
+      'apps/api/prisma/seed-alquileres-prueba.ts:1',
+      'apps/api/package.json:22',
+      'apps/web/src/pages/panel/alquileres.tsx:1',
+    ],
+  }),
+  entrada({
+    modulo: 'alquileres', fecha: F18, slug: 'estadia-para-el-dueno-chico', tipo: 'decisión', quien: 'Alan',
+    titulo: 'La estadía apunta al dueño chico: Airbnb por calendario y CSV, Google Maps, seña online y estadísticas',
+    foco: 'Para la cabaña o el depto chico (Iguazú y lugares así), un solo panel que junta lo que entra por WhatsApp, Airbnb y el sitio propio, sin channel managers ni Booking. Airbnb no tiene API abierta: va por calendario .ics y el CSV de ganancias.',
+    que: `Alan definió el 18/11 hacia dónde va el modo estadía, con una investigación de qué permiten Airbnb y Google. Es lo nuevo que se suma al plan del ciclo (que solo pedía llevar la estadía al backend), así que el cuándo lo ve Ale.
+
+- **Airbnb no tiene API abierta:** solo la usan unas 40 empresas aprobadas, sin admisión abierta. Desde Órbita no se pueden subir fotos, cambiar precios ni leer mensajes de Airbnb. Sí se puede, como cualquier anfitrión: sincronizar el calendario \`.ics\` en las dos direcciones e importar el CSV de ganancias.
+- **Google Business Profile sí tiene API:** fotos, reseñas (leer y responder) y métricas (vistas, llamadas, clics al sitio, "cómo llegar"). Pide que Órbita solicite el acceso una vez (unas dos semanas de revisión) y que cada dueño conecte su ficha. Aparecer en el buscador de alojamientos de Google con precio no se puede: no acepta dueños individuales.
+- **Mercado Pago** ya está conectado por negocio en Ventas: la seña online reusa eso.`,
+    decision: 'La estadía es para el dueño chico y se arma sobre la demo de Alquileres. Airbnb: calendario sincronizado en las dos direcciones y el CSV de ganancias importado; las fotos y precios de Airbnb se siguen editando en Airbnb, y una estadía de Airbnb nunca se carga a mano como reserva. Google Maps: fotos, reseñas y métricas desde el panel, como pieza común de Órbita. Sitio propio: seña online con Mercado Pago; sin Mercado Pago, seña por transferencia que el dueño registra, y una reserva con la seña sin pagar la libera el dueño (no vence sola). Estadísticas: ocupación, ingresos, precio promedio por noche y de dónde vienen las reservas, junto a los números de Google. Fuera: channel managers, Booking y el buscador de alojamientos de Google.',
+    porque: 'Un depto chico en Iguazú no está en Booking: como mucho en Airbnb y en Google Maps, y las reservas le llegan por WhatsApp. Un intermediario certificado (lo único que permite manejar Airbnb por API) cobra por propiedad y por mes, y se come el margen de un dueño chico; lo que más le importa, no reservar dos veces lo mismo y ver sus números, sale con lo gratis. La seña la libera el dueño porque un vencimiento automático puede borrar la reserva de alguien que transfirió y el dueño no lo registró a tiempo. Alan pidió que el resto de las decisiones de diseño las tome Claude con sus recomendaciones; están marcadas así en el documento de diseño.',
+    archivos: [
+      'apps/web/src/modules/alquileres/admin/configuracion/Calendarios.tsx:1',
+      'apps/web/src/lib/reservas/ics.ts:1',
+      'apps/api/src/mercadopago/mercadopago.service.ts:388',
+      'apps/api/src/reservas/reservas.service.ts:100',
+    ],
+  }),
+  entrada({
+    modulo: 'turnos', fecha: F19, slug: 'servicios-sobre-la-api', tipo: 'tarea', quien: 'Mateo',
+    titulo: 'Servicios del panel de Turnos guarda en la API: crear, editar, pausar y borrar',
+    foco: 'Es la primera sección del panel que escribe en el backend. En el panel de un negocio real, crear, editar, pausar, reanudar y borrar un servicio va a /reservas/servicios, y el panel cambia recién cuando la API dice que sí. Si dice que no (un nombre repetido, sin permiso), el aviso muestra su mensaje y nada cambia. En /turnos-demo todo sigue igual.',
+    que: `Tarea del 09/11 del plan, hecha el 19/11.
+
+**El origen guarda** (\`datos/origen/index.ts\`). \`OrigenTurnos\` suma \`servicios\`: crear, editar y borrar. Pausar es editar con \`pausado\`. Cada escritura devuelve el servicio como quedó guardado, y al crear viene con el id que le dio la API.
+
+- **En la demo** (\`demo.ts\`) el servicio vuelve como vino y queda en el estado del panel. Los pausados se siguen anotando en el navegador, porque es lo que lee el sitio de la demo.
+- **En la API** (\`api.ts\`) va a \`POST\`, \`PUT\` y \`DELETE /reservas/servicios\`, que piden el permiso \`reservas.config\`. Se mandan siempre todos los campos que maneja el panel (nombre, duración, precio, reserva online y activo), así editar no deja nada viejo. Uno nuevo va con \`orden\` al final de la lista: si no, la API lo deja en 0 y aparecía segundo. Borrar es una baja: las reservas ya dadas conservan la foto del servicio.
+
+**El panel espera a la API** (\`PanelTurnos.tsx\`). Guardar, pausar y borrar esperan la respuesta y recién ahí cambian la lista. Si falla, el aviso dice qué no se hizo con el mensaje de la API ("Ya tenés un servicio con ese nombre.") y la lista queda como estaba. La regla de no pausar el único servicio activo sigue antes de llamar a la API.
+
+**Probado contra la API local**, con el negocio de prueba y la sesión del dueño, con los mismos datos que manda el panel:
+
+- crear "Diseño de barba" (queda al final y con la ñ bien guardada);
+- editar duración, precio y reserva online;
+- pausar, que lo saca de la lista del sitio, y reanudar, que lo devuelve;
+- un nombre repetido sin importar mayúsculas, que da 400;
+- borrar, que lo saca también de la lista con los pausados;
+- sin sesión, que da 401.
+
+**Lo que queda para otras tareas:**
+
+- **Qué profesional hace cada servicio** (\`recursoIds\`): va con la tarea de Equipo.
+- **La descripción y reordenar la lista:** el panel no las tiene todavía.
+- **El sitio de Turnos:** sigue con los datos de la demo hasta la semana 4. Lo que el panel guarda ya sale en la lista pública de la API (\`/storefront/:slug/reservas/servicios\`), que es la que va a leer.
+
+**Verificado:** typecheck y eslint de \`apps/web\` sin errores y los tests de Turnos en verde (30, 3 nuevos sobre lo que se manda y lo que vuelve). El panel no se abrió a mano en el navegador.`,
+    archivos: [
+      'apps/web/src/modules/turnos/datos/origen/index.ts:62',
+      'apps/web/src/modules/turnos/datos/origen/demo.ts:51',
+      'apps/web/src/modules/turnos/datos/origen/api.ts:117',
+      'apps/web/src/modules/turnos/datos/origen/mapear.ts:99',
+      'apps/web/src/modules/turnos/datos/origen/__tests__/api.test.ts:49',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:342',
+    ],
+  }),
+  entrada({
+    modulo: 'turnos', fecha: F19, slug: 'equipo-y-espacios-sobre-la-api', tipo: 'tarea', quien: 'Mateo',
+    titulo: 'Equipo y Espacios de Turnos guardan sus agendas en la API',
+    foco: 'En el panel de un negocio real, la agenda de quien atiende (Equipo, en los rubros por profesional) y cada cabina o consultorio (Espacios, por sala) se guardan en /reservas/recursos, con sus días y su horario propio. La disponibilidad del sitio lo respeta en el acto. Lo que la API todavía no guarda (el email, el teléfono, cómo cobra cada uno, los roles y quien no atiende) queda en el panel, y el aviso lo dice.',
+    que: `Tareas del 10/11 (Equipo) y del 11/11 (Espacios) del plan, hechas juntas el 19/11 porque las dos son agendas de la misma ruta.
+
+**El origen guarda agendas** (\`datos/origen/index.ts\`, \`agendas\`): crear, editar y borrar, con el rubro (dice si es PROFESIONAL o ESPACIO) y la semana del negocio. En la demo la agenda vuelve como vino; en la API va a \`POST\`, \`PUT\` y \`DELETE /reservas/recursos\`.
+
+**Cómo se traduce una agenda** (\`mapear.ts\`):
+
+- **El horario:** si atiende todos los días que abre el negocio y sin horario propio, va \`null\`. Así un cambio de horario del negocio le llega sola. Si no, va día por día lo que de verdad atiende: el horario del negocio recortado a sus días y a su horario propio. El panel lo vuelve a leer igual.
+- **El rol, el color y el rol del equipo** van en \`datos\` (\`rol\`, \`color\`, \`rolId\`), porque la API no los tiene como campos. Al recargar, cada persona vuelve con su rol (aprendiz, colorista, dueño) si es uno de fábrica; si no, como "Profesional".
+- **Lo que no se manda al editar:** \`orden\` ni \`memberId\`, así quedan como estaban. Una agenda nueva va al final de la lista.
+
+**El panel espera a la API** (\`PanelTurnos.tsx\`), igual que en Servicios:
+
+- **Sumar o editar a alguien que atiende** guarda su agenda y recién ahí lo muestra.
+- **Sacarle la agenda o sacarlo del equipo** borra su agenda. Si tiene turnos por delante, la API no deja: el aviso dice cuántos ("Tiene 70 reservas por delante. Movelas o cancelalas antes de borrarlo.") y nada cambia.
+- **Cambiarle el nombre a un rol** actualiza el rótulo en las agendas de quienes lo tienen.
+- **Espacios:** crear, editar y borrar un espacio va por el mismo camino.
+
+**Lo que queda en el panel** (faltante 4 del mapa: las cuentas del equipo): el email, el teléfono, cómo cobra cada uno, los roles propios y la gente que no atiende (recepción, encargados). Con la API, el aviso al guardar lo dice: "Su agenda quedó guardada. La invitación y sus datos llegan con las cuentas del equipo.", o "Por ahora queda solo en este panel…" para quien no atiende. En la demo los avisos son los de siempre.
+
+**El negocio de prueba** ahora guarda el rol del equipo en cada agenda: la primera es la del dueño.
+
+**Probado contra la API local**, con el negocio de prueba y los mismos datos que manda el panel:
+
+- **Sumar a alguien con el horario del negocio:** su agenda queda sin horario propio, al final y con su rol en \`datos\`. El sitio le ofrece 16 franjas el martes (de 9 a 19:30).
+- **Pasarlo a "martes y jueves de 16 a 20":** el martes quedan 8 franjas, desde las 16, y el miércoles aparece cerrado.
+- **Borrar una agenda con turnos por delante:** la API la rechaza con su mensaje.
+- **Borrar una agenda sin turnos:** se borra, y el sitio deja de ofrecerla.
+- **Espacios:** un espacio (ESPACIO) se crea y se borra.
+- **Sin sesión:** la API rechaza el pedido.
+
+**Lo que no entra en esta tarea:**
+
+- **Qué servicios hace cada profesional** (\`recursoIds\` del servicio): el panel todavía no tiene dónde elegirlo.
+- **Pausar a alguien sin sacarle la agenda:** tampoco tiene botón. Hoy se le cambian los días que atiende.
+- **Un horario distinto en cada día:** sigue sin entrar, porque el panel maneja un solo horario por agenda.
+
+**Verificado:** typecheck y eslint de \`apps/web\` sin errores y los tests de Turnos en verde (33, 3 nuevos). El panel no se abrió a mano en el navegador.`,
+    archivos: [
+      'apps/web/src/modules/turnos/datos/origen/index.ts:79',
+      'apps/web/src/modules/turnos/datos/origen/mapear.ts:99',
+      'apps/web/src/modules/turnos/datos/origen/mapear.ts:110',
+      'apps/web/src/modules/turnos/datos/origen/api.ts:136',
+      'apps/web/src/modules/turnos/datos/origen/demo.ts:56',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:378',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:411',
+      'apps/web/src/modules/turnos/datos/origen/__tests__/api.test.ts:82',
+      'apps/api/prisma/seed-turnos-prueba.ts:175',
+    ],
+  }),
+  entrada({
+    modulo: 'turnos', fecha: F23, slug: 'horarios-y-feriados-sobre-la-api', tipo: 'tarea', quien: 'Mateo',
+    titulo: 'Horarios, feriados y vacaciones de Turnos guardan en la API',
+    foco: 'En un negocio real, Configuración → Horarios guarda la semana en la config de Turnos, y los feriados, los días con otro horario y las vacaciones como bloqueos. La disponibilidad del sitio cambia en el acto. Quien tiene horario propio se recorta al del negocio, porque la API no los cruza, y si alguien se quedaría sin días no se guarda nada. Los turnos ya dados en un día cerrado no se cancelan: el aviso lo dice.',
+    que: `Tarea del 12/11 del plan, hecha el 23/11.
+
+**La semana** va a \`PUT /reservas/config\`. La API usa el horario propio de una agenda tal cual, sin cruzarlo con el del negocio, y el panel promete que el propio va "dentro" del otro. Entonces, al guardar:
+
+- **Se recortan** día por día las agendas con horario propio. Si el sábado pasa a abrir solo a la mañana, a quien atendía el sábado a la tarde se le saca ese día.
+- **Si alguien se quedaría sin ningún día,** no se escribe nada y el aviso dice quién y qué hacer. La API no acepta una agenda sin días.
+- **El recorte no vuelve solo:** si después el negocio agranda el horario, esa agenda hay que volver a abrirla desde Equipo. Resolverlo de fondo es cruzar los dos horarios en la disponibilidad, que es código compartido: queda para hablar con Ale.
+
+**Feriados y vacaciones** van a \`/reservas/bloqueos\`, sin recurso (tapan a todas las agendas):
+
+| En la pantalla | En la API |
+|---|---|
+| Cerrado | Un bloqueo de 00:00 a 24:00 |
+| Otro horario | Dos bloqueos: lo de antes y lo de después de ese horario |
+| Vacaciones | Un bloqueo de varios días, con el aviso en el motivo (marca \`Vacaciones · \`) |
+
+- **"Otro horario" solo achica.** Un bloqueo saca horas, no agrega: tiene que estar dentro de lo que abre ese día, y un día cerrado no se puede abrir así. El panel lo avisa antes de guardar.
+- **Se reemplaza solo lo que cambió,** creando primero y borrando después: si algo falla en el medio, sobra un cierre en lugar de quedar abierto un feriado. En ese caso la pantalla vuelve a traer lo guardado.
+- **Los bloqueos que no tienen una de estas formas** (de un solo recurso, un rato suelto) no se muestran ni se tocan.
+- **Los turnos ya dados** en un día que se cierra no se cancelan. El aviso dice que hay que moverlos o cancelarlos desde la Agenda.
+
+**En la demo** no cambia nada: la semana sigue en el navegador y los días especiales en memoria.
+
+**Probado contra la API local**, con el código real del panel y el negocio de prueba:
+
+- **Sábado solo a la mañana:** Martín pasa de 16 a 8 franjas. Nico, que atendía de 16 a 20, queda de lunes a viernes y el sábado cerrado.
+- **Un horario que dejaría a Nico sin días:** no se guarda, el aviso lo nombra y la config queda intacta.
+- **Feriado:** el martes queda sin franjas.
+- **Otro horario de 10 a 12:** el miércoles quedan 4 franjas, de 10:00 a 11:30.
+- **Vacaciones de tres días:** sin franjas.
+- **Al volver a leer** aparecen igual, y guardar sin cambios no toca los bloqueos.
+- **Quitar el feriado y las vacaciones** devuelve las 16 franjas.
+
+**Lo que queda para otras tareas:**
+
+- **El aviso de vacaciones en el sitio:** la API pública no expone los bloqueos. Se resuelve con el sitio, en la semana 4.
+- **La agenda del panel** todavía no pinta los feriados ni avisa cuáles turnos caen adentro: va con la tarea de la agenda.
+
+**Verificado:** typecheck y eslint de \`apps/web\` sin errores y los tests de Turnos en verde (45, 12 nuevos). El panel no se abrió a mano en el navegador.`,
+    archivos: [
+      'apps/web/src/modules/turnos/admin/configuracion/Horarios.tsx:95',
+      'apps/web/src/modules/turnos/admin/configuracion/Horarios.tsx:180',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:603',
+      'apps/web/src/modules/turnos/datos/origen/index.ts:105',
+      'apps/web/src/modules/turnos/datos/origen/api.ts:146',
+      'apps/web/src/modules/turnos/datos/origen/mapear.ts:82',
+      'apps/web/src/modules/turnos/datos/origen/mapear.ts:142',
+      'apps/web/src/modules/turnos/datos/origen/mapear.ts:207',
+      'apps/web/src/modules/turnos/datos/origen/__tests__/horarios.test.ts:1',
+    ],
+  }),
+  entrada({
+    modulo: 'turnos', fecha: F23, slug: 'reglas-sobre-la-api', tipo: 'tarea', quien: 'Mateo',
+    titulo: 'Reglas de reserva de Turnos guardan en la API',
+    foco: 'En un negocio real, Reglas de reserva lee y guarda en la config de Turnos lo que la API ya sabe aplicar: anticipación, margen, confirmación, seña en porcentaje, cancelación, reprogramación, tope por persona y lista de espera. Una reserva del sitio las respeta en el acto. Lo que la API no tiene (la grilla, la seña fija, elegir profesional, la tolerancia, los datos pedidos, la cuenta de clientes) queda sin guardar, y la pantalla lo dice. Con esto se cierra la semana 2 del plan.',
+    que: `Tarea del 13/11 del plan, hecha el 23/11.
+
+**Qué se guarda en la API** (\`PUT /reservas/config\`, sin tocar el horario):
+
+| En la pantalla | En la config |
+|---|---|
+| Anticipación mínima y máxima | \`anticipacionMinimaMinutos\`, \`anticipacionMaximaDias\` |
+| Margen entre turnos | \`margenMinutos\` |
+| Confirmación | \`confirmacion\` |
+| Seña en porcentaje | \`senaPorcentaje\` (sin seña es 0) |
+| Se cancela sin cargo | \`cancelacionHastaHoras\` |
+| Reprogramar: hasta cuándo y cuántas veces | \`reprogramacionHastaHoras\`, \`reprogramacionesMaximas\` (sin reprogramar es 0) |
+| Turnos activos por persona | \`maximoActivasPorCliente\` |
+| Lista de espera | \`listaDeEspera\` |
+
+**Lo que todavía no se guarda** (faltante 2 del mapa, lo decide Ale): cada cuánto arrancan los horarios, la seña de monto fijo, pedir seña a quien faltó, elegir profesional y "Cualquiera", el tiempo para aceptar un lugar de la lista de espera, qué pasa con la seña fuera de plazo, la tolerancia, los datos del paciente y la cuenta de clientes. Con la API:
+
+- La barra de guardar y el aviso dicen qué no se guarda.
+- La seña de monto fijo no deja guardar, porque el sitio cobraría otra cosa.
+- Estos valores no se escriben en el navegador, para que un negocio real no se mezcle con la demo.
+
+**Alcance en salud** (decisión del 15/11): "Motivo de la consulta" ahora arranca apagado en los 11 rubros de salud, también en la demo, y su ayuda pide que no se escriba un diagnóstico.
+
+**Probado contra la API local**, con el código real del panel y el negocio de prueba:
+
+- **Guardar** anticipación de 2 días a 21, margen, seña del 30%, confirmación manual, sin reprogramar y sin lista de espera: la config pública del sitio las muestra y el horario no cambia.
+- **Retener para mañana:** rechazado ("Hay que reservar con al menos 2 días de anticipación.").
+- **Retener a 30 días:** rechazado ("Se puede reservar hasta 21 días adelante.").
+- **Retener a 17 días:** entra, con precio de $12.000 y seña de $3.600.
+- **Al terminar** se restauraron las reglas originales y se volvió a sembrar el negocio.
+
+**Verificado:** typecheck y eslint de \`apps/web\` sin errores y los tests de Turnos en verde (48, 3 nuevos). El panel no se abrió a mano en el navegador.`,
+    archivos: [
+      'apps/web/src/modules/turnos/admin/configuracion/Reservas.tsx:82',
+      'apps/web/src/modules/turnos/datos/origen/mapear.ts:254',
+      'apps/web/src/modules/turnos/datos/origen/index.ts:115',
+      'apps/web/src/modules/turnos/datos/origen/api.ts:186',
+      'apps/web/src/modules/turnos/datos/origen/__tests__/reglas.test.ts:1',
+    ],
+  }),
+
+  // ─── Alquileres en producción (Alan, 23/11) ─────────────────────────────────
+  entrada({
+    modulo: 'alquileres', fecha: F23, slug: 'demo-en-produccion-para-superadmin', tipo: 'tarea', quien: 'Alan',
+    titulo: 'La demo de Alquileres se puede ver en producción, solo como superadmin',
+    foco: 'Las seis páginas de /alquileres-demo dejaron de dar 404 en producción y pasan por una compuerta: en desarrollo se ven sin más; en producción piden sesión de superadmin. Llevan noindex y están fuera de robots.txt.',
+    que: `Etapa 0 del plan para probar Alquileres en producción (\`docs/superpowers/plans/2026-11-23-alquileres-en-produccion.md\`), pedido de Alan del 23/11.
+
+- **La compuerta** (\`modules/alquileres/demo/SoloEquipo.tsx\`): envuelve las seis páginas. En producción (y en staging) usa \`RequireAuth\` de superadmin: sin sesión, el servidor devuelve solo la pantalla de carga y manda al login.
+- **Buscadores:** \`noindex\` en todas y \`/alquileres-demo\` en el \`Disallow\` de \`robots.txt\`.
+- **Cómo entrar:** el botón "Abrir la demo" de esta pantalla (Módulos → Alquileres), o \`/alquileres-demo\`.
+- **Resguardo:** un test recorre \`pages/alquileres-demo\` y falla si una página no pasa por la compuerta.
+- **Verificado:** con un build de producción y en orbita.site sin sesión, el HTML no trae nada de la demo. La entrada con sesión de superadmin no se probó en la sesión de trabajo: la confirma Alan.
+
+Si Turnos o Gimnasio quieren abrir la suya, es la misma pieza.`,
+    archivos: [
+      'apps/web/src/modules/alquileres/demo/SoloEquipo.tsx:1',
+      'apps/web/src/modules/alquileres/demo/acceso.ts:1',
+      'apps/web/src/modules/alquileres/demo/__tests__/acceso.test.ts:1',
+      'apps/web/src/pages/alquileres-demo/panel.tsx:1',
+      'apps/web/src/pages/robots.txt.ts:36',
+    ],
+  }),
+  entrada({
+    modulo: 'alquileres', fecha: F23, slug: 'negocio-real-de-estadia', tipo: 'tarea', quien: 'Alan',
+    titulo: 'El primer negocio real de Alquileres: se crea desde Superadmin y su panel guarda en la API',
+    foco: 'Desde Módulos → Alquileres se crea un negocio de alojamiento por noche (oculto de buscadores, con cortesía). Su dueño entra a <slug>.orbita.site/panel y carga propiedades, precios, reglas, reservas a mano y bloqueos, que se guardan en el motor de reservas. El alta pública sigue en "Próximamente".',
+    que: `Etapa 1 del plan para probar Alquileres en producción, pedido de Alan del 23/11. Ale aprobó tocar \`/panel\` (dato de Alan).
+
+**Crear el negocio** (solo superadmin): \`POST /platform/businesses/alquileres\`. Arma lo mismo que el alta (sucursal, roles con permisos, dueño, configs) con \`industry: "alquileres"\` y el rubro en \`subrubros\`, \`hiddenFromSearch\`, cortesía por un año y la config de reservas con confirmación manual. Queda en el log de superadmin, sin la contraseña. Por ahora, solo rubros de alojamiento por noche.
+
+**Rutas:** \`/panel\` manda a los negocios de Alquileres a \`/panel/alquileres\` (\`lib/reservas/destinoPanel.ts\`); para Tienda no cambia nada. Turnos y Gimnasio pueden sumar su rubro en ese mismo archivo.
+
+**El panel escribe** (\`datos/origen/escribir.ts\` y \`escriturasDe\` en \`api.ts\`):
+
+| Sección | Qué guarda |
+|---|---|
+| Propiedades | Crear, editar y quitar recursos \`ALOJAMIENTO\` |
+| Precios | El precio por noche de cada propiedad |
+| Reglas de reserva | Plazo de cancelación, noches mínimas, entrada y salida |
+| Pagos y señas | Porcentaje de seña y si se devuelve |
+| Calendario | Reserva a mano (con "ya pagó la seña"), registrar seña y saldo, confirmar, marcar realizada y cancelar |
+| Bloqueos | Bloquear y liberar fechas |
+
+Después de cada escritura el panel vuelve a cargar; si la API rechaza algo (noches recién tomadas, fechas bloqueadas), muestra su mensaje en vez de "guardado".
+
+**Lo que el panel real todavía no muestra:** Mensajes, Calendarios (.ics), Configuración y Equipo, alquiler por mes, temporadas, recargo de fin de semana, limpieza y la carga de fotos (va una de ejemplo). El precio es fijo por noche porque es lo que el servidor calcula hoy; lo demás llega con los cambios del motor. Canchas y salones siguen en la demo.
+
+**Decisiones de esta etapa:**
+- El dueño entra con la contraseña que elige el superadmin, sin cambio forzado: esa pantalla hoy vive en el panel de Tienda (Mi perfil).
+- Un bloqueo de fechas ocupa lo mismo que una estadía (de la hora de entrada del primer día a la de salida del último): quien sale el día que empieza el bloqueo no choca, y el último día queda libre para que entre otro.
+- El panel real usa el día de hoy; la demo sigue con su día fijo.
+
+**Verificado:** tests del front (1.392) y de la API en verde; contra la base de dev, un negocio creado con el servicio y, como su dueño, todas las escrituras del panel por la API (propiedad, config, reserva de 3 noches a $270.000 con seña de $135.000, 409 al pisar noches, pago, confirmar, bloqueo, cancelar). En local, con un Chrome sin ventana a 390 px: el dueño entra, \`/panel\` lo lleva a \`/panel/alquileres\`, agrega una propiedad, ve "Cambios guardados" y la propiedad sigue ahí al recargar. En producción lo prueba Alan.`,
+    archivos: [
+      'apps/api/src/platform/negocios-alquileres.service.ts:1',
+      'apps/api/src/platform/platform.controller.ts:222',
+      'apps/api/test/unit/platform.negocio-alquileres.unit-spec.ts:1',
+      'apps/web/src/modules/superadmin/CrearNegocioAlquileres.tsx:1',
+      'apps/web/src/lib/reservas/destinoPanel.ts:1',
+      'apps/web/src/pages/panel/alquileres.tsx:1',
+      'apps/web/src/modules/alquileres/datos/origen/escribir.ts:1',
+      'apps/web/src/modules/alquileres/datos/origen/api.ts:117',
+      'apps/web/src/modules/alquileres/admin/navegacion.ts:43',
+    ],
+  }),
+  entrada({
+    modulo: 'alquileres', fecha: F23, slug: 'sitio-publico-de-estadia', tipo: 'tarea', quien: 'Alan',
+    titulo: 'El sitio público de un negocio de estadía reserva de verdad',
+    foco: 'En <slug>.orbita.site, un negocio de Alquileres muestra su sitio de reservas en lugar de la tienda: propiedades con su precio y sus noches ocupadas, pedido de reserva sin registrarse y un enlace personal para verla o cancelarla. Todavía no cobra online: la reserva queda pendiente y el dueño la confirma desde el panel cuando recibe la seña.',
+    que: `Etapa 2 del plan para probar Alquileres en producción (\`docs/superpowers/plans/2026-11-23-alquileres-en-produccion.md\`). Solo alojamiento por noche.
+
+**Qué ve cada negocio.** La config pública del sitio (\`GET /storefront/:slug\`) ahora trae el rubro (\`industry\` y \`subrubros\`). Con "alquileres", la portada es el sitio de reservas; con cualquier otro rubro, o si el dato no llegó, la tienda de siempre. \`/reserva\` y \`/mi-reserva/<token>\` dan 404 en un negocio que no es de Alquileres.
+
+**Las pantallas son las de la demo** (\`modules/alquileres/storefront\`), con otro origen de datos y otros links: un contexto (\`rutas.ts\`) le dice a cada una si está en la demo o en un sitio real.
+
+| En el sitio | De dónde sale |
+|---|---|
+| Nombre, logo, WhatsApp y alias | La config pública de la tienda |
+| Seña, cancelación y si confirma el dueño | \`GET .../reservas/config\` |
+| Propiedades | \`GET .../reservas/recursos\` |
+| Noches ocupadas | \`GET .../reservas/disponibilidad/noches\`, hasta un año, en pedidos de 180 días |
+| Reservar | \`POST .../reservas/reservar\`, con una clave por intento |
+| Mi reserva y cancelar | \`GET .../reservas/mi/:token\` y \`POST .../mi/:token/cancelar\` |
+
+El sitio no conoce las reservas de otros: las noches ocupadas entran como bloqueos sin nombre.
+
+**Decisiones de esta etapa:**
+- **Reserva en un paso** (\`reservar\`) y no retener y después confirmar: en una cabaña casi no hay disputa por las fechas, y así no quedan retenciones abandonadas tapando el calendario del dueño. La clave del intento evita duplicar con un doble toque o un reintento; un 409 vuelve a elegir fechas con el calendario al día.
+- **Sin paso de pago.** Todavía no se cobra online: la confirmación dice que el negocio la confirma al recibir la seña y ofrece escribirle por WhatsApp. Si el negocio tiene alias cargado, se muestra.
+- **Sin "Mis reservas".** No hay cuenta: cada reserva se ve con su enlace personal. El navegador recuerda la última para ofrecer "Mi reserva" en el menú.
+- **Cuántos huéspedes vienen va en la nota**, hasta que la reserva tenga dónde guardarlo (etapa 3).
+- El precio es el fijo por noche, igual que en el panel: es lo que cobra el servidor.
+
+**Lo que todavía no hace:**
+- Cambiar las fechas desde "Mi reserva": la disponibilidad pública no deja excluir la reserva propia, así que por ahora se le pide al negocio.
+- Canchas y salones en el sitio real (siguen en la demo).
+- El aviso de cookies es el de la plataforma y habla de "tienda" y "carrito".
+- El negocio de Alquileres todavía no carga su teléfono ni su alias desde su panel: sin esos datos, el sitio dice que el negocio se va a comunicar.
+- \`plan.ts\` no cambió: las tareas del 30/11 al 03/12 quedan a medias (falta canchas, salones, reprogramar y revisar los emails).
+
+**De paso:** \`claveDeIntento\` (el cliente compartido de reservas) ya no depende de \`crypto.randomUUID\`, que no existe por http en un subdominio de desarrollo; y el tipo de la respuesta de cancelar estaba mal declarado (\`sena\` es qué pasó con la seña, no un monto). Le sirve también a Turnos y a Gimnasio.
+
+**Verificado:** tests del front y de la API en verde. En local contra la base de dev, con un Chrome sin ventana a 390 px y a 1280 px: portada, ficha, pedido de reserva de 3 noches ($270.000, seña de $135.000) que queda pendiente, "Mi reserva", cancelación y enlace inexistente; un negocio de Tienda sigue mostrando su tienda y da 404 en \`/reserva\`. El email de la reserva no se revisó.`,
+    archivos: [
+      'apps/api/src/storefront/storefront.service.ts:395',
+      'apps/web/src/pages/tienda/[slug]/index.tsx:1',
+      'apps/web/src/pages/tienda/[slug]/reserva.tsx:1',
+      'apps/web/src/pages/tienda/[slug]/mi-reserva/[token].tsx:1',
+      'apps/web/src/lib/storefront/forceSSR.ts:358',
+      'apps/web/src/lib/reservas/destinoPanel.ts:21',
+      'apps/web/src/modules/alquileres/storefront/SitioReal.tsx:1',
+      'apps/web/src/modules/alquileres/storefront/rutas.ts:1',
+      'apps/web/src/modules/alquileres/storefront/MiReserva.tsx:1',
+      'apps/web/src/modules/alquileres/datos/origen/sitio.ts:1',
+      'apps/web/src/modules/alquileres/datos/origen/mapear.ts:348',
+      'apps/web/src/lib/reservasApi/cliente.ts:41',
+    ],
+  }),
+  entrada({
+    modulo: 'alquileres', fecha: F23, slug: 'motor-precio-de-estadia-y-campos-libres', tipo: 'tarea', quien: 'Alan',
+    titulo: 'El motor de reservas cobra la estadía por temporada y guarda lo propio de cada módulo',
+    foco: 'Tres cambios en el motor que comparten Turnos, Alquileres y Gimnasio: una estadía se cobra noche por noche (temporadas, recargo de viernes y sábado, limpieza); la reserva y la config tienen un campo libre `datos`; y bloquear fechas pide gestionar reservas, no configurarlas. En Alquileres vuelve Temporadas y precios, y el dueño carga el WhatsApp y el alias para coordinar la seña.',
+    que: `Etapa 3 del plan para probar Alquileres en producción. Son los puntos 3 (solo la estadía), 4 y 7 de la decisión "lo que Alquileres le pide al backend compartido", aprobados por Ale según Alan (23/11).
+
+**1. El precio de una estadía, en el servidor** (\`dominio/estadia.ts\`). Es la misma cuenta que \`apps/web/src/lib/reservas/estadia.ts\`, con los mismos casos de prueba:
+
+- Cada noche vale el precio del recurso o el de su temporada; si dos temporadas se pisan, manda la más corta.
+- Viernes y sábado llevan el recargo, redondeado a los cien.
+- La limpieza se suma una vez por estadía.
+- La tarifa se lee de \`datos.tarifa\` del recurso, con cuidado: una temporada sin fechas o con precio negativo no se aplica.
+- **Sin tarifa cargada, un alojamiento vale lo de antes** (precio por noches). Canchas, salones, turnos y clases no cambian.
+
+**2. Campo libre \`datos\`** en \`Reserva\` y en \`ReservaConfig\` (migración \`20261124120000_reservas_datos\`: dos columnas opcionales, sin default). El motor lo guarda sin interpretar.
+
+| Dónde | Tope | Quién lo ve |
+|---|---|---|
+| Reserva (\`datos\` del pedido) | 2.000 caracteres: también llega desde el sitio | El panel y quien tiene el enlace de la reserva |
+| Config (\`PUT /reservas/config\`) | 20.000 caracteres | El panel entero; el sitio, solo lo que esté en \`datos.publico\` (sale como \`publico\`) |
+
+**3. Bloqueos:** \`POST\` y \`DELETE /reservas/bloqueos\` piden \`reservas.manage\` en lugar de \`reservas.config\`, para que un encargado pueda cerrar un día.
+
+**Qué usa Alquileres de esto:**
+- **Temporadas y precios** vuelve al panel real con todo: precio base, fin de semana, limpieza y temporadas. El sitio muestra el detalle noche por noche y el total coincide con el de la reserva.
+- **Pagos y señas** suma "Para coordinar la seña": WhatsApp para reservas, alias y titular. Van a \`datos.publico\` de la config, y el sitio los muestra en la confirmación y en "Mi reserva".
+- **Cuántos huéspedes vienen** va en \`datos\` de la reserva (\`{ huespedes, canal }\`), ya no mezclado en la nota.
+
+**Para Turnos y Gimnasio:** no tienen que hacer nada. Si quieren usar \`datos\`, ya está en \`lib/reservasApi/tipos.ts\` (\`Config.datos\`, \`ConfigPublica.publico\`, \`Reserva.datos\`, \`Pedido.datos\`).
+
+**Lo que quedó afuera:** precios por horario de canchas, alquiler por mes, cambiar las fechas desde "Mi reserva", calendarios externos y seña online. Una reserva con precio puesto a mano que se reprograma se recalcula con la tarifa, como ya pasaba.
+
+**Verificado:** tests de la API y del front en verde. Contra la base de dev, por la API: viernes a lunes da $316.000 (dos noches con 20 % de recargo, una base y $10.000 de limpieza) con seña de $158.000; dos noches en temporada, $310.000; los dos topes rechazan; lo interno de la config no sale al sitio. En pantalla, con un Chrome sin ventana: el panel guarda el alias y sigue ahí al recargar, y el sitio muestra el mismo total y el alias en la confirmación. El permiso nuevo de bloqueos no se probó con un encargado real.`,
+    archivos: [
+      'apps/api/src/reservas/dominio/estadia.ts:1',
+      'apps/api/src/reservas/dominio/estadia.spec.ts:1',
+      'apps/api/src/reservas/reservas.service.ts:165',
+      'apps/api/prisma/migrations/20261124120000_reservas_datos/migration.sql:1',
+      'apps/api/src/reservas/dto/comunes.dto.ts:15',
+      'apps/api/src/reservas/reservas.types.ts:174',
+      'apps/api/src/reservas/reservas-panel.controller.ts:116',
+      'apps/api/src/reservas/README.md:72',
+      'apps/web/src/lib/reservasApi/tipos.ts:53',
+      'apps/web/src/modules/alquileres/datos/origen/escribir.ts:60',
+      'apps/web/src/modules/alquileres/admin/configuracion/Pagos.tsx:64',
+    ],
+  }),
+  entrada({
+    modulo: 'alquileres', fecha: F24, slug: 'prueba-en-produccion-de-estadia', tipo: 'tarea', quien: 'Alan',
+    titulo: 'Prueba en producción de Alquileres: de crear el negocio a cancelar una reserva',
+    foco: 'El recorrido completo de un alojamiento por noche funciona en producción, con un negocio de prueba (prueba-alquileres, oculto de buscadores). Apareció un error: el panel mostraba un código de reserva distinto al que recibe el huésped. Quedó corregido.',
+    que: `Hecha en producción el 24/11, con la sesión de superadmin de Alan y un negocio creado para la prueba.
+
+| Paso | Resultado |
+|---|---|
+| \`/alquileres-demo\` con sesión de superadmin | Abre el panel y el sitio de ejemplo |
+| Crear el negocio desde Módulos → Alquileres | Creado; el dueño entra y llega a \`/panel/alquileres\` |
+| Cargar una propiedad | Guardada, sigue ahí al recargar |
+| Temporadas y precios: $90.000, +20 % el fin de semana, $10.000 de limpieza y una temporada alta | Guardado |
+| Pagos y señas: WhatsApp, alias y titular | Guardado |
+| Sitio público | Con \`noindex\`, la propiedad, su precio y el pie con el contacto |
+| Reservar de viernes a lunes | Total $316.000 y seña $94.800 (30 %), igual en el sitio y en el panel |
+| Confirmación y "Mi reserva" | Con el alias, el botón de WhatsApp, los huéspedes y la nota |
+| El enlace con la forma de los emails (\`/mi-reserva/<token>\`) | Abre la misma reserva |
+| Registrar la seña en el panel | La reserva pasa a confirmada; el huésped lo ve |
+| Cancelar desde "Mi reserva" | Cancelada, con "te devuelven la seña" |
+
+**Lo que apareció:**
+- **El código de la reserva no coincidía:** el huésped recibió uno y el panel mostraba otro, armado con el id interno. Ahora el panel usa el código de la API (\`codigoDe\`).
+- **Guardar tarda unos segundos y el panel no decía nada** mientras tanto: ahora avisa "Guardando…".
+- La ficha de una reserva futura ofrece "Marcar realizada" (el servidor lo rechaza hasta que pase la fecha). Queda anotado.
+- El aviso de cookies sigue hablando de "tienda" y "carrito".
+
+**No se probó:** el email de la reserva (se reservó sin email), el permiso de bloqueos con un encargado y el celular (la prueba fue en escritorio; en dev se había probado a 390 px).
+
+El negocio de prueba queda creado, con una propiedad y sin reservas activas.`,
+    archivos: [
+      'apps/web/src/modules/alquileres/datos/index.ts:775',
+      'apps/web/src/modules/alquileres/datos/origen/mapear.ts:199',
+      'apps/web/src/modules/alquileres/admin/Reservas.tsx:522',
+      'apps/web/src/modules/alquileres/admin/Panel.tsx:183',
     ],
   }),
 ]

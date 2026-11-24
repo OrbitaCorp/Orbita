@@ -39,8 +39,11 @@ import { ESTADO_AYUDA_VACIO, POSPONER_MS, guardarAyuda, leerAyuda, type EstadoAy
 import { AvisoChico, EstilosAyuda, Tarjeta } from './piezas'
 import Recorrido from './Recorrido'
 import { EVENTO_ABRIR_AYUDA } from './AyudaBoton'
+import { EVENTO_ABRIR_NOVEDADES } from './NovedadesBoton'
 import Foco from './Foco'
 import EleccionTutorial from './EleccionTutorial'
+import ModalNovedades from './ModalNovedades'
+import { NOVEDADES, indiceInicialNovedades, novedadesSinVer, novedadesVigentes, type Novedad } from './novedades'
 
 // Mientras hay un paso a medias se vuelve a preguntar cada tanto: crear la
 // categoría o el producto no cambia de ruta, y el cierre tiene que aparecer
@@ -75,6 +78,13 @@ export default function AyudaHost() {
     const [confirmando, setConfirmando] = useState<Sugerencia | null>(null)
     // Tutorial que la persona pidió con una sugerencia: se abre al llegar a su pantalla.
     const [pedida, setPedida] = useState<string | null>(null)
+    // Modal de novedades del panel (carrusel compacto).
+    const [novedadesAbiertas, setNovedadesAbiertas] = useState(false)
+    const [indiceNovedadInicial, setIndiceNovedadInicial] = useState(0)
+    // Las vigentes al momento de abrir (ver novedadesVigentes). Quedan fijas
+    // mientras el modal está abierto: leer una no la saca de la lista ahí mismo.
+    const [novedadesMostradas, setNovedadesMostradas] = useState<readonly Novedad[]>([])
+    const novedadesAutoYa = useRef(false)
 
     const path = router.asPath.split(/[?#]/)[0]
     const segmentos = path.split('/').filter(Boolean)
@@ -254,7 +264,8 @@ export default function AyudaHost() {
         setHojaAbierta(false)
     }, [clave])
 
-    const libre = esMember && listoParaAviso && primeros.tipo === 'nada' && !eleccionVisible && !!modulo
+    const hayNovedadesPendientes = esAdmin && seccion === 'dashboard' && !!ayuda && novedadesSinVer(ayuda.novedadesVistas).length > 0
+    const libre = esMember && listoParaAviso && primeros.tipo === 'nada' && !eleccionVisible && !!modulo && !novedadesAbiertas && !hayNovedadesPendientes
     const ofrecer = libre && !ayuda?.vistos.includes(clave)
     // Pidió este tutorial desde una sugerencia: se abre directo, sin preguntarle de nuevo.
     const pedidaAqui = libre && pedida === clave
@@ -308,11 +319,65 @@ export default function AyudaHost() {
         return () => window.removeEventListener(EVENTO_ABRIR_AYUDA, abrir)
     }, [])
 
+    // ── Novedades del panel ──
+    // Se abren automáticamente 1 vez por actualización al entrar a Inicio
+    // (dashboard) cuando no hay primeros pasos activos, y se pueden reabrir
+    // desde el botón compacto del encabezado en cualquier momento.
+    // Leída = su diapositiva se mostró (la avisa ModalNovedades). Desde ahí la
+    // novedad sigue 3 días y se va (ver novedades.ts).
+    const marcarNovedadLeida = useCallback((id: string) => {
+        actualizarAyuda(a => {
+            if (typeof a.novedadesLeidasEn[id] === 'number') return a
+            return {
+                ...a,
+                novedadesVistas: a.novedadesVistas.includes(id) ? a.novedadesVistas : [...a.novedadesVistas, id],
+                novedadesLeidasEn: { ...a.novedadesLeidasEn, [id]: Date.now() },
+            }
+        })
+    }, [actualizarAyuda])
+
+    // Abre el modal con las vigentes, parado en la primera sin leer.
+    const abrirConVigentes = useCallback((a: { novedadesVistas: string[]; novedadesLeidasEn: Record<string, number> }) => {
+        const vigentes = novedadesVigentes(a, Date.now())
+        if (vigentes.length === 0) return false
+        setNovedadesMostradas(vigentes)
+        setIndiceNovedadInicial(indiceInicialNovedades(a.novedadesVistas, vigentes))
+        setNovedadesAbiertas(true)
+        return true
+    }, [])
+
+    const mostrarNovedadesAuto = hayNovedadesPendientes && listoParaAviso && primeros.tipo === 'nada' && !eleccionVisible
+        && !novedadesAbiertas && !hojaAbierta && !eligiendo && !confirmando
+
+    useEffect(() => {
+        if (!mostrarNovedadesAuto || !ayuda || novedadesAutoYa.current) return
+        // Una sola vez por visita: si la cierra sin pasar por todas, las que
+        // quedaron sin leer siguen en el botón y vuelven a abrirse en la
+        // próxima visita a Inicio, no apenas cierra.
+        novedadesAutoYa.current = true
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        abrirConVigentes(ayuda)
+    }, [mostrarNovedadesAuto, ayuda, abrirConVigentes])
+
+    useEffect(() => {
+        if (!esAdmin || NOVEDADES.length === 0) return
+        const abrirNovedades = () => {
+            setHojaAbierta(false)
+            setAvisoCerrado(true)
+            setSugerencia(null)
+            setEligiendo(null)
+            setConfirmando(null)
+            abrirConVigentes(ayudaRef.current ?? { novedadesVistas: [], novedadesLeidasEn: {} })
+        }
+        window.addEventListener(EVENTO_ABRIR_NOVEDADES, abrirNovedades)
+        return () => window.removeEventListener(EVENTO_ABRIR_NOVEDADES, abrirNovedades)
+    }, [esAdmin, abrirConVigentes])
+
     // ── Sugerencias ──
     // Solo a quien ya terminó los primeros pasos y no tiene nada más en pantalla.
-    const avisoVisible = avisada === clave && !avisoCerrado && !hojaAbierta
+    const avisoVisible = avisada === clave && !avisoCerrado && !hojaAbierta && !novedadesAbiertas
     const puedeSugerir = esAdmin && !!ayuda && cumplidas !== null && pasoInicial(cumplidas) === 'listo'
-        && primeros.tipo === 'nada' && !eleccionVisible && !avisoVisible && !hojaAbierta && !confirmando && !eligiendo
+        && primeros.tipo === 'nada' && !eleccionVisible && !avisoVisible && !hojaAbierta && !confirmando && !eligiendo && !novedadesAbiertas
     useEffect(() => {
         if (!puedeSugerir || sugerencia || !cumplidas) return
         // En la prueba no se espera 25 segundos ni se respeta el intervalo entre sugerencias.
@@ -369,6 +434,18 @@ export default function AyudaHost() {
             onCerrar={() => setEligiendo(null)}
         />
     )
+    const novedadesNodo = novedadesAbiertas && novedadesMostradas.length > 0 && (
+        <ModalNovedades
+            novedades={novedadesMostradas}
+            indiceInicial={indiceNovedadInicial}
+            onLeida={marcarNovedadLeida}
+            onCerrar={() => setNovedadesAbiertas(false)}
+            onIrA={(destino, query) => {
+                setNovedadesAbiertas(false)
+                ir(destino, query)
+            }}
+        />
+    )
 
     // ── Primeros pasos ──
     if (primeros.tipo === 'tira') {
@@ -409,6 +486,7 @@ export default function AyudaHost() {
                 )}
                 {recorridoNodo}
                 {eleccionNodo}
+                {novedadesNodo}
             </>
         )
     }
@@ -419,20 +497,23 @@ export default function AyudaHost() {
         return (
             <>
                 <EstilosAyuda />
-                <Tarjeta
-                    pasos={{ actual: c.numero, nombres: NOMBRES_DE_PASOS }}
-                    etiqueta={`Paso ${c.numero} de 2`}
-                    titulo={c.titulo}
-                    texto={c.texto}
-                    boton={c.boton}
-                    onBoton={() => {
-                        ir(SECCION_DEL_PASO[primeros.paso], primeros.paso === 'producto' ? { vista: 'nuevo' } : undefined)
-                        // En el formulario del producto la guía arranca sola; en Categorías primero se señala el botón.
-                        if (primeros.paso === 'producto') encadenar('catalogo/nuevo')
-                    }}
-                    secundario="Más tarde"
-                    onSecundario={() => { setPospuesto(true); actualizarAyuda(a => ({ ...a, pospuestoHasta: Date.now() + POSPONER_MS })) }}
-                />
+                {!novedadesAbiertas && (
+                    <Tarjeta
+                        pasos={{ actual: c.numero, nombres: NOMBRES_DE_PASOS }}
+                        etiqueta={`Paso ${c.numero} de 2`}
+                        titulo={c.titulo}
+                        texto={c.texto}
+                        boton={c.boton}
+                        onBoton={() => {
+                            ir(SECCION_DEL_PASO[primeros.paso], primeros.paso === 'producto' ? { vista: 'nuevo' } : undefined)
+                            // En el formulario del producto la guía arranca sola; en Categorías primero se señala el botón.
+                            if (primeros.paso === 'producto') encadenar('catalogo/nuevo')
+                        }}
+                        secundario="Más tarde"
+                        onSecundario={() => { setPospuesto(true); actualizarAyuda(a => ({ ...a, pospuestoHasta: Date.now() + POSPONER_MS })) }}
+                    />
+                )}
+                {novedadesNodo}
             </>
         )
     }
@@ -441,39 +522,45 @@ export default function AyudaHost() {
         return (
             <>
                 <EstilosAyuda />
-                <Tarjeta
-                    etiqueta="Listo"
-                    titulo="¿Qué querés hacer ahora?"
-                    texto="Ya tenés tu primer producto y tu correo verificado. ¿Querés seguir creando productos o ver cómo personalizar tu página web?"
-                    boton="Seguir creando productos"
-                    onBoton={() => { cerrar(); ir('catalogo', { vista: 'nuevo' }) }}
-                    secundario="Personalizar mi página web"
-                    onSecundario={() => { cerrar(); setPedida('configuracion/apariencia'); ir('configuracion', { vista: 'apariencia' }) }}
-                    terciario="Ahora no"
-                    onTerciario={cerrar}
-                    cerrar={cerrar}
-                />
+                {!novedadesAbiertas && (
+                    <Tarjeta
+                        etiqueta="Listo"
+                        titulo="¿Qué querés hacer ahora?"
+                        texto="Ya tenés tu primer producto y tu correo verificado. ¿Querés seguir creando productos o ver cómo personalizar tu página web?"
+                        boton="Seguir creando productos"
+                        onBoton={() => { cerrar(); ir('catalogo', { vista: 'nuevo' }) }}
+                        secundario="Personalizar mi página web"
+                        onSecundario={() => { cerrar(); setPedida('configuracion/apariencia'); ir('configuracion', { vista: 'apariencia' }) }}
+                        terciario="Ahora no"
+                        onTerciario={cerrar}
+                        cerrar={cerrar}
+                    />
+                )}
+                {novedadesNodo}
             </>
         )
     }
     if (primeros.tipo === 'listo') {
         // Hasta saber si el correo está verificado no se muestra nada: evita un
         // parpadeo del cierre equivocado.
-        if (correoEf === null) return null
+        if (correoEf === null) return novedadesNodo || null
         const cerrar = () => actualizarAyuda(a => ({ ...a, enCurso: false }))
         return (
             <>
                 <EstilosAyuda />
-                <Tarjeta
-                    etiqueta="Listo"
-                    titulo="¡Ya tenés tu primer producto!"
-                    texto="Tu tienda ya tiene algo para mostrar. Último paso: verificá tu correo para poder recuperar tu cuenta si alguna vez perdés el acceso."
-                    boton="Verificar mi correo"
-                    onBoton={() => { actualizarAyuda(a => ({ ...a, enCurso: false, esperaCorreo: true })); ir('perfil') }}
-                    secundario="Después"
-                    onSecundario={cerrar}
-                    cerrar={cerrar}
-                />
+                {!novedadesAbiertas && (
+                    <Tarjeta
+                        etiqueta="Listo"
+                        titulo="¡Ya tenés tu primer producto!"
+                        texto="Tu tienda ya tiene algo para mostrar. Último paso: verificá tu correo para poder recuperar tu cuenta si alguna vez perdés el acceso."
+                        boton="Verificar mi correo"
+                        onBoton={() => { actualizarAyuda(a => ({ ...a, enCurso: false, esperaCorreo: true })); ir('perfil') }}
+                        secundario="Después"
+                        onSecundario={cerrar}
+                        cerrar={cerrar}
+                    />
+                )}
+                {novedadesNodo}
             </>
         )
     }
@@ -495,6 +582,7 @@ export default function AyudaHost() {
             )}
             {recorridoNodo}
             {eleccionNodo}
+            {novedadesNodo}
             {sugerenciaVisible && (
                 <AvisoChico
                     region="Sugerencia de tutorial"

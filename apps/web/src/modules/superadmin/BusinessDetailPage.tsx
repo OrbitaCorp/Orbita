@@ -515,7 +515,10 @@ function GrantCompModal({ businessName, onCancel, onConfirm }: { businessName: s
             setEnviando(true)
             setError('')
             try {
-              await onConfirm({ currentPeriodEnd: new Date(fecha).toISOString(), grantReason: motivo.trim() })
+              // Hasta el final de ese día en Argentina, igual que EditCompModal.
+              // Antes era `new Date(fecha)`: medianoche UTC, o sea las 21 h
+              // del día ANTERIOR en Argentina — la cortesía duraba un día menos.
+              await onConfirm({ currentPeriodEnd: new Date(`${fecha}T23:59:59-03:00`).toISOString(), grantReason: motivo.trim() })
             } catch (err) {
               setError(err instanceof Error ? err.message : 'No se pudo ceder la licencia.')
               setEnviando(false)

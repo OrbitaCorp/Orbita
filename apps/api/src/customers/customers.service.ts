@@ -16,7 +16,7 @@ const MAX_EXPORTACION = 10_000;
 
 // Lo que vale la pena ver en el registro de auditoría de un cliente editado
 // desde el panel (hallazgo `auditoria-acciones-sin-registro`).
-const CAMPOS_AUDITADOS = ['firstName', 'lastName', 'email', 'phone', 'dni'];
+const CAMPOS_AUDITADOS = ['firstName', 'lastName', 'email', 'phone'];
 
 // Tope de mails a clientes por negocio y por día de Argentina (hallazgo
 // `mail-masivo-sin-tope`, BAJA). El DTO ya corta cada POST en 500
@@ -47,7 +47,7 @@ type Metricas = { orderCount: number; totalSpent: number; avgTicket: number; las
 // campos internos en la respuesta).
 const CAMPOS_PUBLICOS = {
   id: true, firstName: true, lastName: true, email: true, phone: true,
-  dni: true, createdAt: true,
+  createdAt: true,
 } as const;
 
 @Injectable()
@@ -99,7 +99,7 @@ export class CustomersService {
 
   // El formato que promete el contrato para cada cliente de la lista.
   private aClienteConMetricas(
-    c: { id: string; firstName: string; lastName: string | null; email: string | null; phone: string | null; dni: string | null; passwordHash: string | null; createdAt: Date },
+    c: { id: string; firstName: string; lastName: string | null; email: string | null; phone: string | null; passwordHash: string | null; createdAt: Date },
     m: Metricas | undefined,
   ) {
     return {
@@ -108,7 +108,6 @@ export class CustomersService {
       lastName: c.lastName,
       email: c.email,
       phone: c.phone,
-      dni: c.dni,
       // Tiene cuenta si alguna vez se registró en la tienda con contraseña.
       hasAccount: c.passwordHash != null,
       orderCount: m?.orderCount ?? 0,
@@ -154,10 +153,7 @@ export class CustomersService {
     const metricas = await this.metricasDe(businessId, clientes.map((c) => c.id));
 
     return {
-      // Sin el DNI: la lista no lo muestra y la ve cualquiera con
-      // customers.view. Sigue en el detalle y en la exportación (auditoría
-      // interna 10/09, ítem web.panel.clientes).
-      data: clientes.map((c) => ({ ...this.aClienteConMetricas(c, metricas.get(c.id)), dni: undefined })),
+      data: clientes.map((c) => this.aClienteConMetricas(c, metricas.get(c.id))),
       total,
       page,
       limit,
@@ -276,7 +272,6 @@ export class CustomersService {
             firstName: dto.firstName,
             lastName: dto.lastName ?? existente.lastName,
             phone: dto.phone ?? existente.phone,
-            dni: dto.dni ?? existente.dni,
           },
           select: CAMPOS_PUBLICOS,
         });
@@ -290,7 +285,6 @@ export class CustomersService {
           lastName: dto.lastName ?? null,
           email: dto.email ?? null,
           phone: dto.phone ?? null,
-          dni: dto.dni ?? null,
         },
         select: CAMPOS_PUBLICOS,
       });
@@ -322,7 +316,6 @@ export class CustomersService {
       lastName: dto.lastName ?? null,
       email: dto.email ?? null,
       phone: dto.phone ?? null,
-      dni: dto.dni ?? null,
     };
     let actualizado;
     try {

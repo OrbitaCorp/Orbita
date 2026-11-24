@@ -27,8 +27,26 @@ import { precioEstadia, precioMensual, salidaDeMeses, type RangoOcupado, type Ta
 // ─── El "hoy" de la demo ─────────────────────────────────────────────────────
 // Sábado 14/11/2026 a las 10:40, fijo: así la demo se ve igual cualquier día y
 // el servidor y el navegador pintan lo mismo.
-export const HOY: ISO = '2026-11-14'
-export const AHORA = 10 * 60 + 40
+export let HOY: ISO = '2026-11-14'
+export let AHORA = 10 * 60 + 40
+
+/**
+ * El panel de un negocio real usa el día y la hora de verdad. Las pantallas
+ * leen HOY y AHORA al dibujarse, así que alcanza con cambiarlos antes de
+ * montar el panel. Se llama SOLO en el navegador y solo desde el panel real
+ * (pages/panel/alquileres.tsx): en el servidor estas variables las comparten
+ * todos los pedidos, y la demo necesita su día fijo.
+ */
+export function usarHoyReal(fecha: ISO, minutos: number) {
+  HOY = fecha
+  AHORA = minutos
+}
+
+/** El día y los minutos de ahora en Argentina (UTC−3, sin horario de verano), como los usan las pantallas. */
+export function ahoraEnArgentina(): [ISO, number] {
+  const d = new Date(Date.now() - 3 * 60 * 60 * 1000)
+  return [d.toISOString().slice(0, 10), d.getUTCHours() * 60 + d.getUTCMinutes()]
+}
 
 // ─── Modos ───────────────────────────────────────────────────────────────────
 
@@ -246,7 +264,8 @@ export interface Pagos {
   /** Mercado Pago conectado (en la demo se simula: no hay OAuth). */
   mpConectado: boolean
   /** Qué pasa con la seña si cancelan a tiempo (antes de `cancelaHastaHoras`) y si cancelan tarde. */
-  cancelaATiempo: 'devolver' | 'credito'
+  /** 'pierde': lo que hoy guarda la API cuando la seña no se devuelve (no maneja crédito a favor). */
+  cancelaATiempo: 'devolver' | 'credito' | 'pierde'
   cancelaTarde: 'pierde' | 'mitad' | 'credito'
 }
 
@@ -322,6 +341,8 @@ export const tituloEvento = (e?: Evento) => (!e ? 'Evento' : e.edad ? `Cumple de
 
 export interface Reserva {
   id: string
+  /** El código que recibió quien reservó. Lo pone la API; en la demo no viene y sale del id (codigoDe). */
+  codigo?: string
   /** La cancha, el salón o la propiedad. */
   unidadId: string
   clienteId: string
@@ -745,3 +766,10 @@ export const fechaDeReserva = (r: Reserva): ISO => r.entrada ?? r.fecha ?? HOY
 /** Reservas del día, ordenadas por hora (por hora y por bloque). */
 export const reservasDelDia = (reservas: Reserva[], fecha: ISO) =>
   reservas.filter(r => r.fecha === fecha && r.estado !== 'cancelada').sort((a, b) => (a.inicio ?? 0) - (b.inicio ?? 0))
+
+/**
+ * El código de una reserva, el mismo en el panel y en lo que ve quien reservó:
+ * "decime tu código" tiene que dar con la reserva. En un negocio real es el
+ * que generó la API; en la demo, las últimas seis letras del id.
+ */
+export const codigoDe = (r: Pick<Reserva, 'id' | 'codigo'>): string => r.codigo ?? r.id.slice(-6).toUpperCase()

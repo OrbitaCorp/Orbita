@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import { destinoDelPanel } from '@/lib/reservas/destinoPanel'
 import { RequireAuth } from '@/lib/auth/RequireAuth'
 import { PageLoader } from '@/components/PageLoader'
 
@@ -33,7 +34,8 @@ function PanelHome() {
     // identificado por el subdominio actual, así que la URL no lo repite
     // (ver lib/tenant.ts#adminPath). La query viaja entera (ej: ?tutorial=
     // para forzar una variante del tutorial — ver tutoriales/estado.ts).
-    window.location.href = `/admin/ventas/dashboard${window.location.search}`
+    // Un negocio de Alquileres va a su propio panel (lib/reservas/destinoPanel); el resto, como siempre.
+    window.location.href = destinoDelPanel(user.business.industry, window.location.search)
   }, [user])
 
   return <PageLoader visible message="Entrando al panel…" />

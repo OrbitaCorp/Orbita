@@ -20,11 +20,12 @@
 //
 // Acá vive todo lo que se puede tocar (turnos, clientes, servicios, equipo,
 // roles, pagos): son copias en memoria de lo que trajo el origen, así lo que
-// se agrega en una pantalla aparece en las otras. Las escrituras todavía no
-// van a la API: al recargar, o al cambiar de rubro, vuelve todo a como estaba
-// (se conectan sección por sección, plan de Turnos en Módulos). La excepción son
-// los servicios pausados, que quedan en el navegador (datos/negocio.ts) porque
-// el sitio público tiene que dejar de ofrecerlos.
+// se agrega en una pantalla aparece en las otras. Las escrituras se conectan
+// al origen sección por sección (plan de Turnos en Módulos): Servicios ya
+// guarda ahí (en la API, /reservas/servicios). Lo demás todavía queda en
+// memoria y al recargar vuelve a como estaba. En la demo, los servicios
+// pausados quedan además en el navegador (datos/negocio.ts) porque el sitio de
+// la demo tiene que dejar de ofrecerlos.
 //
 // El horario es uno solo para todo el panel: el del negocio (semanaDe) y,
 // adentro, los días y las horas de cada agenda. De ahí salen la grilla de la
@@ -44,7 +45,7 @@ import { temaDe } from '@/modules/turnos/storefront/tema'
 import { useRubroDemo } from '@/modules/turnos/demo/BarraDemo'
 import { useNegocioDemo } from '@/modules/turnos/datos/negocio'
 import { ESTADO_TURNO, semanaDe, tramosDeRecurso, esSalud, horaTxt, duracionTxt, pesos, type EstadoTurno, type Turno, type Cliente, type Recurso, type RubroTurnos } from '@/modules/turnos/datos'
-import { AHORA_DEMO, HOY_SEMANA, extremos, tramosDelDia, type Tramo } from '@/modules/turnos/horario'
+import { AHORA_DEMO, HOY_SEMANA, extremos, tramosDelDia, type Semana, type Tramo } from '@/modules/turnos/horario'
 import ResumenDia from './KPIs'
 import Agenda from './Agenda'
 import DetalleTurno from './Turnos'
@@ -120,6 +121,7 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
   const [roles, setRoles] = useState<Rol[]>([])
   const [personas, setPersonas] = useState<Persona[]>([])
   const [cargados, setCargados] = useState<DatosPanel | null>(null)
+  const [semanaGuardada, setSemanaGuardada] = useState<Semana | null>(null)
   if (carga.datos && carga.datos !== cargados) {
     // Se ajusta durante el render (no en un efecto), así la primera pantalla ya sale con los datos.
     setCargados(carga.datos)
@@ -128,9 +130,11 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
     setServicios(carga.datos.servicios)
     setRoles(carga.datos.roles)
     setPersonas(carga.datos.personas)
+    setSemanaGuardada(null)
   }
-  // El horario del negocio. En la demo cambia apenas se guarda otro en Configuración → Horarios.
-  const semana = useMemo(() => (cargados ? cargados.agenda.semana(rubro) : semanaDe(rubro)), [cargados, rubro])
+  // El horario del negocio. En la demo cambia apenas se guarda otro en Configuración → Horarios;
+  // con la API, es el que devolvió el último guardado o, si no, el que trajo la carga.
+  const semana = useMemo(() => semanaGuardada ?? (cargados ? cargados.agenda.semana(rubro) : semanaDe(rubro)), [semanaGuardada, cargados, rubro])
   // Los pausados de la demo viven en el navegador (el sitio los lee de ahí); los de la API llegan marcados.
   const nombresPausados = useMemo(() => (demo.pausados?.rubro === rubro.key ? demo.pausados.nombres : []), [demo.pausados, rubro.key])
   const servicios: ServicioPanel[] = useMemo(() => serviciosBase.map(({ pausado, ...s }) => ({ ...s, estado: pausado || nombresPausados.includes(s.nombre) ? 'pausado' : 'activo' })), [serviciosBase, nombresPausados])
@@ -334,36 +338,60 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
 
   // ── Altas, cambios y bajas de lo demás ──
   const guardar = <T extends { id: string }>(lista: T[], item: T) => (lista.some(x => x.id === item.id) ? lista.map(x => (x.id === item.id ? item : x)) : [...lista, item])
-  // Los servicios pausados se llevan por nombre en el almacén de la demo: es lo que lee el sitio.
-  const setPausados = (nombres: string[]) => guardarDemo({ pausados: { rubro: rubro.key, nombres: [...new Set(nombres)] } })
-  const guardarServicio = (s: ServicioPanel, silencio?: boolean) => {
+  // Los servicios se guardan en el origen (la API, o nada en la demo) y recién si sale bien cambian en
+  // el panel: si la API dice que no (un nombre repetido, sin permiso), el aviso trae su mensaje y
+  // todo queda como estaba. En la demo, los pausados además se llevan por nombre en el navegador:
+  // es lo que lee el sitio de la demo.
+  const enDemo = origen.tipo === 'demo'
+  const setPausados = (nombres: string[]) => { if (enDemo) guardarDemo({ pausados: { rubro: rubro.key, nombres: [...new Set(nombres)] } }) }
+  const aBase = (s: ServicioPanel, pausado = s.estado === 'pausado'): ServicioBase =>
+    ({ id: s.id, nombre: s.nombre, duracion: s.duracion, precio: s.precio, online: s.online, ...(pausado ? { pausado: true } : {}) })
+  const noSePudo = (titulo: string, e: unknown) => avisar(titulo, e instanceof Error && e.message ? e.message : 'Probá de nuevo en un rato.')
+  const guardarServicio = async (s: ServicioPanel, silencio?: boolean) => {
     const antes = servicios.find(x => x.id === s.id)
-    setServicios(l => guardar(l, { id: s.id, nombre: s.nombre, duracion: s.duracion, precio: s.precio, online: s.online }))
+    let guardado: ServicioBase
+    try {
+      guardado = antes ? await origen.servicios.editar(aBase(s)) : await origen.servicios.crear(aBase(s), servicios.length)
+    } catch (e) { noSePudo(antes ? 'No se guardaron los cambios' : 'No se creó el servicio', e); return }
+    setServicios(l => (antes ? l.map(x => (x.id === s.id ? guardado : x)) : [...l, guardado]))
     // Un servicio pausado que cambia de nombre sigue pausado.
     if (antes?.estado === 'pausado' && antes.nombre !== s.nombre) setPausados(nombresPausados.map(n => (n === antes.nombre ? s.nombre : n)))
-    if (!silencio) avisar(antes ? 'Cambios guardados' : 'Servicio creado', `${s.nombre} · ${duracionTxt(s.duracion)}`)
+    if (!silencio) avisar(antes ? 'Cambios guardados' : 'Servicio creado', `${guardado.nombre} · ${duracionTxt(guardado.duracion)}`)
   }
-  const borrarServicio = (id: string) => {
+  const borrarServicio = async (id: string) => {
     const s = servicios.find(x => x.id === id)
+    try { await origen.servicios.borrar(id) } catch (e) { noSePudo('No se eliminó el servicio', e); return }
     setServicios(l => l.filter(x => x.id !== id))
     if (s?.estado === 'pausado') setPausados(nombresPausados.filter(n => n !== s.nombre))
     avisar('Servicio eliminado', s?.nombre)
   }
   /** Pausar saca el servicio del sitio y de Nuevo turno sin borrarlo; reanudar lo devuelve. */
-  const pausarServicio = (id: string, pausado: boolean) => {
+  const pausarServicio = async (id: string, pausado: boolean) => {
     const s = servicios.find(x => x.id === id)
     if (!s) return
     if (pausado && serviciosActivos.length <= 1) { avisar('Es el único servicio activo', 'Sin él no habría nada para reservar. Creá otro antes de pausarlo.'); return }
+    let guardado: ServicioBase
+    try { guardado = await origen.servicios.editar(aBase(s, pausado)) } catch (e) { noSePudo(pausado ? 'No se pausó el servicio' : 'No se reanudó el servicio', e); return }
+    setServicios(l => l.map(x => (x.id === id ? guardado : x)))
     setPausados(pausado ? [...nombresPausados, s.nombre] : nombresPausados.filter(n => n !== s.nombre))
     avisar(pausado ? 'Servicio pausado' : 'Servicio reanudado', pausado ? `${s.nombre} ya no se ofrece en tu sitio ni al dar un turno. Lo reanudás cuando quieras.` : `${s.nombre} vuelve a tu sitio y a Nuevo turno.`)
   }
-  const guardarRecurso = (r: Recurso) => {
+  // Las agendas (los espacios de Espacios y, en los rubros por profesional, la de cada persona que
+  // atiende) también se guardan en el origen, con el mismo criterio que los servicios.
+  const ctxAgenda = (rolId?: string) => ({ rubro, semana, ...(rolId ? { rolId } : {}) })
+  const guardarRecurso = async (r: Recurso) => {
     const era = recursos.some(x => x.id === r.id)
-    setRecursos(l => guardar(l, r))
-    avisar(era ? 'Cambios guardados' : 'Agregado a la agenda', `${r.nombre} · ${r.dias}${r.horario ? `, ${r.horario}` : ''}`)
+    let guardado: Recurso
+    try {
+      guardado = era ? await origen.agendas.editar(r, ctxAgenda()) : await origen.agendas.crear(r, { ...ctxAgenda(), orden: recursos.length })
+    } catch (e) { noSePudo(era ? 'No se guardaron los cambios' : 'No se agregó a la agenda', e); return }
+    setRecursos(l => (era ? l.map(x => (x.id === r.id ? guardado : x)) : [...l, guardado]))
+    avisar(era ? 'Cambios guardados' : 'Agregado a la agenda', `${guardado.nombre} · ${guardado.dias}${guardado.horario ? `, ${guardado.horario}` : ''}`)
   }
-  const borrarRecurso = (id: string) => {
+  const borrarRecurso = async (id: string) => {
     const r = recursos.find(x => x.id === id)
+    // Con reservas por delante la API no la borra: el aviso dice cuántas hay que mover o cancelar.
+    try { await origen.agendas.borrar(id) } catch (e) { noSePudo('No se eliminó de la agenda', e); return }
     setRecursos(l => l.filter(x => x.id !== id))
     // Quien atendía ahí se queda sin espacio fijo.
     setPersonas(l => l.map(p => (p.recursoId === id ? { id: p.id, nombre: p.nombre, rolId: p.rolId, email: p.email, telefono: p.telefono, color: p.color, pago: p.pago, ...(p.pendiente ? { pendiente: true } : {}) } : p)))
@@ -376,37 +404,64 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
 
   // ── Equipo: personas, roles y pagos ──
   // En los rubros por profesional, quien atiende ES una agenda: guardar a la
-  // persona guarda también su columna (nombre, color, días y horario).
-  const guardarPersona = (p: Persona, agenda: Agenda | null) => {
+  // persona guarda también su columna (nombre, color, días y horario), y eso
+  // va al origen. Lo demás de la persona (email, teléfono, cómo cobra) y los
+  // roles no tienen dónde guardarse en la API todavía: quedan en este panel
+  // hasta que estén las cuentas del equipo (faltante 4 del mapa de Turnos).
+  const sinCuentas = (conAgenda: boolean) => (enDemo ? 'Demo: no se mandó ninguna invitación.'
+    : conAgenda ? 'Su agenda quedó guardada. La invitación y sus datos llegan con las cuentas del equipo.'
+      : 'Por ahora queda solo en este panel: quien no atiende se guarda cuando estén las cuentas del equipo.')
+  const guardarPersona = async (p: Persona, agenda: Agenda | null) => {
     const era = personas.some(x => x.id === p.id)
     let persona = p
+    let conAgenda = false
     if (rubro.modo === 'profesional') {
       if (agenda) {
-        const id = p.recursoId ?? `r${++serie.current}`
+        const existente = p.recursoId ? recursos.find(x => x.id === p.recursoId) : undefined
         const rol = rolDe(p.rolId)
         // El dueño figura en la agenda con su oficio (Barbero), no con "Dueño/a".
-        setRecursos(l => guardar(l, { id, nombre: p.nombre, rol: rol && !rol.fijo ? rol.nombre : rubro.profesional, color: p.color, ...agenda }))
-        persona = { ...p, recursoId: id }
+        const r: Recurso = { id: p.recursoId ?? `r${++serie.current}`, nombre: p.nombre, rol: rol && !rol.fijo ? rol.nombre : rubro.profesional, color: p.color, ...agenda }
+        let guardado: Recurso
+        try {
+          guardado = existente ? await origen.agendas.editar(r, ctxAgenda(p.rolId)) : await origen.agendas.crear(r, { ...ctxAgenda(p.rolId), orden: recursos.length })
+        } catch (e) { noSePudo(era ? 'No se guardaron los cambios' : 'No se sumó al equipo', e); return }
+        setRecursos(l => (existente ? l.map(x => (x.id === r.id ? guardado : x)) : [...l, guardado]))
+        persona = { ...p, recursoId: guardado.id }
+        conAgenda = true
       } else if (p.recursoId) {
         const sinAgenda = p.recursoId
+        try { await origen.agendas.borrar(sinAgenda) } catch (e) { noSePudo('No se le sacó la agenda', e); return }
         setRecursos(l => l.filter(x => x.id !== sinAgenda))
         persona = { id: p.id, nombre: p.nombre, rolId: p.rolId, email: p.email, telefono: p.telefono, color: p.color, pago: p.pago, ...(p.pendiente ? { pendiente: true } : {}) }
       }
     }
     setPersonas(l => guardar(l, persona))
-    avisar(era ? 'Cambios guardados' : 'Sumado al equipo', era ? p.nombre : `${p.nombre} · ${rolDe(p.rolId)?.nombre ?? ''}${p.email ? '. Demo: no se mandó ninguna invitación.' : ''}`)
+    // En la demo, el aviso de siempre; con la API, además, qué quedó guardado y qué no.
+    const detalle = enDemo ? (era ? p.nombre : `${p.nombre} · ${rolDe(p.rolId)?.nombre ?? ''}${p.email ? `. ${sinCuentas(conAgenda)}` : ''}`)
+      : `${p.nombre}${era ? '' : ` · ${rolDe(p.rolId)?.nombre ?? ''}`}. ${sinCuentas(conAgenda)}`
+    avisar(era ? 'Cambios guardados' : 'Sumado al equipo', detalle)
   }
-  const borrarPersona = (id: string) => {
+  const borrarPersona = async (id: string) => {
     const p = personas.find(x => x.id === id)
+    if (rubro.modo === 'profesional' && p?.recursoId) {
+      const suAgenda = p.recursoId
+      try { await origen.agendas.borrar(suAgenda) } catch (e) { noSePudo(`No se sacó a ${p.nombre} del equipo`, e); return }
+      setRecursos(l => l.filter(x => x.id !== suAgenda))
+    }
     setPersonas(l => l.filter(x => x.id !== id))
-    if (rubro.modo === 'profesional' && p?.recursoId) setRecursos(l => l.filter(x => x.id !== p.recursoId))
     avisar('Ya no está en el equipo', p?.nombre)
   }
-  const guardarRol = (r: Rol) => {
+  const guardarRol = async (r: Rol) => {
     const era = roles.some(x => x.id === r.id)
     setRoles(l => guardar(l, r))
-    // El nombre del rol es lo que se lee debajo de cada agenda.
-    if (rubro.modo === 'profesional') setRecursos(l => l.map(x => (personas.some(p => p.recursoId === x.id && p.rolId === r.id) ? { ...x, rol: r.nombre } : x)))
+    // El nombre del rol es lo que se lee debajo de cada agenda: en la API vive en cada agenda.
+    if (rubro.modo === 'profesional') {
+      const afectadas = recursos.filter(x => x.rol !== r.nombre && personas.some(p => p.recursoId === x.id && p.rolId === r.id))
+      try {
+        const guardadas = await Promise.all(afectadas.map(x => origen.agendas.editar({ ...x, rol: r.nombre }, ctxAgenda(r.id))))
+        setRecursos(l => l.map(x => guardadas.find(g => g.id === x.id) ?? x))
+      } catch (e) { noSePudo('El rol cambió, pero no en todas las agendas', e); return }
+    }
     avisar(era ? 'Rol actualizado' : 'Rol creado', era ? `${r.nombre}: vale para todos los que lo tienen.` : `${r.nombre}: ya se lo podés dar a alguien del equipo.`)
   }
   const borrarRol = (id: string) => {
@@ -545,7 +600,7 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
           {vista === 'mensajes' && <Mensajes {...config} turnosHoy={turnos} nombreDe={nombreDe} onAbrir={abrir} />}
           {vista === 'pagos' && <Pagos {...config} senas={senasPendientes} nombreDe={nombreDe} onAbrir={abrir} onRegistrar={registrarSena} onIr={ir} />}
           {vista === 'configuracion' && tab === 'negocio' && <Negocio {...config} />}
-          {vista === 'configuracion' && tab === 'horarios' && <Horarios {...config} />}
+          {vista === 'configuracion' && tab === 'horarios' && <Horarios {...config} semana={semana} onSemanaGuardada={(s, rs) => { setSemanaGuardada(s); setRecursos(rs) }} />}
           {vista === 'configuracion' && tab === 'apariencia' && <Apariencia {...config} />}
           {vista === 'configuracion' && tab === 'dominio' && <Dominio {...config} />}
           {vista === 'configuracion' && tab === 'suscripcion' && <Suscripcion {...config} />}

@@ -1,11 +1,11 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import type { LlmEvent, LlmMessage } from '../../src/orbi/llm/llm-adapter.interface';
-import { orbiAtiendeElChat, pausarSiAtendiaOrbi, type MensajeEntrante } from '../../src/whatsapp/whatsapp-bot-estado';
-import { HerramientasDelBot } from '../../src/whatsapp/whatsapp-bot-tools';
+import { orbiAtiendeElChat, pausarSiAtendiaOrbi, type MensajeEntrante } from '../../src/orbi/atencion/estado';
+import { HerramientasDelBot } from '../../src/orbi/atencion/herramientas';
 import { WhatsappBotService } from '../../src/whatsapp/whatsapp-bot.service';
-import { MENSAJE_DE_DERIVACION, MENSAJE_SIN_MEDIOS, promptDelBot } from '../../src/whatsapp/whatsapp-bot-prompt';
+import { MENSAJE_DE_DERIVACION, MENSAJE_SIN_MEDIOS, promptDelBot } from '../../src/orbi/atencion/prompt';
 import { MARCA_MENU_TEXTO, PEDIDO_DE_OPCION } from '../../src/whatsapp/whatsapp-bot-menu';
-import { ID_CAMBIAR, ID_CONFIRMAR } from '../../src/whatsapp/whatsapp-bot-pedidos';
+import { ID_CAMBIAR, ID_CONFIRMAR } from '../../src/orbi/atencion/pedidos';
 
 // Orbi como atención al público por WhatsApp: cuándo atiende un chat, cuándo se calla, qué lee y qué hace ante la duda.
 
@@ -790,7 +790,7 @@ describe('Orbi toma pedidos', () => {
   it('al tocar "Confirmar pedido" se crea el pedido y el chat queda para coordinar, sin el aviso de "necesita atención" (ya sale el de pedido pendiente)', async () => {
     const t = armar({ cfg, borrador: BORRADOR });
     await t.bot.atender([toco(ID_CONFIRMAR)]);
-    expect(t.pedidos.confirmar).toHaveBeenCalledWith(expect.objectContaining({ businessId: BIZ, customerId: 'cli-1', waId: MSG.waId, slug: 'rama', tienda: 'Rama', borrador: BORRADOR }));
+    expect(t.pedidos.confirmar).toHaveBeenCalledWith(expect.objectContaining({ businessId: BIZ, customerId: 'cli-1', telefono: MSG.waId, canal: 'WHATSAPP', slug: 'rama', tienda: 'Rama', borrador: BORRADOR }));
     expect(t.whatsapp.enviarTexto).toHaveBeenCalledWith(BIZ, CONV, MSG.waId, expect.stringContaining('#57'));
     expect(cambioDeEstado(t).data).toMatchObject({ botEstado: 'DERIVADO', botMotivo: expect.stringContaining('Pedido #57'), isUnread: true });
     expect(t.notificaciones.dispatch).not.toHaveBeenCalled();

@@ -4,7 +4,7 @@ import {
   ArrayMaxSize, IsArray, IsBoolean, IsDefined, IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min,
   ValidateNested,
 } from 'class-validator';
-import { ClienteDto, MENSAJE_FECHA, MENSAJE_MODULO, PaginacionDto, RE_FECHA, recortar } from './comunes.dto';
+import { ClienteDto, JsonHasta, MAX_DATOS_RESERVA, MENSAJE_FECHA, MENSAJE_MODULO, PaginacionDto, RE_FECHA, recortar } from './comunes.dto';
 
 // Un `cliente` que no vino no se valida solo: @ValidateNested saltea lo que falta. Sin @IsDefined el pedido
 // pasaba y el service terminaba leyendo `cliente.email` de undefined (un 500 en vez de un 400).
@@ -48,6 +48,10 @@ export class PedidoReservaDto {
 
   @Transform(recortar) @IsOptional() @IsString() @MaxLength(500)
   notas?: string;
+
+  /** Lo propio del módulo, que el motor guarda sin interpretar (cuántos huéspedes vienen, por dónde llegó la reserva). */
+  @IsOptional() @JsonHasta(MAX_DATOS_RESERVA)
+  datos?: Record<string, unknown>;
 }
 
 /** Sitio público, paso 1: tomar el lugar mientras la persona carga sus datos. */

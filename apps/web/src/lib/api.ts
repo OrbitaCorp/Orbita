@@ -595,6 +595,9 @@ export type ApiGame = {
   // percentPerWin y además un solo fallo terminaba todo (bug reportado
   // 2026-08-28: "el juego solo te da un intento").
   maxAttempts: number
+  // Temática y forma de aparecer. null = el dibujo original, en ventana al centro.
+  theme: string | null
+  presentation: string | null
   // Se incrementa cada vez que se reactiva (inactivo → activo) o se le
   // carga una vigencia distinta — así el storefront trata un relanzamiento
   // como campaña nueva de cara al visitante (ver campaignVersion en
@@ -612,7 +615,7 @@ export function panelGetGames() {
   return panelRequest<ApiGame[]>('/games')
 }
 
-export function panelUpsertGame(type: string, input: { name?: string; isActive: boolean; percentPerWin: number; maxPercent: number; timeLimitSeconds?: number; maxAttempts?: number; startDate?: string; endDate?: string }) {
+export function panelUpsertGame(type: string, input: { name?: string; isActive: boolean; percentPerWin: number; maxPercent: number; timeLimitSeconds?: number; maxAttempts?: number; startDate?: string; endDate?: string; theme?: string; presentation?: string }) {
   return panelRequest<ApiGame>(`/games/${type}`, { method: 'PUT', body: JSON.stringify(input) })
 }
 
@@ -666,6 +669,9 @@ export type ApiPromoModal = {
   code: string | null
   ctaText: string | null
   ctaLink: string | null
+  format: string | null
+  design: string | null
+  imageUrl: string | null
   isActive: boolean
   // Mismo mecanismo que ApiGame.campaignVersion — se incrementa al
   // reactivar, cargar vigencia nueva, o con "Relanzar".
@@ -678,7 +684,7 @@ export function panelGetPromoModal() {
   return panelRequest<ApiPromoModal | null>('/promo-modal')
 }
 
-export function panelUpsertPromoModal(input: { title: string; message?: string; badge?: string; code?: string; ctaText?: string; ctaLink?: string; isActive: boolean; startDate?: string; endDate?: string }) {
+export function panelUpsertPromoModal(input: { title: string; message?: string; badge?: string; code?: string; ctaText?: string; ctaLink?: string; isActive: boolean; startDate?: string; endDate?: string; format?: string; design?: string; imageUrl?: string | null }) {
   return panelRequest<ApiPromoModal>('/promo-modal', { method: 'PUT', body: JSON.stringify(input) })
 }
 
@@ -770,6 +776,9 @@ export type ApiCountdownSettings = {
   // corriendo). Con esto en true el interruptor no se puede apagar (la API
   // devuelve 400) y no se puede crear otra.
   vigente: boolean
+  // Diseño de la oferta en la portada; queda guardado entre una oferta y otra.
+  format?: string | null
+  design?: string | null
 }
 
 export function panelGetCountdownSettings() {
@@ -1129,6 +1138,7 @@ export function panelDisconnectMercadopago() {
 export type ApiHeroSlide = {
   id: string; titulo: string; subtitulo: string; img: string | null; cta: string; ctaLink?: string
   imageStyle?: string; imagePosition?: string; imageOverlay?: string; bgPattern?: string; bgPatternScope?: string; bgColor?: string
+  textAlign?: string; textVertical?: string
 }
 export type ApiHeaderLink = { id: string; label: string; on: boolean }
 export type ApiStatsBarItem = { id: string; value: string; label: string }
@@ -1434,7 +1444,7 @@ export type ApiOrderDetail = {
   }[]
   payments: { id: string; method: string; status: string; amount: number; mpFeeAmount: number | null }[]
   onlineOrderDetails?: {
-    buyerName: string; buyerEmail: string; buyerPhone: string | null; buyerDni: string | null
+    buyerName: string; buyerEmail: string; buyerPhone: string | null
     carrier: ApiCarrier | null; carrierDeliveryMode: 'DOMICILIO' | 'SUCURSAL' | null
     tracking: string | null; shippingCost: number | null
     shippingMethod: 'DELIVERY' | 'PICKUP' | null
@@ -1699,8 +1709,6 @@ export type ApiCustomer = {
   lastName: string | null
   email: string | null
   phone: string | null
-  // Solo en la exportación (GET /customers/export): la lista ya no lo trae.
-  dni?: string | null
   hasAccount: boolean
   orderCount: number
   totalSpent: number
@@ -1807,7 +1815,7 @@ export type CreateOrderInput = {
   // El email queda opcional (Fase 3 — Ale, 31/07): no todas las ventas
   // anónimas necesitan uno. Si el pedido va a un cliente YA registrado
   // (customerId), el backend igual exige que ESE cliente tenga email cargado.
-  buyer?: { name: string; email?: string; phone?: string; dni?: string }
+  buyer?: { name: string; email?: string; phone?: string }
   // "Solo registrar la venta": sin customerId ni buyer. Queda a nombre de
   // "Consumidor final" y no crea ficha en Clientes.
   sinComprador?: boolean
@@ -2157,6 +2165,51 @@ export function panelProxyImage(url: string) {
 
 export function panelUpdateProduct(id: string, input: UpsertProductInput) {
   return panelRequest<ApiProductFull>(`/products/${id}`, { method: 'PUT', body: JSON.stringify(input) })
+}
+
+// ─── Actualizar precios con Excel ───────────────────────────────────────────
+// Una fila por variante activa (ver precios-lote.service.ts). El código es el
+// id de la variante: es lo que el Excel trae de vuelta para saber qué cambiar.
+export interface FilaPrecioExcel {
+  variantId: string
+  nombre: string
+  variante: string
+  sku: string | null
+  categoria: string | null
+  precio: number
+  stock: number
+  estado: 'PUBLISHED' | 'DRAFT' | 'OUT_OF_STOCK'
+}
+export interface CambioDePrecioExcel {
+  variantId: string
+  productId: string
+  nombre: string
+  variante: string
+  antes: number
+  despues: number
+}
+export interface ResultadoPreciosExcel {
+  cambios: CambioDePrecioExcel[]
+  sinCambios: number
+  noEncontradas: string[]
+  aplicado: boolean
+}
+
+export function panelGetFilasPrecios(filters: Pick<ProductListFilters, 'search' | 'categoryId' | 'status'> = {}) {
+  const qs = new URLSearchParams()
+  if (filters.search) qs.set('search', filters.search)
+  if (filters.categoryId) qs.set('categoryId', filters.categoryId)
+  if (filters.status) qs.set('status', filters.status)
+  const query = qs.toString()
+  return panelRequest<FilaPrecioExcel[]>(`/products/precios-lote${query ? `?${query}` : ''}`)
+}
+
+/** Con `simular` no guarda nada: devuelve qué cambiaría, para el resumen. */
+export function panelActualizarPrecios(items: { variantId: string; price: number }[], simular: boolean) {
+  return panelRequest<ResultadoPreciosExcel>('/products/precios-lote', {
+    method: 'POST',
+    body: JSON.stringify({ items, simular }),
+  })
 }
 
 // Baja lógica: el producto desaparece del panel pero los pedidos históricos
@@ -2861,6 +2914,8 @@ export type ApiUpsertDiscountInput = {
   // Oferta relámpago: true la prende en este descuento (y se la saca al que la
   // tenía); false la apaga si era de este; ausente = no tocar lo que estaba.
   countdown?: boolean
+  countdownFormat?: string
+  countdownDesign?: string
 }
 
 export type DiscountListFilters = {
@@ -3045,7 +3100,7 @@ export function panelGetMetrics(filtros: Partial<MetricasFiltros> = {}) {
 
 export type MeProfile = {
   id: string; firstName: string; lastName: string | null; email: string | null
-  phone: string | null; dni: string | null; birthDate: string | null
+  phone: string | null; birthDate: string | null
   avatarUrl: string | null; emailVerified: boolean
 }
 export type MeAddress = {
@@ -3074,7 +3129,7 @@ export type MeSession = {
 // Datos personales (RBT-630)
 export function meGetProfile() { return panelRequest<MeProfile>('/me') }
 // currentPassword: obligatoria solo si el email cambia (auditoría interna 10/09).
-export function meUpdateProfile(input: Partial<Pick<MeProfile, 'firstName' | 'lastName' | 'email' | 'phone' | 'dni' | 'birthDate'>> & { currentPassword?: string }) {
+export function meUpdateProfile(input: Partial<Pick<MeProfile, 'firstName' | 'lastName' | 'email' | 'phone' | 'birthDate'>> & { currentPassword?: string }) {
   return panelRequest<MeProfile>('/me', { method: 'PATCH', body: JSON.stringify(input) })
 }
 export function meChangePassword(input: { currentPassword: string; newPassword: string }) {
@@ -3105,7 +3160,7 @@ export type MeOrderDetail = {
   ivaRatePercent: number | null
   items: { id: string; productName: string; variantLabel: string | null; imgUrl: string | null; quantity: number; unitPrice: number }[]
   onlineOrderDetails: {
-    buyerName: string; buyerEmail: string | null; buyerPhone: string | null; buyerDni: string | null
+    buyerName: string; buyerEmail: string | null; buyerPhone: string | null
     carrier: ApiCarrier | null; carrierDeliveryMode: 'DOMICILIO' | 'SUCURSAL' | null
     tracking: string | null; shippingAddressId: string | null
     shippingAddress: MeAddress | null
@@ -3206,9 +3261,9 @@ export type CheckoutShippingAddress = {
 export type CheckoutInput = {
   items: { variantId: string; quantity: number }[]
   // Teléfono obligatorio: el checkout coordina el envío por WhatsApp, sin
-  // teléfono no hay forma de contactar al comprador para eso. DNI obligatorio
-  // a pedido puntual — identifica al comprador para facturación/entrega.
-  buyer: { name: string; email: string; phone: string; dni: string }
+  // teléfono no hay forma de contactar al comprador para eso. (El DNI se
+  // sacó el 17/11.)
+  buyer: { name: string; email: string; phone: string }
   // Envío a domicilio vs. retiro en el local — independiente del método de
   // pago (antes 'PICKUP' era un valor de paymentMethod).
   shippingMethod: 'DELIVERY' | 'PICKUP'
@@ -3407,19 +3462,26 @@ export type BotModalidad = 'CONVERSACIONAL' | 'MENU_Y_CONVERSACION' | 'SOLO_MENU
 export type MenuEstilo = 'LISTA' | 'BOTONES'
 /** Una opción del menú. Las de fábrica: catalogo, pedidos, promos, envios, horarios, persona. Las del dueño: custom-N (con su `respuesta`). */
 export type OpcionDeMenu = { id: string; titulo: string; descripcion?: string; activa: boolean; respuesta?: string }
-export type WhatsappBotEstado = {
+/** Lo que Orbi configura igual en WhatsApp y en Instagram. */
+export type OrbiCanalEstado = {
   disponible: boolean; conectado: boolean; enabled: boolean; modo: BotModo
   instrucciones: string | null; topeCreditos: number | null
-  modalidad: BotModalidad; menuEstilo: MenuEstilo; bienvenida: string | null; bienvenidaPorDefecto: string; menuOpciones: OpcionDeMenu[]
-  // Orbi toma pedidos (quedan pendientes, "coordinar por WhatsApp"), sus topes por pedido y si la tienda puede (o qué le falta).
+  // Orbi toma pedidos (quedan pendientes, a coordinar por el chat), sus topes por pedido y si la tienda puede (o qué le falta).
   tomaPedidos: boolean; maxUnidades: number; maxMonto: number; pedidos: { disponible: boolean; motivo?: string }
-  cupo: { mes: string; usados: number; total: number; limite: number; porcentaje: number }
+  // El cupo del plan es uno para los dos canales: `usados` es lo de este canal, `otrosCanales` lo que gastó el otro y
+  // `limite` lo que este canal todavía puede llegar a usar (su tope propio, o lo que deja el otro).
+  cupo: { mes: string; usados: number; total: number; limite: number; porcentaje: number; otrosCanales?: number }
+}
+export type OrbiCanalCambios = {
+  enabled?: boolean; modo?: BotModo; instrucciones?: string | null; topeCreditos?: number | null
+  tomaPedidos?: boolean; maxUnidades?: number; maxMonto?: number
+}
+export type WhatsappBotEstado = OrbiCanalEstado & {
+  modalidad: BotModalidad; menuEstilo: MenuEstilo; bienvenida: string | null; bienvenidaPorDefecto: string; menuOpciones: OpcionDeMenu[]
 }
 export function getWhatsappBot() { return panelRequest<WhatsappBotEstado>('/whatsapp/bot') }
-export function updateWhatsappBot(input: {
-  enabled?: boolean; modo?: BotModo; instrucciones?: string | null; topeCreditos?: number | null
+export function updateWhatsappBot(input: OrbiCanalCambios & {
   modalidad?: BotModalidad; menuEstilo?: MenuEstilo; bienvenida?: string | null; menuOpciones?: OpcionDeMenu[]
-  tomaPedidos?: boolean; maxUnidades?: number; maxMonto?: number
 }) {
   return panelRequest<WhatsappBotEstado>('/whatsapp/bot', { method: 'PATCH', body: JSON.stringify(input) })
 }
@@ -3558,6 +3620,8 @@ export type InstagramCharla = {
   noLeida: boolean
   /** Hasta cuándo se puede contestar (24 h desde el último mensaje del cliente); null si ya venció. */
   puedeResponderHasta: string | null
+  /** Orbi en esta charla (mismos estados que en WhatsApp). */
+  bot: { estado: BotChatEstado; motivo: string | null }
 }
 export type InstagramMensaje = {
   id: string
@@ -3566,11 +3630,22 @@ export type InstagramMensaje = {
   adjuntos: { tipo: 'image' | 'video' | 'audio' | 'file'; url: string }[]
   estado: string | null
   creado: string
+  /** Lo mandó Orbi (no una persona). */
+  viaOrbi: boolean
 }
 export function getInstagramCharlas() { return panelRequest<InstagramCharla[]>('/instagram/inbox') }
 export function getInstagramNoLeidos() { return panelRequest<{ count: number }>('/instagram/inbox/unread-count') }
 export function getInstagramMensajes(id: string) {
-  return panelRequest<{ mensajes: InstagramMensaje[]; puedeResponderHasta: string | null }>(`/instagram/inbox/${id}/messages`)
+  return panelRequest<{ mensajes: InstagramMensaje[]; puedeResponderHasta: string | null; bot: InstagramCharla['bot'] }>(`/instagram/inbox/${id}/messages`)
+}
+// Orbi atendiendo los mensajes directos de Instagram (paquete Avanzado): lo mismo que en WhatsApp, sin el menú.
+export function getInstagramBot() { return panelRequest<OrbiCanalEstado>('/instagram/bot') }
+export function updateInstagramBot(input: OrbiCanalCambios) {
+  return panelRequest<OrbiCanalEstado>('/instagram/bot', { method: 'PATCH', body: JSON.stringify(input) })
+}
+/** Enciende (ON, también reactiva una charla pausada o derivada) o apaga (OFF) a Orbi en una charla de Instagram. */
+export function setInstagramCharlaBot(id: string, estado: 'ON' | 'OFF') {
+  return panelRequest<{ botEstado: BotChatEstado }>(`/instagram/inbox/${id}/bot`, { method: 'PATCH', body: JSON.stringify({ estado }) })
 }
 export function responderInstagram(id: string, input: { texto?: string; foto?: File }) {
   const form = new FormData()

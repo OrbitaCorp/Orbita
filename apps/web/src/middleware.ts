@@ -34,6 +34,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v
 // Mismos valores que lib/demo/modo.ts (acá no se importa: corre en el edge).
 const DEMO_SLUG_PANEL = process.env.NEXT_PUBLIC_DEMO_SLUG ?? 'demo'
 const DEMO_SLUG_MODA = process.env.NEXT_PUBLIC_DEMO_SLUG_MODA ?? 'demo-moda'
+const DEMO_SLUG_REGALOS = process.env.NEXT_PUBLIC_DEMO_SLUG_REGALOS ?? 'demo-regalos'
 
 // Paths que en un subdominio de tienda NO se reescriben al storefront:
 // se sirven tal cual (área de dueño, o rutas internas).
@@ -130,10 +131,10 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Demo pública: el panel es uno solo, el de Nébula Tech (DEMO_SLUG en
-  // lib/demo/modo.ts). Desde la tienda de ropa, /panel y /admin llevan ahí:
+  // lib/demo/modo.ts). Desde las otras tiendas de la demo, /panel y /admin llevan ahí:
   // si no, el visitante entraría al panel de Nébula Tech parado en el
   // subdominio de la otra tienda.
-  if (slug === DEMO_SLUG_MODA && (pathname === '/panel' || pathname.startsWith('/panel/') || pathname.startsWith('/admin'))) {
+  if ((slug === DEMO_SLUG_MODA || slug === DEMO_SLUG_REGALOS) && (pathname === '/panel' || pathname.startsWith('/panel/') || pathname.startsWith('/admin'))) {
     const destino = request.nextUrl.clone()
     destino.host = `${DEMO_SLUG_PANEL}.${ROOT_DOMAIN}${destino.port ? `:${destino.port}` : ''}`
     return NextResponse.redirect(destino)

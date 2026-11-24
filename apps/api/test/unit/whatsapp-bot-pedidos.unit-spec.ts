@@ -1,8 +1,8 @@
 import { NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
-  WhatsappBotPedidosService, borradorVigente, esAfirmativo, esNegativo, textoDelResumen, VIGENCIA_BORRADOR_MS, type Borrador,
-} from '../../src/whatsapp/whatsapp-bot-pedidos';
+  PedidosPorChatService, borradorVigente, esAfirmativo, esNegativo, textoDelResumen, VIGENCIA_BORRADOR_MS, type Borrador,
+} from '../../src/orbi/atencion/pedidos';
 import { NotificationsService } from '../../src/notifications/notifications.service';
 import { OrdersService } from '../../src/orders/orders.service';
 
@@ -36,7 +36,7 @@ function armar(o: { carrito?: any; pago?: any; modo?: string; clienteLinea?: any
     create: o.creacion instanceof Error ? jest.fn().mockRejectedValue(o.creacion) : jest.fn().mockResolvedValue({ id: 'ord-1', orderNumber: 57, total: '20000.00' }),
   };
   const notificaciones: any = { dispatch: jest.fn().mockResolvedValue(undefined) };
-  const svc = new WhatsappBotPedidosService(prisma, storefront, orders, notificaciones);
+  const svc = new PedidosPorChatService(prisma, storefront, orders, notificaciones);
   return { svc, prisma, storefront, orders, notificaciones };
 }
 
@@ -173,7 +173,7 @@ describe('preparar (el borrador)', () => {
 });
 
 describe('confirmar', () => {
-  const p = (b: unknown) => ({ businessId: BIZ, conversationId: CONV, customerId: CLI, waId: '5491122334455', slug: 'rama', tienda: 'Rama', borrador: b });
+  const p = (b: unknown) => ({ businessId: BIZ, conversationId: CONV, customerId: CLI, telefono: '5491122334455', slug: 'rama', tienda: 'Rama', borrador: b });
 
   it('crea el pedido pendiente "coordinar por WhatsApp" para este cliente y avisa al dueño', async () => {
     const t = armar();
@@ -189,7 +189,7 @@ describe('confirmar', () => {
     });
     expect(dto.buyer).not.toHaveProperty('email');
     expect(dto.notes).toContain('tomado por Orbi por WhatsApp');
-    expect(opts).toEqual({ publicCheckout: true, paymentMethodChosen: true, porWhatsapp: true });
+    expect(opts).toEqual({ publicCheckout: true, paymentMethodChosen: true, porChat: true });
     expect(t.notificaciones.dispatch).toHaveBeenCalledWith('orbi_pedido_pendiente', BIZ, expect.objectContaining({
       resourceType: 'order', resourceId: 'ord-1', emailBody: expect.stringContaining('/admin/biz-1/ventas/pedidos?vista=detalle&id=ord-1'),
     }));

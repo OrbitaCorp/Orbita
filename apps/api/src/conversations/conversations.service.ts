@@ -1,4 +1,4 @@
-import { pausarSiAtendiaOrbi } from '../whatsapp/whatsapp-bot-estado';
+import { pausarSiAtendiaOrbi, type CanalDeOrbi } from '../orbi/atencion/estado';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -210,8 +210,8 @@ export class ConversationsService {
     // Si lo pendiente era de la otra bandeja, contestar acá no lo borra.
     const limpiaPendiente = !forzado || !ultimoDelCliente || ultimoDelCliente.channel === forzado;
     await this.prisma.conversation.update({ where: { id: conversationId }, data: { ...(limpiaPendiente ? { isUnread: false } : {}), updatedAt: new Date() } });
-    // Contestó una persona por WhatsApp: si Orbi atendía este chat, se calla.
-    if (canal === 'WHATSAPP') await this.pausarOrbi(businessId, conversationId);
+    // Contestó una persona por WhatsApp o Instagram: si Orbi atendía este chat en ese canal, se calla.
+    if (canal) await this.pausarOrbi(businessId, conversationId, canal);
     return this.aMensaje(msg);
   }
 
@@ -245,9 +245,9 @@ export class ConversationsService {
   }
 
   // Mejor esfuerzo: que no se pueda pausar a Orbi no puede hacer fallar un mensaje que ya salió.
-  private async pausarOrbi(businessId: string, conversationId: string): Promise<void> {
+  private async pausarOrbi(businessId: string, conversationId: string, canal: CanalDeOrbi = 'WHATSAPP'): Promise<void> {
     try {
-      await pausarSiAtendiaOrbi(this.prisma, businessId, conversationId);
+      await pausarSiAtendiaOrbi(this.prisma, businessId, conversationId, canal);
     } catch {
       /* se reintenta con el próximo mensaje de la persona */
     }

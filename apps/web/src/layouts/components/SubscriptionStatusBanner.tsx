@@ -4,8 +4,7 @@
 // una sola vista) avisando del estado de la suscripción — antes esto era
 // invisible fuera de Configuración → Suscripción (RBT — ciclo de vida de
 // suscripciones, 2026-09). Mismo criterio de "gracia → suspendida" que
-// Suscripcion.tsx (duplicado a propósito: son dos lugares chicos, no vale la
-// pena una capa de estado global compartido para esto todavía).
+// Suscripcion.tsx.
 //
 // Nunca bloquea el render del panel: si falla la carga de la suscripción,
 // simplemente no se muestra nada — el panel tiene que seguir andando igual.
@@ -13,28 +12,111 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { AlertTriangle, Clock } from 'lucide-react'
 import { panelGetSubscription, type ApiSubscription } from '@/lib/api'
-
-const URL_SUSCRIPCION = '/admin/ventas/configuracion?vista=suscripcion'
+import { useAuth } from '@/hooks/useAuth'
+import { esVisitanteDemo } from '@/lib/demo/modo'
+import { adminPath, currentSlug } from '@/lib/tenant'
+import { estadoCortesiaDe, EVENTO_SUSCRIPCION_ACTUALIZADA } from '@/lib/cortesia'
 
 export default function SubscriptionStatusBanner() {
     const router = useRouter()
+    const { user } = useAuth()
     const [sub, setSub] = useState<ApiSubscription | null>(null)
+    const puedeGestionar = user?.type === 'member' && (user.role === 'owner' || user.role === 'admin') && !esVisitanteDemo()
 
     useEffect(() => {
+        if (!puedeGestionar) return
         let cancelado = false
-        panelGetSubscription()
-            .then(s => { if (!cancelado) setSub(s) })
-            .catch(() => { /* silencioso: nunca bloquea el panel por esto */ })
-        return () => { cancelado = true }
-    }, [])
+        const cargar = () => {
+            panelGetSubscription()
+                .then(s => { if (!cancelado) setSub(s) })
+                .catch(() => { /* silencioso: nunca bloquea el panel por esto */ })
+        }
+        cargar()
+        window.addEventListener('focus', cargar)
+        window.addEventListener(EVENTO_SUSCRIPCION_ACTUALIZADA, cargar)
+        return () => {
+            cancelado = true
+            window.removeEventListener('focus', cargar)
+            window.removeEventListener(EVENTO_SUSCRIPCION_ACTUALIZADA, cargar)
+        }
+    }, [puedeGestionar])
 
     // No repetir el banner adentro de la propia pantalla de Suscripción — ya
     // tiene su propio bloque con el mismo mensaje y el botón de activar.
     if (router.pathname.startsWith('/admin') && router.query.vista === 'suscripcion') return null
-    if (!sub) return null
+    if (!puedeGestionar || !sub) return null
 
-    const esCortesia = sub.origin === 'COMP'
+    const negocioId = currentSlug() ?? (router.query.negocioId as string) ?? user.business.id
+    const irASuscripcion = () => router.push({ pathname: adminPath(negocioId, 'ventas', 'configuracion'), query: { vista: 'suscripcion' } })
+
+    const cortesia = estadoCortesiaDe(sub)
+    const esCortesia = !!cortesia
     const venciendo = new Date(sub.currentPeriodEnd ?? 0) <= new Date()
+
+    // Cortesía vigente dentro de los últimos 3 días: ya puede ejecutar el pago.
+    if (cortesia?.porVencer) {
+        return (
+            <div
+                role="button"
+                tabIndex={0}
+                onClick={() => void irASuscripcion()}
+                onKeyDown={e => { if (e.key === 'Enter') void irASuscripcion() }}
+                style={{
+                    display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+                    padding: '9px 18px', cursor: 'pointer',
+                    background: 'var(--color-warning-bg, rgba(245, 158, 11, 0.12))',
+                    borderBottom: '1px solid var(--color-warning, #d97706)',
+                    fontSize: 12.5,
+                }}
+            >
+                <Clock size={15} strokeWidth={2} color="var(--color-warning, #d97706)" style={{ flexShrink: 0 }} />
+                <span style={{ color: 'var(--color-text)', fontWeight: 500 }}>
+                    Tu cortesía está a punto de vencer (te quedan <strong>{cortesia.tiempoRestante}</strong>). Ya podés ejecutar el pago de tu plan para seguir sin cortes.
+                </span>
+                <span style={{ marginLeft: 'auto', fontWeight: 700, color: 'var(--color-warning, #b45309)', whiteSpace: 'nowrap' }}>
+                    {cortesia.tienePlanElegido ? 'Ejecutar pago →' : 'Elegí tu plan y pagá →'}
+                </span>
+            </div>
+        )
+    }
+
+    // Cortesía vigente con más de 3 días: el contador vive en el Header en
+    // escritorio; en celular (<768px) se muestra esta tira liviana.
+    if (!venciendo && cortesia?.mostrarContador) {
+        return (
+            <>
+                <style>{`
+                    .admin-cortesia-banner-mobile { display: none; }
+                    @media (max-width: 768px) {
+                        .admin-cortesia-banner-mobile { display: flex; }
+                    }
+                `}</style>
+                <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => void irASuscripcion()}
+                    onKeyDown={e => { if (e.key === 'Enter') void irASuscripcion() }}
+                    className="admin-cortesia-banner-mobile"
+                    style={{
+                        alignItems: 'center', gap: 8, flexWrap: 'wrap',
+                        padding: '7px 14px', cursor: 'pointer',
+                        background: 'var(--color-surface)',
+                        borderBottom: '1px solid var(--color-border)',
+                        fontSize: 12,
+                    }}
+                >
+                    <Clock size={14} strokeWidth={2} color="var(--color-primary)" style={{ flexShrink: 0 }} />
+                    <span style={{ color: 'var(--color-body)', fontWeight: 500 }}>
+                        Cortesía activa · te quedan <strong style={{ color: 'var(--color-text)' }}>{cortesia.tiempoRestante}</strong>
+                    </span>
+                    <span style={{ marginLeft: 'auto', fontWeight: 600, color: 'var(--color-primary)', whiteSpace: 'nowrap' }}>
+                        {cortesia.tienePlanElegido ? 'Ver suscripción →' : 'Elegir plan →'}
+                    </span>
+                </div>
+            </>
+        )
+    }
+
     if (!venciendo) return null // todo al día — sin banner
 
     const suspendida = sub.status === 'SUSPENDED'
@@ -54,8 +136,8 @@ export default function SubscriptionStatusBanner() {
         <div
             role="button"
             tabIndex={0}
-            onClick={() => router.push(URL_SUSCRIPCION)}
-            onKeyDown={e => { if (e.key === 'Enter') router.push(URL_SUSCRIPCION) }}
+            onClick={() => void irASuscripcion()}
+            onKeyDown={e => { if (e.key === 'Enter') void irASuscripcion() }}
             style={{
                 display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
                 padding: '9px 18px', cursor: 'pointer',
@@ -74,7 +156,7 @@ export default function SubscriptionStatusBanner() {
                 )}
             </span>
             <span style={{ marginLeft: 'auto', fontWeight: 700, color: suspendida ? 'var(--color-error)' : 'var(--color-primary)', whiteSpace: 'nowrap' }}>
-                {esCortesia && !sub.planActive ? 'Elegí tu plan →' : 'Activar mi plan →'}
+                {esCortesia && !cortesia.tienePlanElegido ? 'Elegí tu plan →' : 'Activar mi plan →'}
             </span>
         </div>
     )

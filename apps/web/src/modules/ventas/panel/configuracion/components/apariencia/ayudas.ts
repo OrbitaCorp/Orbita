@@ -26,6 +26,11 @@ import type { Ayuda } from './AyudaSeccion'
 // textos distintos, porque con una plantilla activa esa tarjeta ya no tiene
 // logo ni nombre adentro.
 export const AYUDA_SECCIONES: Record<string, Ayuda> = {
+    plantillas: {
+        que: 'Combinaciones ya armadas de todo lo que se elige en esta pantalla: colores, modo claro u oscuro, tipografías, header, estilo del nombre o logo, diseño de los sliders (imagen completa o centrada, velo, patrón y color), grilla de productos, categorías, anuncio, banner de WhatsApp y video. Abajo están las plantillas premium: portadas con un diseño propio.',
+        donde: 'En toda la tienda: una plantilla por defecto cambia varias secciones de una.',
+        afecta: 'Al elegir una se completan esos controles, igual que si los eligieras uno por uno, y después podés cambiar cualquiera. No toca tus textos, fotos, logo, enlaces del header ni lo que tenés prendido o apagado. La imagen centrada se usa solo en los slides con foto sin fondo (PNG); los que tienen una foto común quedan a imagen completa. No se publica hasta que tocás Guardar cambios; Descartar vuelve a lo que ya estaba publicado. Las premium se abren en una demo y desde ahí se usan en tu tienda al instante: las que dicen Gratis con cualquier plan, el resto con el paquete Avanzado.',
+    },
     identidad: {
         que: 'El logo de tu tienda (que también se usa como ícono de la pestaña en el navegador), el nombre y las imágenes grandes que rotan arriba del inicio (los sliders del hero).',
         donde: 'El logo, en el header de todas las páginas, en la pestaña del navegador, y también en los emails y comprobantes que reciben tus clientes. Los sliders, en el bloque grande de arriba del inicio.',

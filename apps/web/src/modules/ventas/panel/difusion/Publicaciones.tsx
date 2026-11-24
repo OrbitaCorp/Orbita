@@ -117,7 +117,7 @@ function Compositor({ usuario, productoInicial, desdeSugerida, desdeCalendario, 
   const [idea, setIdea] = useState('')
   const [orbi, setOrbi] = useState<{ cargando: boolean; error: string | null; resultado: InstagramTextoDeOrbi | null }>({ cargando: false, error: null, resultado: null })
 
-  useEffect(() => () => { montado.current = false }, [])
+  useEffect(() => { montado.current = true; return () => { montado.current = false } }, [])
 
   const cargarHistorial = useCallback(() => {
     getInstagramPosts().then((h) => { if (montado.current) setHistorial(h) }).catch(() => undefined)

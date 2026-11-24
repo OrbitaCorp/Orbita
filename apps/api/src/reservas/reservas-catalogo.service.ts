@@ -16,7 +16,7 @@ import { tomarRecurso, TRANSACCION_CON_CANDADO } from './candado';
 const CAMPOS_CONFIG = [
   'activo', 'confirmacion', 'retencionMinutos', 'anticipacionMinimaMinutos', 'anticipacionMaximaDias', 'cancelacionHastaHoras',
   'reprogramacionHastaHoras', 'reprogramacionesMaximas', 'senaPorcentaje', 'senaReembolsable', 'maximoActivasPorCliente',
-  'listaDeEspera', 'margenMinutos', 'horario',
+  'listaDeEspera', 'margenMinutos', 'horario', 'datos',
 ];
 const CAMPOS_RECURSO = ['nombre', 'descripcion', 'tipo', 'cupo', 'duracionMinutos', 'pasoMinutos', 'margenMinutos', 'maximoSeguidos', 'precio', 'horario', 'datos', 'memberId', 'orden', 'activo'];
 const CAMPOS_SERVICIO = ['nombre', 'descripcion', 'duracionMinutos', 'precio', 'reservableOnline', 'recursoIds', 'orden', 'activo'];
@@ -71,8 +71,12 @@ export class ReservasCatalogoService {
       const error = errorDeHorario(dto.horario);
       if (error) throw new BadRequestException(error);
     }
-    const { modulo, horario, ...resto } = dto;
-    const datos = { ...resto, ...(horario !== undefined ? { horario: horario as Prisma.InputJsonValue } : {}) };
+    const { modulo, horario, datos: libres, ...resto } = dto;
+    const datos = {
+      ...resto,
+      ...(horario !== undefined ? { horario: horario as Prisma.InputJsonValue } : {}),
+      ...(libres !== undefined ? { datos: libres as Prisma.InputJsonValue } : {}),
+    };
     const despues = antes
       ? await this.prisma.reservaConfig.update({ where: { businessId_modulo: { businessId, modulo } }, data: datos })
       : await this.prisma.reservaConfig.create({ data: { businessId, modulo, ...datos, horario: (horario ?? HORARIO_DE_FABRICA) as Prisma.InputJsonValue } });

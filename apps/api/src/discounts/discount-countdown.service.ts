@@ -103,7 +103,12 @@ export class DiscountCountdownService {
   // tenía, la pierde) y se refrescan nombre y fecha; con false solo se apaga
   // si era de este descuento. Se llama después de create/update, cuando el
   // Discount ya está en la base.
-  async aplicar(businessId: string, discount: Pick<Discount, 'id' | 'name' | 'endDate'>, prender: boolean): Promise<void> {
+  async aplicar(
+    businessId: string,
+    discount: Pick<Discount, 'id' | 'name' | 'endDate'>,
+    prender: boolean,
+    diseno?: { format?: string; design?: string },
+  ): Promise<void> {
     const actual = await this.prisma.countdownConfig.findUnique({
       where: { businessId },
       select: { discountId: true },
@@ -135,6 +140,8 @@ export class DiscountCountdownService {
       showProductsOnHome: true,
       isActive: true,
       discountId: discount.id,
+      ...(diseno?.format !== undefined ? { format: diseno.format } : {}),
+      ...(diseno?.design !== undefined ? { design: diseno.design } : {}),
     };
     await this.prisma.countdownConfig.upsert({
       where: { businessId },
