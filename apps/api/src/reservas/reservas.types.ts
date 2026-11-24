@@ -52,6 +52,8 @@ export interface ConfigDto {
   listaDeEspera: boolean;
   margenMinutos: number;
   horario: unknown;
+  /** Lo propio del módulo: el motor no lo interpreta. */
+  datos: unknown;
 }
 
 export interface ReservaDto {
@@ -79,6 +81,8 @@ export interface ReservaDto {
   notaInterna?: string | null;
   servicio: unknown;
   extras: unknown;
+  /** Lo propio del módulo: el motor no lo interpreta. */
+  datos: unknown;
   precio: number;
   sena: number;
   pagado: number;
@@ -162,7 +166,14 @@ export function configDto(c: ReservaConfig): ConfigDto {
     cancelacionHastaHoras: c.cancelacionHastaHoras, reprogramacionHastaHoras: c.reprogramacionHastaHoras,
     reprogramacionesMaximas: c.reprogramacionesMaximas, senaPorcentaje: c.senaPorcentaje, senaReembolsable: c.senaReembolsable,
     maximoActivasPorCliente: c.maximoActivasPorCliente, listaDeEspera: c.listaDeEspera, margenMinutos: c.margenMinutos, horario: c.horario,
+    datos: c.datos ?? null,
   };
+}
+
+/** De `datos` de la config, lo único que sale al sitio: lo que el módulo puso en `publico`. */
+export function datosPublicos(datos: unknown): Record<string, unknown> | null {
+  const publico = datos && typeof datos === 'object' && !Array.isArray(datos) ? (datos as Record<string, unknown>).publico : null;
+  return publico && typeof publico === 'object' && !Array.isArray(publico) ? (publico as Record<string, unknown>) : null;
 }
 
 /** Lo público de la config: lo que el sitio necesita para dibujar el flujo, sin nada interno. */
@@ -172,7 +183,7 @@ export function configPublicaDto(c: ReservaConfig) {
     anticipacionMinimaMinutos: c.anticipacionMinimaMinutos, anticipacionMaximaDias: c.anticipacionMaximaDias,
     cancelacionHastaHoras: c.cancelacionHastaHoras, reprogramacionHastaHoras: c.reprogramacionHastaHoras,
     reprogramacionesMaximas: c.reprogramacionesMaximas, senaPorcentaje: c.senaPorcentaje, senaReembolsable: c.senaReembolsable,
-    listaDeEspera: c.listaDeEspera, horario: c.horario,
+    listaDeEspera: c.listaDeEspera, horario: c.horario, publico: datosPublicos(c.datos),
   };
 }
 
@@ -185,7 +196,7 @@ export function reservaDto(r: Reserva, opciones: { panel: boolean }): ReservaDto
     cantidad: r.cantidad, retenidaHasta: r.retenidaHasta?.toISOString() ?? null,
     clienteId: r.clienteId, clienteNombre: r.clienteNombre, clienteTelefono: r.clienteTelefono, clienteEmail: r.clienteEmail,
     notas: r.notas, ...(opciones.panel ? { notaInterna: r.notaInterna } : {}),
-    servicio: r.servicio, extras: r.extras, precio: aNumero(r.precio), sena: aNumero(r.sena), pagado: aNumero(r.pagado), pagoMetodo: r.pagoMetodo,
+    servicio: r.servicio, extras: r.extras, datos: r.datos ?? null, precio: aNumero(r.precio), sena: aNumero(r.sena), pagado: aNumero(r.pagado), pagoMetodo: r.pagoMetodo,
     confirmadaEn: r.confirmadaEn?.toISOString() ?? null, completadaEn: r.completadaEn?.toISOString() ?? null,
     canceladaEn: r.canceladaEn?.toISOString() ?? null, canceladaPor: r.canceladaPor, motivoCancelacion: r.motivoCancelacion,
     reprogramaciones: r.reprogramaciones, version: r.version, creadaEn: r.createdAt.toISOString(),

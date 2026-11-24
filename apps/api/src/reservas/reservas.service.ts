@@ -9,6 +9,7 @@ import { ReservasAvisosService } from './reservas-avisos.service';
 import { desdeDonde, ETIQUETA, mensajeTransicion, OCUPAN } from './dominio/estados';
 import { aperturaDelDia, sesionesDelDia } from './dominio/horario';
 import { extrasElegidos, precioTotal, sena as calcularSena, type ExtraElegido } from './dominio/precio';
+import { precioDeEstadia, tarifaDeAlojamiento } from './dominio/estadia';
 import { diasEntre, esFecha, fechaYMinutos, instante } from './dominio/tiempo';
 import { generarCodigo, generarToken } from './dominio/codigos';
 import type { PedidoReservaDto } from './dto/reservas.dto';
@@ -161,7 +162,12 @@ export class ReservasService {
     const datos = (recurso.datos && typeof recurso.datos === 'object' ? recurso.datos : {}) as Record<string, unknown>;
     const extras = extrasElegidos(datos.extras, pedido.extras);
     const base = servicio ? Number(servicio.precio) : Number(recurso.precio);
-    const precio = opciones.precioManual ?? precioTotal(base, recurso.tipo === 'CLASE' ? cantidad : unidades, extras);
+    // Una estadía se cobra noche por noche (temporadas, fin de semana, limpieza: dominio/estadia.ts).
+    // Sin tarifa cargada da lo de siempre: el precio del recurso por las noches.
+    const calculado = recurso.tipo === 'ALOJAMIENTO' && pedido.fechaHasta
+      ? precioTotal(precioDeEstadia(pedido.fecha, pedido.fechaHasta, tarifaDeAlojamiento(base, recurso.datos)).total, 1, extras)
+      : precioTotal(base, recurso.tipo === 'CLASE' ? cantidad : unidades, extras);
+    const precio = opciones.precioManual ?? calculado;
     return {
       reglas, inicio, fin, fecha: fechaYMinutos(inicio).fecha, cantidad, precio,
       sena: calcularSena(precio, config.senaPorcentaje), extras,
@@ -213,6 +219,7 @@ export class ReservasService {
                 notas: o.notas ?? null, notaInterna: o.notaInterna ?? null,
                 servicio: p.servicio ? (p.servicio as Prisma.InputJsonValue) : Prisma.DbNull,
                 extras: p.extras.length ? (p.extras as unknown as Prisma.InputJsonValue) : Prisma.DbNull,
+                datos: pedido.datos ? (pedido.datos as Prisma.InputJsonValue) : Prisma.DbNull,
                 precio: p.precio, sena: p.sena,
                 confirmadaEn: o.estado === 'CONFIRMADA' ? ahora : null,
                 claveIdempotencia: o.clave ?? null, creadaPorMemberId: o.memberId ?? null,
@@ -388,7 +395,8 @@ export class ReservasService {
       throw e;
     });
     if (p.inicio.getTime() === r.inicio.getTime() && p.fin.getTime() === r.fin.getTime() && recursoId === r.recursoId) return r;
-    // El precio solo se recalcula si cambió la cantidad de noches (alojamientos); lo demás queda como se pactó.
+    // El precio solo se recalcula en un alojamiento, si el total de las noches nuevas es otro (más o menos noches,
+    // otra temporada, un fin de semana); lo demás queda como se pactó.
     const precioNuevo = recursoViejo.tipo === 'ALOJAMIENTO' && p.precio !== Number(r.precio) ? p.precio : null;
 
     try {

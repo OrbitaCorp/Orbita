@@ -111,15 +111,17 @@ export class ReservasPanelController {
     return this.catalogo.bloqueos(m.businessId, q.modulo, q.desde, q.hasta);
   }
 
+  // Cerrar un día o una semana es del día a día: lo hace quien gestiona las reservas (un encargado),
+  // no solo quien configura el negocio.
   @Post('bloqueos')
-  @RequirePermission('reservas.config')
+  @RequirePermission('reservas.manage')
   crearBloqueo(@CurrentBusiness() ctx: AuthContext, @Body() dto: CrearBloqueoDto) {
     const m = assertMemberContext(ctx);
     return this.catalogo.crearBloqueo(m.businessId, m.memberId, dto);
   }
 
   @Delete('bloqueos/:id')
-  @RequirePermission('reservas.config')
+  @RequirePermission('reservas.manage')
   borrarBloqueo(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
     const m = assertMemberContext(ctx);
     return this.catalogo.borrarBloqueo(m.businessId, m.memberId, id);

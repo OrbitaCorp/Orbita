@@ -133,6 +133,24 @@ describe('ReservasService · resolverPedido (lo que se verifica antes del candad
     await expect(svc.resolverPedido(BIZ, { modulo: 'ALQUILERES', recursoId: 'r-cab', fecha: '2026-11-13' }, 'publico', AHORA)).rejects.toThrow(/check-out/);
   });
 
+  it('una estadía se cobra noche por noche: temporada, recargo de fin de semana y limpieza, y la seña sale de ese total', async () => {
+    const cabana = cancha({
+      id: 'r-cab', tipo: 'ALOJAMIENTO', duracionMinutos: null, maximoSeguidos: 1, precio: 60_000,
+      datos: { tarifa: { temporadas: [{ id: 'alta', nombre: 'Temporada alta', desde: '2026-11-20', hasta: '2026-11-30', precioNoche: 95_000 }], finDeSemanaPct: 20, limpieza: 25_000 } },
+    });
+    const { svc } = armar({ recurso: cabana });
+    // 13/11 viernes (+20 %), 14/11 sábado (+20 %), 15/11 domingo (base): 72.000 + 72.000 + 60.000 + 25.000 de limpieza
+    const p = await svc.resolverPedido(BIZ, { modulo: 'ALQUILERES', recursoId: 'r-cab', fecha: '2026-11-13', fechaHasta: '2026-11-16' }, 'publico', AHORA);
+    expect(p.precio).toBe(229_000);
+    expect(p.sena).toBe(114_500);
+    // Adentro de la temporada manda su precio: lunes 23 y martes 24 a 95.000, más la limpieza
+    const alta = await svc.resolverPedido(BIZ, { modulo: 'ALQUILERES', recursoId: 'r-cab', fecha: '2026-11-23', fechaHasta: '2026-11-25' }, 'publico', AHORA);
+    expect(alta.precio).toBe(215_000);
+    // El precio que pone el negocio a mano desde el panel sigue mandando
+    const manual = await svc.resolverPedido(BIZ, { modulo: 'ALQUILERES', recursoId: 'r-cab', fecha: '2026-11-13', fechaHasta: '2026-11-16' }, 'panel', AHORA, { precioManual: 150_000 });
+    expect(manual.precio).toBe(150_000);
+  });
+
   it('con las reservas online pausadas el sitio no reserva, pero el panel sí', async () => {
     const { svc } = armar({ config: config({ activo: false }) });
     await expect(svc.resolverPedido(BIZ, pedido(), 'publico', AHORA)).rejects.toThrow(/pausadas/);
@@ -166,6 +184,18 @@ describe('ReservasService · crear', () => {
     expect(datos.retenidaHasta.toISOString()).toBe(new Date(AHORA.getTime() + 10 * 60_000).toISOString());
     expect(datos.codigo).toMatch(/^[A-Z2-9]{6}$/);
     expect(datos.tokenAcceso).toHaveLength(32);
+  });
+
+  it('guarda el `datos` del pedido tal cual, sin interpretarlo; sin datos queda en null', async () => {
+    const { svc, prisma } = armar();
+    const create = jest.fn().mockResolvedValue(reserva({ id: 'nueva', estado: 'RETENIDA' }));
+    (prisma.reserva as Record<string, jest.Mock>).create = create;
+    await svc.crear(BIZ, pedido({ datos: { huespedes: 3, canal: 'sitio' } }), { estado: 'RETENIDA', origen: 'TIENDA', actor: 'CLIENTE', clave: 'k3' }, AHORA);
+    expect(create.mock.calls[0][0].data.datos).toEqual({ huespedes: 3, canal: 'sitio' });
+    await svc.crear(BIZ, pedido(), { estado: 'RETENIDA', origen: 'TIENDA', actor: 'CLIENTE', clave: 'k4' }, AHORA);
+    // Prisma.DbNull: la columna queda en NULL de SQL, no en el null de JSON.
+    expect(create.mock.calls[1][0].data.datos).not.toEqual(expect.objectContaining({ huespedes: expect.anything() }));
+    expect(JSON.stringify(create.mock.calls[1][0].data.datos)).not.toContain('huespedes');
   });
 
   it('si el lugar ya está tomado adentro de la transacción responde 409 y no inserta', async () => {

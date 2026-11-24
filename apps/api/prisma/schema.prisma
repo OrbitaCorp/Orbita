@@ -3936,6 +3936,9 @@ model ReservaConfig {
   /// Horario semanal por defecto de los recursos sin horario propio:
   /// { "1": [[540, 780], [900, 1200]], … } con 0 = domingo y minutos desde las 00:00 de Argentina.
   horario                   Json
+  /// Lo propio de cada módulo que el motor no interpreta (formas de pago, plantillas de mensajes…).
+  /// Lo que esté adentro de `publico` es lo único que ve el sitio: { "publico": { "alias": "…" } }.
+  datos                     Json?
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -4053,6 +4056,8 @@ model Reserva {
   servicio        Json?
   /// Extras elegidos del recurso: [{ id, nombre, precio }].
   extras          Json?
+  /// Lo propio de cada módulo que el motor no interpreta: { huespedes, canal } en una estadía, el evento en un salón…
+  datos           Json?
 
   precio     Decimal @default(0) @db.Decimal(12, 2)
   sena       Decimal @default(0) @db.Decimal(12, 2)

@@ -4,7 +4,7 @@ import {
   ArrayMaxSize, IsArray, IsBoolean, IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min,
   ValidateNested,
 } from 'class-validator';
-import { ClienteDto, MENSAJE_FECHA, MENSAJE_MODULO, PaginacionDto, RE_FECHA, recortar } from './comunes.dto';
+import { ClienteDto, JsonHasta, MAX_DATOS_RESERVA, MENSAJE_FECHA, MENSAJE_MODULO, PaginacionDto, RE_FECHA, recortar } from './comunes.dto';
 
 // Qué se quiere reservar: el recurso, el día y la hora (minutos de Argentina),
 // y según el tipo: el servicio (Turnos), cuántas franjas seguidas (canchas),
@@ -44,6 +44,10 @@ export class PedidoReservaDto {
 
   @Transform(recortar) @IsOptional() @IsString() @MaxLength(500)
   notas?: string;
+
+  /** Lo propio del módulo, que el motor guarda sin interpretar (cuántos huéspedes vienen, por dónde llegó la reserva). */
+  @IsOptional() @JsonHasta(MAX_DATOS_RESERVA)
+  datos?: Record<string, unknown>;
 }
 
 /** Sitio público, paso 1: tomar el lugar mientras la persona carga sus datos. */

@@ -4,7 +4,7 @@ import {
   ArrayMaxSize, IsArray, IsBoolean, IsDefined, IsEnum, IsInt, IsNumber, IsObject, IsOptional, IsString, IsUUID,
   Matches, Max, MaxLength, Min, MinLength, ValidateIf,
 } from 'class-validator';
-import { MENSAJE_FECHA, MENSAJE_MODULO, RE_FECHA, recortar, recortarObligatorio } from './comunes.dto';
+import { JsonHasta, MAX_DATOS_CONFIG, MENSAJE_FECHA, MENSAJE_MODULO, RE_FECHA, recortar, recortarObligatorio } from './comunes.dto';
 
 // Las reglas de reserva de un módulo. Los rangos son los que ofrece el panel;
 // el horario se valida en el service (errorDeHorario) porque class-validator
@@ -55,6 +55,13 @@ export class UpsertConfigDto {
   /** Obligatorio al crear; al editar, si no viene, queda el de antes. */
   @IsOptional() @IsObject({ message: 'El horario tiene que ser un objeto con los días de la semana.' })
   horario?: Record<string, unknown>;
+
+  /**
+   * Lo propio del módulo, que el motor guarda sin interpretar. Si viene,
+   * reemplaza entero al anterior. Lo que esté en `publico` lo ve el sitio.
+   */
+  @IsOptional() @JsonHasta(MAX_DATOS_CONFIG)
+  datos?: Record<string, unknown>;
 }
 
 export class UpsertRecursoDto {

@@ -1,10 +1,34 @@
 import { ReservaModulo } from '@prisma/client';
 import { Transform, Type } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength, ValidateBy, type ValidationOptions } from 'class-validator';
 
 export const RE_FECHA = /^\d{4}-\d{2}-\d{2}$/;
 export const MENSAJE_FECHA = 'La fecha tiene que ser AAAA-MM-DD.';
 export const MENSAJE_MODULO = 'El módulo tiene que ser TURNOS, ALQUILERES o GIMNASIO.';
+
+/**
+ * Un objeto JSON libre (el `datos` de una reserva o de la config) que no pase
+ * de `maximo` caracteres serializado. El motor no mira adentro, pero uno de
+ * estos llega desde el sitio público: sin tope sería un lugar donde guardar
+ * cualquier cosa.
+ */
+export function JsonHasta(maximo: number, opciones?: ValidationOptions): PropertyDecorator {
+  return ValidateBy({
+    name: 'jsonHasta',
+    constraints: [maximo],
+    validator: {
+      validate: (v: unknown) => {
+        if (v === null || typeof v !== 'object' || Array.isArray(v)) return false;
+        try { return JSON.stringify(v).length <= maximo; } catch { return false; }
+      },
+      defaultMessage: () => `Los datos tienen que ser un objeto de hasta ${maximo} caracteres.`,
+    },
+  }, opciones);
+}
+
+/** Tope del `datos` de una reserva (llega también desde el sitio) y del de la config (solo desde el panel). */
+export const MAX_DATOS_RESERVA = 2_000;
+export const MAX_DATOS_CONFIG = 20_000;
 
 /** Recorta espacios; un texto vacío queda undefined para que lo opcional sea opcional de verdad. */
 export const recortar = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() || undefined : value);

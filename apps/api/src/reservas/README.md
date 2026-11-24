@@ -69,7 +69,8 @@ mira la restricción de exclusión de la base.
 | **Se cancela** | Compare-and-set sobre el estado (y la `version` si viene): la segunda de dos acciones simultáneas recibe 409 con el estado real. Desde el sitio vale la política (`cancelacionHastaHoras`); el negocio cancela siempre. La seña paga queda `DEVUELTA`, `PERDIDA` o `SIN_SENA` en el historial y en el aviso. Si hay lista de espera para ese horario, **el primero toma el lugar en la misma transacción** (con el recurso tomado: nadie se mete en el medio). |
 | Confirmar, completar, marcar ausente, cobrar | Mismo compare-and-set; completar o marcar ausente solo después del inicio; el pago nunca pasa del total. Repetir una acción ya hecha no rompe nada (idempotente). |
 | Reservar fuera de horario, en un bloqueo, demasiado pronto o lejos, en una sesión que no existe | 400 con el motivo en castellano. El panel puede saltearse la apertura (`fueraDeHorario`, un turno excepcional), nunca el cupo ni los bloqueos. |
-| Precio y seña | Se calculan **siempre en el servidor** a partir del servicio o del recurso y de sus extras; lo que mande el cliente se ignora. Un precio a mano desde el panel exige `reservas.config`. |
+| Precio y seña | Se calculan **siempre en el servidor** a partir del servicio o del recurso y de sus extras; lo que mande el cliente se ignora. Un precio a mano desde el panel exige `reservas.config`. Una estadía (`ALOJAMIENTO`) se cobra noche por noche con la tarifa de `datos.tarifa` del recurso: temporadas, recargo de viernes y sábado y limpieza (`dominio/estadia.ts`, la misma cuenta que `apps/web/src/lib/reservas/estadia.ts`); sin tarifa, el precio del recurso por las noches. |
+| Campo libre (`datos`) | La reserva y la config tienen un `datos` JSON que el motor guarda **sin interpretar**: es de cada módulo (cuántos huéspedes vienen, el canal, las formas de pago, las plantillas de mensajes). Con tope de tamaño (2.000 caracteres en la reserva, que también llega desde el sitio; 20.000 en la config). De la config, el sitio ve solo lo que esté en `datos.publico` (sale como `publico` en la config pública). |
 | Otro negocio | Todo filtra por `businessId` del token (lo vigila `aislamiento-consultas.unit-spec.ts`); el sitio resuelve el negocio por el `:slug` y nunca busca reservas por código ni por teléfono: solo por el token del enlace personal. |
 
 ## Rutas
@@ -95,8 +96,8 @@ mira la restricción de exclusión de la base.
 | Permiso | Rutas |
 |---|---|
 | `reservas.view` | `GET config`, `GET recursos`, `GET servicios`, `GET bloqueos`, `GET disponibilidad[/rango|/noches]`, `GET /` (agenda, por `desde`/`hasta`/`recursoId`/`estado`/`q`), `GET :id` (con historial), `GET resumen`, `GET espera` |
-| `reservas.manage` | `POST /` (nace `CONFIRMADA` o `PENDIENTE`), `POST :id/confirmar|completar|ausente|cancelar|reprogramar|pago`, `PATCH :id/nota`, `DELETE espera/:id` |
-| `reservas.config` | `PUT config`, `POST|PUT|DELETE recursos`, `POST|PUT|DELETE servicios`, `POST|DELETE bloqueos` (y el `precio` a mano al crear) |
+| `reservas.manage` | `POST /` (nace `CONFIRMADA` o `PENDIENTE`), `POST :id/confirmar|completar|ausente|cancelar|reprogramar|pago`, `PATCH :id/nota`, `DELETE espera/:id`, `POST|DELETE bloqueos` (cerrar un día es del día a día: lo hace un encargado) |
+| `reservas.config` | `PUT config`, `POST|PUT|DELETE recursos`, `POST|PUT|DELETE servicios` (y el `precio` a mano al crear) |
 
 Los roles de fábrica: `owner`/`admin` tienen los tres; `empleado` ve y gestiona, no configura
 (migración `20261103120000_reservas` para los negocios existentes; `common/permisos/catalogo.ts`
