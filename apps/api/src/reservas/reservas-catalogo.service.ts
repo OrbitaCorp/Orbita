@@ -154,6 +154,10 @@ export class ReservasCatalogoService {
       throw new BadRequestException(`Tiene ${futuras} ${futuras === 1 ? 'reserva por delante' : 'reservas por delante'}. Movelas o cancelalas antes de borrarlo.`);
     }
     await this.prisma.reservaRecurso.updateMany({ where: { id, businessId }, data: { eliminadoEn: ahora, activo: false } });
+    // Sus calendarios externos y lo que habían bloqueado se van con él: no queda nada ocupando
+    // noches de algo que ya no existe (la base también borra esos bloqueos en cascada).
+    await this.prisma.reservaBloqueo.deleteMany({ where: { businessId, recursoId: id, origen: 'ICAL' } });
+    await this.prisma.reservaCalendarioExterno.deleteMany({ where: { businessId, recursoId: id } });
     await this.audit?.registrar({ businessId, memberId, entityType: 'reserva_recurso', entityId: id, action: 'DELETE' });
     return { ok: true };
   }
@@ -284,7 +288,11 @@ export class ReservasCatalogoService {
   }
 
   async borrarBloqueo(businessId: string, memberId: string, id: string): Promise<{ ok: true }> {
-    const r = await this.prisma.reservaBloqueo.deleteMany({ where: { id, businessId } });
+    // Lo que vino de un calendario externo lo maneja la sincronización: si se quitara a mano,
+    // volvería en la próxima corrida (y mientras tanto la noche quedaría libre con alguien adentro).
+    const externo = await this.prisma.reservaBloqueo.findFirst({ where: { id, businessId, origen: 'ICAL' }, select: { id: true } });
+    if (externo) throw new BadRequestException('Ese bloqueo viene de Airbnb: se va solo cuando Airbnb libera esas noches, o desconectando el calendario.');
+    const r = await this.prisma.reservaBloqueo.deleteMany({ where: { id, businessId, origen: 'DUENO' } });
     if (r.count === 0) throw new NotFoundException('Ese bloqueo no existe.');
     await this.audit?.registrar({ businessId, memberId, entityType: 'reserva_bloqueo', entityId: id, action: 'DELETE' });
     return { ok: true };

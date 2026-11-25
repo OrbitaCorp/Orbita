@@ -142,12 +142,6 @@ export class ReservasCalendariosService {
     });
   }
 
-  /** Al borrar una propiedad: sus calendarios y lo que habían bloqueado se van con ella. */
-  async desconectarDelRecurso(businessId: string, recursoId: string): Promise<void> {
-    const suyos = await this.prisma.reservaCalendarioExterno.findMany({ where: { businessId, recursoId }, select: { id: true } });
-    for (const c of suyos) await this.borrar(businessId, c.id);
-  }
-
   // ─── Sincronizar ───────────────────────────────────────────────────────────
 
   /** A pedido ("Sincronizar ahora"). */

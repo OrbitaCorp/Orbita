@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
@@ -6,6 +7,8 @@ import { assertMemberContext } from '../common/utils/assert-member-context';
 import { ReservasCatalogoService } from './reservas-catalogo.service';
 import { DisponibilidadService } from './disponibilidad.service';
 import { ReservasService } from './reservas.service';
+import { ReservasCalendariosService } from './calendarios/reservas-calendarios.service';
+import { ConectarCalendarioDto } from './dto/calendarios.dto';
 import { CrearBloqueoDto, ListarBloqueosQueryDto, ListarCatalogoQueryDto, UpsertConfigDto, UpsertRecursoDto, UpsertServicioDto } from './dto/catalogo.dto';
 import { ModuloQueryDto } from './dto/comunes.dto';
 import {
@@ -16,8 +19,8 @@ import { configDto, recursoDto, reservaDto, servicioDto } from './reservas.types
 
 // El panel de Turnos, Alquileres y Gimnasio. Tres permisos:
 // - reservas.view: ver la agenda, las reservas, los recursos y las reglas.
-// - reservas.manage: dar, mover, confirmar, cancelar, cobrar.
-// - reservas.config: recursos, servicios, reglas y bloqueos.
+// - reservas.manage: dar, mover, confirmar, cancelar, cobrar, bloquear fechas y pedir una sincronización.
+// - reservas.config: recursos, servicios, reglas, y conectar o desconectar un calendario externo.
 // businessId sale SIEMPRE del token (assertMemberContext), nunca de la URL.
 @Controller('reservas')
 export class ReservasPanelController {
@@ -25,6 +28,7 @@ export class ReservasPanelController {
     private readonly catalogo: ReservasCatalogoService,
     private readonly disponibilidad: DisponibilidadService,
     private readonly reservas: ReservasService,
+    private readonly calendariosExternos: ReservasCalendariosService,
   ) {}
 
   // ─── Reglas ───────────────────────────────────────────────────────────────
@@ -125,6 +129,40 @@ export class ReservasPanelController {
   borrarBloqueo(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
     const m = assertMemberContext(ctx);
     return this.catalogo.borrarBloqueo(m.businessId, m.memberId, id);
+  }
+
+  // ─── Calendarios externos (Airbnb) ────────────────────────────────────────
+
+  @Get('calendarios')
+  @RequirePermission('reservas.view')
+  calendarios(@CurrentBusiness() ctx: AuthContext, @Query() q: ModuloQueryDto) {
+    const m = assertMemberContext(ctx);
+    return this.calendariosExternos.listar(m.businessId, q.modulo);
+  }
+
+  /** Conecta el calendario y lo baja en el momento: la respuesta ya trae si el enlace sirvió. */
+  @Post('calendarios')
+  @RequirePermission('reservas.config')
+  @Throttle({ default: { limit: 6, ttl: 60_000 } })
+  conectarCalendario(@CurrentBusiness() ctx: AuthContext, @Body() dto: ConectarCalendarioDto) {
+    const m = assertMemberContext(ctx);
+    return this.calendariosExternos.conectar(m.businessId, m.memberId, { modulo: dto.modulo, recursoId: dto.recursoId, nombre: dto.nombre ?? 'Airbnb', url: dto.url });
+  }
+
+  @Delete('calendarios/:id')
+  @RequirePermission('reservas.config')
+  desconectarCalendario(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
+    const m = assertMemberContext(ctx);
+    return this.calendariosExternos.desconectar(m.businessId, m.memberId, id);
+  }
+
+  /** "Sincronizar ahora". Con tope: cada pedido le pega a Airbnb. */
+  @Post('calendarios/:id/sincronizar')
+  @RequirePermission('reservas.manage')
+  @Throttle({ default: { limit: 6, ttl: 60_000 } })
+  sincronizarCalendario(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
+    const m = assertMemberContext(ctx);
+    return this.calendariosExternos.sincronizar(m.businessId, id);
   }
 
   // ─── Disponibilidad ───────────────────────────────────────────────────────

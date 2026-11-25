@@ -95,9 +95,9 @@ mira la restricción de exclusión de la base.
 
 | Permiso | Rutas |
 |---|---|
-| `reservas.view` | `GET config`, `GET recursos`, `GET servicios`, `GET bloqueos`, `GET disponibilidad[/rango|/noches]`, `GET /` (agenda, por `desde`/`hasta`/`recursoId`/`estado`/`q`), `GET :id` (con historial), `GET resumen`, `GET espera` |
-| `reservas.manage` | `POST /` (nace `CONFIRMADA` o `PENDIENTE`), `POST :id/confirmar|completar|ausente|cancelar|reprogramar|pago`, `PATCH :id/nota`, `DELETE espera/:id`, `POST|DELETE bloqueos` (cerrar un día es del día a día: lo hace un encargado) |
-| `reservas.config` | `PUT config`, `POST|PUT|DELETE recursos`, `POST|PUT|DELETE servicios` (y el `precio` a mano al crear) |
+| `reservas.view` | `GET config`, `GET recursos`, `GET servicios`, `GET bloqueos`, `GET calendarios`, `GET disponibilidad[/rango|/noches]`, `GET /` (agenda, por `desde`/`hasta`/`recursoId`/`estado`/`q`), `GET :id` (con historial), `GET resumen`, `GET espera` |
+| `reservas.manage` | `POST /` (nace `CONFIRMADA` o `PENDIENTE`), `POST :id/confirmar|completar|ausente|cancelar|reprogramar|pago`, `PATCH :id/nota`, `DELETE espera/:id`, `POST|DELETE bloqueos` (cerrar un día es del día a día: lo hace un encargado), `POST calendarios/:id/sincronizar` |
+| `reservas.config` | `PUT config`, `POST|PUT|DELETE recursos`, `POST|PUT|DELETE servicios`, `POST calendarios`, `DELETE calendarios/:id` (y el `precio` a mano al crear) |
 
 Los roles de fábrica: `owner`/`admin` tienen los tres; `empleado` ve y gestiona, no configura
 (migración `20261103120000_reservas` para los negocios existentes; `common/permisos/catalogo.ts`
@@ -146,3 +146,31 @@ pnpm exec jest --config ./test/jest-unit.json reservas.service             # el 
 # contra la base de DEV (nunca producción): ver DEPLOYMENT.md § Correr los e2e contra dev
 E2E_DATABASE_URL=… E2E_DIRECT_URL=… pnpm test:e2e -- reservas
 ```
+
+## Calendarios externos (Airbnb)
+
+Un alojamiento puede sincronizar sus noches con un aviso de Airbnb por `.ics`, en las dos direcciones.
+Código: `calendarios/` y `dominio/ics.ts`. Plan y decisiones: `docs/superpowers/plans/2026-11-25-alquileres-airbnb-calendario.md`.
+
+- **De acá para allá:** `GET /storefront/:slug/reservas/ical/<recursoId>.ics`, público. Trae las reservas que
+  ocupan y los bloqueos del dueño como eventos de día entero, sin datos de nadie. Nunca lo que vino de afuera.
+  No lleva token: muestra lo mismo que `disponibilidad/noches`.
+- **De allá para acá:** el dueño conecta el enlace `.ics` del aviso (`reservas_calendarios_externos`). Cada
+  sincronización baja el archivo y **reemplaza** los bloqueos de ese calendario (`reservas_bloqueos` con
+  `origen = ICAL`, `calendario_id`, `externo_tipo` y `externo_uid`). El motor ya respeta cualquier bloqueo al
+  reservar, así que no hay nada más que tocar.
+- **Cada cuánto:** el job `instagram-cada-5-minutos` baja hasta 5 calendarios por corrida, los que no se
+  bajan hace 30 minutos. Solo corre en producción: en local y en staging se usa "Sincronizar ahora".
+- **Si falla la descarga** se guarda el motivo en el calendario y los bloqueos quedan como estaban.
+- **El eco:** Airbnb vuelve a publicar como "no disponible" lo que importó de acá, y a veces lo sigue
+  publicando cuando acá ya se canceló. Un evento "no disponible" con las fechas exactas de algo que este
+  recurso exportó en los últimos 60 días (también una reserva cancelada) no bloquea. Lo que allá es una
+  **reserva** bloquea siempre.
+- **Conflictos:** `GET calendarios` devuelve, por calendario, las reservas activas de acá que pisan noches
+  reservadas allá. No se resuelven solos: decide el dueño.
+- **Qué enlaces se aceptan** (`calendarios/descarga.ts`): solo `https://www.airbnb.<país>/….ics`, por lista
+  fija, sin seguir redirecciones, con 8 s y 1 MB como máximo. Es una dirección que escribe un usuario y que
+  baja el servidor: no se abre a otros sitios sin revisar esto. Fuera de producción vale además el host de
+  `RESERVAS_ICAL_HOST_DE_PRUEBA`, para probar con un archivo propio.
+- Un bloqueo `ICAL` no se borra a mano (`DELETE bloqueos/:id` responde 400): se va cuando Airbnb libera las
+  noches o al desconectar el calendario. Borrar el recurso se lleva sus calendarios y sus bloqueos importados.

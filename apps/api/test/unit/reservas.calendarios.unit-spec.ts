@@ -1,6 +1,9 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { ReservasCalendariosService } from '../../src/reservas/calendarios/reservas-calendarios.service';
 import { instante } from '../../src/reservas/dominio/tiempo';
+import { ReservasCatalogoService } from '../../src/reservas/reservas-catalogo.service';
+import { ReservasPanelController } from '../../src/reservas/reservas-panel.controller';
+import { PERMISSION_KEY } from '../../src/common/decorators/require-permission.decorator';
 
 // La sincronización con el calendario de Airbnb, sin base y sin internet: qué
 // bloqueos quedan después de cada corrida, y qué pasa cuando algo falla.
@@ -313,5 +316,48 @@ describe('ReservasCalendariosService · el .ics que se le da a Airbnb', () => {
     a.descargar.mockResolvedValue({ ok: true, texto: devuelto });
     await a.svc.sincronizar(BIZ, 'cal-1', AHORA);
     expect(a.deCalendario()).toEqual([]);
+  });
+});
+
+describe('Calendarios externos · guardas del catálogo', () => {
+  const catalogoCon = (o: { bloqueos?: Fila[]; calendarios?: Fila[]; reservas?: Fila[] } = {}) => {
+    const t = { reservaBloqueo: tabla(o.bloqueos ?? []), reservaCalendarioExterno: tabla(o.calendarios ?? []), reserva: tabla(o.reservas ?? []), reservaRecurso: tabla([cabana()]) };
+    const prisma = { ...t, $transaction: jest.fn(async (fn: (tx: unknown) => unknown) => fn(prisma)) } as Record<string, unknown>;
+    return { t, svc: new ReservasCatalogoService(prisma as never, { registrar: jest.fn().mockResolvedValue(undefined) } as never) };
+  };
+  const deAirbnb = (id: string, calendarioId = 'cal-1'): Fila => ({ id, businessId: BIZ, modulo: 'ALQUILERES', recursoId: 'r-cab', origen: 'ICAL', calendarioId, inicio: AHORA, fin: AHORA });
+
+  it('un bloqueo que vino de Airbnb no se quita a mano: se dice cómo se va', async () => {
+    const { svc, t } = catalogoCon({ bloqueos: [deAirbnb('b-ical'), bloqueoDueno('2026-12-10', '2026-12-12')] });
+    await expect(svc.borrarBloqueo(BIZ, 'm-1', 'b-ical')).rejects.toThrow(/viene de Airbnb/);
+    expect(t.reservaBloqueo.filas).toHaveLength(2);
+    await expect(svc.borrarBloqueo(BIZ, 'm-1', 'blo-2026-12-10')).resolves.toEqual({ ok: true });
+    expect(t.reservaBloqueo.filas.map((b) => b.id)).toEqual(['b-ical']);
+  });
+
+  it('borrar una propiedad se lleva sus calendarios y lo que habían bloqueado, y nada de otra propiedad', async () => {
+    const { svc, t } = catalogoCon({
+      calendarios: [calendario(), calendario({ id: 'cal-otra', recursoId: 'r-otra' })],
+      bloqueos: [deAirbnb('b1'), deAirbnb('b2'), { ...deAirbnb('b-otra', 'cal-otra'), recursoId: 'r-otra' }],
+    });
+    await svc.borrarRecurso(BIZ, 'm-1', 'r-cab', AHORA);
+    expect(t.reservaCalendarioExterno.filas.map((c) => c.id)).toEqual(['cal-otra']);
+    expect(t.reservaBloqueo.filas.map((b) => b.id)).toEqual(['b-otra']);
+  });
+});
+
+describe('Calendarios externos · quién puede qué en el panel', () => {
+  const permiso = (metodo: keyof ReservasPanelController) => Reflect.getMetadata(PERMISSION_KEY, ReservasPanelController.prototype[metodo] as object);
+
+  it('ver pide reservas.view; conectar y desconectar, reservas.config; sincronizar ahora, reservas.manage', () => {
+    expect(permiso('calendarios')).toBe('reservas.view');
+    expect(permiso('conectarCalendario')).toBe('reservas.config');
+    expect(permiso('desconectarCalendario')).toBe('reservas.config');
+    expect(permiso('sincronizarCalendario')).toBe('reservas.manage');
+  });
+
+  it('bloquear y desbloquear a mano siguen siendo de quien gestiona las reservas', () => {
+    expect(permiso('crearBloqueo')).toBe('reservas.manage');
+    expect(permiso('borrarBloqueo')).toBe('reservas.manage');
   });
 });

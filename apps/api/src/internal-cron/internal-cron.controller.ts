@@ -19,6 +19,7 @@ import { InstagramService } from '../instagram/instagram.service';
 import { InstagramPublicacionesService } from '../instagram/instagram-publicaciones.service';
 import { InstagramComentariosService } from '../instagram/instagram-comentarios.service';
 import { ReservasMantenimientoService } from '../reservas/reservas-mantenimiento.service';
+import { ReservasCalendariosService } from '../reservas/calendarios/reservas-calendarios.service';
 
 /**
  * Reemplazo de los @Cron() que tenía el backend antes de migrar a Cloud Run.
@@ -99,6 +100,9 @@ export class InternalCronController {
     // Reservas: vence las retenidas que pasaron su tiempo (cada 5 minutos, colgado del mismo disparo).
     // Opcional por la misma razón de compatibilidad con specs unitarios.
     private readonly reservasMantenimiento?: ReservasMantenimientoService,
+    // Reservas: calendarios externos (Airbnb). Cada 5 minutos se bajan los que toca (uno cada 30 minutos, de a
+    // pocos por corrida). Opcional por la misma razón de compatibilidad con specs unitarios.
+    private readonly reservasCalendarios?: ReservasCalendariosService,
     // Dominios propios pendientes: se verifican solos (cada 5 minutos, colgado del mismo disparo) en vez de
     // esperar a que el dueño toque "Verificar". Opcional por la misma razón de compatibilidad con specs unitarios.
     private readonly domains?: DomainsService,
@@ -233,7 +237,16 @@ export class InternalCronController {
     } catch (e) {
       this.logger.error(`Verificación automática de dominios: no se pudo correr — ${describeError(e)}`);
     }
-    return { publicaciones, moderacion, reservas, dominios };
+    // Calendarios externos de reservas (Airbnb): los que no se bajan hace 30 minutos, de a 5 por corrida.
+    // Una descarga que falla queda anotada en su calendario; si se rompe la corrida entera, se anota acá y sigue.
+    let calendarios: { revisados: number; conError: number } | undefined;
+    try {
+      calendarios = await this.reservasCalendarios?.sincronizarVencidos();
+      if (calendarios?.conError) this.logger.warn(`Calendarios externos: ${calendarios.conError} de ${calendarios.revisados} no se pudieron bajar`);
+    } catch (e) {
+      this.logger.error(`Calendarios externos de reservas: no se pudo correr — ${describeError(e)}`);
+    }
+    return { publicaciones, moderacion, reservas, dominios, calendarios };
   }
 
   // Antes: @Cron('0 22 * * *')
