@@ -189,6 +189,24 @@ export const DERIVAR_SIN_RESPUESTA = 'Esa no la sé con seguridad, y prefiero no
 export const GRACIAS_AL_DERIVAR = '¡Gracias! Ya se lo pasé al equipo con lo que me contaste. Te responden por acá en cuanto puedan.';
 export const ULTIMOS_DEL_BOT_AL_DERIVAR = [DERIVAR_SIN_RESPUESTA];
 
+/**
+ * Cuánto vale la pregunta de "¿qué vendés?" después de derivar. Pasado este plazo (o si el equipo todavía no contestó
+ * y la persona vuelve a escribir), lo nuevo ya no es la respuesta a esa pregunta: el bot vuelve a atender.
+ */
+export const PLAZO_DERIVADO_MS = 2 * 3_600_000;
+
+const PALABRAS_DE_SALUDO = new Set([
+  'hola', 'holi', 'buenas', 'buen', 'buenos', 'dia', 'dias', 'tardes', 'noches', 'que', 'tal', 'como', 'estas', 'andas',
+  'va', 'todo', 'bien', 'hey', 'ey', 'saludos', 'hi', 'hello',
+]);
+
+/** ¿El mensaje es solo un saludo ("Hola", "hola que tal", "buenas tardes!!")? No es la respuesta a una pregunta. */
+export function esSaludo(texto: string): boolean {
+  const palabras = normalizar(texto).replace(/[^a-z0-9ñ ]/g, ' ').split(' ').filter(Boolean)
+    .map((p) => p.replace(/(.)\1+$/, '$1'));
+  return palabras.length > 0 && palabras.length <= 6 && palabras.every((p) => PALABRAS_DE_SALUDO.has(p));
+}
+
 // ── Lo que la IA sabe de Órbita ──────────────────────────────────────────────
 // Copiado de la web (ver el test). La IA responde solo con esto y, si no alcanza, deriva.
 

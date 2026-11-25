@@ -13,7 +13,7 @@ import type { MensajeDeCliente } from '../../orbi/atencion/estado';
 import { describeError } from '../../common/utils/describe-error.util';
 import { escaparHtml } from '../../common/utils/html';
 import {
-  BIENVENIDA, DERIVAR_SIN_RESPUESTA, GRACIAS_AL_DERIVAR, MENU, PIDE_DATOS_AL_DERIVAR, OPCION, OPCIONES, PALABRAS_CLAVE_POR_DEFECTO, PREGUNTAS_FRECUENTES,
+  BIENVENIDA, DERIVAR_SIN_RESPUESTA, GRACIAS_AL_DERIVAR, MENU, PIDE_DATOS_AL_DERIVAR, PLAZO_DERIVADO_MS, esSaludo, OPCION, OPCIONES, PALABRAS_CLAVE_POR_DEFECTO, PREGUNTAS_FRECUENTES,
   RESPUESTAS_PUBLICAS_POR_DEFECTO, SALUDO_COMENTARIO_POR_DEFECTO, TITULO_OPCION, enlacesDe, normalizar, promptDeVentas,
   respuestaDe, tienePalabraClave, type Opcion, type Precios, type Tarjeta,
 } from './contenido';
@@ -196,7 +196,7 @@ export class InstagramVentasService implements AtencionAlternativa, OnModuleInit
     if (!cfg?.activo) return;
     const conv = await this.prisma.conversation.findFirst({ where: { id: m.conversationId, businessId: m.businessId }, select: { botEstado: true } });
     if (!conv) return;
-    if (conv.botEstado === 'DERIVADO') return this.agradecerUnaVez(m, cfg);
+    if (conv.botEstado === 'DERIVADO' && !(await this.atenderDerivada(m, cfg))) return;
     if (conv.botEstado === 'PAUSADO' || conv.botEstado === 'OFF') return;
 
     const opcion = opcionDe(m);
@@ -233,20 +233,36 @@ export class InstagramVentasService implements AtencionAlternativa, OnModuleInit
   }
 
   /**
-   * La charla ya es del equipo. Si lo último que dijo el bot fue la pregunta de "¿qué vendés?" (o el aviso de que no
-   * sabía) y la persona contesta, agradece una sola vez y le reenvía al equipo lo que contó. Si después de eso sigue
-   * escribiendo, o si ya contestó alguien del equipo, no dice nada más.
+   * Una charla derivada que el equipo todavía no contestó. Devuelve true si el bot tiene que volver a atenderla.
+   *
+   * - Si ya contestó alguien del equipo, la charla es suya: el bot no dice nada.
+   * - Si lo último del bot fue la pregunta de "¿qué vendés?" (o el aviso de que no sabía), hace menos de
+   *   PLAZO_DERIVADO_MS, y la persona contesta algo que no es un saludo: agradece UNA vez y le pasa al equipo lo que contó.
+   * - Si sigue contando más dentro de ese plazo, se calla (el equipo ya lo lee en la bandeja).
+   * - Si saluda, o si pasó el plazo, lo nuevo ya no es la respuesta a esa pregunta: el bot vuelve a atender como
+   *   siempre. El equipo ya tiene el aviso y la charla sigue sin leer en la bandeja.
    */
-  private async agradecerUnaVez(m: MensajeDeCliente, cfg: MarketingInstagramBot): Promise<void> {
-    if (!m.esTexto || !m.texto) return;
+  private async atenderDerivada(m: MensajeDeCliente, cfg: MarketingInstagramBot): Promise<boolean> {
     const ultimo = await this.prisma.message.findFirst({
       where: { conversationId: m.conversationId, conversation: { businessId: m.businessId }, sender: 'STORE' },
       orderBy: { createdAt: 'desc' },
-      select: { viaOrbi: true, text: true },
+      select: { viaOrbi: true, text: true, createdAt: true },
     });
-    if (!ultimo?.viaOrbi || (ultimo.text !== PIDE_DATOS_AL_DERIVAR && ultimo.text !== DERIVAR_SIN_RESPUESTA)) return;
-    await this.enviarTexto(m, GRACIAS_AL_DERIVAR, []);
-    await this.avisarAlEquipo(cfg, m, 'Contó más sobre lo que necesita.');
+    if (!ultimo?.viaOrbi) return false;
+    const reciente = !!ultimo.createdAt && Date.now() - new Date(ultimo.createdAt).getTime() < PLAZO_DERIVADO_MS;
+    const saludo = !!m.texto && esSaludo(m.texto);
+    if (reciente && !saludo) {
+      if (!m.esTexto || !m.texto) return false;
+      if (ultimo.text !== PIDE_DATOS_AL_DERIVAR && ultimo.text !== DERIVAR_SIN_RESPUESTA) return false;
+      await this.enviarTexto(m, GRACIAS_AL_DERIVAR, []);
+      await this.avisarAlEquipo(cfg, m, 'Contó más sobre lo que necesita.');
+      return false;
+    }
+    await this.prisma.conversation.updateMany({
+      where: { id: m.conversationId, businessId: m.businessId, botEstado: 'DERIVADO' },
+      data: { botEstado: 'DEFAULT', botMotivo: null, botCambiadoAt: new Date() },
+    });
+    return true;
   }
 
   private async avisarAlEquipo(cfg: MarketingInstagramBot, m: MensajeDeCliente, motivo: string): Promise<void> {

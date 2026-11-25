@@ -3,7 +3,7 @@ import { join } from 'path';
 import { Prisma } from '@prisma/client';
 import {
   GRACIAS_AL_DERIVAR, MENU, OPCION, OPCIONES, PIDE_DATOS_AL_DERIVAR, PREGUNTAS_DE_LA_WEB, PREGUNTAS_FRECUENTES, TITULO_OPCION, enlacesDe, promptDeVentas, respuestaDe,
-  tienePalabraClave, type Opcion,
+  BIENVENIDA, esSaludo, tienePalabraClave, type Opcion,
 } from '../../src/marketing/instagram-ventas/contenido';
 import { InstagramVentasService, opcionDe } from '../../src/marketing/instagram-ventas/instagram-ventas.service';
 
@@ -176,21 +176,49 @@ describe('bot de ventas de Instagram: mensajes', () => {
 
   it('derivado: si contesta la pregunta del bot, agradece una sola vez y le pasa al equipo lo que contó', async () => {
     const { svc, instagram, prisma, mail, llm } = armar({ botEstado: 'DERIVADO' });
-    prisma.message.findFirst.mockResolvedValueOnce({ viaOrbi: true, text: PIDE_DATOS_AL_DERIVAR });
+    const recien = new Date();
+    prisma.message.findFirst.mockResolvedValueOnce({ viaOrbi: true, text: PIDE_DATOS_AL_DERIVAR, createdAt: recien });
     await svc.atender([mensaje({ texto: 'Vendo zapatos' })]);
     expect(instagram.enviarTexto.mock.calls[0][3]).toBe(GRACIAS_AL_DERIVAR);
     expect(mail.sendCustomEmail).toHaveBeenCalledWith('equipo@orbita.test', expect.any(String), expect.stringContaining('Vendo zapatos'));
     expect(llm.streamChat).not.toHaveBeenCalled();
 
-    // Lo siguiente que escriba ya no lo contesta: lo último del bot es el agradecimiento.
-    prisma.message.findFirst.mockResolvedValueOnce({ viaOrbi: true, text: GRACIAS_AL_DERIVAR });
+    // Si sigue contando más, no lo contesta: lo último del bot es el agradecimiento y el equipo ya lo lee.
+    prisma.message.findFirst.mockResolvedValueOnce({ viaOrbi: true, text: GRACIAS_AL_DERIVAR, createdAt: recien });
     await svc.atender([mensaje({ texto: 'unos 200 productos' })]);
     expect(instagram.enviarTexto).toHaveBeenCalledTimes(1);
 
-    // Si ya contestó alguien del equipo, tampoco.
-    prisma.message.findFirst.mockResolvedValueOnce({ viaOrbi: false, text: 'Hola, soy Mateo' });
-    await svc.atender([mensaje({ texto: 'genial' })]);
+    // Si ya contestó alguien del equipo, tampoco (aunque salude).
+    prisma.message.findFirst.mockResolvedValueOnce({ viaOrbi: false, text: 'Hola, soy Mateo', createdAt: recien });
+    await svc.atender([mensaje({ texto: 'hola' })]);
     expect(instagram.enviarTexto).toHaveBeenCalledTimes(1);
+    expect(instagram.enviarConRespuestasRapidas).not.toHaveBeenCalled();
+    expect(prisma.conversation.updateMany).not.toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ botEstado: 'DEFAULT' }) }));
+  });
+
+  it('derivado: si saluda, el bot vuelve a atender (no toma el saludo como respuesta)', async () => {
+    const { svc, instagram, prisma } = armar({ botEstado: 'DERIVADO', cfg: { usarIa: false } });
+    prisma.message.findFirst.mockResolvedValueOnce({ viaOrbi: true, text: GRACIAS_AL_DERIVAR, createdAt: new Date() });
+    await svc.atender([mensaje({ texto: 'Hola' })]);
+    expect(prisma.conversation.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ botEstado: 'DEFAULT' }) }));
+    expect(instagram.enviarConRespuestasRapidas.mock.calls[0][3]).toBe(BIENVENIDA);
+    expect(instagram.enviarTexto).not.toHaveBeenCalled();
+  });
+
+  it('derivado: pasado el plazo, lo nuevo no es la respuesta a la pregunta y el bot vuelve a atender', async () => {
+    const { svc, instagram, prisma, llm, mail } = armar({ botEstado: 'DERIVADO' });
+    const ayer = new Date(Date.now() - 20 * 3_600_000);
+    prisma.message.findFirst.mockResolvedValueOnce({ viaOrbi: true, text: PIDE_DATOS_AL_DERIVAR, createdAt: ayer });
+    await svc.atender([mensaje({ texto: '¿cuánto sale?' })]);
+    expect(prisma.conversation.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ botEstado: 'DEFAULT' }) }));
+    expect(llm.streamChat).toHaveBeenCalledTimes(1);
+    expect(instagram.enviarTexto).not.toHaveBeenCalled();
+    expect(mail.sendCustomEmail).not.toHaveBeenCalled();
+  });
+
+  it('reconoce un saludo suelto, pero no una respuesta', () => {
+    for (const s of ['Hola', 'hola que tal', 'Holaaa!!', 'buenas tardes', 'Buen día, cómo estás?']) expect(esSaludo(s)).toBe(true);
+    for (const s of ['Vendo zapatos', 'hola, vendo ropa', 'unos 200 productos', '']) expect(esSaludo(s)).toBe(false);
   });
 
   it('con la IA apagada contesta con el menú y no llama al modelo', async () => {
