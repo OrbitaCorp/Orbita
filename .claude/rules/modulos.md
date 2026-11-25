@@ -78,7 +78,9 @@ el detalle para que lo lea el Claude de cada uno cuando toca su módulo.
   `apps/api/src/orbi/manual/manual.generated.ts`. Sus temas viajan aparte (`modulos` del
   artefacto) y no entran al índice del prompt de Tienda. Gimnasio ya tiene el suyo, con un test
   que falla si un `[[botón]]` no existe en el panel (`modules/gimnasio/__tests__/manual.test.ts`,
-  con `lib/manual/contrato.ts`): copiar ese test para el módulo propio.
+  con `lib/manual/contrato.ts`): copiar ese test para el módulo propio. Un botón del kit que se
+  ve en el panel (la barra de guardar: "Guardar cambios", "Descartar") también se puede nombrar:
+  el contrato mira las pantallas del módulo y `design-system/reservas`.
 - **Los módulos no usan Orbi.** Solo conocimiento, en texto: no se le agregan tools, no se lo
   llama desde el panel ni el sitio, no se corren evals ni grabaciones contra el modelo. Así no
   pagamos IA por los módulos.
