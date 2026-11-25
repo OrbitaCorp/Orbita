@@ -256,6 +256,7 @@ export type LeadEstado = 'NUEVO' | 'CONTACTADO' | 'RESPONDIO' | 'DEMO' | 'PILOTO
 export type MarketingLead = {
   id: string
   clave: string | null
+  placeId?: string | null
   rubro: LeadRubro
   subrubro: string
   clasificacion: LeadClasificacion
@@ -321,6 +322,60 @@ export type ActualizarLeadInput = {
   estado?: LeadEstado
   asignadoA?: string | null
   notas?: string | null
+}
+
+export type RubroLeadBusqueda = Exclude<LeadRubro, 'TIENDA'>
+
+export type MarketingLeadBusqueda = {
+  id: string
+  claveConsulta: string
+  rubro: RubroLeadBusqueda
+  localidad: string
+  termino: string
+  pagina: number
+  fuente: string
+  encontrados: number
+  nuevos: number
+  duplicados: number
+  ejecutadoPor: string | null
+  ejecutadoAt: string
+}
+
+export type MarketingLeadsBusquedasEstado = {
+  serperConfigurado: boolean
+  totalPlanificadas: number
+  totalHechas: number
+  totalPendientes: number
+  porRubro: Record<RubroLeadBusqueda, { hechas: number; totales: number; pendientes: number }>
+  localidades: string[]
+  ultimasBusquedas: MarketingLeadBusqueda[]
+}
+
+export type BuscarLeadsInput = {
+  rubro?: 'TODOS' | RubroLeadBusqueda
+  localidad?: string
+  maxConsultas?: number
+  forzarRebusqueda?: boolean
+}
+
+export type BuscarLeadsResultado = {
+  consultasEjecutadas: number
+  consultasOmitidas: number
+  pendientesRestantes: number
+  encontrados: number
+  nuevos: number
+  duplicados: number
+  errores: number
+  detalle: Array<{
+    claveConsulta: string
+    rubro: RubroLeadBusqueda
+    localidad: string
+    termino: string
+    encontrados: number
+    nuevos: number
+    duplicados: number
+    error?: string
+  }>
 }
 
 export type McpSolicitud = { cliente: string; retorno: string; permisos: string[]; dominios: string[]; usuario: string }
@@ -1357,6 +1412,8 @@ export const platformApi = {
   leadsCrear: (body: CrearLeadInput) => sendJSON<MarketingLead>('/platform/marketing/leads', 'POST', body),
   leadsActualizar: (id: string, cambios: ActualizarLeadInput) => sendJSON<MarketingLead>(`/platform/marketing/leads/${id}`, 'PATCH', cambios),
   leadsEliminar: (id: string) => sendJSON<{ ok: true }>(`/platform/marketing/leads/${id}`, 'DELETE'),
+  leadsBusquedasEstado: () => getJSONConMensaje<MarketingLeadsBusquedasEstado>('/platform/marketing/leads/busquedas'),
+  leadsBuscarMas: (body: BuscarLeadsInput) => sendJSON<BuscarLeadsResultado>('/platform/marketing/leads/buscar', 'POST', body),
   mcpSolicitud: (req: string) => getJSONConMensaje<McpSolicitud>(`/platform/mcp/solicitud?req=${encodeURIComponent(req)}`),
   mcpResolver: (req: string, decision: 'aprobar' | 'cancelar') => sendJSON<{ redirect: string }>('/platform/mcp/resolver', 'POST', { req, decision }),
   mcpDesconectar: () => sendJSON<{ revocados: number }>('/platform/mcp/conexiones', 'DELETE'),

@@ -69,7 +69,7 @@ const ABIERTO_A_MARKETING = [
   // Prospección
   'ProspeccionController.criterio', 'ProspeccionController.consultar', 'ProspeccionController.lotes', 'ProspeccionController.lote', 'ProspeccionController.guardarAnalisis', 'ProspeccionController.prospectos', 'ProspeccionController.actualizar',
   // Leads y Pilotos por rubro
-  'LeadsController.listar', 'LeadsController.crear', 'LeadsController.actualizar', 'LeadsController.eliminar',
+  'LeadsController.listar', 'LeadsController.estadoBusquedas', 'LeadsController.buscarMas', 'LeadsController.crear', 'LeadsController.actualizar', 'LeadsController.eliminar',
 ].sort();
 
 describe('Rol MARKETING — acceso por lista cerrada', () => {

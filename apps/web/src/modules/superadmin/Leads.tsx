@@ -1,15 +1,17 @@
 import { useMemo, useState } from 'react'
 import {
-  AtSign, Building2, CalendarClock, Check, Download, Dumbbell, FileText, MapPin,
+  AtSign, Building2, CalendarClock, Check, Compass, Download, Dumbbell, FileText, MapPin,
   MessageCircle, Plus, ScanBarcode, Search, Store, Trash2,
 } from 'lucide-react'
 import {
   platformApi,
   type ActualizarLeadInput,
+  type BuscarLeadsResultado,
   type LeadClasificacion,
   type LeadEstado,
   type LeadRubro,
   type MarketingLead,
+  type RubroLeadBusqueda,
 } from '@/lib/platform/api'
 import type { ToastVariant } from '@/design-system/components/Toast'
 import {
@@ -105,6 +107,7 @@ export function PanelLeads({ puedeEditar, setAviso }: { puedeEditar: boolean; se
   const [busqueda, setBusqueda] = useState('')
 
   const [creando, setCreando] = useState(false)
+  const [buscandoMas, setBuscandoMas] = useState(false)
   const [editandoNota, setEditandoNota] = useState<MarketingLead | null>(null)
   const [eliminando, setEliminando] = useState<MarketingLead | null>(null)
 
@@ -345,9 +348,14 @@ export function PanelLeads({ puedeEditar, setAviso }: { puedeEditar: boolean; se
               <Download size={14} /> Exportar CSV ({visibles.length})
             </button>
             {puedeEditar && (
-              <button type="button" onClick={() => setCreando(true)} style={{ ...btnPrimary, height: 32, padding: '0 13px', fontSize: 12.5 }}>
-                <Plus size={14} /> Agregar lead
-              </button>
+              <>
+                <button type="button" onClick={() => setBuscandoMas(true)} className="ds-hover" style={btnGhostSm}>
+                  <Compass size={14} /> Buscar más leads
+                </button>
+                <button type="button" onClick={() => setCreando(true)} style={{ ...btnPrimary, height: 32, padding: '0 13px', fontSize: 12.5 }}>
+                  <Plus size={14} /> Agregar lead
+                </button>
+              </>
             )}
           </div>
         )}
@@ -613,6 +621,21 @@ export function PanelLeads({ puedeEditar, setAviso }: { puedeEditar: boolean; se
         />
       )}
 
+      {buscandoMas && (
+        <ModalBuscarLeads
+          rubroInicial={plantilla === 'NUEVOS_RUBROS' ? rubroNuevo : 'TODOS'}
+          onClose={() => setBuscandoMas(false)}
+          onBuscado={(res) => {
+            setTick((n) => n + 1)
+            setAviso({
+              variant: res.nuevos > 0 ? 'success' : 'info',
+              title: res.nuevos > 0 ? `${res.nuevos} leads nuevos guardados` : 'Sin leads nuevos en este lote',
+              description: `${res.consultasEjecutadas} búsquedas en Misiones (${res.duplicados} duplicados omitidos).`,
+            })
+          }}
+        />
+      )}
+
       {editandoNota && (
         <ModalNotaLead
           lead={editandoNota}
@@ -825,6 +848,174 @@ function ModalNotaLead({ lead, puedeEditar, onClose, onGuardar }: {
             </button>
           )}
         </div>
+      </div>
+    </ModalShell>
+  )
+}
+
+function ModalBuscarLeads({
+  rubroInicial,
+  onClose,
+  onBuscado,
+}: {
+  rubroInicial: 'TODOS' | RubroLeadBusqueda
+  onClose: () => void
+  onBuscado: (res: BuscarLeadsResultado) => void
+}) {
+  const [estadoTick, setEstadoTick] = useState(0)
+  const { data: estado, loading, error } = useFetch(() => platformApi.leadsBusquedasEstado(), [estadoTick])
+  const [rubro, setRubro] = useState<'TODOS' | RubroLeadBusqueda>(rubroInicial)
+  const [localidad, setLocalidad] = useState('')
+  const [maxConsultas, setMaxConsultas] = useState(8)
+  const [buscando, setBuscando] = useState(false)
+  const [errRun, setErrRun] = useState('')
+  const [resultado, setResultado] = useState<BuscarLeadsResultado | null>(null)
+
+  const ejecutar = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setBuscando(true)
+    setErrRun('')
+    try {
+      const res = await platformApi.leadsBuscarMas({
+        rubro,
+        localidad: localidad || undefined,
+        maxConsultas,
+      })
+      setResultado(res)
+      setEstadoTick((t) => t + 1)
+      onBuscado(res)
+    } catch (err) {
+      setErrRun(err instanceof Error ? err.message : 'No se pudo completar la búsqueda automática.')
+    } finally {
+      setBuscando(false)
+    }
+  }
+
+  return (
+    <ModalShell title="Buscar más leads en Misiones (incremental)" onClose={onClose} cerrarAlClickAfuera={false} ancho={640}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ fontSize: 13, color: 'var(--color-muted)', lineHeight: 1.5 }}>
+          Cada búsqueda ya hecha se guarda con su checkpoint y los negocios existentes se filtran por clave, Google Place ID, WhatsApp e Instagram para no repetir ni pisar pilotos elegidos.
+        </div>
+
+        {loading && !estado && <Loader />}
+        {error && <ErrorBox msg="No se pudo leer el estado de búsquedas." />}
+
+        {estado && (
+          <>
+            {!estado.serperConfigurado && (
+              <ErrorBox msg="Falta configurar SERPER_API_KEY en el servidor para consultar Google Maps automáticamente." />
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8 }}>
+              {RUBROS_NUEVOS.map((r) => {
+                const st = estado.porRubro[r.id]
+                const pct = st.totales > 0 ? Math.round((st.hechas / st.totales) * 100) : 0
+                return (
+                  <div
+                    key={r.id}
+                    style={{
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 10,
+                      padding: '10px 11px',
+                      background: 'var(--color-bg)',
+                    }}
+                  >
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text)' }}>{r.label}</div>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, fontFamily: '"Geist Mono", monospace', marginTop: 3, color: 'var(--color-primary)' }}>
+                      {st.hechas} / {st.totales}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 2 }}>
+                      {pct}% · {st.pendientes} pend.
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            <form onSubmit={ejecutar} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {errRun && <ErrorBox msg={errRun} />}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 130px', gap: 10 }}>
+                <Field label="Rubro">
+                  <select value={rubro} onChange={(e) => setRubro(e.target.value as 'TODOS' | RubroLeadBusqueda)} style={inputStyle}>
+                    <option value="TODOS">Todos los nuevos rubros</option>
+                    <option value="TURNOS">Turnos</option>
+                    <option value="ALQUILERES">Alquileres</option>
+                    <option value="GIMNASIO">Gimnasios</option>
+                    <option value="POS">POS / Mostrador</option>
+                  </select>
+                </Field>
+
+                <Field label="Localidad">
+                  <select value={localidad} onChange={(e) => setLocalidad(e.target.value)} style={inputStyle}>
+                    <option value="">Automático (próximas pendientes en Misiones)</option>
+                    {estado.localidades.map((loc) => (
+                      <option key={loc} value={loc}>{loc}</option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Consultas">
+                  <select value={maxConsultas} onChange={(e) => setMaxConsultas(Number(e.target.value))} style={inputStyle}>
+                    <option value={4}>4 lotes</option>
+                    <option value={8}>8 lotes</option>
+                    <option value={12}>12 lotes</option>
+                    <option value={20}>20 lotes</option>
+                  </select>
+                </Field>
+              </div>
+
+              {resultado && (
+                <div
+                  style={{
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 10,
+                    padding: '10px 12px',
+                    background: 'var(--color-success-bg)',
+                    color: 'var(--chip-success-fg)',
+                    fontSize: 12.5,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  <strong>Última corrida:</strong> {resultado.consultasEjecutadas} búsquedas ejecutadas ·{' '}
+                  <strong>{resultado.nuevos}</strong> leads nuevos · {resultado.duplicados} duplicados filtrados ·{' '}
+                  {resultado.pendientesRestantes} pendientes en Misiones
+                  {resultado.errores > 0 ? ` · ${resultado.errores} con error` : ''}.
+                </div>
+              )}
+
+              {estado.ultimasBusquedas.length > 0 && (
+                <div style={{ border: '1px solid var(--color-border)', borderRadius: 10, padding: '10px 12px' }}>
+                  <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--color-muted)', marginBottom: 6 }}>
+                    Historial reciente ya guardado ({estado.totalHechas} / {estado.totalPlanificadas} búsquedas realizadas)
+                  </div>
+                  <div style={{ maxHeight: 130, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {estado.ultimasBusquedas.slice(0, 6).map((b) => (
+                      <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, color: 'var(--color-body)' }}>
+                        <span>{b.rubro} · {b.localidad} · <em>{b.termino}</em></span>
+                        <span style={{ fontFamily: '"Geist Mono", monospace', color: 'var(--color-muted)', whiteSpace: 'nowrap' }}>
+                          +{b.nuevos} / {b.duplicados} dup
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button type="button" onClick={onClose} className="ds-hover" style={btnGhost}>Cerrar</button>
+                <button
+                  type="submit"
+                  disabled={buscando || !estado.serperConfigurado || estado.totalPendientes === 0}
+                  style={{ ...btnPrimary, opacity: buscando || !estado.serperConfigurado ? 0.6 : 1 }}
+                >
+                  <Compass size={14} /> {buscando ? 'Buscando en Google Maps…' : 'Ejecutar búsqueda incremental'}
+                </button>
+              </div>
+            </form>
+          </>
+        )}
       </div>
     </ModalShell>
   )

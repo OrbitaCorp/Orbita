@@ -2,7 +2,8 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuard
 import { SuperadminYMarketing } from '../../common/decorators/platform-role.decorator';
 import { PlatformAdminGuard } from '../../common/guards/platform-admin.guard';
 import { PlatformAdminContext } from '../../common/types/auth-context.type';
-import { ActualizarLeadDto, CrearLeadDto } from './leads.dto';
+import { LeadsDiscoveryService } from './leads-discovery.service';
+import { ActualizarLeadDto, BuscarLeadsDto, CrearLeadDto } from './leads.dto';
 import { LeadsService } from './leads.service';
 
 interface RequestWithAdmin {
@@ -13,7 +14,10 @@ interface RequestWithAdmin {
 @SuperadminYMarketing()
 @Controller('platform/marketing/leads')
 export class LeadsController {
-  constructor(private readonly leads: LeadsService) {}
+  constructor(
+    private readonly leads: LeadsService,
+    private readonly discovery: LeadsDiscoveryService,
+  ) {}
 
   @Get()
   listar(
@@ -24,6 +28,16 @@ export class LeadsController {
     @Query('q') q?: string,
   ) {
     return this.leads.listar({ rubro, clasificacion, estado, localidad, q });
+  }
+
+  @Get('busquedas')
+  estadoBusquedas() {
+    return this.discovery.estadoBusquedas();
+  }
+
+  @Post('buscar')
+  buscarMas(@Req() req: RequestWithAdmin, @Body() dto: BuscarLeadsDto) {
+    return this.discovery.buscarMas(req.user.adminId, dto);
   }
 
   @Post()

@@ -1,4 +1,5 @@
-import { IsBoolean, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { RUBROS_BUSQUEDA, RubroBusqueda } from './leads-discovery.catalogo';
 import { CLASIFICACIONES_LEAD, ESTADOS_LEAD, RUBROS_LEAD } from './leads-seed.data';
 
 export class CrearLeadDto {
@@ -129,4 +130,25 @@ export class ActualizarLeadDto {
   @IsString()
   @MaxLength(1000)
   notas?: string | null;
+}
+
+export class BuscarLeadsDto {
+  @IsOptional()
+  @IsIn(['TODOS', ...RUBROS_BUSQUEDA])
+  rubro?: 'TODOS' | RubroBusqueda;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  localidad?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(25)
+  maxConsultas?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  forzarRebusqueda?: boolean;
 }

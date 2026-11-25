@@ -1,3 +1,5 @@
+import { RAW_LEADS_EXPANSION } from './leads-expansion.data';
+
 export const RUBROS_LEAD = ['TIENDA', 'TURNOS', 'ALQUILERES', 'GIMNASIO', 'POS'] as const;
 export type LeadRubro = (typeof RUBROS_LEAD)[number];
 
@@ -20,20 +22,40 @@ export const MAX_PILOTOS_POR_RUBRO = 5;
 export const LOCALIDAD_LOCAL = 'Puerto Iguazú';
 
 export const UBICACION_MISIONES: Record<string, { zona: string; departamento: string }> = {
+  // Norte
   'Puerto Iguazú': { zona: 'Norte', departamento: 'Iguazú' },
   'Puerto Esperanza': { zona: 'Norte', departamento: 'Iguazú' },
   Wanda: { zona: 'Norte', departamento: 'Iguazú' },
   'Puerto Libertad': { zona: 'Norte', departamento: 'Iguazú' },
+  'Comandante Andresito': { zona: 'Norte', departamento: 'General Manuel Belgrano' },
+  'Bernardo de Irigoyen': { zona: 'Norte', departamento: 'General Manuel Belgrano' },
   Eldorado: { zona: 'Norte', departamento: 'Eldorado' },
   Montecarlo: { zona: 'Norte', departamento: 'Montecarlo' },
+  'San Pedro': { zona: 'Norte', departamento: 'San Pedro' },
+  // Centro-Norte
   'Puerto Rico': { zona: 'Centro-Norte', departamento: 'Libertador Gral. San Martín' },
+  Capioví: { zona: 'Centro-Norte', departamento: 'Libertador Gral. San Martín' },
+  Garuhapé: { zona: 'Centro-Norte', departamento: 'Libertador Gral. San Martín' },
+  // Centro
   'Jardín América': { zona: 'Centro', departamento: 'San Ignacio' },
+  'San Ignacio': { zona: 'Centro', departamento: 'San Ignacio' },
   Oberá: { zona: 'Centro', departamento: 'Oberá' },
   'Aristóbulo del Valle': { zona: 'Centro', departamento: 'Cainguás' },
+  'Campo Grande': { zona: 'Centro', departamento: 'Cainguás' },
+  'Campo Viera': { zona: 'Centro', departamento: 'Oberá' },
+  '25 de Mayo': { zona: 'Centro', departamento: '25 de Mayo' },
+  // Centro-Este
   'San Vicente': { zona: 'Centro-Este', departamento: 'Guaraní' },
+  'El Soberbio': { zona: 'Centro-Este', departamento: 'Guaraní' },
+  'Dos de Mayo': { zona: 'Centro-Este', departamento: 'Cainguás' },
+  // Sur
+  Posadas: { zona: 'Sur', departamento: 'Capital' },
+  Garupá: { zona: 'Sur', departamento: 'Capital' },
+  Candelaria: { zona: 'Sur', departamento: 'Candelaria' },
   'Leandro N. Alem': { zona: 'Sur', departamento: 'Leandro N. Alem' },
   Apóstoles: { zona: 'Sur', departamento: 'Apóstoles' },
-  Posadas: { zona: 'Sur', departamento: 'Capital' },
+  'San Javier': { zona: 'Sur', departamento: 'San Javier' },
+  'Concepción de la Sierra': { zona: 'Sur', departamento: 'Concepción' },
 };
 
 const AREA_CODES = ['3757', '3755', '3751', '3743', '3754', '3756', '3758', '2657', '376', '341', '11'];
@@ -87,6 +109,7 @@ export function normalizarInstagram(ig?: string | null): string | null {
 
 export interface LeadSeedRow {
   clave: string;
+  placeId?: string | null;
   rubro: LeadRubro;
   subrubro: string;
   clasificacion: LeadClasificacion;
@@ -115,15 +138,20 @@ type RawRow = readonly [
   resenas: string | null,
   direccion: string | null,
   fuente: string,
+  placeId?: string | null,
 ];
 
-function slugify(s: string): string {
+export function slugifyLead(s: string): string {
   return s
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
+}
+
+export function claveLead(rubro: LeadRubro, localidad: string, negocio: string): string {
+  return `${rubro.toLowerCase()}::${slugifyLead(localidad)}::${slugifyLead(negocio)}`;
 }
 
 const RAW_LEADS: RawRow[] = [
@@ -362,25 +390,45 @@ const RAW_LEADS: RawRow[] = [
   ['POS', 'Oberá', 'DE TODO UN POCO. Ferretería. Muebleria. Electricidad', 'Ferretería / Varios', 'LEAD', '03755 27-1582', null, 'Sin sitio web', '4.6★ (15)', 'Av. Libertad 622, Oberá', 'Google Maps'],
 ];
 
-export const LEADS_SEMILLA: LeadSeedRow[] = RAW_LEADS.map(
-  ([rubro, localidad, negocio, subrubro, clasificacion, telefono, instagram, webActual, resenas, direccion, fuente]) => {
-    const ubic = UBICACION_MISIONES[localidad] ?? { zona: 'Misiones', departamento: localidad };
-    return {
-      clave: `${rubro.toLowerCase()}::${slugify(localidad)}::${slugify(negocio)}`,
-      rubro,
-      subrubro,
-      clasificacion,
-      negocio,
-      zona: ubic.zona,
-      departamento: ubic.departamento,
-      localidad,
-      telefono,
-      whatsappUrl: normalizarWhatsappUrl(telefono),
-      instagram: normalizarInstagram(instagram),
-      webActual,
-      resenas,
-      direccion,
-      fuente,
-    };
-  },
-);
+const TODAS_LAS_FILAS: RawRow[] = [...RAW_LEADS, ...RAW_LEADS_EXPANSION];
+
+const clavesVistas = new Set<string>();
+export const LEADS_SEMILLA: LeadSeedRow[] = [];
+
+for (const [
+  rubro,
+  localidad,
+  negocio,
+  subrubro,
+  clasificacion,
+  telefono,
+  instagram,
+  webActual,
+  resenas,
+  direccion,
+  fuente,
+  placeId,
+] of TODAS_LAS_FILAS) {
+  const clave = claveLead(rubro, localidad, negocio);
+  if (clavesVistas.has(clave)) continue;
+  clavesVistas.add(clave);
+  const ubic = UBICACION_MISIONES[localidad] ?? { zona: 'Misiones', departamento: localidad };
+  LEADS_SEMILLA.push({
+    clave,
+    placeId: placeId ?? null,
+    rubro,
+    subrubro,
+    clasificacion,
+    negocio,
+    zona: ubic.zona,
+    departamento: ubic.departamento,
+    localidad,
+    telefono,
+    whatsappUrl: normalizarWhatsappUrl(telefono),
+    instagram: normalizarInstagram(instagram),
+    webActual,
+    resenas,
+    direccion,
+    fuente,
+  });
+}

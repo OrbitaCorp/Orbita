@@ -9,31 +9,34 @@ import {
 import { LeadsService } from '../../src/marketing/leads/leads.service';
 
 describe('Marketing → Leads: semilla y reglas de negocio', () => {
-  it('contiene exactamente 189 negocios verificados sin claves duplicadas', () => {
-    expect(LEADS_SEMILLA).toHaveLength(189);
+  it('contiene al menos los 189 negocios base sin claves ni placeIds duplicados', () => {
+    expect(LEADS_SEMILLA.length).toBeGreaterThanOrEqual(189);
     const claves = new Set(LEADS_SEMILLA.map((l) => l.clave));
-    expect(claves.size).toBe(189);
+    expect(claves.size).toBe(LEADS_SEMILLA.length);
+
+    const placeIds = LEADS_SEMILLA.map((l) => l.placeId).filter((id): id is string => Boolean(id));
+    expect(new Set(placeIds).size).toBe(placeIds.length);
   });
 
-  it('respeta los conteos por rubro, los potenciales/posibles pilotos de Iguazú y arranca en 0 pilotos automáticos por rubro nuevo', () => {
+  it('respeta los pisos por rubro, los potenciales/posibles pilotos de Iguazú y arranca en 0 pilotos automáticos por rubro nuevo', () => {
     const porRubro = (r: string) => LEADS_SEMILLA.filter((l) => l.rubro === r);
 
     expect(porRubro('TIENDA')).toHaveLength(102);
-    expect(porRubro('TURNOS')).toHaveLength(22);
-    expect(porRubro('ALQUILERES')).toHaveLength(22);
-    expect(porRubro('GIMNASIO')).toHaveLength(21);
-    expect(porRubro('POS')).toHaveLength(22);
+    expect(porRubro('TURNOS').length).toBeGreaterThanOrEqual(22);
+    expect(porRubro('ALQUILERES').length).toBeGreaterThanOrEqual(22);
+    expect(porRubro('GIMNASIO').length).toBeGreaterThanOrEqual(21);
+    expect(porRubro('POS').length).toBeGreaterThanOrEqual(22);
 
     const tiendasIguazu = porRubro('TIENDA').filter((l) => l.clasificacion === 'POTENCIAL_LOCAL');
     expect(tiendasIguazu).toHaveLength(22);
     expect(tiendasIguazu.every((l) => esPuertoIguazu(l.localidad))).toBe(true);
 
-    const esperadosIguazu: Record<string, number> = { TURNOS: 12, ALQUILERES: 12, GIMNASIO: 11, POS: 12 };
+    const pisosIguazu: Record<string, number> = { TURNOS: 12, ALQUILERES: 12, GIMNASIO: 11, POS: 12 };
     for (const r of ['TURNOS', 'ALQUILERES', 'GIMNASIO', 'POS']) {
       const pilotos = porRubro(r).filter((l) => l.clasificacion === 'PILOTO');
       expect(pilotos).toHaveLength(0);
       const posibles = porRubro(r).filter((l) => l.clasificacion === 'POTENCIAL_LOCAL');
-      expect(posibles).toHaveLength(esperadosIguazu[r]);
+      expect(posibles.length).toBeGreaterThanOrEqual(pisosIguazu[r]);
       expect(posibles.every((l) => esPuertoIguazu(l.localidad))).toBe(true);
     }
     expect(MAX_PILOTOS_POR_RUBRO).toBe(5);

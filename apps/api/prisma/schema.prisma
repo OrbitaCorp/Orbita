@@ -4411,6 +4411,7 @@ model GimnasioSuscripcion {
 model MarketingLead {
   id            String    @id @default(uuid())
   clave         String?   @unique
+  placeId       String?   @unique @map("place_id")
   rubro         String
   subrubro      String
   clasificacion String    @default("LEAD")
@@ -4438,4 +4439,22 @@ model MarketingLead {
   @@index([rubro, clasificacion])
   @@index([estado, contactado])
   @@map("marketing_leads")
+}
+
+model MarketingLeadBusqueda {
+  id            String   @id @default(uuid())
+  claveConsulta String   @unique @map("clave_consulta")
+  rubro         String
+  localidad     String
+  termino       String
+  pagina        Int      @default(1)
+  fuente        String   @default("serper_maps")
+  encontrados   Int      @default(0)
+  nuevos        Int      @default(0)
+  duplicados    Int      @default(0)
+  ejecutadoPor  String?  @map("ejecutado_por")
+  ejecutadoAt   DateTime @default(now()) @map("ejecutado_at")
+
+  @@index([rubro, localidad])
+  @@map("marketing_lead_busquedas")
 }
