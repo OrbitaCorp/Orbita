@@ -149,8 +149,16 @@ export function bloqueosDeApi(bloqueos: Bloqueo[]): BloqueoGym[] {
   })
 }
 
-/** Lo que el panel lee de la API para armar el negocio. `planes` falta si la API todavía no tiene los de Gimnasio. */
-export interface CatalogoApi { config: Config; recursos: Recurso[]; bloqueos: Bloqueo[]; planes?: PlanApi[] }
+/**
+ * Lo que se lee de la API para armar el negocio. De la config alcanza con el horario y las reglas que se muestran:
+ * así sirve la del panel y la pública del sitio. `planes` falta si la API todavía no tiene los de Gimnasio.
+ */
+export interface CatalogoApi {
+  config: Pick<Config, 'horario' | 'anticipacionMaximaDias' | 'cancelacionHastaHoras'>
+  recursos: Recurso[]
+  bloqueos: Bloqueo[]
+  planes?: PlanApi[]
+}
 
 /**
  * El negocio del panel con lo que dice la API: horario, reglas, clases, días

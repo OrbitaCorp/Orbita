@@ -4,6 +4,11 @@
 // con el sol o la luna de la cabecera (modoSitio del kit). Redefine los tokens
 // --color-* adentro de .gis, así las piezas rv- del design system se pintan
 // solas, de día y de noche.
+//
+// El mismo armazón sirve a la demo y al sitio de un negocio real: los links
+// salen del contexto (rutas.ts). En el real no hay tira de la demo arriba, no
+// existe "Mis clases" todavía y el pie muestra solo los datos que el negocio
+// tiene cargados.
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { ArrowRight, MapPin, Phone } from 'lucide-react'
@@ -11,15 +16,12 @@ import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 import { EstiloReservas } from '@/design-system/reservas/estilo'
 import { BotonTema, useModoSitio } from '@/design-system/reservas/modoSitio'
 import type { NegocioGym } from '../datos'
+import { rutaDemo, useSitio, type PaginaSitio } from './rutas'
 
-export type PaginaSitio = 'inicio' | 'reserva' | 'mis-clases'
-const RUTAS: Record<PaginaSitio, string> = { inicio: '/gimnasio-demo/negocio', reserva: '/gimnasio-demo/reserva', 'mis-clases': '/gimnasio-demo/mis-clases' }
+export type { PaginaSitio }
 
-/** Link a una página del sitio, conservando el rubro de la demo. */
-export function ruta(p: PaginaSitio, rubro: string, q: Record<string, string> = {}, hash = '') {
-  const s = new URLSearchParams({ rubro, ...q }).toString()
-  return `${RUTAS[p]}?${s}${hash}`
-}
+/** Link a una página del sitio de la demo, conservando el rubro. Las pantallas de la demo lo usan directo; el armazón, el del contexto. */
+export const ruta = rutaDemo
 
 /**
  * La barra de cupo (BarraCupo) la usan el sitio y el panel: su hoja va aparte y
@@ -188,6 +190,12 @@ export const CSS_SITIO = `
   @media (max-width: 480px) { .gis-hero-datos li { padding: 10px; } .gis-hero-datos b { font-size: 17px; } .gis-clases { grid-template-columns: minmax(0, 1fr); } }
 `
 
+/** Lo que cambia en el sitio de un negocio real: sin la tira de la demo arriba, el header pega contra el borde. */
+const CSS_REAL = `
+  .gis[data-real] { --rv-tope: 0px; }
+  html:has(.gis[data-real]) { scroll-padding-top: 72px; }
+`
+
 interface Props {
   negocio: NegocioGym
   pagina: PaginaSitio
@@ -198,23 +206,26 @@ interface Props {
 export default function Sitio({ negocio, pagina, cta, children }: Props) {
   const sigla = negocio.nombre.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase()
   const oscuro = useModoSitio('gimnasio', false)
-  const nav: { id: PaginaSitio; label: string; fijo?: boolean }[] = [
+  const sitio = useSitio()
+  const todas: { id: PaginaSitio; label: string; fijo?: boolean }[] = [
     { id: 'inicio', label: 'Inicio' },
     { id: 'reserva', label: 'Reservar clase', fijo: true },
     { id: 'mis-clases', label: 'Mis clases', fijo: true },
   ]
+  const nav = sitio.real ? todas.filter(n => n.id !== 'mis-clases') : todas
   return (
-    <div className="rv gis" data-oscuro={oscuro || undefined} data-cta={!!cta || undefined}>
+    <div className="rv gis" data-oscuro={oscuro || undefined} data-cta={!!cta || undefined} data-real={sitio.real || undefined}>
       <EstiloReservas />
       <style>{CSS_SITIO + CSS_CUPO}</style>
+      {sitio.real && <style>{CSS_REAL}</style>}
       <header className="gis-header">
         <div className="gis-cont gis-header-in">
-          <Link href={ruta('inicio', negocio.rubro)} className="gis-marca" aria-label={`${negocio.nombre}: inicio`}>
+          <Link href={sitio.ruta('inicio', negocio.rubro)} className="gis-marca" aria-label={`${negocio.nombre}: inicio`}>
             {negocio.logo ? <img src={negocio.logo} alt="" style={{ width: 36, height: 36, borderRadius: 10, objectFit: 'cover' }} /> : <span className="gis-marca-sigla" aria-hidden>{sigla}</span>}
             <b>{negocio.nombre}</b>
           </Link>
           <nav className="gis-nav" aria-label="Secciones del sitio">
-            {nav.map(n => <Link key={n.id} href={ruta(n.id, negocio.rubro)} aria-current={pagina === n.id ? 'page' : undefined} data-fijo={n.fijo || undefined}>{n.label}</Link>)}
+            {nav.map(n => <Link key={n.id} href={sitio.ruta(n.id, negocio.rubro)} aria-current={pagina === n.id ? 'page' : undefined} data-fijo={n.fijo || undefined}>{n.label}</Link>)}
           </nav>
           <BotonTema modulo="gimnasio" oscuro={oscuro} className="gis-tema" />
         </div>
@@ -222,7 +233,12 @@ export default function Sitio({ negocio, pagina, cta, children }: Props) {
       <main className="gis-main">{children}</main>
       <footer className="gis-cont">
         <div className="gis-pie">
-          <span><Phone size={13} aria-hidden style={{ verticalAlign: '-2px', marginRight: 5 }} />{negocio.telefono} · <MapPin size={13} aria-hidden style={{ verticalAlign: '-2px', marginRight: 4 }} />{negocio.direccion}, {negocio.ciudad}</span>
+          {/* Cada dato, solo si el negocio lo tiene (el de un negocio real puede no tener dirección cargada). */}
+          <span>
+            {negocio.telefono && <><Phone size={13} aria-hidden style={{ verticalAlign: '-2px', marginRight: 5 }} />{negocio.telefono}</>}
+            {negocio.telefono && negocio.direccion && ' · '}
+            {negocio.direccion && <><MapPin size={13} aria-hidden style={{ verticalAlign: '-2px', marginRight: 4 }} />{negocio.direccion}{negocio.ciudad ? `, ${negocio.ciudad}` : ''}</>}
+          </span>
           <span>Reservas con <a href="https://orbita.site" target="_blank" rel="noreferrer"><OrbitaLogo size={14} animated={false} /> Órbita</a></span>
         </div>
       </footer>
@@ -248,12 +264,13 @@ export function Mapa({ latLng, titulo }: { latLng: [number, number]; titulo: str
 
 /**
  * Barra de cupo: cuánto se llenó una clase. El texto dice lo mismo que el color. Necesita CSS_CUPO montado.
- * El id es para que la describa quien la usa (en Reservar, el radio de cada clase).
+ * El id es para que la describa quien la usa (en Reservar, el radio de cada clase). Con `sinEspera`, una clase
+ * completa no ofrece la lista de espera (el negocio no la tiene).
  */
-export function BarraCupo({ anotados, cupo, id }: { anotados: number; cupo: number; id?: string }) {
+export function BarraCupo({ anotados, cupo, id, sinEspera = false }: { anotados: number; cupo: number; id?: string; sinEspera?: boolean }) {
   const libres = Math.max(0, cupo - anotados)
   const tono = libres === 0 ? 'lleno' : libres <= 3 ? 'aviso' : undefined
-  const texto = libres === 0 ? 'Completa · lista de espera' : libres === 1 ? 'Último lugar' : `${libres} lugares libres`
+  const texto = libres === 0 ? (sinEspera ? 'Completa' : 'Completa · lista de espera') : libres === 1 ? 'Último lugar' : `${libres} lugares libres`
   return (
     <div className="gis-cupo" id={id}>
       {/* Un div no se nombra con aria-label (el lector lo ignora): la cuenta va como texto oculto. */}

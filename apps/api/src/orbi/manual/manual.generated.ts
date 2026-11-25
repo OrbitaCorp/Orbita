@@ -10,7 +10,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "3272f878871269d6",
+  "version": "1c992559c8806ee9",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -1154,6 +1154,13 @@ export const MANUAL_GENERADO: ManualGenerado = {
           "titulo": "Cargar un feriado o unas vacaciones",
           "pista": "cerrar un día, feriado, vacaciones, mantenimiento",
           "texto": "1. Abrí la sección: Reservas → Días sin clases.\n2. Cargá los días: Tocá \"Agregar días\", elegí desde y hasta qué día (los dos incluidos) y escribí el motivo: se muestra en el sitio ese día.\n3. Guardá: Tocá \"Agregar\". Esos días no se puede reservar y en Clases se ven sin clases.\n\nOjo: Lo que ya estaba reservado esos días no se cancela solo. El formulario avisa cuántas reservas hay antes de guardar y, al guardar, cuántas quedaron adentro.\n\nDespués, cada día sin clases que todavía tiene reservas lo dice en su fila (\"3 reservas siguen en pie\"). Tocá \"Ver el día\" para ir a ese día en Clases: ahí se ven las clases que quedaron con gente, para avisarles y liberar sus lugares.\n\nPara volver a abrir esos días, tocá \"Quitar\" al lado del que cargaste. Los que vienen de un calendario externo se quitan desde Calendarios."
+        },
+        {
+          "id": "gimnasio.reservar-desde-el-sitio",
+          "capitulo": "El sitio del negocio",
+          "titulo": "Cómo se reserva desde el sitio",
+          "pista": "qué ve el alumno, reservar online, lugar guardado, lista de espera desde el sitio",
+          "texto": "El sitio del negocio muestra las clases que se pueden reservar hoy y en los próximos días, cada una con los lugares que le quedan, los planes que tienen prendido \"Se ofrece en el sitio\" y el horario. Se reserva sin registrarse.\n\n1. Elige la clase: El día y la clase. Al tocar \"Continuar\", su lugar queda guardado unos minutos mientras carga sus datos: nadie se lo lleva en el medio.\n2. Carga sus datos: Nombre y celular. El email es opcional: sirve para que le llegue la confirmación.\n3. Confirma: Con \"Confirmar reserva\" el lugar queda a su nombre y recibe un código. Si tarda más de lo que dura el lugar guardado, tiene que tomarlo de nuevo.\n\n- Cómo se paga: En el sitio no se paga ni se elige el plan. El lugar llega al panel sin definir: decí cómo paga desde su fila, en la lista de anotados de la clase.\n- Clase completa: Con la lista de espera prendida, la persona se anota ahí desde el sitio y, si alguien libera su lugar, pasa sola. Sin lista de espera, la clase se ve completa y no se puede elegir.\n- Días sin clases: Un día cargado en Días sin clases se ve cerrado en el sitio, con su motivo.\n- Hasta cuándo se reserva: Hasta los días de anticipación de las reglas del negocio (el sitio muestra, como mucho, cinco semanas). Una clase que está por empezar ya no se ofrece.\n\nDato: Tocar dos veces el botón, o reintentar después de un corte de conexión, no reserva dos lugares."
         }
       ]
     }

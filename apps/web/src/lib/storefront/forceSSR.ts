@@ -9,7 +9,7 @@ import { esSlugDemo } from '@/lib/demo/modo'
 import { temaDePlantilla } from '@/modules/ventas/cliente/inicio/plantillaReal'
 import type { Tema } from '@/modules/ventas/panel/avanzado/plantillas/tipos'
 import { esNavegadorMovil } from '@/hooks/useMovilPlantilla'
-import { esDeAlquileres } from '@/lib/reservas/destinoPanel'
+import { esDeAlquileres, sitioConReserva } from '@/lib/reservas/destinoPanel'
 
 // Marca/branding de la tienda que el loader necesita para pintarse bien.
 // Viaja serializado en `pageProps` (vía __NEXT_DATA__), así que está
@@ -339,12 +339,14 @@ export function crearGetServerSideProps(tipo: TipoPagina | null = null): GetServ
     tipo, slug: slug ?? '', nombre: storeMeta?.nombre ?? slug ?? 'Tienda', cfg: cfgOk, estado: storeStatus, esNavegacion,
   })
 
-  // El rubro del negocio (null si la config no llegó): con "alquileres", el sitio
-  // es el de reservas y no la tienda (pages/tienda/[slug]/index.tsx). El slug va
-  // con él porque esas páginas lo necesitan desde el primer render.
+  // El rubro del negocio (null si la config no llegó): con "alquileres" o con
+  // "gimnasio" (y un subrubro de Gimnasio), el sitio es el de reservas y no la
+  // tienda (pages/tienda/[slug]/index.tsx). El slug va con él porque esas
+  // páginas lo necesitan desde el primer render.
   const industry = cfgOk?.business.industry ?? null
+  const subrubros = cfgOk?.business.subrubros ?? null
 
-  return { props: { __storefront: true, __storeMeta: storeMeta, __storeStatus: storeStatus, __homeTemplate: homeTemplate, __temaPlantilla: temaPlantilla, __movil: movil, __seo: seo, __industry: industry, __slug: slug } }
+  return { props: { __storefront: true, __storeMeta: storeMeta, __storeStatus: storeStatus, __homeTemplate: homeTemplate, __temaPlantilla: temaPlantilla, __movil: movil, __seo: seo, __industry: industry, __subrubros: subrubros, __slug: slug } }
   }
 }
 
@@ -366,6 +368,21 @@ export function soloAlquileres(base: GetServerSideProps): GetServerSideProps {
   }
 }
 
+/**
+ * Para /reserva: existe en el sitio de un negocio que reserva (Alquileres,
+ * Gimnasio) y en una tienda es un 404. Como `soloAlquileres`: si la config no
+ * llegó a tiempo no se puede saber, se sirve igual y la página avisa.
+ */
+export function soloSitiosDeReservas(base: GetServerSideProps): GetServerSideProps {
+  return async (ctx) => {
+    const res = await base(ctx)
+    if (!('props' in res)) return res
+    const props = (await res.props) as { __industry?: string | null; __subrubros?: string[] | null; __storeMeta?: StoreMetaSSR | null }
+    if (props.__storeMeta && !sitioConReserva(props.__industry, props.__subrubros)) return { notFound: true }
+    return res
+  }
+}
+
 // Sin tipo: la página no se indexa (carrito, checkout, perfil, login, legales…).
 // Es el valor por defecto a propósito: una página nueva de la tienda no aparece
 // en Google hasta que alguien decida que tiene que aparecer.
@@ -375,6 +392,7 @@ export const getServerSidePropsCatalogo = crearGetServerSideProps('catalogo')
 export const getServerSidePropsCategoria = crearGetServerSideProps('categoria')
 export const getServerSidePropsProducto = crearGetServerSideProps('producto')
 export const getServerSidePropsAlquileres = soloAlquileres(crearGetServerSideProps())
+export const getServerSidePropsReserva = soloSitiosDeReservas(crearGetServerSideProps())
 /** Como la anterior, con el token del enlace personal entre las props (ya resuelto para el primer render). */
 export const getServerSidePropsMiReserva: GetServerSideProps = async (ctx) => {
   const res = await getServerSidePropsAlquileres(ctx)

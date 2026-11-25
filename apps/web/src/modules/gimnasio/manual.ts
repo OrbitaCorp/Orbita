@@ -266,5 +266,30 @@ export const MANUAL_GIMNASIO: ManualDeModulo = {
                 },
             ],
         },
+        {
+            id: 'sitio', titulo: 'El sitio del negocio',
+            resumen: 'Lo que ve quien reserva desde el sitio y cómo llega cada reserva al panel.',
+            temas: [
+                {
+                    id: 'reservar-desde-el-sitio', titulo: 'Cómo se reserva desde el sitio',
+                    pista: 'qué ve el alumno, reservar online, lugar guardado, lista de espera desde el sitio',
+                    bloques: [
+                        { tipo: 'parrafo', texto: 'El sitio del negocio muestra las clases que se pueden reservar hoy y en los próximos días, cada una con los lugares que le quedan, los planes que tienen prendido "Se ofrece en el sitio" y el horario. Se reserva sin registrarse.' },
+                        { tipo: 'pasos', items: [
+                            { titulo: 'Elige la clase', texto: 'El día y la clase. Al tocar "Continuar", su lugar queda guardado unos minutos mientras carga sus datos: nadie se lo lleva en el medio.' },
+                            { titulo: 'Carga sus datos', texto: 'Nombre y celular. El email es opcional: sirve para que le llegue la confirmación.' },
+                            { titulo: 'Confirma', texto: 'Con "Confirmar reserva" el lugar queda a su nombre y recibe un código. Si tarda más de lo que dura el lugar guardado, tiene que tomarlo de nuevo.' },
+                        ] },
+                        { tipo: 'campos', items: [
+                            { label: 'Cómo se paga', texto: 'En el sitio no se paga ni se elige el plan. El lugar llega al panel **sin definir**: decí cómo paga desde su fila, en la lista de anotados de la clase.' },
+                            { label: 'Clase completa', texto: 'Con la lista de espera prendida, la persona se anota ahí desde el sitio y, si alguien libera su lugar, pasa sola. Sin lista de espera, la clase se ve completa y no se puede elegir.' },
+                            { label: 'Días sin clases', texto: 'Un día cargado en Días sin clases se ve cerrado en el sitio, con su motivo.' },
+                            { label: 'Hasta cuándo se reserva', texto: 'Hasta los días de anticipación de las reglas del negocio (el sitio muestra, como mucho, cinco semanas). Una clase que está por empezar ya no se ofrece.' },
+                        ] },
+                        { tipo: 'nota', variante: 'dato', texto: 'Tocar dos veces el botón, o reintentar después de un corte de conexión, no reserva dos lugares.' },
+                    ],
+                },
+            ],
+        },
     ],
 }

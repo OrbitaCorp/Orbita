@@ -141,7 +141,25 @@ export const gimnasioPanel = {
 
 export type ClienteGimnasio = typeof gimnasioPanel
 
-export const gimnasioSitio = (slug: string) => ({
-  /** Los planes que el negocio ofrece en el sitio. */
-  planes: async () => leer<Omit<PlanApi, 'activo'>[]>(await fetch(`${API_BASE}/storefront/${encodeURIComponent(slug)}/gimnasio/planes`)),
-})
+/** Una sesión de una clase en un día: cuántos lugares tiene y cuántos quedan. */
+export interface SesionApi { recursoId: string; inicioMinutos: number; finMinutos: number; libres: number; cupo: number }
+
+/**
+ * La grilla del sitio: las sesiones de todas las clases, día por día, con las reglas del sitio ya aplicadas (no trae
+ * la clase que ya no se puede reservar). `cerrado` y `motivo` son el día sin clases que cargó el negocio.
+ */
+export interface GrillaApi {
+  desde: string
+  hasta: string
+  dias: { fecha: string; cerrado: boolean; motivo: string | null; sesiones: SesionApi[] }[]
+}
+
+export const gimnasioSitio = (slug: string) => {
+  const base = `${API_BASE}/storefront/${encodeURIComponent(slug)}/gimnasio`
+  return {
+    /** Los planes que el negocio ofrece en el sitio. */
+    planes: async () => leer<Omit<PlanApi, 'activo'>[]>(await fetch(`${base}/planes`)),
+    /** Las sesiones de todas las clases entre dos días (hasta 35, los dos incluidos), en un solo pedido. */
+    grilla: async (desde: string, hasta: string) => leer<GrillaApi>(await fetch(`${base}/grilla?${new URLSearchParams({ desde, hasta }).toString()}`)),
+  }
+}

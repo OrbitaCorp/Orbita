@@ -36,5 +36,7 @@ describe('manual de Gimnasio', () => {
         expect(m.temas.find(t => t.id === 'gimnasio.lista-de-espera')?.texto).toMatch(/"A la lista de espera"/)
         // Lo nuevo del 24/11: cómo paga cada lugar, los alumnos y los planes tienen su tema.
         expect(ids).toEqual(expect.arrayContaining(['gimnasio.como-paga', 'gimnasio.lista-de-alumnos', 'gimnasio.sumar-alumno', 'gimnasio.asignar-plan', 'gimnasio.planes-y-precios']))
+        // El sitio: lo que ve quien reserva desde ahí y cómo llega al panel.
+        expect(m.temas.find(t => t.id === 'gimnasio.reservar-desde-el-sitio')?.texto).toMatch(/sin definir/)
     })
 })
