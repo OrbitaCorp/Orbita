@@ -506,7 +506,8 @@ Para que ande de punta a punta hacen falta, una sola vez, dos cosas en Meta:
 
 Al guardar con el bot prendido, la API suscribe la cuenta a `messages,messaging_postbacks,comments` y carga las cuatro
 preguntas frecuentes; el resultado queda a la vista en la pantalla. Mientras Meta no apruebe la revisión de la app,
-todo esto funciona solo con cuentas que tengan un rol en la app (igual que la bandeja).
+la cuenta CONECTADA tiene que tener un rol en la app (la de Órbita lo tiene); quien le escribe o comenta puede ser
+cualquier persona.
 
 Límites de Instagram que el bot respeta: un solo mensaje privado por comentario y hasta 7 días después (por eso lleva
 botones); responder solo dentro de las 24 h del último mensaje de la persona; tarjetas, botones y preguntas frecuentes
