@@ -287,6 +287,8 @@ export interface Turno {
   precio: number
   estado: EstadoTurno
   senaPagada?: boolean
+  /** Con la API: el monto de la seña que calculó el motor. Sin él, el % del rubro sobre el precio. */
+  sena?: number
   nota?: string
 }
 

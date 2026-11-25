@@ -45,8 +45,9 @@ import { temaDe } from '@/modules/turnos/storefront/tema'
 import { useRubroDemo } from '@/modules/turnos/demo/BarraDemo'
 import { useNegocioDemo } from '@/modules/turnos/datos/negocio'
 import { ESTADO_TURNO, semanaDe, tramosDeRecurso, esSalud, horaTxt, duracionTxt, pesos, type EstadoTurno, type Turno, type Cliente, type Recurso, type RubroTurnos } from '@/modules/turnos/datos'
-import { AHORA_DEMO, HOY_SEMANA, extremos, tramosDelDia, type Semana, type Tramo } from '@/modules/turnos/horario'
+import { AHORA, HOY_DIA, extremos, fijarReloj, tramosDelDia, type Semana, type Tramo } from '@/modules/turnos/horario'
 import ResumenDia from './KPIs'
+import ListaEspera from './ListaEspera'
 import Agenda from './Agenda'
 import DetalleTurno from './Turnos'
 import Servicios from './Servicios'
@@ -70,6 +71,7 @@ import { CSS_PIEZAS_PANEL, MensajeWhatsApp } from './piezasPanel'
 import { cuandoTxt, fechaLarga, indiceDia, libresPorTramo, tieneTelefono, type MensajeWA, type NuevoTurnoPre, type ServicioBase, type ServicioPanel, type TurnoAgenda } from '../datos/agenda'
 import { clientesDeLaAgenda, pagadoHastaInicial, plata, puedeDe, taparTelefono, type Pago, type Persona, type Rol, type VerComo } from '../datos/equipo'
 import { useDatosPanel, useOrigenTurnos, type DatosPanel } from '../datos/origen'
+import { ahoraArgentina, type EnEspera } from '../datos/origen/mapear'
 import { seccionesVisibles, type Vista } from './secciones'
 
 // Las hojas que comparten varias pantallas se montan una sola vez acá; lo propio de cada pantalla lo monta ella.
@@ -100,14 +102,14 @@ export default function PanelTurnos() {
   return <PanelDeRubro key={rubro.alta ? `${rubro.key}:alta` : rubro.key} rubro={rubro} />
 }
 
-function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
+function PanelDeRubro({ rubro: rubroBase }: { rubro: RubroTurnos }) {
   const router = useRouter()
   // Mismo nombre que muestra el sitio público de ese rubro.
-  const negocio = temaDe(rubro).nombre
+  const negocio = temaDe(rubroBase).nombre
   const { demo, guardar: guardarDemo } = useNegocioDemo()
   // De dónde salen los datos: la demo por defecto, la API en el panel de un negocio real.
   const origen = useOrigenTurnos()
-  const carga = useDatosPanel(origen, rubro)
+  const carga = useDatosPanel(origen, rubroBase)
   // En la demo la espera de la API es fingida. Como el panel se monta por rubro (la key en
   // PanelTurnos), cambiar de rubro vuelve a mostrar la silueta: es cargar otro negocio.
   const simulada = useCargaSimulada()
@@ -124,6 +126,8 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
   const [semanaGuardada, setSemanaGuardada] = useState<Semana | null>(null)
   // El equipo como quedó guardado en el origen (JSON), para saber cuándo hay que volver a guardarlo.
   const [equipoGuardado, setEquipoGuardado] = useState<string | null>(null)
+  // El reloj del panel: null es el de la demo; con la API, el de Argentina (ver fijarReloj en horario.ts).
+  const [reloj, setReloj] = useState<{ hoy: string; minutos: number } | null>(null)
   if (carga.datos && carga.datos !== cargados) {
     // Se ajusta durante el render (no en un efecto), así la primera pantalla ya sale con los datos.
     setCargados(carga.datos)
@@ -134,7 +138,24 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
     setPersonas(carga.datos.personas)
     setSemanaGuardada(null)
     setEquipoGuardado(JSON.stringify({ personas: carga.datos.personas, roles: carga.datos.roles }))
+    setReloj(carga.datos.reloj ?? null)
   }
+  // Antes que cualquier cálculo de este render y de las pantallas: es idempotente.
+  fijarReloj(reloj)
+  // Con la API la hora avanza: cada minuto se actualiza; si cambió el día, se vuelve a cargar
+  // (los días de la agenda se cuentan desde el de la carga).
+  const tic = useEffectEvent(() => {
+    const ahora = ahoraArgentina()
+    if (reloj && ahora.hoy !== reloj.hoy) carga.reintentar()
+    else setReloj(ahora)
+  })
+  useEffect(() => {
+    if (!reloj) return
+    const id = setInterval(tic, 60_000)
+    return () => clearInterval(id)
+  }, [reloj])
+  // En un negocio real la seña es la de sus reglas, no la típica del rubro de la demo.
+  const rubro = useMemo(() => (cargados?.senaPct !== undefined ? { ...rubroBase, sena: cargados.senaPct } : rubroBase), [rubroBase, cargados])
   // El horario del negocio. En la demo cambia apenas se guarda otro en Configuración → Horarios;
   // con la API, es el que devolvió el último guardado o, si no, el que trajo la carga.
   const semana = useMemo(() => semanaGuardada ?? (cargados ? cargados.agenda.semana(rubro) : semanaDe(rubro)), [semanaGuardada, cargados, rubro])
@@ -171,7 +192,7 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
     const r = recursos.find(x => x.id === recursoId)
     return r ? tramosDeRecurso(r, semana, indiceDia(dia)) : []
   }
-  const tramosHoy = tramosDelDia(semana, HOY_SEMANA)
+  const tramosHoy = tramosDelDia(semana, HOY_DIA)
   const rangoHoy: Tramo = tramosHoy.length ? [tramosHoy[0][0], tramosHoy[tramosHoy.length - 1][1]] : extremos(semana)
 
   // ── Quién mira ──
@@ -209,7 +230,7 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
   // Señas por cobrar: los turnos de las próximas dos semanas que todavía no la pagaron. Solo si el
   // negocio pide seña; es lo que Pagos lista para cobrar y lo que cuenta el badge del menú.
   const senasPendientes: TurnoAgenda[] = rubro.sena > 0
-    ? Array.from({ length: 14 }, (_, d) => delDia(d).filter(t => !t.senaPagada && (t.estado === 'confirmado' || t.estado === 'pendiente') && (d > 0 || t.inicio > AHORA_DEMO)).sort((a, b) => a.inicio - b.inicio)).flat()
+    ? Array.from({ length: 14 }, (_, d) => delDia(d).filter(t => !t.senaPagada && (t.estado === 'confirmado' || t.estado === 'pendiente') && (d > 0 || t.inicio > AHORA)).sort((a, b) => a.inicio - b.inicio)).flat()
     : []
   // Qué secciones hay sale de secciones.ts (la tabla rubro → sidebar); acá cada una toma su nombre,
   // su ícono y su badge. Quien puede configurar las tiene todas; el resto, las que su rol permite.
@@ -270,7 +291,16 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
   }
   const cambiarEstado = async (id: string, estado: EstadoTurno) => {
     if (origen.turnos) {
-      try { aplicar(await origen.turnos.estado(id, estado)) } catch (e) { noSePudo('No se cambió el turno', e); return }
+      let r: Awaited<ReturnType<typeof origen.turnos.estado>>
+      try { r = await origen.turnos.estado(id, estado) } catch (e) { noSePudo('No se cambió el turno', e); return }
+      aplicar(r.turno)
+      if (r.promovido) {
+        // Alguien esperaba ese horario y la API le dio el lugar: su turno aparece y sale de la lista.
+        aplicar(r.promovido)
+        setVueltaEspera(n => n + 1)
+        avisar('Turno cancelado', `El lugar pasó a ${nombreDe(r.promovido.clienteId)}, que estaba en la lista de espera.`)
+        return
+      }
     } else setCambios(c => ({ ...c, [id]: { ...c[id], estado } }))
     const quien = abierto ? pila(abierto.clienteId) : ''
     if (estado === 'confirmado') avisar('Turno confirmado', quien ? `Le avisamos a ${quien}.` : undefined)
@@ -304,7 +334,7 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
     if (origen.turnos) {
       try { aplicar(await origen.turnos.sena(t.id)) } catch (e) { noSePudo('No se registró la seña', e); return }
     } else setCambios(c => ({ ...c, [t.id]: { ...c[t.id], senaPagada: true } }))
-    avisar('Seña registrada', `${pesos(Math.round(t.precio * rubro.sena / 100))} de ${nombreDe(t.clienteId)}`)
+    avisar('Seña registrada', `${pesos(t.sena ?? Math.round(t.precio * rubro.sena / 100))} de ${nombreDe(t.clienteId)}`)
   }
   const crearTurno = async (t: Omit<TurnoAgenda, 'id'>, clienteNuevo?: { nombre: string; telefono: string }) => {
     if (origen.turnos) {
@@ -360,7 +390,7 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
   const proximoDe = (clienteId: string): TurnoAgenda | null => {
     for (let d = 0; d <= 21; d++) {
       const t = delDiaVista(d)
-        .filter(x => x.clienteId === clienteId && (x.estado === 'confirmado' || x.estado === 'pendiente') && (d > 0 || x.inicio > AHORA_DEMO))
+        .filter(x => x.clienteId === clienteId && (x.estado === 'confirmado' || x.estado === 'pendiente') && (d > 0 || x.inicio > AHORA))
         .sort((a, b) => a.inicio - b.inicio)[0]
       if (t) return t
     }
@@ -386,6 +416,32 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
   const aBase = (s: ServicioPanel, pausado = s.estado === 'pausado'): ServicioBase =>
     ({ id: s.id, nombre: s.nombre, duracion: s.duracion, precio: s.precio, online: s.online, ...(pausado ? { pausado: true } : {}) })
   const noSePudo = (titulo: string, e: unknown) => avisar(titulo, e instanceof Error && e.message ? e.message : 'Probá de nuevo en un rato.')
+
+  // La lista de espera: solo con un origen que la tenga (la API). Se vuelve a traer después de cada
+  // cambio que la toca (darle el lugar, quitar a alguien, una cancelación que se la dio a otro).
+  const [esperas, setEsperas] = useState<EnEspera[]>([])
+  const [vueltaEspera, setVueltaEspera] = useState(0)
+  useEffect(() => {
+    if (!origen.turnos || !cargados) return
+    let vivo = true
+    origen.turnos.espera().then(l => { if (vivo) setEsperas(l) }, () => { /* sin lista: la agenda se usa igual */ })
+    return () => { vivo = false }
+  }, [origen.turnos, cargados, vueltaEspera])
+  const darLugar = async (e: EnEspera) => {
+    if (!origen.turnos) return
+    let t: TurnoAgenda
+    try { t = await origen.turnos.darLugar(e.id) } catch (err) { noSePudo('No se le dio el lugar', err); setVueltaEspera(n => n + 1); return }
+    if (!clientes.some(c => c.id === t.clienteId)) setClientes(cs => [...cs, { id: t.clienteId, nombre: e.nombre, telefono: e.telefono ?? 'Sin teléfono', visitas: 0, ultima: '—', gastado: 0 }])
+    aplicar(t)
+    setVueltaEspera(n => n + 1)
+    avisar('Lugar asignado', `${e.nombre} · ${cuandoTxt(t.dia ?? 0)} a las ${horaTxt(t.inicio)}. Le avisamos.`)
+  }
+  const quitarDeEspera = async (e: EnEspera) => {
+    if (!origen.turnos) return
+    try { await origen.turnos.quitarDeEspera(e.id) } catch (err) { noSePudo('No se lo sacó de la lista', err); return }
+    setEsperas(l => l.filter(x => x.id !== e.id))
+    avisar('Salió de la lista de espera', e.nombre)
+  }
 
   // El equipo (personas, roles, cómo cobra cada uno) se guarda solo cuando cambia, en el origen
   // que lo sepa guardar (la API, en `datos` de la config). Se espera medio segundo para juntar
@@ -621,6 +677,9 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
               onAbrir={abrir} onIr={ir} onNuevo={agendar} onCompartir={setMensaje}
             />
           )}
+          {vista === 'agenda' && esperas.length > 0 && (
+            <ListaEspera esperas={esperas} recursos={recursos} puedeEditar={puedeAgendar} verContacto={verContacto} onDarLugar={darLugar} onQuitar={quitarDeEspera} />
+          )}
           {vista === 'agenda' && <Agenda rubro={rubro} semana={semana} recursos={recursosVista} turnosDelDia={delDiaVista} jornada={jornada} clientes={clientes} puedeAgendar={puedeAgendar} onAbrir={abrir} onNuevo={agendar} />}
           {vista === 'clientes' && (
             <Clientes
@@ -665,6 +724,7 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
         <DetalleTurno
           key={abierto.id}
           turno={abierto}
+          historial={origen.turnos?.historial}
           rubro={rubro}
           cliente={clientes.find(c => c.id === abierto.clienteId)}
           recurso={recursos.find(r => r.id === abierto.recursoId)}

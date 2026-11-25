@@ -58,15 +58,17 @@ describe('cambiar un turno', () => {
     confirmar.mockResolvedValue(reserva())
     completar.mockResolvedValue(reserva({ estado: 'COMPLETADA' }))
     ausente.mockResolvedValue(reserva({ estado: 'AUSENTE' }))
-    expect((await turnos.estado('r1', 'confirmado')).estado).toBe('confirmado')
-    expect((await turnos.estado('r1', 'completado')).estado).toBe('completado')
-    expect((await turnos.estado('r1', 'ausente')).estado).toBe('ausente')
+    expect((await turnos.estado('r1', 'confirmado')).turno.estado).toBe('confirmado')
+    expect((await turnos.estado('r1', 'completado')).turno.estado).toBe('completado')
+    expect((await turnos.estado('r1', 'ausente')).turno.estado).toBe('ausente')
     await expect(turnos.estado('r1', 'en-curso')).rejects.toThrow('no se hace a mano')
   })
-  it('cancelar vuelve a leer la reserva', async () => {
-    cancelar.mockResolvedValue({ sena: 'DEVUELTA' })
+  it('cancelar vuelve a leer la reserva y trae a quien tomó el lugar', async () => {
+    cancelar.mockResolvedValue({ sena: 'DEVUELTA', promovida: reserva({ id: 'r9', clienteNombre: 'Ana' }) })
     detalle.mockResolvedValue(reserva({ estado: 'CANCELADA' }))
-    expect((await turnos.estado('r1', 'cancelado')).estado).toBe('cancelado')
+    const r = await turnos.estado('r1', 'cancelado')
+    expect(r.turno.estado).toBe('cancelado')
+    expect(r.promovido).toMatchObject({ id: 'r9', estado: 'confirmado' })
     expect(detalle).toHaveBeenCalledWith('r1')
   })
   it('mover reprograma con la fecha del día pedido', async () => {
@@ -80,5 +82,35 @@ describe('cambiar un turno', () => {
     pago.mockResolvedValue(reserva({ sena: 3600, pagado: 3600 }))
     expect((await turnos.sena('r1')).senaPagada).toBe(true)
     expect(pago).toHaveBeenCalledWith('r1', { monto: 2600, metodo: 'OTRO', referencia: 'Seña registrada desde el panel' })
+  })
+})
+
+describe('historial y lista de espera', () => {
+  it('el historial va del más nuevo al más viejo, con quién y cuándo, y un cambio sin estado nuevo es "Movido"', async () => {
+    const { pasosDeHistorial } = await import('../mapear')
+    const h = (id: string, de: string | null, a: string, quien: string, createdAt: string, motivo: string | null = null) =>
+      ({ id, de, a, quien, memberId: null, motivo, datos: null, createdAt }) as never
+    const pasos = pasosDeHistorial([
+      h('1', null, 'PENDIENTE', 'CLIENTE', '2026-11-24T13:00:00.000Z'),
+      h('2', 'PENDIENTE', 'CONFIRMADA', 'NEGOCIO', '2026-11-24T14:05:00.000Z'),
+      h('3', 'CONFIRMADA', 'CONFIRMADA', 'NEGOCIO', '2026-11-24T15:00:00.000Z'),
+      h('4', 'CONFIRMADA', 'CANCELADA', 'CLIENTE', '2026-11-24T16:30:00.000Z', 'No llega'),
+    ])
+    expect(pasos.map(p => [p.titulo, p.quien, p.cuando, p.motivo ?? null])).toEqual([
+      ['Cancelado', 'el cliente', '24/11 13:30', 'No llega'],
+      ['Movido', 'el negocio', '24/11 12:00', null],
+      ['Confirmado', 'el negocio', '24/11 11:05', null],
+      ['Dado · Sin confirmar', 'el cliente', '24/11 10:00', null],
+    ])
+  })
+
+  it('la espera trae solo a quien sigue esperando, con su día y su hora', async () => {
+    const espera = vi.fn().mockResolvedValue([
+      { id: 'e1', modulo: 'TURNOS', recursoId: 'rec1', inicio: `${manana}T13:00:00.000Z`, fin: `${manana}T13:30:00.000Z`, clienteId: null, clienteNombre: 'Ana', clienteTelefono: '11 0000-0101', clienteEmail: null, estado: 'ESPERANDO', reservaId: null, createdAt: '' },
+      { id: 'e2', modulo: 'TURNOS', recursoId: 'rec1', inicio: `${manana}T14:00:00.000Z`, fin: `${manana}T14:30:00.000Z`, clienteId: null, clienteNombre: 'Beto', clienteTelefono: null, clienteEmail: null, estado: 'TOMADA', reservaId: 'r5', createdAt: '' },
+    ])
+    const { panel } = await import('@/lib/reservasApi/cliente')
+    ;(panel as unknown as Record<string, unknown>).espera = espera
+    expect(await turnos.espera()).toEqual([{ id: 'e1', recursoId: 'rec1', dia: 1, inicio: 600, fin: 630, nombre: 'Ana', telefono: '11 0000-0101' }])
   })
 })

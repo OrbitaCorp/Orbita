@@ -6,7 +6,7 @@
 // hoy (`dia`, 0 = hoy), de minutos desde las 00:00, de días de la semana con
 // el lunes en 0 y de estados en minúscula. La API habla de fechas AAAA-MM-DD de
 // Argentina, del domingo en 0 y de estados en mayúscula. Acá se traduce.
-import type { Bloqueo, Config, CrearBloqueo, GuardarConfig, GuardarRecurso, GuardarServicio, HorarioSemanal, Recurso as RecursoApi, Reserva, Servicio as ServicioApi, TipoRecurso, Tramo } from '@/lib/reservasApi/tipos'
+import type { Bloqueo, Config, CrearBloqueo, Espera, Historial, GuardarConfig, GuardarRecurso, GuardarServicio, HorarioSemanal, Recurso as RecursoApi, Reserva, Servicio as ServicioApi, TipoRecurso, Tramo } from '@/lib/reservasApi/tipos'
 import { diasEntre, sumarDias, fechaNumerica, type ISO } from '@/lib/reservas/fechas'
 import { aMinutos, cruzar, diasAbiertos, diasTxt, hhmm, tramosDe, tramosDelDia, tramosTxt, type Semana } from '@/modules/turnos/horario'
 import { COLORES_EQUIPO } from '@/modules/turnos/datos/equipo'
@@ -133,7 +133,7 @@ const FIN_DEL_DIA = 1440
 const RANGO_DE_FABRICA: [string, string] = ['09:00', '13:00']
 
 /** Fecha y minuto de Argentina (UTC−3, sin horario de verano) de un instante de la API. */
-function enArgentina(iso: string): { fecha: ISO; minuto: number } {
+export function enArgentina(iso: string): { fecha: ISO; minuto: number } {
   const t = new Date(Date.parse(iso) - 3 * 3600_000).toISOString()
   return { fecha: t.slice(0, 10), minuto: Number(t.slice(11, 13)) * 60 + Number(t.slice(14, 16)) }
 }
@@ -386,6 +386,7 @@ export function turnoDeApi(r: Reserva, hoy: ISO, minutos: number): TurnoAgenda |
     precio: r.precio,
     estado,
     senaPagada: r.sena <= 0 || r.pagado >= r.sena,
+    sena: r.sena,
     ...(nota ? { nota } : {}),
     dia: diaDe(r.fecha, hoy),
   }
@@ -430,4 +431,40 @@ export function clientesDeReservas(reservas: Reserva[]): Cliente[] {
       gastado: atendidas.reduce((s, r) => s + r.pagado, 0),
     }
   }).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+}
+
+// ─── Historial y lista de espera ─────────────────────────────────────────────
+
+/** Un cambio de un turno como lo lee el panel. */
+export interface PasoTurno { cuando: string; titulo: string; quien: string; motivo?: string }
+
+const ESTADO_TXT: Record<string, string> = {
+  RETENIDA: 'Retenido', PENDIENTE: 'Sin confirmar', CONFIRMADA: 'Confirmado', COMPLETADA: 'Atendido',
+  CANCELADA: 'Cancelado', VENCIDA: 'Vencido', AUSENTE: 'Ausente',
+}
+const QUIEN_TXT: Record<string, string> = { CLIENTE: 'el cliente', NEGOCIO: 'el negocio', SISTEMA: 'automático' }
+
+/** El historial de la API, del más nuevo al más viejo. Un cambio sin cambio de estado es un turno movido. */
+export function pasosDeHistorial(h: Historial[]): PasoTurno[] {
+  return [...h].sort((x, y) => y.createdAt.localeCompare(x.createdAt)).map(p => {
+    const { fecha, minuto } = enArgentina(p.createdAt)
+    return {
+      cuando: `${fecha.slice(8, 10)}/${fecha.slice(5, 7)} ${hhmm(minuto)}`,
+      titulo: !p.de ? `Dado · ${ESTADO_TXT[p.a] ?? p.a}` : p.de === p.a ? 'Movido' : ESTADO_TXT[p.a] ?? p.a,
+      quien: QUIEN_TXT[p.quien] ?? p.quien.toLowerCase(),
+      ...(p.motivo ? { motivo: p.motivo } : {}),
+    }
+  })
+}
+
+/** Alguien que espera un horario lleno. */
+export interface EnEspera { id: string; recursoId: string; dia: number; inicio: number; fin: number; nombre: string; telefono?: string }
+
+export function enEsperaDeApi(e: Espera, hoy: ISO): EnEspera {
+  const a = enArgentina(e.inicio)
+  const z = enArgentina(e.fin)
+  return {
+    id: e.id, recursoId: e.recursoId, dia: diaDe(a.fecha, hoy), inicio: a.minuto, fin: z.fecha === a.fecha ? z.minuto : 1440,
+    nombre: e.clienteNombre, ...(e.clienteTelefono ? { telefono: e.clienteTelefono } : {}),
+  }
 }

@@ -3737,4 +3737,46 @@ Usa el campo libre que sumó Alan (\`ReservaConfig.datos\`, 23/11), sin migraci�
       'apps/web/src/modules/turnos/datos/origen/__tests__/turnos.test.ts:1',
     ],
   }),
+  entrada({
+    modulo: 'turnos', fecha: F24, slug: 'agenda-real-historial-y-espera', tipo: 'tarea', quien: 'Mateo',
+    titulo: 'La agenda de Turnos con el día y la hora reales, la seña de las reglas y el historial de cada turno',
+    foco: 'En un negocio real el panel ya no vive en el sábado 26/09 a las 10:40 de la demo: usa el día y la hora de Argentina, y los actualiza solos. La seña sale de las reglas del negocio y no del rubro. El detalle de cada turno muestra su historial. La lista de espera del panel está hecha, pero el motor no deja anotar a nadie en Turnos: se arregla en el backend compartido.',
+    que: `Tareas del 16/11 (la agenda del día) y del 19/11 (pagos y el detalle con su historial), y la vista de la lista de espera, hechas el 24/11.
+
+**El día y la hora reales** (\`horario.ts\`, \`fijarReloj\`). Con la API, el panel tomaba el día de la semana, las fechas y la hora de la demo. Una agenda de un martes mostraba los horarios de un sábado de septiembre y la línea de "ahora" estaba a las 10:40.
+
+- **Cómo:** ahora el reloj es uno solo, con exports vivos: \`AHORA\`, \`HOY_DIA\`, \`HOY_TXT\` y \`HOY_FECHA\`. En la demo vale la hora de siempre. Con la API, el panel lo fija con la hora de Argentina al cargar.
+- **Qué lo usa:** la agenda, el resumen, los espacios y el detalle del turno lo leen sin cambiar, y lo mismo las fechas de la agenda (\`fechaDe\`, \`indiceDia\`, \`fechaLarga\`).
+- **Cómo avanza:** se actualiza cada minuto. Si cambia el día, el panel vuelve a cargar, porque los días se cuentan desde el de la carga.
+- **El sitio público** sigue con la hora de la demo hasta la semana 4.
+
+**La seña de las reglas.** Con la API, la seña del panel (Pagos, el detalle, el aviso al registrarla) es la de la config del negocio y no la típica del rubro. Cada turno trae el monto exacto que calculó el motor.
+
+**El historial del turno.** El detalle muestra cada cambio, del más nuevo al más viejo: qué pasó (dado, confirmado, movido, cancelado…), quién (el cliente, el negocio o automático), cuándo y el motivo si lo hay. En salud, la "ficha del paciente" de ejemplo (con alergias y motivo inventados) ya no se muestra con la API: Turnos en salud no guarda nada clínico (decisión del 15/11).
+
+**Cancelar con lista de espera.** Si alguien esperaba ese horario, la API le da el lugar en el acto. El panel ahora muestra ese turno nuevo y avisa a quién le tocó. Antes el horario se veía libre estando tomado.
+
+**La lista de espera del panel** (\`ListaEspera.tsx\`) aparece arriba de la Agenda cuando hay alguien esperando. Muestra quién espera, qué día, a qué hora, con quién y su teléfono si el rol lo deja ver. Tiene dos acciones, "Darle el lugar" y "Quitar", que se apagan mientras guardan.
+
+**Lo que encontré en el motor compartido:** en Turnos no se puede anotar a nadie en la lista de espera. La API calcula la duración por el servicio, y la espera no guarda el servicio: anotarse siempre responde "Elegí un servicio." (\`disponibilidad.service.ts:58\`). Arreglarlo es una columna nueva en la espera (\`servicioId\`, opcional, así Gimnasio y Alquileres no cambian) y usarla al anotar, al darle el lugar y al cancelar. Es la próxima tarea. Hasta entonces la lista del panel no se llena en Turnos.
+
+**Probado contra la API local**, con el código real del panel y el negocio de prueba:
+
+- **Mover y cancelar:** el historial muestra "Cancelado" y "Movido", con quién y la hora.
+- **La espera:** vuelve vacía sin romper nada.
+- **Darle el lugar a alguien que no está:** trae el mensaje de la API.
+- **El reloj:** con un test, el martes 24/11 da martes, las fechas siguen desde ese día, y sin reloj real vuelve el sábado de la demo.
+
+**Verificado:** typecheck y eslint de \`apps/web\` sin errores y los tests de Turnos en verde (66). El panel no se abrió a mano en el navegador.`,
+    archivos: [
+      'apps/web/src/modules/turnos/horario.ts:54',
+      'apps/web/src/modules/turnos/datos/agenda.ts:46',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:144',
+      'apps/web/src/modules/turnos/admin/Turnos.tsx:203',
+      'apps/web/src/modules/turnos/admin/ListaEspera.tsx:1',
+      'apps/web/src/modules/turnos/datos/origen/mapear.ts:448',
+      'apps/web/src/modules/turnos/__tests__/reloj.test.ts:1',
+      'apps/api/src/reservas/disponibilidad.service.ts:58',
+    ],
+  }),
 ]

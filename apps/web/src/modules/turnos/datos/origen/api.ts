@@ -26,7 +26,7 @@ import type { ServicioBase, TurnoAgenda } from '@/modules/turnos/datos/agenda'
 import { rolesDe, type Persona, type Rol } from '@/modules/turnos/datos/equipo'
 import {
   ahoraArgentina, bloqueoDeVacaciones, bloqueosDeDia, claveDeDia, claveDeVacaciones, clientesDeReservas, configDeReglas, diasCerradosDeBloqueos, horarioDeSemana,
-  porDia, recortarHorario, recursoDeApi, turnoDeApi, recursoParaApi, reglasDeConfig, rolIdDeApi, semanaDeHorario, servicioDeApi, servicioParaApi, tipoDeAgenda,
+  enEsperaDeApi, pasosDeHistorial, porDia, recortarHorario, recursoDeApi, turnoDeApi, recursoParaApi, reglasDeConfig, rolIdDeApi, semanaDeHorario, servicioDeApi, servicioParaApi, tipoDeAgenda,
 } from './mapear'
 import type { DatosPanel, FuenteAgenda, OrigenTurnos } from './index'
 import { conCambios, extrasDeDatos, leerDatos } from './datosConfig'
@@ -145,6 +145,8 @@ export const origenApi: OrigenTurnos = {
       clientes: clientesApi(reservas),
       ...equipoApi(rubro, catalogo.recursos, catalogo.rolIds, leerDatos(config.datos).turnos.equipo),
       agenda: agendaApi(reservas, semana, hoy, minutos),
+      reloj: { hoy, minutos },
+      senaPct: config.senaPorcentaje,
     }
   },
   // /reservas/servicios (exige el permiso reservas.config). Borrar es una baja: las reservas ya
@@ -232,14 +234,17 @@ export const origenApi: OrigenTurnos = {
       return aTurno(r)
     },
     async estado(id, estado) {
+      if (estado === 'cancelado') {
+        // Cancelar devuelve qué pasó con la seña y a quién se le dio el lugar, no la reserva: se vuelve a leer.
+        const { promovida } = await panel.cancelar(id)
+        return { turno: aTurno(await panel.detalle(id)), ...(promovida ? { promovido: aTurno(promovida) } : {}) }
+      }
       const r = estado === 'confirmado' ? await panel.confirmar(id)
         : estado === 'completado' ? await panel.completar(id)
           : estado === 'ausente' ? await panel.ausente(id)
-            // Cancelar devuelve qué pasó con la seña, no la reserva: se vuelve a leer.
-            : estado === 'cancelado' ? (await panel.cancelar(id), await panel.detalle(id))
-              : null
+            : null
       if (!r) throw new Error('Ese cambio no se hace a mano.')
-      return aTurno(r)
+      return { turno: aTurno(r) }
     },
     async mover(id, dia, inicio, recursoId) {
       const { hoy } = ahoraArgentina()
@@ -250,6 +255,13 @@ export const origenApi: OrigenTurnos = {
       const falta = Math.max(0, r.sena - r.pagado)
       return aTurno(falta > 0 ? await panel.pago(id, { monto: falta, metodo: 'OTRO', referencia: 'Seña registrada desde el panel' }) : r)
     },
+    historial: async id => pasosDeHistorial((await panel.detalle(id)).historial),
+    async espera() {
+      const { hoy } = ahoraArgentina()
+      return (await panel.espera('TURNOS')).filter(e => e.estado === 'ESPERANDO').map(e => enEsperaDeApi(e, hoy))
+    },
+    darLugar: async id => aTurno(await panel.darLugar(id)),
+    quitarDeEspera: async id => { await panel.quitarDeEspera(id) },
   },
   equipo: {
     async guardar(personas, roles) {

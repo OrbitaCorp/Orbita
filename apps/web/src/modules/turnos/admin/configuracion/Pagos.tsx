@@ -46,7 +46,7 @@ export default function Pagos({ rubro, avisar, senas, nombreDe, onAbrir, onRegis
   }))
   const v = b.v
   const [copiado, setCopiado] = useState(false)
-  const senaDe = (x: TurnoAgenda) => Math.round(x.precio * rubro.sena / 100)
+  const senaDe = (x: TurnoAgenda) => x.sena ?? Math.round(x.precio * rubro.sena / 100)
   const totalSenas = senas.reduce((s, x) => s + senaDe(x), 0)
 
   return (

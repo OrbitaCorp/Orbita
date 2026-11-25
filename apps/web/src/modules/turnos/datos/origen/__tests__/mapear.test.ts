@@ -101,7 +101,7 @@ describe('agenda', () => {
   it('una reserva es un turno con su día, su duración y si pagó la seña', () => {
     expect(turnoDeApi(reserva({ fecha: '2026-11-15', sena: 3000, pagado: 0, notaInterna: 'Trae foto' }), HOY, 0)).toEqual({
       id: 'r1', recursoId: 'rec1', clienteId: 'tel:1155550101', servicio: 'Corte', inicio: 600, duracion: 45, precio: 12000,
-      estado: 'confirmado', senaPagada: false, nota: 'Trae foto', dia: 2,
+      estado: 'confirmado', senaPagada: false, sena: 3000, nota: 'Trae foto', dia: 2,
     })
     expect(turnoDeApi(reserva({ sena: 3000, pagado: 3000 }), HOY, 0)?.senaPagada).toBe(true)
     expect(turnoDeApi(reserva(), HOY, 0)?.senaPagada).toBe(true)

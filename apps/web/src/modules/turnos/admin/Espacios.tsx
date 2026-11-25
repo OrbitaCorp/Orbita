@@ -11,7 +11,7 @@ import { useState } from 'react'
 import { Plus, Clock, CalendarDays, Pencil, Check, UserRound, MoonStar } from 'lucide-react'
 import { Encabezado, Modal } from '@/design-system/reservas/piezas'
 import { DIAS_CORTOS, horaTxt, horarioDeRecurso, type Recurso, type RubroTurnos, type Turno } from '@/modules/turnos/datos'
-import { AHORA_DEMO, minutosAbiertos, tramosTxt, type Semana, type Tramo } from '@/modules/turnos/horario'
+import { AHORA, minutosAbiertos, tramosTxt, type Semana, type Tramo } from '@/modules/turnos/horario'
 import { Campo } from './configuracion/ui'
 import { ErrorCampo, Borrar, CamposAgenda, TiraJornada, IconoRecurso, agendaDeForm, agendaFormDe, errorAgenda } from './piezasPanel'
 import { COLORES_EQUIPO, type Persona } from '../datos/equipo'
@@ -51,13 +51,13 @@ export function ResumenAgenda({ recurso: r, semana, turnos, tramos, rango, verbo
   recurso: Recurso; semana: Semana; turnos: Turno[]; tramos: Tramo[]; rango: Tramo; /** "atiende" para una persona, "se usa" para un espacio. */ verbo: string
 }) {
   const lista = turnos.filter(t => t.recursoId === r.id && t.estado !== 'cancelado')
-  const sigue = lista.filter(t => t.inicio > AHORA_DEMO).sort((a, b) => a.inicio - b.inicio)[0]
+  const sigue = lista.filter(t => t.inicio > AHORA).sort((a, b) => a.inicio - b.inicio)[0]
   return (
     <>
       <div className="rv-rotulo" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
         <span>Hoy</span><span>{tramos.length === 0 ? `No ${verbo}` : `${lista.length} turno${lista.length === 1 ? '' : 's'}`}</span>
       </div>
-      <TiraJornada rango={rango} tramos={tramos} turnos={lista} color={r.color} ahora={AHORA_DEMO} label={tramos.length ? `Jornada de ${r.nombre}: ${lista.length} turnos` : `${r.nombre} hoy no ${verbo}`} />
+      <TiraJornada rango={rango} tramos={tramos} turnos={lista} color={r.color} ahora={AHORA} label={tramos.length ? `Jornada de ${r.nombre}: ${lista.length} turnos` : `${r.nombre} hoy no ${verbo}`} />
       <div className="tu-eq-dias" role="img" aria-label={`Días que ${verbo}: ${r.dias}`} style={{ ['--c' as string]: r.color }}>
         {DIAS_CORTOS.map((d, i) => <span key={d} aria-hidden data-on={r.atiende.includes(i)}>{d[0]}</span>)}
       </div>

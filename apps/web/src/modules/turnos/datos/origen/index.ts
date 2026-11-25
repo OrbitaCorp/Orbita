@@ -32,7 +32,7 @@ import type { Cliente, EstadoTurno, Recurso, RubroTurnos } from '@/modules/turno
 import type { Semana } from '@/modules/turnos/horario'
 import type { ServicioBase, TurnoAgenda } from '@/modules/turnos/datos/agenda'
 import type { Persona, Rol } from '@/modules/turnos/datos/equipo'
-import type { DiasCerrados, ReglasApi } from './mapear'
+import type { DiasCerrados, EnEspera, PasoTurno, ReglasApi } from './mapear'
 import type { ExtrasReglas } from './datosConfig'
 import { origenDemo } from './demo'
 
@@ -57,6 +57,10 @@ export interface DatosPanel {
   personas: Persona[]
   roles: Rol[]
   agenda: FuenteAgenda
+  /** Con la API: hoy y la hora de Argentina al cargar. Sin él, el panel usa el reloj de la demo. */
+  reloj?: { hoy: string; minutos: number }
+  /** Con la API: la seña de las reglas del negocio (en %). Sin ella, la del rubro. */
+  senaPct?: number
 }
 
 /**
@@ -137,12 +141,22 @@ export interface ClienteDelTurno { id?: string; nombre: string; telefono?: strin
  */
 export interface EscrituraTurnos {
   crear(t: Omit<TurnoAgenda, 'id'>, cliente: ClienteDelTurno, servicioId?: string): Promise<TurnoAgenda>
-  /** Confirmar, atender, ausente o cancelar. */
-  estado(id: string, estado: EstadoTurno): Promise<TurnoAgenda>
+  /**
+   * Confirmar, atender, ausente o cancelar. Al cancelar, si alguien esperaba ese horario la API
+   * le da el lugar en el acto: vuelve como `promovido`.
+   */
+  estado(id: string, estado: EstadoTurno): Promise<{ turno: TurnoAgenda; promovido?: TurnoAgenda }>
   /** A otro día (contado desde hoy) y otra hora, y si se pide, a otra agenda. */
   mover(id: string, dia: number, inicio: number, recursoId?: string): Promise<TurnoAgenda>
   /** Registra lo que falta pagar de la seña. */
   sena(id: string): Promise<TurnoAgenda>
+  /** Cada cambio del turno, del más nuevo al más viejo. */
+  historial(id: string): Promise<PasoTurno[]>
+  /** Quiénes esperan un horario, de hoy en adelante. */
+  espera(): Promise<EnEspera[]>
+  /** Le da el lugar a quien espera: vuelve su turno nuevo. */
+  darLugar(id: string): Promise<TurnoAgenda>
+  quitarDeEspera(id: string): Promise<void>
 }
 
 export interface OrigenTurnos {
