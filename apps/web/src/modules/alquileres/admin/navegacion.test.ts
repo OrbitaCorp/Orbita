@@ -90,9 +90,17 @@ describe('resolverRuta', () => {
 })
 
 describe('el panel real (con la API) muestra solo lo que ya guarda de verdad', () => {
-  it('en estadía quedan la agenda, las propiedades, los precios, los bloqueos, las reglas y la seña', () => {
+  it('en estadía quedan la agenda, las propiedades, los precios, los bloqueos, las reglas, la seña y Airbnb', () => {
     const ids = seccionesDe('estadia', undefined, true).map(s => s.id)
-    expect(ids).toEqual(['reservas', 'disponibilidad', 'clientes', 'ingresos', 'propiedades', 'temporadas', 'bloqueos', 'reglas', 'pagos'])
+    expect(ids).toEqual(['reservas', 'disponibilidad', 'clientes', 'ingresos', 'propiedades', 'temporadas', 'bloqueos', 'reglas', 'pagos', 'calendarios'])
+  })
+  it('los calendarios, en un negocio real de estadía, se llaman Airbnb (es lo único que se conecta); en la demo, como siempre', () => {
+    expect(seccionesDe('estadia', undefined, true).find(s => s.id === 'calendarios')?.label).toBe('Airbnb')
+    expect(seccionesDe('estadia').find(s => s.id === 'calendarios')?.label).toBe('Calendarios (.ics)')
+  })
+  it('canchas y salones reales todavía no tienen calendarios', () => {
+    expect(seccionesDe('cancha', undefined, true).map(s => s.id)).not.toContain('calendarios')
+    expect(seccionesDe('bloque', undefined, true).map(s => s.id)).not.toContain('calendarios')
   })
   it('Temporadas se llama igual que en la demo: el servidor ya cobra por temporada', () => {
     expect(seccionesDe('estadia', undefined, true).find(s => s.id === 'temporadas')?.label).toBe('Temporadas y precios')

@@ -50,6 +50,7 @@ import Bloqueos from './configuracion/Bloqueos'
 import Mensajes from './configuracion/Mensajes'
 import Pagos from './configuracion/Pagos'
 import Calendarios from './configuracion/Calendarios'
+import Airbnb from './configuracion/Airbnb'
 
 const ICONOS: Record<Vista, LucideIcon> = {
   reservas: CalendarDays, disponibilidad: CalendarSearch, clientes: Contact, eventos: PartyPopper, ingresos: HandCoins,
@@ -180,6 +181,7 @@ export default function Panel() {
   // ── Lo que escriben las secciones ──
   // En la demo la escritura es al instante; con la API es un pedido que puede fallar. El aviso sale
   // cuando terminó: "guardado" si salió bien, o el motivo de la API si no (un 409, una regla del negocio).
+  const conflictosDeAirbnb = negocio.calendariosExternos.flatMap(c => c.conflictos ?? [])
   const hacer = (accion: () => void | Promise<void>, texto?: string, detalle?: string) => {
     // En un negocio real guardar tarda (va a la API y vuelve a cargar): se dice mientras tanto, y el resultado lo reemplaza.
     if (real) avisar('Guardando…')
@@ -203,6 +205,15 @@ export default function Panel() {
         <Vacio titulo="No pudimos traer los datos del panel" texto={n.error} accion={<button type="button" className="rv-btn rv-btn--sm" onClick={n.reintentar}>Reintentar</button>} />
       ) : cargando ? <SkeletonVista forma={FORMAS[vista]} nombre={nombreVista} /> : (
         <>
+          {/* Airbnb y Órbita tomaron las mismas noches (entraron entre una sincronización y la otra): se dice arriba de todo, con el código. */}
+          {vista === 'reservas' && real && conflictosDeAirbnb.length > 0 && (
+            <div className="rv-pagina" style={{ paddingBottom: 0 }}>
+              <Nota tono="aviso">
+                <span style={{ flex: 1, minWidth: 0 }}><b>Airbnb tiene reservadas noches que también tenés acá.</b> {conflictosDeAirbnb.map(x => `${rangoTxt(x.entrada, x.salida)} (código ${x.codigo})`).join(' · ')}. Decidí con cuál te quedás: acá no se cancela nada solo.</span>
+                <button type="button" className="rv-btn rv-btn--sm" onClick={() => irA('calendarios')}>Ver en Airbnb</button>
+              </Nota>
+            </div>
+          )}
           {vista === 'reservas' && <Reservas key={k} negocio={negocio} reservas={reservas} clientes={clientes} reservaAbierta={reservaAbierta} onAbrirReserva={abrirReserva} onCambiar={cambiar} onReservar={reservar} onBloqueo={bloquear} onQuitarBloqueo={quitarBloqueo} />}
           {vista === 'disponibilidad' && <Disponibilidad key={k} negocio={negocio} reservas={reservas} clientes={clientes} onReservar={reservar} onCambiar={cambiar} />}
           {vista === 'eventos' && <Eventos key={k} negocio={negocio} reservas={reservas} clientes={clientes} abierta={reservaAbierta} onAbrir={abrirReserva} onCambiar={cambiar} />}
@@ -219,7 +230,14 @@ export default function Panel() {
           {vista === 'bloqueos' && <Bloqueos key={k} negocio={negocio} reservas={reservas} onBloqueo={bloquear} onQuitarBloqueo={quitarBloqueo} onIr={irA} />}
           {vista === 'mensajes' && <Mensajes key={k} negocio={negocio} reservas={reservas} clientes={clientes} onGuardar={onGuardar} onAviso={avisar} />}
           {vista === 'pagos' && <Pagos key={kForm} negocio={negocio} onGuardar={onGuardar} onIr={irA} real={real} />}
-          {vista === 'calendarios' && <Calendarios key={k} negocio={negocio} reservas={reservas} onCalendario={(c, b) => { n.agregarCalendario(tipo, c, b); avisar('Calendario conectado', `${b.length} ${b.length === 1 ? 'fecha bloqueada' : 'fechas bloqueadas'}. Demo: sincronización simulada.`) }} onQuitarCalendario={id => { n.quitarCalendario(tipo, id); avisar('Calendario desconectado') }} />}
+          {vista === 'calendarios' && real && (
+            <Airbnb key={kForm} negocio={negocio}
+              onConectar={c => hacer(() => n.agregarCalendario(tipo, c, []), 'Calendario conectado', 'Ya se bajaron las noches que Airbnb tiene tomadas.')}
+              onDesconectar={id => hacer(() => n.quitarCalendario(tipo, id), 'Calendario desconectado', 'Las noches que venían de Airbnb quedaron libres.')}
+              onSincronizar={id => hacer(() => n.sincronizarCalendario(tipo, id), 'Calendario sincronizado')}
+              onVerReserva={verReserva} />
+          )}
+          {vista === 'calendarios' && !real && <Calendarios key={k} negocio={negocio} reservas={reservas} onCalendario={(c, b) => { n.agregarCalendario(tipo, c, b); avisar('Calendario conectado', `${b.length} ${b.length === 1 ? 'fecha bloqueada' : 'fechas bloqueadas'}. Demo: sincronización simulada.`) }} onQuitarCalendario={id => { n.quitarCalendario(tipo, id); avisar('Calendario desconectado') }} />}
           {vista === 'configuracion' && tab === 'negocio' && <Negocio key={k} negocio={negocio} onGuardar={onGuardar} />}
           {vista === 'configuracion' && tab === 'horarios' && <Horarios key={k} negocio={negocio} onGuardar={onGuardar} />}
           {vista === 'configuracion' && tab === 'equipo' && <Equipo key={k} negocio={negocio} onGuardar={onGuardar} />}
