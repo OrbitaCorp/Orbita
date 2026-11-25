@@ -137,6 +137,7 @@ describe('Gimnasio · con qué plan se paga un lugar', () => {
     expect(motivoParaElNegocio({ causa: 'sin-clases', restantes: 3 })).toMatch(/Le quedan 3 clases en el pack/);
     expect(motivoParaElNegocio({ causa: 'tope-semanal', porSemana: 1, usadas: 1 })).toMatch(/Ya usó su clase de esa semana/);
     expect(motivoParaElNegocio({ causa: 'tope-semanal', porSemana: 3, usadas: 3 })).toMatch(/Ya usó sus 3 clases de esa semana/);
-    expect(motivoParaElNegocio({ causa: 'un-lugar' })).toMatch(/un lugar por clase/);
+    // Dice qué hacer: anotarlo con un solo lugar para que use su plan, o cobrarle los lugares aparte.
+    expect(motivoParaElNegocio({ causa: 'un-lugar' })).toMatch(/un solo lugar por clase\. Anotalo con un solo lugar/);
   });
 });
