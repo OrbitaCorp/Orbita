@@ -17,16 +17,16 @@
 //   "Profesional". La API no guarda roles propios de Turnos, ni cómo cobra cada
 //   uno, ni quién es el dueño: hasta que se decida dónde viven, el equipo de la
 //   API es solo quien atiende.
-import { panel } from '@/lib/reservasApi/cliente'
+import { claveDeIntento, panel } from '@/lib/reservasApi/cliente'
 import type { Reserva } from '@/lib/reservasApi/tipos'
 import { sumarDias, type ISO } from '@/lib/reservas/fechas'
 import type { Cliente, Recurso, RubroTurnos } from '@/modules/turnos/datos'
 import type { Semana } from '@/modules/turnos/horario'
-import type { ServicioBase } from '@/modules/turnos/datos/agenda'
+import type { ServicioBase, TurnoAgenda } from '@/modules/turnos/datos/agenda'
 import { rolesDe, type Persona, type Rol } from '@/modules/turnos/datos/equipo'
 import {
   ahoraArgentina, bloqueoDeVacaciones, bloqueosDeDia, claveDeDia, claveDeVacaciones, clientesDeReservas, configDeReglas, diasCerradosDeBloqueos, horarioDeSemana,
-  porDia, recortarHorario, recursoDeApi, recursoParaApi, reglasDeConfig, rolIdDeApi, semanaDeHorario, servicioDeApi, servicioParaApi, tipoDeAgenda,
+  porDia, recortarHorario, recursoDeApi, turnoDeApi, recursoParaApi, reglasDeConfig, rolIdDeApi, semanaDeHorario, servicioDeApi, servicioParaApi, tipoDeAgenda,
 } from './mapear'
 import type { DatosPanel, FuenteAgenda, OrigenTurnos } from './index'
 import { conCambios, extrasDeDatos, leerDatos } from './datosConfig'
@@ -121,6 +121,14 @@ export function equipoApi(rubro: RubroTurnos, recursos: Recurso[], rolIds: Recor
   return { personas: [...conocidas, ...nuevas], roles }
 }
 
+/** Una reserva como turno del panel, con el "ahora" real. Una vencida no debería volver de una acción. */
+function aTurno(r: Reserva): TurnoAgenda {
+  const { hoy, minutos } = ahoraArgentina()
+  const t = turnoDeApi(r, hoy, minutos)
+  if (!t) throw new Error('El turno venció antes de que se guardara. Volvé a darlo.')
+  return t
+}
+
 export const origenApi: OrigenTurnos = {
   tipo: 'api',
   async cargar(rubro): Promise<DatosPanel> {
@@ -208,6 +216,39 @@ export const origenApi: OrigenTurnos = {
         const agendas = (await panel.recursos('TURNOS')).filter(r => r.tipo === tipo && r.pasoMinutos !== grilla)
         await Promise.all(agendas.map(r => panel.editarRecurso(r.id, { modulo: 'TURNOS', tipo: r.tipo, nombre: r.nombre, pasoMinutos: grilla })))
       }
+    },
+  },
+  turnos: {
+    async crear(t, cliente, servicioId) {
+      const { hoy } = ahoraArgentina()
+      // Alguien que ya tiene ficha va por su id; el resto, con sus datos (la API arma o encuentra la ficha).
+      const conFicha = cliente.id && !/^(tel|mail|reserva):/.test(cliente.id)
+      const r = await panel.crear({
+        modulo: 'TURNOS', recursoId: t.recursoId, servicioId, fecha: sumarDias(hoy, t.dia ?? 0), inicioMinutos: t.inicio,
+        estado: t.estado === 'pendiente' ? 'PENDIENTE' : 'CONFIRMADA', clave: claveDeIntento(),
+        ...(conFicha ? { clienteId: cliente.id } : { cliente: { nombre: cliente.nombre, ...(cliente.telefono ? { telefono: cliente.telefono } : {}), ...(cliente.email ? { email: cliente.email } : {}) } }),
+        ...(t.nota ? { notaInterna: t.nota } : {}),
+      })
+      return aTurno(r)
+    },
+    async estado(id, estado) {
+      const r = estado === 'confirmado' ? await panel.confirmar(id)
+        : estado === 'completado' ? await panel.completar(id)
+          : estado === 'ausente' ? await panel.ausente(id)
+            // Cancelar devuelve qué pasó con la seña, no la reserva: se vuelve a leer.
+            : estado === 'cancelado' ? (await panel.cancelar(id), await panel.detalle(id))
+              : null
+      if (!r) throw new Error('Ese cambio no se hace a mano.')
+      return aTurno(r)
+    },
+    async mover(id, dia, inicio, recursoId) {
+      const { hoy } = ahoraArgentina()
+      return aTurno(await panel.reprogramar(id, { fecha: sumarDias(hoy, dia), inicioMinutos: inicio, ...(recursoId ? { recursoId } : {}) }))
+    },
+    async sena(id) {
+      const r = await panel.detalle(id)
+      const falta = Math.max(0, r.sena - r.pagado)
+      return aTurno(falta > 0 ? await panel.pago(id, { monto: falta, metodo: 'OTRO', referencia: 'Seña registrada desde el panel' }) : r)
     },
   },
   equipo: {

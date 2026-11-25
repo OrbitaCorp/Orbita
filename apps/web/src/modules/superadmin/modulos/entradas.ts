@@ -3692,4 +3692,49 @@ Usa el campo libre que sumó Alan (\`ReservaConfig.datos\`, 23/11), sin migraci�
       'apps/api/prisma/seed-turnos-prueba.ts:161',
     ],
   }),
+  entrada({
+    modulo: 'turnos', fecha: F24, slug: 'agenda-sobre-la-api', tipo: 'tarea', quien: 'Mateo',
+    titulo: 'La agenda de Turnos da, cambia, mueve y cobra turnos en la API',
+    foco: 'En un negocio real la agenda del panel ya opera sobre la API. Dar un turno (a alguien de la lista o nuevo), confirmarlo, marcarlo atendido o ausente, cancelarlo, moverlo y registrar la seña van a /reservas, y el turno queda como lo devolvió la API. Si la API dice que no (el horario se ocupó, todavía no es la hora), el aviso trae su mensaje y nada cambia. Falta de la semana 3: el "ahora" real de la agenda, ver el historial en el detalle del turno y la lista de espera.',
+    que: `Tareas del 17/11 (dar un turno) y del 18/11 (cambiar y mover), y la seña de la del 19/11, hechas el 24/11.
+
+**El origen opera turnos** (\`datos/origen/index.ts\`, \`turnos\`): crear, cambiar de estado, mover y registrar la seña. Cada acción devuelve el turno como quedó. La demo no lo tiene, así que en \`/turnos-demo\` todo sigue en el estado del panel.
+
+| En la agenda | En la API |
+|---|---|
+| Nuevo turno | \`POST /reservas\` con el servicio, la agenda, el día, la hora, la nota interna y una clave de intento (dos clics no dan dos turnos) |
+| A alguien con ficha | Por su \`clienteId\` |
+| A alguien sin ficha o nuevo | Con su nombre y su teléfono: la API la encuentra o la arma |
+| Confirmar, atendido, ausente | \`confirmar\`, \`completar\`, \`ausente\` |
+| Cancelar | \`cancelar\`, y se vuelve a leer la reserva (la respuesta dice qué pasó con la seña, no cómo quedó) |
+| Mover | \`reprogramar\` con la fecha y la hora nuevas: es el mismo turno, no uno nuevo |
+| Registrar la seña | \`pago\` por lo que falta de la seña |
+
+**El panel** (\`PanelTurnos.tsx\`) espera a la API y pone el turno devuelto en lugar del que trajo la carga. Si la API dice que no, el aviso trae su mensaje: "Ese horario se acaba de ocupar. Elegí otro." o "Todavía no es la hora: no se puede marcar como atendida ni ausente."
+
+**Probado contra la API local**, con el código real del panel y el negocio de prueba, con la seña al 30%:
+
+- Un turno sin confirmar para alguien nuevo, con la nota.
+- El mismo horario otra vez: rechazado por la API.
+- Confirmarlo y registrar la seña: queda pagado $3.600.
+- Moverlo a otro día: es el mismo turno.
+- Marcarlo atendido antes de hora: rechazado.
+- Cancelarlo: el historial queda con cada cambio.
+- Uno de hoy que ya había empezado: marcado como atendido.
+
+**Lo que falta de la semana 3:**
+
+- **El "ahora" de la agenda** (la línea de la hora y "en curso") sigue en la hora fija de la demo.
+- **El detalle del turno** todavía no muestra su historial (la API ya lo da en \`GET /reservas/:id\`).
+- **La lista de espera del panel.**
+- **Pagos**, que todavía calcula la seña con la del rubro de la demo y no con la config.
+
+**Verificado:** typecheck y eslint de \`apps/web\` sin errores y los tests de Turnos en verde (62, 7 nuevos). El panel no se abrió a mano en el navegador.`,
+    archivos: [
+      'apps/web/src/modules/turnos/datos/origen/index.ts:138',
+      'apps/web/src/modules/turnos/datos/origen/api.ts:221',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:267',
+      'apps/web/src/modules/turnos/datos/origen/__tests__/turnos.test.ts:1',
+    ],
+  }),
 ]

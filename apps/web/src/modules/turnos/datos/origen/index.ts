@@ -28,7 +28,7 @@
 // horarios (13/11). El mapa completo, con lo que el backend no cubre, está en
 // la entrada "mapa-de-turnos-sobre-el-backend" de Auditoría.
 import { createContext, createElement, useCallback, useContext, useEffect, useEffectEvent, useState, type ReactNode } from 'react'
-import type { Cliente, Recurso, RubroTurnos } from '@/modules/turnos/datos'
+import type { Cliente, EstadoTurno, Recurso, RubroTurnos } from '@/modules/turnos/datos'
 import type { Semana } from '@/modules/turnos/horario'
 import type { ServicioBase, TurnoAgenda } from '@/modules/turnos/datos/agenda'
 import type { Persona, Rol } from '@/modules/turnos/datos/equipo'
@@ -126,6 +126,25 @@ export interface EscrituraEquipo {
   guardar(personas: Persona[], roles: Rol[]): Promise<void>
 }
 
+/** Quién reserva un turno dado desde el panel: alguien de la lista (con su ficha o sus datos) o alguien nuevo. */
+export interface ClienteDelTurno { id?: string; nombre: string; telefono?: string; email?: string }
+
+/**
+ * Lo que el panel hace con un turno (semana 3 del plan). Cada acción devuelve
+ * el turno como quedó en el origen; si el origen dice que no (el horario se
+ * ocupó, alguien ya lo cambió), el error trae su mensaje. La demo no lo tiene:
+ * ahí los turnos viven en el estado del panel.
+ */
+export interface EscrituraTurnos {
+  crear(t: Omit<TurnoAgenda, 'id'>, cliente: ClienteDelTurno, servicioId?: string): Promise<TurnoAgenda>
+  /** Confirmar, atender, ausente o cancelar. */
+  estado(id: string, estado: EstadoTurno): Promise<TurnoAgenda>
+  /** A otro día (contado desde hoy) y otra hora, y si se pide, a otra agenda. */
+  mover(id: string, dia: number, inicio: number, recursoId?: string): Promise<TurnoAgenda>
+  /** Registra lo que falta pagar de la seña. */
+  sena(id: string): Promise<TurnoAgenda>
+}
+
 export interface OrigenTurnos {
   tipo: 'demo' | 'api'
   /** Lo de cada sección, junto. Si falla, el error trae el mensaje para mostrar. */
@@ -135,6 +154,7 @@ export interface OrigenTurnos {
   horarios?: EscrituraHorarios
   reglas?: EscrituraReglas
   equipo?: EscrituraEquipo
+  turnos?: EscrituraTurnos
 }
 
 const Contexto = createContext<OrigenTurnos>(origenDemo)
