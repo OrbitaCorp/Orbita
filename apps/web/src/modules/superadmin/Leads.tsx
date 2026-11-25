@@ -59,9 +59,9 @@ function canalDe(lead: MarketingLead): Exclude<FiltroCanal, 'TODOS'> {
   return 'PRESENCIAL'
 }
 
-function etiquetaClasificacion(c: LeadClasificacion): { text: string; tone: 'green' | 'blue' | 'gray' } {
-  if (c === 'POTENCIAL_LOCAL') return { text: 'Potencial · Iguazú', tone: 'green' }
+function etiquetaClasificacion(c: LeadClasificacion, rubro: LeadRubro): { text: string; tone: 'green' | 'blue' | 'gray' } {
   if (c === 'PILOTO') return { text: 'Piloto · Cortesía 3m', tone: 'blue' }
+  if (c === 'POTENCIAL_LOCAL') return { text: rubro === 'TIENDA' ? 'Potencial · Iguazú' : 'Posible piloto · Iguazú', tone: 'green' }
   return { text: 'Lead · Venta', tone: 'gray' }
 }
 
@@ -296,7 +296,7 @@ export function PanelLeads({ puedeEditar, setAviso }: { puedeEditar: boolean; se
                 <span style={{ fontFamily: '"Geist Mono", monospace', fontSize: 12, color: activo ? 'var(--color-primary)' : 'var(--color-muted)' }}>
                   {items.length}
                 </span>
-                <Chip text={`${pilotos}/5 pilotos`} tone={pilotos >= 5 ? 'blue' : 'amber'} />
+                <Chip text={`${pilotos}/5 pilotos`} tone={pilotos === 0 ? 'gray' : pilotos >= 5 ? 'blue' : 'amber'} />
               </button>
             )
           })}
@@ -320,7 +320,7 @@ export function PanelLeads({ puedeEditar, setAviso }: { puedeEditar: boolean; se
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', padding: '12px 16px', borderRadius: 12, border: '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
           <div style={{ fontSize: 13, color: 'var(--color-body)', lineHeight: 1.5 }}>
             <strong style={{ color: 'var(--color-text)' }}>Cupo de pilotos en Puerto Iguazú ({RUBROS_NUEVOS.find((r) => r.id === rubroNuevo)?.label}):</strong>{' '}
-            {statsRubro.pilotos} de 5 asignados (cortesía de hasta 3 meses). Los demás negocios de Iguazú y del resto de Misiones quedan como <b>Leads (venta cerrada)</b>.
+            {statsRubro.pilotos} de 5 elegidos (cortesía de hasta 3 meses). Elegí entre los posibles pilotos de Iguazú con el botón <b>«Elegir como Piloto»</b>; el resto quedan como <b>Leads (venta cerrada)</b>.
           </div>
           <div style={{ width: 140, height: 8, borderRadius: 999, background: 'var(--color-surface-alt)', overflow: 'hidden', flexShrink: 0 }}>
             <div style={{ width: `${Math.min(100, (statsRubro.pilotos / 5) * 100)}%`, height: '100%', background: 'var(--color-primary)' }} />
@@ -391,8 +391,9 @@ export function PanelLeads({ puedeEditar, setAviso }: { puedeEditar: boolean; se
               </>
             ) : (
               <>
-                <button type="button" className="ld-chip-btn" aria-pressed={clasificacionFiltro === 'PILOTO'} onClick={() => setClasificacionFiltro('PILOTO')}>Pilotos Iguazú ({statsRubro.pilotos}/5)</button>
-                <button type="button" className="ld-chip-btn" aria-pressed={clasificacionFiltro === 'LEAD'} onClick={() => setClasificacionFiltro('LEAD')}>Leads venta ({statsRubro.total - statsRubro.pilotos})</button>
+                <button type="button" className="ld-chip-btn" aria-pressed={clasificacionFiltro === 'PILOTO'} onClick={() => setClasificacionFiltro('PILOTO')}>Pilotos elegidos ({statsRubro.pilotos}/5)</button>
+                <button type="button" className="ld-chip-btn" aria-pressed={clasificacionFiltro === 'POTENCIAL_LOCAL'} onClick={() => setClasificacionFiltro('POTENCIAL_LOCAL')}>Posibles pilotos Iguazú ({statsRubro.potenciales})</button>
+                <button type="button" className="ld-chip-btn" aria-pressed={clasificacionFiltro === 'LEAD'} onClick={() => setClasificacionFiltro('LEAD')}>Leads resto ({statsRubro.total - statsRubro.pilotos - statsRubro.potenciales})</button>
               </>
             )}
 
@@ -445,7 +446,7 @@ export function PanelLeads({ puedeEditar, setAviso }: { puedeEditar: boolean; se
               </thead>
               <tbody>
                 {visibles.map((l) => {
-                  const badge = etiquetaClasificacion(l.clasificacion)
+                  const badge = etiquetaClasificacion(l.clasificacion, l.rubro)
                   const iguazu = esIguazu(l.localidad)
                   const igClean = l.instagram?.replace(/^@/, '')
                   return (
@@ -492,12 +493,12 @@ export function PanelLeads({ puedeEditar, setAviso }: { puedeEditar: boolean; se
                               type="button"
                               onClick={() => void actualizarLead(
                                 l,
-                                { clasificacion: l.clasificacion === 'PILOTO' ? 'LEAD' : 'PILOTO' },
-                                l.clasificacion === 'PILOTO' ? 'Pasado a Lead (venta)' : 'Marcado como Piloto',
+                                { clasificacion: l.clasificacion === 'PILOTO' ? 'POTENCIAL_LOCAL' : 'PILOTO' },
+                                l.clasificacion === 'PILOTO' ? 'Quitado de Piloto' : 'Elegido como Piloto',
                               )}
                               style={{ border: 'none', background: 'none', padding: 0, font: 'inherit', fontSize: 11.5, fontWeight: 600, color: 'var(--color-primary)', cursor: 'pointer', textDecoration: 'underline' }}
                             >
-                              {l.clasificacion === 'PILOTO' ? 'Pasar a Lead' : 'Pasar a Piloto'}
+                              {l.clasificacion === 'PILOTO' ? 'Quitar de Piloto' : 'Elegir como Piloto'}
                             </button>
                           )}
                         </div>
@@ -666,9 +667,7 @@ function ModalNuevoLead({ rubroInicial, onClose, onCreado }: {
   const [negocio, setNegocio] = useState('')
   const [subrubro, setSubrubro] = useState('')
   const [localidad, setLocalidad] = useState('Puerto Iguazú')
-  const [clasificacion, setClasificacion] = useState<LeadClasificacion>(
-    rubroInicial === 'TIENDA' ? 'POTENCIAL_LOCAL' : 'LEAD',
-  )
+  const [clasificacion, setClasificacion] = useState<LeadClasificacion>('POTENCIAL_LOCAL')
   const [telefono, setTelefono] = useState('')
   const [instagram, setInstagram] = useState('')
   const [direccion, setDireccion] = useState('')
@@ -712,7 +711,7 @@ function ModalNuevoLead({ rubroInicial, onClose, onCreado }: {
               onChange={(e) => {
                 const r = e.target.value as LeadRubro
                 setRubro(r)
-                setClasificacion(r === 'TIENDA' && esIguazu(localidad) ? 'POTENCIAL_LOCAL' : 'LEAD')
+                setClasificacion(esIguazu(localidad) ? 'POTENCIAL_LOCAL' : 'LEAD')
               }}
               style={inputStyle}
             >
@@ -732,8 +731,9 @@ function ModalNuevoLead({ rubroInicial, onClose, onCreado }: {
                 </>
               ) : (
                 <>
-                  <option value="LEAD">Lead · Venta cerrada</option>
+                  <option value="POTENCIAL_LOCAL">Posible piloto · Iguazú</option>
                   <option value="PILOTO">Piloto · Iguazú (máx. 5)</option>
+                  <option value="LEAD">Lead · Venta cerrada</option>
                 </>
               )}
             </select>

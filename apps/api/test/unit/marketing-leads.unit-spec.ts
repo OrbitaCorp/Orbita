@@ -15,7 +15,7 @@ describe('Marketing → Leads: semilla y reglas de negocio', () => {
     expect(claves.size).toBe(189);
   });
 
-  it('respeta los conteos por rubro, los 22 potenciales locales de Tienda Iguazú y máximo 5 pilotos en Iguazú por rubro nuevo', () => {
+  it('respeta los conteos por rubro, los potenciales/posibles pilotos de Iguazú y arranca en 0 pilotos automáticos por rubro nuevo', () => {
     const porRubro = (r: string) => LEADS_SEMILLA.filter((l) => l.rubro === r);
 
     expect(porRubro('TIENDA')).toHaveLength(102);
@@ -28,11 +28,15 @@ describe('Marketing → Leads: semilla y reglas de negocio', () => {
     expect(tiendasIguazu).toHaveLength(22);
     expect(tiendasIguazu.every((l) => esPuertoIguazu(l.localidad))).toBe(true);
 
+    const esperadosIguazu: Record<string, number> = { TURNOS: 12, ALQUILERES: 12, GIMNASIO: 11, POS: 12 };
     for (const r of ['TURNOS', 'ALQUILERES', 'GIMNASIO', 'POS']) {
       const pilotos = porRubro(r).filter((l) => l.clasificacion === 'PILOTO');
-      expect(pilotos).toHaveLength(MAX_PILOTOS_POR_RUBRO);
-      expect(pilotos.every((l) => esPuertoIguazu(l.localidad))).toBe(true);
+      expect(pilotos).toHaveLength(0);
+      const posibles = porRubro(r).filter((l) => l.clasificacion === 'POTENCIAL_LOCAL');
+      expect(posibles).toHaveLength(esperadosIguazu[r]);
+      expect(posibles.every((l) => esPuertoIguazu(l.localidad))).toBe(true);
     }
+    expect(MAX_PILOTOS_POR_RUBRO).toBe(5);
   });
 
   it('normaliza teléfonos argentinos a wa.me/549... y usuarios de Instagram', () => {
