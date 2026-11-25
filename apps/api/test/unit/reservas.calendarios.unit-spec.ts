@@ -255,3 +255,63 @@ describe('ReservasCalendariosService · la corrida automática', () => {
     expect(a.t.reservaCalendarioExterno.filas.find((c) => c.id === 'apagado')?.ultimaSync).toBeNull();
   });
 });
+
+describe('ReservasCalendariosService · el .ics que se le da a Airbnb', () => {
+  it('exporta reservas activas y bloqueos del dueño como eventos de día entero, sin datos personales', async () => {
+    const { svc } = armar({
+      reservas: [reserva('2026-12-10', '2026-12-13', { clienteNombre: 'Ana Ríos', clienteTelefono: '3757 55-0101', clienteEmail: 'ana@ejemplo.com', precio: 316000, notas: 'Llegamos tarde' })],
+      bloqueos: [bloqueoDueno('2026-12-15', '2026-12-17'), bloqueoDueno('2026-12-28', '2026-12-30', { id: 'de-todo-el-negocio', recursoId: null, motivo: 'Vacaciones de Juan' })],
+    });
+    const texto = await svc.feed(BIZ, 'r-cab', AHORA);
+    expect(texto).toContain('X-WR-CALNAME:Cabaña del Monte');
+    expect(texto).toContain('UID:res-2026-12-10@orbita.site');
+    expect(texto).toContain('DTSTART;VALUE=DATE:20261210');
+    expect(texto).toContain('DTEND;VALUE=DATE:20261213');
+    expect(texto).toContain('SUMMARY:Reservado');
+    expect(texto).toContain('DTSTART;VALUE=DATE:20261215');
+    expect(texto).toContain('DTEND;VALUE=DATE:20261217');
+    expect(texto).toContain('SUMMARY:No disponible');
+    expect(texto).toContain('UID:de-todo-el-negocio@orbita.site');
+    for (const privado of ['Ana', '3757', 'ejemplo.com', '316000', 'Llegamos', 'Vacaciones', 'Uso propio', 'Q2R4PS']) expect(texto).not.toContain(privado);
+  });
+
+  it('no exporta lo que vino de Airbnb, ni las reservas canceladas o vencidas, ni lo que ya pasó', async () => {
+    const { svc } = armar({
+      reservas: [
+        reserva('2026-12-10', '2026-12-13', { id: 'cancelada', estado: 'CANCELADA' }),
+        reserva('2026-12-14', '2026-12-16', { id: 'vencida', estado: 'VENCIDA' }),
+        reserva('2026-12-17', '2026-12-19', { id: 'retenida-vencida', estado: 'RETENIDA', retenidaHasta: new Date(AHORA.getTime() - 60_000) }),
+        reserva('2026-12-20', '2026-12-22', { id: 'retenida-viva', estado: 'RETENIDA', retenidaHasta: new Date(AHORA.getTime() + 60_000) }),
+        reserva('2026-10-01', '2026-10-05', { id: 'pasada' }),
+      ],
+      bloqueos: [{ id: 'de-airbnb', businessId: BIZ, modulo: 'ALQUILERES', recursoId: 'r-cab', origen: 'ICAL', calendarioId: 'cal-1', inicio: instante('2027-01-05', 900), fin: instante('2027-01-07', 600) }],
+    });
+    const texto = await svc.feed(BIZ, 'r-cab', AHORA);
+    expect(texto).toContain('UID:retenida-viva@orbita.site');
+    for (const id of ['cancelada', 'vencida', 'retenida-vencida', 'pasada', 'de-airbnb']) expect(texto).not.toContain(`UID:${id}@`);
+  });
+
+  it('un recurso de otro negocio, inactivo, borrado o que no es alojamiento no tiene calendario', async () => {
+    await expect(armar().svc.feed('otro-negocio', 'r-cab', AHORA)).rejects.toThrow(NotFoundException);
+    await expect(armar({ recursos: [cabana({ activo: false })] }).svc.feed(BIZ, 'r-cab', AHORA)).rejects.toThrow(NotFoundException);
+    await expect(armar({ recursos: [cabana({ eliminadoEn: AHORA })] }).svc.feed(BIZ, 'r-cab', AHORA)).rejects.toThrow(NotFoundException);
+    await expect(armar({ recursos: [cabana({ tipo: 'CANCHA' })] }).svc.feed(BIZ, 'r-cab', AHORA)).rejects.toThrow(NotFoundException);
+    await expect(armar().svc.feed(BIZ, 'no-existe', AHORA)).rejects.toThrow(NotFoundException);
+  });
+
+  it('sin nada ocupado devuelve un calendario válido y vacío', async () => {
+    const texto = await armar().svc.feed(BIZ, 'r-cab', AHORA);
+    expect(texto.startsWith('BEGIN:VCALENDAR')).toBe(true);
+    expect(texto.trimEnd().endsWith('END:VCALENDAR')).toBe(true);
+    expect(texto).not.toContain('BEGIN:VEVENT');
+  });
+
+  it('lo que exporta y lo que reconoce como eco usan las mismas fechas: ida y vuelta sin bloquear de más', async () => {
+    const a = armar({ reservas: [reserva('2026-12-10', '2026-12-13')], bloqueos: [bloqueoDueno('2026-12-15', '2026-12-17')] });
+    // Airbnb importa el calendario de Órbita y lo devuelve entero como "no disponible".
+    const devuelto = (await a.svc.feed(BIZ, 'r-cab', AHORA)).replace(/SUMMARY:[^\r\n]*/g, 'SUMMARY:Airbnb (Not available)').replace(/@orbita\.site/g, '@airbnb.com');
+    a.descargar.mockResolvedValue({ ok: true, texto: devuelto });
+    await a.svc.sincronizar(BIZ, 'cal-1', AHORA);
+    expect(a.deCalendario()).toEqual([]);
+  });
+});

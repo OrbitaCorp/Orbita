@@ -4,7 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../../audit/audit.service';
 import { describeError } from '../../common/utils/describe-error.util';
 import { ReservasCatalogoService, datosAlojamiento } from '../reservas-catalogo.service';
-import { clasificarEvento, leerICS, sinEco, type NochesExportadas } from '../dominio/ics';
+import { clasificarEvento, generarICS, leerICS, sinEco, type EventoParaExportar, type NochesExportadas } from '../dominio/ics';
 import { fechaYMinutos, instante, sumarDias } from '../dominio/tiempo';
 import { descargarCalendario, errorDeUrl, type Descarga } from './descarga';
 
@@ -32,6 +32,8 @@ export const MAXIMO_POR_RECURSO = 3;
 /** Hasta cuándo para atrás se mira lo que Órbita exportó, para reconocer su eco. */
 const DIAS_DE_MEMORIA_DEL_ECO = 60;
 const DIA_MS = 24 * 60 * 60 * 1000;
+/** Hasta cuánto para adelante se exporta. */
+const DIAS_QUE_SE_EXPORTAN = 365;
 
 export interface ConflictoDto { reservaId: string; codigo: string; desde: string; hasta: string }
 
@@ -221,6 +223,40 @@ export class ReservasCalendariosService {
       await tx.reservaCalendarioExterno.updateMany({ where: { id: c.id, businessId }, data: { ultimaSync: ahora, ultimoError: null } });
     });
     return true;
+  }
+
+  // ─── Exportar ──────────────────────────────────────────────────────────────
+
+  /**
+   * El .ics de una propiedad, para pegar en Airbnb: sus reservas que ocupan y
+   * los bloqueos del dueño, de ayer a un año, como eventos de día entero.
+   * Solo fechas: ni nombres, ni teléfonos, ni notas, ni montos, ni el motivo
+   * de un bloqueo. Nunca lo que vino de un calendario externo (sería
+   * devolverle a Airbnb lo suyo). Es lo mismo que ya muestra el sitio en
+   * disponibilidad/noches, por eso no lleva token.
+   */
+  async feed(businessId: string, recursoId: string, ahora = new Date()): Promise<string> {
+    const recurso = await this.prisma.reservaRecurso.findFirst({ where: { id: recursoId, businessId, eliminadoEn: null, activo: true }, select: { id: true, nombre: true, tipo: true, modulo: true } });
+    if (!recurso || recurso.tipo !== 'ALOJAMIENTO') throw new NotFoundException('Ese calendario no existe.');
+    const desde = new Date(ahora.getTime() - DIA_MS);
+    const hasta = new Date(ahora.getTime() + DIAS_QUE_SE_EXPORTAN * DIA_MS);
+    const [reservas, bloqueos] = await Promise.all([
+      this.prisma.reserva.findMany({
+        where: {
+          businessId, recursoId: recurso.id, fin: { gt: desde }, inicio: { lt: hasta },
+          OR: [{ estado: { in: ['PENDIENTE', 'CONFIRMADA'] } }, { estado: 'RETENIDA', retenidaHasta: { gte: ahora } }],
+        },
+        select: { id: true, inicio: true, fin: true },
+        orderBy: { inicio: 'asc' },
+      }),
+      this.prisma.reservaBloqueo.findMany({
+        where: { businessId, modulo: recurso.modulo, origen: 'DUENO', OR: [{ recursoId: null }, { recursoId: recurso.id }], fin: { gt: desde }, inicio: { lt: hasta } },
+        select: { id: true, inicio: true, fin: true },
+        orderBy: { inicio: 'asc' },
+      }),
+    ]);
+    const evento = (x: { id: string; inicio: Date; fin: Date }, titulo: string): EventoParaExportar => ({ uid: `${x.id}@orbita.site`, titulo, ...nochesDe(x.inicio, x.fin) });
+    return generarICS([...reservas.map((r) => evento(r, 'Reservado')), ...bloqueos.map((b) => evento(b, 'No disponible'))], { nombre: recurso.nombre, ahora });
   }
 
   /**
