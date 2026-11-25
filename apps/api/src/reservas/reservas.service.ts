@@ -610,7 +610,7 @@ export class ReservasService {
    */
   async anotarseEnEspera(
     businessId: string,
-    d: { modulo: ReservaModulo; recursoId: string; fecha: string; inicioMinutos: number; cliente: DatosCliente },
+    d: { modulo: ReservaModulo; recursoId: string; fecha: string; inicioMinutos: number; servicioId?: string; cliente: DatosCliente },
     clienteId?: string,
     ahora = new Date(),
     o: { modo?: Modo; memberId?: string } = {},
@@ -620,7 +620,8 @@ export class ReservasService {
     const email = d.cliente.email?.trim().toLowerCase() || null;
     const telefono = d.cliente.telefono?.trim() || null;
     if (!email && !telefono && !clienteId) throw new BadRequestException('Hace falta un teléfono o un email para avisarle cuando se libere un lugar.');
-    const dia = await this.disponibilidad.delDia(businessId, { modulo: d.modulo, recursoId: d.recursoId, fecha: d.fecha }, o.modo ?? 'publico', ahora);
+    // En Turnos la franja depende del servicio (su duración): sin él, la disponibilidad pide elegirlo.
+    const dia = await this.disponibilidad.delDia(businessId, { modulo: d.modulo, recursoId: d.recursoId, fecha: d.fecha, ...(d.servicioId ? { servicioId: d.servicioId } : {}) }, o.modo ?? 'publico', ahora);
     const franja = dia.franjas.find((f) => f.inicioMinutos === d.inicioMinutos);
     if (!franja) throw new BadRequestException('Ese horario no existe o ya pasó.');
     if (franja.libres > 0) throw new BadRequestException('Todavía hay lugar en ese horario: reservá directo.');
@@ -644,6 +645,7 @@ export class ReservasService {
           data: {
             businessId, modulo: d.modulo, recursoId: d.recursoId, inicio, fin, clienteId: vinculado,
             clienteNombre: d.cliente.nombre, clienteTelefono: telefono, clienteEmail: email, tokenAcceso: generarToken(),
+            servicioId: d.servicioId ?? null,
           },
         });
         return { espera: creada, yaEstaba: false };
@@ -873,10 +875,13 @@ export class ReservasService {
     if (ocupadas.reduce((s, o) => s + o.cantidad, 0) + 1 > cupo) return 'sin-lugar';
     const reclamada = await tx.reservaEspera.updateMany({ where: { id: espera.id, businessId, estado: 'ESPERANDO' }, data: { estado: 'TOMADA' } });
     if (reclamada.count === 0) return 'ya-no-espera';
-    const precio = Number(recurso.precio);
+    // Turnos: el precio y la foto del servicio que eligió al anotarse; si el servicio ya no está, el del recurso.
+    const servicio = espera.servicioId ? await tx.reservaServicio.findFirst({ where: { id: espera.servicioId, businessId, eliminadoEn: null } }) : null;
+    const precio = Number(servicio?.precio ?? recurso.precio);
     const reserva = await tx.reserva.create({
       data: {
         businessId, modulo: recurso.modulo, recursoId: recurso.id, codigo: generarCodigo(), tokenAcceso: generarToken(),
+        ...(servicio ? { servicioId: servicio.id, servicio: { id: servicio.id, nombre: servicio.nombre, duracionMinutos: servicio.duracionMinutos, precio } } : {}),
         estado: 'CONFIRMADA', origen: por.origen, inicio, fin, fecha: fechaYMinutos(inicio).fecha, cantidad: 1, exclusivo: cupo === 1,
         clienteId: espera.clienteId, clienteNombre: espera.clienteNombre, clienteTelefono: espera.clienteTelefono, clienteEmail: espera.clienteEmail,
         precio, sena: calcularSena(precio, senaPorcentaje), confirmadaEn: ahora, creadaPorMemberId: por.memberId ?? null,

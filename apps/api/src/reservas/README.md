@@ -48,7 +48,8 @@ el 26/10 y no se reemplaza: este módulo lo cubre para los tres.
   pagado, `codigo` visible (6 letras), `tokenAcceso` (el secreto del enlace personal),
   `claveIdempotencia`, `version`.
 - **`ReservaHistorial`**: cada cambio de estado con quién y por qué (solo se agrega).
-- **`ReservaEspera`**: lista de espera por sesión. **`ReservaBloqueo`**: rangos en que no se
+- **`ReservaEspera`**: lista de espera por sesión (en Turnos, con el `servicioId` elegido: da la
+  duración, el precio y la seña del turno cuando la persona toma el lugar; desde el 24/11). **`ReservaBloqueo`**: rangos en que no se
   reserva (feriado, mantenimiento), de un recurso o de todos.
 
 ### Estados

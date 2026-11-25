@@ -3779,4 +3779,43 @@ Usa el campo libre que sumó Alan (\`ReservaConfig.datos\`, 23/11), sin migraci�
       'apps/api/src/reservas/disponibilidad.service.ts:58',
     ],
   }),
+  entrada({
+    modulo: 'turnos', fecha: F24, slug: 'lista-de-espera-en-turnos', tipo: 'tarea', quien: 'Mateo',
+    titulo: 'La lista de espera funciona en Turnos: la espera guarda el servicio',
+    foco: 'En Turnos no se podía anotar a nadie en la lista de espera: el motor calcula la duración de un turno por el servicio, y la espera no lo guardaba. Ahora la espera guarda el servicio, como dato opcional para que Gimnasio y Alquileres no cambien. Al pasarle el lugar a alguien, su turno sale con ese servicio, su precio y su seña. Probado con los e2e de reservas contra Postgres y con el panel contra la API.',
+    que: `Tarea del 19/11 (la lista de espera del panel), terminada el 24/11 con un arreglo en el motor compartido.
+
+**Lo que pasaba:** anotarse en la espera de un turno respondía siempre "Elegí un servicio." (\`disponibilidad.service.ts:58\`). Y si alguien llegaba a tomar el lugar, la reserva salía con el precio del recurso, que en Turnos es 0. La lista del panel (\`ListaEspera.tsx\`, del mismo día) no se podía llenar nunca.
+
+**El arreglo en el motor** (compartido, aditivo):
+
+- **Migración** \`20261124180000_reservas_espera_servicio\`: \`reservas_espera.servicio_id\`, opcional y sin default. Lo que ya existe no cambia.
+- **Al anotarse,** \`servicioId\` es opcional en \`AnotarseEnEsperaDto\`, para el panel y para el sitio. Si viene, la franja se busca con la duración de ese servicio y se guarda en la espera.
+- **Al tomar el lugar** (por una cancelación o con "Darle el lugar"), la reserva sale con ese servicio: su id, la foto con el nombre, la duración y el precio, y la seña calculada sobre ese precio. Si el servicio ya no está, el precio del recurso, como antes.
+- **Para el panel y el sitio:** la espera devuelve \`servicioId\`, y el cliente de la web (\`lib/reservasApi/tipos.ts\`) lo tiene.
+- **Gimnasio y Alquileres** no mandan servicio y siguen igual.
+
+**Probado:**
+
+- **Unitario:** Turnos se anota con su servicio, la disponibilidad se pide con él, la espera lo guarda y la reserva que toma el lugar sale con el servicio, el precio y la seña (\`reservas.service.unit-spec.ts\`). Los 46 tests del servicio de reservas pasan.
+- **E2E contra Postgres de dev:** los 22 de reservas pasan, con los de concurrencia (seis a la vez por una cancha, ocho por tres lugares de una clase) y el de la lista de espera de una clase.
+- **El panel contra la API local,** con el negocio de prueba y la seña al 30%:
+  - Anotarse sin servicio sigue respondiendo "Elegí un servicio." y con servicio se anota.
+  - "Darle el lugar" con el horario lleno: "No queda lugar en ese horario."
+  - Al cancelar al titular, el lugar pasa al primero de la lista: "Corte clásico", $12.000, seña de $3.600, confirmado. Su historial dice "Tomó el lugar desde la lista de espera."
+  - Quitar al otro de la lista lo saca.
+
+**Lo que queda dicho para más adelante:** la espera es por horario exacto. Un lugar que se libera pasa solo a quien esperaba ese mismo inicio y ese mismo fin, y en Turnos los servicios duran distinto. Si se libera un turno de 45 minutos y alguien esperaba uno de 30 en ese horario, no pasa solo: queda "Darle el lugar" desde el panel, que mira si entra.
+
+**Del motor compartido** cambió solo esto (aditivo, con su migración) y el README de reservas lo dice.`,
+    archivos: [
+      'apps/api/prisma/migrations/20261124180000_reservas_espera_servicio/migration.sql:1',
+      'apps/api/prisma/schema.prisma:4188',
+      'apps/api/src/reservas/dto/reservas.dto.ts:249',
+      'apps/api/src/reservas/reservas.service.ts:878',
+      'apps/api/src/reservas/reservas.types.ts:216',
+      'apps/api/test/unit/reservas.service.unit-spec.ts:316',
+      'apps/web/src/lib/reservasApi/tipos.ts:353',
+    ],
+  }),
 ]

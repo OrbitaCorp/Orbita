@@ -4184,6 +4184,8 @@ model ReservaEspera {
   clienteNombre   String              @map("cliente_nombre") @db.VarChar(120)
   clienteTelefono String?             @map("cliente_telefono") @db.VarChar(30)
   clienteEmail    String?             @map("cliente_email") @db.VarChar(200)
+  /// Turnos: el servicio que eligió (da la duración y el precio del turno). Los demás módulos no lo usan.
+  servicioId      String?             @map("servicio_id")
   tokenAcceso     String              @unique @map("token_acceso")
   estado          ReservaEsperaEstado @default(ESPERANDO)
   reservaId       String?             @map("reserva_id")

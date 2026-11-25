@@ -219,6 +219,8 @@ export interface Espera {
   clienteNombre: string
   clienteTelefono: string | null
   clienteEmail: string | null
+  /** Turnos: el servicio que eligió. */
+  servicioId?: string | null
   estado: EstadoEspera
   reservaId: string | null
   createdAt: string
@@ -353,6 +355,8 @@ export interface AnotarseEnEspera {
   recursoId: string
   fecha: string
   inicioMinutos: number
+  /** Turnos: el servicio que se quiere (da la duración del turno). */
+  servicioId?: string
   cliente: Cliente
 }
 

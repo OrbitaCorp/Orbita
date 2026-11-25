@@ -246,6 +246,10 @@ export class AnotarseEnEsperaDto {
   @IsInt() @Min(0) @Max(1439)
   inicioMinutos!: number;
 
+  /** Turnos: el servicio que se quiere (da la duración del turno). Los demás módulos no lo mandan. */
+  @IsOptional() @IsUUID('4')
+  servicioId?: string;
+
   @IsDefined({ message: MENSAJE_SIN_CLIENTE }) @ValidateNested() @Type(() => ClienteDto)
   cliente!: ClienteDto;
 }
