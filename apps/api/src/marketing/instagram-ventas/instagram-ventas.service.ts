@@ -1,3 +1,4 @@
+import { cuentaInstagramDe, filtroDeCuentaInstagram } from '../../instagram/cuenta-instagram';
 import { Inject, Injectable, Logger, OnModuleInit, Optional, UnprocessableEntityException, ConflictException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma, type MarketingInstagramBot } from '@prisma/client';
@@ -79,10 +80,13 @@ export class InstagramVentasService implements AtencionAlternativa, OnModuleInit
   }
 
   async atiende(businessId: string): Promise<boolean> {
-    const cfg = await this.prisma.marketingInstagramBot.findUnique({ where: { businessId }, select: { activo: true } });
-    if (!cfg?.activo) return false;
+    const cfg = await this.prisma.marketingInstagramBot.findUnique({ where: { businessId }, select: { activo: true, cuenta: true } });
+    if (!cfg?.activo || !cfg.cuenta) return false;
     // Doble seguro: aunque una fila quedara en otro negocio, solo atiende la cuenta de la empresa.
-    return (await this.negocioId()) === businessId;
+    if ((await this.negocioId()) !== businessId) return false;
+    // Solo la cuenta de Instagram con la que se prendió: si el negocio conectó otra, esa la atiende Orbi como a
+    // cualquier dueño (prendido o apagado según su configuración), no el bot que vende Órbita.
+    return cfg.cuenta === (await cuentaInstagramDe(this.prisma, businessId));
   }
 
   /** Lo que muestra el super panel. Sin fila todavía, los valores por defecto (apagado). */
@@ -98,11 +102,15 @@ export class InstagramVentasService implements AtencionAlternativa, OnModuleInit
     });
     const desde = new Date(Date.now() - 7 * DIA_MS);
     const [derivadas, respuestas] = await Promise.all([
-      this.prisma.conversation.count({ where: { businessId, botEstado: 'DERIVADO', messages: { some: { channel: 'INSTAGRAM' } } } }),
+      this.prisma.conversation.count({ where: { businessId, botEstado: 'DERIVADO', ...(await filtroDeCuentaInstagram(this.prisma, businessId)), messages: { some: { channel: 'INSTAGRAM' } } } }),
       this.prisma.message.count({ where: { channel: 'INSTAGRAM', viaOrbi: true, createdAt: { gte: desde }, conversation: { businessId } } }),
     ]);
+    const conexion = await this.prisma.instagramConnection.findUnique({ where: { businessId }, select: { igUserId: true, username: true } });
     return {
       activo: cfg?.activo ?? false,
+      // Prendido con otra cuenta de Instagram: no contesta en la conectada hasta volver a guardarlo.
+      prendidoConOtraCuenta: !!cfg?.activo && !!conexion && cfg.cuenta !== conexion.igUserId,
+      cuentaConectada: conexion?.username ?? null,
       usarIa: cfg?.usarIa ?? true,
       responderComentarios: cfg?.responderComentarios ?? true,
       todosLosComentarios: cfg?.todosLosComentarios ?? false,
@@ -129,6 +137,8 @@ export class InstagramVentasService implements AtencionAlternativa, OnModuleInit
       respuestasPublicas: limpiar(dto.respuestasPublicas),
       saludoComentario: dto.saludoComentario?.trim() || null,
       correosAviso: limpiar(dto.correosAviso).map((c) => c.toLowerCase()),
+      // Prenderlo (o guardarlo prendido) lo deja atendiendo la cuenta conectada en este momento.
+      ...(dto.activo ? { cuenta: await cuentaInstagramDe(this.prisma, businessId) } : {}),
     };
     const antes = await this.leer(businessId);
     await this.prisma.marketingInstagramBot.upsert({ where: { businessId }, create: { businessId, ...data }, update: data });

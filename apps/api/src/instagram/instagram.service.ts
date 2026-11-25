@@ -1,3 +1,4 @@
+import { cuentaInstagramDe } from './cuenta-instagram';
 import {
   BadGatewayException,
   BadRequestException,
@@ -767,7 +768,7 @@ export class InstagramService {
     let esNueva = false;
     const conv =
       (await this.prisma.conversation.findFirst({ where: { businessId: conexion.businessId, customerId }, select: { id: true } })) ??
-      ((esNueva = true), await this.prisma.conversation.create({ data: { businessId: conexion.businessId, customerId, isUnread: !eco }, select: { id: true } }));
+      ((esNueva = true), await this.prisma.conversation.create({ data: { businessId: conexion.businessId, customerId, isUnread: !eco, instagramCuenta: conexion.igUserId }, select: { id: true } }));
 
     // Un eco que no conocemos en un chat que atiende Orbi puede ser la respuesta de Orbi que todavía se está guardando: se
     // espera un poco y se vuelve a mirar antes de tomarlo como escrito por una persona (que callaría a Orbi).
@@ -788,7 +789,9 @@ export class InstagramService {
       this.prisma.conversation.update({
         where: { id: conv.id },
         // Un eco (el dueño contestó desde el celular) no marca la charla como sin leer.
-        data: eco ? { updatedAt: new Date() } : { isUnread: true, isArchived: false, updatedAt: new Date() },
+        data: eco
+          ? { updatedAt: new Date(), instagramCuenta: conexion.igUserId }
+          : { isUnread: true, isArchived: false, updatedAt: new Date(), instagramCuenta: conexion.igUserId },
       }),
     ]);
     if (eco) {
@@ -871,9 +874,13 @@ export class InstagramService {
       });
       customerId = creado.id;
     }
-    const conv =
-      (await this.prisma.conversation.findFirst({ where: { businessId, customerId }, select: { id: true } })) ??
-      (await this.prisma.conversation.create({ data: { businessId, customerId, isUnread: false }, select: { id: true } }));
+    const instagramCuenta = await cuentaInstagramDe(this.prisma, businessId);
+    const existenteConv = await this.prisma.conversation.findFirst({ where: { businessId, customerId }, select: { id: true } });
+    if (existenteConv) {
+      if (instagramCuenta) await this.prisma.conversation.updateMany({ where: { id: existenteConv.id, businessId }, data: { instagramCuenta } });
+      return existenteConv.id;
+    }
+    const conv = await this.prisma.conversation.create({ data: { businessId, customerId, isUnread: false, instagramCuenta }, select: { id: true } });
     return conv.id;
   }
 
@@ -906,11 +913,11 @@ export class InstagramService {
     }
   }
 
-  private async conexionActiva(ids: (string | undefined)[]): Promise<{ businessId: string } | null> {
+  private async conexionActiva(ids: (string | undefined)[]): Promise<{ businessId: string; igUserId: string } | null> {
     for (const id of ids) {
       if (!id) continue;
-      const c = await this.prisma.instagramConnection.findUnique({ where: { igUserId: id }, select: { businessId: true, status: true } });
-      if (c && c.status === 'ACTIVE') return { businessId: c.businessId };
+      const c = await this.prisma.instagramConnection.findUnique({ where: { igUserId: id }, select: { businessId: true, igUserId: true, status: true } });
+      if (c && c.status === 'ACTIVE') return { businessId: c.businessId, igUserId: c.igUserId };
     }
     return null;
   }

@@ -197,6 +197,9 @@ export type IgConversacion = {
 /** El bot de ventas de la cuenta de Instagram de la empresa (Marketing → Instagram → Respuestas automáticas). */
 export type IgBotVentas = {
   activo: boolean
+  /** Prendido con otra cuenta de Instagram: no contesta en la conectada hasta volver a guardarlo. */
+  prendidoConOtraCuenta: boolean
+  cuentaConectada: string | null
   usarIa: boolean
   responderComentarios: boolean
   todosLosComentarios: boolean
@@ -208,7 +211,7 @@ export type IgBotVentas = {
   comentariosRecientes: { id: string; usuario: string | null; texto: string; privado: boolean; publico: boolean; error: string | null; createdAt: string }[]
   resumen: { charlasEsperandoAlEquipo: number; respuestasUltimos7Dias: number }
 }
-export type IgBotVentasInput = Omit<IgBotVentas, 'estadoMeta' | 'comentariosRecientes' | 'resumen'>
+export type IgBotVentasInput = Omit<IgBotVentas, 'estadoMeta' | 'comentariosRecientes' | 'resumen' | 'prendidoConOtraCuenta' | 'cuentaConectada'>
 export type IgMensaje = { id: string; sender: 'CUSTOMER' | 'STORE'; text: string; channel: string; createdAt: string }
 export type TiktokEstado = {
   configurado: boolean

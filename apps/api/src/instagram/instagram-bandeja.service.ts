@@ -1,3 +1,4 @@
+import { filtroDeCuentaInstagram } from './cuenta-instagram';
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -93,7 +94,10 @@ export class InstagramBandejaService {
   /** Las charlas de Instagram del negocio, la más reciente primero. */
   async listar(businessId: string): Promise<CharlaVista[]> {
     const filas = await this.prisma.conversation.findMany({
-      where: { businessId, isArchived: false, messages: { some: { channel: 'INSTAGRAM' } }, customer: { instagramId: { not: null }, deletedAt: null } },
+      where: {
+        businessId, isArchived: false, ...(await filtroDeCuentaInstagram(this.prisma, businessId)),
+        messages: { some: { channel: 'INSTAGRAM' } }, customer: { instagramId: { not: null }, deletedAt: null },
+      },
       orderBy: { updatedAt: 'desc' },
       take: MAX_CHARLAS,
       select: {
@@ -135,7 +139,10 @@ export class InstagramBandejaService {
 
   async noLeidas(businessId: string): Promise<{ count: number }> {
     const count = await this.prisma.conversation.count({
-      where: { businessId, isUnread: true, isArchived: false, messages: { some: { channel: 'INSTAGRAM' } }, customer: { instagramId: { not: null }, deletedAt: null } },
+      where: {
+        businessId, isUnread: true, isArchived: false, ...(await filtroDeCuentaInstagram(this.prisma, businessId)),
+        messages: { some: { channel: 'INSTAGRAM' } }, customer: { instagramId: { not: null }, deletedAt: null },
+      },
     });
     return { count };
   }

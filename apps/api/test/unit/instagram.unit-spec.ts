@@ -52,7 +52,7 @@ function build(overrides: Record<string, any> = {}, cfg: Record<string, string> 
       update: jest.fn().mockResolvedValue({}),
     },
     instagramConnection: {
-      findUnique: jest.fn().mockResolvedValue({ businessId: BIZ, status: 'ACTIVE' }),
+      findUnique: jest.fn().mockResolvedValue({ businessId: BIZ, igUserId: IG_CUENTA, status: 'ACTIVE' }),
       findMany: jest.fn().mockResolvedValue([]),
       update: jest.fn().mockResolvedValue({}),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -206,6 +206,8 @@ describe('InstagramService (unit)', () => {
       expect(prisma.conversation.update).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 'cv-nueva' }, data: expect.objectContaining({ isUnread: true }) }),
       );
+      // La charla queda marcada con la cuenta del negocio a la que llegó (si después conecta otra, no se muestra).
+      expect(prisma.conversation.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ instagramCuenta: IG_CUENTA }) }));
     });
 
     it('una imagen del cliente se guarda como adjunto, bajada al almacenamiento propio', async () => {

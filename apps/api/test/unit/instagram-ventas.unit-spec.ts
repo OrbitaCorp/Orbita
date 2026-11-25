@@ -81,23 +81,26 @@ describe('bot de ventas de Instagram: contenido', () => {
   });
 });
 
-function armar(o: { cfg?: Record<string, unknown> | null; botEstado?: string; ia?: string; negocio?: string } = {}) {
+function armar(o: { cfg?: Record<string, unknown> | null; botEstado?: string; ia?: string; negocio?: string; cuentaConectada?: string } = {}) {
   const cfg = o.cfg === null ? null : {
     businessId: NEGOCIO, activo: true, usarIa: true, responderComentarios: true, todosLosComentarios: false,
     palabrasClave: ['info'], respuestasPublicas: ['¡Te escribimos!'], saludoComentario: null, correosAviso: ['equipo@orbita.test'], estadoMeta: null,
+    cuenta: 'IG-EMPRESA',
     ...o.cfg,
   };
   const prisma = {
     business: { findFirst: jest.fn().mockResolvedValue({ id: o.negocio ?? NEGOCIO }) },
-    marketingInstagramBot: { findUnique: jest.fn().mockResolvedValue(cfg) },
-    conversation: { findFirst: jest.fn().mockResolvedValue({ botEstado: o.botEstado ?? 'DEFAULT' }), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+    marketingInstagramBot: { findUnique: jest.fn().mockResolvedValue(cfg), upsert: jest.fn().mockResolvedValue({}), update: jest.fn().mockResolvedValue({}) },
+    instagramConnection: { findUnique: jest.fn().mockResolvedValue({ igUserId: o.cuentaConectada ?? 'IG-EMPRESA', username: 'cuenta' }) },
+    platformAdminLog: { create: jest.fn().mockResolvedValue({}) },
+    conversation: { findFirst: jest.fn().mockResolvedValue({ botEstado: o.botEstado ?? 'DEFAULT' }), updateMany: jest.fn().mockResolvedValue({ count: 1 }), count: jest.fn().mockResolvedValue(0) },
     message: {
       create: jest.fn().mockResolvedValue({}), count: jest.fn().mockResolvedValue(0),
       findMany: jest.fn().mockResolvedValue([{ sender: 'CUSTOMER', text: 'hola' }]),
       findFirst: jest.fn().mockResolvedValue(null),
     },
     customer: { findFirst: jest.fn().mockResolvedValue({ firstName: 'Lu' }) },
-    marketingInstagramComentario: { create: jest.fn().mockResolvedValue({ id: 'fila' }), update: jest.fn().mockResolvedValue({}) },
+    marketingInstagramComentario: { create: jest.fn().mockResolvedValue({ id: 'fila' }), update: jest.fn().mockResolvedValue({}), findMany: jest.fn().mockResolvedValue([]) },
   };
   const config = { get: jest.fn((k: string) => (k === 'FRONTEND_URL' ? 'https://orbita.site' : undefined)) };
   const instagram = {
@@ -128,6 +131,26 @@ describe('bot de ventas de Instagram: mensajes', () => {
     expect(await armar().svc.atiende(NEGOCIO)).toBe(true);
     expect(await armar({ negocio: 'otro' }).svc.atiende(NEGOCIO)).toBe(false);
     expect(await armar({ cfg: { activo: false } }).svc.atiende(NEGOCIO)).toBe(false);
+  });
+
+  it('solo atiende la cuenta de Instagram con la que se prendió: si se conecta otra, esa la atiende Orbi', async () => {
+    expect(await armar({ cuentaConectada: 'IG-OTRA' }).svc.atiende(NEGOCIO)).toBe(false);
+    expect(await armar({ cfg: { cuenta: null } }).svc.atiende(NEGOCIO)).toBe(false);
+  });
+
+  it('guardarlo prendido lo deja atendiendo la cuenta conectada, y el panel avisa si está prendido con otra', async () => {
+    const { svc, prisma } = armar({ cuentaConectada: 'IG-OTRA' });
+    expect((await svc.estado())?.prendidoConOtraCuenta).toBe(true);
+    await svc.guardar('admin-1', {
+      activo: true, usarIa: true, responderComentarios: true, todosLosComentarios: false, palabrasClave: ['info'], respuestasPublicas: [], saludoComentario: '', correosAviso: [],
+    } as never);
+    expect(prisma.marketingInstagramBot.upsert.mock.calls[0][0].update.cuenta).toBe('IG-OTRA');
+
+    // Apagarlo no toca la cuenta.
+    await svc.guardar('admin-1', {
+      activo: false, usarIa: true, responderComentarios: true, todosLosComentarios: false, palabrasClave: ['info'], respuestasPublicas: [], saludoComentario: '', correosAviso: [],
+    } as never);
+    expect(prisma.marketingInstagramBot.upsert.mock.calls[1][0].update).not.toHaveProperty('cuenta');
   });
 
   it('una opción manda el texto, las tarjetas y los botones para seguir', async () => {

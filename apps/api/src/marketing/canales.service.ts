@@ -1,3 +1,4 @@
+import { filtroDeCuentaInstagram } from '../instagram/cuenta-instagram';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
@@ -49,7 +50,9 @@ export class CanalesService {
     const instagramActivo = !!ig && ig.status === 'ACTIVE';
     // Conversaciones de Instagram que nadie del equipo leyó todavía (la bandeja las muestra con un punto).
     const sinLeer = instagramActivo
-      ? await this.prisma.conversation.count({ where: { businessId: negocio.id, isUnread: true, isArchived: false, messages: { some: { channel: 'INSTAGRAM' } } } })
+      ? await this.prisma.conversation.count({
+          where: { businessId: negocio.id, isUnread: true, isArchived: false, ...(await filtroDeCuentaInstagram(this.prisma, negocio.id)), messages: { some: { channel: 'INSTAGRAM' } } },
+        })
       : 0;
 
     return {

@@ -10,6 +10,7 @@ const hace = (horas: number) => new Date(Date.now() - horas * 3600_000);
 
 function build() {
   const prisma: any = {
+    instagramConnection: { findUnique: jest.fn().mockResolvedValue({ igUserId: 'IG-ACTUAL' }) },
     conversation: {
       findMany: jest.fn().mockResolvedValue([]),
       findFirst: jest.fn().mockResolvedValue({ id: 'cv-1', isUnread: true, customerId: 'cli-ig', customer: { instagramId: 'IGSID1' } }),
@@ -57,6 +58,19 @@ describe('InstagramBandejaService', () => {
     expect(prisma.conversation.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: expect.objectContaining({ businessId: BIZ, customer: expect.objectContaining({ instagramId: { not: null } }) }) }),
     );
+  });
+
+  it('muestra solo las charlas de la cuenta de Instagram conectada (las de una cuenta anterior no se pueden contestar)', async () => {
+    const { svc, prisma } = build();
+    await svc.listar(BIZ);
+    await svc.noLeidas(BIZ);
+    expect(prisma.conversation.findMany.mock.calls[0][0].where.instagramCuenta).toBe('IG-ACTUAL');
+    expect(prisma.conversation.count.mock.calls[0][0].where.instagramCuenta).toBe('IG-ACTUAL');
+
+    // Sin ninguna conexión (nunca conectó) no filtra por cuenta.
+    prisma.instagramConnection.findUnique.mockResolvedValue(null);
+    await svc.listar(BIZ);
+    expect(prisma.conversation.findMany.mock.calls[1][0].where).not.toHaveProperty('instagramCuenta');
   });
 
   it('resume la última foto como "Foto" y marca hasta cuándo se puede contestar', async () => {

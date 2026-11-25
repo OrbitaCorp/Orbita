@@ -10,6 +10,7 @@ function armar(over: { negocio?: object | null; conversacion?: object | null; fi
   const prisma = {
     business: { findFirst: jest.fn().mockResolvedValue(over.negocio === undefined ? NEGOCIO : over.negocio) },
     platformAdminLog: { create: jest.fn().mockResolvedValue({}) },
+    instagramConnection: { findUnique: jest.fn().mockResolvedValue({ igUserId: 'IG-ORBITA' }) },
     conversation: {
       findFirst: jest.fn().mockResolvedValue(over.conversacion === undefined ? { id: 'c-1' } : over.conversacion),
       findMany: jest.fn().mockResolvedValue(over.filas ?? []),
@@ -41,7 +42,7 @@ describe('conversaciones', () => {
     await svc.conversaciones();
     expect(prisma.business.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { subdomain: 'negocio', deletedAt: null } }));
     expect(prisma.conversation.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { businessId: 'b-orbita', isArchived: false, messages: { some: { channel: 'INSTAGRAM' } } },
+      where: { businessId: 'b-orbita', isArchived: false, instagramCuenta: 'IG-ORBITA', messages: { some: { channel: 'INSTAGRAM' } } },
       orderBy: { updatedAt: 'desc' },
     }));
   });

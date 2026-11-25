@@ -1633,6 +1633,10 @@ model Conversation {
   botBorrador   Json?                 @map("bot_borrador")
   // Cuándo se le avisó por última vez al dueño que este chat necesita atención: evita mandar un correo por cada mensaje.
   botAvisoAt    DateTime?             @map("bot_aviso_at")
+  // Instagram: la cuenta del negocio (InstagramConnection.igUserId) a la que llegó la charla. El IGSID del cliente vale
+  // solo para esa cuenta, así que si el negocio conecta otra, estas charlas no se pueden contestar y la bandeja no las
+  // muestra; vuelven a verse si se reconecta la misma cuenta. null = charla que no es de Instagram.
+  instagramCuenta String?             @map("instagram_cuenta")
   createdAt     DateTime              @default(now()) @map("created_at")
   updatedAt     DateTime              @updatedAt @map("updated_at")
 
@@ -1935,6 +1939,9 @@ model MarketingInstagramBot {
   saludoComentario     String?  @map("saludo_comentario")
   correosAviso         String[] @default([]) @map("correos_aviso") // a quién avisar cuando alguien pide una persona
   estadoMeta           Json?    @map("estado_meta") // resultado de suscribir comentarios y cargar las preguntas frecuentes
+  // La cuenta de Instagram (igUserId) con la que se prendió. Si el negocio conecta otra, el bot no la atiende (pasa a
+  // Orbi, con lo que tenga configurado esa cuenta) hasta que alguien lo vuelva a guardar prendido.
+  cuenta               String?
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
 

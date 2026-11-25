@@ -1,3 +1,4 @@
+import { filtroDeCuentaInstagram } from '../instagram/cuenta-instagram';
 import { Injectable, NotFoundException, Optional, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
@@ -58,7 +59,7 @@ export class InstagramBandejaService {
   async conversaciones(limite = 100): Promise<ConversacionDeInstagram[]> {
     const businessId = await this.negocioId();
     const filas = await this.prisma.conversation.findMany({
-      where: { businessId, isArchived: false, messages: SOLO_INSTAGRAM },
+      where: { businessId, isArchived: false, ...(await filtroDeCuentaInstagram(this.prisma, businessId)), messages: SOLO_INSTAGRAM },
       orderBy: { updatedAt: 'desc' },
       take: Math.min(Math.max(limite, 1), 200),
       include: {

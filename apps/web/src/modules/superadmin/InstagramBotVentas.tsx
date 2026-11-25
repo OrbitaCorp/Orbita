@@ -118,6 +118,11 @@ export function InstagramBotVentas({ permitido }: { permitido: boolean }) {
               En los últimos 7 días respondió {bot.resumen.respuestasUltimos7Dias} {bot.resumen.respuestasUltimos7Dias === 1 ? 'mensaje' : 'mensajes'}
               {bot.resumen.charlasEsperandoAlEquipo > 0 && <> · <span style={{ color: 'var(--color-text)' }}>{bot.resumen.charlasEsperandoAlEquipo} {bot.resumen.charlasEsperandoAlEquipo === 1 ? 'charla espera' : 'charlas esperan'} al equipo en Mensajes</span></>}
             </div>
+            {bot.activo && bot.prendidoConOtraCuenta && (
+              <div role="status" style={{ marginTop: 10, padding: '10px 14px', borderRadius: 10, background: 'var(--color-warning-bg)', color: 'var(--chip-warning-fg)', fontSize: 12.5, lineHeight: 1.5 }}>
+                Lo prendiste con otra cuenta de Instagram, así que no está contestando en {bot.cuentaConectada ? `@${bot.cuentaConectada}` : 'la cuenta conectada'}. Guardá para que la atienda.
+              </div>
+            )}
             {problemasMeta.length > 0 && (
               <div role="status" style={{ marginTop: 10, padding: '10px 14px', borderRadius: 10, background: 'var(--color-warning-bg)', color: 'var(--chip-warning-fg)', fontSize: 12.5, lineHeight: 1.5 }}>
                 Instagram respondió con un problema: {problemasMeta.join('; ')}. Revisá que la cuenta tenga el permiso de comentarios (Renovar la conexión) y volvé a guardar.
