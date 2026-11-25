@@ -8,6 +8,7 @@ import { PLATFORM_ROLE_KEY } from '../../src/common/decorators/platform-role.dec
 import { InstagramAdminController } from '../../src/instagram/instagram-admin.controller';
 import { InstagramBandejaController } from '../../src/marketing/instagram-bandeja.controller';
 import { InstagramContenidoController } from '../../src/marketing/instagram-contenido.controller';
+import { InstagramVentasController } from '../../src/marketing/instagram-ventas/instagram-ventas.controller';
 import { MarketingController } from '../../src/marketing/marketing.controller';
 import { McpConsentimientoController } from '../../src/marketing/prospeccion/mcp/mcp.controller';
 import { ProspeccionController } from '../../src/marketing/prospeccion/prospeccion.controller';
@@ -28,7 +29,7 @@ import { SupportAdminController } from '../../src/support/support-admin.controll
 // habilita un endpoint más (o se le cierra uno), este test se rompe y obliga a decidirlo a conciencia.
 
 const CONTROLADORES = [
-  InstagramAdminController, InstagramBandejaController, InstagramContenidoController, MarketingController, McpConsentimientoController,
+  InstagramAdminController, InstagramBandejaController, InstagramContenidoController, InstagramVentasController, MarketingController, McpConsentimientoController,
   ProspeccionController, TiktokController, VideosController, TutorialesController, PlatformAuditController, CorreoPlataformaController,
   CostsController, OrbiSaludController, ConversacionesPlataformaController, OrbiUsoPlataformaController, PlatformController, SupportAdminController,
   SeguimientoController,
@@ -82,7 +83,7 @@ describe('Rol MARKETING — acceso por lista cerrada', () => {
 
   it('lo que sí puede es exactamente la lista de lo habilitado (redes, videos, correo, prospección, conector, resumen)', () => {
     // Los de videos, tutoriales, TikTok e Instagram contenido se listan aparte por tamaño; el resto está pinchado arriba.
-    const aparte = abiertas.filter((n) => /^(VideosController|TutorialesController|TiktokController|InstagramContenidoController|InstagramBandejaController)\./.test(n));
+    const aparte = abiertas.filter((n) => /^(VideosController|TutorialesController|TiktokController|InstagramContenidoController|InstagramBandejaController|InstagramVentasController)\./.test(n));
     expect(abiertas.filter((n) => !aparte.includes(n))).toEqual(ABIERTO_A_MARKETING);
     expect(aparte.filter((n) => n.startsWith('VideosController.'))).toEqual(
       rutasDe(VideosController).map((m) => `VideosController.${m}`).sort(),
@@ -92,6 +93,8 @@ describe('Rol MARKETING — acceso por lista cerrada', () => {
     // Las redes de la empresa (TikTok e Instagram, con la conexión de la cuenta y los mensajes directos) las maneja marketing.
     expect(aparte.filter((n) => n.startsWith('TiktokController.')).length).toBe(rutasDe(TiktokController).length);
     expect(aparte.filter((n) => n.startsWith('InstagramBandejaController.')).length).toBe(rutasDe(InstagramBandejaController).length);
+    // Las respuestas automáticas de la cuenta de la empresa (bot de ventas): mismo criterio que la bandeja.
+    expect(aparte.filter((n) => n.startsWith('InstagramVentasController.')).length).toBe(rutasDe(InstagramVentasController).length);
   });
 
   it('nunca le abre lo que toca plata, accesos o cuentas de la empresa', () => {

@@ -13,11 +13,12 @@ import { InstagramOrbiService } from './instagram-orbi.service';
 import { InstagramPublicacionesService } from './instagram-publicaciones.service';
 import { InstagramWebhookController } from './instagram-webhook.controller';
 import { InstagramService } from './instagram.service';
+import { InstagramRuteoService } from './instagram-ruteo.service';
 
 @Module({
   imports: [CostsModule, AtencionOrbiModule], // AtencionOrbiModule: Orbi atiende los mensajes directos (lo mismo que en WhatsApp)
   controllers: [InstagramController, InstagramWebhookController, InstagramAdminController],
-  providers: [InstagramService, InstagramPublicacionesService, InstagramMediosService, InstagramComentariosService, InstagramEstadisticasService, InstagramBandejaService, InstagramOrbiService, InstagramAjustesService, InstagramBotService],
-  exports: [InstagramService, InstagramPublicacionesService, InstagramComentariosService, InstagramMediosService, InstagramEstadisticasService], // ConversationsService responde por Instagram; el cron renueva los tokens; el super panel (Marketing) usa el resto
+  providers: [InstagramService, InstagramPublicacionesService, InstagramMediosService, InstagramComentariosService, InstagramEstadisticasService, InstagramBandejaService, InstagramOrbiService, InstagramAjustesService, InstagramBotService, InstagramRuteoService],
+  exports: [InstagramService, InstagramPublicacionesService, InstagramComentariosService, InstagramMediosService, InstagramEstadisticasService, InstagramRuteoService, AtencionOrbiModule], // InstagramRuteoService y la IA del bot (AtencionOrbiModule): el bot de ventas de la empresa; ConversationsService responde por Instagram; el cron renueva los tokens; el super panel (Marketing) usa el resto
 })
 export class InstagramModule {}

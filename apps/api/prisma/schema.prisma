@@ -112,6 +112,8 @@ model Business {
   instagramPosts       InstagramPost[]
   instagramSettings    InstagramSettings?
   instagramBotConfig   InstagramBotConfig?
+  marketingInstagramBot MarketingInstagramBot?
+  marketingInstagramComentarios MarketingInstagramComentario[]
   discounts            Discount[]
   discountRedemptions  DiscountRedemption[]
   returns              Return[]
@@ -1909,6 +1911,49 @@ model InstagramBotConfig {
   business Business @relation(fields: [businessId], references: [id])
 
   @@map("instagram_bot_configs")
+}
+
+// Bot de ventas de Órbita en la cuenta de Instagram de la EMPRESA (Superadmin → Marketing → Instagram → Respuestas
+// automáticas). Una fila por negocio; en la práctica, solo el negocio al que está conectada la cuenta de Órbita
+// (MARKETING_NEGOCIO). Lo que dice está en marketing/instagram-ventas/contenido.ts.
+model MarketingInstagramBot {
+  id                   String   @id @default(uuid())
+  businessId           String   @unique @map("business_id")
+  activo               Boolean  @default(false)
+  usarIa               Boolean  @default(true) @map("usar_ia") // las preguntas sueltas las contesta la IA con lo que dice la web
+  responderComentarios Boolean  @default(true) @map("responder_comentarios")
+  todosLosComentarios  Boolean  @default(false) @map("todos_los_comentarios") // false = solo los que tienen una palabra clave
+  palabrasClave        String[] @default([]) @map("palabras_clave")
+  respuestasPublicas   String[] @default([]) @map("respuestas_publicas") // se alternan; vacío = no contesta en público
+  saludoComentario     String?  @map("saludo_comentario")
+  correosAviso         String[] @default([]) @map("correos_aviso") // a quién avisar cuando alguien pide una persona
+  estadoMeta           Json?    @map("estado_meta") // resultado de suscribir comentarios y cargar las preguntas frecuentes
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@map("marketing_instagram_bots")
+}
+
+// Comentarios a los que el bot de ventas ya les mandó el mensaje privado. commentId único: Meta reintenta el aviso y
+// Instagram deja mandar UN solo mensaje privado por comentario.
+model MarketingInstagramComentario {
+  id         String   @id @default(uuid())
+  businessId String   @map("business_id")
+  commentId  String   @unique @map("comment_id")
+  mediaId    String?  @map("media_id")
+  usuario    String?
+  texto      String
+  privado    Boolean  @default(false) // salió el mensaje privado
+  publico    Boolean  @default(false) // salió la respuesta pública
+  error      String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@index([businessId, createdAt])
+  @@map("marketing_instagram_comentarios")
 }
 
 enum WhatsappConnectionStatus {
