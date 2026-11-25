@@ -7,6 +7,7 @@ import { DisponibilidadService } from './disponibilidad.service';
 import { ReservasService } from './reservas.service';
 import { ReservasAvisosService } from './reservas-avisos.service';
 import { ReservasMantenimientoService } from './reservas-mantenimiento.service';
+import { ReservasCalendariosService } from './calendarios/reservas-calendarios.service';
 
 // El backend compartido de Turnos, Alquileres y Gimnasio (ver README.md).
 // Importa StorefrontModule por resolveBusinessId (el slug del sitio público);
@@ -14,7 +15,8 @@ import { ReservasMantenimientoService } from './reservas-mantenimiento.service';
 @Module({
   imports: [StorefrontModule],
   controllers: [ReservasPanelController, ReservasPublicoController],
-  providers: [ReservasCatalogoService, DisponibilidadService, ReservasService, ReservasAvisosService, ReservasMantenimientoService],
-  exports: [ReservasMantenimientoService],
+  providers: [ReservasCatalogoService, DisponibilidadService, ReservasService, ReservasAvisosService, ReservasMantenimientoService, ReservasCalendariosService],
+  // Los dos los usa el job de cada 5 minutos (internal-cron).
+  exports: [ReservasMantenimientoService, ReservasCalendariosService],
 })
 export class ReservasModule {}
