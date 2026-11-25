@@ -166,6 +166,7 @@ const F18 = '2026-11-18'
 // Lunes 23/11: Horarios y feriados de Turnos, y Alquileres en producción (la demo para superadmin y el primer negocio real).
 const F23 = '2026-11-23'
 const F24 = '2026-11-24'
+const F25 = '2026-11-25'
 
 export const ENTRADAS: Entrada[] = [
   // ─── Transversal · la sección Módulos ───────────────────────────────────────
@@ -3086,6 +3087,50 @@ El negocio de prueba queda creado, con una propiedad y sin reservas activas.`,
       'apps/web/src/modules/alquileres/datos/origen/mapear.ts:199',
       'apps/web/src/modules/alquileres/admin/Reservas.tsx:522',
       'apps/web/src/modules/alquileres/admin/Panel.tsx:183',
+    ],
+  }),
+  entrada({
+    modulo: 'alquileres', fecha: F25, slug: 'calendario-de-airbnb', tipo: 'tarea', quien: 'Alan',
+    titulo: 'El calendario de Airbnb se sincroniza de verdad, en las dos direcciones',
+    foco: 'Un alojamiento conecta el .ics de su aviso de Airbnb: lo que le reservan allá se bloquea acá cada 30 minutos, y Órbita publica un .ics por propiedad para que Airbnb bloquee lo de acá. Si entran dos reservas para las mismas noches, el panel lo avisa con el código. Toca el motor compartido: una tabla nueva y cuatro columnas en los bloqueos.',
+    que: `Etapa 4 del plan de Alquileres en producción (\`docs/superpowers/plans/2026-11-25-alquileres-airbnb-calendario.md\`). Es el faltante F9 del mapa y el punto 5 de la decisión "lo que Alquileres le pide al backend compartido". Solo alojamiento por noche.
+
+**De Órbita a Airbnb.** \`GET /storefront/:slug/reservas/ical/<recurso>.ics\`, público: las reservas que ocupan y los bloqueos del dueño como eventos de día entero. Solo fechas, sin nombres ni montos, y nunca lo que vino de Airbnb.
+
+**De Airbnb a Órbita.** El dueño pega el enlace del aviso en la pantalla nueva **Airbnb** del panel. Cada sincronización baja el archivo y reemplaza los bloqueos de ese calendario. El motor ya respetaba cualquier bloqueo al reservar, así que el sitio deja de ofrecer esas noches sin tocar nada más.
+
+| Qué pasa | Qué hace |
+|---|---|
+| Airbnb tiene una reserva | Bloquea esas noches, siempre |
+| Airbnb devuelve como "no disponible" lo que importó de Órbita (el eco) | No bloquea: se reconoce por las fechas exactas de algo que Órbita exportó en los últimos 60 días |
+| Se cancela acá una reserva que Airbnb ya había importado | Las noches quedan libres acá aunque Airbnb las siga publicando |
+| Airbnb no responde, o responde otra cosa | Se guarda el motivo, se muestra, y los bloqueos anteriores no se tocan |
+| Entran dos reservas para las mismas noches entre una sincronización y la otra | Aviso arriba del calendario y en Airbnb, con el código. No se cancela nada solo |
+| El dueño quiere quitar a mano un bloqueo que vino de Airbnb | No se puede: se va cuando Airbnb libera o al desconectar |
+
+**Tres cosas distintas del diseño del 18/11:**
+- **Sin token** en el enlace que se exporta: muestra lo mismo que el sitio ya publica, y \`datos\` del recurso (donde iba el token) es público.
+- **El eco también vale para lo cancelado.** En foros de anfitriones se ve que Airbnb reexporta lo que importó y a veces no lo libera. El costo: si el dueño cierra a mano en Airbnb exactamente las noches de una reserva que canceló acá, ese cierre no bloquea.
+- **Solo enlaces de Airbnb**, por lista fija de dominios, sin seguir redirecciones, con 8 segundos y 1 MB como máximo. El servidor baja una dirección que escribe un usuario: no se abre a otros sitios sin revisar \`calendarios/descarga.ts\`.
+
+**Para Turnos y Gimnasio** (motor compartido): migraciones \`20261125120000_reservas_calendarios_externos\` y \`20261125120100_rls_reservas_calendarios_externos\`. Ningún bloqueo existente cambia: todos quedan con origen \`DUENO\`. El paso nuevo del job de 5 minutos baja hasta 5 calendarios por corrida. Cuando un alojamiento rechaza noches bloqueadas, el mensaje ahora habla de noches; para turnos y canchas es el de siempre.
+
+**Lo que falta y por qué:**
+- **Probarlo con un aviso real de Airbnb.** No se pudo verificar cómo titula hoy sus eventos ni cada cuánto relee el calendario de Órbita. Lo hace Alan con la propiedad de prueba de producción.
+- Importar las ganancias de Airbnb por CSV, otros sitios, calendarios para canchas y salones, y avisar un conflicto por email.
+
+**Verificado:** tests de la API (2.864 y 800) y del front (1.446) en verde. Contra la base de dev, con un Airbnb de mentira en la misma máquina: el .ics exportado no trae datos de nadie; el eco no bloquea; reservar en el sitio noches de Airbnb se rechaza; el conflicto aparece con su código; cancelar libera aunque el eco siga; una caída no libera nada. En pantalla, a 1280 y a 390 px: conectar, sincronizar, desconectar y el rechazo de un enlace ajeno.`,
+    archivos: [
+      'apps/api/src/reservas/dominio/ics.ts:1',
+      'apps/api/src/reservas/calendarios/descarga.ts:1',
+      'apps/api/src/reservas/calendarios/reservas-calendarios.service.ts:1',
+      'apps/api/test/unit/reservas.calendarios.unit-spec.ts:1',
+      'apps/api/prisma/migrations/20261125120000_reservas_calendarios_externos/migration.sql:1',
+      'apps/api/src/reservas/reservas-publico.controller.ts:119',
+      'apps/api/src/internal-cron/internal-cron.controller.ts:211',
+      'apps/api/src/reservas/README.md:1',
+      'apps/web/src/modules/alquileres/admin/configuracion/Airbnb.tsx:1',
+      'apps/web/src/lib/reservasApi/cliente.ts:1',
     ],
   }),
 ]
