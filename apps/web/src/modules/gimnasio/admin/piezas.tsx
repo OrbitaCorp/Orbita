@@ -8,8 +8,11 @@ import { useId, type CSSProperties } from 'react'
 import { Check } from 'lucide-react'
 import type { NegocioGym } from '../datos'
 
-/** Lo que recibe cada pantalla de configuración: el negocio y cómo guardar un cambio (con el aviso que se muestra). */
-export interface PropsConfig { negocio: NegocioGym; onGuardar: (cambio: Partial<NegocioGym>, aviso?: string, detalle?: string) => void }
+/**
+ * Lo que recibe cada pantalla de configuración: el negocio y cómo guardar un cambio (con el aviso que se muestra).
+ * Guardar contesta si salió bien: quien abre un formulario encima (Días sin clases) no lo cierra hasta saberlo.
+ */
+export interface PropsConfig { negocio: NegocioGym; onGuardar: (cambio: Partial<NegocioGym>, aviso?: string, detalle?: string) => Promise<boolean> }
 
 export const CSS_PANEL = `
   /* ── Muestras de color (radios de verdad: Tab entra una vez, las flechas eligen) ── */
@@ -22,6 +25,22 @@ export const CSS_PANEL = `
 
   /* ── El punto de color de cada profe, al lado de su nombre ── */
   .gip-punto { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--color-border-strong)); flex-shrink: 0; vertical-align: 1px; margin-right: 5px; }
+
+  /* ── La franja de abajo del header cuando el panel es el de un negocio real (con la API) ── */
+  .gip-franja { display: flex; align-items: center; gap: 10px; flex-shrink: 0; padding: 8px 16px; font-size: 13px; line-height: 1.45; color: var(--chip-primary-fg); background: var(--color-primary-bg); border-bottom: 1px solid var(--color-border); }
+  .gip-franja > svg { flex-shrink: 0; }
+  .gip-franja > span { flex: 1; min-width: 0; }
+  .gip-franja b { font-weight: 600; }
+  /* La última lectura falló: en el tono de aviso, con el botón de actualizar al lado (abajo, a lo ancho, en celular). */
+  .gip-franja[data-tono='aviso'] { color: var(--chip-warning-fg); background: var(--color-warning-bg); flex-wrap: wrap; }
+  .gip-franja[data-tono='aviso'] > .rv-btn { flex-shrink: 0; }
+  @media (max-width: 560px) { .gip-franja[data-tono='aviso'] > span { flex-basis: calc(100% - 26px); } .gip-franja[data-tono='aviso'] > .rv-btn { flex: 1 1 100%; min-height: 44px; } }
+
+  /* ── Guardando en la API: sin clics hasta que llega lo nuevo; se atenúa recién si tarda (una lectura rápida no parpadea) ── */
+  .gip-seccion[data-ocupado] { pointer-events: none; cursor: progress; }
+  .gip-seccion .rv-pagina, .gip-seccion .rv-modal { transition: opacity 120ms ease; }
+  .gip-seccion[data-ocupado] .rv-pagina, .gip-seccion[data-ocupado] .rv-modal { opacity: 0.72; transition-delay: 250ms; }
+  @media (prefers-reduced-motion: reduce) { .gip-seccion .rv-pagina, .gip-seccion .rv-modal { transition: none; } }
 
   /* ── Filas de una lista editable (una actividad, una sala, un plan) ── */
   .gip-filas { display: flex; flex-direction: column; }

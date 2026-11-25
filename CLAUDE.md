@@ -104,6 +104,14 @@ Si tocás una pantalla del panel, actualizá su tema en
 `pnpm test` de `apps/web` falla si el manual nombra un botón que no existe o si el artefacto quedó
 viejo. Detalle en `.claude/rules/manual.md`.
 
+## Módulos nuevos (Turnos, Alquileres, Gimnasio): qué no puede faltar en cada avance
+
+Cada avance en un módulo deja, además del código: su entrada en Superadmin → Módulos → Auditoría,
+el estilo del rubro al estándar, el cambio en el manual que lee Orbi (solo conocimiento, sin usar
+Orbi: no pagamos IA por los módulos) y, al terminar el módulo, sus tutoriales como los de Tienda.
+Cada responsable decide lo de su módulo; Ale, lo transversal (cobro online de la seña, WhatsApp,
+recordatorios, Próximamente). El checklist completo: `.claude/rules/modulos.md`.
+
 ## Prospección y videos automatizados (Superadmin → Marketing)
 
 Dos herramientas que usan **el Claude que paga cada persona** (sin clave de API) por **un solo

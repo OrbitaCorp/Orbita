@@ -228,6 +228,12 @@ export class InternalCronController {
     } catch (e) {
       this.logger.error(`Reservas retenidas vencidas: no se pudo correr — ${describeError(e)}`);
     }
+    // Quien esperaba un horario que ya empezó sale de la lista de espera: prolijidad, igual que lo de arriba.
+    try {
+      await this.reservasMantenimiento?.cerrarEsperasPasadas();
+    } catch (e) {
+      this.logger.error(`Esperas de horarios pasados: no se pudo correr — ${describeError(e)}`);
+    }
     // Dominios propios que esperan DNS o certificado → ACTIVE apenas estén listos (ver
     // DomainsService.verificarPendientes). Mismo criterio: si falla, se anota y sigue.
     let dominios: { revisados: number; activados: string[] } | undefined;

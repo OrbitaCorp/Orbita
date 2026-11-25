@@ -591,7 +591,7 @@ function Compartido({ modulo }: { modulo?: Modulo }) {
       abiertoAlInicio={!modulo}
       resumen={modulo
         ? <><strong style={{ color: 'var(--color-text)' }}>{modulo.def.nombre} no vive solo:</strong> estas {CARPETAS_COMPARTIDAS.length} carpetas son también de {otros.join(' y ')}. Lo que cambiés ahí les cambia a ellos en el acto, y lo que ellos cambien te cambia a vos. Las reglas de cada carpeta están en su README; antes de tocar, avisá.</>
-        : <>Los tres módulos son independientes (ninguno importa de otro), pero el motor de reservas, el cliente de su API, las cuentas de calendario y de plata y el kit visual son uno solo, en estas {CARPETAS_COMPARTIDAS.length} carpetas. Lo que se actualiza ahí se actualiza para los tres. Las reglas de cada una están en su README; acá, lo que todos tienen que saber.</>}
+        : <>Los tres módulos son independientes (ninguno importa de otro), pero el motor de reservas, el cliente de su API, las cuentas de calendario y de plata, el kit visual y el vocabulario del manual de Orbi son uno solo, en estas {CARPETAS_COMPARTIDAS.length} carpetas. Lo que se actualiza ahí se actualiza para los tres. Las reglas de cada una están en su README; acá, lo que todos tienen que saber.</>}
     >
       <ol className="mo-compartido-reglas" aria-label="Reglas para tocar lo compartido">
         {REGLAS_COMPARTIDO.map((r) => <li key={r}>{r}</li>)}

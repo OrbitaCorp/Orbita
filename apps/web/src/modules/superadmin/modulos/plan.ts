@@ -147,11 +147,11 @@ const TURNOS = plan('turnos', 'Turnos', 'Mateo',
     documentada(t('2026-11-12', 'Mateo', 'Horarios y feriados del negocio sobre la config y los bloqueos', 'Cambiar el horario semanal o cargar un feriado cambia GET disponibilidad en el acto'), 'auditoria.turnos.2026-11-23-horarios-y-feriados-sobre-la-api'),
     documentada(t('2026-11-13', 'Mateo', 'Reglas de reserva (anticipación, cancelación, seña, tope por persona) sobre la config', 'Cada regla guardada se refleja en lo que acepta POST /retener del sitio'), 'auditoria.turnos.2026-11-23-reglas-sobre-la-api'),
     // Semana 3 · agenda y reservas del panel (el 20/11 es feriado)
-    t('2026-11-16', 'Mateo', 'Agenda del día por profesional sobre GET /reservas y la disponibilidad', 'La agenda muestra las reservas reales del día con su estado y los huecos libres'),
-    t('2026-11-17', 'Mateo', 'Nueva reserva a mano desde el panel (POST /reservas) con cliente, servicio, profesional y horario', 'La reserva aparece en la agenda y el cliente recibe su email'),
-    t('2026-11-18', 'Mateo', 'Confirmar, completar, marcar ausente, cancelar y reprogramar desde la agenda', 'Cada acción cambia el estado y el historial; un 409 se muestra con el mensaje de la API'),
-    t('2026-11-19', 'Mateo', 'Pagos: registrar seña y saldo (POST :id/pago) y el detalle de la reserva con su historial', 'El pago nunca supera el total; el detalle muestra cada cambio con quién y por qué'),
-    t('2026-11-19', 'Mateo', 'Lista de espera del panel sobre /reservas/espera', 'Se ve quién espera cada horario y se lo puede quitar'),
+    documentada(t('2026-11-16', 'Mateo', 'Agenda del día por profesional sobre GET /reservas y la disponibilidad', 'La agenda muestra las reservas reales del día con su estado y los huecos libres'), 'auditoria.turnos.2026-11-24-agenda-real-historial-y-espera'),
+    documentada(t('2026-11-17', 'Mateo', 'Nueva reserva a mano desde el panel (POST /reservas) con cliente, servicio, profesional y horario', 'La reserva aparece en la agenda y el cliente recibe su email'), 'auditoria.turnos.2026-11-24-agenda-sobre-la-api'),
+    documentada(t('2026-11-18', 'Mateo', 'Confirmar, completar, marcar ausente, cancelar y reprogramar desde la agenda', 'Cada acción cambia el estado y el historial; un 409 se muestra con el mensaje de la API'), 'auditoria.turnos.2026-11-24-agenda-sobre-la-api'),
+    documentada(t('2026-11-19', 'Mateo', 'Pagos: registrar seña y saldo (POST :id/pago) y el detalle de la reserva con su historial', 'El pago nunca supera el total; el detalle muestra cada cambio con quién y por qué'), 'auditoria.turnos.2026-11-24-agenda-real-historial-y-espera'),
+    documentada(t('2026-11-19', 'Mateo', 'Lista de espera del panel sobre /reservas/espera', 'Se ve quién espera cada horario y se lo puede quitar'), 'auditoria.turnos.2026-11-24-lista-de-espera-en-turnos'),
     // Semana 4 · el sitio
     t('2026-11-23', 'Mateo', 'Sitio: elegir servicio y profesional desde la API (config pública, servicios y recursos)', 'El sitio lista lo mismo que el panel, sin datos del navegador'),
     t('2026-11-24', 'Mateo', 'Sitio: calendario y horarios desde GET disponibilidad, con la anticipación mínima y máxima', 'Los horarios ofrecidos son los libres de verdad; un horario ya tomado no se ofrece'),
@@ -181,6 +181,9 @@ const TURNOS = plan('turnos', 'Turnos', 'Mateo',
     t('2026-12-23', 'Mateo', 'Cierre de Turnos: resumen del ciclo y entrega a Ale', 'Entrada de cierre con lo hecho, lo que quedó afuera y lo que sigue'),
     // Sumada el 04/11 (pedido de Ale: "tener mucho cuidado" con los rubros): el sidebar cambia según el modo de agenda.
     documentada(t('2026-11-06', 'Mateo', 'Revisar qué muestra el sidebar del panel en cada rubro de Turnos (por profesional: Equipo; por sala o cabina: Espacios) y dejarlo escrito', 'Tabla rubro → secciones del sidebar en Auditoría, con lo que cambia por modo y por modalidad (a domicilio); ninguna sección vacía en ningún rubro'), 'auditoria.turnos.2026-11-16-sidebar-por-rubro'),
+    // Sumadas el 04/11 (pedido de Ale): todo cambio en conocimiento de Orbi, sin usar Orbi; y los tutoriales del módulo al terminar, como los de Tienda.
+    t('2026-12-21', 'Mateo', 'El manual de Turnos en Orbi: cada pantalla del panel y del sitio con su tema y los nombres exactos de los botones, regenerado (sin tools ni llamadas a Orbi)', 'Orbi tiene cada pantalla de Turnos en el manual; pnpm test de apps/web en verde con el artefacto regenerado'),
+    t('2026-12-22', 'Mateo', 'Tutoriales de Turnos: la lista en Marketing → Videos → Tutoriales y los videos como los de Tienda', 'La lista de Turnos cargada con grupos y pantallas, y cada tutorial con su link de YouTube (No listado) cargado por el conector, o en proceso con quién lo hace'),
   ])
 
 // ─── Alquileres · Alan ────────────────────────────────────────────────────────
@@ -207,7 +210,7 @@ const ALQUILERES = plan('alquileres', 'Alquileres', 'Alan',
     documentada(t('2026-11-05', 'Alan', 'Leer el contrato del backend compartido y armar el mapa pantalla → ruta de Alquileres', 'Tabla pantalla → ruta (panel y sitio) por modo, con lo que el backend no cubre marcado (por mes, paquetes, temporadas)'), 'auditoria.alquileres.2026-11-18-mapa-sobre-el-backend'),
     documentada(t('2026-11-05', 'Alan', 'Crear el negocio de prueba de Alquileres en dev con su ReservaConfig y una cancha', 'El negocio existe en dev con config de Alquileres y GET /reservas/recursos devuelve la cancha'), 'auditoria.alquileres.2026-11-18-negocios-de-prueba'),
     documentada(t('2026-11-06', 'Alan', 'Separar en el panel de Alquileres la capa de datos: un origen (demo o API) por sección', 'Cada sección lee de una función de datos propia; la demo sigue igual con ?tipo='), 'auditoria.alquileres.2026-11-18-capa-de-datos-por-origen'),
-    t('2026-11-06', 'Alan', 'Definir con Ale cómo entran al backend los paquetes por salón, las temporadas y el alquiler por mes (datos del recurso o tarifa nueva)', 'Decisión registrada en Auditoría con la forma elegida y avisada antes de tocar lo compartido'),
+    t('2026-11-06', 'Alan', 'Definir cómo entran al backend los paquetes por salón, las temporadas y el alquiler por mes (datos del recurso o tarifa nueva): lo decide Alan', 'Decisión de Alan registrada en Auditoría con la forma elegida; si toca lo compartido, avisada antes'),
     // Semana 2 · canchas
     t('2026-11-09', 'Alan', 'Canchas y extras como recursos CANCHA (duración de la franja, turnos seguidos, extras en datos)', 'Una cancha creada en el panel sale en GET /reservas/recursos con sus extras'),
     t('2026-11-10', 'Alan', 'Precios por horario sobre el recurso (franjas) y la seña de la config', 'El precio que muestra el sitio para una franja coincide con el del panel'),
@@ -247,6 +250,9 @@ const ALQUILERES = plan('alquileres', 'Alquileres', 'Alan',
     t('2026-12-21', 'Alan', 'Correcciones finales de Alquileres', 'Sin fallas abiertas en las entradas de Alquileres'),
     t('2026-12-22', 'Alan', 'Propuesta para sacar Alquileres de "Próximamente": qué falta y qué decide Ale', 'Entrada tipo decisión con la lista de lo que falta y la propuesta'),
     t('2026-12-23', 'Alan', 'Cierre de Alquileres: resumen del ciclo y entrega a Ale', 'Entrada de cierre con lo hecho, lo que quedó afuera y lo que sigue'),
+    // Sumadas el 04/11 (pedido de Ale): todo cambio en conocimiento de Orbi, sin usar Orbi; y los tutoriales del módulo al terminar, como los de Tienda.
+    t('2026-12-21', 'Alan', 'El manual de Alquileres en Orbi: cada pantalla del panel y del sitio con su tema y los nombres exactos de los botones, regenerado (sin tools ni llamadas a Orbi)', 'Orbi tiene cada pantalla de Alquileres en el manual; pnpm test de apps/web en verde con el artefacto regenerado'),
+    t('2026-12-22', 'Alan', 'Tutoriales de Alquileres: la lista en Marketing → Videos → Tutoriales y los videos como los de Tienda', 'La lista de Alquileres cargada con grupos y pantallas, y cada tutorial con su link de YouTube (No listado) cargado por el conector, o en proceso con quién lo hace'),
   ])
 
 // ─── Gimnasio · Ale (y lo transversal) ────────────────────────────────────────
@@ -270,22 +276,22 @@ const GIMNASIO = plan('gimnasio', 'Gimnasio', 'Ale',
   ],
   [
     // Semana 1 · arranque (jueves y viernes)
-    t('2026-11-05', 'Ale', 'Leer el contrato del backend compartido y armar el mapa pantalla → ruta de Gimnasio', 'Tabla pantalla → ruta por sección, con planes, pases y alumnos marcados como "no son reservas"'),
-    t('2026-11-05', 'Ale', 'Transversal: verificar la API en producción (Cloud Run con /reservas respondiendo) y dar por cerrado el deploy en Módulos', 'GET /api/v1/reservas/config responde 401 (no 404) en api.orbita.site; la decisión del deploy figura tomada'),
-    t('2026-11-06', 'Ale', 'Crear el negocio de prueba de Gimnasio en dev con su ReservaConfig y dos clases como CLASE con cupo', 'GET /reservas/recursos devuelve las clases con cupo y sesiones en el horario'),
+    documentada(t('2026-11-05', 'Ale', 'Leer el contrato del backend compartido y armar el mapa pantalla → ruta de Gimnasio', 'Tabla pantalla → ruta por sección, con planes, pases y alumnos marcados como "no son reservas"'), 'auditoria.gimnasio.2026-11-05-mapa-sobre-el-backend'),
+    documentada(t('2026-11-05', 'Ale', 'Transversal: verificar la API en producción (Cloud Run con /reservas respondiendo) y dar por cerrado el deploy en Módulos', 'GET /api/v1/reservas/config responde 401 (no 404) en api.orbita.site; la decisión del deploy figura tomada'), 'auditoria.gimnasio.2026-11-05-api-en-produccion'),
+    documentada(t('2026-11-06', 'Ale', 'Crear el negocio de prueba de Gimnasio en dev con su ReservaConfig y dos clases como CLASE con cupo', 'GET /reservas/recursos devuelve las clases con cupo y sesiones en el horario'), 'auditoria.gimnasio.2026-11-06-negocio-de-prueba'),
     t('2026-11-06', 'Ale', 'Transversal: avisar a Mateo y Alan el arranque del ciclo, la tarjeta de lo compartido y la regla de avisar antes de tocarlo', 'Los dos confirmaron que vieron Módulos en producción y su plan'),
     // Semana 2 · clases y salas
-    t('2026-11-09', 'Ale', 'Clases y salas como recursos CLASE: cupo, duración, sesiones en el horario y profe en datos', 'Una clase creada en el panel sale en GET /reservas/recursos con sus sesiones'),
-    t('2026-11-10', 'Ale', 'Grilla semanal del panel sobre GET disponibilidad con cupo y lugares libres', 'La grilla muestra las sesiones reales con cuántos lugares quedan'),
-    t('2026-11-11', 'Ale', 'Reservar un lugar (cantidad) desde el panel y la lista de espera con /reservas/espera', 'Con la clase llena el panel ofrece la espera; al cancelar, el primero toma el lugar'),
-    t('2026-11-12', 'Ale', 'Cancelar, marcar ausente y completar lugares desde la clase del día', 'Cada acción cambia el estado y el historial; un 409 se muestra con el mensaje de la API'),
-    t('2026-11-13', 'Ale', 'Días sin clases y feriados sobre /reservas/bloqueos', 'Un bloqueo saca las sesiones de la grilla y avisa cuántas reservas afecta'),
+    documentada(t('2026-11-09', 'Ale', 'Clases y salas como recursos CLASE: cupo, duración, sesiones en el horario y profe en datos', 'Una clase creada en el panel sale en GET /reservas/recursos con sus sesiones'), 'auditoria.gimnasio.2026-11-09-clases-como-recursos'),
+    documentada(t('2026-11-10', 'Ale', 'Grilla semanal del panel sobre GET disponibilidad con cupo y lugares libres', 'La grilla muestra las sesiones reales con cuántos lugares quedan'), 'auditoria.gimnasio.2026-11-10-grilla-con-cupo-real'),
+    documentada(t('2026-11-11', 'Ale', 'Reservar un lugar (cantidad) desde el panel y la lista de espera con /reservas/espera', 'Con la clase llena el panel ofrece la espera; al cancelar, el primero toma el lugar'), 'auditoria.gimnasio.2026-11-11-anotar-y-lista-de-espera'),
+    documentada(t('2026-11-12', 'Ale', 'Cancelar, marcar ausente y completar lugares desde la clase del día', 'Cada acción cambia el estado y el historial; un 409 se muestra con el mensaje de la API'), 'auditoria.gimnasio.2026-11-12-liberar-presente-ausente'),
+    documentada(t('2026-11-13', 'Ale', 'Días sin clases y feriados sobre /reservas/bloqueos', 'Un bloqueo saca las sesiones de la grilla y avisa cuántas reservas afecta'), 'auditoria.gimnasio.2026-11-13-dias-sin-clases'),
     // Semana 3 · alumnos, planes y pases (el 20/11 es feriado)
-    t('2026-11-16', 'Ale', 'Definir dónde viven planes, pases y alumnos (propuesta: tablas propias de Gimnasio en la API, fuera de reservas)', 'Decisión registrada en Auditoría con el modelo elegido'),
-    t('2026-11-17', 'Ale', 'Alumnos sobre la API según lo decidido: alta, plan vigente y vencimiento', 'Un alumno creado en el panel tiene plan y fecha de vencimiento en la base'),
-    t('2026-11-18', 'Ale', 'Planes (mensual, pase libre, por cantidad de clases) sobre la API', 'Los tres tipos de plan se crean y se muestran con su precio'),
-    t('2026-11-19', 'Ale', 'Pases que se descuentan al reservar un lugar y renovación del plan', 'Reservar descuenta un pase; sin pases no deja reservar; renovar extiende el vencimiento'),
-    t('2026-11-19', 'Ale', 'Transversal: los planes de Mateo y Alan al día en Módulos (atrasos y entradas por confirmar)', 'Ningún atraso sin explicar; lo documentado confirmado o marcado'),
+    documentada(t('2026-11-16', 'Ale', 'Definir dónde viven planes, pases y alumnos (propuesta: tablas propias de Gimnasio en la API, fuera de reservas)', 'Decisión registrada en Auditoría con el modelo elegido'), 'auditoria.gimnasio.2026-11-16-planes-pases-alumnos'),
+    documentada(t('2026-11-17', 'Ale', 'Alumnos sobre la API según lo decidido: alta, plan vigente y vencimiento', 'Un alumno creado en el panel tiene plan y fecha de vencimiento en la base'), 'auditoria.gimnasio.2026-11-17-alumnos-sobre-la-api'),
+    documentada(t('2026-11-18', 'Ale', 'Planes (mensual, pase libre, por cantidad de clases) sobre la API', 'Los tres tipos de plan se crean y se muestran con su precio'), 'auditoria.gimnasio.2026-11-18-planes-sobre-la-api'),
+    documentada(t('2026-11-19', 'Ale', 'Pases que se descuentan al reservar un lugar y renovación del plan', 'Reservar descuenta un pase; sin pases no deja reservar; renovar extiende el vencimiento'), 'auditoria.gimnasio.2026-11-19-pases-y-renovacion'),
+    documentada(t('2026-11-19', 'Ale', 'Transversal: los planes de Mateo y Alan al día en Módulos (atrasos y entradas por confirmar)', 'Ningún atraso sin explicar; lo documentado confirmado o marcado'), 'auditoria.gimnasio.2026-11-19-los-tres-planes-al-dia'),
     // Semana 4 · el sitio y el checkpoint
     t('2026-11-23', 'Ale', 'Sitio: grilla pública de clases desde la API (config pública y recursos)', 'El sitio muestra las mismas sesiones y cupos que el panel'),
     t('2026-11-24', 'Ale', 'Sitio: reservar un lugar con retener y confirmar e idempotencia, y anotarse en la espera', 'Doble clic no duplica; con la clase llena el sitio ofrece la espera'),
@@ -313,6 +319,10 @@ const GIMNASIO = plan('gimnasio', 'Gimnasio', 'Ale',
     t('2026-12-21', 'Ale', 'Correcciones finales de Gimnasio', 'Sin fallas abiertas en las entradas de Gimnasio'),
     t('2026-12-22', 'Ale', 'Transversal: cierre del ciclo en Módulos (resumen por módulo y decisiones)', 'Los tres módulos con su entrada de cierre y el resumen sin atrasos sin explicar'),
     t('2026-12-23', 'Ale', 'Transversal: retro del ciclo y plan del siguiente', 'Retro registrada en Auditoría y plan del próximo ciclo cargado en modules/superadmin/modulos/plan.ts'),
+    // Sumadas el 04/11 (pedido de Ale): todo cambio en conocimiento de Orbi, sin usar Orbi; y los tutoriales del módulo al terminar, como los de Tienda.
+    t('2026-12-21', 'Ale', 'El manual de Gimnasio en Orbi: cada pantalla del panel y del sitio con su tema y los nombres exactos de los botones, regenerado (sin tools ni llamadas a Orbi)', 'Orbi tiene cada pantalla de Gimnasio en el manual; pnpm test de apps/web en verde con el artefacto regenerado'),
+    t('2026-12-22', 'Ale', 'Tutoriales de Gimnasio: la lista en Marketing → Videos → Tutoriales y los videos como los de Tienda', 'La lista de Gimnasio cargada con grupos y pantallas, y cada tutorial con su link de YouTube (No listado) cargado por el conector, o en proceso con quién lo hace'),
+    documentada(t('2026-11-12', 'Ale', 'Transversal: Orbi y la lista de tutoriales reciben a los módulos (un manual por módulo que el generador junta sin importar a Tienda; grupo o módulo por tutorial con sus pantallas)', 'Un tema de prueba de Turnos, Alquileres y Gimnasio llega a manual.generated.ts sin que ningún módulo importe a ventas, y la lista de tutoriales distingue el módulo'), 'auditoria.gimnasio.2026-11-12-orbi-y-tutoriales-por-modulo'),
   ])
 
 export const PLANES: PlanModulo[] = [TURNOS, ALQUILERES, GIMNASIO]

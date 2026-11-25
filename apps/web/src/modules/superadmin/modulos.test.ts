@@ -30,7 +30,8 @@ const gimnasio = PLANES.find((p) => p.modulo === 'gimnasio')!
 const LIB = 'auditoria.gimnasio.2026-10-26-lib-reservas'
 // El ciclo 2 arranca sin tareas documentadas: para probar la confirmación se
 // documentan las tres primeras de Gimnasio con la entrada de la lib.
-const conLib = PLANES.map((p) => (p.modulo === 'gimnasio' ? { ...p, tareas: p.tareas.map((t, i) => (i < 3 ? { ...t, auditoria: LIB } : t)) } : p))
+// Las tres primeras de Gimnasio documentadas con LIB y ninguna más (sobre el plan sin documentar: el real avanza).
+const conLib = sinDocumentar.map((p) => (p.modulo === 'gimnasio' ? { ...p, tareas: p.tareas.map((t, i) => (i < 3 ? { ...t, auditoria: LIB } : t)) } : p))
 
 describe('MarkdownInforme — imágenes', () => {
   it('srcSeguro deja pasar https y /auditoria/…, y nada más', () => {
@@ -90,7 +91,8 @@ describe('Modulos — aviso de las entradas de sesión', () => {
 
 describe('Modulos — modelo', () => {
   it('sin nada guardado: 8 semanas desde el lunes 02/11, nada hecho, y el día antes del inicio la semana 1 sigue pendiente', () => {
-    const m = armarModulo(DEF.gimnasio, datos(), '2026-11-04')
+    // El plan como arrancó el ciclo, sin tareas documentadas (las que ya tienen su entrada esperan confirmación: ver abajo).
+    const m = armarModulo(DEF.gimnasio, datos(ESTADO_VACIO, sinDocumentar), '2026-11-04')
     expect(m.semanas).toHaveLength(8)
     expect(m.fin).toBe('2026-12-23')
     expect(m.semanas[0]).toMatchObject({ n: 1, desde: '2026-11-02', hasta: '2026-11-06', titulo: 'Arranque: el mapa del módulo y la API en producción' })

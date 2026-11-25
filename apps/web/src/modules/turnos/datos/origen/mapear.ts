@@ -6,11 +6,11 @@
 // hoy (`dia`, 0 = hoy), de minutos desde las 00:00, de días de la semana con
 // el lunes en 0 y de estados en minúscula. La API habla de fechas AAAA-MM-DD de
 // Argentina, del domingo en 0 y de estados en mayúscula. Acá se traduce.
-import type { Bloqueo, Config, CrearBloqueo, GuardarConfig, GuardarRecurso, GuardarServicio, HorarioSemanal, Recurso as RecursoApi, Reserva, Servicio as ServicioApi, TipoRecurso, Tramo } from '@/lib/reservasApi/tipos'
+import type { Bloqueo, Config, CrearBloqueo, Espera, Historial, GuardarConfig, GuardarRecurso, GuardarServicio, HorarioSemanal, Recurso as RecursoApi, Reserva, Servicio as ServicioApi, TipoRecurso, Tramo } from '@/lib/reservasApi/tipos'
 import { diasEntre, sumarDias, fechaNumerica, type ISO } from '@/lib/reservas/fechas'
 import { aMinutos, cruzar, diasAbiertos, diasTxt, hhmm, tramosDe, tramosDelDia, tramosTxt, type Semana } from '@/modules/turnos/horario'
 import { COLORES_EQUIPO } from '@/modules/turnos/datos/equipo'
-import { semanaDeRecurso, type Cliente, type EstadoTurno, type Recurso, type RubroTurnos } from '@/modules/turnos/datos'
+import { type Cliente, type EstadoTurno, type Recurso, type RubroTurnos } from '@/modules/turnos/datos'
 import type { ServicioBase, TurnoAgenda } from '@/modules/turnos/datos/agenda'
 
 const NOMBRES_DIA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
@@ -69,15 +69,22 @@ export function agendaDeHorario(propio: HorarioSemanal | null, semana: Semana): 
   }
   const atiende: number[] = []
   for (let i = 0; i < 7; i++) if (propio[claveApi(i)]?.length) atiende.push(i)
-  const delNegocio = atiende.every(i => igualesTramos(propio[claveApi(i)] ?? [], tramosDe(semana[i]?.[1]) as Tramo[]))
+  // "Todo el día" es "el horario del negocio": la API lo cruza con el del negocio. Lo que se
+  // guardó antes del 24/11 traía el del negocio copiado, y se lee igual.
+  const delNegocio = atiende.every(i => {
+    const t = propio[claveApi(i)] ?? []
+    return igualesTramos(t, TODO_EL_DIA) || igualesTramos(t, tramosDe(semana[i]?.[1]) as Tramo[])
+  })
   const primero = atiende.length ? propio[claveApi(atiende[0])] ?? [] : []
   return { atiende, horario: delNegocio ? '' : tramosTxt(primero), dias: diasTxt(atiende) }
 }
 
+const TODO_EL_DIA: Tramo[] = [[0, 1440]]
+
 /**
- * Un horario propio recortado al del negocio, día por día. La API no los cruza
- * (una agenda con horario propio usa solo el suyo), y el panel promete que el
- * propio va "dentro" del del negocio: si el negocio achica, se recorta acá.
+ * Un horario propio recortado al del negocio, día por día: lo mismo que hace
+ * la API al dar disponibilidad en Turnos (horarioEfectivo, dominio/horario.ts).
+ * El panel lo usa para avisar quién se queda sin días con un horario nuevo.
  */
 export function recortarHorario(propio: HorarioSemanal, negocio: HorarioSemanal): HorarioSemanal {
   const h: HorarioSemanal = {}
@@ -89,14 +96,6 @@ export function recortarHorario(propio: HorarioSemanal, negocio: HorarioSemanal)
   return h
 }
 
-/** Si dos horarios abren igual todos los días. */
-export function mismoHorario(a: HorarioSemanal, b: HorarioSemanal): boolean {
-  for (let i = 0; i < 7; i++) {
-    const clave = claveApi(i)
-    if (!igualesTramos(a[clave] ?? [], b[clave] ?? [])) return false
-  }
-  return true
-}
 
 // ─── Feriados y vacaciones ───────────────────────────────────────────────────
 //
@@ -134,7 +133,7 @@ const FIN_DEL_DIA = 1440
 const RANGO_DE_FABRICA: [string, string] = ['09:00', '13:00']
 
 /** Fecha y minuto de Argentina (UTC−3, sin horario de verano) de un instante de la API. */
-function enArgentina(iso: string): { fecha: ISO; minuto: number } {
+export function enArgentina(iso: string): { fecha: ISO; minuto: number } {
   const t = new Date(Date.parse(iso) - 3 * 3600_000).toISOString()
   return { fecha: t.slice(0, 10), minuto: Number(t.slice(11, 13)) * 60 + Number(t.slice(14, 16)) }
 }
@@ -299,14 +298,19 @@ export function recursoDeApi(r: RecursoApi, rubro: RubroTurnos, semana: Semana, 
 
 /**
  * El horario de una agenda del panel como lo guarda la API: null si es el del
- * negocio (todos los días que abre, sin horario propio), así un cambio de
- * horario del negocio le llega sola. Si no, día por día lo que de verdad
- * atiende: el horario del negocio recortado a sus días y a su horario propio.
+ * negocio (todos los días que abre, sin horario propio). Si no, sus días con
+ * su horario propio o, si no tiene, "todo el día". Se guarda sin recortar: la
+ * API lo cruza con el del negocio al dar disponibilidad (desde el 24/11), así
+ * que si el negocio cambia su horario, la agenda lo sigue sola.
  */
 export function horarioDeRecurso(r: Recurso, semana: Semana): HorarioSemanal | null {
   const abiertos = diasAbiertos(semana)
   const todos = abiertos.length === r.atiende.length && abiertos.every(d => r.atiende.includes(d))
-  return !r.horario && todos ? null : horarioDeSemana(semanaDeRecurso(r, semana))
+  if (!r.horario && todos) return null
+  const tramos = r.horario ? (tramosDe(r.horario) as Tramo[]) : TODO_EL_DIA
+  const h: HorarioSemanal = {}
+  for (const d of [...r.atiende].sort((x, y) => x - y)) if (tramos.length) h[claveApi(d)] = tramos
+  return h
 }
 
 /**
@@ -382,6 +386,7 @@ export function turnoDeApi(r: Reserva, hoy: ISO, minutos: number): TurnoAgenda |
     precio: r.precio,
     estado,
     senaPagada: r.sena <= 0 || r.pagado >= r.sena,
+    sena: r.sena,
     ...(nota ? { nota } : {}),
     dia: diaDe(r.fecha, hoy),
   }
@@ -426,4 +431,40 @@ export function clientesDeReservas(reservas: Reserva[]): Cliente[] {
       gastado: atendidas.reduce((s, r) => s + r.pagado, 0),
     }
   }).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+}
+
+// ─── Historial y lista de espera ─────────────────────────────────────────────
+
+/** Un cambio de un turno como lo lee el panel. */
+export interface PasoTurno { cuando: string; titulo: string; quien: string; motivo?: string }
+
+const ESTADO_TXT: Record<string, string> = {
+  RETENIDA: 'Retenido', PENDIENTE: 'Sin confirmar', CONFIRMADA: 'Confirmado', COMPLETADA: 'Atendido',
+  CANCELADA: 'Cancelado', VENCIDA: 'Vencido', AUSENTE: 'Ausente',
+}
+const QUIEN_TXT: Record<string, string> = { CLIENTE: 'el cliente', NEGOCIO: 'el negocio', SISTEMA: 'automático' }
+
+/** El historial de la API, del más nuevo al más viejo. Un cambio sin cambio de estado es un turno movido. */
+export function pasosDeHistorial(h: Historial[]): PasoTurno[] {
+  return [...h].sort((x, y) => y.createdAt.localeCompare(x.createdAt)).map(p => {
+    const { fecha, minuto } = enArgentina(p.createdAt)
+    return {
+      cuando: `${fecha.slice(8, 10)}/${fecha.slice(5, 7)} ${hhmm(minuto)}`,
+      titulo: !p.de ? `Dado · ${ESTADO_TXT[p.a] ?? p.a}` : p.de === p.a ? 'Movido' : ESTADO_TXT[p.a] ?? p.a,
+      quien: QUIEN_TXT[p.quien] ?? p.quien.toLowerCase(),
+      ...(p.motivo ? { motivo: p.motivo } : {}),
+    }
+  })
+}
+
+/** Alguien que espera un horario lleno. */
+export interface EnEspera { id: string; recursoId: string; dia: number; inicio: number; fin: number; nombre: string; telefono?: string }
+
+export function enEsperaDeApi(e: Espera, hoy: ISO): EnEspera {
+  const a = enArgentina(e.inicio)
+  const z = enArgentina(e.fin)
+  return {
+    id: e.id, recursoId: e.recursoId, dia: diaDe(a.fecha, hoy), inicio: a.minuto, fin: z.fecha === a.fecha ? z.minuto : 1440,
+    nombre: e.clienteNombre, ...(e.clienteTelefono ? { telefono: e.clienteTelefono } : {}),
+  }
 }

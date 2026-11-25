@@ -321,7 +321,8 @@ export default function Reserva({ negocio, inscripciones, socios, onInscribir, q
   )
 }
 
-function Bloque({ refTitulo, titulo, sub, children }: { refTitulo: React.RefObject<HTMLHeadingElement | null>; titulo: string; sub?: string; children: ReactNode }) {
+/** Un paso de la reserva: su título (que recibe el foco al llegar), la bajada y el contenido. Lo usa también el sitio real (ReservaReal.tsx). */
+export function Bloque({ refTitulo, titulo, sub, children }: { refTitulo: React.RefObject<HTMLHeadingElement | null>; titulo: string; sub?: string; children: ReactNode }) {
   return (
     <section className="rv-entra">
       <h1 ref={refTitulo} className="rv-h1" tabIndex={-1} style={{ fontSize: 24 }}>{titulo}</h1>
@@ -335,7 +336,7 @@ function Bloque({ refTitulo, titulo, sub, children }: { refTitulo: React.RefObje
 // con error. El label tiene solo el rótulo y el error va fuera, enlazado desde el
 // input (adentro del label, el lector de pantalla lo leía dos veces: en el nombre y
 // en la descripción).
-function CampoR(p: { id: string; label: string; value: string; onChange: (v: string) => void; error?: string; placeholder?: string; inputMode?: 'text' | 'tel' | 'email'; autoComplete?: string }) {
+export function CampoR(p: { id: string; label: string; value: string; onChange: (v: string) => void; error?: string; placeholder?: string; inputMode?: 'text' | 'tel' | 'email'; autoComplete?: string }) {
   const id = `gir-${p.id}`
   return (
     <div className="rv-campo">

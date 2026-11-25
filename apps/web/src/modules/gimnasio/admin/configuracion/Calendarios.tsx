@@ -5,27 +5,31 @@
 // días sin clases).
 import { useState } from 'react'
 import { Download, Link2, Trash2, Upload } from 'lucide-react'
-import { diaSemana, rangoTxt, sumarDias } from '@/lib/reservas/fechas'
+import { diaSemana, rangoTxt, sumarDias, type ISO } from '@/lib/reservas/fechas'
 import { descargarICS, generarICS, leerICS } from '@/lib/reservas/ics'
-import { HOY, type BloqueoGym, type CalendarioExterno } from '../../datos'
+import type { BloqueoGym, CalendarioExterno } from '../../datos'
+import { useReloj } from '../../datos/reloj'
 import { Campo, Encabezado, EtiquetaDemo, Nota, Seccion } from '@/design-system/reservas/piezas'
 import type { PropsConfig } from '../piezas'
 
-const ICS_EJEMPLO = [
+/** El calendario de ejemplo que "trae" la sincronización simulada: dos cierres en las próximas semanas, contados desde hoy. */
+const icsDeEjemplo = (hoy: ISO) => [
   'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Ejemplo//Calendario externo//ES',
-  `BEGIN:VEVENT\r\nUID:ext-1@ejemplo\r\nDTSTART;VALUE=DATE:${sumarDias(HOY, 10).replace(/-/g, '')}\r\nDTEND;VALUE=DATE:${sumarDias(HOY, 11).replace(/-/g, '')}\r\nSUMMARY:Competencia fuera del box\r\nEND:VEVENT`,
-  `BEGIN:VEVENT\r\nUID:ext-2@ejemplo\r\nDTSTART;VALUE=DATE:${sumarDias(HOY, 24).replace(/-/g, '')}\r\nDTEND;VALUE=DATE:${sumarDias(HOY, 26).replace(/-/g, '')}\r\nSUMMARY:Mantenimiento\r\nEND:VEVENT`,
+  `BEGIN:VEVENT\r\nUID:ext-1@ejemplo\r\nDTSTART;VALUE=DATE:${sumarDias(hoy, 10).replace(/-/g, '')}\r\nDTEND;VALUE=DATE:${sumarDias(hoy, 11).replace(/-/g, '')}\r\nSUMMARY:Competencia fuera del box\r\nEND:VEVENT`,
+  `BEGIN:VEVENT\r\nUID:ext-2@ejemplo\r\nDTSTART;VALUE=DATE:${sumarDias(hoy, 24).replace(/-/g, '')}\r\nDTEND;VALUE=DATE:${sumarDias(hoy, 26).replace(/-/g, '')}\r\nSUMMARY:Mantenimiento\r\nEND:VEVENT`,
   'END:VCALENDAR',
 ].join('\r\n')
 
 export default function Calendarios({ negocio, onGuardar }: PropsConfig) {
+  // El día de hoy sale del reloj del origen: el fijo de la demo o el de verdad con la API.
+  const { hoy } = useReloj()
   const [url, setUrl] = useState('')
   const [nombre, setNombre] = useState('')
   const [error, setError] = useState('')
   const exportar = () => {
     const eventos: Parameters<typeof generarICS>[0] = []
     for (let d = 0; d < 28; d++) {
-      const f = sumarDias(HOY, d)
+      const f = sumarDias(hoy, d)
       if (negocio.bloqueos.some(b => b.desde <= f && f < b.hasta)) continue
       for (const c of negocio.clases.filter(x => x.dia === diaSemana(f))) {
         const a = negocio.actividades.find(x => x.id === c.actividadId)
@@ -38,8 +42,8 @@ export default function Calendarios({ negocio, onGuardar }: PropsConfig) {
     if (!/^https?:\/\/\S+\.ics(\?\S*)?$/i.test(url.trim())) { setError('Pegá una URL que termine en .ics, como la que da Google Calendar.'); return }
     setError('')
     const id = `ce${Date.now().toString(36)}`
-    const bloqueos: BloqueoGym[] = leerICS(ICS_EJEMPLO).map((e, i) => ({ id: `${id}-${i}`, desde: e.desde, hasta: e.hasta, motivo: `${nombre.trim() || 'Calendario externo'}: ${e.titulo}`, origen: 'ical' }))
-    const cal: CalendarioExterno = { id, nombre: nombre.trim() || 'Calendario externo', url: url.trim(), ultimaSync: HOY }
+    const bloqueos: BloqueoGym[] = leerICS(icsDeEjemplo(hoy)).map((e, i) => ({ id: `${id}-${i}`, desde: e.desde, hasta: e.hasta, motivo: `${nombre.trim() || 'Calendario externo'}: ${e.titulo}`, origen: 'ical' }))
+    const cal: CalendarioExterno = { id, nombre: nombre.trim() || 'Calendario externo', url: url.trim(), ultimaSync: hoy }
     onGuardar({ calendariosExternos: [...negocio.calendariosExternos, cal], bloqueos: [...negocio.bloqueos, ...bloqueos] }, `Calendario conectado: ${bloqueos.length} días sin clases`, 'Demo: sincronización simulada.')
     setUrl(''); setNombre('')
   }

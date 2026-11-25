@@ -2,19 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { CAPITULOS } from './contenido'
-import { aArchivoTs, armarManualParaOrbi, plano, textoDeBloque, versionDe } from './paraOrbi'
+import { armarManualParaOrbi, plano, textoDeBloque, versionDe } from './paraOrbi'
 import { MODULOS_DEL_MENU, PERMISOS_MODULO } from '@/layouts/components/permisosDelMenu'
 
-const ARTEFACTO = '../../../../../../api/src/orbi/manual/manual.generated.ts'
 const SIDEBAR = fileURLToPath(new URL('../../../../layouts/components/Sidebar.tsx', import.meta.url))
 
-describe('manual para Orbi: el artefacto de la API', () => {
-    // Si este test falla en CI: cd apps/web && pnpm manual:generar, y commitear
-    // apps/api/src/orbi/manual/manual.generated.ts.
-    it('manual.generated.ts está al día con el manual, los primeros pasos y el menú', async () => {
-        await expect(aArchivoTs(armarManualParaOrbi())).toMatchFileSnapshot(ARTEFACTO)
-    })
-
+// El artefacto entero (Tienda y los módulos) lo escribe modules/orbi/manual/artefacto.test.ts.
+describe('manual para Orbi: la parte de Tienda', () => {
     it('trae todos los temas, con su capítulo y un destino', () => {
         const m = armarManualParaOrbi()
         expect(m.temas).toHaveLength(CAPITULOS.reduce((n, c) => n + c.temas.length, 0))

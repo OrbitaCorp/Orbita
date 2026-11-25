@@ -9,12 +9,16 @@
 // eso vive en el negocio de la demo (datos/negocio.ts) y el sitio, la reserva,
 // "Mis turnos" y los Términos lo leen de ahí.
 //
-// En un negocio real, lo que la config de la API sabe guardar va ahí
-// (origen.reglas): anticipación, margen, confirmación, seña en porcentaje,
-// cancelación, reprogramación, tope por persona y lista de espera. Lo demás
-// (la grilla, la seña fija, elegir profesional, la tolerancia, los datos del
-// paciente, la cuenta de clientes) todavía no tiene dónde vivir: es el
-// faltante 2 del mapa de Turnos, y la barra de guardar lo dice.
+// En un negocio real todo va a la config de Turnos (origen.reglas): lo que el
+// motor aplica en sus columnas (anticipación, margen, confirmación, seña en
+// porcentaje, cancelación, reprogramación, tope por persona y lista de espera)
+// y lo demás en su `datos` (datosConfig.ts): la grilla, que el motor aplica
+// como paso de cada agenda, y lo que lee el sitio (elegir profesional, datos
+// del paciente, tolerancia, seña fuera de plazo, cuenta de clientes). Dos
+// cosas no se muestran con la API porque el motor no las hace: pedir seña a
+// quien faltó y el tiempo para aceptar un lugar de la lista de espera (el
+// motor se lo da al primero en el acto). La seña de monto fijo no deja
+// guardar: el motor cobra en porcentaje.
 import { useEffect, useState, type ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import {
@@ -29,6 +33,7 @@ import { BarraGuardar, useBorrador } from '@/design-system/reservas/piezas'
 import { SkeletonVista } from '@/design-system/reservas/skeleton'
 import { useOrigenTurnos, type EscrituraReglas } from '@/modules/turnos/datos/origen'
 import type { ReglasApi } from '@/modules/turnos/datos/origen/mapear'
+import type { ExtrasReglas } from '@/modules/turnos/datos/origen/datosConfig'
 import { vozDe, cap } from './datos'
 
 const ANT_MIN = [{ id: 0, label: 'Sin mínimo' }, { id: 60, label: '1 hora' }, { id: 120, label: '2 horas' }, { id: 240, label: '4 horas' }, { id: 720, label: '12 horas' }, { id: 1440, label: '1 día' }]
@@ -81,7 +86,7 @@ export default function Reservas(props: PropsTab) {
 /** Con la API: trae las reglas guardadas antes de mostrar el formulario. */
 function ReservasApi({ reglas, ...props }: PropsTab & { reglas: EscrituraReglas }) {
   const { rubro } = props
-  const [estado, setEstado] = useState<{ guardadas: ReglasApi | null; error: string | null }>({ guardadas: null, error: null })
+  const [estado, setEstado] = useState<{ guardadas: { reglas: ReglasApi; extras: Partial<ExtrasReglas> } | null; error: string | null }>({ guardadas: null, error: null })
   const [vuelta, setVuelta] = useState(0)
   // Una vez por rubro y por intento: el rubro cambia de objeto al guardar otras pantallas.
   const clave = rubro.key
@@ -105,7 +110,7 @@ function ReservasApi({ reglas, ...props }: PropsTab & { reglas: EscrituraReglas 
   return <FormReglas {...props} api={{ reglas, guardadas: estado.guardadas }} />
 }
 
-function FormReglas({ rubro, avisar, api }: PropsTab & { api?: { reglas: EscrituraReglas; guardadas: ReglasApi } }) {
+function FormReglas({ rubro, avisar, api }: PropsTab & { api?: { reglas: EscrituraReglas; guardadas: { reglas: ReglasApi; extras: Partial<ExtrasReglas> } } }) {
   const voz = vozDe(rubro)
   const salud = esSalud(rubro)
   const b = useBorrador<Reglas>(() => ({
@@ -117,7 +122,8 @@ function FormReglas({ rubro, avisar, api }: PropsTab & { api?: { reglas: Escritu
     limite: 2, espera: rubro.modo === 'profesional', esperaMin: 30, ausentes: true,
     // El motivo de la consulta va apagado en todos los rubros de salud (alcance en salud, 15/11).
     obraSocial: salud, dni: salud, motivo: false,
-    ...(api ? (({ cancelaHasta, ...resto }) => { void cancelaHasta; return resto })(api.guardadas) : {}),
+    ...(api ? (({ cancelaHasta, ...resto }) => { void cancelaHasta; return resto })(api.guardadas.reglas) : {}),
+    ...(api ? reglasDeExtras(api.guardadas.extras) : {}),
   }))
   const v = b.v
   const ejemplo = rubro.servicios.find(s => s.precio > 0) ?? rubro.servicios[0]
@@ -130,7 +136,14 @@ function FormReglas({ rubro, avisar, api }: PropsTab & { api?: { reglas: Escritu
   const { demo, guardar: guardarDemo } = useNegocioDemo()
   // Con la API no se escribe en el negocio de la demo: lo guardado queda acá, y el plazo de
   // cancelación sale de la config.
-  const [baseApi, setBaseApi] = useState(() => (api ? { cuentas: demo.cuentas, politica: { ...demo.politica, cancelaHasta: api.guardadas.cancelaHasta } } : null))
+  const [baseApi, setBaseApi] = useState(() => {
+    if (!api) return null
+    const { extras, reglas: guardadas } = api.guardadas
+    return {
+      cuentas: extras.cuentas ?? demo.cuentas,
+      politica: { ...demo.politica, cancelaHasta: guardadas.cancelaHasta, ...(extras.tolerancia !== undefined ? { tolerancia: extras.tolerancia } : {}), ...(extras.senaFueraDePlazo ? { senaFueraDePlazo: extras.senaFueraDePlazo } : {}) },
+    }
+  })
   const cuentasGuardadas = baseApi?.cuentas ?? demo.cuentas
   const politicaGuardada = baseApi?.politica ?? demo.politica
   const [guardando, setGuardando] = useState(false)
@@ -160,6 +173,9 @@ function FormReglas({ rubro, avisar, api }: PropsTab & { api?: { reglas: Escritu
         minAnt: v.minAnt, maxAnt: v.maxAnt, buffer: v.buffer, confirmacion: v.confirmacion, sena: v.sena, senaPct: v.senaPct,
         reprogramar: v.reprogramar, reproHoras: v.reproHoras, reproMax: v.reproMax, limite: v.limite, espera: v.espera,
         cancelaHasta: politica.cancelaHasta,
+      }, {
+        grilla: v.grilla, elegirRecurso: v.elegirRecurso, cualquiera: v.cualquiera, campos: { obraSocial: v.obraSocial, dni: v.dni, motivo: v.motivo },
+        tolerancia: politica.tolerancia, senaFueraDePlazo: politica.senaFueraDePlazo, cuentas,
       }, rubro)
     } catch (e) {
       avisar('No se guardaron las reglas', e instanceof Error && e.message ? e.message : 'Probá de nuevo en un rato.')
@@ -170,7 +186,7 @@ function FormReglas({ rubro, avisar, api }: PropsTab & { api?: { reglas: Escritu
     b.guardar()
     setBaseApi({ cuentas, politica })
     setCuentasBorrador(null); setPoliticaBorrador(null)
-    avisar('Reglas guardadas', `Ya valen para las reservas nuevas de tu sitio. ${SOLO_EN_PANEL}`)
+    avisar('Reglas guardadas', 'Ya valen para las reservas nuevas de tu sitio.')
   }
   const guardar = () => {
     if (api) { void guardarEnApi(api); return }
@@ -253,8 +269,12 @@ function FormReglas({ rubro, avisar, api }: PropsTab & { api?: { reglas: Escritu
               </div>
               <div className="tuc-ayuda" style={{ marginTop: 10 }}>Ejemplo: en “{ejemplo.nombre}” (<span className="rv-num">{pesos(ejemplo.precio)}</span>) la seña es <b className="rv-num" style={{ color: 'var(--color-text)' }}>{pesos(senaMonto)}</b>.</div>
             </FilaSwitch>
-            <Divisor />
-            <FilaSwitch Icon={UserX} titulo="Pedir seña a quien faltó sin avisar" ayuda="Aunque no pidas seña en general, quien tiene una ausencia la paga en su próximo turno." on={v.ausentes} onChange={x => b.set('ausentes', x)} />
+            {!api && (
+              <>
+                <Divisor />
+                <FilaSwitch Icon={UserX} titulo="Pedir seña a quien faltó sin avisar" ayuda="Aunque no pidas seña en general, quien tiene una ausencia la paga en su próximo turno." on={v.ausentes} onChange={x => b.set('ausentes', x)} />
+              </>
+            )}
           </SecCard>
 
           <SecCard titulo="Cancelaciones y cambios" Icon={RotateCcw} bajada="Hasta cuándo se puede cancelar o mover, y qué pasa con la seña.">
@@ -287,11 +307,15 @@ function FormReglas({ rubro, avisar, api }: PropsTab & { api?: { reglas: Escritu
 
           <SecCard titulo="Límites y lista de espera" Icon={ShieldCheck} bajada="Para repartir mejor los horarios más pedidos.">
             <Selector label={`${cap(voz.turnos)} activos por ${voz.cliente}`} ayuda="Para que nadie acapare los mejores horarios." valor={v.limite} opciones={conActual(LIMITE, v.limite, `${v.limite} a la vez`)} onChange={x => b.set('limite', x)} />
-            <FilaSwitch Icon={Hourglass} titulo="Lista de espera" ayuda={`Si un horario está lleno, se anotan. Cuando alguien cancela, le ofrecemos el lugar al primero por WhatsApp.`} on={v.espera} onChange={x => b.set('espera', x)}>
-              <Rotulo>Tiempo para aceptar el lugar</Rotulo>
-              <Segmentado label="Tiempo para aceptar el lugar" valor={v.esperaMin} onChange={x => b.set('esperaMin', x)} opciones={[15, 30, 60].map(m => ({ id: m, label: duracionTxt(m) }))} />
-              <div className="tuc-ayuda" style={{ marginTop: 8 }}>Si no responde a tiempo, pasa al siguiente de la lista.</div>
-            </FilaSwitch>
+            {api ? (
+              <FilaSwitch Icon={Hourglass} titulo="Lista de espera" ayuda="Si un horario está lleno, se anotan. Cuando alguien cancela, el primero de la lista se queda con el lugar y le avisamos." on={v.espera} onChange={x => b.set('espera', x)} />
+            ) : (
+              <FilaSwitch Icon={Hourglass} titulo="Lista de espera" ayuda={`Si un horario está lleno, se anotan. Cuando alguien cancela, le ofrecemos el lugar al primero por WhatsApp.`} on={v.espera} onChange={x => b.set('espera', x)}>
+                <Rotulo>Tiempo para aceptar el lugar</Rotulo>
+                <Segmentado label="Tiempo para aceptar el lugar" valor={v.esperaMin} onChange={x => b.set('esperaMin', x)} opciones={[15, 30, 60].map(m => ({ id: m, label: duracionTxt(m) }))} />
+                <div className="tuc-ayuda" style={{ marginTop: 8 }}>Si no responde a tiempo, pasa al siguiente de la lista.</div>
+              </FilaSwitch>
+            )}
           </SecCard>
 
           {salud && (
@@ -304,25 +328,31 @@ function FormReglas({ rubro, avisar, api }: PropsTab & { api?: { reglas: Escritu
         </div>
 
         <aside className="tuc-res-resumen" aria-label="Así lo ve tu cliente">
-          <Resumen v={v} rubro={rubro} senaMonto={senaMonto} cuentas={cuentas} politica={politica} />
+          <Resumen v={v} rubro={rubro} senaMonto={senaMonto} cuentas={cuentas} politica={politica} motor={!!api} />
         </aside>
       </div>
 
       <BarraGuardar cambiado={b.cambiado || seAplica} onDescartar={descartar} onGuardar={guardar}
         motivo={guardando ? 'Guardando…' : senaFijaSinApi ? 'La seña de monto fijo todavía no se guarda: usá porcentaje.' : undefined}
-        nota={api ? SOLO_EN_PANEL : undefined} />
+ />
     </div>
   )
 }
 
-const SOLO_EN_PANEL = 'La grilla, elegir profesional, la tolerancia, los datos pedidos y la cuenta de clientes todavía no se guardan.'
+/** Lo de `datos` en la forma del formulario. */
+function reglasDeExtras(e: Partial<ExtrasReglas>): Partial<Reglas> {
+  return Object.fromEntries(Object.entries({
+    grilla: e.grilla, elegirRecurso: e.elegirRecurso, cualquiera: e.cualquiera,
+    obraSocial: e.campos?.obraSocial, dni: e.campos?.dni, motivo: e.campos?.motivo,
+  }).filter(([, x]) => x !== undefined))
+}
 
 const AHORA = 10 * 60 // la demo "está" a las 10:00
 
 // Tarjeta que imita el paso de elegir horario del sitio público, con los
 // textos que genera cada regla. Pinta con los colores del sitio del negocio
 // (tema.ts) para que se sienta "del otro lado del mostrador".
-function Resumen({ v, rubro, senaMonto, cuentas, politica }: { v: Reglas; rubro: PropsTab['rubro']; senaMonto: number; cuentas: BeneficiosCuenta; politica: PoliticaReserva }) {
+function Resumen({ v, rubro, senaMonto, cuentas, politica, motor }: { v: Reglas; rubro: PropsTab['rubro']; senaMonto: number; cuentas: BeneficiosCuenta; politica: PoliticaReserva; motor: boolean }) {
   const voz = vozDe(rubro)
   const t = temaDe(rubro)
   const ejemplo = rubro.servicios.find(s => s.precio > 0) ?? rubro.servicios[0]
@@ -345,7 +375,7 @@ function Resumen({ v, rubro, senaMonto, cuentas, politica }: { v: Reglas; rubro:
   if (politica.tolerancia > 0) lineas.push([AlarmClock, <>Te esperamos <b>{politica.tolerancia} minutos</b>.</>])
   if (v.reprogramar) lineas.push([Repeat, <>Podés cambiar el horario hasta {v.reproMax === 1 ? '1 vez' : `${v.reproMax} veces`}.</>])
   if (rubro.modo === 'profesional' && v.elegirRecurso) lineas.push([Users, <>Elegís con quién atenderte{v.cualquiera ? <> o “Cualquiera”</> : ''}.</>])
-  if (v.espera) lineas.push([Hourglass, <>Si está lleno, te anotás en la lista de espera y tenés <b>{duracionTxt(v.esperaMin)}</b> para aceptar el lugar.</>])
+  if (v.espera) lineas.push([Hourglass, motor ? <>Si está lleno, te anotás en la <b>lista de espera</b> y, si se libera, el lugar es tuyo.</> : <>Si está lleno, te anotás en la lista de espera y tenés <b>{duracionTxt(v.esperaMin)}</b> para aceptar el lugar.</>])
   if (v.limite) lineas.push([Timer, <>Hasta {v.limite} {v.limite === 1 ? voz.turno : voz.turnos} activos a la vez.</>])
   if (v.dni || v.obraSocial) lineas.push([IdCard, <>Te pedimos {[v.dni && 'DNI', v.obraSocial && 'obra social'].filter(Boolean).join(' y ')}.</>])
   if (beneficios.length) lineas.push([Gift, <>Si querés, creás tu cuenta y sumás <b>{beneficios.map(x => x.titulo.toLowerCase()).join(', ')}</b>.</>])

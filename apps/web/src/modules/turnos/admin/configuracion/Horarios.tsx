@@ -190,8 +190,7 @@ function FormHorarios({ rubro, avisar, semana, onSemanaGuardada, inicial, api }:
         onSemanaGuardada(r.semana, r.recursos)
         setBorrador(null); setModo(null)
         partes.push('Tu disponibilidad ya usa el horario nuevo.')
-        if (r.ajustadas.length) partes.push(`Se recortó el horario propio de ${r.ajustadas.join(', ')}.`)
-        if (r.sinAjustar.length) partes.push(`No se pudo recortar el de ${r.sinAjustar.join(', ')}: revisalo en su agenda.`)
+        if (r.sinDias.length) partes.push(`Con este horario, ${r.sinDias.join(', ')} no ${r.sinDias.length === 1 ? 'atiende' : 'atienden'} ningún día: revisá su agenda en Equipo.`)
       }
     } catch (e) {
       setGuardando(false)

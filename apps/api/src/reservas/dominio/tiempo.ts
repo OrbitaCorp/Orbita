@@ -52,6 +52,18 @@ export function hhmm(minutos: number): string {
   return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 }
 
+const FECHA_LARGA = new Intl.DateTimeFormat('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', weekday: 'long', day: 'numeric', month: 'long' });
+
+/** "lunes 10 de noviembre de 09:30 a 10:00": un rango de instantes dicho en palabras, en hora de Argentina. */
+export function cuandoEs(r: { inicio: Date; fin: Date }): string {
+  const dia = FECHA_LARGA.format(r.inicio);
+  const ini = fechaYMinutos(r.inicio).minutos;
+  const fin = ini + Math.round((r.fin.getTime() - r.inicio.getTime()) / 60_000);
+  // Más de un día (un alojamiento): se dice por días.
+  if (fin - ini >= MINUTOS_DIA) return `del ${dia} al ${FECHA_LARGA.format(r.fin)}`;
+  return `${dia} de ${hhmm(ini)} a ${hhmm(fin)}`;
+}
+
 /** Dos tramos se pisan si comparten al menos un minuto. Tocarse en el borde no es pisarse. */
 export const seSolapan = (a: Tramo, b: Tramo): boolean => a[0] < b[1] && b[0] < a[1];
 

@@ -242,6 +242,8 @@ export interface Espera {
   clienteNombre: string
   clienteTelefono: string | null
   clienteEmail: string | null
+  /** Turnos: el servicio que eligió. */
+  servicioId?: string | null
   estado: EstadoEspera
   reservaId: string | null
   createdAt: string
@@ -254,6 +256,22 @@ export interface MiEspera {
   inicio: string
   fin: string
   reserva: ReservaConToken | null
+}
+
+/**
+ * Lo que contesta el sitio al anotarse en la lista de espera. `token` es el
+ * enlace personal (con él se consulta el lugar en la lista y se sale): viene
+ * una sola vez, hay que guardarlo. Si esa persona ya esperaba ese horario,
+ * `yaEstaba` es true y `token` es null: se le muestra su lugar, sin enlace.
+ */
+export interface AnotadaEnEspera {
+  id: string
+  token: string | null
+  yaEstaba: boolean
+  estado: EstadoEspera
+  posicion: number | null
+  inicio: string
+  fin: string
 }
 
 export interface Resumen {
@@ -360,6 +378,8 @@ export interface AnotarseEnEspera {
   recursoId: string
   fecha: string
   inicioMinutos: number
+  /** Turnos: el servicio que se quiere (da la duración del turno). */
+  servicioId?: string
   cliente: Cliente
 }
 
@@ -372,5 +392,6 @@ export interface FiltroAgenda {
   estado?: Estado[]
   q?: string
   page?: number
+  /** Hasta 500 por página (50 si no se manda). El orden es por inicio y por id: recorrer las páginas no repite ni saltea filas. */
   limit?: number
 }

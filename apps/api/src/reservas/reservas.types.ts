@@ -1,7 +1,7 @@
 // Lo que devuelven los endpoints de reservas. Es el contrato que leen los
 // paneles y los sitios de Turnos, Alquileres y Gimnasio (apps/web/src/lib/
 // reservasApi/tipos.ts lo copia): si cambia algo acá, cambia allá.
-import { Prisma, Reserva, ReservaActor, ReservaConfig, ReservaEstado, ReservaModulo, ReservaRecurso, ReservaServicio } from '@prisma/client';
+import { Prisma, Reserva, ReservaActor, ReservaConfig, ReservaEspera, ReservaEstado, ReservaModulo, ReservaRecurso, ReservaServicio } from '@prisma/client';
 import { fechaYMinutos } from './dominio/tiempo';
 
 export interface RecursoDto {
@@ -97,6 +97,28 @@ export interface ReservaDto {
   creadaEn: string;
 }
 
+/**
+ * Alguien en la lista de espera, como lo ve el panel. Sin `tokenAcceso`: ese
+ * token es el enlace personal de la persona (con él sale de la lista desde el
+ * sitio) y no tiene por qué viajar al panel.
+ */
+export interface EsperaDto {
+  id: string;
+  modulo: ReservaModulo;
+  recursoId: string;
+  inicio: string;
+  fin: string;
+  clienteId: string | null;
+  clienteNombre: string;
+  clienteTelefono: string | null;
+  clienteEmail: string | null;
+  /** Turnos: el servicio que eligió. */
+  servicioId: string | null;
+  estado: ReservaEspera['estado'];
+  reservaId: string | null;
+  createdAt: string;
+}
+
 /** Lo que el cliente puede hacer con su reserva ahora mismo, según las reglas del negocio. */
 export interface PoliticaDto {
   puedeCancelar: boolean;
@@ -142,6 +164,27 @@ export interface NochesDto {
   checkOutMinutos: number;
 }
 
+/** Una sesión de una clase en un día: cuántos lugares tiene y cuántos quedan. */
+export interface SesionDto {
+  recursoId: string;
+  inicioMinutos: number;
+  finMinutos: number;
+  libres: number;
+  cupo: number;
+}
+
+/**
+ * Las sesiones de todas las clases de un módulo, día por día
+ * (DisponibilidadService.sesionesEntre). `cerrado`: el negocio bloqueó el día
+ * entero para todo el módulo (un feriado, vacaciones); `motivo` es el que
+ * cargó, para mostrarlo en el sitio.
+ */
+export interface SesionesDto {
+  desde: string;
+  hasta: string;
+  dias: { fecha: string; cerrado: boolean; motivo: string | null; sesiones: SesionDto[] }[];
+}
+
 export const aNumero = (d: Prisma.Decimal | number | null | undefined): number => (d === null || d === undefined ? 0 : Number(d));
 
 export function recursoDto(r: ReservaRecurso): RecursoDto {
@@ -184,6 +227,14 @@ export function configPublicaDto(c: ReservaConfig) {
     cancelacionHastaHoras: c.cancelacionHastaHoras, reprogramacionHastaHoras: c.reprogramacionHastaHoras,
     reprogramacionesMaximas: c.reprogramacionesMaximas, senaPorcentaje: c.senaPorcentaje, senaReembolsable: c.senaReembolsable,
     listaDeEspera: c.listaDeEspera, horario: c.horario, publico: datosPublicos(c.datos),
+  };
+}
+
+export function esperaDto(e: ReservaEspera): EsperaDto {
+  return {
+    id: e.id, modulo: e.modulo, recursoId: e.recursoId, inicio: e.inicio.toISOString(), fin: e.fin.toISOString(),
+    clienteId: e.clienteId, clienteNombre: e.clienteNombre, clienteTelefono: e.clienteTelefono, clienteEmail: e.clienteEmail,
+    servicioId: e.servicioId, estado: e.estado, reservaId: e.reservaId, createdAt: e.createdAt.toISOString(),
   };
 }
 

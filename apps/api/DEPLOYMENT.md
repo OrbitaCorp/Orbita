@@ -488,6 +488,32 @@ su cantidad.
 Sin los tres secretos cargados, la pantalla de Marketing avisa que TikTok no está configurado y el resto
 de la API sigue igual.
 
+## Bot de ventas de Órbita en Instagram (Marketing → Instagram → Respuestas automáticas)
+
+Contesta los mensajes directos y los comentarios de la cuenta de Instagram de la EMPRESA (la conectada al negocio
+`MARKETING_NEGOCIO`) para llevar a la persona a crear su cuenta. Código: `src/marketing/instagram-ventas/` (lo que dice
+está en `contenido.ts`). Las tiendas siguen con Orbi: el webhook único reparte por negocio (`InstagramRuteoService`).
+Migración `20261124120000_marketing_instagram_bot` (dos tablas nuevas, con RLS). No usa secretos nuevos: la IA es la
+misma cadena barata del bot de Orbi (Groq → Workers AI → Gemini) y el correo de aviso sale por Resend.
+
+Para que ande de punta a punta hacen falta, una sola vez, dos cosas en Meta:
+
+1. En la app de Meta (Instagram → Webhooks), además de `messages`, suscribir los campos **`messaging_postbacks`**
+   (botones de las tarjetas y preguntas frecuentes) y **`comments`** (comentarios nuevos). Sin `comments`, el bot
+   contesta los mensajes pero no se entera de los comentarios.
+2. Que la cuenta tenga el permiso `instagram_business_manage_comments` (se pide al conectar con el kit: «Renovar la
+   conexión» en Marketing si faltara).
+
+Al guardar con el bot prendido, la API suscribe la cuenta a `messages,messaging_postbacks,comments` y carga las cuatro
+preguntas frecuentes; el resultado queda a la vista en la pantalla. Mientras Meta no apruebe la revisión de la app,
+la cuenta CONECTADA tiene que tener un rol en la app (la de Órbita lo tiene); quien le escribe o comenta puede ser
+cualquier persona.
+
+Límites de Instagram que el bot respeta: un solo mensaje privado por comentario y hasta 7 días después (por eso lleva
+botones); responder solo dentro de las 24 h del último mensaje de la persona; tarjetas, botones y preguntas frecuentes
+no se ven desde la computadora (cada respuesta trae los enlaces también en el texto). Topes de IA: 20 respuestas por
+charla y 800 por día; pasados, contesta con los botones.
+
 ## Rol Marketing del super panel
 
 Tercer rol de `platform_admins.role` (`MARKETING`, migración `20261021010000_platform_admin_rol_marketing`: agrega el valor al enum, no toca datos).
@@ -581,6 +607,24 @@ Código en `src/marketing/videos/`; tablas `marketing_videos`, `marketing_video_
   además las carga para la lista y aprueba los tutoriales que estaban pendientes en la cola). Cargar el link deja el tutorial HECHO.
   El panel de cada tienda los lee con `GET /business/tutoriales-video` (cualquier member). Estado y responsable también se corrigen
   desde el panel; el link, solo por el conector (o `PATCH /platform/marketing/tutoriales/:id` con `youtube` / `pantallas`).
+  **Cada tutorial es de un módulo** (`modulo`: `tienda`, `turnos`, `alquileres` o `gimnasio`; migración
+  `20261116120000_marketing_tutoriales_modulo`, aditiva e idempotente: los que existían quedan como `tienda`). El responsable de
+  cada módulo nuevo carga su lista con `tutoriales_crear` (queda FALTA, al final de su grupo; `tutorial_crear` en el registro de
+  acciones); `tutoriales_listar`, `tutoriales_actualizar`, `GET /platform/marketing/tutoriales` y el PATCH aceptan `modulo` (uno
+  desconocido es 400). Fuera de Tienda cada pantalla empieza con `<modulo>/` (`gimnasio/clases`) y admite un tramo más que las
+  de Tienda (`gimnasio/configuracion/equipo/invitar`); en Tienda ninguna puede empezar con el prefijo de otro módulo.
+  `GET /business/tutoriales-video` sin `?modulo=` devuelve solo los de Tienda, igual que antes. El conector tiene 14 herramientas.
+  **Lo cargado se corrige, no se borra:** `tutoriales_actualizar` acepta también `titulo` y `grupo` (solo por el conector: el
+  PATCH no los recibe) y no hay borrado ni por REST ni por el conector. Los grupos se emparejan sin mirar mayúsculas ni acentos, y
+  la respuesta de `tutoriales_crear` (y la de `tutoriales_actualizar` cuando cambia de grupo o de módulo) trae `grupoNuevo`
+  (true si abrió un grupo que no existía en ese módulo). Un tutorial se ubica por su título con una comparación exacta sin
+  distinguir mayúsculas (`lower("titulo") = lower($1)`; con el `mode: 'insensitive'` de Prisma, que arma un ILIKE, «%» y «_»
+  eran comodines). Todo lo que toca un título o un lugar de la lista (crear; actualizar con `titulo`, `grupo` o `modulo`) corre en
+  una transacción que empieza con `pg_advisory_xact_lock(hashtext('marketing_tutoriales'))`: dos altas a la vez no quedan en el
+  mismo lugar ni con el mismo título. Nada de esto lleva migración.
+  **El «Ver tutorial» de los paneles de Turnos, Alquileres y Gimnasio todavía no existe:** hoy solo el panel de Tienda pide
+  `GET /business/tutoriales-video` (sin `?modulo=`). El link y las pantallas de un tutorial de otro módulo quedan guardados;
+  cuando el panel de ese módulo tenga el botón, los pide con `?modulo=<módulo>`.
 - **Aviso por correo a TODO el equipo (solo marketing; los tutoriales no avisan):** cuando entra un video, un correo (por Resend, con el diseño de Órbita) a los superadmins
   ACTIVOS con correo `@orbita.site` u `@orbita-corp.com` (`MCP_DOMINIOS_PERMITIDOS`) y también a su correo personal si lo cargó:
   «Hay N videos nuevos para ver y comentar», con los títulos y un botón al panel (el texto no habla de aprobaciones). Sale **uno por

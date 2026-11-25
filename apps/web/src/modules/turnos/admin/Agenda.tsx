@@ -20,7 +20,7 @@ import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 're
 import { CalendarDays, ChevronLeft, ChevronRight, Plus, Coins, MoonStar } from 'lucide-react'
 import { Encabezado, Sigla } from '@/design-system/reservas/piezas'
 import { ESTADO_TURNO, DIAS, DIAS_CORTOS, horaTxt, type Recurso, type Cliente, type RubroTurnos } from '@/modules/turnos/datos'
-import { AHORA_DEMO, diasAbiertos, extremos, minutosAbiertos, tramosDelDia, tramosFrase, type Semana, type Tramo } from '@/modules/turnos/horario'
+import { AHORA, diasAbiertos, extremos, minutosAbiertos, tramosDelDia, tramosFrase, type Semana, type Tramo } from '@/modules/turnos/horario'
 import { IconoRecurso } from './piezasPanel'
 import { fechaCorta, fechaDe, fechaLarga, grillaDelMes, indiceDia, lunesDe, mesTxt, mismoMes, moverMes, rangoSemana, type NuevoTurnoPre, type TurnoAgenda } from '../datos/agenda'
 
@@ -243,7 +243,7 @@ export default function Agenda({ rubro, semana, recursos, turnosDelDia, jornada,
 
   // La grilla abre parada en "ahora" (con un poco de aire arriba), no en la apertura.
   const grilla = useRef<HTMLDivElement>(null)
-  useEffect(() => { grilla.current?.scrollTo({ top: Math.max(0, ((AHORA_DEMO - desde) / 60) * PX_HORA - 190) }) }, [vista, desde])
+  useEffect(() => { grilla.current?.scrollTo({ top: Math.max(0, ((AHORA - desde) / 60) * PX_HORA - 190) }) }, [vista, desde])
 
   const mover = (sentido: 1 | -1) => setDia(d => (vista === 'mes' ? moverMes(d, sentido) : d + sentido * (vista === 'semana' ? 7 : 1)))
   const unidad = vista === 'dia' ? 'Día' : vista === 'semana' ? 'Semana' : 'Mes'
@@ -253,7 +253,7 @@ export default function Agenda({ rubro, semana, recursos, turnosDelDia, jornada,
     if (e.target !== e.currentTarget || !recursoId) return
     const px = e.clientY - e.currentTarget.getBoundingClientRect().top
     const inicio = desde + Math.floor((px / PX_HORA) * 2) * 30
-    if (!tramos.some(([a, b]) => inicio >= a && inicio < b) || (d === 0 && inicio + 30 <= AHORA_DEMO)) return
+    if (!tramos.some(([a, b]) => inicio >= a && inicio < b) || (d === 0 && inicio + 30 <= AHORA)) return
     onNuevo({ recursoId, inicio, dia: d })
   }
 
@@ -403,10 +403,10 @@ export default function Agenda({ rubro, semana, recursos, turnosDelDia, jornada,
             {/* Columna de horas */}
             <div className="tu-ag-horas" style={{ height: y(hasta) }}>
               {horas.map(hh => {
-                const actual = hoyALaVista && hh <= AHORA_DEMO && hh + 60 > AHORA_DEMO
+                const actual = hoyALaVista && hh <= AHORA && hh + 60 > AHORA
                 return <div key={hh} className="rv-num tu-ag-hora-rot" data-actual={actual} style={{ height: PX_HORA }}>{horaTxt(hh)}</div>
               })}
-              {hoyALaVista && AHORA_DEMO >= desde && AHORA_DEMO <= hasta && <span className="rv-num tu-ag-ahora-etq" aria-hidden style={{ top: y(AHORA_DEMO) - 10 }}>{horaTxt(AHORA_DEMO)}</span>}
+              {hoyALaVista && AHORA >= desde && AHORA <= hasta && <span className="rv-num tu-ag-ahora-etq" aria-hidden style={{ top: y(AHORA) - 10 }}>{horaTxt(AHORA)}</span>}
             </div>
 
             {/* Columnas */}
@@ -429,9 +429,9 @@ export default function Agenda({ rubro, semana, recursos, turnosDelDia, jornada,
                   </div>
                 ))}
                 {/* Lo que ya pasó del día */}
-                {c.dia <= 0 && <div aria-hidden className="tu-ag-pasado" style={{ height: hoy ? Math.max(0, y(AHORA_DEMO)) : '100%' }} />}
-                {hoy && AHORA_DEMO >= desde && AHORA_DEMO <= hasta && (
-                  <div aria-hidden className="tu-ag-ahora" style={{ top: y(AHORA_DEMO) - 1 }}>
+                {c.dia <= 0 && <div aria-hidden className="tu-ag-pasado" style={{ height: hoy ? Math.max(0, y(AHORA)) : '100%' }} />}
+                {hoy && AHORA >= desde && AHORA <= hasta && (
+                  <div aria-hidden className="tu-ag-ahora" style={{ top: y(AHORA) - 1 }}>
                     {(ci === 0 || c.esDia) && <i />}
                   </div>
                 )}

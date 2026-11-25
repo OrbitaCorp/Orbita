@@ -68,6 +68,7 @@ import { WizardAnalyticsModule } from './wizard-analytics/wizard-analytics.modul
 import { SupportModule } from './support/support.module';
 import { ImageStudioModule } from './image-studio/image-studio.module';
 import { ReservasModule } from './reservas/reservas.module';
+import { GimnasioModule } from './gimnasio/gimnasio.module';
 
 @Module({
   imports: [
@@ -133,6 +134,8 @@ import { ReservasModule } from './reservas/reservas.module';
     ImageStudioModule,
     // Reservas: el backend compartido de Turnos, Alquileres y Gimnasio (03/11/2026).
     ReservasModule,
+    // Gimnasio: lo que no es una reserva (planes, alumnos y el plan de cada alumno), al lado del motor (24/11/2026).
+    GimnasioModule,
   ],
   controllers: [AppController],
   providers: [

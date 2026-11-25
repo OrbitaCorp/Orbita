@@ -263,6 +263,83 @@ Alternativas: dejarlo para después del ciclo (los 19 rubros ya cubren lugares y
     ],
   }),
 
+  // ─── De la revisión de Gimnasio sobre la API (16/11/2026): las reglas del ciclo ──
+  decisionAbierta({
+    modulo: 'gimnasio', slug: 'como-entra-un-cambio-a-lo-compartido', decide: 'Ale', transversal: true, fecha: '2026-11-16',
+    titulo: 'Transversal: cómo entra un cambio a lo compartido (hoy se avisa de palabra)',
+    foco: 'Entre el 16 y el 24/11 el motor compartido cambió por dos lados sin que el otro lo supiera: Alan le sumó el precio de la estadía, el campo datos y un permiso, y los arreglos de Gimnasio esperaban sin subir. No chocaron de casualidad.',
+    simple: 'La regla dice "antes de tocar lo compartido, avisá a los otros dos". No dice cómo, y no deja rastro. ¿Alcanza con eso, o un cambio a las carpetas compartidas tiene que pasar por un pull request que mire uno de los otros dos antes de llegar a main?',
+    alcance: 'Las cinco carpetas de "Lo compartido" (el motor, su cliente, las cuentas, el kit y el vocabulario del manual). No cambia cómo trabaja cada uno adentro de su módulo ni cómo se despliega la API. La decide Ale.',
+    propuesta: `1. **Un pull request por cambio compartido.** Lo que toque una de las cinco carpetas va en una rama propia y en un pull request a \`main\`, con lo que cambia del contrato y lo que tienen que mirar los otros módulos (lo mismo que hoy se escribe después, en la entrada transversal).
+2. **Lo mira uno de los otros dos.** Alcanza con un "visto": la idea es que se entere antes, no frenar el trabajo. Un archivo \`CODEOWNERS\` con las cinco carpetas hace que GitHub lo pida solo.
+3. **Se junta con "Squash and merge".** Vercel construye cada commit una sola vez: si la rama se sube y después \`main\` avanza al mismo commit, producción queda vieja (es la regla de "se pushea solo main"). Con squash, \`main\` recibe un commit nuevo y ese problema no aparece.
+4. **Lo que es de un solo módulo sigue como hoy:** directo a \`main\`, sin pull request.
+
+**Alternativas:** seguir como hoy (avisar de palabra y la entrada transversal después); o un canal fijo donde se avisa antes de tocar, sin pull request.`,
+    abierta: 'Cambia cómo trabajan los tres y suma un paso antes de cada cambio compartido: es una regla del equipo.',
+    origen: 'La revisión del 16/11 (Ale pidió mirar también las reglas) y lo que pasó al traer main el 24/11: seis archivos con conflicto, dos de ellos del motor y de su cliente.',
+    archivos: [
+      'apps/web/src/modules/superadmin/modulos/compartido.ts:29',
+      'apps/web/src/modules/superadmin/modulos/reglas.ts:35',
+      'apps/api/src/reservas/README.md:1',
+    ],
+  }),
+  decisionAbierta({
+    modulo: 'gimnasio', slug: 'el-manual-como-ayuda-en-el-panel', decide: 'Ale', transversal: true, fecha: '2026-11-16',
+    titulo: 'Transversal: el manual de cada módulo, ¿también como Ayuda dentro de su panel?',
+    foco: 'Cada módulo escribe su manual para Orbi, pero los módulos no usan Orbi: hoy ese texto no lo lee nadie. Gimnasio ya tiene nueve temas escritos y probados contra sus pantallas.',
+    simple: 'El manual de cada módulo se mantiene al día (un test falla si nombra un botón que no existe), pero se guarda para "cuando se decida usar Orbi". ¿Se muestra mientras tanto como una sección Ayuda del panel? Es solo texto: no usa inteligencia artificial y no cuesta nada.',
+    alcance: 'Los paneles de los tres módulos y el kit (una pieza que dibuje los bloques del manual). No toca Orbi ni el panel de Tienda, que ya tiene su Manual. Cada responsable decide si la suma a su panel; la pieza compartida la decide Ale.',
+    propuesta: `1. **Una pieza del kit** que dibuja el manual de un módulo (capítulos, temas, pasos, notas), con un buscador.
+2. **Cada panel suma "Ayuda"** al final de su barra lateral, cuando su responsable quiera.
+3. **Sin inteligencia artificial:** es el mismo texto que ya se escribe para Orbi, mostrado tal cual.
+
+**Alternativa:** dejarlo solo para Orbi hasta que se decida si los módulos lo usan.`,
+    abierta: 'Suma una sección a los tres paneles y una pieza al kit: es producto, no un arreglo.',
+    origen: 'La revisión del 16/11: el manual de Gimnasio se corrige con cada cambio de pantalla y hoy no tiene lector.',
+    archivos: [
+      'apps/web/src/lib/manual/modulos.ts:1',
+      'apps/web/src/modules/gimnasio/manual.ts:16',
+      'apps/web/src/modules/orbi/manual/artefacto.ts:23',
+    ],
+  }),
+  decisionAbierta({
+    modulo: 'gimnasio', slug: 'las-demos-en-produccion', decide: 'Ale', transversal: true, fecha: '2026-11-16',
+    titulo: 'Transversal: las demos de los módulos en producción, cada una a su manera',
+    foco: 'Desde el 23/11 la demo de Alquileres se ve en orbita.site con sesión de superadmin; las de Gimnasio y Turnos siguen dando 404 en producción. Para mostrar Gimnasio hoy hace falta una computadora con el proyecto levantado.',
+    simple: '¿La demo de Gimnasio (y la de Turnos) se abre en producción igual que la de Alquileres, solo para el equipo, o siguen cerradas hasta que el módulo salga de "Próximamente"?',
+    alcance: 'Las páginas de /gimnasio-demo (Ale) y de /turnos-demo (Mateo). No abre nada al público: piden sesión de superadmin y no aparecen en buscadores. No cambia el alta, donde los tres módulos siguen en "Próximamente".',
+    propuesta: `1. **La compuerta que hizo Alan** (en producción pide sesión de superadmin; en desarrollo, nada) pasa a lo compartido, para no escribirla tres veces.
+2. **Gimnasio la usa en sus seis páginas,** con un test que falla si una página nueva no pasa por la compuerta, como el de Alquileres.
+3. **Turnos,** cuando Mateo lo decida.
+
+**Alternativas:** dejarlas en 404 hasta la salida de "Próximamente"; o abrirlas solo en staging.`,
+    abierta: 'Es mostrar en producción pantallas de un módulo que todavía no salió, aunque sea solo para el equipo, y la pieza compartida toca a los tres.',
+    origen: 'Al traer main el 24/11: Alan abrió su demo el 23/11 (entrada "La demo de Alquileres se puede ver en producción, solo como superadmin") y las otras dos quedaron distintas.',
+    archivos: [
+      'apps/web/src/modules/alquileres/demo/SoloEquipo.tsx:14',
+      'apps/web/src/pages/gimnasio-demo/panel.tsx:18',
+    ],
+  }),
+  decisionAbierta({
+    modulo: 'gimnasio', slug: 'los-ids-de-las-tareas-del-plan', decide: 'Ale', transversal: true, fecha: '2026-11-16',
+    titulo: 'Transversal: las tareas del plan se identifican por su posición',
+    foco: 'Lo que cada uno tilda en su navegador se guarda con el número de orden de la tarea (t1, t2…). Si una tarea se suma o se saca en el medio, todo lo tildado después queda apuntando a otra tarea, sin aviso.',
+    simple: '¿Las tareas pasan a tener un id propio, que no cambie aunque se muevan, o se mantiene la regla de "sumar siempre al final"?',
+    alcance: 'El plan de Módulos (plan.ts) y lo que guarda cada navegador (estado.ts). No cambia las tareas ni las fechas. La decide Ale.',
+    propuesta: `1. **Cada tarea lleva un id escrito a mano,** corto, en vez de su número de orden.
+2. **Lo tildado hasta hoy se pasa una vez** al id nuevo, en cada navegador, al abrir Módulos.
+3. **El test** que hoy exige t1, t2… pasa a exigir ids únicos.
+
+**Alternativa:** dejarlo como está. La regla de sumar al final ya está escrita y los dos merges de noviembre la respetaron.`,
+    abierta: 'Toca el plan de los tres y lo que cada uno ya tildó en su navegador; no es urgente y tiene un costo de migración.',
+    origen: 'La revisión del 16/11 y los merges del 16 y del 24/11, donde hubo que cuidar a mano el orden de las tareas que sumó cada rama.',
+    archivos: [
+      'apps/web/src/modules/superadmin/modulos/plan.ts:42',
+      'apps/web/src/modules/superadmin/modulos/estado.ts:39',
+    ],
+  }),
+
   // ─── Del arranque de Alquileres sobre el backend (18/11/2026) ───────────────
   decisionAbierta({
     modulo: 'gimnasio', slug: 'lo-que-alquileres-pide-al-backend', decide: 'Ale', transversal: true, fecha: '2026-11-18',
@@ -288,6 +365,32 @@ Alternativas: dejarlo para después del ciclo (los 19 rubros ya cubren lugares y
       'apps/api/prisma/schema.prisma:3784',
       'apps/api/src/reservas/reservas-panel.controller.ts:22',
       'apps/web/src/modules/superadmin/modulos/plan.ts:187',
+    ],
+  }),
+  // ─── De la revisión de los planes y del sitio de Gimnasio (25/11/2026) ──────
+  decisionAbierta({
+    modulo: 'gimnasio', slug: 'el-rubro-que-decide-el-sitio-se-escribe-a-mano', decide: 'Ale', transversal: true, fecha: '2026-11-25',
+    titulo: 'Transversal: el rubro que decide qué sitio y qué panel ve un negocio se puede escribir a mano',
+    simple: 'El rubro principal del negocio (`industry`) decide dos cosas: qué muestra `<slug>.orbita.site` (su tienda o su sitio de reservas) y a dónde lleva `/panel`. En Tienda, Configuración → Información del negocio tiene "Rubro (opcional)", un texto libre que guarda en ese mismo campo. Hay que decidir cómo se evita que una tienda cambie de sitio y de panel por escribir una palabra.',
+    alcance: 'La Configuración de Tienda en producción (el campo "Rubro (opcional)"), la API que lo guarda y `lib/reservas/destinoPanel.ts`, que comparten los módulos. Toca a Tienda y a los tres módulos: la decide Ale. A Alan le cambia cómo se reconoce un negocio de Alquileres.',
+    foco: 'Un negocio ve su tienda o su sitio de reservas según su rubro principal. Ese mismo dato lo puede cambiar el dueño de una tienda desde su Configuración, en un campo de texto libre: si escribe "alquileres", deja de ver su tienda y su panel.',
+    propuesta: `Lo que ya está hecho: **Gimnasio pide dos cosas** para mostrar su sitio, el rubro "gimnasio" y un subrubro de Gimnasio (\`esDeGimnasio\`). Una tienda que escriba "gimnasio" en ese campo sigue viendo su tienda, porque sus subrubros son los de Tienda. Tiene su test.
+
+Lo que falta decidir, en orden de preferencia:
+
+1. **Que el campo de Tienda no guarde en \`industry\`.** "Rubro (opcional)" pasa a ser un texto propio de la tienda, o se saca: el rubro ya se elige en el alta, con sus subrubros. Corta el problema de raíz, para los tres módulos y para los que vengan.
+2. **Mientras tanto, que Alquileres pida también su subrubro**, como Gimnasio. Es un cambio chico en \`destinoPanel.ts\`, con su test. Lo hace Alan, o Ale avisándole.
+3. **En la API, no aceptar como rubro de una tienda las claves de los módulos** ("turnos", "alquileres", "gimnasio") al guardar la configuración.
+
+No se sabe de ninguna tienda en producción con ese valor: es un riesgo, no algo que haya pasado. Se puede mirar en Superadmin → Negocios, que muestra el rubro de cada uno.`,
+    abierta: 'Cambia una pantalla de Tienda en producción y cómo se reconoce a los negocios de los tres módulos. No se destraba con código de Gimnasio solo.',
+    origen: 'Sesión del 25/11/2026: al sumar el sitio de Gimnasio a las rutas del sitio de un negocio (entrada "cómo viene cada plan…").',
+    archivos: [
+      'apps/web/src/lib/reservas/destinoPanel.ts:33',
+      'apps/web/src/modules/ventas/panel/configuracion/components/general/SeccionNegocio.tsx:90',
+      'apps/web/src/pages/tienda/[slug]/index.tsx:19',
+      'apps/web/src/pages/panel/index.tsx:38',
+      'apps/web/src/lib/storefront/forceSSR.ts:347',
     ],
   }),
 ]

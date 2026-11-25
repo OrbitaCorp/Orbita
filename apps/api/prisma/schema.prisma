@@ -42,6 +42,11 @@ model Business {
   // su localStorage; el servidor rechaza cualquier escritura pública sobre
   // este negocio (ver DemoGuard). Se marca a mano, nunca desde la app.
   isDemo                 Boolean   @default(false) @map("is_demo")
+  // Negocio de prueba del equipo (24/11/2026): sigue funcionando igual, pero no
+  // cuenta en las métricas del superadmin (resumen, series, suscripciones,
+  // seguimiento) y la lista de Negocios lo separa de los reales. Lo marca solo
+  // el superadmin, con registro en PlatformAdminLog; el dueño no lo ve.
+  isTest                 Boolean   @default(false) @map("is_test")
   // Moderación (06/10/2026): el equipo de Órbita saca la tienda de Google y del
   // directorio (orbita.site/tiendas) SIN suspenderla, así que la tienda sigue
   // vendiendo. Es la palanca para un caso dudoso o una denuncia que se está
@@ -107,6 +112,8 @@ model Business {
   instagramPosts       InstagramPost[]
   instagramSettings    InstagramSettings?
   instagramBotConfig   InstagramBotConfig?
+  marketingInstagramBot MarketingInstagramBot?
+  marketingInstagramComentarios MarketingInstagramComentario[]
   discounts            Discount[]
   discountRedemptions  DiscountRedemption[]
   returns              Return[]
@@ -149,6 +156,10 @@ model Business {
   reservasBloqueos     ReservaBloqueo[]
   reservasCalendarios  ReservaCalendarioExterno[]
   reservasIcalExportadas ReservaIcalExportada[]
+  // Gimnasio: lo que no es una reserva (planes, alumnos y el plan de cada alumno), ver el bloque al final.
+  gimnasioPlanes       GimnasioPlan[]
+  gimnasioAlumnos      GimnasioAlumno[]
+  gimnasioAbonos       GimnasioSuscripcion[]
 
   @@map("businesses")
 }
@@ -670,6 +681,7 @@ model Customer {
   personalDiscounts Discount[]
   gameSessions      GameSession[]
   reservas          Reserva[]
+  gimnasioAlumnos   GimnasioAlumno[]
 
   @@unique([businessId, email])
   @@unique([businessId, googleId])
@@ -1906,6 +1918,49 @@ model InstagramBotConfig {
   business Business @relation(fields: [businessId], references: [id])
 
   @@map("instagram_bot_configs")
+}
+
+// Bot de ventas de Órbita en la cuenta de Instagram de la EMPRESA (Superadmin → Marketing → Instagram → Respuestas
+// automáticas). Una fila por negocio; en la práctica, solo el negocio al que está conectada la cuenta de Órbita
+// (MARKETING_NEGOCIO). Lo que dice está en marketing/instagram-ventas/contenido.ts.
+model MarketingInstagramBot {
+  id                   String   @id @default(uuid())
+  businessId           String   @unique @map("business_id")
+  activo               Boolean  @default(false)
+  usarIa               Boolean  @default(true) @map("usar_ia") // las preguntas sueltas las contesta la IA con lo que dice la web
+  responderComentarios Boolean  @default(true) @map("responder_comentarios")
+  todosLosComentarios  Boolean  @default(false) @map("todos_los_comentarios") // false = solo los que tienen una palabra clave
+  palabrasClave        String[] @default([]) @map("palabras_clave")
+  respuestasPublicas   String[] @default([]) @map("respuestas_publicas") // se alternan; vacío = no contesta en público
+  saludoComentario     String?  @map("saludo_comentario")
+  correosAviso         String[] @default([]) @map("correos_aviso") // a quién avisar cuando alguien pide una persona
+  estadoMeta           Json?    @map("estado_meta") // resultado de suscribir comentarios y cargar las preguntas frecuentes
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@map("marketing_instagram_bots")
+}
+
+// Comentarios a los que el bot de ventas ya les mandó el mensaje privado. commentId único: Meta reintenta el aviso y
+// Instagram deja mandar UN solo mensaje privado por comentario.
+model MarketingInstagramComentario {
+  id         String   @id @default(uuid())
+  businessId String   @map("business_id")
+  commentId  String   @unique @map("comment_id")
+  mediaId    String?  @map("media_id")
+  usuario    String?
+  texto      String
+  privado    Boolean  @default(false) // salió el mensaje privado
+  publico    Boolean  @default(false) // salió la respuesta pública
+  error      String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@index([businessId, createdAt])
+  @@map("marketing_instagram_comentarios")
 }
 
 enum WhatsappConnectionStatus {
@@ -3787,11 +3842,15 @@ model MarketingVideo {
 
 // ─── Marketing de Órbita: lista de tutoriales (qué hay y qué falta) ───────────────
 // La lista de tutoriales del panel y de la tienda que el equipo va a ir produciendo. La actualiza el Claude de cada
-// persona por el conector (tutoriales_listar / tutoriales_actualizar) y también se puede corregir desde el panel.
+// persona por el conector (tutoriales_listar / tutoriales_crear / tutoriales_actualizar) y también se puede corregir desde el panel.
 // `estado`: FALTA | EN_PROCESO | EN_REVISION (de antes: los tutoriales ya no esperan aprobación) | HECHO.
 // Los videos viven en YouTube (`youtubeId`) y el panel los ofrece en "Ver tutorial" según `pantallas`.
+// Cada tutorial es de un módulo (`modulo`): la lista de cada uno la carga su responsable al terminar su ciclo.
 model MarketingTutorial {
   id             String   @id @default(uuid())
+  /// tienda | turnos | alquileres | gimnasio (MODULOS_TUTORIAL en marketing/videos/tutoriales.service.ts). `grupoOrden` y
+  /// `orden` cuentan dentro del módulo. Fuera de Tienda, cada pantalla empieza con «<modulo>/», así no choca con las de Tienda.
+  modulo         String   @default("tienda")
   grupo          String
   grupoOrden     Int      @map("grupo_orden")
   orden          Int
@@ -3811,6 +3870,7 @@ model MarketingTutorial {
   updatedAt      DateTime @updatedAt @map("updated_at")
 
   @@index([grupoOrden, orden])
+  @@index([modulo, grupoOrden, orden])
   @@map("marketing_tutoriales")
 }
 
@@ -4133,6 +4193,8 @@ model ReservaEspera {
   clienteNombre   String              @map("cliente_nombre") @db.VarChar(120)
   clienteTelefono String?             @map("cliente_telefono") @db.VarChar(30)
   clienteEmail    String?             @map("cliente_email") @db.VarChar(200)
+  /// Turnos: el servicio que eligió (da la duración y el precio del turno). Los demás módulos no lo usan.
+  servicioId      String?             @map("servicio_id")
   tokenAcceso     String              @unique @map("token_acceso")
   estado          ReservaEsperaEstado @default(ESPERANDO)
   reservaId       String?             @map("reserva_id")
@@ -4232,4 +4294,111 @@ model ReservaIcalExportada {
   @@unique([recursoId, desde, hasta])
   @@index([businessId])
   @@map("reservas_ical_exportadas")
+}
+
+// ─── Gimnasio ────────────────────────────────────────────────────────────────
+// Lo que el módulo Gimnasio guarda y NO es una reserva: los planes, los alumnos
+// y el plan de cada alumno (decisión del 16/11/2026: tablas propias, al lado
+// del motor de reservas y sin tocarlo). Las clases, los lugares y la lista de
+// espera son del motor (reservas_*).
+//
+// Las clases que un alumno usó de su plan no se guardan acá: cada reserva dice
+// con qué se pagó en su campo libre (`reservas.datos.gimnasio`: pago y
+// suscripcionId) y de ahí se cuentan. Así el saldo de un pack no puede
+// desfasarse de lo reservado: si la reserva se cancela, la clase vuelve sola.
+
+enum GimnasioPlanTipo {
+  PRUEBA
+  SUELTA
+  PACK
+  MEMBRESIA
+}
+
+enum GimnasioSuscripcionEstado {
+  VIGENTE
+  CANCELADA
+}
+
+// Lo que el negocio vende: la clase de prueba, la clase suelta, un pack de N
+// clases o una membresía (con tope semanal, o libre).
+model GimnasioPlan {
+  id           String           @id @default(uuid())
+  businessId   String           @map("business_id")
+  tipo         GimnasioPlanTipo
+  nombre       String           @db.VarChar(80)
+  precio       Decimal          @default(0) @db.Decimal(12, 2)
+  /// Pack: cuántas clases trae.
+  clases       Int?
+  /// Membresía: clases por semana; 0 = libre.
+  porSemana    Int?             @map("por_semana")
+  /// Cuántos días vale desde que arranca.
+  vigenciaDias Int              @map("vigencia_dias")
+  /// Se ofrece en el sitio.
+  activo       Boolean          @default(true)
+  orden        Int              @default(0)
+  /// Borrado blando: un plan que alguien ya compró no desaparece de su historial.
+  eliminadoEn  DateTime?        @map("eliminado_en")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  business      Business              @relation(fields: [businessId], references: [id])
+  suscripciones GimnasioSuscripcion[]
+
+  @@index([businessId, eliminadoEn])
+  @@map("gimnasio_planes")
+}
+
+// Un alumno (o socio) del negocio: la ficha de cliente que el motor de reservas
+// ya vincula a cada reserva por celular o email, con lo propio de Gimnasio.
+model GimnasioAlumno {
+  id         String  @id @default(uuid())
+  businessId String  @map("business_id")
+  clienteId  String  @map("cliente_id")
+  nota       String? @db.VarChar(500)
+  /// Día de alta, AAAA-MM-DD de Argentina.
+  alta       String  @db.VarChar(10)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  business      Business              @relation(fields: [businessId], references: [id])
+  cliente       Customer              @relation(fields: [clienteId], references: [id])
+  suscripciones GimnasioSuscripcion[]
+
+  @@unique([businessId, clienteId])
+  @@map("gimnasio_alumnos")
+}
+
+// El plan de un alumno: una fila por compra o renovación. Guarda una foto del
+// plan (si después cambia el precio o las clases del plan, lo ya vendido no
+// cambia) y desde y hasta qué día vale.
+model GimnasioSuscripcion {
+  id                String                    @id @default(uuid())
+  businessId        String                    @map("business_id")
+  alumnoId          String                    @map("alumno_id")
+  planId            String                    @map("plan_id")
+  tipo              GimnasioPlanTipo
+  nombre            String                    @db.VarChar(80)
+  precio            Decimal                   @default(0) @db.Decimal(12, 2)
+  clases            Int?
+  porSemana         Int?                      @map("por_semana")
+  /// AAAA-MM-DD de Argentina, los dos días incluidos.
+  desde             String                    @db.VarChar(10)
+  hasta             String                    @db.VarChar(10)
+  estado            GimnasioSuscripcionEstado @default(VIGENTE)
+  /// La suscripción que esta continúa, si es una renovación del mismo plan.
+  renuevaId         String?                   @map("renueva_id")
+  creadaPorMemberId String?                   @map("creada_por_member_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  business Business       @relation(fields: [businessId], references: [id])
+  alumno   GimnasioAlumno @relation(fields: [alumnoId], references: [id], onDelete: Cascade)
+  plan     GimnasioPlan   @relation(fields: [planId], references: [id])
+
+  @@index([businessId, alumnoId, hasta])
+  @@index([businessId, desde])
+  @@map("gimnasio_suscripciones")
 }

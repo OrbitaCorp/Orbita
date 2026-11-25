@@ -8,6 +8,7 @@ import {
   type PlatformAdminRole,
   type LogRow,
   type MailTemplateRow,
+  type TipoDeNegocios,
 } from '@/lib/platform/api'
 import {
   LayoutDashboard, Store, Globe, Users, ShieldCheck, ScrollText, Mail, Ticket, Tag, Wand2, ClipboardCheck, LifeBuoy,
@@ -216,7 +217,7 @@ function TabResumen({ sinFacturacion = false }: { sinFacturacion?: boolean }) {
 
       <Grid>
         {!sinFacturacion && <Kpi label="Facturación mensual" value={money(data.subscriptions.mrr)} accent hint="Suma de las suscripciones pagas activas" />}
-        <Kpi label="Negocios totales" value={String(data.businesses.total)} hint={`${data.businesses.active} funcionando hoy`} />
+        <Kpi label="Negocios totales" value={String(data.businesses.total)} hint={`${data.businesses.active} funcionando hoy${data.businesses.test > 0 ? ` · ${data.businesses.test} de prueba aparte` : ''}`} />
         <Kpi label="Altas últimos 30 días" value={`+${data.businesses.newLast30Days}`} hint="Negocios nuevos" />
         <Kpi label="Negocios activos" value={String(data.businesses.active)} hint="Vendiendo con normalidad" />
         <Kpi label="Negocios pausados" value={String(data.businesses.paused)} hint="Su tienda no acepta pedidos" />
@@ -322,14 +323,37 @@ function TabNegocios() {
     return () => clearTimeout(t)
   }, [search])
 
-  const { data, error } = useFetch(() => platformApi.businesses({ search: debounced, limit: 50 }), [debounced])
+  const [tipo, setTipo] = useState<TipoDeNegocios>('reales')
+  const { data, error } = useFetch(() => platformApi.businesses({ search: debounced, tipo, limit: 50 }), [debounced, tipo])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <PageHeader
         title="Negocios"
-        subtitle="Todos los negocios de la plataforma. Hacé clic en una fila para ver su detalle."
+        subtitle={tipo === 'reales'
+          ? 'Los negocios de clientes. Hacé clic en una fila para ver su detalle.'
+          : 'Negocios de prueba del equipo y la demo: siguen funcionando, pero no cuentan en ninguna métrica.'}
       />
+
+      <div role="tablist" aria-label="Tipo de negocios" style={{ display: 'flex', gap: 6 }}>
+        {([['reales', 'Reales', data?.tipos?.reales], ['pruebas', 'De prueba', data?.tipos?.pruebas]] as const).map(([k, label, n]) => (
+          <button
+            key={k}
+            role="tab"
+            aria-selected={tipo === k}
+            onClick={() => setTipo(k)}
+            className="ds-hover"
+            style={{
+              padding: '7px 14px', borderRadius: 999, fontSize: 13.5, fontWeight: 600, cursor: 'pointer',
+              border: '1px solid var(--color-border)',
+              background: tipo === k ? 'var(--color-text)' : 'transparent',
+              color: tipo === k ? 'var(--color-bg)' : 'var(--color-muted)',
+            }}
+          >
+            {label}{n !== undefined ? ` · ${n}` : ''}
+          </button>
+        ))}
+      </div>
 
       <div style={{ position: 'relative', width: '100%', maxWidth: 440 }}>
         <Search size={16} strokeWidth={1.75} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-muted)', pointerEvents: 'none' }} />
@@ -376,7 +400,7 @@ function TabNegocios() {
             }))}
           />
           <div style={{ padding: '12px 18px', fontSize: 12.5, color: 'var(--color-muted)', borderTop: '1px solid var(--color-border)' }}>
-            {data.total === 1 ? '1 negocio' : `${data.total} negocios`}{data.total > data.data.length ? ` · se muestran los primeros ${data.data.length}` : ''}
+            {data.total === 1 ? '1 negocio' : `${data.total} negocios`}{tipo === 'pruebas' ? ' de prueba' : ''}{data.total > data.data.length ? ` · se muestran los primeros ${data.data.length}` : ''}
           </div>
         </Card>
       )}

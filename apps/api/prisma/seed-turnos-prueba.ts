@@ -26,7 +26,7 @@
 process.loadEnvFile?.();
 
 import { randomBytes } from 'node:crypto';
-import { PrismaClient, type ReservaEstado } from '@prisma/client';
+import { Prisma, PrismaClient, type ReservaEstado } from '@prisma/client';
 import * as argon2 from 'argon2';
 
 const DEV_REF = 'hhaqlzrcskmwnvhgydon';
@@ -158,10 +158,17 @@ async function turnos(businessId: string) {
     prisma.reservaRecurso.deleteMany({ where: donde }),
   ]);
 
+  // Cada corrida deja las reglas como de fábrica y sin `datos` (equipo, grilla y reglas extra del
+  // panel): lo que se probó antes no se arrastra.
+  const reglas = {
+    activo: true, horario: HORARIO, confirmacion: 'AUTOMATICA' as const, retencionMinutos: 10, anticipacionMinimaMinutos: 60, anticipacionMaximaDias: 60,
+    cancelacionHastaHoras: 24, reprogramacionHastaHoras: 24, reprogramacionesMaximas: 2, senaPorcentaje: 0, senaReembolsable: true,
+    maximoActivasPorCliente: 2, listaDeEspera: true, margenMinutos: 0,
+  };
   await prisma.reservaConfig.upsert({
     where: { businessId_modulo: donde },
-    update: { activo: true, horario: HORARIO },
-    create: { ...donde, horario: HORARIO, confirmacion: 'AUTOMATICA', anticipacionMinimaMinutos: 60, maximoActivasPorCliente: 2 },
+    update: { ...reglas, datos: Prisma.DbNull },
+    create: { ...donde, ...reglas },
   });
 
   const dueno = await prisma.member.findFirst({ where: { businessId, email: EMAIL_DUENO }, select: { id: true } });

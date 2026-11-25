@@ -18,7 +18,7 @@ import { CalendarCheck, Clock3, UserX, Wallet, ArrowRight, Plus, Send, BellRing,
 import { Avatar } from '@/design-system/components/Avatar'
 import { Encabezado, Kpi } from '@/design-system/reservas/piezas'
 import { DIAS, horaTxt, type Turno, type Cliente, type Recurso, type RubroTurnos } from '@/modules/turnos/datos'
-import { AHORA_DEMO, FECHA_DEMO, HOY_SEMANA, minutosAbiertos, type Tramo } from '@/modules/turnos/horario'
+import { AHORA, HOY_TXT, HOY_DIA, minutosAbiertos, type Tramo } from '@/modules/turnos/horario'
 import { Barra } from './piezasPanel'
 import TurnosLista from './TurnosLista'
 import { SLOT, horariosLibres, huecosDe, type MensajeWA, type NuevoTurnoPre } from '../datos/agenda'
@@ -98,13 +98,13 @@ export default function ResumenDia({ negocio, saludo: aQuien, rubro, turnos, tur
     return { turnos: a.length, ingresos: a.filter(t => t.estado !== 'ausente').reduce((s, t) => s + t.precio, 0) }
   }
   const pasado = delDia(turnosDelDia(-7))
-  const contraDia = `vs. ${DIAS[HOY_SEMANA].toLowerCase()} pasado`
+  const contraDia = `vs. ${DIAS[HOY_DIA].toLowerCase()} pasado`
   /** Porcentaje contra el mismo día de la semana pasada; si ese día no hubo nada, no hay variación. */
   // La variación contra el mismo día de la semana pasada, para el chip del indicador: sin dato de antes, no hay chip.
   const variacion = (hoy: number, antes: number) => (antes > 0 ? { valor: Math.round(((hoy - antes) / antes) * 1000) / 10 } : undefined)
-  const proximos = turnos.filter(t => t.inicio + t.duracion > AHORA_DEMO && t.estado !== 'cancelado').sort((a, b) => a.inicio - b.inicio)
+  const proximos = turnos.filter(t => t.inicio + t.duracion > AHORA && t.estado !== 'cancelado').sort((a, b) => a.inicio - b.inicio)
   // El tiempo libre de acá al cierre, en bloques de media hora: es el número de "Huecos libres".
-  const libresFuturos = recursos.map(r => ({ r, libres: huecosDe(turnos, jornada(r.id), r.id).filter(m => m >= AHORA_DEMO) }))
+  const libresFuturos = recursos.map(r => ({ r, libres: huecosDe(turnos, jornada(r.id), r.id).filter(m => m >= AHORA) }))
   const totalLibres = libresFuturos.reduce((s, x) => s + x.libres.length, 0)
   // Lo que se ofrece son los horarios donde entra al menos el servicio más corto: los mismos que
   // muestra "Nuevo turno". Media hora suelta no sirve si nada dura tan poco (la estética arranca en 40 min).
@@ -115,8 +115,8 @@ export default function ResumenDia({ negocio, saludo: aQuien, rubro, turnos, tur
   const sinConfirmar = pendientes.length
   const etiquetaRecurso = rubro.modo === 'profesional' ? rubro.profesional : 'Espacio'
   const enCurso = turnos.find(t => t.estado === 'en-curso')
-  const sigue = proximos.find(t => t.inicio > AHORA_DEMO)
-  const avance = enCurso ? Math.min(1, Math.max(0, (AHORA_DEMO - enCurso.inicio) / enCurso.duracion)) : 0
+  const sigue = proximos.find(t => t.inicio > AHORA)
+  const avance = enCurso ? Math.min(1, Math.max(0, (AHORA - enCurso.inicio) / enCurso.duracion)) : 0
 
   const compartir = () => {
     const conLugar = ofrecibles.filter(x => x.libres.length > 0)
@@ -132,9 +132,9 @@ export default function ResumenDia({ negocio, saludo: aQuien, rubro, turnos, tur
       <style>{CSS}</style>
 
       <Encabezado
-        rotulo={FECHA_DEMO}
-        titulo={`${saludo(AHORA_DEMO)}, ${aQuien}`}
-        bajada={<>Hoy tenés <b style={{ color: 'var(--color-text)' }}>{activos.length} turno{activos.length === 1 ? '' : 's'}</b>. Quedan <b style={{ color: 'var(--color-text)' }}>{proximos.length} por delante</b>{sigue ? <> y el próximo arranca en <b style={{ color: 'var(--color-text)' }}>{faltan(sigue.inicio - AHORA_DEMO)}</b>.</> : '.'}</>}
+        rotulo={HOY_TXT}
+        titulo={`${saludo(AHORA)}, ${aQuien}`}
+        bajada={<>Hoy tenés <b style={{ color: 'var(--color-text)' }}>{activos.length} turno{activos.length === 1 ? '' : 's'}</b>. Quedan <b style={{ color: 'var(--color-text)' }}>{proximos.length} por delante</b>{sigue ? <> y el próximo arranca en <b style={{ color: 'var(--color-text)' }}>{faltan(sigue.inicio - AHORA)}</b>.</> : '.'}</>}
         acciones={<>
           <button type="button" className="rv-btn" onClick={() => onIr('agenda')}><CalendarDays size={16} /> Ver agenda</button>
           {puedeAgendar && <button type="button" className="rv-btn rv-btn--primario" onClick={() => onNuevo()}><Plus size={16} /> Nuevo turno</button>}
@@ -172,7 +172,7 @@ export default function ResumenDia({ negocio, saludo: aQuien, rubro, turnos, tur
           )}
           {sigue && (
             <button type="button" className="rv-card rv-card--accion tu-res-mini" onClick={() => onAbrir(sigue)}>
-              <span className="tu-res-mini-cab"><span className="rv-rotulo">Sigue</span><span className="rv-num">en {faltan(sigue.inicio - AHORA_DEMO)}</span></span>
+              <span className="tu-res-mini-cab"><span className="rv-rotulo">Sigue</span><span className="rv-num">en {faltan(sigue.inicio - AHORA)}</span></span>
               <span className="tu-res-mini-quien">
                 <span className="tu-res-hora rv-num">{horaTxt(sigue.inicio)}</span>
                 <span><b>{nombre(sigue.clienteId)}</b><small>{sigue.servicio} · {recursos.find(r => r.id === sigue.recursoId)?.nombre}</small></span>

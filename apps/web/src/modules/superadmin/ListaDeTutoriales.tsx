@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { platformApi, type TutorialDeLaLista, type TutorialEstado, type ResponsableTutorial } from '@/lib/platform/api'
+import { platformApi, type ModuloTutorial, type TutorialDeLaLista, type TutorialEstado, type ResponsableTutorial } from '@/lib/platform/api'
 import type { ToastVariant } from '@/design-system/components/Toast'
 import { Play } from 'lucide-react'
 import { useFetch, Card, Chip, Loader, ErrorBox, Empty, ModalShell, btnGhostSm, btnPrimary, inputStyle } from './ui'
@@ -9,6 +9,8 @@ import { useFetch, Card, Chip, Loader, ErrorBox, Empty, ModalShell, btnGhostSm, 
 // Acá se sigue el progreso y se mira cada video; los links NO se cargan desde esta pantalla, solo por el conector.
 // Los estados y responsables, si hace falta, se corrigen.
 // Se corrige de a uno (los selectores de cada fila) o de a varios: se tildan filas y una barra flotante pide confirmar el cambio.
+// Cada tutorial es de un módulo (Tienda, Turnos, Alquileres o Gimnasio): la lista se pide por módulo y los que no son de Tienda
+// llevan un chip con el suyo. La lista de un módulo nuevo la carga su responsable con su Claude (tutoriales_crear), no esta pantalla.
 // Apps/api/src/marketing/videos/tutoriales.service.ts.
 
 type Aviso = { variant: ToastVariant; title: string; description?: string }
@@ -39,13 +41,26 @@ export const OPCIONES_RESPONSABLE: { id: ResponsableTutorial; texto: string }[] 
   { id: 'ALE', texto: 'Ale · CPO' },
 ]
 
+const NOMBRE_MODULO: Record<ModuloTutorial, string> = { tienda: 'Tienda', turnos: 'Turnos', alquileres: 'Alquileres', gimnasio: 'Gimnasio' }
+const MODULOS: ModuloTutorial[] = ['tienda', 'turnos', 'alquileres', 'gimnasio']
+type FiltroModulo = ModuloTutorial | 'TODOS'
+// La API de antes de los módulos no manda el módulo: todo lo que había era de Tienda.
+const moduloDe = (t: TutorialDeLaLista): ModuloTutorial => t.modulo ?? 'tienda'
+
 const casilla = { width: 17, height: 17, margin: 0, flexShrink: 0, cursor: 'pointer', accentColor: 'var(--color-primary)' } as const
 // Un clic en un control de la fila (el selector, la casilla) no debe contar como clic en la fila.
 const esControl = (el: EventTarget) => !!(el as HTMLElement).closest('select, input, button, a, label')
 
 export function ListaDeTutoriales({ puedeEditar, setAviso }: { puedeEditar: boolean; setAviso: (a: Aviso) => void }) {
   const [tick, setTick] = useState(0)
-  const { data, loading, error } = useFetch(() => platformApi.tutorialesLista(), [tick])
+  const [modulo, setModulo] = useState<FiltroModulo>('TODOS')
+  // La lista (y su resumen) se pide por módulo. Al cambiar de módulo no queda a la vista la del anterior mientras llega la
+  // nueva: se ve el Loader, como en la primera carga. Al recargar el mismo módulo, la lista se queda en pantalla.
+  const { data: cargada, loading, error } = useFetch(
+    async () => ({ modulo, lista: await platformApi.tutorialesLista(modulo === 'TODOS' ? undefined : modulo) }),
+    [tick, modulo],
+  )
+  const data = cargada?.modulo === modulo ? cargada.lista : null
   const [soloFaltan, setSoloFaltan] = useState(false)
   const [filtroResponsable, setFiltroResponsable] = useState<ResponsableTutorial | 'TODOS'>('TODOS')
   const [seleccion, setSeleccion] = useState<Set<string>>(new Set())
@@ -88,7 +103,8 @@ export function ListaDeTutoriales({ puedeEditar, setAviso }: { puedeEditar: bool
     }
   }
 
-  const todosTutoriales = data?.tutoriales ?? []
+  // El servidor ya filtra por módulo; se mira también acá por si la API todavía es la de antes y devuelve todo.
+  const todosTutoriales = (data?.tutoriales ?? []).filter((t) => modulo === 'TODOS' || moduloDe(t) === modulo)
   const alanTutoriales = todosTutoriales.filter((t) => t.asignadoA === 'ALAN')
   const mateoTutoriales = todosTutoriales.filter((t) => t.asignadoA === 'MATEO')
   const aleTutoriales = todosTutoriales.filter((t) => t.asignadoA === 'ALE')
@@ -103,9 +119,28 @@ export function ListaDeTutoriales({ puedeEditar, setAviso }: { puedeEditar: bool
     return true
   })
 
-  const grupos = new Map<string, TutorialDeLaLista[]>()
-  for (const t of visibles) grupos.set(t.grupo, [...(grupos.get(t.grupo) ?? []), t])
-  const r = data?.resumen
+  // Los grupos son de cada módulo: el «Arrancar» de Gimnasio no se junta con el de Tienda.
+  const agrupar = (lista: TutorialDeLaLista[]) => {
+    const mapa = new Map<string, TutorialDeLaLista[]>()
+    for (const t of lista) {
+      const clave = `${moduloDe(t)}/${t.grupo}`
+      mapa.set(clave, [...(mapa.get(clave) ?? []), t])
+    }
+    return mapa
+  }
+  const grupos = agrupar(visibles)
+  // Cada grupo entero, también con los tutoriales que el filtro tapa: de ahí sale lo que dice su encabezado.
+  const gruposEnteros = agrupar(todosTutoriales)
+
+  // El resumen llega del servidor, ya del módulo pedido. La API de antes de los módulos no manda el módulo de cada tutorial
+  // ni filtra por él: su resumen es el de toda la lista, así que con un módulo elegido se cuenta acá, sobre los que quedaron.
+  const apiSinModulos = (data?.tutoriales ?? []).some((t) => !t.modulo)
+  const cuantos = (estado: TutorialEstado) => todosTutoriales.filter((t) => t.estado === estado).length
+  const r = !data
+    ? undefined
+    : modulo !== 'TODOS' && apiSinModulos
+      ? { total: todosTutoriales.length, hechos: cuantos('HECHO'), enRevision: cuantos('EN_REVISION'), enProceso: cuantos('EN_PROCESO'), faltan: cuantos('FALTA') }
+      : data.resumen
   const conVideo = todosTutoriales.filter((t) => t.youtubeId).length
 
   // Solo se tildan los que se pueden cambiar a mano y se ven ahora: si uno pasa a «en revisión» o lo tapa el filtro, se suelta solo.
@@ -164,8 +199,40 @@ export function ListaDeTutoriales({ puedeEditar, setAviso }: { puedeEditar: bool
         </span>
       )}
     >
-      {/* El Loader es solo para la primera carga: al recargar la lista se queda en pantalla, con su scroll y su selección. */}
-      {!data && loading ? <Loader /> : !data ? (
+      {/* Filtro por módulo: la lista y el resumen de abajo pasan a ser de ese módulo (se piden de nuevo al servidor). Queda
+          afuera de la carga para que se pueda cambiar de módulo mientras llega la lista, o si la de un módulo no se pudo leer. */}
+      <div role="group" aria-label="Filtrar por módulo" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12, alignItems: 'center' }}>
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-muted)', marginRight: 2 }}>Módulo:</span>
+        {(['TODOS', ...MODULOS] as const).map((id) => {
+          const activo = modulo === id
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setModulo(id)}
+              aria-pressed={activo}
+              className="ds-hover"
+              style={{
+                ...btnGhostSm,
+                height: 28,
+                fontSize: 12,
+                padding: '0 10px',
+                borderRadius: 999,
+                background: activo ? 'var(--color-primary-bg)' : undefined,
+                color: activo ? 'var(--color-primary)' : 'var(--color-text)',
+                fontWeight: activo ? 600 : 400,
+              }}
+            >
+              {id === 'TODOS' ? 'Todos' : NOMBRE_MODULO[id]}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Mientras no hay lista de este módulo se ve el Loader: en la primera carga y al cambiar de módulo (ahí hay un render con
+          la lista del módulo anterior y sin `loading` todavía, que antes caía en el error). El error, que se anuncia como
+          alerta, sale solo si el pedido falló. Al recargar, la lista se queda en pantalla, con su scroll y su selección. */}
+      {!data && !error ? <Loader /> : !data ? (
         <ErrorBox msg="No se pudo leer la lista de tutoriales." action={<button type="button" onClick={recargar} style={btnGhostSm}>Reintentar</button>} />
       ) : (
         <>
@@ -258,21 +325,36 @@ export function ListaDeTutoriales({ puedeEditar, setAviso }: { puedeEditar: bool
             </button>
           </div>
 
-          {grupos.size === 0 ? <Empty text="No hay tutoriales para mostrar con los filtros aplicados." /> : (
+          {grupos.size === 0 ? (
+            <Empty
+              text={modulo !== 'TODOS' && todosTutoriales.length === 0
+                ? `Todavía no hay tutoriales de ${NOMBRE_MODULO[modulo]}. Los carga su responsable con su Claude, por el conector (tutoriales_crear), al terminar el ciclo del módulo.`
+                : 'No hay tutoriales para mostrar con los filtros aplicados.'}
+            />
+          ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {[...grupos.entries()].map(([grupo, items]) => {
+              {[...grupos.entries()].map(([clave, items]) => {
+                const grupo = items[0].grupo
+                const delModulo = moduloDe(items[0])
+                // Para el lector de pantalla: con todos los módulos puede haber dos «Arrancar».
+                const nombre = delModulo === 'tienda' ? grupo : `${grupo} (${NOMBRE_MODULO[delModulo]})`
                 const delGrupo = items.filter((t) => t.estado !== 'EN_REVISION')
                 const grupoCompleto = delGrupo.length > 0 && delGrupo.every((t) => seleccion.has(t.id))
+                // «Prioridad alta» y «opcional» son de cada tutorial: el encabezado lo dice solo si lo son todos los del
+                // grupo; si lo son algunos, cada fila que lo es lleva su chip.
+                const entero = gruposEnteros.get(clave) ?? items
+                const todosPrioridad = entero.every((t) => t.prioridadAlta)
+                const todosOpcionales = entero.every((t) => t.opcional)
                 return (
-                  <section key={grupo} aria-label={grupo}>
+                  <section key={clave} aria-label={nombre}>
                     <h3 style={{ margin: '0 0 6px', padding: '0 10px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
                       {puedeEditar && delGrupo.length > 0 && (
-                        <input type="checkbox" checked={grupoCompleto} onChange={() => alternarVarios(items)} aria-label={`Seleccionar todo «${grupo}»`} style={casilla} />
+                        <input type="checkbox" checked={grupoCompleto} onChange={() => alternarVarios(items)} aria-label={`Seleccionar todo «${nombre}»`} style={casilla} />
                       )}
                       <span>
                         {grupo}
-                        {items[0].prioridadAlta && <span style={{ marginLeft: 8, fontWeight: 400, color: 'var(--color-muted)' }}>· prioridad alta</span>}
-                        {items[0].opcional && <span style={{ marginLeft: 8, fontWeight: 400, color: 'var(--color-muted)' }}>· opcionales (sirven también como promo)</span>}
+                        {todosPrioridad && <span style={{ marginLeft: 8, fontWeight: 400, color: 'var(--color-muted)' }}>· prioridad alta</span>}
+                        {todosOpcionales && <span style={{ marginLeft: 8, fontWeight: 400, color: 'var(--color-muted)' }}>· opcionales (sirven también como promo)</span>}
                       </span>
                     </h3>
                     {items.map((t) => {
@@ -306,6 +388,11 @@ export function ListaDeTutoriales({ puedeEditar, setAviso }: { puedeEditar: bool
                             </div>
                           </div>
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                            {/* Solo cuando en el grupo no lo son todos: si lo son, ya lo dice el encabezado. */}
+                            {t.prioridadAlta && !todosPrioridad && <Chip text="prioridad alta" tone="red" />}
+                            {t.opcional && !todosOpcionales && <Chip text="opcional" tone="gray" />}
+                            {/* De qué módulo es: solo en los que no son de Tienda, que es lo que había siempre. */}
+                            {moduloDe(t) !== 'tienda' && <Chip text={NOMBRE_MODULO[moduloDe(t)]} tone="violet" />}
                             {t.youtubeId && (
                               <button type="button" onClick={() => setViendo(t)} className="ds-hover" style={{ ...btnGhostSm, height: 32 }}>
                                 <Play size={13} aria-hidden="true" /> Ver video

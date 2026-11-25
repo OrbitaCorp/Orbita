@@ -61,6 +61,9 @@ function armar(opciones: { tamanio?: number | null; env?: Record<string, string>
       create: async ({ data }: { data: Fila }) => { const c = { id: uid(++n), createdAt: new Date(), ...data }; comentarios.filas.push(c); return c; },
     },
     marketingTutorial: tutoriales,
+    // El título de un tutorial se busca con SQL (`lower("titulo") = lower($1)`: exacto, sin distinguir mayúsculas y sin
+    // comodines). Acá, lo mismo sobre las filas en memoria.
+    $queryRaw: jest.fn(async (_sql: readonly string[], titulo: string) => tutoriales.filas.filter((t) => t.titulo.toLowerCase() === titulo.toLowerCase()).map((t) => ({ id: t.id as string }))),
     platformAdmin: admins,
     platformAdminLog: { create: jest.fn().mockResolvedValue({}) },
   };
@@ -428,6 +431,22 @@ describe('tutoriales: vínculo con la lista', () => {
     await expect(ctx.svc.registrar('cto', { videoId: t, titulo: 'x', tutorial: 'No está en la lista' })).rejects.toBeInstanceOf(BadRequestException);
     const m = await reservado(ctx, 'cto');
     await expect(ctx.svc.registrar('cto', { videoId: m, titulo: 'x', tutorial: CARGAR })).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('el título del tutorial se compara exacto, sin distinguir mayúsculas: «%» y «_» no son comodines', async () => {
+    const ctx = armar();
+    const t = await reservado(ctx, 'cto', 'TUTORIAL');
+    // Con el ILIKE de antes, cualquiera de estos encontraba «Cargar un producto».
+    for (const comodin of ['Cargar un product_', 'Cargar%', '%']) {
+      await expect(ctx.svc.registrar('cto', { videoId: t, titulo: 'x', tutorial: comodin })).rejects.toBeInstanceOf(BadRequestException);
+    }
+    expect(ctx.tutoriales[0].estado).toBe('FALTA');
+    await ctx.svc.registrar('cto', { videoId: t, titulo: 'x', tutorial: ' cargar UN producto ' });
+    expect(ctx.filas[0].tutorialId).toBe(CARGAR);
+    // El título viaja como parámetro de la consulta, nunca adentro del SQL.
+    const [sql, ...parametros] = ctx.prisma.$queryRaw.mock.calls.at(-1)!;
+    expect(sql.join('?')).toMatch(/WHERE lower\("titulo"\) = lower\(\?\)/);
+    expect(parametros).toEqual(['cargar UN producto']);
   });
 });
 

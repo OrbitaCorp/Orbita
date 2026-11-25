@@ -6,6 +6,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { R2Service } from '../../r2/r2.service';
 import { aprobacionCompleta, puedeAprobar, puedeRechazar, reglasDeConfig, type Persona } from './politica-aprobacion';
 import { TIPOS_VIDEO, type TipoVideo } from './tipos-video';
+import { idDeTutorialPorTitulo } from './tutoriales.service';
 import { VideosAvisoService } from './videos-aviso.service';
 
 // Marketing → cola de videos.
@@ -203,13 +204,13 @@ export class VideosService {
     return this.vista(actualizado);
   }
 
-  /** El id del ítem de la lista de tutoriales: se acepta su id o su título exacto. */
+  /** El id del ítem de la lista de tutoriales: se acepta su id o su título exacto (sin distinguir mayúsculas y sin comodines). */
   private async tutorialDeLaLista(ref: string): Promise<string> {
-    const item = UUID.test(ref)
-      ? await this.prisma.marketingTutorial.findUnique({ where: { id: ref }, select: { id: true } })
-      : await this.prisma.marketingTutorial.findFirst({ where: { titulo: { equals: ref.trim(), mode: 'insensitive' } }, select: { id: true } });
-    if (!item) throw new BadRequestException('No existe ese tutorial en la lista (usá tutoriales_listar para ver los ids)');
-    return item.id;
+    const id = UUID.test(ref)
+      ? (await this.prisma.marketingTutorial.findUnique({ where: { id: ref }, select: { id: true } }))?.id
+      : await idDeTutorialPorTitulo(this.prisma, ref.trim());
+    if (!id) throw new BadRequestException('No existe ese tutorial en la lista (usá tutoriales_listar para ver los ids)');
+    return id;
   }
 
   /** Al terminar de subir una tanda: avisa por correo si quedó algún video pendiente sin anunciar. Los tutoriales no avisan. */

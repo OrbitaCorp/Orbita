@@ -12,6 +12,7 @@ import { CICLO, PERSONAS, PLANES, semanaDelCiclo } from './plan'
 import { AVISO_SESION, ENTRADAS, type Entrada } from './entradas'
 import { DECISIONES, avisoAbierta } from './decisiones'
 import { CARPETAS_COMPARTIDAS, REGLAS_COMPARTIDO } from './compartido'
+import { AVISOS_MODULO, COMO_SE_TRABAJA } from './reglas'
 
 const PUBLIC = fileURLToPath(new URL('../../../../public', import.meta.url))
 const RAIZ = fileURLToPath(new URL('../../../../../../', import.meta.url))
@@ -250,5 +251,25 @@ describe('Módulos — lo compartido', () => {
     expect(REGLAS_COMPARTIDO.length).toBeGreaterThanOrEqual(4)
     for (const r of REGLAS_COMPARTIDO) expect(r.trim().length).toBeGreaterThan(40)
     expect(REGLAS_COMPARTIDO[0]).toMatch(/Turnos, Alquileres y Gimnasio a la vez/)
+  })
+})
+
+describe('Módulos — cómo se trabaja', () => {
+  it('las reglas piden Orbi sin usar Orbi y los tutoriales al terminar, y el checklist completo existe en .claude/rules/modulos.md', () => {
+    expect(existsSync(`${RAIZ}.claude/rules/modulos.md`)).toBe(true)
+    const textos = COMO_SE_TRABAJA.map((r) => `${r.titulo} ${r.texto}`)
+    expect(textos.some((t) => /Orbi/.test(t) && /no pagamos IA/.test(t))).toBe(true)
+    expect(textos.some((t) => /tutoriales/i.test(t) && /Tienda/.test(t))).toBe(true)
+    // Cada módulo decide lo suyo: ningún aviso manda a definirlo con Ale.
+    for (const aviso of Object.values(AVISOS_MODULO)) expect(aviso).not.toMatch(/con Ale/)
+  })
+
+  it('cada plan cierra con el manual del módulo en Orbi y sus tutoriales, y Ale engancha a los módulos en Orbi y en la lista', () => {
+    for (const p of PLANES) {
+      expect(p.tareas.some((t) => t.texto.startsWith(`El manual de ${p.nombre} en Orbi`))).toBe(true)
+      expect(p.tareas.some((t) => t.texto.startsWith(`Tutoriales de ${p.nombre}`))).toBe(true)
+    }
+    const gimnasio = PLANES.find((p) => p.modulo === 'gimnasio')!
+    expect(gimnasio.tareas.some((t) => /^Transversal: Orbi y la lista de tutoriales reciben a los módulos/.test(t.texto))).toBe(true)
   })
 })

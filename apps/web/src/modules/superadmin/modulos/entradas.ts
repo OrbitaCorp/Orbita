@@ -157,6 +157,14 @@ const F4 = '2026-11-04'
 const F13 = '2026-11-13'
 // El rubro en subrubros y el alcance en salud (15/11/2026).
 const F15 = '2026-11-15'
+// Ciclo 2 · Gimnasio (Ale): cada tarea con el día que le toca en el plan.
+const G5 = '2026-11-05'
+const G6 = '2026-11-06'
+const G9 = '2026-11-09'
+const G10 = '2026-11-10'
+const G11 = '2026-11-11'
+const G12 = '2026-11-12'
+const G17 = '2026-11-17'
 // Lunes 16/11: la tabla rubro → sidebar de Turnos.
 const F16 = '2026-11-16'
 // Jueves 19/11: Servicios de Turnos guarda en la API.
@@ -2577,6 +2585,755 @@ Esas tres cosas se resuelven con las tareas de la semana 2.
     ],
   }),
 
+  // ─── Ciclo 2 · Gimnasio (Ale) ───────────────────────────────────────────────
+  entrada({
+    modulo: 'gimnasio', fecha: F4, slug: 'plan-orbi-y-tutoriales', tipo: 'tarea', quien: 'Ale', transversal: true,
+    titulo: 'Transversal: el plan suma el manual de Orbi y los tutoriales de cada módulo, y lo que decide cada uno',
+    foco: 'Pedido de Ale del 04/11: cada plan cierra con el manual del módulo en Orbi (21/12) y sus tutoriales (22/12); Gimnasio suma la transversal del 12/11 que engancha a los módulos en Orbi y en la lista de tutoriales; Alan decide cómo entran sus paquetes, temporadas y alquiler por mes; y Cómo se trabaja suma dos reglas.',
+    que: `Cambio del plan que pidió Ale el 04/11, para que Mateo y Alan lo sepan (la regla es que un cambio del plan queda en una entrada):
+
+- **Tareas nuevas al final de cada plan** (los ids son por posición): "El manual de <módulo> en Orbi" el 21/12 y "Tutoriales de <módulo>" el 22/12, en los tres. En Gimnasio, además, la transversal del 12/11 "Orbi y la lista de tutoriales reciben a los módulos".
+- **Alquileres:** la tarea del 06/11 dice que la forma de los paquetes por salón, las temporadas y el alquiler por mes la decide Alan (y que, si toca lo compartido, lo avisa antes); el aviso del módulo dice lo mismo.
+- **Cómo se trabaja:** dos reglas nuevas, "Orbi tiene que saberlo, sin usar Orbi" y "Al terminar, los tutoriales del módulo", y la que dice qué decide Ale nombra el cobro online de la seña, WhatsApp, los recordatorios y la salida de Próximamente.
+- **El checklist entero** quedó en \`.claude/rules/modulos.md\` (se carga solo al tocar los módulos) y su resumen en \`CLAUDE.md\`.`,
+    archivos: [
+      'apps/web/src/modules/superadmin/modulos/plan.ts:184',
+      'apps/web/src/modules/superadmin/modulos/plan.ts:213',
+      'apps/web/src/modules/superadmin/modulos/plan.ts:325',
+      'apps/web/src/modules/superadmin/modulos/reglas.ts:43',
+      'apps/web/src/modules/superadmin/modulos/reglas.ts:55',
+      'apps/web/src/modules/superadmin/modulos/datos.test.ts:257',
+    ],
+  }),
+  entrada({
+    modulo: 'gimnasio', fecha: G5, slug: 'mapa-sobre-el-backend', tipo: 'tarea', quien: 'Ale',
+    titulo: 'El mapa de Gimnasio sobre el backend compartido: cada pantalla con su ruta, y planes, pases y alumnos aparte',
+    foco: 'Cada pantalla del panel y cada página del sitio de Gimnasio con la ruta de /reservas que la cubre. Las clases son reservas (cupo, sesiones, lista de espera); los planes, los pases y los alumnos no son reservas y quedan marcados como del módulo, con su decisión aparte (16/11).',
+    que: `Tarea del 05/11 del plan: leer el contrato del backend compartido (\`apps/api/src/reservas\`, su README y \`lib/reservasApi\`) y armar el mapa de Gimnasio, con lo que no cubre marcado.
+
+**Cómo entra Gimnasio en el motor:** cada clase de la grilla es un recurso \`CLASE\` con **una sesión semanal** (su horario es \`{ día: [[inicio, fin]] }\`), su cupo y la duración de su actividad; lo propio de Gimnasio (actividad, color, profe y sala) va en \`datos.gimnasio\`. Así cada clase tiene su cupo y su profe, como en la demo. Cada lugar reservado es una reserva (con \`cantidad\` si son varios) y cada persona esperando, una fila de la lista de espera.
+
+**Panel** (rutas \`/api/v1/reservas/...\`, con la sesión del panel):
+
+| Pantalla | Lee | Escribe | Estado |
+|---|---|---|---|
+| Clases · Día y detalle de la clase | \`GET /reservas\` (una ventana de semanas), \`GET /recursos\`, \`GET /espera\`, \`GET /bloqueos\` | \`POST /reservas\`, \`POST /:id/cancelar\`, \`completar\` y \`ausente\`, \`POST /espera\`, \`POST /espera/:id/lugar\`, \`DELETE /espera/:id\` | Cubre. Las dos rutas de la espera se sumaron al motor (11/11) |
+| Clases · Grilla semanal | \`GET /recursos\` (CLASE) | \`POST\`, \`PUT\` y \`DELETE /recursos\` | Cubre |
+| Días sin clases | \`GET /bloqueos\` | \`POST\` y \`DELETE /bloqueos\` (devuelve cuántas reservas quedaron adentro) | Cubre |
+| Reglas de reserva | \`GET /config\` | \`PUT /config\` | Parcial: el check-in antes de la clase no existe en el motor (marca presente recién cuando empieza) |
+| Configuración → Horarios | \`config.horario\` | \`PUT /config\` | Cubre (la pantalla se conecta aparte) |
+| Alumnos | Las reservas y la espera dan nombre y contacto | — | **No son reservas:** falta dónde vive el alumno y su plan |
+| Planes y precios | — | — | **No son reservas:** falta |
+| Ingresos | \`GET /resumen\` (lo cobrado por reservas) | — | Parcial: planes y renovaciones no existen en el motor |
+| Equipo, Actividades y salas | Lo que dicen las clases (\`datos.gimnasio\`) | — | Falta un catálogo propio: hoy una actividad sin clases no se puede guardar |
+| Recordatorios y mensajes | — | — | Falta: lo decide Ale (WhatsApp y recordatorio) |
+| Pagos | \`POST /:id/pago\` registra | — | Parcial: el cobro online lo decide Ale |
+| Calendarios (.ics) y Datos del negocio | — | — | No son de reservas |
+
+**Sitio** (rutas \`/api/v1/storefront/:slug/reservas/...\`, sin sesión):
+
+| Página | Rutas | Estado |
+|---|---|---|
+| Inicio y grilla pública | \`GET /config\`, \`/recursos\` | Cubre |
+| Reservar un lugar | \`GET /disponibilidad\`, \`POST /retener\` y \`/mi/:token/confirmar\` (o \`/reservar\`), con \`cantidad\` | Cubre |
+| Lista de espera | \`POST /espera\`, \`GET\` y \`DELETE /espera/:token\` | Cubre |
+| Mi clase (enlace del email) | \`GET /mi/:token\`, \`POST /mi/:token/cancelar\` | Cubre; falta la página \`/mi-clase/<token>\` del sitio |
+| Mis clases con sesión | — | Falta (como en Turnos) |
+| Comprar un plan | — | Falta: planes y cobro |
+
+**Lo que el backend no cubre:**
+
+1. **Planes, pases y alumnos:** no existen en el motor ni tienen por qué: no son reservas. La propuesta (tablas propias de Gimnasio, al lado del motor y sin tocarlo) es la decisión abierta del 16/11.
+2. **Actividades, salas y equipo:** hoy salen de las clases. Entran en la misma decisión.
+3. **Check-in anticipado:** el motor marca presente o ausente desde que la clase empieza; la demo deja el check-in unos minutos antes (Reglas de reserva). Con la API, el panel usa la regla del motor.
+4. **Corregir la asistencia:** en el motor, presente y ausente son estados finales; la demo deja pasar de uno al otro. Con la API, el panel no ofrece la corrección.
+5. **Anotar en la espera y darle el lugar desde el panel:** no existían; se sumaron al motor compartido (entrada transversal del 11/11).
+
+**Lo que falta del lado del front:**
+
+- **Rutas de producción:** el panel de un negocio de Gimnasio todavía no tiene dónde abrirse fuera de \`/gimnasio-demo\` (lo mismo marcó Mateo para Turnos). Para probarlo contra la API está \`/gimnasio-demo/panel?origen=api\`, solo en local.
+- **El rubro:** va como en Tienda, \`industry: "gimnasio"\` y el subrubro en \`subrubros\` (\`["crossfit"]\`); por ahora el panel lo toma de \`?rubro=\`.`,
+    archivos: [
+      'apps/api/src/reservas/README.md:106',
+      'apps/api/src/reservas/reservas-panel.controller.ts:164',
+      'apps/api/src/reservas/disponibilidad.service.ts:87',
+      'apps/api/src/reservas/reservas.service.ts:464',
+      'apps/api/prisma/schema.prisma:4015',
+      'apps/api/prisma/schema.prisma:70',
+      'apps/web/src/lib/reservasApi/cliente.ts:1',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:1',
+    ],
+  }),
+  entrada({
+    modulo: 'gimnasio', fecha: G5, slug: 'api-en-produccion', tipo: 'tarea', quien: 'Ale', transversal: true,
+    titulo: 'Transversal: la API de reservas responde en producción y el deploy queda cerrado en Módulos',
+    foco: 'GET /api/v1/reservas/config en api.orbita.site responde 401 (la ruta existe y pide sesión) y no 404, y la ruta pública del sitio también existe. El deploy del motor compartido figura como decisión tomada (04/11).',
+    que: `Tarea del 05/11 del plan: verificar que el backend compartido de reservas está vivo en producción y dar por cerrado su deploy en Módulos.
+
+| Pedido a api.orbita.site | Respuesta | Qué dice |
+|---|---|---|
+| \`GET /api/v1/reservas/config?modulo=GIMNASIO\` | 401 "Token requerido" | La ruta del panel existe y pide la sesión del panel |
+| \`GET /api/v1/storefront/no-existe-xyz/reservas/config?modulo=GIMNASIO\` | 404 "Negocio no encontrado" | La ruta pública existe: busca el negocio y no lo encuentra |
+| \`GET /api/v1/reservas-no-existe\` (de control) | 404 "Cannot GET …" | Así responde una ruta que no existe, distinto de las dos de arriba |
+
+- **El deploy:** la decisión abierta "lo que el backend compartido deja para decidir" lo tiene tomado en su punto 6 (04/11: la migración \`20261103120000_reservas\` aplicada en producción y la API desplegada), y la entrada del 04/11 "todo a producción con los módulos en Próximamente" lo documenta.
+- **La revisión de Cloud Run no se miró:** gcloud no tenía sesión en esta máquina; para el criterio de la tarea alcanza con lo que responde la API.
+- **Ojo:** lo que se sumó al motor después (anotar en la espera y darle el lugar desde el panel, 11/11) todavía no está en producción: va con el próximo \`deploy.sh\`, cuando Ale lo decida.`,
+    archivos: [
+      'apps/api/src/reservas/reservas-panel.controller.ts:32',
+      'apps/api/src/reservas/reservas-publico.controller.ts:29',
+      'apps/api/prisma/migrations/20261103120000_reservas/migration.sql:1',
+    ],
+  }),
+  entrada({
+    modulo: 'gimnasio', fecha: G6, slug: 'negocio-de-prueba', tipo: 'tarea', quien: 'Ale',
+    titulo: 'El negocio de prueba de Gimnasio en dev: config de reservas y dos clases con cupo',
+    foco: 'Un script deja en la base de dev el negocio "Gimnasio de prueba" con su dueño, la config de reservas de GIMNASIO (lunes a sábado de 7 a 22, con lista de espera) y dos clases como recursos CLASE con cupo y su sesión semanal. Se puede correr de nuevo sin duplicar nada.',
+    que: `Tarea del 06/11 del plan. El alta real todavía muestra Gimnasio como "Próximamente", así que el negocio de prueba lo crea un script: \`apps/api/scripts/gimnasio-de-prueba.ts\`.
+
+- **Solo dev:** antes de conectar mira el ref del proyecto en \`DATABASE_URL\` y \`DIRECT_URL\` (sin imprimirlas): si es producción corta, y si no es la base de dev no toca nada.
+- **El negocio y su dueño, con Prisma, igual que el alta:** sucursal, los dos roles de fábrica con sus permisos (Propietario con todo, Empleado sin configurar) y la config del negocio y de la tienda. El rubro va como en Tienda: \`industry: "gimnasio"\` y \`subrubros: ["crossfit"]\`. Subdominio \`gimnasio-prueba\`, dueño \`dueno@gimnasio-prueba.orbita.test\`; la clave no está en el repo: se pasa al correrlo (\`GIMNASIO_PRUEBA_CLAVE\`).
+- **La config y las clases, por la API** (\`PUT /reservas/config\` y \`POST /reservas/recursos\`, con la sesión del dueño): pasan por las mismas validaciones que el panel. Lunes a sábado de 7 a 22, confirmación automática, 14 días de anticipación, cancelación hasta 2 horas antes y lista de espera.
+- **Las dos clases:** WOD los lunes de 19 a 20 con cupo 12 (Nico, Box) y Halterofilia los miércoles de 18 a 19 con cupo 3 (Seba, Box): la de cupo 3 se llena rápido y deja probar la espera.
+
+**Verificado:** \`GET /reservas/recursos?modulo=GIMNASIO\` devuelve las dos clases con su cupo, su sesión en el horario y lo de Gimnasio en \`datos\`:
+
+\`\`\`
+WOD: cupo 12, 60 min, sesiones {"1":[[1140,1200]]}, datos {"gimnasio":{"sala":"Box","color":"#2563EB","profe":"Nico","profeId":"p1","actividadId":"a1"}}
+Halterofilia: cupo 3, 60 min, sesiones {"3":[[1080,1140]]}, datos {"gimnasio":{"sala":"Box","color":"#059669","profe":"Seba","profeId":"p2","actividadId":"a3"}}
+\`\`\`
+
+La segunda corrida no duplicó nada. Para usarlo: con la API local levantada contra dev, \`GIMNASIO_PRUEBA_CLAVE=… pnpm exec ts-node scripts/gimnasio-de-prueba.ts\` desde \`apps/api\`; después, entrar en \`localhost:3001/login\` con el dueño y abrir \`/gimnasio-demo/panel?origen=api\`.`,
+    archivos: [
+      'apps/api/scripts/gimnasio-de-prueba.ts:68',
+      'apps/api/scripts/gimnasio-de-prueba.ts:75',
+      'apps/api/scripts/gimnasio-de-prueba.ts:119',
+      'apps/api/scripts/gimnasio-de-prueba.ts:57',
+    ],
+  }),
+  entrada({
+    modulo: 'gimnasio', fecha: G9, slug: 'clases-como-recursos', tipo: 'tarea', quien: 'Ale',
+    titulo: 'Las clases de la grilla son recursos CLASE: el panel de Gimnasio lee y guarda en la API',
+    foco: 'El panel de Gimnasio ya no arma sus datos por su cuenta: se los pide a un origen, la demo o la API de reservas. Crear, cambiar o quitar una clase de la grilla crea, edita o borra su recurso CLASE (cupo, duración, sesión en el horario, y profe y sala en datos). La demo queda igual.',
+    que: `Tarea del 09/11 del plan.
+
+- **El origen** (\`datos/origen/\`), con el mismo criterio que Turnos y sin importarlo: el panel pide el negocio, los socios, las inscripciones, el reloj y las acciones, y las pantallas los siguen recibiendo por props. **La demo** (\`demo.ts\`) es el almacén del navegador de siempre; **la API** (\`api.ts\`) lee una ventana de días con \`GET /reservas\` (la agranda si se mira otra fecha) y, después de cada acción, vuelve a leer: lo que se ve es lo que quedó en la base.
+- **Las traducciones** (\`mapear.ts\`, puras, con 18 tests): los días (la API cuenta el domingo como 0, el panel el lunes), una clase por sesión, lo de Gimnasio en \`datos.gimnasio\` y, al guardar, qué crear, cambiar y quitar. Las acciones contra la API tienen 11 tests con un cliente falso.
+- **La grilla:** "Nueva clase" crea un recurso \`CLASE\` con una sesión semanal; cambiar una clase edita su recurso (si el recurso tuviera varias sesiones, solo la suya); quitarla lo borra o le saca su sesión. Las actividades, las salas y el equipo salen de las clases hasta que el módulo tenga su catálogo (decisión del 16/11).
+- **Lo reservado se cuida** (en la demo también): el cupo no baja de los lugares tomados en una fecha que viene, y una clase con lugares por delante no cambia de día, hora ni duración ni se quita.
+- **El reloj:** con la API, el día y la hora son los de Argentina (se mueven solos); la demo sigue en su sábado 14/11 a las 10:40.
+- **Lo que todavía no guarda:** con la API, las secciones que no son Clases ni Días sin clases lo dicen en una franja y no mandan nada.
+- **Para probarlo:** \`/gimnasio-demo/panel?origen=api\` en local, con la sesión del dueño del negocio de prueba.
+
+**Verificado en el navegador contra la API local y la base de dev:** una clase nueva el jueves a las 7 con cupo 10 sale en \`GET /reservas/recursos\` con su sesión \`{"4":[[420,480]]}\`, cupo 10 y profe y sala en \`datos.gimnasio\`. Tests de \`modules/gimnasio\` en verde, typecheck y eslint sin errores, y la demo sin cambios (9 chequeos en el navegador).
+
+${comoQuedo('gimnasio', ['Grilla semanal sobre la API · 1280', 'api-grilla-1280.webp'], ['Grilla semanal sobre la API · 390', 'api-grilla-390.webp'])}`,
+    archivos: [
+      'apps/web/src/modules/gimnasio/datos/origen/index.ts:78',
+      'apps/web/src/modules/gimnasio/datos/origen/index.ts:171',
+      'apps/web/src/modules/gimnasio/datos/origen/demo.ts:88',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:177',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:308',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:508',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:94',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:426',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:454',
+      'apps/web/src/modules/gimnasio/datos/reloj.ts:76',
+      'apps/web/src/modules/gimnasio/admin/Panel.tsx:62',
+      'apps/web/src/modules/gimnasio/admin/Panel.tsx:187',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:614',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:660',
+      'apps/web/src/pages/gimnasio-demo/panel.tsx:28',
+      'apps/web/src/modules/gimnasio/datos/origen/__tests__/mapear.test.ts:49',
+      'apps/web/src/modules/gimnasio/datos/origen/__tests__/api.test.ts:83',
+    ],
+  }),
+  entrada({
+    modulo: 'gimnasio', fecha: G10, slug: 'grilla-con-cupo-real', tipo: 'tarea', quien: 'Ale',
+    titulo: 'Las clases de cada día muestran las sesiones reales con cuántos lugares quedan',
+    foco: 'Con la API, las clases de cada día salen de las sesiones de los recursos y los lugares tomados, de las reservas que ocupan lugar (también las retenidas que todavía no vencieron), como cuenta el motor. Lo que dice el panel coincide con GET disponibilidad.',
+    que: `Tarea del 10/11 del plan.
+
+- **De dónde sale cada número:** las clases de un día son las sesiones de los recursos en ese día de la semana (menos los días sin clases); los lugares tomados son la suma de \`cantidad\` de las reservas confirmadas, pendientes o retenidas que todavía no vencieron, igual que cuenta el motor. Una retenida vencida no ocupa lugar aunque el barrido todavía no la haya marcado.
+- **Por qué \`GET /reservas\` y no una llamada a \`GET disponibilidad\` por clase:** la disponibilidad no devuelve lo que ya pasó (el día de ayer, la clase de hace una hora) y el panel lo necesita para la asistencia y el % de la grilla. Con una lectura por ventana de semanas se dibujan todos los días; al reservar, el que manda sigue siendo el motor (si no queda lugar, 409 con su mensaje).
+- **Varios lugares por reserva:** una persona que viene acompañada ocupa \`cantidad\` lugares; la barra de cupo y "N lugares libres" los cuentan (en la demo también).
+- **La grilla:** el % de cada clase en las últimas cuatro semanas sale de las mismas reservas.
+
+**Verificado:** con la clase de cupo 3 llena (una reserva de 2 lugares y otra de 1), el panel la muestra completa y \`GET /reservas/disponibilidad\` de esa fecha devuelve \`libres: 0, cupo: 3\`. A 390 no hay scroll horizontal.
+
+${comoQuedo('gimnasio', ['Clases de hoy sobre la API · 1280', 'api-clases-dia-1280.webp'], ['Clases de hoy sobre la API · 390', 'api-clases-dia-390.webp'])}`,
+    archivos: [
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:270',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:211',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:365',
+      'apps/web/src/modules/gimnasio/datos/index.ts:742',
+      'apps/web/src/modules/gimnasio/datos/index.ts:325',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:177',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:219',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:546',
+    ],
+  }),
+  entrada({
+    modulo: 'gimnasio', fecha: G11, slug: 'anotar-y-lista-de-espera', tipo: 'tarea', quien: 'Ale',
+    titulo: 'Anotar desde el panel (también a alguien nuevo y con varios lugares) y la lista de espera sobre la API',
+    foco: 'En la clase del día se anota a quien ya vino o a alguien nuevo (nombre y celular), con varios lugares si viene acompañado. Con la clase llena el panel ofrece la lista de espera y avisa en qué lugar quedó; al liberarse un lugar, el primero pasa solo.',
+    que: `Tarea del 11/11 del plan.
+
+- **Anotar:** el selector de "Anotar" suma "Alguien nuevo…" (nombre y celular, validado como lo pide la API) y, si queda más de un lugar, "Lugares". Con la API es \`POST /reservas\` confirmada, con una clave por intento (dos clics no dan dos lugares) y los datos de la persona; el motor la vincula a la ficha de cliente del negocio por celular o email. En la demo, la persona nueva queda como socio.
+- **Con la clase llena:** el botón pasa a "A la lista de espera" y anota con \`POST /reservas/espera\`, una ruta nueva del panel (entrada transversal del mismo día); el aviso dice en qué lugar de la lista quedó (en la demo también).
+- **El primero pasa solo:** al liberar un lugar, el motor se lo da al primero que esperaba en la misma transacción, y el aviso dice quién pasó. "Darle el lugar" (\`POST /reservas/espera/:id/lugar\`) queda para cuando aparece un lugar sin que nadie cancele, por ejemplo al subirle el cupo a la clase.
+- **Si la clase se llenó mientras se miraba** (alguien reservó desde el sitio), la API contesta 409 "No queda lugar en ese horario.": el panel lo muestra en un aviso de error y vuelve a leer. Mientras se guarda y se relee, la sección no se puede tocar (lo que se ve puede estar viejo).
+
+**Verificado en el navegador contra la API local y la base de dev**, sobre Halterofilia (cupo 3): Lu Paz con 2 lugares y Sol Ríos con 1 llenan la clase; el botón pasa a "A la lista de espera" y Tomás Vera queda primero ("Está en el lugar 1 de la lista."). En la API: 3 de 3 lugares y una persona esperando.
+
+${comoQuedo('gimnasio', ['Clase llena con lista de espera · 1280', 'api-clase-llena-1280.webp'], ['Anotar a alguien nuevo · 390', 'api-clase-detalle-390.webp'])}`,
+    archivos: [
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:308',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:355',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:436',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:486',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:530',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:350',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:427',
+      'apps/web/src/modules/gimnasio/datos/origen/demo.ts:47',
+      'apps/web/src/modules/gimnasio/admin/piezas.tsx:40',
+      'apps/web/src/design-system/reservas/piezas.tsx:240',
+    ],
+  }),
+  entrada({
+    modulo: 'gimnasio', fecha: G11, slug: 'espera-desde-el-panel', tipo: 'tarea', quien: 'Ale', transversal: true,
+    titulo: 'Transversal: el motor de reservas anota en la espera y le da el lugar a quien espera, desde el panel',
+    foco: 'Dos rutas nuevas del panel en el backend compartido: POST /reservas/espera (el negocio anota a alguien en un horario lleno, hasta que empieza) y POST /reservas/espera/:id/lugar (darle el lugar, con el mismo candado y la misma cuenta que una reserva nueva). La lista del panel ya no trae el token del enlace personal. Sirve a los tres módulos.',
+    que: `Hacía falta para la tarea del 11/11 de Gimnasio y les sirve a Turnos y Alquileres: el panel no tenía cómo anotar a alguien en la espera ni cómo darle un lugar a quien esperaba. **Es lo compartido: hay que avisarles a Mateo y Alan antes de mergear.**
+
+- **\`POST /reservas/espera\`** (\`reservas.manage\`): el mismo \`anotarseEnEspera\` del sitio, en modo panel (un horario de hoy se anota hasta que empieza, sin la anticipación del sitio) y con registro en \`audit_logs\`. Solo con el horario lleno ("Todavía hay lugar en ese horario: reservá directo."). Devuelve la fila y su \`posicion\`.
+- **\`POST /reservas/espera/:id/lugar\`** (\`reservas.manage\`): con el recurso tomado (\`SELECT … FOR UPDATE\`) cuenta si entra uno más; si entra, la persona pasa a una reserva confirmada del panel y la espera queda tomada; si no, 409 "No queda lugar en ese horario." y sigue esperando. Repetirlo (dos clics, o una cancelación que la promovió en el medio) devuelve la misma reserva.
+- **La espera se reclama antes de crear nada:** \`promoverEspera\` (al cancelar) y darle el lugar usan el mismo camino, que primero marca la fila como tomada con un compare-and-set sobre \`ESPERANDO\`. Si la persona salió de la lista en ese mismo momento, no se crea una reserva para alguien que ya no esperaba (antes podía pasar) y, al cancelar, pasa el siguiente.
+- **\`GET /reservas/espera\` ya no devuelve \`tokenAcceso\`:** ese token es el enlace personal de la persona y no tiene por qué viajar al panel. La forma es la de \`Espera\` en \`lib/reservasApi/tipos.ts\`, que ya no lo tenía.
+- **El cliente web:** \`panel.anotarEnEspera\` y \`panel.darLugar\` en \`lib/reservasApi\`, y el tipo de lo que devuelve cancelar, arreglado: como intersección con \`Reserva\` se reducía a \`never\`, porque la API pisa \`sena\` con lo que pasó con la seña.
+
+**Verificado:** 5 tests unitarios nuevos del motor (30 en verde), 2 e2e nuevos contra Postgres de dev (17 de 17), entre ellos dos "darle el lugar" a la vez que devuelven la misma reserva, y el aislamiento por negocio en verde. **No está en producción:** va con el próximo \`deploy.sh\` (no lleva migración), cuando Ale lo decida.`,
+    archivos: [
+      'apps/api/src/reservas/reservas.service.ts:611',
+      'apps/api/src/reservas/reservas.service.ts:671',
+      'apps/api/src/reservas/reservas.service.ts:834',
+      'apps/api/src/reservas/reservas.service.ts:855',
+      'apps/api/src/reservas/reservas-panel.controller.ts:164',
+      'apps/api/src/reservas/reservas-panel.controller.ts:172',
+      'apps/api/src/reservas/reservas-panel.controller.ts:182',
+      'apps/api/src/reservas/reservas.types.ts:233',
+      'apps/api/src/reservas/README.md:106',
+      'apps/api/test/unit/reservas.service.unit-spec.ts:295',
+      'apps/api/test/reservas.e2e-spec.ts:315',
+      'apps/web/src/lib/reservasApi/cliente.ts:132',
+      'apps/web/src/lib/reservasApi/cliente.ts:69',
+    ],
+  }),
+  entrada({
+    modulo: 'gimnasio', fecha: G12, slug: 'liberar-presente-ausente', tipo: 'tarea', quien: 'Ale',
+    titulo: 'Liberar un lugar, check-in y faltó desde la clase del día, sobre la API',
+    foco: 'La cruz libera el lugar (si había espera, el primero pasa solo y el aviso dice quién), Check-in completa la reserva y Faltó la marca ausente. Con la API son estados finales: se marcan una vez, sobre un lugar reservado y desde que la clase empezó.',
+    que: `Tarea del 12/11 del plan.
+
+| En la clase | Con la API | Cuándo se puede |
+|---|---|---|
+| La cruz al lado de un anotado | \`POST /reservas/:id/cancelar\` | Antes de que la clase termine |
+| Check-in | \`POST /reservas/:id/completar\` | Desde que la clase empieza (en la demo, unos minutos antes) |
+| Faltó | \`POST /reservas/:id/ausente\` | Cuando la clase terminó |
+| La cruz al lado de alguien en espera | \`DELETE /reservas/espera/:id\` | Siempre |
+
+- **Estados finales:** en el motor, presente y ausente no se corrigen (de AUSENTE no se pasa a COMPLETADA). Con la API, el panel ofrece Check-in y Faltó solo sobre un lugar reservado; en la demo se sigue pudiendo corregir. Lo dice el origen (\`puede.corregirAsistencia\`), no la pantalla.
+- **Cuándo se abre el check-in:** el motor no deja completar antes de la hora; con la API el detalle dice "El check-in se abre cuando empieza la clase".
+- **El aviso:** al liberar un lugar con gente esperando, dice quién pasó de la lista (en la demo también).
+
+**Verificado en el navegador contra la API local y la base de dev:** en Halterofilia, la cruz de Sol Ríos la cancela y Tomás Vera pasa de la espera a confirmado ("Tomás pasó de la lista de espera y ya tiene su lugar."). En una clase que ya terminó, Check-in deja a Ana COMPLETADA y Faltó deja a Beto AUSENTE, y después no queda ningún botón para corregir.
+
+${comoQuedo('gimnasio', ['El primero de la espera toma el lugar · 1280', 'api-espera-pasa-1280.webp'], ['Asistencia de una clase que terminó · 1280', 'api-asistencia-1280.webp'])}`,
+    archivos: [
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:387',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:369',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:382',
+      'apps/web/src/modules/gimnasio/datos/origen/index.ts:78',
+      'apps/web/src/modules/gimnasio/datos/origen/demo.ts:58',
+    ],
+  }),
+  entrada({
+    modulo: 'gimnasio', fecha: G12, slug: 'orbi-y-tutoriales-por-modulo', tipo: 'tarea', quien: 'Ale', transversal: true,
+    titulo: 'Transversal: Orbi y la lista de tutoriales reciben a los módulos',
+    foco: 'Cada módulo escribe su manual para Orbi sin importar a Tienda (lib/manual) y el generador lo junta en el artefacto de la API, aparte de los temas de Tienda: no entra al prompt, no se paga IA por los módulos. La lista de tutoriales distingue el módulo y cada responsable carga la suya con tutoriales_crear.',
+    que: `Tarea transversal del 12/11 del plan (sumada el 04/11): que el manual de cada módulo llegue a Orbi y que la lista de tutoriales distinga el módulo.
+
+**El manual de cada módulo:**
+
+- **El vocabulario** (\`lib/manual/bloques.ts\`): los bloques (párrafo, lista, pasos, campos, estados, nota) y el texto plano para Orbi salen del manual de Tienda a una librería que no conoce módulos (eslint lo vigila). Tienda los sigue usando igual.
+- **Un manual por módulo** (\`lib/manual/modulos.ts\`): cada uno escribe el suyo en \`modules/<módulo>/manual.ts\`. Gimnasio ya tiene el suyo: las secciones del panel, las clases del día, anotar, la lista de espera, liberar un lugar, check-in y faltas, la grilla semanal y los días sin clases, con los nombres exactos de los botones y un test que falla si un botón no existe en el panel.
+- **El generador** (\`modules/orbi/manual/artefacto.ts\`) junta Tienda y los módulos, como el alta conoce a los cuatro. Los temas de los módulos van en \`modulos\` del artefacto, con el módulo adelante del id (\`gimnasio.anotar\`), y **no entran al índice del prompt**: un test de la API lo vigila. Orbi no los usa todavía; quedan escritos y al día.
+- **Turnos y Alquileres:** no se tocaron sus módulos. Un test arma el artefacto con un tema de prueba de cada uno y comprueba que llega; cuando Mateo y Alan escriban su manual, lo suman a \`MANUALES_DE_MODULOS\` (está explicado en \`.claude/rules/modulos.md\`).
+
+**La lista de tutoriales:**
+
+- **Columna \`modulo\`** en \`marketing_tutoriales\` (tienda, turnos, alquileres o gimnasio; los 39 que había quedaron en tienda). Migración \`20261116120000_marketing_tutoriales_modulo\`, aditiva e idempotente, **aplicada en dev** (160 de 160) y **no en producción**.
+- **El conector:** \`tutoriales_listar\` y \`tutoriales_actualizar\` aceptan \`modulo\`, y **\`tutoriales_crear\`** suma un tutorial a la lista de un módulo (queda en FALTA, al final de su grupo). Las pantallas de un módulo empiezan con el módulo (\`gimnasio/clases\`), así no chocan con las de Tienda. Los títulos no se repiten, ni entre módulos.
+- **El panel de Tienda recibe lo mismo de siempre:** "Ver tutorial" pide los videos sin módulo y le llegan solo los de Tienda.
+- **Marketing → Videos → Tutoriales:** un filtro por módulo y un chip en los que no son de Tienda.
+- **Docs:** \`docs/marketing/FLUJO-PROSPECCION-Y-VIDEOS.md\` § La lista de tutoriales, \`apps/api/DEPLOYMENT.md\`, y las reglas \`.claude/rules/modulos.md\` (§ 4 y § 5) y \`manual.md\`.
+
+**Verificado:** los tests del manual (web y API) y del artefacto (al día, regenerado con \`pnpm manual:generar\`), los de tutoriales y del conector (5 suites, 116 casos) y el typecheck de las dos apps. **No está en producción:** la API necesita la migración (\`prisma-prod.sh migrate deploy\`) y \`deploy.sh\`; la web funciona igual con la API de antes.`,
+    archivos: [
+      'apps/web/src/lib/manual/bloques.ts:10',
+      'apps/web/src/lib/manual/modulos.ts:31',
+      'apps/web/src/lib/manual/modulos.ts:42',
+      'apps/web/src/lib/manual/contrato.ts:29',
+      'apps/web/src/modules/gimnasio/manual.ts:16',
+      'apps/web/src/modules/gimnasio/__tests__/manual.test.ts:15',
+      'apps/web/src/modules/orbi/manual/artefacto.ts:23',
+      'apps/web/src/modules/orbi/manual/artefacto.ts:29',
+      'apps/web/src/modules/orbi/manual/artefacto.test.ts:37',
+      'apps/web/src/modules/ventas/panel/manual/paraOrbi.ts:34',
+      'apps/web/src/modules/ventas/panel/manual/contenido.ts:43',
+      'apps/web/eslint.config.mjs:39',
+      'apps/api/src/orbi/manual/manual.types.ts:38',
+      'apps/api/src/orbi/manual/manual.generated.ts:1055',
+      'apps/api/src/orbi/manual/manual.spec.ts:52',
+      'apps/api/prisma/schema.prisma:3851',
+      'apps/api/prisma/migrations/20261116120000_marketing_tutoriales_modulo/migration.sql:5',
+      'apps/api/src/marketing/videos/tutoriales.service.ts:33',
+      'apps/api/src/marketing/videos/tutoriales.service.ts:185',
+      'apps/api/src/marketing/videos/tutoriales.service.ts:300',
+      'apps/api/src/marketing/prospeccion/mcp/mcp-prospeccion.ts:233',
+      'apps/api/src/marketing/videos/videos.controller.ts:95',
+      'apps/api/test/unit/tutoriales.unit-spec.ts:160',
+      'apps/web/src/modules/superadmin/ListaDeTutoriales.tsx:204',
+    ],
+  }),
+  entrada({
+    modulo: 'gimnasio', fecha: F13, slug: 'dias-sin-clases', tipo: 'tarea', quien: 'Ale',
+    titulo: 'Días sin clases sobre /reservas/bloqueos: el bloqueo saca las sesiones y avisa cuántas reservas quedaron adentro',
+    foco: 'Agregar días crea un bloqueo de todo el negocio (del primer día a las 00:00 al final del último) y Quitar lo borra. La API no deja reservar esos días y devuelve cuántas reservas quedaron adentro: el panel lo avisa, porque no se cancelan solas.',
+    que: `Tarea del 13/11 del plan.
+
+- **De días a instantes:** el panel guarda los días sin clases como \`[desde, hasta)\`; a la API van como \`fechaDesde\` y \`fechaHasta\` (el último día incluido, hasta las 24). Al leer, un bloqueo que termina a la medianoche no se lleva el día siguiente y uno que termina a mitad de un día lo cuenta entero. Solo los de todo el negocio son "días sin clases"; uno de una sola clase igual tapa esa sesión en la API.
+- **El aviso:** \`POST /reservas/bloqueos\` no cancela lo reservado y devuelve \`afectadas\`; el panel dice "2 reservas quedan adentro: no se cancelan solas, avisales.". La demo cuenta lo mismo con sus inscripciones, y el modal ya no dice que quien tenía lugar "lo ve cancelado" (con la API no es así).
+- **Las fechas:** el día de hoy es el de verdad con la API, y el selector no deja elegir días que ya pasaron.
+
+**Verificado en el navegador contra la API local y la base de dev:** el miércoles con dos reservas en Halterofilia, Agregar días con el motivo "Mantenimiento del box" avisa "2 reservas quedan adentro"; en la API el bloqueo existe y \`GET /reservas/disponibilidad\` de ese día queda sin sesiones; en Clases ese día se ve "Sin clases" con el motivo. Quitar lo borra de la API.
+
+${comoQuedo('gimnasio', ['Días sin clases sobre la API · 1280', 'api-dias-sin-clases-1280.webp'], ['Días sin clases sobre la API · 390', 'api-dias-sin-clases-390.webp'], ['El día bloqueado en Clases · 1280', 'api-dia-bloqueado-1280.webp'])}`,
+    archivos: [
+      'apps/web/src/modules/gimnasio/admin/configuracion/Bloqueos.tsx:63',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Bloqueos.tsx:145',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:142',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:472',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:327',
+      'apps/web/src/modules/gimnasio/datos/index.ts:754',
+      'apps/api/src/reservas/reservas-catalogo.service.ts:343',
+    ],
+  }),
+
+  entrada({
+    modulo: 'gimnasio', fecha: F16, slug: 'planes-pases-alumnos', tipo: 'decisión', quien: 'Ale',
+    titulo: 'Planes, pases y alumnos viven en tablas propias de Gimnasio, al lado del motor de reservas',
+    foco: 'Tarea del 16/11 del plan. Lo que no es una reserva (los planes, las clases que le quedan a cada alumno y los alumnos mismos) se guarda en tablas gimnasio_* de la API, con su propio módulo, sin tocar el motor compartido.',
+    que: `Las clases ya eran reservas en el motor compartido. Faltaba decidir dónde se guarda lo demás antes de conectar Alumnos (17/11), Planes (18/11) y los pases (19/11). Había tres caminos: tablas propias de Gimnasio, los datos sueltos (JSON) de las clases o de la config, o la ficha de cliente de Tienda con campos de más.
+
+**Lo que queda decidido**
+
+1. **\`gimnasio_planes\`:** el tipo (prueba, suelta, pack o membresía), el nombre, el precio, cuántas clases trae (pack), cuántas por semana (membresía; 0 es libre), los días de vigencia, si se ofrece en el sitio y el orden. Es lo que edita Planes y precios.
+2. **\`gimnasio_alumnos\`:** el alumno del negocio, enganchado a la ficha de cliente que el motor ya vincula a cada reserva por celular o email, más la nota y el día de alta. Así una reserva hecha desde el sitio cae en su alumno sin pasos de más.
+3. **\`gimnasio_suscripciones\`:** el plan de cada alumno: una fila por compra o renovación, con una foto del plan (si después cambia el precio, lo vendido no cambia) y desde y hasta qué día vale. Es el historial que Ingresos armaba a mano.
+4. **Las clases usadas de un pack no se guardan aparte: se cuentan de las reservas.** Cada reserva dice con qué se pagó en su campo libre (con el plan, aparte o como clase de prueba), y las usadas de un plan son sus reservas que no se cancelaron. Al cancelar, la clase vuelve sola.
+
+Reservar un lugar con plan pasa por una ruta de Gimnasio: toma el candado del alumno, mira el plan (vigente, tope de la semana, clases del pack) y le pide la reserva al motor. La reserva sigue siendo del motor: el cupo, la espera y el candado del recurso no cambian.
+
+**Corregido el 24/11, al implementarlo.** La propuesta del 16/11 tenía una cuarta tabla, \`gimnasio_movimientos\`, con cada clase descontada o devuelta. Quedó afuera: un contador guardado aparte se puede desfasar de lo reservado, y contando las reservas eso no puede pasar. El campo libre de la reserva lo había sumado Alan al motor el 23/11.
+
+**Lo que queda para después:** el catálogo de actividades y salas y el equipo (el punto 5 de la propuesta) no tiene tarea en el plan todavía. Hasta entonces se siguen escribiendo al cargar una clase.
+
+Se implementa con las tareas del 17 al 19/11. Lleva una migración nueva, que en producción se aplica recién cuando Ale lo diga.`,
+    decision: 'Tablas propias de Gimnasio (`gimnasio_planes`, `gimnasio_alumnos` y `gimnasio_suscripciones`) en un módulo propio de la API, al lado del motor de reservas y sin tocarlo; las clases usadas de un pack se cuentan de las reservas. Ale la tomó el 24/11, al retomar el módulo: ante la recomendación de este camino contestó "hacé todo".',
+    porque: 'En los datos sueltos de una clase no hay integridad (dos reservas a la vez podrían gastar la misma clase de un pack), ni historial, ni forma de listar o filtrar. En la ficha de cliente de Tienda se mezclaría Tienda con Gimnasio, y el plan y los pases igual necesitarían tablas. Con tablas propias y el candado del alumno, dos reservas a la vez no gastan la misma clase, queda el historial de renovaciones y Turnos y Alquileres no se enteran.',
+    archivos: [
+      'apps/web/src/modules/gimnasio/datos/index.ts:117',
+      'apps/web/src/modules/gimnasio/datos/index.ts:259',
+      'apps/web/src/modules/gimnasio/datos/index.ts:325',
+      'apps/api/prisma/schema.prisma:649',
+      'apps/api/prisma/schema.prisma:4085',
+      'apps/api/src/reservas/reservas.service.ts:322',
+    ],
+  }),
+  // Lo que encontró la revisión de Gimnasio sobre la API (pedida por Ale el 16/11) y cómo quedó.
+  entrada({
+    modulo: 'gimnasio', fecha: F16, slug: 'el-motor-cuida-la-espera-y-las-clases', tipo: 'tarea', quien: 'Ale', transversal: true,
+    titulo: 'Transversal: el motor de reservas cuida la lista de espera y las clases con lugares tomados',
+    foco: 'Cambia para los tres módulos, sin migración: anotarse en la espera, darle el lugar a alguien y editar o borrar un recurso pasan por el mismo candado; nadie recibe un lugar que no puede usar; y el enlace personal de la espera se entrega una sola vez.',
+    que: `Ale pidió el 16/11 revisar todo lo que quedó conectado de Gimnasio a la API y arreglar lo que apareciera. Esto es lo que cambió en el motor que comparten Turnos, Alquileres y Gimnasio (\`apps/api/src/reservas\`). **No lleva migración.** Se terminó y se probó el 24/11, ya sobre lo que Alan sumó al motor el 23/11 (el precio de la estadía, el campo \`datos\` y los bloqueos con \`reservas.manage\`).
+
+| Qué | Antes | Ahora |
+|---|---|---|
+| Anotarse en la lista de espera | Sin teléfono ni email quedaba una fila a la que no se le podía avisar, y dos pedidos a la vez de la misma persona dejaban dos filas | Pide un teléfono o un email (400 si faltan los dos) y busca y crea con el candado del recurso: queda una sola |
+| El enlace personal de la espera, en el sitio | \`POST espera\` lo devolvía siempre: con el mail o el celular de alguien que ya esperaba se conseguía su enlace | Se entrega una sola vez. Si ya estaba, la respuesta dice \`yaEstaba: true\`, su lugar en la lista y \`token: null\` |
+| Darle el lugar a quien espera (cuando otro cancela, o desde el panel) | Contaba contra el cupo que se había leído antes de tomar el candado y sin el margen entre reservas, y pasaba aunque el horario ya hubiera empezado, estuviera bloqueado o el recurso estuviera pausado | Cuenta como una reserva nueva (el cupo de la fila tomada, con el margen) y no pasa nadie en un horario que ya empezó, que está bloqueado o con el recurso pausado |
+| Salir de la lista de espera | Con el lugar ya tomado contestaba que sí y no hacía nada | 409: lo que queda es cancelar la reserva |
+| Quiénes esperan (\`GET espera\` sin fecha) | Todos, también los de horarios que ya pasaron | De hoy en adelante; con \`fecha\`, los de ese día |
+| Quien esperaba un horario que ya empezó | Quedaba "esperando" para siempre | El job de cada 5 minutos lo saca de la lista |
+| Editar una clase (\`PUT recursos/:id\`) | Sin candado: se le podía bajar el cupo por debajo de lo ya reservado o sacarle una sesión con gente | Con candado. En una \`CLASE\`, 400 con la fecha si el cupo baja de lo tomado o si se saca o se mueve una sesión que tiene reservas por delante |
+| Borrar un recurso | La cuenta de reservas y el borrado iban sin candado | Los dos con el candado: nadie reserva en el medio |
+| La agenda (\`GET /reservas\`) | Hasta 100 por página, ordenada por inicio: las reservas de una clase empiezan todas a la misma hora, y una página podía repetir o saltear una | Hasta 500 por página, ordenada por inicio y por id |
+| Un pedido sin \`cliente\` | 500 | 400 con su mensaje |
+
+**Para Turnos y Alquileres, lo que conviene mirar:**
+
+- Si su sitio usa la lista de espera: \`sitio(slug).anotarseEnEspera\` ahora devuelve \`AnotadaEnEspera\` y el \`token\` puede venir en \`null\`. El enlace hay que guardarlo la primera vez.
+- Editar un recurso de tipo \`CLASE\` que tiene reservas por delante puede contestar 400: el mensaje ya viene escrito para mostrar. En los demás tipos de recurso no cambia nada.
+- Ninguna ruta ni ningún campo que ya usaran cambió de nombre.
+
+El candado quedó en un solo lugar (\`candado.ts\`) y lo usan el motor y el catálogo. El contrato completo está en el README del motor, en las filas "Lista de espera", "El enlace personal de la espera" y "Editar o borrar una clase con lugares tomados".
+
+**Cómo se probó:** los unitarios del motor y de aislamiento, los del dominio y los 22 de punta a punta contra la base de dev (\`test/reservas.e2e-spec.ts\`, con dos personas esperando y un solo lugar nuevo, a la vez). Además, en el navegador con el panel de Gimnasio: una clase de cupo 3 llena, la cuarta persona a la espera, se libera un lugar y pasa quien esperaba.
+
+**Falta:** está en \`main\` pero no en producción hasta el próximo \`deploy.sh\`. Mateo y Alan tienen que enterarse antes de ese deploy (regla de lo compartido).`,
+    archivos: [
+      'apps/api/src/reservas/candado.ts:15',
+      'apps/api/src/reservas/reservas.service.ts:611',
+      'apps/api/src/reservas/reservas.service.ts:671',
+      'apps/api/src/reservas/reservas.service.ts:737',
+      'apps/api/src/reservas/reservas.service.ts:757',
+      'apps/api/src/reservas/reservas.service.ts:786',
+      'apps/api/src/reservas/reservas.service.ts:855',
+      'apps/api/src/reservas/reservas-catalogo.service.ts:142',
+      'apps/api/src/reservas/reservas-catalogo.service.ts:173',
+      'apps/api/src/reservas/reservas-catalogo.service.ts:222',
+      'apps/api/src/reservas/reservas-mantenimiento.service.ts:46',
+      'apps/api/src/reservas/reservas-publico.controller.ts:185',
+      'apps/api/src/reservas/dto/comunes.dto.ts:78',
+      'apps/api/src/reservas/dto/reservas.dto.ts:11',
+      'apps/api/src/internal-cron/internal-cron.controller.ts:229',
+      'apps/api/src/reservas/README.md:76',
+      'apps/api/test/unit/reservas-catalogo.unit-spec.ts:46',
+      'apps/api/test/reservas.e2e-spec.ts:28',
+      'apps/web/src/lib/reservasApi/tipos.ts:244',
+      'apps/web/src/lib/reservasApi/cliente.ts:167',
+    ],
+  }),
+  entrada({
+    modulo: 'gimnasio', fecha: F16, slug: 'el-panel-sobre-la-api-revisado', tipo: 'tarea', quien: 'Ale',
+    titulo: 'El panel de Gimnasio sobre la API, revisado: relee solo lo que cambió, avisa cuando algo falla y pregunta antes de liberar un lugar',
+    foco: 'Lo que apareció al revisar el panel conectado a la API y cómo quedó: lecturas de a una y solo de lo tocado, una franja cuando los datos pueden estar viejos, confirmación al liberar un lugar, formularios que esperan la respuesta y los días sin clases con sus reservas a la vista.',
+    que: `Revisión pedida por Ale el 16/11 sobre las tareas del 09 al 13/11; terminada y probada el 24/11. La demo sigue igual: lo que no es igual en la demo y con la API llega a las pantallas en \`puede\` (Capacidades).
+
+**Cómo lee el panel**
+
+- **Solo lo que cambió.** Después de cada acción se relee lo que esa acción pudo tocar: el día de esa clase, las clases o los días sin clases. Antes se releía la ventana entera en cada clic, y al tomar asistencia (varios clics seguidos) se llegaba al tope de pedidos por minuto de la API.
+- **De a una y en orden.** Las lecturas pasan por una cola (\`ColaDeLecturas\`): cada una parte de lo que dejó la anterior, así una respuesta que tarda no pisa a una más nueva, y una que falla no corta la cola.
+- **Se actualiza solo.** El día que se está mirando se relee cada minuto y al volver a la pestaña: lo que alguien reserva desde el sitio aparece sin tocar nada.
+- **La ventana.** Cinco semanas para atrás y ocho para adelante; mirar otra fecha pide solo los días que faltan, hasta un año para cada lado.
+
+**Cuando algo falla, se dice**
+
+- Si una lectura falla con datos en pantalla, no se borran: una franja avisa "No pudimos actualizar los datos", con el botón Actualizar.
+- Lo que rechaza la API se muestra con su mensaje ("No queda lugar en ese horario."). Lo demás (sin conexión, sesión vencida, demasiados pedidos seguidos, el servidor que no contesta en 20 segundos) se dice en castellano, no con el error del navegador.
+
+**Clases**
+
+- Liberar un lugar o sacar a alguien de la lista de espera pide confirmación, y dice que con la API no tiene vuelta atrás (la reserva queda cancelada y a la persona le llega el aviso). En celular la cruz mide un dedo y queda arriba, al lado del nombre.
+- Cada lugar se ve con el nombre con el que se anotó: dos personas pueden compartir celular y ficha (una madre que anota a sus dos hijos).
+- Los formularios esperan la respuesta: la clase y los días sin clases no se cierran hasta que se guardaron, y si la API rechaza el cambio lo cargado no se pierde. "Anotar" devuelve lo cargado si no se pudo.
+- Con la API, la actividad, el profe y la sala se escriben al cargar la clase (viajan adentro de su recurso, porque todavía no hay un catálogo aparte). Tocarle el cupo a una clase no le cambia la duración.
+- Un día marcado sin clases deja a la vista las clases que todavía tienen gente, con el aviso de cuántas reservas siguen en pie; ese día no se anota a nadie más.
+
+**Días sin clases:** cada fila dice cuántas reservas siguen en pie, con "Ver el día" para ir a liberarlas, y el formulario lo avisa antes de guardar. Para poder contarlas, el panel lee hasta el último día cerrado que viene.
+
+**Lo demás:** Alumnos, Ingresos, Mensajes, Pagos y Calendarios usan el día del reloj del origen (con la API usaban el día fijo de la demo); Reglas dice qué pasa con la espera al subir el cupo según el origen; el aviso del kit tenía una región viva adentro de otra y el lector de pantalla lo leía dos veces.
+
+**El manual de Orbi** quedó al día con todo esto (Clases, la grilla, Días sin clases y un tema nuevo para el aviso de datos viejos).
+
+**Verificado en el navegador contra la API local y la base de dev, a 1280 y a 390:** anotar a tres personas nuevas en una clase de cupo 3; la cuarta va a la espera y el aviso dice su lugar; "Volver" no libera nada y "Liberar el lugar" deja pasar a quien esperaba; cargar el día como sin clases avisa las 3 reservas antes y después de guardar, y "Ver el día" lleva a ese día; una clase con actividad, profe y sala escritos ahí mismo queda en la grilla; sin conexión aparece la franja, la acción avisa en castellano y, con conexión, Actualizar la saca. Sin scroll horizontal y con los botones de 44 px o más a 390.
+
+${comoQuedo('gimnasio',
+    ['Días sin clases con reservas en pie · 1280', 'arreglos-bloqueos-reservas-en-pie-1280.webp'], ['Días sin clases con reservas en pie · 390', 'arreglos-bloqueos-reservas-en-pie-390.webp'],
+    ['El día sin clases, con la clase que quedó con gente · 1280', 'arreglos-dia-sin-clases-1280.webp'], ['El día sin clases · 390', 'arreglos-dia-sin-clases-390.webp'],
+    ['La pregunta antes de liberar un lugar · 1280', 'arreglos-confirmar-liberar-1280.webp'], ['La pregunta antes de liberar un lugar · 390', 'arreglos-confirmar-liberar-390.webp'],
+    ['Una clase con actividad y profe nuevos · 1280', 'arreglos-clase-con-actividad-nueva-1280.webp'], ['Una clase con actividad y profe nuevos · 390', 'arreglos-clase-con-actividad-nueva-390.webp'],
+    ['El aviso de datos viejos · 1280', 'arreglos-datos-viejos-1280.webp'], ['El aviso de datos viejos · 390', 'arreglos-datos-viejos-390.webp'],
+  )}`,
+    archivos: [
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:113',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:205',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:226',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:272',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:449',
+      'apps/web/src/modules/gimnasio/datos/origen/index.ts:117',
+      'apps/web/src/modules/gimnasio/datos/origen/index.ts:122',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:426',
+      'apps/web/src/modules/gimnasio/admin/Panel.tsx:188',
+      'apps/web/src/modules/gimnasio/admin/Panel.tsx:227',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:308',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:488',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:614',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Bloqueos.tsx:63',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Bloqueos.tsx:123',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Reglas.tsx:24',
+      'apps/web/src/modules/gimnasio/admin/Ingresos.tsx:89',
+      'apps/web/src/modules/gimnasio/admin/Socios.tsx:84',
+      'apps/web/src/design-system/reservas/piezas.tsx:240',
+      'apps/web/src/modules/gimnasio/manual.ts:46',
+      'apps/web/src/modules/gimnasio/datos/origen/__tests__/api.test.ts:568',
+      'apps/web/src/modules/gimnasio/datos/origen/__tests__/mapear.test.ts:159',
+    ],
+  }),
+  entrada({
+    modulo: 'gimnasio', fecha: F16, slug: 'tutoriales-se-corrigen-no-se-borran', tipo: 'tarea', quien: 'Ale', transversal: true,
+    titulo: 'Transversal: un tutorial cargado con un error se corrige por el conector, y dos altas a la vez no quedan en el mismo lugar',
+    foco: 'La lista de tutoriales por módulo, revisada: tutoriales_actualizar también cambia el título y el grupo, los títulos se comparan sin comodines, los grupos sin mirar acentos, y lo que toca un título o un lugar corre de a uno. Sin borrado y sin migración.',
+    que: `Revisión pedida por Ale el 16/11 sobre la tarea transversal del 12/11 (la lista de tutoriales recibe a los módulos).
+
+- **Corregir en vez de borrar.** \`tutoriales_actualizar\` acepta también \`titulo\` y \`grupo\` (además de \`modulo\`): renombra, o pasa el tutorial al final del grupo donde queda. No hay borrado, ni por el conector ni desde el panel: lo que sobra se renombra o se reusa.
+- **\`grupoNuevo\`.** Crear o mover un tutorial avisa si para eso hubo que abrir un grupo que no existía en ese módulo: un nombre mal escrito no pasa sin que nadie se entere. Los grupos se emparejan sin mirar mayúsculas ni acentos ("Catalogo" entra en "Catálogo").
+- **El título, exacto.** Un tutorial se ubica por su título con una comparación exacta sin distinguir mayúsculas. Antes se usaba el modo "insensitive" de Prisma, que arma un ILIKE: "%" y "_" eran comodines y "a_c" encontraba "abc". También en la cola de videos.
+- **De a uno.** Lo que toca un título o un lugar de la lista corre en una transacción con un candado de la base: dos altas a la vez ya no leen el mismo "último lugar" ni ven libre el mismo título.
+- **Las pantallas.** Fuera de Tienda admiten un tramo más (el primero es el módulo: \`gimnasio/configuracion/equipo\`); en Tienda ninguna puede empezar con el prefijo de otro módulo, tampoco al pasar a Tienda un tutorial con las pantallas que ya tenía.
+- **Lo que hay y lo que no.** El conector y la documentación dicen que el botón "Ver tutorial" de los paneles de Turnos, Alquileres y Gimnasio todavía no existe: el link y las pantallas de un tutorial de esos módulos quedan guardados para cuando lo tengan.
+- **En el panel** (Marketing → Videos → Tutoriales): el encabezado de un grupo dice "prioridad alta" u "opcionales" solo si lo son todos (si no, un chip por fila), y al cambiar de módulo se ve la carga y no un error.
+
+La documentación está en \`docs/marketing/FLUJO-PROSPECCION-Y-VIDEOS.md\` (§ La lista de tutoriales) y en \`DEPLOYMENT.md\`.
+
+**Cómo se probó:** los unitarios de tutoriales, de videos y del protocolo del conector. **Falta:** la API va con el próximo \`deploy.sh\`, y la columna \`modulo\` (migración del 16/11) todavía no está en producción. El panel anda igual con la API de hoy.`,
+    archivos: [
+      'apps/api/src/marketing/videos/tutoriales.service.ts:80',
+      'apps/api/src/marketing/videos/tutoriales.service.ts:126',
+      'apps/api/src/marketing/videos/tutoriales.service.ts:232',
+      'apps/api/src/marketing/videos/tutoriales.service.ts:330',
+      'apps/api/src/marketing/videos/videos.service.ts:208',
+      'apps/api/src/marketing/prospeccion/mcp/mcp-prospeccion.ts:208',
+      'apps/api/test/unit/tutoriales.unit-spec.ts:77',
+      'apps/web/src/modules/superadmin/ListaDeTutoriales.tsx:137',
+      'apps/api/DEPLOYMENT.md:617',
+    ],
+  }),
+  entrada({
+    modulo: 'gimnasio', fecha: F16, slug: 'la-independencia-y-el-manual-los-cuidan-los-tests', tipo: 'tarea', quien: 'Ale', transversal: true,
+    titulo: 'Transversal: que un módulo no importe a otro y que el manual nombre botones que existen ahora lo bloquean los tests',
+    foco: 'Dos reglas del ciclo dependían del lint, que en el CI es informativo. Ahora un test falla si Turnos, Alquileres o Gimnasio importan a otro módulo, y otro si el manual de cualquier módulo nombra un botón que no está en sus pantallas.',
+    que: `Parte de la revisión que Ale pidió el 16/11: mirar también las reglas del ciclo.
+
+- **Independencia.** \`modules/__tests__/independencia.test.ts\` lee los imports de cada módulo con el parser de TypeScript (los \`import\`, los \`export … from\`, los \`import()\` y los \`require()\`) y falla si uno de los tres importa a otro o al alta, o si lo compartido (\`lib/reservas\`, \`lib/reservasApi\`, \`lib/manual\`, \`design-system/reservas\`) importa a un módulo. Es la misma regla de eslint, pero el lint del CI es informativo y los tests no. Hoy pasa: no había ningún cruce.
+- **El manual.** Las guardas de \`artefacto.test.ts\` valen para el manual de cualquier módulo que se sume a \`MANUALES_DE_MODULOS\`: que no importe a otro módulo, que cada \`[[botón]]\` exista en sus pantallas y que sus temas no repitan id. Quien escriba el de Turnos o el de Alquileres queda cubierto sin copiar nada.
+- **Un botón que termina en "…".** El contrato comparaba el nombre del manual tal cual contra el texto de la pantalla ya limpio: "Actividad nueva…" nunca coincidía. Ahora los dos se comparan igual (\`botonesQueFaltan\`).
+- **Lo compartido suma una carpeta.** \`lib/manual\` (el vocabulario con el que cada módulo escribe su manual) figura en "Lo compartido" de Módulos, y la regla de Orbi manda al manual de cada módulo, no al de Tienda.
+
+**Cómo se probó:** los tests de Módulos, del manual y el de independencia, y la suite completa de la web.`,
+    archivos: [
+      'apps/web/src/modules/__tests__/independencia.test.ts:19',
+      'apps/web/src/modules/orbi/manual/artefacto.test.ts:56',
+      'apps/web/src/lib/manual/contrato.ts:56',
+      'apps/web/src/modules/gimnasio/__tests__/manual.test.ts:19',
+      'apps/web/src/modules/superadmin/modulos/compartido.ts:63',
+      'apps/web/src/modules/superadmin/modulos/reglas.ts:43',
+      'apps/web/src/lib/reservas/README.md:62',
+      'apps/web/eslint.config.mjs:15',
+    ],
+  }),
+
+  // Las tareas del 17 al 19/11 (hechas el 24 y el 25/11, al retomar el módulo): Alumnos, Planes y los pases sobre la API.
+  entrada({
+    modulo: 'gimnasio', fecha: G17, slug: 'alumnos-sobre-la-api', tipo: 'tarea', quien: 'Ale',
+    titulo: 'Alumnos sobre la API: se dan de alta con su plan y cada uno dice hasta cuándo vale',
+    foco: 'Tarea del 17/11 del plan. Alumnos guarda en la API de Gimnasio: el alta (con o sin plan), el plan que usa hoy con su vencimiento y, para quien reservó sin ser alumno, la ficha de cliente que ya tenía.',
+    que: `La decisión del 16/11 dejó a los alumnos en tablas propias de Gimnasio, al lado del motor de reservas. Hecha el 24 y el 25/11.
+
+**En la API** (\`apps/api/src/gimnasio\`, un módulo nuevo que usa el motor por sus servicios)
+
+- **\`gimnasio_alumnos\`:** un alumno es la ficha de cliente que el motor ya vincula a cada reserva por celular o email, más la nota y el día de alta. Uno por ficha: dar de alta a quien ya era alumno devuelve el mismo.
+- **\`GET /gimnasio/alumnos\`** trae cada alumno con sus planes que valen hoy o arrancan después, lo que usó y lo que le queda de cada uno, el último que tuvo si hoy no le queda ninguno y si ya tomó la clase de prueba.
+- **\`POST /gimnasio/alumnos\`** da de alta con una ficha que ya existe o con nombre y un celular o un email; con \`planId\`, arranca con ese plan.
+- Migración \`20261124130000_gimnasio_planes_alumnos\`: tres tablas nuevas, aditiva. Sin permisos nuevos: usa los de reservas.
+
+**En el panel**
+
+- **La lista** muestra a los alumnos de la API y, además, a quienes reservaron una clase sin ser alumnos todavía (por ejemplo, desde el sitio): figuran sin plan hasta que se les asigne uno. Cada fila dice el plan que usa hoy, cuándo vence y lo que le queda.
+- **Sumar a alguien** espera la respuesta: el formulario no se cierra hasta que se guardó, y el aviso dice con qué plan quedó y hasta cuándo.
+- **La ficha** le asigna un plan a quien solo había reservado (lo da de alta con su misma ficha: sus reservas siguen siendo suyas) y, cuando alguien tiene más de un plan, los muestra todos, cada uno con hasta cuándo vale y lo que le queda.
+- **Si la API todavía no tiene Gimnasio** (el panel se publica antes que la API), Alumnos abre igual y avisa que no guarda.
+
+**Cómo se probó:** en el navegador contra la API local y la base de dev, a 1280 en claro y a 390 en claro y en oscuro: el alta con plan, asignarle un plan a quien solo había reservado y la lista con los dos. Además, los 28 tests del servicio sin base, los de punta a punta contra dev (\`test/gimnasio.e2e-spec.ts\`) y los del panel sin red.
+
+**Falta:** la API no está en producción hasta el próximo \`deploy.sh\`, que necesita la migración aplicada allá. Las dos cosas las decide Ale.
+
+${comoQuedo('gimnasio', ['Alumnos sobre la API · 1280', 'alumnos-api-1280.webp'], ['Alumnos sobre la API · 390', 'alumnos-api-390.webp'], ['La ficha, con una membresía y un pack · 1280', 'alumnos-api-ficha-1280.webp'], ['La ficha · 390', 'alumnos-api-ficha-390.webp'])}`,
+    archivos: [
+      'apps/api/prisma/schema.prisma:4283',
+      'apps/api/prisma/migrations/20261124130000_gimnasio_planes_alumnos/migration.sql:1',
+      'apps/api/src/gimnasio/gimnasio.service.ts:118',
+      'apps/api/src/gimnasio/gimnasio.service.ts:181',
+      'apps/api/src/gimnasio/gimnasio-panel.controller.ts:51',
+      'apps/api/src/gimnasio/README.md:1',
+      'apps/web/src/modules/gimnasio/datos/origen/gimnasioApi.ts:119',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:329',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:349',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:365',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:142',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:399',
+      'apps/web/src/modules/gimnasio/admin/Socios.tsx:198',
+      'apps/web/src/modules/gimnasio/admin/Socios.tsx:312',
+      'apps/api/test/unit/gimnasio.unit-spec.ts:89',
+      'apps/api/test/gimnasio.e2e-spec.ts:113',
+    ],
+  }),
+  entrada({
+    modulo: 'gimnasio', fecha: F18, slug: 'planes-sobre-la-api', tipo: 'tarea', quien: 'Ale',
+    titulo: 'Planes y precios sobre la API: la clase de prueba, la suelta, los packs y las membresías',
+    foco: 'Tarea del 18/11 del plan. Planes y precios guarda en la API de Gimnasio: los cuatro tipos con su precio, cuántos alumnos tiene cada uno y si se ofrece en el sitio, que ya los puede leer sin sesión.',
+    que: `Hecha el 24 y el 25/11, junto con Alumnos.
+
+**En la API**
+
+- **\`gimnasio_planes\`:** el tipo (prueba, suelta, pack o membresía), el nombre, el precio, cuántas clases trae un pack, cuántas por semana una membresía (0 es libre), los días de vigencia, si se ofrece en el sitio y el orden. Un plan quitado no se borra: queda fuera de la lista, y quien lo tiene lo sigue usando.
+- **\`PUT /gimnasio/planes\`** recibe la lista entera como queda, todo o nada: con \`id\` se cambia, sin \`id\` se crea y lo que no viene se quita. Pide el permiso de configurar reservas. Un pack sin clases, un precio negativo o un plan que no existe son 400 y la lista queda como estaba.
+- **\`GET /storefront/:slug/gimnasio/planes\`**, sin sesión: los que el negocio ofrece en su sitio.
+
+**En el panel**
+
+- Un negocio que recién empieza no tiene planes: puede arrancar con los que suele tener su rubro ("Usar los planes sugeridos") y cambiarles el nombre y el precio.
+- Se suman con Membresía y Pack. La clase suelta y la de prueba son una de cada una: su botón aparece solo si falta.
+- Cada pack y cada membresía dice cuántos alumnos lo tienen hoy.
+- "Se ofrece en el sitio" apagado deja de venderlo; quien ya lo tiene lo sigue usando hasta que venza.
+- Un plan sin nombre no se guarda: la barra de guardar dice por qué.
+- Cambiar el precio o las clases de un plan no toca lo que ya tiene nadie: cada alumno guarda su plan como era cuando se lo asignaron.
+
+**Cómo se probó:** en el navegador contra la API local y la base de dev: los sugeridos, guardar, recargar y ver lo mismo, cambiar un precio, sumar un pack, apagar la clase suelta y el nombre vacío. A 1280 y a 390, sin scroll horizontal. Además, los tests de punta a punta contra dev (la lista entera, los 400 y lo que ve el sitio) y los del panel sin red.
+
+**Falta:** lo mismo que Alumnos: el \`deploy.sh\` de la API y su migración en producción.
+
+${comoQuedo('gimnasio', ['Sin planes: los sugeridos del rubro · 1280', 'planes-api-vacio-1280.webp'], ['Planes guardados en la API · 1280', 'planes-api-1280.webp'], ['Planes y precios · 390', 'planes-api-390.webp'])}`,
+    archivos: [
+      'apps/api/prisma/schema.prisma:4253',
+      'apps/api/src/gimnasio/gimnasio.service.ts:56',
+      'apps/api/src/gimnasio/gimnasio.service.ts:71',
+      'apps/api/src/gimnasio/gimnasio-panel.controller.ts:34',
+      'apps/api/src/gimnasio/gimnasio-publico.controller.ts:55',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:287',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:300',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:345',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Planes.tsx:28',
+      'apps/web/src/modules/gimnasio/admin/Panel.tsx:266',
+      'apps/api/test/gimnasio.e2e-spec.ts:113',
+    ],
+  }),
+  entrada({
+    modulo: 'gimnasio', fecha: F19, slug: 'pases-y-renovacion', tipo: 'tarea', quien: 'Ale',
+    titulo: 'Cada lugar dice cómo se paga: el pack se descuenta al reservar y renovar no pierde días',
+    foco: 'Tarea del 19/11 del plan. Al anotar a alguien se dice cómo paga ese lugar (con su plan, aparte o como clase de prueba): el pack descuenta, la membresía cuenta su tope de la semana y, si el plan no alcanza, el panel dice por qué. Renovar la misma membresía la continúa.',
+    que: `Hecha el 24 y el 25/11. Es lo que le da sentido a Alumnos y a Planes: que el plan se use.
+
+**Cómo se cuenta un pack (sin tabla de movimientos)**
+
+Cada reserva dice con qué se pagó en su campo libre, que el motor guarda sin interpretar: con el plan del alumno, aparte (se cobra en el gimnasio, como clase suelta) o como clase de prueba. Las clases usadas de un plan **se cuentan de sus reservas**: las que no se cancelaron. No hay un contador guardado aparte, así que no se puede desfasar de lo reservado: si la reserva se cancela, la clase vuelve sola; quien falta sin avisar la usó igual.
+
+**Las reglas, en la API** (\`dominio/planes.ts\`, puras y con su test)
+
+- **Con su plan:** entre los planes que valen ese día se usa primero el que vence antes. Un pack tiene que alcanzar para todos los lugares; una membresía cubre un lugar por clase y, si tiene tope, hasta sus clases de la semana.
+- **Si no alcanza, no se reserva:** 409 con el motivo ya escrito para mostrar (venció, no le quedan clases, ya usó las de esa semana). El negocio puede anotarlo igual cobrándolo aparte.
+- **Dos pedidos a la vez con la última clase de un pack:** entra uno solo. Anotar con plan, pasar un lugar al plan y asignar un plan toman antes el candado del alumno. Probado con cuatro pedidos simultáneos.
+- **Doble clic:** el pedido lleva una clave por intento; repetirlo devuelve la misma reserva sin descontar dos veces.
+- **La clase de prueba** es una sola vez por persona; si la cancela, puede volver a pedirla.
+- **Renovar:** la misma membresía antes de que venza continúa (arranca al día siguiente de que termina la que tiene: no pierde días); otra membresía reemplaza a la anterior; un pack convive con lo que haya.
+
+**En el panel**
+
+- **Al anotar**, "Cómo paga" ya propone lo que corresponde: su plan si cubre esa clase (dice cuál y, si es un pack, cuántas le quedan); si no, aparte, con el precio de la clase suelta. Si tiene un plan y no se la cubre, una nota dice por qué y qué hacer: renovarlo, o anotarlo con un solo lugar si la membresía no cubre a quien lo acompaña.
+- **En la lista de anotados**, un botón por persona dice cómo paga y deja corregirlo. Pasar un lugar del plan a aparte le devuelve la clase.
+- **"Sin definir"** es el lugar de quien reservó desde el sitio o pasó solo de la lista de espera: se le dice cómo paga desde su fila. Sin sesión no se descuenta un pack con solo escribir un celular.
+- **Dos personas que se llaman igual** se distinguen por el celular en la lista de "Anotar".
+- **La ficha** muestra en el historial cómo se pagó cada clase, y "Quitar este plan" saca uno asignado por error (los lugares ya reservados con él siguen reservados).
+
+**El manual que lee Orbi** suma "Cómo paga cada lugar" y los capítulos de Alumnos y de Planes y precios, con los nombres exactos de los botones.
+
+**Cambió en lo compartido:** \`botonesQueFaltan\` (\`lib/manual/contrato.ts\`) acepta varias carpetas, y el contrato de los manuales de los módulos mira también las piezas del kit: la barra de guardar ("Guardar cambios", "Descartar") se ve en los tres paneles y hasta ahora no se podía nombrar en un manual. A Turnos y a Alquileres no les cambia nada de lo que ya tenían.
+
+**Cómo se probó:** en el navegador contra la API local y la base de dev, a 1280 y a 390: definir tres lugares sin definir (con plan, aparte y prueba), anotar con un pack y verlo bajar de 8 a 7, pasarlo a aparte y verlo volver a 8, una membresía con un pack al lado (un lugar va con la membresía; dos, con el pack), la lista de espera que pasa sola y deja el lugar sin definir, renovar sin perder días y quitar un plan. Además, 30 tests de punta a punta contra dev, 110 del panel sin red y 17 del dominio.
+
+**Falta:** el \`deploy.sh\` de la API y su migración en producción.
+
+${comoQuedo('gimnasio',
+    ['Anotar: el panel propone cómo paga · 1280', 'pases-anotar-1280.webp'], ['Cada lugar con cómo se paga · 1280', 'pases-clase-1280.webp'],
+    ['Lugares sin definir (del sitio o de la espera) · 1280', 'pases-sin-definir-1280.webp'], ['Decir cómo paga un lugar · 1280', 'pases-como-paga-1280.webp'],
+    ['Renovar la misma membresía: sigue sin perder días · 1280', 'pases-renovacion-1280.webp'], ['La clase en el celular · 390', 'pases-clase-390.webp'],
+    ['Si el plan no cubre la clase, dice por qué · 390', 'pases-no-cubre-390.webp'], ['En oscuro · 390', 'pases-clase-oscuro-390.webp'])}`,
+    archivos: [
+      'apps/api/src/gimnasio/dominio/planes.ts:70',
+      'apps/api/src/gimnasio/dominio/planes.ts:89',
+      'apps/api/src/gimnasio/dominio/planes.ts:121',
+      'apps/api/src/gimnasio/dominio/planes.ts:157',
+      'apps/api/src/gimnasio/gimnasio.service.ts:216',
+      'apps/api/src/gimnasio/gimnasio.service.ts:284',
+      'apps/api/src/gimnasio/gimnasio.service.ts:339',
+      'apps/api/src/gimnasio/gimnasio.service.ts:388',
+      'apps/api/src/gimnasio/gimnasio-panel.controller.ts:84',
+      'apps/api/src/gimnasio/README.md:20',
+      'apps/web/src/modules/gimnasio/datos/index.ts:295',
+      'apps/web/src/modules/gimnasio/datos/index.ts:697',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:247',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:518',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:350',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:391',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:75',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:341',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:513',
+      'apps/web/src/modules/gimnasio/admin/Socios.tsx:198',
+      'apps/web/src/modules/gimnasio/manual.ts:86',
+      'apps/web/src/modules/gimnasio/manual.ts:169',
+      'apps/web/src/lib/manual/contrato.ts:56',
+      'apps/web/src/modules/orbi/manual/artefacto.test.ts:56',
+      'apps/web/src/modules/gimnasio/datos/__tests__/pagos.test.ts:36',
+      'apps/api/test/gimnasio.e2e-spec.ts:113',
+    ],
+  }),
+  entrada({
+    modulo: 'gimnasio', fecha: F19, slug: 'los-tres-planes-al-dia', tipo: 'tarea', quien: 'Ale', transversal: true,
+    titulo: 'Transversal: cómo viene cada plan: lo que espera confirmación y los atrasos, con su porqué',
+    foco: 'Tarea del 19/11 del plan, con corte al 25/11. Turnos tiene 15 tareas documentadas sin confirmar y le faltan las tres del sitio; Alquileres muestra 14 atrasos porque fue primero con la estadía, que ya está en producción; Gimnasio quedó al día hasta el 19/11.',
+    que: `Revisión de los tres planes de Módulos al **miércoles 25/11**. No toca el plan ni las entradas de Turnos ni de Alquileres: dice cómo están y qué le toca a cada uno.
+
+Cómo se cuenta: una tarea del plan con fecha pasada y sin su entrada es un **atraso**; con su entrada, **espera la confirmación** de su responsable, que la tilda en su navegador.
+
+| Módulo | Tocaban hasta el 25/11 | Con su entrada | Sin entrada |
+|---|---|---|---|
+| Turnos (Mateo) | 18 | 15 | 3 |
+| Alquileres (Alan) | 17 | 3 | 14 |
+| Gimnasio (Ale) | 18 | 14 | 4 |
+
+**Turnos**
+
+- Las 15 documentadas van del 05/11 al 19/11 del plan; sus entradas son del 13 al 24/11. El trabajo viene unos días corrido, pero completo y en orden.
+- Sin entrada: las tres del sitio (elegir servicio y profesional, el calendario desde la disponibilidad, y retener y confirmar), del 23 al 25/11.
+- **Le toca a Mateo:** confirmar las 15, y decir si el sitio mantiene sus fechas o las corre.
+
+**Alquileres**
+
+- Con entrada, las tres del arranque (el mapa, la capa de datos y los negocios de prueba).
+- Los 14 atrasos tienen una explicación: **el orden cambió**. El plan iba de canchas (semana 2) a salones (semana 3) y después a la estadía (semana 4), con el sitio en la semana 5. Alan fue primero con la **estadía por noche, de punta a punta y a producción**: el primer negocio real desde Superadmin, su sitio público con el enlace personal, el precio por temporada en el motor y la prueba en producción. Son seis entradas del 18 al 24/11 que no están enlazadas a ninguna tarea del plan.
+- Lo que el plan muestra atrasado y no se empezó: canchas (cinco tareas, del 09 al 13/11), salones (cinco, del 16 al 19/11) y la definición de cómo entran al backend los paquetes por salón y el alquiler por mes (06/11).
+- Lo que figura atrasado y, por lo que dicen sus entradas, está hecho: las tres de estadía del 23 al 25/11. También hay partes del sitio (30/11 al 03/12) ya adelantadas para la estadía.
+- **Reordenar el plan ya es una decisión abierta de Ale** desde el 18/11 ("lo que Alquileres le pide al backend compartido, y cómo se reordena su plan"). Su propuesta ordenaba canchas, salones y después la estadía; pasó al revés, así que ese punto hay que rehacerlo con lo hecho: la estadía primero y ya en producción, y canchas y salones con fechas nuevas. De esa misma decisión, varios puntos ya los resolvió Alan el 23/11 (el precio de la estadía en el servidor, el campo libre de la reserva y de la config, los bloqueos con el permiso de gestionar y las rutas de producción de Alquileres).
+- **Le toca a Alan**, cuando el plan quede reordenado: enlazar sus entradas de estadía a las tareas que cubren. Mover una tarea de lugar cambia su número, así que conviene hacerlo de una sola vez.
+
+**Gimnasio**
+
+- Al día hasta el 19/11: Alumnos, Planes y los pases tienen su entrada desde hoy.
+- Sin entrada: avisarles a Mateo y a Alan el arranque del ciclo (06/11: falta que los dos confirmen que lo vieron), las dos del sitio (23 y 24/11: el código y sus tests están en \`main\`; falta verlo en un navegador antes de darlas por hechas) y el enlace personal de la clase (25/11).
+
+**Lo que apareció al revisar, y cruza a los tres:** el rubro principal de un negocio decide qué sitio y qué panel ve, y es el mismo campo que una tienda puede escribir a mano en su Configuración. Quedó como decisión abierta de Ale ("El rubro que decide el sitio se puede escribir a mano").
+
+**Cómo se hizo:** contando en \`plan.ts\` las tareas con fecha hasta el 25/11 y cuáles tienen su entrada, y leyendo las entradas de noviembre de cada módulo.`,
+    archivos: [
+      'apps/web/src/modules/superadmin/modulos/plan.ts:119',
+      'apps/web/src/modules/superadmin/modulos/plan.ts:190',
+      'apps/web/src/modules/superadmin/modulos/plan.ts:108',
+      'apps/web/src/modules/superadmin/modulos/decisiones.ts:345',
+      'apps/web/src/modules/superadmin/Modulos.tsx:199',
+    ],
+  }),
+
   // ─── Ciclo 2 · Alquileres (Alan) ────────────────────────────────────────────
   entrada({
     modulo: 'alquileres', fecha: F18, slug: 'mapa-sobre-el-backend', tipo: 'tarea', quien: 'Alan',
@@ -3087,6 +3844,182 @@ El negocio de prueba queda creado, con una propiedad y sin reservas activas.`,
       'apps/web/src/modules/alquileres/datos/origen/mapear.ts:199',
       'apps/web/src/modules/alquileres/admin/Reservas.tsx:522',
       'apps/web/src/modules/alquileres/admin/Panel.tsx:183',
+    ],
+  }),
+  entrada({
+    modulo: 'turnos', fecha: F24, slug: 'donde-vive-lo-que-el-motor-no-tiene', tipo: 'decisión', quien: 'Mateo',
+    titulo: 'Dónde vive lo que el motor no tiene: horario propio, reglas extra y equipo',
+    foco: 'Mateo resolvió los tres pendientes de Turnos sobre el backend. En Turnos, el horario propio de una agenda va dentro del del negocio, y lo cruza el motor. Las reglas extra van en `datos` de la config: lo que ve el sitio en `publico`, lo del panel en `turnos`. El equipo también va en `datos` hasta que existan las cuentas del equipo, que van sobre Member. Del motor compartido solo cambió el cruce de horario, y solo para PROFESIONAL y ESPACIO: Alquileres y Gimnasio quedan igual.',
+    que: `Pedido de Mateo el 24/11: "los pendientes con Ale, hacelo vos con la mejor recomendación, prácticas y escalabilidad". Implementado y probado el mismo día contra la API local.
+
+**1. El horario propio va dentro del del negocio, y lo cruza el motor.**
+
+- **Qué cambió en el motor:** \`horarioEfectivo\` (\`dominio/horario.ts\`) cruza día por día el horario propio de una agenda PROFESIONAL o ESPACIO con el del negocio, al dar disponibilidad y al reservar. CANCHA, SALON, ALOJAMIENTO y CLASE siguen usando el suyo tal cual: una cancha o una clase pueden abrir cuando el negocio "no abre".
+- **Qué cambió en el panel:** ya no recorta ni reescribe agendas al guardar Horarios. Guarda cada agenda como es (sus días, y su horario o "todo el día") y avisa quién se queda sin días.
+- **Por qué:** el recorte del panel se perdía. Si el negocio achicaba y después volvía a agrandar, la agenda no volvía sola. Ahora la regla vive en un solo lugar, el motor, y vale igual para el panel, el sitio y cualquier cliente futuro de la API.
+- **Probado:** con el sábado solo a la mañana, Nico (16 a 20) queda cerrado el sábado sin que se toque su agenda. Al volver a abrir el sábado a la tarde, recupera sus 8 franjas.
+
+**2. Las reglas extra van en \`datos\` de la config.**
+
+Usa el campo libre que sumó Alan (\`ReservaConfig.datos\`, 23/11), sin migración propia. Lo de Turnos se lee y se escribe en \`datos/origen/datosConfig.ts\`:
+
+- **\`datos.publico\`** (lo ve el sitio, en la config pública): elegir profesional y "Cualquiera", qué datos del paciente se piden (DNI, obra social, motivo), tolerancia, qué pasa con la seña fuera de plazo y la cuenta de clientes con sus beneficios.
+- **\`datos.turnos\`** (solo el panel): la grilla. El motor ya la sabe aplicar: se escribe como \`pasoMinutos\` de cada agenda, y una agenda nueva arranca con ella.
+- **Cómo se escribe:** el motor reemplaza \`datos\` entero, así que cada pantalla lee lo último guardado y cambia solo su parte (\`conCambios\`). Las claves que no son de Turnos se conservan. Lo que se lee se valida campo por campo y lo que no tiene forma vale lo de fábrica.
+- **Lo que no se guardó, a propósito:**
+  - **La seña de monto fijo** sigue sin dejar guardar, porque el motor cobra en porcentaje y el sitio cobraría otra cosa. Sumarla es una columna del motor, para cuando un rubro la pida de verdad.
+  - **"Pedir seña a quien faltó" y "tiempo para aceptar un lugar"** no se muestran con la API: el motor no los hace (le da el lugar al primero de la lista en el acto). Una opción que no hace nada confunde más que no tenerla.
+- **Probado:** con la grilla de 15, Martín pasa de 16 a 30 franjas el martes y las tres agendas quedan con paso 15. La config pública muestra \`publico\` y al releer vuelve igual.
+
+**3. El equipo va en \`datos\` ahora, y sobre Member cuando haya cuentas.**
+
+- **Ahora (fase A):** las personas, los roles y cómo cobra cada uno se guardan en \`datos.turnos.equipo\`. El panel lo guarda solo cuando cambia, con medio segundo de espera para juntar cambios seguidos. Al leer, quien apunta a una agenda borrada la suelta, y una agenda sin persona suma a quien atiende ahí. Con esto Ganancias deja de estar vacía con la API.
+- **Por qué no una tabla nueva ya:** un negocio de Turnos tiene pocas personas (entra holgado en el tope de 20.000 caracteres) y todavía nadie del equipo entra con su cuenta. Una tabla propia sería un segundo sistema de personas al lado de Member.
+- **Fase B (las cuentas del equipo):**
+  - Cada persona pasa a ser un \`Member\` del negocio, con la invitación que ya existe (\`/aceptar-invitacion\`), y su agenda la apunta con \`memberId\`.
+  - Los roles de Turnos pasan a \`Role\` con permisos nuevos de alcance "lo propio" (ver solo su agenda, sus clientes y sus ganancias), aplicados en la API y no solo en el panel.
+  - Cómo cobra cada uno sale de \`datos\` a un lugar que solo lean quienes tienen permiso de ver ganancias. Hoy \`datos\` lo lee cualquiera con \`reservas.view\`, y hoy eso es solo el dueño. **Tiene que estar resuelto antes de invitar al primer empleado.**
+
+**Del motor compartido** cambió solo el cruce de horario (con sus tests), y el README de reservas lo dice. Lo demás usa lo que ya existía (\`datos\`, \`pasoMinutos\`). El negocio de prueba ahora vuelve a las reglas de fábrica y sin \`datos\` en cada corrida del seed.`,
+    decision: 'En Turnos, el horario propio de una agenda va dentro del horario del negocio y lo cruza el motor (solo PROFESIONAL y ESPACIO). Las reglas que el motor no tiene van en datos de la config: lo que ve el sitio en datos.publico y la grilla en datos.turnos, que se aplica como paso de cada agenda. El equipo va en datos.turnos.equipo hasta las cuentas del equipo, que van sobre Member con permisos de alcance propio. La seña fija y las reglas que el motor no hace no se ofrecen con la API.',
+    porque: 'Decidido por Mateo el 24/11/2026: delegó los pendientes pidiendo la mejor práctica y que escale. Cada regla vive en un solo lugar: lo que aplica el motor, en el motor; lo que es de Turnos, en su espacio de la config, sin un sistema de personas paralelo a Member. El cambio al motor compartido es chico, va con tests y no cambia nada para Alquileres ni Gimnasio.',
+    archivos: [
+      'apps/api/src/reservas/dominio/horario.ts:46',
+      'apps/api/src/reservas/disponibilidad.service.ts:74',
+      'apps/api/src/reservas/dominio/horario.spec.ts:1',
+      'apps/web/src/modules/turnos/datos/origen/datosConfig.ts:1',
+      'apps/web/src/modules/turnos/datos/origen/api.ts:1',
+      'apps/web/src/modules/turnos/datos/origen/mapear.ts:1',
+      'apps/web/src/modules/turnos/admin/configuracion/Reservas.tsx:1',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:1',
+      'apps/web/src/modules/turnos/datos/origen/__tests__/datosConfig.test.ts:1',
+      'apps/api/prisma/seed-turnos-prueba.ts:161',
+    ],
+  }),
+  entrada({
+    modulo: 'turnos', fecha: F24, slug: 'agenda-sobre-la-api', tipo: 'tarea', quien: 'Mateo',
+    titulo: 'La agenda de Turnos da, cambia, mueve y cobra turnos en la API',
+    foco: 'En un negocio real la agenda del panel ya opera sobre la API. Dar un turno (a alguien de la lista o nuevo), confirmarlo, marcarlo atendido o ausente, cancelarlo, moverlo y registrar la seña van a /reservas, y el turno queda como lo devolvió la API. Si la API dice que no (el horario se ocupó, todavía no es la hora), el aviso trae su mensaje y nada cambia. Falta de la semana 3: el "ahora" real de la agenda, ver el historial en el detalle del turno y la lista de espera.',
+    que: `Tareas del 17/11 (dar un turno) y del 18/11 (cambiar y mover), y la seña de la del 19/11, hechas el 24/11.
+
+**El origen opera turnos** (\`datos/origen/index.ts\`, \`turnos\`): crear, cambiar de estado, mover y registrar la seña. Cada acción devuelve el turno como quedó. La demo no lo tiene, así que en \`/turnos-demo\` todo sigue en el estado del panel.
+
+| En la agenda | En la API |
+|---|---|
+| Nuevo turno | \`POST /reservas\` con el servicio, la agenda, el día, la hora, la nota interna y una clave de intento (dos clics no dan dos turnos) |
+| A alguien con ficha | Por su \`clienteId\` |
+| A alguien sin ficha o nuevo | Con su nombre y su teléfono: la API la encuentra o la arma |
+| Confirmar, atendido, ausente | \`confirmar\`, \`completar\`, \`ausente\` |
+| Cancelar | \`cancelar\`, y se vuelve a leer la reserva (la respuesta dice qué pasó con la seña, no cómo quedó) |
+| Mover | \`reprogramar\` con la fecha y la hora nuevas: es el mismo turno, no uno nuevo |
+| Registrar la seña | \`pago\` por lo que falta de la seña |
+
+**El panel** (\`PanelTurnos.tsx\`) espera a la API y pone el turno devuelto en lugar del que trajo la carga. Si la API dice que no, el aviso trae su mensaje: "Ese horario se acaba de ocupar. Elegí otro." o "Todavía no es la hora: no se puede marcar como atendida ni ausente."
+
+**Probado contra la API local**, con el código real del panel y el negocio de prueba, con la seña al 30%:
+
+- Un turno sin confirmar para alguien nuevo, con la nota.
+- El mismo horario otra vez: rechazado por la API.
+- Confirmarlo y registrar la seña: queda pagado $3.600.
+- Moverlo a otro día: es el mismo turno.
+- Marcarlo atendido antes de hora: rechazado.
+- Cancelarlo: el historial queda con cada cambio.
+- Uno de hoy que ya había empezado: marcado como atendido.
+
+**Lo que falta de la semana 3:**
+
+- **El "ahora" de la agenda** (la línea de la hora y "en curso") sigue en la hora fija de la demo.
+- **El detalle del turno** todavía no muestra su historial (la API ya lo da en \`GET /reservas/:id\`).
+- **La lista de espera del panel.**
+- **Pagos**, que todavía calcula la seña con la del rubro de la demo y no con la config.
+
+**Verificado:** typecheck y eslint de \`apps/web\` sin errores y los tests de Turnos en verde (62, 7 nuevos). El panel no se abrió a mano en el navegador.`,
+    archivos: [
+      'apps/web/src/modules/turnos/datos/origen/index.ts:138',
+      'apps/web/src/modules/turnos/datos/origen/api.ts:221',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:267',
+      'apps/web/src/modules/turnos/datos/origen/__tests__/turnos.test.ts:1',
+    ],
+  }),
+  entrada({
+    modulo: 'turnos', fecha: F24, slug: 'agenda-real-historial-y-espera', tipo: 'tarea', quien: 'Mateo',
+    titulo: 'La agenda de Turnos con el día y la hora reales, la seña de las reglas y el historial de cada turno',
+    foco: 'En un negocio real el panel ya no vive en el sábado 26/09 a las 10:40 de la demo: usa el día y la hora de Argentina, y los actualiza solos. La seña sale de las reglas del negocio y no del rubro. El detalle de cada turno muestra su historial. La lista de espera del panel está hecha, pero el motor no deja anotar a nadie en Turnos: se arregla en el backend compartido.',
+    que: `Tareas del 16/11 (la agenda del día) y del 19/11 (pagos y el detalle con su historial), y la vista de la lista de espera, hechas el 24/11.
+
+**El día y la hora reales** (\`horario.ts\`, \`fijarReloj\`). Con la API, el panel tomaba el día de la semana, las fechas y la hora de la demo. Una agenda de un martes mostraba los horarios de un sábado de septiembre y la línea de "ahora" estaba a las 10:40.
+
+- **Cómo:** ahora el reloj es uno solo, con exports vivos: \`AHORA\`, \`HOY_DIA\`, \`HOY_TXT\` y \`HOY_FECHA\`. En la demo vale la hora de siempre. Con la API, el panel lo fija con la hora de Argentina al cargar.
+- **Qué lo usa:** la agenda, el resumen, los espacios y el detalle del turno lo leen sin cambiar, y lo mismo las fechas de la agenda (\`fechaDe\`, \`indiceDia\`, \`fechaLarga\`).
+- **Cómo avanza:** se actualiza cada minuto. Si cambia el día, el panel vuelve a cargar, porque los días se cuentan desde el de la carga.
+- **El sitio público** sigue con la hora de la demo hasta la semana 4.
+
+**La seña de las reglas.** Con la API, la seña del panel (Pagos, el detalle, el aviso al registrarla) es la de la config del negocio y no la típica del rubro. Cada turno trae el monto exacto que calculó el motor.
+
+**El historial del turno.** El detalle muestra cada cambio, del más nuevo al más viejo: qué pasó (dado, confirmado, movido, cancelado…), quién (el cliente, el negocio o automático), cuándo y el motivo si lo hay. En salud, la "ficha del paciente" de ejemplo (con alergias y motivo inventados) ya no se muestra con la API: Turnos en salud no guarda nada clínico (decisión del 15/11).
+
+**Cancelar con lista de espera.** Si alguien esperaba ese horario, la API le da el lugar en el acto. El panel ahora muestra ese turno nuevo y avisa a quién le tocó. Antes el horario se veía libre estando tomado.
+
+**La lista de espera del panel** (\`ListaEspera.tsx\`) aparece arriba de la Agenda cuando hay alguien esperando. Muestra quién espera, qué día, a qué hora, con quién y su teléfono si el rol lo deja ver. Tiene dos acciones, "Darle el lugar" y "Quitar", que se apagan mientras guardan.
+
+**Lo que encontré en el motor compartido:** en Turnos no se puede anotar a nadie en la lista de espera. La API calcula la duración por el servicio, y la espera no guarda el servicio: anotarse siempre responde "Elegí un servicio." (\`disponibilidad.service.ts:58\`). Arreglarlo es una columna nueva en la espera (\`servicioId\`, opcional, así Gimnasio y Alquileres no cambian) y usarla al anotar, al darle el lugar y al cancelar. Es la próxima tarea. Hasta entonces la lista del panel no se llena en Turnos.
+
+**Probado contra la API local**, con el código real del panel y el negocio de prueba:
+
+- **Mover y cancelar:** el historial muestra "Cancelado" y "Movido", con quién y la hora.
+- **La espera:** vuelve vacía sin romper nada.
+- **Darle el lugar a alguien que no está:** trae el mensaje de la API.
+- **El reloj:** con un test, el martes 24/11 da martes, las fechas siguen desde ese día, y sin reloj real vuelve el sábado de la demo.
+
+**Verificado:** typecheck y eslint de \`apps/web\` sin errores y los tests de Turnos en verde (66). El panel no se abrió a mano en el navegador.`,
+    archivos: [
+      'apps/web/src/modules/turnos/horario.ts:54',
+      'apps/web/src/modules/turnos/datos/agenda.ts:46',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:144',
+      'apps/web/src/modules/turnos/admin/Turnos.tsx:203',
+      'apps/web/src/modules/turnos/admin/ListaEspera.tsx:1',
+      'apps/web/src/modules/turnos/datos/origen/mapear.ts:448',
+      'apps/web/src/modules/turnos/__tests__/reloj.test.ts:1',
+      'apps/api/src/reservas/disponibilidad.service.ts:58',
+    ],
+  }),
+  entrada({
+    modulo: 'turnos', fecha: F24, slug: 'lista-de-espera-en-turnos', tipo: 'tarea', quien: 'Mateo',
+    titulo: 'La lista de espera funciona en Turnos: la espera guarda el servicio',
+    foco: 'En Turnos no se podía anotar a nadie en la lista de espera: el motor calcula la duración de un turno por el servicio, y la espera no lo guardaba. Ahora la espera guarda el servicio, como dato opcional para que Gimnasio y Alquileres no cambien. Al pasarle el lugar a alguien, su turno sale con ese servicio, su precio y su seña. Probado con los e2e de reservas contra Postgres y con el panel contra la API.',
+    que: `Tarea del 19/11 (la lista de espera del panel), terminada el 24/11 con un arreglo en el motor compartido.
+
+**Lo que pasaba:** anotarse en la espera de un turno respondía siempre "Elegí un servicio." (\`disponibilidad.service.ts:58\`). Y si alguien llegaba a tomar el lugar, la reserva salía con el precio del recurso, que en Turnos es 0. La lista del panel (\`ListaEspera.tsx\`, del mismo día) no se podía llenar nunca.
+
+**El arreglo en el motor** (compartido, aditivo):
+
+- **Migración** \`20261124180000_reservas_espera_servicio\`: \`reservas_espera.servicio_id\`, opcional y sin default. Lo que ya existe no cambia.
+- **Al anotarse,** \`servicioId\` es opcional en \`AnotarseEnEsperaDto\`, para el panel y para el sitio. Si viene, la franja se busca con la duración de ese servicio y se guarda en la espera.
+- **Al tomar el lugar** (por una cancelación o con "Darle el lugar"), la reserva sale con ese servicio: su id, la foto con el nombre, la duración y el precio, y la seña calculada sobre ese precio. Si el servicio ya no está, el precio del recurso, como antes.
+- **Para el panel y el sitio:** la espera devuelve \`servicioId\`, y el cliente de la web (\`lib/reservasApi/tipos.ts\`) lo tiene.
+- **Gimnasio y Alquileres** no mandan servicio y siguen igual.
+
+**Probado:**
+
+- **Unitario:** Turnos se anota con su servicio, la disponibilidad se pide con él, la espera lo guarda y la reserva que toma el lugar sale con el servicio, el precio y la seña (\`reservas.service.unit-spec.ts\`). Los 46 tests del servicio de reservas pasan.
+- **E2E contra Postgres de dev:** los 22 de reservas pasan, con los de concurrencia (seis a la vez por una cancha, ocho por tres lugares de una clase) y el de la lista de espera de una clase.
+- **El panel contra la API local,** con el negocio de prueba y la seña al 30%:
+  - Anotarse sin servicio sigue respondiendo "Elegí un servicio." y con servicio se anota.
+  - "Darle el lugar" con el horario lleno: "No queda lugar en ese horario."
+  - Al cancelar al titular, el lugar pasa al primero de la lista: "Corte clásico", $12.000, seña de $3.600, confirmado. Su historial dice "Tomó el lugar desde la lista de espera."
+  - Quitar al otro de la lista lo saca.
+
+**Lo que queda dicho para más adelante:** la espera es por horario exacto. Un lugar que se libera pasa solo a quien esperaba ese mismo inicio y ese mismo fin, y en Turnos los servicios duran distinto. Si se libera un turno de 45 minutos y alguien esperaba uno de 30 en ese horario, no pasa solo: queda "Darle el lugar" desde el panel, que mira si entra.
+
+**Del motor compartido** cambió solo esto (aditivo, con su migración) y el README de reservas lo dice.`,
+    archivos: [
+      'apps/api/prisma/migrations/20261124180000_reservas_espera_servicio/migration.sql:1',
+      'apps/api/prisma/schema.prisma:4188',
+      'apps/api/src/reservas/dto/reservas.dto.ts:249',
+      'apps/api/src/reservas/reservas.service.ts:878',
+      'apps/api/src/reservas/reservas.types.ts:216',
+      'apps/api/test/unit/reservas.service.unit-spec.ts:316',
+      'apps/web/src/lib/reservasApi/tipos.ts:353',
     ],
   }),
   entrada({

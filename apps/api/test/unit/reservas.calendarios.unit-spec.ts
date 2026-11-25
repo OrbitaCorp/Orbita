@@ -365,7 +365,12 @@ describe('ReservasCalendariosService · el .ics que se le da a Airbnb', () => {
 describe('Calendarios externos · guardas del catálogo', () => {
   const catalogoCon = (o: { bloqueos?: Fila[]; calendarios?: Fila[]; reservas?: Fila[] } = {}) => {
     const t = { reservaBloqueo: tabla(o.bloqueos ?? []), reservaCalendarioExterno: tabla(o.calendarios ?? []), reserva: tabla(o.reservas ?? []), reservaRecurso: tabla([cabana()]) };
-    const prisma = { ...t, $transaction: jest.fn(async (fn: (tx: unknown) => unknown) => fn(prisma)) } as Record<string, unknown>;
+    // $queryRaw es el candado del recurso (candado.ts): devuelve su fila.
+    const prisma = {
+      ...t,
+      $transaction: jest.fn(async (fn: (tx: unknown) => unknown) => fn(prisma)),
+      $queryRaw: jest.fn().mockResolvedValue([{ id: 'r-cab', cupo: 1, activo: true, nombre: 'Cabaña' }]),
+    } as Record<string, unknown>;
     return { t, svc: new ReservasCatalogoService(prisma as never, { registrar: jest.fn().mockResolvedValue(undefined) } as never) };
   };
   const deAirbnb = (id: string, calendarioId = 'cal-1'): Fila => ({ id, businessId: BIZ, modulo: 'ALQUILERES', recursoId: 'r-cab', origen: 'ICAL', calendarioId, inicio: AHORA, fin: AHORA });

@@ -3,15 +3,18 @@
 // leer este archivo: se le entrega un artefacto generado y commiteado,
 // apps/api/src/orbi/manual/manual.generated.ts.
 //
-// Lo escribe paraOrbi.test.ts con toMatchFileSnapshot:
+// Esto arma la parte de Tienda. El artefacto entero (Tienda y el manual de
+// cada módulo nuevo) lo junta modules/orbi/manual/artefacto.ts, y lo escribe
+// artefacto.test.ts con toMatchFileSnapshot:
 //   - `pnpm manual:generar` lo regenera (vitest -u sobre ese test).
 //   - `pnpm test` (lo corre CI) falla si alguien cambió el manual, los
 //     primeros pasos o los permisos del menú y no lo regeneró.
 //
-// Solo lo importa ese test: node:crypto no llega nunca al navegador.
+// Solo lo importan los tests: node:crypto no llega nunca al navegador.
 
 import { createHash } from 'node:crypto'
-import { CAPITULOS, type Bloque, type Destino } from './contenido'
+import { CAPITULOS, type Destino } from './contenido'
+import { plano, textoDeBloque } from '@/lib/manual/bloques'
 import { TAREAS_CHECKLIST, TAREAS_CHECKLIST_ETAPA2, type TareaChecklist } from '../tutoriales/copy'
 import { MODULOS_DEL_MENU } from '@/layouts/components/permisosDelMenu'
 
@@ -27,30 +30,8 @@ export type ManualParaOrbi = {
     modulosDelMenu: ModuloParaOrbi[]
 }
 
-const PREFIJO_DE_NOTA = { tip: 'Consejo', aviso: 'Ojo', dato: 'Dato' } as const
-
-/**
- * Texto plano para el modelo: sin **negrita**, y cada [[Botón]] entre comillas
- * — es el nombre exacto que la persona va a ver en la pantalla, y Orbi tiene
- * que poder citarlo tal cual.
- */
-export function plano(texto: string): string {
-    return texto.replace(/\*\*/g, '').replace(/\[\[([^\]]+)\]\]/g, '"$1"')
-}
-
-export function textoDeBloque(b: Bloque): string {
-    switch (b.tipo) {
-        case 'parrafo': return plano(b.texto)
-        case 'nota': return `${PREFIJO_DE_NOTA[b.variante]}: ${plano(b.texto)}`
-        case 'lista': return b.items.map(i => `- ${plano(i)}`).join('\n')
-        case 'pasos': return b.items.map((i, n) => `${n + 1}. ${plano(i.titulo)}: ${plano(i.texto)}`).join('\n')
-        case 'campos': return [
-            ...(b.titulo ? [`${plano(b.titulo)}:`] : []),
-            ...b.items.map(i => `- ${plano(i.label)}: ${plano(i.texto)}`),
-        ].join('\n')
-        case 'estados': return b.items.map(i => `- ${plano(i.label)}: ${plano(i.texto)}`).join('\n')
-    }
-}
+// El texto plano de cada bloque es el de lib/manual: el mismo para Tienda y para los módulos.
+export { plano, textoDeBloque }
 
 function destinoDe(d: Destino | undefined): DestinoParaOrbi | undefined {
     if (!d) return undefined
@@ -95,22 +76,4 @@ export function armarManualParaOrbi(): ManualParaOrbi {
 
     const contenido = { temas, primerosPasos, modulosDelMenu }
     return { version: versionDe(contenido), ...contenido }
-}
-
-/** El archivo .ts que se commitea en la API. */
-export function aArchivoTs(manual: ManualParaOrbi): string {
-    return [
-        '// GENERADO — no editar a mano.',
-        '//',
-        '// Sale del manual del panel (apps/web/src/modules/ventas/panel/manual/contenido.ts),',
-        '// de los primeros pasos (tutoriales/copy.ts) y de los permisos del menú',
-        '// (apps/web/src/layouts/components/permisosDelMenu.ts). Para regenerarlo:',
-        '//   cd apps/web && pnpm manual:generar',
-        '// apps/web/src/modules/ventas/panel/manual/paraOrbi.test.ts falla en CI si quedó viejo.',
-        '',
-        "import type { ManualGenerado } from './manual.types';",
-        '',
-        `export const MANUAL_GENERADO: ManualGenerado = ${JSON.stringify(manual, null, 2)};`,
-        '',
-    ].join('\n')
 }

@@ -6,8 +6,9 @@
 import { useMemo, useRef, useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { BellRing, CalendarCheck, CheckCheck, ChevronDown, Hourglass, RotateCcw, Send, Tag } from 'lucide-react'
-import { fechaLarga, hhmm, sumarDias } from '@/lib/reservas/fechas'
-import { HOY, MOMENTOS, VARIABLES_MENSAJE, clasesDelDia, estadoPlanDe, mensajesDe, planDe, rubroPorKey, type Momento, type NegocioGym, type Plantilla, type Socio } from '../../datos'
+import { fechaLarga, hhmm, sumarDias, type ISO } from '@/lib/reservas/fechas'
+import { MOMENTOS, VARIABLES_MENSAJE, clasesDelDia, estadoPlanDe, mensajesDe, planDe, rubroPorKey, type Momento, type NegocioGym, type Plantilla, type Socio } from '../../datos'
+import { useReloj } from '../../datos/reloj'
 import { BarraGuardar, Campo, Chip, Encabezado, FilaSwitch, Seccion, Selector, Switch, useBorrador } from '@/design-system/reservas/piezas'
 import { type PropsConfig } from '../piezas'
 
@@ -56,18 +57,18 @@ const CSS = `
 `
 
 /** Los datos con los que se arma la vista previa: un alumno del negocio y una clase de la grilla. */
-function ejemploDe(negocio: NegocioGym, socios: Socio[]): Record<string, string> {
+function ejemploDe(negocio: NegocioGym, socios: Socio[], hoy: ISO): Record<string, string> {
   const r = rubroPorKey(negocio.rubro)
-  const socio = socios.find(s => estadoPlanDe(s) === 'por-vencer') ?? socios[0]
+  const socio = socios.find(s => estadoPlanDe(s, hoy) === 'por-vencer') ?? socios[0]
   // La primera clase del próximo día que abre.
-  let fecha = sumarDias(HOY, 1)
+  let fecha = sumarDias(hoy, 1)
   for (let k = 0; k < 7 && clasesDelDia(negocio, fecha).length === 0; k++) fecha = sumarDias(fecha, 1)
   const clase = clasesDelDia(negocio, fecha)[0]
   const plan = socio ? planDe(negocio, socio.planId) : null
   return {
     nombre: socio?.nombre.split(' ')[0] ?? 'Sofía', clase: clase?.actividad?.nombre ?? 'la clase', fecha: fechaLarga(fecha).toLowerCase(), hora: clase ? hhmm(clase.inicio) : '08:30',
     profe: clase?.profe?.nombre ?? r.profe.toLowerCase(), sala: clase?.sala ?? negocio.salas[0] ?? 'la sala', negocio: negocio.nombre,
-    plan: plan?.nombre ?? 'tu plan', vence: socio?.vence ? fechaLarga(socio.vence).toLowerCase() : fechaLarga(sumarDias(HOY, 3)).toLowerCase(), link: `${negocio.slug}.orbita.site/mis-clases`,
+    plan: plan?.nombre ?? 'tu plan', vence: socio?.vence ? fechaLarga(socio.vence).toLowerCase() : fechaLarga(sumarDias(hoy, 3)).toLowerCase(), link: `${negocio.slug}.orbita.site/mis-clases`,
   }
 }
 
@@ -77,7 +78,8 @@ export default function Mensajes({ negocio, socios, onGuardar, onAvisar }: Props
   const v = b.v
   const [abierto, setAbierto] = useState<Momento | null>('recordatorio')
   const setPl = (m: Momento, c: Partial<Plantilla>) => b.set('plantillas', { ...v.plantillas, [m]: { ...v.plantillas[m], ...c } })
-  const ejemplo = useMemo(() => ejemploDe(negocio, socios), [negocio, socios])
+  const { hoy } = useReloj()
+  const ejemplo = useMemo(() => ejemploDe(negocio, socios, hoy), [negocio, socios, hoy])
   const sugeridos = mensajesDe(negocio.telefono).plantillas
   const prendidos = MOMENTOS.filter(m => v.plantillas[m].on).length
   return (

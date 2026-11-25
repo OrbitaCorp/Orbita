@@ -27,7 +27,8 @@ export default function Home({ negocio, inscripciones }: P) {
   )
 }
 
-function Encabezado({ id, titulo, bajada, accion }: { id: string; titulo: string; bajada?: string; accion?: { label: string; href: string } }) {
+/** El encabezado de una sección de la portada. Lo usa también la del sitio real (HomeReal.tsx). */
+export function Encabezado({ id, titulo, bajada, accion }: { id: string; titulo: string; bajada?: string; accion?: { label: string; href: string } }) {
   return (
     <div className="gis-sec-cab">
       <div><h2 id={id}>{titulo}</h2>{bajada && <p>{bajada}</p>}</div>

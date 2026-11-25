@@ -43,4 +43,18 @@ describe('reservasApi · cliente', () => {
     const [url] = fetchMock.mock.calls[0] as unknown as [string]
     expect(url).toMatch(/\/reservas\?modulo=GIMNASIO&desde=2026-11-10&hasta=2026-11-16&estado=CONFIRMADA$/)
   })
+
+  it('la lista de espera del panel: anotar y darle el lugar son POST a /reservas/espera', async () => {
+    const fetchMock = vi.fn(async () => respuesta(201, { id: 'e1', estado: 'ESPERANDO', posicion: 2 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const anotada = await panel.anotarEnEspera({ modulo: 'GIMNASIO', recursoId: 'c1', fecha: '2026-11-17', inicioMinutos: 1140, cliente: { nombre: 'Lu', telefono: '11 5555 0000' } })
+    expect(anotada.posicion).toBe(2)
+    await panel.darLugar('e1')
+    const [[url1, init1], [url2, init2]] = fetchMock.mock.calls as unknown as [string, RequestInit][]
+    expect(url1).toMatch(/\/reservas\/espera$/)
+    expect(init1.method).toBe('POST')
+    expect(JSON.parse(init1.body as string)).toMatchObject({ recursoId: 'c1', inicioMinutos: 1140, cliente: { nombre: 'Lu' } })
+    expect(url2).toMatch(/\/reservas\/espera\/e1\/lugar$/)
+    expect(init2.method).toBe('POST')
+  })
 })

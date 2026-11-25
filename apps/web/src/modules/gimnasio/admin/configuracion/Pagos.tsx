@@ -4,7 +4,8 @@
 // días de gracia hay y qué pasa con las reservas de quien venció. Conectar y
 // desconectar es visual: no hay OAuth ni backend.
 import { ArrowRight, CircleCheck, PlugZap, Unplug, Wallet } from 'lucide-react'
-import { HOY, estadoPlanDe, rubroPorKey, type Socio } from '../../datos'
+import { estadoPlanDe, rubroPorKey, type Socio } from '../../datos'
+import { useReloj } from '../../datos/reloj'
 import { BarraGuardar, Campo, Chip, Encabezado, FilaSwitch, Nota, Seccion, Selector, useBorrador } from '@/design-system/reservas/piezas'
 import { type PropsConfig } from '../piezas'
 
@@ -20,19 +21,20 @@ const CSS = `
 
 export default function Pagos({ negocio, socios, onGuardar, onIrMensajes }: PropsConfig & { socios: Socio[]; onIrMensajes: () => void }) {
   const r = rubroPorKey(negocio.rubro)
+  const { hoy } = useReloj()
   const b = useBorrador(negocio.pagos)
   const v = b.v
   const mp = v.mercadoPago
   // Conectar y desconectar se guardan al toque (no quedan en el borrador): un "Conectado" sin guardar confundía.
   const conectar = () => {
-    const nuevo = { ...v, mercadoPago: { conectado: true, email: `pagos@${negocio.slug}.com.ar`, desde: HOY }, cobroOnline: true }
+    const nuevo = { ...v, mercadoPago: { conectado: true, email: `pagos@${negocio.slug}.com.ar`, desde: hoy }, cobroOnline: true }
     b.setV(nuevo); onGuardar({ pagos: nuevo }, 'Mercado Pago conectado', 'Demo: no se conectó ninguna cuenta real.')
   }
   const desconectar = () => {
     const nuevo = { ...v, mercadoPago: { conectado: false, email: '', desde: null }, cobroOnline: false, renovacion: 'manual' as const }
     b.setV(nuevo); onGuardar({ pagos: nuevo }, 'Mercado Pago desconectado', 'Mientras tanto se cobra solo en el mostrador.')
   }
-  const vencen = socios.filter(s => estadoPlanDe(s) === 'por-vencer').length
+  const vencen = socios.filter(s => estadoPlanDe(s, hoy) === 'por-vencer').length
   const diasAviso = negocio.mensajes.plantillas.vence.cuando
   return (
     <div className="rv-pagina rv-pagina--form">

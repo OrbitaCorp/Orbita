@@ -12,10 +12,10 @@ import { ConectarCalendarioDto } from './dto/calendarios.dto';
 import { CrearBloqueoDto, ListarBloqueosQueryDto, ListarCatalogoQueryDto, UpsertConfigDto, UpsertRecursoDto, UpsertServicioDto } from './dto/catalogo.dto';
 import { ModuloQueryDto } from './dto/comunes.dto';
 import {
-  CambioDeEstadoDto, CancelarDto, CrearReservaPanelDto, DisponibilidadQueryDto, DisponibilidadRangoQueryDto, ListarEsperaQueryDto, ListarReservasQueryDto,
-  NotaInternaDto, RegistrarPagoDto, ReprogramarDto, ResumenQueryDto,
+  AnotarseEnEsperaDto, CambioDeEstadoDto, CancelarDto, CrearReservaPanelDto, DisponibilidadQueryDto, DisponibilidadRangoQueryDto, ListarEsperaQueryDto,
+  ListarReservasQueryDto, NotaInternaDto, RegistrarPagoDto, ReprogramarDto, ResumenQueryDto,
 } from './dto/reservas.dto';
-import { configDto, recursoDto, reservaDto, servicioDto } from './reservas.types';
+import { configDto, esperaDto, recursoDto, reservaDto, servicioDto } from './reservas.types';
 
 // El panel de Turnos, Alquileres y Gimnasio. Tres permisos:
 // - reservas.view: ver la agenda, las reservas, los recursos y las reglas.
@@ -199,9 +199,27 @@ export class ReservasPanelController {
 
   @Get('espera')
   @RequirePermission('reservas.view')
-  espera(@CurrentBusiness() ctx: AuthContext, @Query() q: ListarEsperaQueryDto) {
+  async espera(@CurrentBusiness() ctx: AuthContext, @Query() q: ListarEsperaQueryDto) {
     const m = assertMemberContext(ctx);
-    return this.reservas.listarEspera(m.businessId, q.modulo, q.recursoId, q.fecha);
+    return (await this.reservas.listarEspera(m.businessId, q.modulo, q.recursoId, q.fecha)).map(esperaDto);
+  }
+
+  /** El negocio anota a alguien en la lista de espera de un horario lleno (en el panel, hasta que empieza). */
+  @Post('espera')
+  @RequirePermission('reservas.manage')
+  async anotarEnEspera(@CurrentBusiness() ctx: AuthContext, @Body() dto: AnotarseEnEsperaDto) {
+    const m = assertMemberContext(ctx);
+    const { espera } = await this.reservas.anotarseEnEspera(m.businessId, dto, undefined, new Date(), { modo: 'panel', memberId: m.memberId });
+    const { posicion } = await this.reservas.posicionEnEspera(m.businessId, espera.tokenAcceso);
+    return { ...esperaDto(espera), posicion };
+  }
+
+  /** "Darle el lugar": la persona pasa de la lista a una reserva confirmada, si entra. */
+  @Post('espera/:id/lugar')
+  @RequirePermission('reservas.manage')
+  async darLugar(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
+    const m = assertMemberContext(ctx);
+    return reservaDto(await this.reservas.darLugarDesdeEspera(m.businessId, id, m.memberId), { panel: true });
   }
 
   @Delete('espera/:id')

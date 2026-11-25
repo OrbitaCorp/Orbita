@@ -1,4 +1,5 @@
 import { ArrayMaxSize, IsArray, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { MODULOS_TUTORIAL } from '../tutoriales.service';
 
 export class PublicarVideoInstagramDto {
   /** Si no se manda, se usa el texto sugerido que dejó Claude al registrar el video. */
@@ -13,6 +14,8 @@ export class ActualizarTutorialDto {
   /** Link (o id) del video en YouTube; vacío para quitarlo. La validación fina está en TutorialesService. */
   @IsOptional() @IsString() @MaxLength(300) youtube?: string;
   @IsOptional() @IsArray() @ArrayMaxSize(6) @IsString({ each: true }) pantallas?: string[];
+  /** Pasarlo a otro módulo: sus pantallas tienen que llevar el prefijo del módulo nuevo (lo valida TutorialesService). */
+  @IsOptional() @IsIn([...MODULOS_TUTORIAL]) modulo?: string;
 }
 
 export class ComentarVideoDto {
