@@ -15,6 +15,8 @@ import { diaDeSemana, fechaYMinutos, sumarDias } from '../src/reservas/dominio/t
 // - El tope semanal de una membresía, la clase de prueba una vez por persona,
 //   pasar al plan un lugar reservado desde el sitio, renovar sin perder días.
 // - Los permisos del panel y lo que ve el sitio.
+// - La grilla del sitio (todas las clases con sus lugares en un pedido) y el
+//   camino de quien reserva desde ahí: retener, confirmar y la lista de espera.
 //
 // Usa el negocio seed (zapatoslorena) y limpia todo lo que crea en afterAll.
 const GIM = '/api/v1/gimnasio';
@@ -39,6 +41,8 @@ describe('Gimnasio: planes, alumnos y pases (e2e)', () => {
   let employeeToken: string;
   let businessId: string;
   let claseId: string;
+  /** La clase de dos lugares de las pruebas del sitio. */
+  let chicaId: string;
   let planes: Record<'prueba' | 'suelta' | 'pack' | 'membresia' | 'oculto', Plan>;
 
   const hoy = fechaYMinutos(new Date()).fecha;
@@ -86,14 +90,16 @@ describe('Gimnasio: planes, alumnos y pases (e2e)', () => {
 
   afterAll(async () => {
     if (businessId) {
-      if (claseId) {
-        const reservas = await prisma.reserva.findMany({ where: { businessId, recursoId: claseId }, select: { id: true } });
+      const clases = [claseId, chicaId].filter(Boolean);
+      if (clases.length) {
+        const reservas = await prisma.reserva.findMany({ where: { businessId, recursoId: { in: clases } }, select: { id: true } });
         const ids = reservas.map((r) => r.id);
         await prisma.reservaHistorial.deleteMany({ where: { businessId, reservaId: { in: ids } } });
-        await prisma.reservaEspera.deleteMany({ where: { businessId, recursoId: claseId } });
+        await prisma.reservaEspera.deleteMany({ where: { businessId, recursoId: { in: clases } } });
         await prisma.reserva.deleteMany({ where: { businessId, id: { in: ids } } });
-        await prisma.reservaRecurso.deleteMany({ where: { businessId, id: claseId } });
+        await prisma.reservaRecurso.deleteMany({ where: { businessId, id: { in: clases } } });
       }
+      await prisma.reservaBloqueo.deleteMany({ where: { businessId, modulo: 'GIMNASIO', motivo: { startsWith: '[e2e]' } } });
       // Todo lo de Gimnasio de este negocio es de esta prueba: el negocio seed no usa el módulo.
       await prisma.gimnasioSuscripcion.deleteMany({ where: { businessId } });
       await prisma.gimnasioAlumno.deleteMany({ where: { businessId } });
@@ -342,6 +348,113 @@ describe('Gimnasio: planes, alumnos y pases (e2e)', () => {
       expect((await http().post(`${GIM}/reservas`).set(owner()).send({ ...base, pago: 'gratis', alumnoId: uuid() })).status).toBe(400);
       expect((await http().post(`${GIM}/reservas`).set(owner()).send(base)).status).toBe(400);
       expect((await http().post(`${GIM}/reservas`).set(owner()).send({ ...base, cliente: { nombre: 'Sin Contacto' } })).status).toBe(400);
+    });
+  });
+
+  // Lo que hace el sitio de un gimnasio, sin sesión: pide la grilla, retiene el lugar mientras la persona
+  // carga sus datos, lo confirma y, con la clase llena, la anota en la lista de espera.
+  describe('el sitio: la grilla y reservar un lugar', () => {
+    interface Sesion { recursoId: string; inicioMinutos: number; finMinutos: number; libres: number; cupo: number }
+    interface Grilla { desde: string; hasta: string; dias: { fecha: string; cerrado: boolean; motivo: string | null; sesiones: Sesion[] }[] }
+    // Un lunes, tres semanas adelante: lejos de lo que reservan las otras pruebas.
+    const fecha = dia(21);
+    const grilla = (desde: string, hasta: string) => http().get(`${PUBLICO}/gimnasio/grilla`).query({ desde, hasta });
+    const laChica = async (): Promise<Sesion | undefined> => {
+      const res = await grilla(fecha, fecha);
+      expect(res.status).toBe(200);
+      return (res.body as Grilla).dias[0].sesiones.find((s) => s.recursoId === chicaId);
+    };
+    const pedido = (clave: string) => ({ modulo: 'GIMNASIO', recursoId: chicaId, fecha, inicioMinutos: 1200, clave });
+    let retenida: { id: string; token: string; estado: string; retenidaHasta: string | null };
+    const claveDeAna = uuid();
+
+    it('la grilla trae, sin sesión y en un pedido, cada clase de cada día con su cupo y sus lugares libres', async () => {
+      const clase = await http().post(`${PANEL}/recursos`).set(owner()).send({
+        modulo: 'GIMNASIO', tipo: 'CLASE', nombre: '[e2e] Gimnasio de dos lugares', duracionMinutos: 60, cupo: 2, precio: 0, horario: { '1': [[1200, 1260]] },
+      });
+      expect(clase.status).toBe(201);
+      chicaId = clase.body.id;
+      const res = await grilla(fecha, sumarDias(fecha, 6));
+      expect(res.status).toBe(200);
+      const g = res.body as Grilla;
+      expect(g.dias.map((d) => d.fecha)).toEqual([0, 1, 2, 3, 4, 5, 6].map((n) => sumarDias(fecha, n)));
+      expect(g.dias[0].sesiones.find((s) => s.recursoId === chicaId)).toEqual({ recursoId: chicaId, inicioMinutos: 1200, finMinutos: 1260, libres: 2, cupo: 2 });
+      // La otra clase tiene dos sesiones todos los días; la de dos lugares, solo los lunes.
+      expect(g.dias[1].sesiones.filter((s) => s.recursoId === claseId).map((s) => s.inicioMinutos)).toEqual([600, 1140]);
+      expect(g.dias[1].sesiones.some((s) => s.recursoId === chicaId)).toBe(false);
+      expect(g.dias.every((d) => !d.cerrado && d.motivo === null)).toBe(true);
+    }, LARGO);
+
+    it('retener toma el lugar; repetir el pedido con la misma clave (doble clic) devuelve la misma reserva y no toma otro', async () => {
+      const una = await http().post(`${PUBLICO}/reservas/retener`).send(pedido(claveDeAna));
+      expect(una.status).toBe(201);
+      expect(una.body).toMatchObject({ estado: 'RETENIDA', cantidad: 1 });
+      expect(una.body.retenidaHasta).toBeTruthy();
+      retenida = una.body;
+      const otraVez = await http().post(`${PUBLICO}/reservas/retener`).send(pedido(claveDeAna));
+      expect(otraVez.status).toBe(201);
+      expect(otraVez.body.id).toBe(retenida.id);
+      expect((await laChica())?.libres).toBe(1);
+    }, LARGO);
+
+    it('confirmar con los datos de la persona la deja firme y sin definir cómo se paga; confirmar dos veces no hace nada más', async () => {
+      const cliente = { nombre: 'Ana Sitio', telefono: '3757 55-0901' };
+      const res = await http().post(`${PUBLICO}/reservas/mi/${retenida.token}/confirmar`).send({ cliente });
+      expect(res.status).toBe(201);
+      expect(res.body).toMatchObject({ id: retenida.id, estado: 'CONFIRMADA', clienteNombre: 'Ana Sitio', datos: null });
+      expect(res.body.codigo).toMatch(/^[A-Z0-9]{6}$/);
+      const otraVez = await http().post(`${PUBLICO}/reservas/mi/${retenida.token}/confirmar`).send({ cliente });
+      expect(otraVez.status).toBe(201);
+      expect(otraVez.body).toMatchObject({ id: retenida.id, estado: 'CONFIRMADA' });
+      expect((await laChica())?.libres).toBe(1);
+      // En el panel es un lugar más de la clase, que el negocio después dice cómo se paga.
+      const agenda = await http().get(PANEL).set(owner()).query({ modulo: 'GIMNASIO', recursoId: chicaId, desde: fecha, hasta: fecha });
+      expect(agenda.body.data.map((r: { id: string; origen: string; estado: string }) => [r.id, r.origen, r.estado])).toEqual([[retenida.id, 'TIENDA', 'CONFIRMADA']]);
+    }, LARGO);
+
+    it('con el último lugar tomado la clase sale completa y retener responde 409', async () => {
+      const beto = await http().post(`${PUBLICO}/reservas/reservar`).send({ ...pedido(uuid()), cliente: { nombre: 'Beto Sitio', email: mail('beto-sitio') } });
+      expect(beto.status).toBe(201);
+      expect(await laChica()).toMatchObject({ libres: 0, cupo: 2 });
+      const tarde = await http().post(`${PUBLICO}/reservas/retener`).send(pedido(uuid()));
+      expect(tarde.status).toBe(409);
+      expect(typeof tarde.body.message).toBe('string');
+    }, LARGO);
+
+    it('con la clase llena se anota en la lista de espera con un teléfono o un email; repetirlo no la anota dos veces', async () => {
+      const espera = { modulo: 'GIMNASIO', recursoId: chicaId, fecha, inicioMinutos: 1200 };
+      const sinContacto = await http().post(`${PUBLICO}/reservas/espera`).send({ ...espera, cliente: { nombre: 'Caro Sitio' } });
+      expect(sinContacto.status).toBe(400);
+      const caro = await http().post(`${PUBLICO}/reservas/espera`).send({ ...espera, cliente: { nombre: 'Caro Sitio', telefono: '3757 55-0903' } });
+      expect(caro.status).toBe(201);
+      expect(caro.body).toMatchObject({ yaEstaba: false, estado: 'ESPERANDO', posicion: 1 });
+      expect(caro.body.token).toBeTruthy();
+      const otraVez = await http().post(`${PUBLICO}/reservas/espera`).send({ ...espera, cliente: { nombre: 'Caro Sitio', telefono: '3757 55-0903' } });
+      expect(otraVez.status).toBe(201);
+      expect(otraVez.body).toMatchObject({ yaEstaba: true, token: null, posicion: 1 });
+      // Con lugar, la espera no corresponde: se reserva directo.
+      const conLugar = await http().post(`${PUBLICO}/reservas/espera`).send({ ...espera, recursoId: claseId, inicioMinutos: 600, cliente: { nombre: 'Caro Sitio', telefono: '3757 55-0903' } });
+      expect(conLugar.status).toBe(400);
+    }, LARGO);
+
+    it('un día sin clases sale cerrado, con el motivo que cargó el negocio y sin sesiones', async () => {
+      const cierre = sumarDias(fecha, 7);
+      const b = await http().post(`${PANEL}/bloqueos`).set(owner()).send({ modulo: 'GIMNASIO', fechaDesde: cierre, motivo: '[e2e] Feriado' });
+      expect(b.status).toBe(201);
+      const res = await grilla(sumarDias(cierre, -1), sumarDias(cierre, 1));
+      const g = res.body as Grilla;
+      expect(g.dias[1]).toEqual({ fecha: cierre, cerrado: true, motivo: '[e2e] Feriado', sesiones: [] });
+      expect(g.dias[0].cerrado).toBe(false);
+      expect(g.dias[2].sesiones.length).toBeGreaterThan(0);
+      expect((await http().delete(`${PANEL}/bloqueos/${b.body.id}`).set(owner())).status).toBe(200);
+    }, LARGO);
+
+    it('un rango mal pedido es 400 y un negocio que no existe, 404', async () => {
+      expect((await grilla(fecha, sumarDias(fecha, -1))).status).toBe(400);
+      expect((await grilla(fecha, sumarDias(fecha, 35))).status).toBe(400);
+      expect((await grilla('ayer', fecha)).status).toBe(400);
+      expect((await http().get(`${PUBLICO}/gimnasio/grilla`)).status).toBe(400);
+      expect((await http().get('/api/v1/storefront/este-negocio-no-existe-e2e/gimnasio/grilla').query({ desde: fecha, hasta: fecha })).status).toBe(404);
     });
   });
 });

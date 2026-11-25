@@ -142,6 +142,14 @@ clave de idempotencia siguen siendo de acá), busca o crea la ficha de cliente c
 `ReservasService.fichaDe` y deja lo propio en el campo libre `datos`, bajo su nombre. No escribe
 en las tablas de reglas del motor ni cambia el estado de una reserva por su cuenta.
 
+**Las sesiones de todas las clases en un pedido.** `DisponibilidadService.sesionesEntre(negocio,
+{ modulo, desde, hasta }, modo)` devuelve, día por día (hasta 35), cada sesión de cada recurso
+`CLASE` con su cupo y sus lugares libres, y los días que el negocio bloqueó enteros con su motivo.
+Usa las mismas reglas que la disponibilidad de un día (bloqueos, retenidas vencidas, anticipación
+en modo `publico`) y lee la config, las clases, los bloqueos y las reservas una sola vez. Lo usa
+el sitio de Gimnasio (`GET /storefront/:slug/gimnasio/grilla`): sin sesión los pedidos se cuentan
+por IP, y pedir clase por clase y día por día no escala. Desde el 25/11.
+
 **La lista de espera es por sesión de horario fijo.** Hoy la usa Gimnasio (`CLASE`). En Turnos no
 alcanza: la espera no guarda el servicio, así que un `PROFESIONAL` sin duración propia responde
 "Elegí un servicio." al anotar. En Alquileres tampoco: al cancelar una reserva de varias franjas

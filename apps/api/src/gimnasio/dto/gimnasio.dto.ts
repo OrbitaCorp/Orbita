@@ -9,6 +9,15 @@ import { PAGOS, type Pago } from '../dominio/planes';
 const MENSAJE_TIPO = 'El tipo de plan tiene que ser PRUEBA, SUELTA, PACK o MEMBRESIA.';
 const MENSAJE_PAGO = 'Decí cómo se paga el lugar: plan, aparte o prueba.';
 
+/** El rango de días de la grilla del sitio (los dos incluidos). */
+export class GrillaQueryDto {
+  @Matches(RE_FECHA, { message: MENSAJE_FECHA })
+  desde!: string;
+
+  @Matches(RE_FECHA, { message: MENSAJE_FECHA })
+  hasta!: string;
+}
+
 /** Un plan como lo edita Planes y precios. Con `id`, uno que ya existe; sin `id`, uno nuevo. */
 export class PlanDto {
   @IsOptional() @IsUUID('4')

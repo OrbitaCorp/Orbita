@@ -78,15 +78,25 @@ espera, los días sin clases) son las rutas del motor.
 | Ruta | Qué hace |
 |---|---|
 | `GET planes` | Los planes que el negocio ofrece en el sitio |
+| `GET grilla?desde=AAAA-MM-DD&hasta=AAAA-MM-DD` | Las sesiones de todas las clases entre esos días (hasta 35, los dos incluidos): `{ desde, hasta, dias: [{ fecha, cerrado, motivo, sesiones: [{ recursoId, inicioMinutos, finMinutos, libres, cupo }] }] }`. Con las reglas del sitio: no trae las clases que ya no se pueden reservar. `cerrado` y `motivo` son el día sin clases que cargó el negocio |
 
-Reservar desde el sitio es el motor (`/storefront/:slug/reservas`). Esos lugares nacen sin
-definir: el plan se usa desde el panel (o, más adelante, con la sesión del alumno). No se
-descuenta un pack con solo escribir el celular de alguien.
+La grilla la arma el motor (`DisponibilidadService.sesionesEntre`) en un solo pedido: el sitio no
+pregunta clase por clase. Qué es cada clase (actividad, profe, sala) lo dicen los recursos del
+motor (`GET /storefront/:slug/reservas/recursos?modulo=GIMNASIO`), que el sitio cruza por
+`recursoId`.
+
+Reservar desde el sitio es el motor (`/storefront/:slug/reservas`): `retener` toma el lugar
+mientras la persona carga sus datos, `mi/:token/confirmar` lo deja firme y, con la clase llena,
+`espera` la anota en la lista. Esos lugares nacen sin definir: el plan se usa desde el panel (o,
+más adelante, con la sesión del alumno). No se descuenta un pack con solo escribir el celular de
+alguien.
 
 ## Tests
 
 - `dominio/planes.spec.ts` (jest-src): las cuentas.
 - `test/unit/gimnasio.unit-spec.ts`: lo que el servicio decide, sin base.
+- `test/unit/reservas-sesiones.unit-spec.ts`: la grilla del sitio, sin base (qué arma con lo
+  que lee, y que lo lee una vez).
 - `test/gimnasio.e2e-spec.ts`: contra la base de dev (los filtros sobre `datos`, el candado del
-  alumno, los permisos). Se corre a mano, como los demás e2e (`DEPLOYMENT.md` § Correr los e2e
-  contra dev).
+  alumno, los permisos, y el camino del sitio: la grilla, retener, confirmar y la lista de
+  espera). Se corre a mano, como los demás e2e (`DEPLOYMENT.md` § Correr los e2e contra dev).

@@ -5,7 +5,7 @@ import { ReservasCatalogoService, datosAlojamiento } from './reservas-catalogo.s
 import { franjasDelDia, seguidasDesde, sesionesConCupo, type OcupacionDelDia } from './dominio/disponibilidad';
 import { aperturaDelDia, horarioEfectivo, sesionesDelDia, type HorarioSemanal } from './dominio/horario';
 import { diasEntre, esFecha, fechaYMinutos, instante, MINUTOS_DIA, sumarDias, tramoEnElDia, type Tramo } from './dominio/tiempo';
-import { DisponibilidadDiaDto, DisponibilidadRangoDto, NochesDto } from './reservas.types';
+import { DisponibilidadDiaDto, DisponibilidadRangoDto, NochesDto, SesionDto, SesionesDto } from './reservas.types';
 
 export type Modo = 'publico' | 'panel';
 
@@ -24,6 +24,8 @@ export interface ReglasDelRecurso {
 }
 
 const MAX_DIAS_RANGO = 93;
+/** Cuántos días de sesiones se arman en un pedido: cinco semanas, lo que muestra la grilla de un sitio de clases. */
+const MAX_DIAS_SESIONES = 35;
 
 // Qué se puede reservar y cuándo. Lee la config, el recurso, los bloqueos y
 // las reservas que ocupan lugar, y le pasa todo al dominio puro
@@ -172,6 +174,68 @@ export class DisponibilidadService {
       salida.push({ fecha, libres: franjas.filter((f) => f.libres > 0).length, cerrado });
     }
     return { recursoId: r.recurso.id, dias: salida };
+  }
+
+  /**
+   * Las sesiones de TODAS las clases del módulo entre dos días, cada una con
+   * su cupo y los lugares que quedan: lo que el sitio de un negocio de clases
+   * necesita para dibujar su grilla con un solo pedido. El sitio no tiene
+   * sesión y sus pedidos se cuentan por IP: pedir clase por clase y día por
+   * día (`delDia`) no escala con veinte clases por semana.
+   *
+   * Mismas reglas que `delDia`, clase por clase: una sesión tapada por un
+   * bloqueo no se da, una retenida vencida no ocupa lugar y, en modo
+   * 'publico', no salen las que ya no se pueden reservar (ya pasaron, o caen
+   * fuera de la anticipación del negocio). Lee la config, las clases, los
+   * bloqueos y las reservas del rango una vez cada uno.
+   *
+   * `cerrado` es el día entero bloqueado para todo el módulo, con su motivo.
+   */
+  async sesionesEntre(businessId: string, q: { modulo: ReservaModulo; desde: string; hasta: string }, modo: Modo, ahora = new Date()): Promise<SesionesDto> {
+    if (!esFecha(q.desde) || !esFecha(q.hasta)) throw new BadRequestException('Esa fecha no existe.');
+    const dias = diasEntre(q.desde, q.hasta);
+    if (dias < 0) throw new BadRequestException('El fin del rango es anterior al inicio.');
+    if (dias >= MAX_DIAS_SESIONES) throw new BadRequestException(`Pedí hasta ${MAX_DIAS_SESIONES} días por vez.`);
+    const config = await this.catalogo.configOFalla(businessId, q.modulo);
+    const clases = (await this.catalogo.recursos(businessId, q.modulo)).filter((r) => r.tipo === 'CLASE');
+    const ids = clases.map((r) => r.id);
+    const inicio = instante(q.desde, 0);
+    const fin = instante(q.hasta, MINUTOS_DIA);
+    const [bloqueos, ocupadas] = await Promise.all([
+      this.prisma.reservaBloqueo.findMany({
+        where: { businessId, modulo: q.modulo, OR: [{ recursoId: null }, { recursoId: { in: ids } }], inicio: { lt: fin }, fin: { gt: inicio } },
+        select: { recursoId: true, inicio: true, fin: true, motivo: true },
+      }),
+      ids.length === 0 ? Promise.resolve([]) : this.prisma.reserva.findMany({
+        where: {
+          businessId, recursoId: { in: ids }, inicio: { lt: fin }, fin: { gt: inicio },
+          OR: [{ estado: { in: ['PENDIENTE', 'CONFIRMADA'] } }, { estado: 'RETENIDA', retenidaHasta: { gte: ahora } }],
+        },
+        select: { recursoId: true, inicio: true, fin: true, cantidad: true },
+      }),
+    ]);
+    const horarios = new Map(clases.map((r) => [r.id, horarioEfectivo(r.tipo, r.horario as HorarioSemanal | null, config.horario as HorarioSemanal | null)]));
+    const salida: SesionesDto['dias'] = [];
+    for (let i = 0; i <= dias; i++) {
+      const fecha = sumarDias(q.desde, i);
+      const delDia = bloqueos.map((b) => ({ ...b, tramo: tramoEnElDia(b.inicio, b.fin, fecha) })).filter((b): b is typeof b & { tramo: Tramo } => b.tramo !== null);
+      // El día entero y para todo el módulo: es lo que el negocio carga como "día sin clases".
+      const cierre = delDia.find((b) => !b.recursoId && b.tramo[0] === 0 && b.tramo[1] === MINUTOS_DIA);
+      const desdeMinuto = DisponibilidadService.desdeMinuto(fecha, ahora, modo, config);
+      const sesiones: SesionDto[] = [];
+      if (desdeMinuto !== null) {
+        for (const r of clases) {
+          const tapan = delDia.filter((b) => !b.recursoId || b.recursoId === r.id).map((b) => b.tramo);
+          const ocupacion = this.ocupacionDelDia(ocupadas.filter((o) => o.recursoId === r.id), fecha);
+          for (const f of sesionesConCupo(sesionesDelDia(horarios.get(r.id), fecha), tapan, ocupacion, r.cupo, desdeMinuto)) {
+            sesiones.push({ recursoId: r.id, inicioMinutos: f.inicio, finMinutos: f.fin, libres: f.libres, cupo: f.cupo });
+          }
+        }
+      }
+      sesiones.sort((a, b) => a.inicioMinutos - b.inicioMinutos || a.recursoId.localeCompare(b.recursoId));
+      salida.push({ fecha, cerrado: !!cierre, motivo: cierre?.motivo?.trim() || null, sesiones });
+    }
+    return { desde: q.desde, hasta: q.hasta, dias: salida };
   }
 
   /** Alojamientos: qué noches están tomadas o bloqueadas entre dos días. */

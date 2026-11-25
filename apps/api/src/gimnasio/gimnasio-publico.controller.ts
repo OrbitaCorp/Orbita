@@ -1,8 +1,10 @@
-import { Controller, Get, NotFoundException, Param, UnprocessableEntityException } from '@nestjs/common';
+import { Controller, Get, NotFoundException, Param, Query, UnprocessableEntityException } from '@nestjs/common';
 import { Public } from '../common/decorators/public.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorefrontService } from '../storefront/storefront.service';
 import { ReservasCatalogoService } from '../reservas/reservas-catalogo.service';
+import { DisponibilidadService } from '../reservas/disponibilidad.service';
+import { GrillaQueryDto } from './dto/gimnasio.dto';
 import { GimnasioService } from './gimnasio.service';
 import { planDto } from './gimnasio.types';
 
@@ -10,15 +12,18 @@ import { planDto } from './gimnasio.types';
 // <slug>.orbita.site → /api/v1/storefront/:slug/gimnasio/... Sin login.
 //
 // Las clases, los lugares y la reserva misma son del motor
-// (/storefront/:slug/reservas, con modulo=GIMNASIO): acá solo están los planes
-// que el negocio ofrece, para la sección "Planes y pases" del sitio. Pide el
-// sitio abierto (publicado y sin pausar), como el motor.
+// (/storefront/:slug/reservas, con modulo=GIMNASIO). Acá están los planes que
+// el negocio ofrece, para la sección "Planes y pases" del sitio, y la grilla:
+// las sesiones de todas las clases con sus lugares libres en un solo pedido
+// (la arma el motor; el sitio no pide clase por clase). Pide el sitio abierto
+// (publicado y sin pausar), como el motor.
 @Controller('storefront/:slug/gimnasio')
 export class GimnasioPublicoController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storefront: StorefrontService,
     private readonly catalogo: ReservasCatalogoService,
+    private readonly disponibilidad: DisponibilidadService,
     private readonly gimnasio: GimnasioService,
   ) {}
 
@@ -30,6 +35,20 @@ export class GimnasioPublicoController {
     if (b.isPaused) throw new UnprocessableEntityException('Este negocio está pausado temporalmente.');
     await this.catalogo.configOFalla(businessId, 'GIMNASIO');
     return businessId;
+  }
+
+  /**
+   * La grilla del sitio: las sesiones de cada clase entre dos días (hasta 35),
+   * con el cupo y los lugares que quedan, y los días que el negocio cerró con
+   * su motivo. Con las reglas del sitio: no salen las clases que ya no se
+   * pueden reservar. Qué clase es cada una (actividad, profe, sala) lo dicen
+   * los recursos del motor: el sitio cruza las dos cosas por `recursoId`.
+   */
+  @Get('grilla')
+  @Public()
+  async grilla(@Param('slug') slug: string, @Query() q: GrillaQueryDto) {
+    const businessId = await this.negocioAbierto(slug);
+    return this.disponibilidad.sesionesEntre(businessId, { modulo: 'GIMNASIO', desde: q.desde, hasta: q.hasta }, 'publico');
   }
 
   /** Los planes que se ofrecen en el sitio, en el orden que les dio el negocio. */
