@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { NEGOCIOS_DEMO, type NegocioAlquiler } from '../index'
-import { leerPesos, linkWhatsApp, milesTxt, plazoTxt, politicaCancelacion, senaAlCancelar, textoBloqueo } from '../textos'
+import { hace, leerPesos, linkWhatsApp, milesTxt, plazoTxt, politicaCancelacion, senaAlCancelar, textoBloqueo } from '../textos'
 
 const con = ({ pagos, ...n }: Omit<Partial<NegocioAlquiler>, 'pagos'> & { pagos?: Partial<NegocioAlquiler['pagos']> }): NegocioAlquiler => ({
   ...NEGOCIOS_DEMO.estadia, ...n, pagos: { ...NEGOCIOS_DEMO.estadia.pagos, ...pagos },
@@ -66,5 +66,27 @@ describe('montos', () => {
     expect(leerPesos('120.000')).toBe(120000)
     expect(leerPesos('$ 1.500')).toBe(1500)
     expect(leerPesos('')).toBe(0)
+  })
+})
+
+describe('hace', () => {
+  const ahora = Date.parse('2026-11-25T15:00:00.000Z')
+  const antes = (min: number) => new Date(ahora - min * 60_000).toISOString()
+  it('dice hace cuánto fue, en la unidad que se entiende de un vistazo', () => {
+    expect(hace(antes(0), ahora)).toBe('recién')
+    expect(hace(antes(1), ahora)).toBe('recién')
+    expect(hace(antes(12), ahora)).toBe('hace 12 min')
+    expect(hace(antes(59), ahora)).toBe('hace 59 min')
+    expect(hace(antes(60), ahora)).toBe('hace 1 h')
+    expect(hace(antes(3 * 60 + 20), ahora)).toBe('hace 3 h')
+    expect(hace(antes(47 * 60), ahora)).toBe('hace 47 h')
+    expect(hace(antes(48 * 60), ahora)).toBe('hace 2 días')
+  })
+  it('sin fecha, o con una que no se entiende, todavía no pasó', () => {
+    expect(hace(undefined, ahora)).toBe('todavía no se sincronizó')
+    expect(hace('no es una fecha', ahora)).toBe('todavía no se sincronizó')
+  })
+  it('un reloj adelantado no da tiempos negativos', () => {
+    expect(hace(new Date(ahora + 5 * 60_000).toISOString(), ahora)).toBe('recién')
   })
 })

@@ -11,7 +11,7 @@
 // y el primer pintado ven los valores de fábrica, y recién después aparece lo
 // guardado, así no hay diferencias de hidratación.
 import { useSyncExternalStore } from 'react'
-import { NEGOCIOS_DEMO, reservasDe, CLIENTES, type Bloqueo, type CalendarioExterno, type Cliente, type NegocioAlquiler, type Reserva, type TipoAlquiler } from './index'
+import { HOY, NEGOCIOS_DEMO, reservasDe, CLIENTES, type Bloqueo, type CalendarioExterno, type Cliente, type NegocioAlquiler, type Reserva, type TipoAlquiler } from './index'
 
 export interface DemoAlquiler {
   /** Lo que cambió el dueño de cada negocio de ejemplo (alta o Configuración). */
@@ -130,6 +130,12 @@ export function useDemoAlquiler() {
       const d = leer()
       const n = negocioDe(d, tipo)
       escribir({ ...d, negocios: { ...d.negocios, [tipo]: { ...d.negocios[tipo], calendariosExternos: [...n.calendariosExternos, c], bloqueos: [...n.bloqueos, ...bloqueos] } } })
+    },
+    /** En la demo no hay nada que bajar: queda como recién sincronizado. */
+    sincronizarCalendario: (tipo: TipoAlquiler, id: string) => {
+      const d = leer()
+      const n = negocioDe(d, tipo)
+      escribir({ ...d, negocios: { ...d.negocios, [tipo]: { ...d.negocios[tipo], calendariosExternos: n.calendariosExternos.map(c => (c.id === id ? { ...c, ultimaSync: HOY } : c)) } } })
     },
     quitarCalendario: (tipo: TipoAlquiler, id: string) => {
       const d = leer()

@@ -48,8 +48,13 @@ export function textosDePantallas(dir: string): Set<string> {
  * texto de la pantalla (normalizar): sin eso, un botón que termina en "…"
  * ("Actividad nueva…") nunca coincidía con el suyo, que se guarda sin los
  * puntos.
+ *
+ * Con varias carpetas, alcanza con que esté en una: las pantallas de un módulo
+ * muestran también los botones de las piezas compartidas que usan (la barra
+ * de guardar del kit: "Guardar cambios", "Descartar").
  */
-export function botonesQueFaltan(botones: string[], dir: string): string[] {
-    const textos = textosDePantallas(dir)
+export function botonesQueFaltan(botones: string[], dir: string | string[]): string[] {
+    const textos = new Set<string>()
+    for (const d of [dir].flat()) for (const t of textosDePantallas(d)) textos.add(t)
     return botones.filter(b => !textos.has(normalizar(b)))
 }

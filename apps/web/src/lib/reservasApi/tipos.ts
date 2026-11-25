@@ -207,7 +207,30 @@ export interface Bloqueo {
   fin: string
   motivo: string | null
   createdAt: string
+  /** De dónde salió: lo cargó el negocio o vino de un calendario externo. Opcional: una API anterior no lo manda. */
+  origen?: 'DUENO' | 'ICAL'
+  /** Solo ICAL: de qué calendario vino. */
+  calendarioId?: string | null
+  /** Solo ICAL: una reserva hecha allá, o noches que allá figuran como no disponibles. */
+  externoTipo?: 'RESERVADO' | 'CERRADO' | null
 }
+
+/** Un calendario .ics de afuera (hoy, el de un aviso de Airbnb) conectado a un recurso. */
+export interface CalendarioExterno {
+  id: string
+  recursoId: string
+  nombre: string
+  url: string
+  activo: boolean
+  /** Cuándo se intentó bajar por última vez (instante ISO); null si nunca. */
+  ultimaSync: string | null
+  /** Por qué falló la última vez, listo para mostrar; null si salió bien. */
+  ultimoError: string | null
+  /** Reservas activas de acá que pisan noches reservadas allá. */
+  conflictos: { reservaId: string; codigo: string; desde: string; hasta: string }[]
+}
+
+export interface ConectarCalendario { modulo: Modulo; recursoId: string; nombre?: string; url: string }
 
 export interface Espera {
   id: string

@@ -11,7 +11,7 @@
 //   una; si se cancela a tiempo (antes del plazo del negocio), vuelve. Quien
 //   pasa de la lista de espera a reservado también la descuenta.
 import { useSyncExternalStore } from 'react'
-import { AHORA, COLORES_EQUIPO, HOY, cupoDe, inscripcionesDe, lugaresDe, negocioDe, planDe, rubroPorKey, sociosDe, type ClaseSemanal, type Inscripcion, type NegocioGym, type Profe, type Socio } from './index'
+import { AHORA, COLORES_EQUIPO, HOY, cupoDe, inscripcionesDe, lugaresDe, negocioDe, planDe, rubroPorKey, sociosDe, type ClaseSemanal, type Inscripcion, type NegocioGym, type Pago, type Profe, type Socio } from './index'
 import { diaSemana, diasEntre, sumarDias } from '@/lib/reservas/fechas'
 
 export interface DemoGym {
@@ -195,6 +195,19 @@ export const accionesGym = {
       }
     }
     escribir({ ...d, cambios, cambiosSocio })
+  },
+  /**
+   * Cambia con qué se paga un lugar ya reservado (`planId` es el plan con el que queda: el del socio, la clase suelta
+   * o la de prueba). Si sale del pack, la clase vuelve; si entra, se descuenta. En la lista de espera no se toca el pack.
+   */
+  definirPago: (rubro: string, id: string, pago: Pago, planId: string | null) => {
+    const d = leer()
+    const la = inscripcionesDelDemo(d, rubro).find(i => i.id === id)
+    if (!la) return
+    const ocupa = la.estado === 'reservada' || la.estado === 'asistio' || la.estado === 'ausente'
+    const sinLaVieja = ocupa ? ajustarPack(d, rubro, la, +1) : d.cambiosSocio
+    const conLaNueva = ocupa ? ajustarPack({ ...d, cambiosSocio: sinLaVieja }, rubro, { ...la, planId }, -1) : sinLaVieja
+    escribir({ ...d, cambios: { ...d.cambios, [id]: { ...d.cambios[id], pago, planId } }, cambiosSocio: conLaNueva })
   },
   agregarSocio: (rubro: string, s: Socio) => {
     const d = leer()

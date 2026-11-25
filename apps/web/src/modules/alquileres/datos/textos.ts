@@ -71,3 +71,19 @@ export const milesTxt = (n: number) => Math.max(0, Math.round(n)).toLocaleString
 
 /** Lo que se escribió en un campo de plata, como número: solo los dígitos. */
 export const leerPesos = (s: string) => Number(s.replace(/\D/g, '')) || 0
+
+/**
+ * Hace cuánto pasó algo, para leer de un vistazo: "recién", "hace 12 min",
+ * "hace 3 h", "hace 2 días". `ahora` en milisegundos (se pasa para poder
+ * probarlo y para no depender del reloj al dibujar).
+ */
+export function hace(instante: string | undefined, ahora: number): string {
+  const t = instante ? Date.parse(instante) : NaN
+  if (!Number.isFinite(t)) return 'todavía no se sincronizó'
+  const min = Math.floor((ahora - t) / 60_000)
+  if (min < 2) return 'recién'
+  if (min < 60) return `hace ${min} min`
+  const horas = Math.floor(min / 60)
+  if (horas < 48) return `hace ${horas} h`
+  return `hace ${Math.floor(horas / 24)} días`
+}

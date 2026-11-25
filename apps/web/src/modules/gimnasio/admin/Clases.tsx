@@ -13,14 +13,24 @@
 // reservados por delante no se mueve de día u hora ni se quita. Acá se avisa
 // antes de guardar; con la API, la que decide es la API.
 //
+// Cada lugar dice cómo se paga: con el plan de la persona (un pack descuenta
+// una clase; una membresía, una de las de esa semana), aparte (se cobra en el
+// gimnasio, como clase suelta) o con la clase de prueba. Se elige al anotar y
+// se puede corregir después desde la misma fila. El lugar de quien pasó de la
+// lista de espera o reservó desde el sitio puede estar sin definir.
+//
 // Lo que no es igual en la demo y en la API llega en `puede` (Capacidades):
 // si la asistencia se corrige, si liberar un lugar tiene vuelta atrás, si la
 // actividad, el profe y la sala se escriben al cargar la clase.
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useRouter } from 'next/router'
-import { Check, ChevronLeft, ChevronRight, Hourglass, Plus, Trash2, UserPlus, X } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Hourglass, Plus, Trash2, UserPlus, Wallet, X } from 'lucide-react'
 import { DIAS_CORTOS, DIAS_SEMANA, diaSemana, esISO, fechaCorta, fechaLarga, fechaRelativa, hhmm, sumarDias, type ISO } from '@/lib/reservas/fechas'
-import { COLORES_ACTIVIDAD, actividadDe, clasesDelDia, colorDe, cupoDe, diaBloqueado, lugaresDe, maximoTomadoDesde, nombreDeInscripcion, profeDe, reservadasEntre, rubroPorKey, socioPorId, topeSemanal, type ClaseSemanal, type Inscripcion, type NegocioGym, type Socio } from '../datos'
+import { pesos } from '@/lib/reservas/precio'
+import {
+  COLORES_ACTIVIDAD, PAGO_TXT, actividadDe, clasesDelDia, colorDe, cupoDe, diaBloqueado, lugaresDe, maximoTomadoDesde, nombreDeInscripcion, pagoDe, pagosPosibles, planesDeSocio,
+  profeDe, reservadasEntre, rubroPorKey, socioPorId, type ClaseSemanal, type Inscripcion, type NegocioGym, type Pago, type PagosPosibles, type PlanDeSocio, type Socio,
+} from '../datos'
 import { LIMITE_DIAS, type Capacidades } from '../datos/origen'
 import { useReloj } from '../datos/reloj'
 import { Chip, Encabezado, Modal, Nota, Selector, Sigla, Vacio, Campo } from '@/design-system/reservas/piezas'
@@ -39,8 +49,10 @@ interface P {
   // Cada acción contesta si salió bien: un formulario no se cierra ni queda vacío hasta saberlo.
   onCambiar: (id: string, cambio: Partial<Inscripcion>, aviso?: string) => Promise<boolean>
   onCancelar: (id: string, aviso?: string) => Promise<boolean>
-  /** `nuevo`: la persona, si se cargó recién (Alguien nuevo…). */
+  /** `nuevo`: la persona, si se cargó recién (Alguien nuevo…). `i.pago` dice cómo paga el lugar. */
   onInscribir: (i: Inscripcion, aviso?: string, nuevo?: Socio) => Promise<boolean>
+  /** Dice (o corrige) cómo se paga un lugar que ya está reservado. */
+  onDefinirPago: (id: string, pago: Pago, aviso?: string) => Promise<boolean>
   /** `catalogo`: lo que se escribió ahí mismo al cargar la clase. */
   onGuardarGrilla: (clases: ClaseSemanal[], aviso?: string, catalogo?: CatalogoNuevo) => Promise<boolean>
 }
@@ -51,6 +63,23 @@ const primerNombre = (nombre: string) => nombre.trim().split(/\s+/)[0] ?? nombre
 const celularValido = (t: string) => /^[\d\s()+-]{6,30}$/.test(t.trim()) && t.replace(/\D/g, '').length >= 6
 /** Cuántos lugares se pueden pedir de una vez para alguien (una persona con amigas), como mucho. */
 const MAX_LUGARES = 10
+
+/** Un id provisorio para lo que se carga acá (la persona nueva, su lugar): el origen le pone el definitivo al guardar. */
+const idNuevo = (prefijo: string) => `${prefijo}${Date.now().toString(36)}`
+
+/** Cómo paga un lugar, dicho corto: va en el botón de cada fila. */
+const PAGO_CORTO: Record<Pago, string> = { plan: 'Con su plan', aparte: 'Aparte', prueba: 'Prueba' }
+/** El plan con el que se pagaría, con lo que le queda si es un pack: "Pack de 8 clases (le quedan 3)". */
+const planTxt = (p: PlanDeSocio | undefined) => (p ? `${p.nombre}${p.tipo === 'pack' ? ` (le ${p.restantes === 1 ? 'queda 1' : `quedan ${p.restantes ?? 0}`})` : ''}` : '')
+/** Las opciones del selector "Cómo paga": su plan si le alcanza, aparte siempre, y la clase de prueba si no la usó. */
+function opcionesDePago(op: PagosPosibles, lugares: number, conPlan: boolean, conPrueba: boolean): { id: Pago; label: string }[] {
+  const plan = planTxt(op.plan.con)
+  return [
+    ...(conPlan ? [{ id: 'plan' as const, label: `Con su plan${plan ? ` · ${plan}` : ''}` }] : []),
+    { id: 'aparte' as const, label: `Se cobra aparte${op.suelta ? ` · ${pesos(op.suelta.precio * lugares)}` : ''}` },
+    ...(conPrueba ? [{ id: 'prueba' as const, label: 'Clase de prueba · gratis' }] : []),
+  ]
+}
 
 const CSS = `
   /* La tira de días ocupa lo que dejan las flechas y scrollea adentro: en celular no empuja la página. Las flechas no se achican (en 390 quedaban de 27 px). */
@@ -105,8 +134,11 @@ const CSS = `
   .gic-persona-sacar { flex-shrink: 0; }
   /* El aviso de un día sin clases que todavía tiene reservas, arriba de esas clases. */
   .gic-bloqueado { margin-bottom: 12px; }
-  /* Anotar: a quién y cuántos lugares, con el botón al lado. */
+  /* Anotar: a quién y cuántos lugares; abajo, cómo paga y el botón (siempre en el mismo lugar). */
   .gic-lugares { width: 104px; flex-shrink: 0; }
+  .gic-anotar-fin { justify-content: flex-end; }
+  /* Cómo paga cada lugar: un botón chico en la fila. Sin definir va en el tono de aviso: es lo que falta resolver. */
+  .gic-pago[data-sin='true'] { background: var(--color-warning-bg); border-color: transparent; color: var(--chip-warning-fg); font-weight: 600; }
 
   @media (max-width: 1100px) { .gic-grilla { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   @media (max-width: 768px) {
@@ -184,7 +216,7 @@ export default function Clases(p: P) {
 
 // ─── El día ──────────────────────────────────────────────────────────────────
 
-function Dia({ negocio, inscripciones, socios, puede, onCambiar, onCancelar, onInscribir, socioTxt, dia, abierta, onDia, onAbrir }: P & { socioTxt: string; dia: ISO; abierta: string; onDia: (f: ISO) => void; onAbrir: (id: string | null) => void }) {
+function Dia({ negocio, inscripciones, socios, puede, onCambiar, onCancelar, onInscribir, onDefinirPago, socioTxt, dia, abierta, onDia, onAbrir }: P & { socioTxt: string; dia: ISO; abierta: string; onDia: (f: ISO) => void; onAbrir: (id: string | null) => void }) {
   const { hoy, ahora } = useReloj()
   const desde = sumarDias(dia, -3)
   const bloqueo = diaBloqueado(negocio, dia)
@@ -265,7 +297,7 @@ function Dia({ negocio, inscripciones, socios, puede, onCambiar, onCancelar, onI
           </div>
         </>
       )}
-      {clase && <DetalleClase negocio={negocio} clase={clase} fecha={dia} inscripciones={inscripciones} socios={socios} pasada={pasada(clase)} sinClases={!!bloqueo} socioTxt={socioTxt} puede={puede} onCerrar={() => onAbrir(null)} onCambiar={onCambiar} onCancelar={onCancelar} onInscribir={onInscribir} />}
+      {clase && <DetalleClase negocio={negocio} clase={clase} fecha={dia} inscripciones={inscripciones} socios={socios} pasada={pasada(clase)} sinClases={!!bloqueo} socioTxt={socioTxt} puede={puede} onCerrar={() => onAbrir(null)} onCambiar={onCambiar} onCancelar={onCancelar} onInscribir={onInscribir} onDefinirPago={onDefinirPago} />}
     </>
   )
 }
@@ -273,11 +305,11 @@ function Dia({ negocio, inscripciones, socios, puede, onCambiar, onCancelar, onI
 /** Lo que se elige en "Anotar" para cargar a alguien que todavía no está entre los socios. */
 const NUEVA = '__nueva__'
 
-function DetalleClase({ negocio, clase, fecha, inscripciones, socios, pasada, sinClases, socioTxt, puede, onCerrar, onCambiar, onCancelar, onInscribir }: {
+function DetalleClase({ negocio, clase, fecha, inscripciones, socios, pasada, sinClases, socioTxt, puede, onCerrar, onCambiar, onCancelar, onInscribir, onDefinirPago }: {
   negocio: NegocioGym; clase: ClaseSemanal; fecha: ISO; inscripciones: Inscripcion[]; socios: Socio[]; pasada: boolean; socioTxt: string; puede: Capacidades
   /** El día está marcado sin clases: se ve quién quedó anotado, pero no se anota a nadie más. */
   sinClases: boolean
-  onCerrar: () => void; onCambiar: P['onCambiar']; onCancelar: P['onCancelar']; onInscribir: P['onInscribir']
+  onCerrar: () => void; onCambiar: P['onCambiar']; onCancelar: P['onCancelar']; onInscribir: P['onInscribir']; onDefinirPago: P['onDefinirPago']
 }) {
   const { hoy, ahora } = useReloj()
   const act = actividadDe(negocio, clase.actividadId)
@@ -291,37 +323,50 @@ function DetalleClase({ negocio, clase, fecha, inscripciones, socios, pasada, si
   const anotados = suyas.filter(i => i.estado !== 'espera').sort((a, b) => nombreDe(a).localeCompare(nombreDe(b), 'es'))
   const espera = suyas.filter(i => i.estado === 'espera').sort((a, b) => a.creada.localeCompare(b.creada) || a.id.localeCompare(b.id))
   const lugaresCon = (estado: Inscripcion['estado']) => anotados.filter(i => i.estado === estado).reduce((s, i) => s + lugaresDe(i), 0)
-  const [anotar, setAnotar] = useState('')
+  const [anotar, setAnotarEstado] = useState('')
   const [nueva, setNueva] = useState({ nombre: '', telefono: '' })
   const [lugares, setLugares] = useState(1)
+  // Cómo paga, si quien anota lo cambió; null = lo que corresponde (su plan si le alcanza; si no, aparte).
+  const [pago, setPago] = useState<Pago | null>(null)
+  // Con otra persona, la elección de antes no vale.
+  const setAnotar = (v: string) => { setAnotarEstado(v); setPago(null) }
   // A quién se está por sacar: liberar un lugar (o sacar de la espera) pide confirmación.
   const [aSacar, setASacar] = useState<Inscripcion | null>(null)
+  // El lugar al que se le está diciendo (o corrigiendo) cómo paga.
+  const [aPagar, setAPagar] = useState<Inscripcion | null>(null)
   const libres = socios.filter(s => !suyas.some(i => i.socioId === s.id))
+  // Dos personas que se llaman igual se distinguen por el celular: si no, en la lista parecen la misma.
+  const mismoNombre = (s: Socio) => s.nombre.trim().toLowerCase()
+  const repetidos = new Set(libres.map(mismoNombre).filter((n, i, l) => l.indexOf(n) !== i))
+  const enLaLista = (s: Socio) => (repetidos.has(mismoNombre(s)) && s.telefono ? `${s.nombre} · ${s.telefono}` : s.nombre)
   const esNueva = anotar === NUEVA
-  // El dueño puede anotar a quien quiera, pero se le avisa si a esa persona ya no le quedan clases esa semana o en el pack.
   const elegido = anotar && !esNueva ? socioPorId(anotar, socios) : undefined
-  const tope = elegido ? topeSemanal(negocio, elegido, fecha, inscripciones) : null
-  const sinPack = elegido?.clasesRestantes !== null && elegido?.clasesRestantes !== undefined && elegido.clasesRestantes <= 0
   // Varios lugares para la misma persona (viene con amigas): hasta los que quedan. Con la clase llena, a la espera va de a una.
   const maxLugares = Math.min(MAX_LUGARES, k.libres)
+  const cuantos = k.lleno ? 1 : Math.max(1, Math.min(lugares, maxLugares))
+  // Cómo paga se elige al anotar en un lugar. A la lista de espera se entra sin decirlo: se define cuando tenga su lugar.
+  const opciones = puede.eligePago && !k.lleno && (elegido || esNueva) ? pagosPosibles(negocio, elegido, fecha, hoy, inscripciones, cuantos) : null
+  const pagoElegido: Pago = opciones && pago && (pago !== 'plan' || opciones.plan.puede) && (pago !== 'prueba' || opciones.prueba) ? pago : opciones?.plan.puede ? 'plan' : 'aparte'
+  // Tiene (o tuvo) un plan y esta clase no se la cubre: se dice por qué. Quien nunca tuvo plan no necesita el aviso.
+  const noCubre = opciones && elegido && !opciones.plan.puede && opciones.plan.motivo && planesDeSocio(negocio, elegido).length > 0 ? opciones.plan : undefined
   const nombreMal = esNueva && nueva.nombre.trim().length < 2
   const celularMal = esNueva && !celularValido(nueva.telefono)
   const puedeAnotar = esNueva ? !nombreMal && !celularMal : !!elegido
   const agregar = async () => {
     const s: Socio | undefined = esNueva
-      ? { id: `sn-${Date.now().toString(36)}`, nombre: nueva.nombre.trim(), telefono: nueva.telefono.trim(), planId: null, desde: null, vence: null, clasesRestantes: null, probo: false, alta: hoy }
+      ? { id: idNuevo('sn-'), nombre: nueva.nombre.trim(), telefono: nueva.telefono.trim(), planId: null, desde: null, vence: null, clasesRestantes: null, probo: false, alta: hoy }
       : elegido
     if (!s || !puedeAnotar) return
-    const cuantos = k.lleno ? 1 : Math.max(1, Math.min(lugares, maxLugares))
-    const i: Inscripcion = { id: `n${Date.now().toString(36)}`, claseId: clase.id, fecha, socioId: s.id, estado: k.lleno ? 'espera' : 'reservada', creada: hoy, planId: s.planId, ...(cuantos > 1 ? { cantidad: cuantos } : {}) }
+    const i: Inscripcion = { id: idNuevo('n'), claseId: clase.id, fecha, socioId: s.id, estado: k.lleno ? 'espera' : 'reservada', creada: hoy, planId: s.planId, ...(opciones ? { pago: pagoElegido } : {}), ...(cuantos > 1 ? { cantidad: cuantos } : {}) }
     // El formulario se vacía en el acto (un segundo clic no anota dos veces). Si no se pudo anotar,
     // vuelve lo que estaba cargado: no hay que tipear de nuevo el nombre y el celular.
-    const cargado = { anotar, nueva, lugares }
-    setAnotar('')
+    const cargado = { anotar, nueva, lugares, pago }
+    setAnotarEstado('')
+    setPago(null)
     setNueva({ nombre: '', telefono: '' })
     setLugares(1)
     const ok = await onInscribir(i, k.lleno ? `${primerNombre(s.nombre)} quedó en lista de espera` : cuantos > 1 ? `${primerNombre(s.nombre)} anotado con ${cuantos} lugares` : `${primerNombre(s.nombre)} anotado`, esNueva ? s : undefined)
-    if (!ok) { setAnotar(cargado.anotar); setNueva(cargado.nueva); setLugares(cargado.lugares) }
+    if (!ok) { setAnotarEstado(cargado.anotar); setPago(cargado.pago); setNueva(cargado.nueva); setLugares(cargado.lugares) }
   }
   return (
     <Modal titulo={act?.nombre ?? 'Clase'} bajada={`${fechaRelativa(fecha, hoy) === 'Hoy' ? 'Hoy' : fechaLarga(fecha)} · ${hhmm(clase.inicio)} a ${hhmm(clase.inicio + (act?.duracion ?? 60))} · ${profe?.nombre ?? 'Sin profe'}${clase.sala ? ` · ${clase.sala}` : ''}`} onCerrar={onCerrar} ancho={600}
@@ -341,12 +386,20 @@ function DetalleClase({ negocio, clase, fecha, inscripciones, socios, pasada, si
           // Con la API, presente y ausente son finales: se marcan una vez, sobre un lugar reservado.
           const puedePresente = checkInAbierto && (puede.corregirAsistencia ? i.estado !== 'asistio' : i.estado === 'reservada')
           const puedeFalto = pasada && (puede.corregirAsistencia ? i.estado !== 'ausente' : i.estado === 'reservada')
+          const comoPaga = pagoDe(negocio, i)
           return (
             <div key={i.id} className="gic-persona">
               <Sigla nombre={nombre} color={colorDe(nombre)} size={32} />
               <span style={{ flex: 1, minWidth: 0 }}><span className="gic-persona-nombre">{nombre}</span><span className="rv-ayuda">{[s?.telefono, n > 1 ? `${n} lugares` : ''].filter(Boolean).join(' · ')}</span></span>
               <span className="gic-persona-acciones">
                 {i.estado === 'asistio' ? <Chip tono="ok"><Check size={12} aria-hidden /> Vino</Chip> : i.estado === 'ausente' ? <Chip tono="error">Faltó</Chip> : null}
+                {/* Cómo paga este lugar: se ve y se cambia desde acá. Sin definir es lo que falta resolver. */}
+                {puede.eligePago && (
+                  <button type="button" className="rv-btn rv-btn--sm rv-btn--fantasma gic-pago" data-sin={comoPaga === null || undefined} onClick={() => setAPagar(i)}
+                    aria-label={`Cómo paga ${nombre}: ${comoPaga ? PAGO_TXT[comoPaga].toLowerCase() : 'sin definir'}. Cambiar`} aria-haspopup="dialog">
+                    <Wallet size={14} aria-hidden /> {comoPaga ? PAGO_CORTO[comoPaga] : 'Sin definir'}
+                  </button>
+                )}
                 {puedePresente && <button type="button" className="rv-btn rv-btn--sm" onClick={() => onCambiar(i.id, { estado: 'asistio' }, `Check-in de ${primerNombre(nombre)}`)}><Check size={14} aria-hidden /> Check-in</button>}
                 {puedeFalto && <button type="button" className="rv-btn rv-btn--sm rv-btn--fantasma" onClick={() => onCambiar(i.id, { estado: 'ausente' }, `${primerNombre(nombre)} quedó como que faltó`)}>Faltó</button>}
               </span>
@@ -380,9 +433,8 @@ function DetalleClase({ negocio, clase, fecha, inscripciones, socios, pasada, si
       {!pasada && !sinClases && (
         <>
           <div className="rv-fila gic-anotar" style={{ marginTop: 18, alignItems: 'flex-end' }}>
-            <div style={{ flex: 1, minWidth: 200 }}><Selector label={`Anotar ${socioTxt.toLowerCase()}`} valor={anotar} onChange={setAnotar} opciones={[{ id: '', label: 'Elegí a alguien' }, { id: NUEVA, label: 'Alguien nuevo…' }, ...libres.map(s => ({ id: s.id, label: s.nombre }))]} /></div>
+            <div style={{ flex: 1, minWidth: 200 }}><Selector label={`Anotar ${socioTxt.toLowerCase()}`} valor={anotar} onChange={setAnotar} opciones={[{ id: '', label: 'Elegí a alguien' }, { id: NUEVA, label: 'Alguien nuevo…' }, ...libres.map(s => ({ id: s.id, label: enLaLista(s) }))]} /></div>
             {!k.lleno && maxLugares > 1 && <div className="gic-lugares"><Selector label="Lugares" valor={Math.min(lugares, maxLugares)} onChange={setLugares} opciones={Array.from({ length: maxLugares }, (_, n) => ({ id: n + 1, label: String(n + 1) }))} /></div>}
-            <button type="button" className="rv-btn" onClick={() => void agregar()} disabled={!puedeAnotar}><UserPlus size={15} aria-hidden /> {k.lleno ? 'A la lista de espera' : 'Anotar'}</button>
           </div>
           {esNueva && (
             <div className="rv-dos" style={{ marginTop: 10 }}>
@@ -391,15 +443,28 @@ function DetalleClase({ negocio, clase, fecha, inscripciones, socios, pasada, si
                 error={nueva.telefono && celularMal ? 'Solo números (podés usar espacios, + y guiones).' : undefined} ayuda="Con el celular se la reconoce la próxima vez." />
             </div>
           )}
+          {/* Abajo, cómo paga (cuando ya se sabe quién es) y el botón, que no cambia de lugar. */}
+          <div className="rv-fila gic-anotar gic-anotar-fin" style={{ marginTop: 10, alignItems: 'flex-end' }}>
+            {opciones && <div style={{ flex: 1, minWidth: 200 }}><Selector label="Cómo paga" valor={pagoElegido} onChange={setPago} opciones={opcionesDePago(opciones, cuantos, opciones.plan.puede, opciones.prueba)} /></div>}
+            <button type="button" className="rv-btn" onClick={() => void agregar()} disabled={!puedeAnotar}><UserPlus size={15} aria-hidden /> {k.lleno ? 'A la lista de espera' : 'Anotar'}</button>
+          </div>
           {/* Por qué el botón está apagado: que no haya que adivinarlo. */}
           {esNueva && !puedeAnotar && <p className="rv-ayuda" style={{ margin: '8px 0 0' }}>Cargá el nombre y un celular para {k.lleno ? 'sumarla a la lista de espera' : 'anotarla'}.</p>}
-          {k.lleno && <p className="rv-ayuda" style={{ margin: '8px 0 0' }}>La clase está llena: queda en la lista de espera y, si alguien cancela, pasa sola.</p>}
-          {elegido && (tope?.lleno || sinPack) && (
+          {k.lleno && <p className="rv-ayuda" style={{ margin: '8px 0 0' }}>La clase está llena: queda en la lista de espera y, si alguien cancela, pasa sola.{puede.pagoSinDefinir ? ' Cuando tenga su lugar, decí cómo paga desde su fila.' : ''}</p>}
+          {noCubre && (
             <div style={{ marginTop: 10 }}>
-              <Nota tono="aviso">{tope?.lleno ? `${primerNombre(elegido.nombre)} ya usó sus ${tope.porSemana} clases de esa semana. Si lo anotás igual, cobrale la clase aparte.` : `A ${primerNombre(elegido.nombre)} no le quedan clases en el pack. Si lo anotás igual, cobrale la clase aparte o renovale el pack desde su ficha.`}</Nota>
+              <Nota tono="aviso">{noCubre.motivo} Si lo anotás igual, se cobra aparte.{noCubre.salida ? ` ${noCubre.salida}` : ''}</Nota>
             </div>
           )}
         </>
+      )}
+      {aPagar && (
+        <ComoPaga negocio={negocio} inscripcion={aPagar} socio={socioPorId(aPagar.socioId, socios)} nombre={nombreDe(aPagar)} inscripciones={inscripciones} onVolver={() => setAPagar(null)}
+          onGuardar={async p => {
+            const nombre = primerNombre(nombreDe(aPagar))
+            const ok = await onDefinirPago(aPagar.id, p, p === 'plan' ? `${nombre} paga con su plan` : p === 'prueba' ? `${nombre} usa su clase de prueba` : `A ${nombre} se le cobra aparte`)
+            if (ok) setAPagar(null)
+          }} />
       )}
       {aSacar && (
         <ConfirmarSacar inscripcion={aSacar} nombre={nombreDe(aSacar)} hayEspera={espera.length > 0} definitivo={puede.liberarEsDefinitivo} onVolver={() => setASacar(null)}
@@ -435,6 +500,43 @@ function ConfirmarSacar({ inscripcion, nombre, hayEspera, definitivo, onVolver, 
           : <>{n > 1 ? `Se liberan sus ${n} lugares` : 'Se libera su lugar'}{definitivo ? ': la reserva queda cancelada y, si dejó su email, le llega el aviso.' : '.'}{hayEspera ? ' El primero de la lista de espera pasa solo.' : ''}</>}
         {definitivo && !deLaEspera && <> No se puede deshacer: si fue un error, hay que anotarla de nuevo.</>}
       </p>
+    </Modal>
+  )
+}
+
+/**
+ * Cómo paga un lugar que ya está reservado: para el de quien pasó de la lista
+ * de espera o reservó desde el sitio (que nace sin definir) y para corregir
+ * uno que se cargó mal. Las cuentas se hacen sin contar este lugar: si hoy se
+ * paga con el plan, esa clase ya está descontada.
+ */
+function ComoPaga({ negocio, inscripcion, socio, nombre, inscripciones, onVolver, onGuardar }: {
+  negocio: NegocioGym; inscripcion: Inscripcion; socio: Socio | undefined; nombre: string; inscripciones: Inscripcion[]
+  onVolver: () => void; onGuardar: (pago: Pago) => Promise<void>
+}) {
+  const { hoy } = useReloj()
+  const actual = pagoDe(negocio, inscripcion)
+  const lugares = lugaresDe(inscripcion)
+  const op = pagosPosibles(negocio, socio, inscripcion.fecha, hoy, inscripciones.filter(i => i.id !== inscripcion.id), lugares)
+  const conPlan = actual === 'plan' || op.plan.puede
+  const [pago, setPago] = useState<Pago>(actual ?? (op.plan.puede ? 'plan' : 'aparte'))
+  // El modal se queda abierto hasta saber que se guardó.
+  const [guardando, setGuardando] = useState(false)
+  const guardar = async () => {
+    if (guardando || pago === actual) return
+    setGuardando(true)
+    await onGuardar(pago)
+    setGuardando(false)
+  }
+  return (
+    <Modal encima ancho={440} titulo={`¿Cómo paga ${nombre} este lugar?`} bajada={lugares > 1 ? `Son ${lugares} lugares.` : undefined} onCerrar={onVolver} onEnviar={() => void guardar()}
+      pie={<>
+        <button type="button" className="rv-btn" onClick={onVolver} disabled={guardando}>Volver</button>
+        <button type="button" className="rv-btn rv-btn--primario" onClick={() => void guardar()} disabled={guardando || pago === actual}><Check size={15} aria-hidden /> {guardando ? 'Guardando…' : 'Guardar'}</button>
+      </>}>
+      <Selector label="Cómo paga" valor={pago} onChange={setPago} opciones={opcionesDePago(op, lugares, conPlan, op.prueba || actual === 'prueba')} />
+      {!conPlan && op.plan.motivo && <p className="rv-ayuda" style={{ margin: '8px 0 0' }}>{op.plan.motivo}</p>}
+      <p className="rv-ayuda" style={{ margin: '8px 0 0' }}>Con su plan se le descuenta la clase. Si deja de pagarse con el plan, la clase le vuelve.</p>
     </Modal>
   )
 }

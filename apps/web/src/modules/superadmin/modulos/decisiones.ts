@@ -367,4 +367,30 @@ Alternativas: dejarlo para después del ciclo (los 19 rubros ya cubren lugares y
       'apps/web/src/modules/superadmin/modulos/plan.ts:187',
     ],
   }),
+  // ─── De la revisión de los planes y del sitio de Gimnasio (25/11/2026) ──────
+  decisionAbierta({
+    modulo: 'gimnasio', slug: 'el-rubro-que-decide-el-sitio-se-escribe-a-mano', decide: 'Ale', transversal: true, fecha: '2026-11-25',
+    titulo: 'Transversal: el rubro que decide qué sitio y qué panel ve un negocio se puede escribir a mano',
+    simple: 'El rubro principal del negocio (`industry`) decide dos cosas: qué muestra `<slug>.orbita.site` (su tienda o su sitio de reservas) y a dónde lleva `/panel`. En Tienda, Configuración → Información del negocio tiene "Rubro (opcional)", un texto libre que guarda en ese mismo campo. Hay que decidir cómo se evita que una tienda cambie de sitio y de panel por escribir una palabra.',
+    alcance: 'La Configuración de Tienda en producción (el campo "Rubro (opcional)"), la API que lo guarda y `lib/reservas/destinoPanel.ts`, que comparten los módulos. Toca a Tienda y a los tres módulos: la decide Ale. A Alan le cambia cómo se reconoce un negocio de Alquileres.',
+    foco: 'Un negocio ve su tienda o su sitio de reservas según su rubro principal. Ese mismo dato lo puede cambiar el dueño de una tienda desde su Configuración, en un campo de texto libre: si escribe "alquileres", deja de ver su tienda y su panel.',
+    propuesta: `Lo que ya está hecho: **Gimnasio pide dos cosas** para mostrar su sitio, el rubro "gimnasio" y un subrubro de Gimnasio (\`esDeGimnasio\`). Una tienda que escriba "gimnasio" en ese campo sigue viendo su tienda, porque sus subrubros son los de Tienda. Tiene su test.
+
+Lo que falta decidir, en orden de preferencia:
+
+1. **Que el campo de Tienda no guarde en \`industry\`.** "Rubro (opcional)" pasa a ser un texto propio de la tienda, o se saca: el rubro ya se elige en el alta, con sus subrubros. Corta el problema de raíz, para los tres módulos y para los que vengan.
+2. **Mientras tanto, que Alquileres pida también su subrubro**, como Gimnasio. Es un cambio chico en \`destinoPanel.ts\`, con su test. Lo hace Alan, o Ale avisándole.
+3. **En la API, no aceptar como rubro de una tienda las claves de los módulos** ("turnos", "alquileres", "gimnasio") al guardar la configuración.
+
+No se sabe de ninguna tienda en producción con ese valor: es un riesgo, no algo que haya pasado. Se puede mirar en Superadmin → Negocios, que muestra el rubro de cada uno.`,
+    abierta: 'Cambia una pantalla de Tienda en producción y cómo se reconoce a los negocios de los tres módulos. No se destraba con código de Gimnasio solo.',
+    origen: 'Sesión del 25/11/2026: al sumar el sitio de Gimnasio a las rutas del sitio de un negocio (entrada "cómo viene cada plan…").',
+    archivos: [
+      'apps/web/src/lib/reservas/destinoPanel.ts:33',
+      'apps/web/src/modules/ventas/panel/configuracion/components/general/SeccionNegocio.tsx:90',
+      'apps/web/src/pages/tienda/[slug]/index.tsx:19',
+      'apps/web/src/pages/panel/index.tsx:38',
+      'apps/web/src/lib/storefront/forceSSR.ts:347',
+    ],
+  }),
 ]

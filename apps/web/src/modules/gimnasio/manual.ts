@@ -39,7 +39,7 @@ export const MANUAL_GIMNASIO: ManualDeModulo = {
                             { label: 'Pagos', texto: 'Cómo cobra el negocio.' },
                         ] },
                         { tipo: 'parrafo', texto: 'Arriba a la derecha está la campanita: avisa las clases de hoy con gente esperando lugar, las que ya están completas, los planes que vencen en los próximos días y las clases de la grilla que quedaron sin profe. Cada aviso lleva directo a la clase o a la ficha.' },
-                        { tipo: 'nota', variante: 'dato', texto: 'Clases y Días sin clases ya guardan en el sistema de reservas del negocio. Mientras se conecta el resto, una franja arriba avisa cuando una sección todavía no guarda: lo que se cambie ahí no queda guardado.' },
+                        { tipo: 'nota', variante: 'dato', texto: 'Clases, Alumnos o socios, Planes y precios y Días sin clases ya guardan en el sistema de reservas del negocio. Mientras se conecta el resto, una franja arriba avisa cuando una sección todavía no guarda: lo que se cambie ahí no queda guardado.' },
                     ],
                 },
                 {
@@ -68,16 +68,37 @@ export const MANUAL_GIMNASIO: ManualDeModulo = {
                 },
                 {
                     id: 'anotar', titulo: 'Anotar a alguien en una clase',
-                    pista: 'reservar un lugar a mano, para alguien nuevo o para varias personas',
+                    pista: 'reservar un lugar a mano, para alguien nuevo o para varias personas, con su plan o cobrando aparte',
                     bloques: [
                         { tipo: 'pasos', items: [
                             { titulo: 'Abrí la clase', texto: 'Desde Clases, tocá la clase del día que corresponda.' },
-                            { titulo: 'Elegí a la persona', texto: 'En "Anotar", elegí a un alumno o socio de la lista, o "Alguien nuevo…" y cargá su nombre y su celular: con el celular se la reconoce la próxima vez.' },
+                            { titulo: 'Elegí a la persona', texto: 'En "Anotar", elegí a un alumno o socio de la lista, o "Alguien nuevo…" y cargá su nombre y su celular: con el celular se la reconoce la próxima vez. Si dos personas se llaman igual, la lista muestra el celular de cada una.' },
                             { titulo: 'Elegí cuántos lugares', texto: 'Si viene con amigas o amigos, en "Lugares" elegís cuántos ocupa (hasta los que quedan).' },
-                            { titulo: 'Anotala', texto: 'Tocá [[Anotar]]. Aparece en la lista de anotados de esa clase.' },
+                            { titulo: 'Mirá cómo paga', texto: 'En "Cómo paga" el panel ya propone lo que corresponde: con su plan, si tiene uno que cubre esa clase (dice cuál y, si es un pack, cuántas clases le quedan); si no, se cobra aparte, con el precio de la clase suelta. Si todavía no usó su clase de prueba, también se puede elegir.' },
+                            { titulo: 'Anotala', texto: 'Tocá [[Anotar]]. Aparece en la lista de anotados de esa clase, y el aviso dice cómo quedó su plan o cuánto se le cobra.' },
                         ] },
-                        { tipo: 'nota', variante: 'aviso', texto: 'Si a esa persona ya no le quedan clases esa semana o en su pack, el panel lo avisa antes de anotarla: se puede igual, cobrándole la clase aparte.' },
+                        { tipo: 'nota', variante: 'aviso', texto: 'Si tiene un plan y esa clase no se la cubre (venció, no le quedan clases en el pack o ya usó las de esa semana), el panel dice por qué antes de anotarla: se puede igual, cobrándole la clase aparte.' },
+                        { tipo: 'nota', variante: 'dato', texto: 'Una membresía cubre un solo lugar por clase: si viene con alguien, anotá a esa persona por separado para que use su plan.' },
                         { tipo: 'nota', variante: 'dato', texto: 'Si la clase se llenó mientras la mirabas (alguien reservó desde el sitio), el panel avisa que no queda lugar y muestra la clase como está.' },
+                    ],
+                },
+                {
+                    id: 'como-paga', titulo: 'Cómo paga cada lugar',
+                    pista: 'con su plan, se cobra aparte, clase de prueba, sin definir, corregir cómo pagó una clase',
+                    bloques: [
+                        { tipo: 'parrafo', texto: 'En la lista de anotados de una clase, al lado de cada persona, un botón dice cómo paga ese lugar: **Con su plan**, **Aparte** o **Prueba**.' },
+                        { tipo: 'campos', items: [
+                            { label: 'Con su plan', texto: 'Se le descuenta una clase del pack, o cuenta entre las de esa semana de su membresía.' },
+                            { label: 'Se cobra aparte', texto: 'No toca su plan: se le cobra la clase suelta, una por cada lugar.' },
+                            { label: 'Clase de prueba', texto: 'Gratis, una sola vez por persona y para un solo lugar.' },
+                        ] },
+                        { tipo: 'pasos', items: [
+                            { titulo: 'Tocá el botón de su fila', texto: 'El que dice cómo paga hoy ese lugar.' },
+                            { titulo: 'Elegí', texto: 'En "Cómo paga" aparecen solo las opciones que esa persona puede usar; si su plan no cubre la clase, abajo dice por qué.' },
+                            { titulo: 'Guardá', texto: 'Tocá [[Guardar]]. [[Volver]] cierra sin cambiar nada.' },
+                        ] },
+                        { tipo: 'parrafo', texto: 'En el sistema de reservas del negocio, si el botón dice [[Sin definir]] falta decirlo: pasa con quien reservó desde el sitio y con quien pasó solo de la lista de espera. Tocalo y elegí cómo paga.' },
+                        { tipo: 'nota', variante: 'dato', texto: 'Si un lugar deja de pagarse con el plan, o se libera, la clase que se había descontado del pack le vuelve sola.' },
                     ],
                 },
                 {
@@ -88,6 +109,7 @@ export const MANUAL_GIMNASIO: ManualDeModulo = {
                         { tipo: 'parrafo', texto: 'Cuando alguien libera su lugar, **el primero de la lista pasa solo** y queda anotado; el aviso dice quién pasó. Si aparece un lugar sin que nadie cancele (por ejemplo, le subiste el cupo a la clase), tocá [[Darle el lugar]] al lado de quien quieras.' },
                         { tipo: 'parrafo', texto: 'Para sacar a alguien de la lista, tocá la cruz al lado de su nombre y confirmá con [[Sacar de la lista]]: pierde su lugar en la fila y, si después quiere volver, entra al final. [[Volver]] lo deja como estaba.' },
                         { tipo: 'nota', variante: 'dato', texto: 'En un día marcado sin clases, o en una clase que ya empezó, no se le da el lugar a nadie.' },
+                        { tipo: 'nota', variante: 'dato', texto: 'A la lista de espera se entra sin decir cómo paga. En el sistema de reservas del negocio, quien pasa queda con su lugar sin definir: decí cómo paga desde su fila, en la lista de anotados.' },
                     ],
                 },
                 {
@@ -144,6 +166,87 @@ export const MANUAL_GIMNASIO: ManualDeModulo = {
             ],
         },
         {
+            id: 'alumnos', titulo: 'Alumnos o socios',
+            resumen: 'Quién tiene qué plan, cuándo vence y cuánto viene; sumar a alguien y asignarle, renovarle o quitarle un plan.',
+            temas: [
+                {
+                    id: 'lista-de-alumnos', titulo: 'La lista y los vencimientos',
+                    pista: 'ver quién está al día, a quién se le vence el plan, buscar a alguien',
+                    bloques: [
+                        { tipo: 'parrafo', texto: 'En Alumnos (o Socios, según el rubro) está cada persona con su plan, cuándo vence, lo que le queda y su asistencia de los últimos 30 días. Los que vencen en los próximos 7 días van primero: son a quienes conviene avisarles esta semana.' },
+                        { tipo: 'campos', items: [
+                            { label: 'Al día', texto: 'Tiene un plan que vale hoy.' },
+                            { label: 'Vencen en 7 días', texto: 'Su plan vence esta semana. Si hay alguno, una franja arriba dice quiénes son.' },
+                            { label: 'Vencidos', texto: 'El plan venció o al pack no le quedan clases.' },
+                            { label: 'Sin plan', texto: 'Vino de prueba, paga la clase suelta o todavía no tiene plan.' },
+                        ] },
+                        { tipo: 'parrafo', texto: 'Los mismos cuatro grupos están como filtros arriba de la lista, junto a un buscador por nombre o teléfono. Para abrir la ficha de alguien, tocá [[Ver]] en su fila.' },
+                        { tipo: 'nota', variante: 'dato', texto: 'En el sistema de reservas del negocio también aparece quien reservó una clase sin ser alumno todavía (por ejemplo, desde el sitio): figura sin plan hasta que se le asigne uno.' },
+                    ],
+                },
+                {
+                    id: 'sumar-alumno', titulo: 'Sumar a alguien',
+                    pista: 'dar de alta un alumno o socio nuevo, anotar a alguien en el mostrador',
+                    bloques: [
+                        { tipo: 'pasos', items: [
+                            { titulo: 'Abrí el formulario', texto: 'En Alumnos (o Socios), con el botón de arriba a la derecha: dice "Sumar" y cómo se llama a quien viene en tu rubro.' },
+                            { titulo: 'Cargá sus datos', texto: 'Nombre y apellido, y el celular con código de área. El email es opcional.' },
+                            { titulo: 'Elegí el plan', texto: 'Un pack o una membresía, o "Sin plan por ahora" para asignárselo después.' },
+                            { titulo: 'Guardá', texto: 'Tocá [[Sumar]]. El aviso dice con qué plan quedó y hasta cuándo vale. [[Cancelar]] cierra sin sumar a nadie.' },
+                        ] },
+                        { tipo: 'nota', variante: 'dato', texto: 'El formulario queda abierto hasta que se guardó: si algo falla, lo que cargaste no se pierde. Con el celular se la reconoce después, cuando reserva desde el sitio.' },
+                    ],
+                },
+                {
+                    id: 'asignar-plan', titulo: 'Asignar, renovar o quitar un plan',
+                    pista: 'renovar la membresía, vender un pack, cambiar de plan, sacar un plan cargado por error',
+                    bloques: [
+                        { tipo: 'pasos', items: [
+                            { titulo: 'Abrí su ficha', texto: 'En Alumnos (o Socios), tocá [[Ver]] en su fila.' },
+                            { titulo: 'Elegí el plan', texto: 'En "Asignar un plan" (o "Renovar o cambiar", si ya tiene uno): un pack o una membresía de los que cargaste en Planes y precios.' },
+                            { titulo: 'Guardá', texto: 'Tocá [[Asignar]], o [[Renovar]] si es el mismo plan que ya tiene. El aviso dice hasta cuándo vale.' },
+                        ] },
+                        { tipo: 'parrafo', texto: 'En el sistema de reservas del negocio, lo que pasa depende de lo que ya tenga:' },
+                        { tipo: 'campos', items: [
+                            { label: 'Renovar la misma membresía antes de que venza', texto: 'La nueva arranca al día siguiente de que termina la que tiene: no pierde días.' },
+                            { label: 'Pasar a otra membresía', texto: 'La nueva arranca hoy y reemplaza a la anterior.' },
+                            { label: 'Sumar un pack', texto: 'Convive con lo que tenga. Cuando más de un plan cubre una clase, se usa primero el que vence antes.' },
+                        ] },
+                        { tipo: 'parrafo', texto: 'Quien tiene más de un plan los ve en su ficha en una lista, cada uno con hasta cuándo vale y lo que le queda.' },
+                        { tipo: 'parrafo', texto: 'Para sacar un plan asignado por error, tocá [[Quitar este plan]] (o [[Quitar]] al lado del plan, si tiene varios) y confirmá con [[Quitar el plan]]: deja de valer desde ese momento, y los lugares que ya reservó con ese plan siguen reservados. [[Volver]] cierra sin quitar nada.' },
+                        { tipo: 'parrafo', texto: 'Más abajo, la ficha muestra cuánto vino y cuánto faltó en los últimos 30 días y sus últimas clases, cada una con cómo se pagó.' },
+                        { tipo: 'nota', variante: 'aviso', texto: 'Asignar o renovar un plan no cobra nada: el cobro se registra aparte.' },
+                    ],
+                },
+            ],
+        },
+        {
+            id: 'planes', titulo: 'Planes y precios',
+            resumen: 'La clase de prueba, la clase suelta, los packs y las membresías: cargarlos, cambiarlos y dejar de ofrecerlos.',
+            temas: [
+                {
+                    id: 'planes-y-precios', titulo: 'Cargar y cambiar los planes',
+                    pista: 'crear un pack o una membresía, cambiar un precio, dejar de vender un plan',
+                    bloques: [
+                        { tipo: 'parrafo', texto: 'En Negocio → Planes y precios hay cuatro tipos: la clase de prueba (gratis, una vez por persona), la clase suelta, los packs de clases y las membresías.' },
+                        { tipo: 'pasos', items: [
+                            { titulo: 'Si todavía no hay ninguno', texto: 'Tocá [[Usar los planes sugeridos]] para arrancar con los que suele tener tu rubro, y cambiales el nombre y el precio.' },
+                            { titulo: 'Sumá los que falten', texto: 'Con [[Membresía]] o [[Pack]]. La clase suelta y la de prueba son una de cada una: si falta alguna, aparecen también [[Clase suelta]] y [[Clase de prueba]].' },
+                            { titulo: 'Completá cada plan', texto: 'El nombre y el precio. En un pack, cuántas clases trae y por cuántos días vale; en una membresía, cuántas clases por semana (o libre) y la vigencia.' },
+                            { titulo: 'Guardá', texto: 'Tocá [[Guardar cambios]] en la barra de abajo. [[Descartar]] vuelve a lo que estaba guardado.' },
+                        ] },
+                        { tipo: 'campos', items: [
+                            { label: 'Se ofrece en el sitio', texto: 'Apagado, un pack o una membresía no se vende más; quien ya lo tiene lo sigue usando hasta que venza. La clase suelta o la de prueba apagadas no aparecen en el sitio, pero desde el panel se sigue pudiendo anotar con ellas.' },
+                            { label: 'Quitar un plan', texto: 'Con [[Quitar]] sale de la lista al guardar. Quien ya lo tiene lo sigue usando hasta que venza. La clase de prueba no se quita: se apaga.' },
+                            { label: 'Cuántos lo tienen', texto: 'Cada pack y cada membresía dice cuántos alumnos o socios lo tienen hoy.' },
+                        ] },
+                        { tipo: 'nota', variante: 'dato', texto: 'Cada persona guarda su plan como era cuando se lo asignaron: cambiarle el precio o las clases a un plan vale para los que se asignen desde ahora, no para los que ya están dados.' },
+                        { tipo: 'nota', variante: 'aviso', texto: 'Un plan sin nombre no se guarda: la barra de abajo lo avisa.' },
+                    ],
+                },
+            ],
+        },
+        {
             id: 'dias-sin-clases', titulo: 'Días sin clases',
             resumen: 'Feriados, vacaciones o cierres: esos días no se reserva.',
             temas: [
@@ -159,6 +262,31 @@ export const MANUAL_GIMNASIO: ManualDeModulo = {
                         { tipo: 'nota', variante: 'aviso', texto: 'Lo que ya estaba reservado esos días no se cancela solo. El formulario avisa cuántas reservas hay antes de guardar y, al guardar, cuántas quedaron adentro.' },
                         { tipo: 'parrafo', texto: 'Después, cada día sin clases que todavía tiene reservas lo dice en su fila ("3 reservas siguen en pie"). Tocá [[Ver el día]] para ir a ese día en Clases: ahí se ven las clases que quedaron con gente, para avisarles y liberar sus lugares.' },
                         { tipo: 'parrafo', texto: 'Para volver a abrir esos días, tocá [[Quitar]] al lado del que cargaste. Los que vienen de un calendario externo se quitan desde Calendarios.' },
+                    ],
+                },
+            ],
+        },
+        {
+            id: 'sitio', titulo: 'El sitio del negocio',
+            resumen: 'Lo que ve quien reserva desde el sitio y cómo llega cada reserva al panel.',
+            temas: [
+                {
+                    id: 'reservar-desde-el-sitio', titulo: 'Cómo se reserva desde el sitio',
+                    pista: 'qué ve el alumno, reservar online, lugar guardado, lista de espera desde el sitio',
+                    bloques: [
+                        { tipo: 'parrafo', texto: 'El sitio del negocio muestra las clases que se pueden reservar hoy y en los próximos días, cada una con los lugares que le quedan, los planes que tienen prendido "Se ofrece en el sitio" y el horario. Se reserva sin registrarse.' },
+                        { tipo: 'pasos', items: [
+                            { titulo: 'Elige la clase', texto: 'El día y la clase. Al tocar "Continuar", su lugar queda guardado unos minutos mientras carga sus datos: nadie se lo lleva en el medio.' },
+                            { titulo: 'Carga sus datos', texto: 'Nombre y celular. El email es opcional: sirve para que le llegue la confirmación.' },
+                            { titulo: 'Confirma', texto: 'Con "Confirmar reserva" el lugar queda a su nombre y recibe un código. Si tarda más de lo que dura el lugar guardado, tiene que tomarlo de nuevo.' },
+                        ] },
+                        { tipo: 'campos', items: [
+                            { label: 'Cómo se paga', texto: 'En el sitio no se paga ni se elige el plan. El lugar llega al panel **sin definir**: decí cómo paga desde su fila, en la lista de anotados de la clase.' },
+                            { label: 'Clase completa', texto: 'Con la lista de espera prendida, la persona se anota ahí desde el sitio y, si alguien libera su lugar, pasa sola. Sin lista de espera, la clase se ve completa y no se puede elegir.' },
+                            { label: 'Días sin clases', texto: 'Un día cargado en Días sin clases se ve cerrado en el sitio, con su motivo.' },
+                            { label: 'Hasta cuándo se reserva', texto: 'Hasta los días de anticipación de las reglas del negocio (el sitio muestra, como mucho, cinco semanas). Una clase que está por empezar ya no se ofrece.' },
+                        ] },
+                        { tipo: 'nota', variante: 'dato', texto: 'Tocar dos veces el botón, o reintentar después de un corte de conexión, no reserva dos lugares.' },
                     ],
                 },
             ],

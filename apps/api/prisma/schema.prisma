@@ -154,6 +154,12 @@ model Business {
   reservasHistorial    ReservaHistorial[]
   reservasEspera       ReservaEspera[]
   reservasBloqueos     ReservaBloqueo[]
+  reservasCalendarios  ReservaCalendarioExterno[]
+  reservasIcalExportadas ReservaIcalExportada[]
+  // Gimnasio: lo que no es una reserva (planes, alumnos y el plan de cada alumno), ver el bloque al final.
+  gimnasioPlanes       GimnasioPlan[]
+  gimnasioAlumnos      GimnasioAlumno[]
+  gimnasioAbonos       GimnasioSuscripcion[]
 
   @@map("businesses")
 }
@@ -675,6 +681,7 @@ model Customer {
   personalDiscounts Discount[]
   gameSessions      GameSession[]
   reservas          Reserva[]
+  gimnasioAlumnos   GimnasioAlumno[]
 
   @@unique([businessId, email])
   @@unique([businessId, googleId])
@@ -4040,10 +4047,12 @@ model ReservaRecurso {
   createdAt       DateTime           @default(now()) @map("created_at")
   updatedAt       DateTime           @updatedAt @map("updated_at")
 
-  business Business         @relation(fields: [businessId], references: [id])
-  reservas Reserva[]
-  esperas  ReservaEspera[]
-  bloqueos ReservaBloqueo[]
+  business    Business                   @relation(fields: [businessId], references: [id])
+  reservas        Reserva[]
+  esperas         ReservaEspera[]
+  bloqueos        ReservaBloqueo[]
+  calendarios     ReservaCalendarioExterno[]
+  icalExportadas  ReservaIcalExportada[]
 
   @@index([businessId, modulo])
   @@map("reservas_recursos")
@@ -4203,19 +4212,193 @@ model ReservaEspera {
 // recursoId null tapa a todos los recursos del módulo. No cancela lo ya
 // reservado: el panel avisa cuántas reservas quedaron adentro.
 model ReservaBloqueo {
-  id                String        @id @default(uuid())
-  businessId        String        @map("business_id")
+  id                String               @id @default(uuid())
+  businessId        String               @map("business_id")
   modulo            ReservaModulo
-  recursoId         String?       @map("recurso_id")
+  recursoId         String?              @map("recurso_id")
   inicio            DateTime
   fin               DateTime
-  motivo            String?       @db.VarChar(200)
-  creadoPorMemberId String?       @map("creado_por_member_id")
-  createdAt         DateTime      @default(now()) @map("created_at")
+  motivo            String?              @db.VarChar(200)
+  creadoPorMemberId String?              @map("creado_por_member_id")
+  createdAt         DateTime             @default(now()) @map("created_at")
+  /// DUENO: lo cargó el negocio. ICAL: vino de un calendario externo (Airbnb) y se reemplaza en cada sincronización.
+  origen            ReservaBloqueoOrigen @default(DUENO)
+  /// Solo ICAL: de qué calendario vino. Al borrar el calendario, sus bloqueos se van con él.
+  calendarioId      String?              @map("calendario_id")
+  /// Solo ICAL: 'RESERVADO' (una reserva hecha allá) o 'CERRADO' (noches que allá figuran como no disponibles).
+  externoTipo       String?              @map("externo_tipo") @db.VarChar(12)
+  /// Solo ICAL: el UID del evento en el .ics, para no crear dos veces el mismo.
+  externoUid        String?              @map("externo_uid") @db.VarChar(255)
 
-  business Business        @relation(fields: [businessId], references: [id])
-  recurso  ReservaRecurso? @relation(fields: [recursoId], references: [id])
+  business   Business                  @relation(fields: [businessId], references: [id])
+  recurso    ReservaRecurso?           @relation(fields: [recursoId], references: [id])
+  calendario ReservaCalendarioExterno? @relation(fields: [calendarioId], references: [id], onDelete: Cascade)
 
   @@index([businessId, modulo, inicio])
+  @@index([calendarioId])
   @@map("reservas_bloqueos")
+}
+
+enum ReservaBloqueoOrigen {
+  DUENO
+  ICAL
+}
+
+// Un calendario .ics de afuera conectado a un recurso: hoy, el de un aviso de
+// Airbnb para un ALOJAMIENTO. Cada sincronización baja el archivo y reemplaza
+// los bloqueos de ese calendario (ReservaBloqueo con origen ICAL). Si la
+// descarga falla se guarda el motivo y los bloqueos quedan como estaban.
+// Ver src/reservas/README.md § Calendarios externos.
+model ReservaCalendarioExterno {
+  id          String        @id @default(uuid())
+  businessId  String        @map("business_id")
+  modulo      ReservaModulo
+  recursoId   String        @map("recurso_id")
+  nombre      String        @db.VarChar(80)
+  url         String        @db.VarChar(600)
+  activo      Boolean       @default(true)
+  /// Cuándo se intentó por última vez (haya salido bien o mal): de ahí sale a quién le toca.
+  ultimaSync  DateTime?     @map("ultima_sync")
+  /// Por qué falló la última vez, listo para mostrar. null = salió bien.
+  ultimoError String?       @map("ultimo_error") @db.VarChar(300)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  business Business         @relation(fields: [businessId], references: [id])
+  recurso  ReservaRecurso   @relation(fields: [recursoId], references: [id])
+  bloqueos ReservaBloqueo[]
+
+  @@index([businessId, modulo])
+  @@index([activo, ultimaSync])
+  @@map("reservas_calendarios_externos")
+}
+
+// Las noches que el .ics público de un recurso mostró alguna vez (su "memoria").
+// Sirve para reconocer el eco: Airbnb vuelve a publicar como "no disponible" lo
+// que importó de ese .ics, y a veces lo sigue publicando cuando acá ya se
+// canceló, se movió o se desbloqueó. Lo que cuenta no es lo que hay hoy en la
+// base sino lo que el calendario llegó a mostrar: por eso se anota en cada
+// lectura. Se olvida a los 60 días de la última vez que se mostró.
+model ReservaIcalExportada {
+  id         String   @id @default(uuid())
+  businessId String   @map("business_id")
+  recursoId  String   @map("recurso_id")
+  /// Día de entrada y de salida (exclusiva), como salieron en el .ics.
+  desde      String   @db.VarChar(10)
+  hasta      String   @db.VarChar(10)
+  ultimaVez  DateTime @map("ultima_vez")
+
+  business Business       @relation(fields: [businessId], references: [id])
+  recurso  ReservaRecurso @relation(fields: [recursoId], references: [id])
+
+  @@unique([recursoId, desde, hasta])
+  @@index([businessId])
+  @@map("reservas_ical_exportadas")
+}
+
+// ─── Gimnasio ────────────────────────────────────────────────────────────────
+// Lo que el módulo Gimnasio guarda y NO es una reserva: los planes, los alumnos
+// y el plan de cada alumno (decisión del 16/11/2026: tablas propias, al lado
+// del motor de reservas y sin tocarlo). Las clases, los lugares y la lista de
+// espera son del motor (reservas_*).
+//
+// Las clases que un alumno usó de su plan no se guardan acá: cada reserva dice
+// con qué se pagó en su campo libre (`reservas.datos.gimnasio`: pago y
+// suscripcionId) y de ahí se cuentan. Así el saldo de un pack no puede
+// desfasarse de lo reservado: si la reserva se cancela, la clase vuelve sola.
+
+enum GimnasioPlanTipo {
+  PRUEBA
+  SUELTA
+  PACK
+  MEMBRESIA
+}
+
+enum GimnasioSuscripcionEstado {
+  VIGENTE
+  CANCELADA
+}
+
+// Lo que el negocio vende: la clase de prueba, la clase suelta, un pack de N
+// clases o una membresía (con tope semanal, o libre).
+model GimnasioPlan {
+  id           String           @id @default(uuid())
+  businessId   String           @map("business_id")
+  tipo         GimnasioPlanTipo
+  nombre       String           @db.VarChar(80)
+  precio       Decimal          @default(0) @db.Decimal(12, 2)
+  /// Pack: cuántas clases trae.
+  clases       Int?
+  /// Membresía: clases por semana; 0 = libre.
+  porSemana    Int?             @map("por_semana")
+  /// Cuántos días vale desde que arranca.
+  vigenciaDias Int              @map("vigencia_dias")
+  /// Se ofrece en el sitio.
+  activo       Boolean          @default(true)
+  orden        Int              @default(0)
+  /// Borrado blando: un plan que alguien ya compró no desaparece de su historial.
+  eliminadoEn  DateTime?        @map("eliminado_en")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  business      Business              @relation(fields: [businessId], references: [id])
+  suscripciones GimnasioSuscripcion[]
+
+  @@index([businessId, eliminadoEn])
+  @@map("gimnasio_planes")
+}
+
+// Un alumno (o socio) del negocio: la ficha de cliente que el motor de reservas
+// ya vincula a cada reserva por celular o email, con lo propio de Gimnasio.
+model GimnasioAlumno {
+  id         String  @id @default(uuid())
+  businessId String  @map("business_id")
+  clienteId  String  @map("cliente_id")
+  nota       String? @db.VarChar(500)
+  /// Día de alta, AAAA-MM-DD de Argentina.
+  alta       String  @db.VarChar(10)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  business      Business              @relation(fields: [businessId], references: [id])
+  cliente       Customer              @relation(fields: [clienteId], references: [id])
+  suscripciones GimnasioSuscripcion[]
+
+  @@unique([businessId, clienteId])
+  @@map("gimnasio_alumnos")
+}
+
+// El plan de un alumno: una fila por compra o renovación. Guarda una foto del
+// plan (si después cambia el precio o las clases del plan, lo ya vendido no
+// cambia) y desde y hasta qué día vale.
+model GimnasioSuscripcion {
+  id                String                    @id @default(uuid())
+  businessId        String                    @map("business_id")
+  alumnoId          String                    @map("alumno_id")
+  planId            String                    @map("plan_id")
+  tipo              GimnasioPlanTipo
+  nombre            String                    @db.VarChar(80)
+  precio            Decimal                   @default(0) @db.Decimal(12, 2)
+  clases            Int?
+  porSemana         Int?                      @map("por_semana")
+  /// AAAA-MM-DD de Argentina, los dos días incluidos.
+  desde             String                    @db.VarChar(10)
+  hasta             String                    @db.VarChar(10)
+  estado            GimnasioSuscripcionEstado @default(VIGENTE)
+  /// La suscripción que esta continúa, si es una renovación del mismo plan.
+  renuevaId         String?                   @map("renueva_id")
+  creadaPorMemberId String?                   @map("creada_por_member_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  business Business       @relation(fields: [businessId], references: [id])
+  alumno   GimnasioAlumno @relation(fields: [alumnoId], references: [id], onDelete: Cascade)
+  plan     GimnasioPlan   @relation(fields: [planId], references: [id])
+
+  @@index([businessId, alumnoId, hasta])
+  @@index([businessId, desde])
+  @@map("gimnasio_suscripciones")
 }

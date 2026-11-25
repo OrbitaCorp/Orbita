@@ -40,16 +40,21 @@ const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 /**
  * Lo que el panel real (con la API de reservas) todavía no guarda y por eso no
- * muestra: mensajes, calendarios externos y la configuración del negocio y del
- * equipo. Se suman a medida que se conectan (plan 2026-11-23-alquileres-en-produccion).
+ * muestra: mensajes y la configuración del negocio y del equipo; y, fuera de la
+ * estadía, los calendarios externos. Se suman a medida que se conectan (plan
+ * 2026-11-23-alquileres-en-produccion).
  */
-const SIN_API: Vista[] = ['mensajes', 'calendarios', 'configuracion']
+const SIN_API: Vista[] = ['mensajes', 'configuracion']
 
 /** `real`: el panel de un negocio de verdad (origen de la API), con solo lo que ya guarda. La demo no lo pasa. */
 export function seccionesDe(tipo: TipoAlquiler, palabras: Pick<Palabras, 'unidades' | 'clientes'> = DE_FABRICA[tipo], real = false): SeccionNav[] {
   const todas = todasLasSecciones(tipo, palabras)
   if (!real) return todas
-  return todas.filter(s => !SIN_API.includes(s.id))
+  // Calendarios: en un alojamiento real es la sincronización con Airbnb (lo único que se conecta), y así se llama.
+  // Canchas y salones todavía no conectan ninguno.
+  return todas
+    .filter(s => !SIN_API.includes(s.id) && (s.id !== 'calendarios' || tipo === 'estadia'))
+    .map(s => (s.id === 'calendarios' ? { ...s, label: 'Airbnb' } : s))
 }
 
 function todasLasSecciones(tipo: TipoAlquiler, palabras: Pick<Palabras, 'unidades' | 'clientes'>): SeccionNav[] {

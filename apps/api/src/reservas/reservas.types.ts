@@ -164,6 +164,27 @@ export interface NochesDto {
   checkOutMinutos: number;
 }
 
+/** Una sesión de una clase en un día: cuántos lugares tiene y cuántos quedan. */
+export interface SesionDto {
+  recursoId: string;
+  inicioMinutos: number;
+  finMinutos: number;
+  libres: number;
+  cupo: number;
+}
+
+/**
+ * Las sesiones de todas las clases de un módulo, día por día
+ * (DisponibilidadService.sesionesEntre). `cerrado`: el negocio bloqueó el día
+ * entero para todo el módulo (un feriado, vacaciones); `motivo` es el que
+ * cargó, para mostrarlo en el sitio.
+ */
+export interface SesionesDto {
+  desde: string;
+  hasta: string;
+  dias: { fecha: string; cerrado: boolean; motivo: string | null; sesiones: SesionDto[] }[];
+}
+
 export const aNumero = (d: Prisma.Decimal | number | null | undefined): number => (d === null || d === undefined ? 0 : Number(d));
 
 export function recursoDto(r: ReservaRecurso): RecursoDto {

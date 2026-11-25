@@ -8,12 +8,18 @@ import { botonesDelManual, manualDeModuloParaOrbi } from '@/lib/manual/modulos'
 import { MANUAL_GIMNASIO } from '../manual'
 
 const PANEL = fileURLToPath(new URL('../admin', import.meta.url))
+// La barra de guardar ("Guardar cambios", "Descartar") es del kit compartido: sus botones también se ven en el panel.
+const KIT = fileURLToPath(new URL('../../../design-system/reservas', import.meta.url))
 
 describe('manual de Gimnasio', () => {
     it('cada botón que nombra existe en el panel de Gimnasio', () => {
         const botones = botonesDelManual(MANUAL_GIMNASIO)
         expect(botones.length).toBeGreaterThan(10)
-        expect(botonesQueFaltan(botones, PANEL)).toEqual([])
+        // Falta el que no está ni en las pantallas del módulo ni en las piezas del kit que esas pantallas usan.
+        expect(botonesQueFaltan(botones, [PANEL, KIT])).toEqual([])
+        // Sin el kit, los de la barra de guardar faltarían: están en sus piezas, no en las pantallas del módulo.
+        expect(botonesQueFaltan(botones, PANEL)).toEqual(['Guardar cambios', 'Descartar'])
+        expect(botones).toEqual(expect.arrayContaining(['Guardar cambios', 'Sin definir', 'Quitar el plan', 'Usar los planes sugeridos']))
         // El contrato muerde: un botón que no existe se detecta, y uno que termina en "…" se reconoce.
         expect(botonesQueFaltan(['Un botón que no existe', 'Actividad nueva…'], PANEL)).toEqual(['Un botón que no existe'])
     })
@@ -28,5 +34,9 @@ describe('manual de Gimnasio', () => {
             expect(t.texto.length).toBeGreaterThan(40)
         }
         expect(m.temas.find(t => t.id === 'gimnasio.lista-de-espera')?.texto).toMatch(/"A la lista de espera"/)
+        // Lo nuevo del 24/11: cómo paga cada lugar, los alumnos y los planes tienen su tema.
+        expect(ids).toEqual(expect.arrayContaining(['gimnasio.como-paga', 'gimnasio.lista-de-alumnos', 'gimnasio.sumar-alumno', 'gimnasio.asignar-plan', 'gimnasio.planes-y-precios']))
+        // El sitio: lo que ve quien reserva desde ahí y cómo llega al panel.
+        expect(m.temas.find(t => t.id === 'gimnasio.reservar-desde-el-sitio')?.texto).toMatch(/sin definir/)
     })
 })

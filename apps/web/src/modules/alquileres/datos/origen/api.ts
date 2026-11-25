@@ -15,7 +15,8 @@
 //
 // Escribe lo de la estadía por noche (escriturasDe): propiedades con su
 // tarifa (temporadas, fin de semana, limpieza), reglas y seña, el alias y el
-// WhatsApp para coordinarla, reservas a mano, pagos, cambios de estado y bloqueos. Cada escritura
+// WhatsApp para coordinarla, reservas a mano, pagos, cambios de estado, bloqueos
+// y los calendarios de Airbnb (conectar, desconectar y sincronizar). Cada escritura
 // le pide a la API y vuelve a cargar, así el panel muestra siempre lo que
 // quedó guardado. Canchas y salones todavía no escriben.
 import { useCallback, useEffect, useEffectEvent, useState } from 'react'
@@ -25,8 +26,8 @@ import { panel } from '@/lib/reservasApi/cliente'
 import type { Reserva as ReservaApi } from '@/lib/reservasApi/tipos'
 import { sumarDias, type ISO } from '@/lib/reservas/fechas'
 import { NEGOCIOS_DEMO } from '../index'
-import { clientesDeReservas, fechaArgentina, negocioDeApi, reservaDeApi, soloPorNoche, tipoDeRecurso, tipoDeRubro } from './mapear'
-import { bloqueoParaApi, cambiosDePropiedades, configDeCambio, idDeBloqueo, pasosDeCambio, pedidoDeReserva, recursoDePropiedad } from './escribir'
+import { calendarioDeApi, clientesDeReservas, fechaArgentina, negocioDeApi, reservaDeApi, soloPorNoche, tipoDeRecurso, tipoDeRubro } from './mapear'
+import { bloqueoParaApi, calendarioParaApi, cambiosDePropiedades, configDeCambio, idDeBloqueo, pasosDeCambio, pedidoDeReserva, recursoDePropiedad } from './escribir'
 import type { DatosPanelAlquiler, Escrituras, OrigenAlquileres } from './index'
 
 /** Cuántos días para cada lado de hoy trae el panel. */
@@ -77,7 +78,7 @@ export type CargaApi = Pick<DatosPanelAlquiler, 'tipo' | 'negocio' | 'reservas' 
 export async function cargarApi(hoy: ISO): Promise<CargaApi> {
   const desde = sumarDias(hoy, -DIAS_ATRAS)
   const hasta = sumarDias(hoy, DIAS_ADELANTE)
-  const [negocio, config, recursosTodos, servicios, bloqueos, reservasApi] = await Promise.all([
+  const [negocio, config, recursosTodos, servicios, bloqueos, reservasApi, calendarios] = await Promise.all([
     panelGetBusiness(),
     panel.config('ALQUILERES'),
     // Con los desactivados: sus reservas (las pasadas y las que siguen en pie) no desaparecen del panel.
@@ -85,6 +86,8 @@ export async function cargarApi(hoy: ISO): Promise<CargaApi> {
     panel.servicios('ALQUILERES'),
     panel.bloqueos('ALQUILERES', desde, hasta),
     reservasEntre(desde, hasta),
+    // Si la API todavía no tiene calendarios (el front se despliega unos minutos antes), el panel carga igual.
+    panel.calendarios('ALQUILERES').catch(() => []),
   ])
   if (!config) throw new Error('Este negocio todavía no tiene Alquileres configurado.')
   const { tipo, rubro } = tipoDeRubro(negocio.subrubros)
@@ -99,7 +102,7 @@ export async function cargarApi(hoy: ISO): Promise<CargaApi> {
   })
   return {
     tipo,
-    negocio: { ...armado, propiedades: armado.propiedades.map(soloPorNoche) },
+    negocio: { ...armado, propiedades: armado.propiedades.map(soloPorNoche), calendariosExternos: calendarios.map(c => calendarioDeApi(c, hoy)) },
     reservas: delModo.map(r => reservaDeApi(r, tipo)).filter(r => r !== null),
     clientes: clientesDeReservas(delModo),
     reservasApi: delModo,
@@ -166,8 +169,23 @@ export function escriturasDe(d: CargaApi, recargar: () => Promise<void>): Escrit
       await recargar()
     },
     // Los calendarios externos de verdad (Airbnb) son la etapa 4: la sección no se muestra en el panel real.
-    agregarCalendario: async () => { throw new Error(NO_SE_GUARDA) },
-    quitarCalendario: async () => { throw new Error(NO_SE_GUARDA) },
+    // Los bloqueos no viajan: los arma el servidor al bajar el calendario.
+    agregarCalendario: async (_tipo, c) => {
+      estadia()
+      const conectado = await panel.conectarCalendario(calendarioParaApi(c))
+      await recargar()
+      // Conectarlo y poder bajarlo son dos cosas: si Airbnb no lo dejó bajar, no bloquea nada todavía.
+      // No se festeja: el calendario queda a la vista con su error, y se dice.
+      if (conectado.ultimoError) throw new Error(`Quedó conectado, pero todavía no se pudo bajar: ${conectado.ultimoError}`)
+    },
+    quitarCalendario: async (_tipo, id) => {
+      await panel.desconectarCalendario(id)
+      await recargar()
+    },
+    sincronizarCalendario: async (_tipo, id) => {
+      await panel.sincronizarCalendario(id)
+      await recargar()
+    },
   }
 }
 

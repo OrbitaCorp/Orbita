@@ -13,17 +13,25 @@
 //   actividades, salas ni equipo de Gimnasio: se arman con lo que dicen las
 //   clases (lo decide la tarea del 16/11, junto con planes, pases y alumnos).
 // - Cada reserva es una inscripción y cada persona en la lista de espera, una
-//   inscripción en estado 'espera'. Los socios salen de esas mismas filas, uno
-//   por persona (su ficha, su celular o su email), hasta que los alumnos
-//   tengan su lugar en la API. Cada inscripción conserva el nombre con el que
-//   se anotó: dos personas con el mismo celular comparten ficha (una madre que
-//   anota a sus dos hijos) y en la clase cada lugar se ve con su nombre.
+//   inscripción en estado 'espera'. Cada inscripción conserva el nombre con el
+//   que se anotó: dos personas con el mismo celular comparten ficha (una madre
+//   que anota a sus dos hijos) y en la clase cada lugar se ve con su nombre.
+// - Los socios son los alumnos de la API de Gimnasio (apps/api/src/gimnasio),
+//   cada uno con sus planes, más quienes reservaron o esperan y todavía no son
+//   alumnos (reservaron desde el sitio): uno por persona, que es su ficha de
+//   cliente o, si no tiene, su celular o su email.
+// - Los planes y precios son los de esa misma API. Cómo se paga cada lugar
+//   viaja en `datos.gimnasio` de la reserva (pago, suscripcionId, planId): sin
+//   eso, el lugar está sin definir (pasó de la lista de espera o se reservó
+//   desde el sitio).
 // - Los días: la API cuenta el domingo como 0; el panel, el lunes. Las horas
 //   son minutos de Argentina en los dos.
 import type { AnotarseEnEspera, Bloqueo, Cliente, Config, CrearBloqueo, CrearDesdePanel, Espera, GuardarRecurso, HorarioSemanal, Recurso, Reserva, Tramo } from '@/lib/reservasApi/tipos'
 import { diaSemana, sumarDias, type ISO } from '@/lib/reservas/fechas'
-import { COLORES_ACTIVIDAD, colorDe, lugaresDe, type Actividad, type Apertura, type BloqueoGym, type ClaseSemanal, type EstadoInscripcion, type Inscripcion, type NegocioGym, type Profe, type Socio } from '../index'
+import { pesos } from '@/lib/reservas/precio'
+import { COLORES_ACTIVIDAD, colorDe, lugaresDe, type Actividad, type Apertura, type BloqueoGym, type ClaseSemanal, type EstadoInscripcion, type Inscripcion, type NegocioGym, type Pago, type Plan, type PlanDeSocio, type Profe, type Socio, type TipoPlan } from '../index'
 import { relojArgentina } from '../reloj'
+import type { AltaDeAlumno, AlumnoApi, GuardarPlan, PagoApi, PlanApi, ReservarConPago, SuscripcionApi, TipoPlanApi } from './gimnasioApi'
 
 export const MODULO = 'GIMNASIO' as const
 const CLAVES = ['0', '1', '2', '3', '4', '5', '6'] as const
@@ -141,14 +149,23 @@ export function bloqueosDeApi(bloqueos: Bloqueo[]): BloqueoGym[] {
   })
 }
 
-/** Lo que el panel lee de la API para armar el negocio. */
-export interface CatalogoApi { config: Config; recursos: Recurso[]; bloqueos: Bloqueo[] }
+/**
+ * Lo que se lee de la API para armar el negocio. De la config alcanza con el horario y las reglas que se muestran:
+ * así sirve la del panel y la pública del sitio. `planes` falta si la API todavía no tiene los de Gimnasio.
+ */
+export interface CatalogoApi {
+  config: Pick<Config, 'horario' | 'anticipacionMaximaDias' | 'cancelacionHastaHoras'>
+  recursos: Recurso[]
+  bloqueos: Bloqueo[]
+  planes?: PlanApi[]
+}
 
 /**
- * El negocio del panel con lo que dice la API: horario, reglas, clases y días
- * sin clases. Lo que la API todavía no guarda (los datos del negocio, planes,
+ * El negocio del panel con lo que dice la API: horario, reglas, clases, días
+ * sin clases y planes. Lo que la API todavía no guarda (los datos del negocio,
  * mensajes, pagos) sale de `base`, que es el negocio de ejemplo del rubro con
- * el nombre del negocio de verdad; los planes van vacíos.
+ * el nombre del negocio de verdad. Los planes de ejemplo no se muestran nunca:
+ * sin los de la API, van vacíos.
  */
 export function negocioDeApi(base: NegocioGym, c: CatalogoApi): NegocioGym {
   const clases = c.recursos.filter(r => r.tipo === 'CLASE')
@@ -159,7 +176,7 @@ export function negocioDeApi(base: NegocioGym, c: CatalogoApi): NegocioGym {
     salas: salasDe(clases),
     profes: profesDe(clases),
     clases: clases.flatMap(clasesDeRecurso),
-    planes: [],
+    planes: (c.planes ?? []).map(planDeApi),
     anticipacionDias: c.config.anticipacionMaximaDias,
     cancelaHastaHoras: c.config.cancelacionHastaHoras,
     // La API marca presente o ausente recién cuando la clase empezó.
@@ -216,7 +233,24 @@ export function inscripcionDeReserva(r: Reserva, clases: Map<string, string>, ah
   // tiene una sola sesión, ese id es el de la clase y la reserva se sigue viendo en su fecha, con la clase de ahora. La
   // API no deja mover una clase con lugares tomados por delante, así que esto le pasa solo a lo que ya pasó.
   const claseId = clases.get(llave(r.recursoId, r.fecha, r.inicioMinutos)) ?? r.recursoId
-  return { id: r.id, claseId, fecha: r.fecha, socioId: personaDe(r), estado, creada: r.creadaEn, planId: null, cantidad: r.cantidad, nombre: r.clienteNombre }
+  const pago = pagoDeDatos(r.datos)
+  return {
+    id: r.id, claseId, fecha: r.fecha, socioId: personaDe(r), estado, creada: r.creadaEn, cantidad: r.cantidad, nombre: r.clienteNombre,
+    // null = sin definir: el lugar de quien pasó de la lista de espera o reservó desde el sitio.
+    planId: pago?.planId ?? null, pago: pago?.pago ?? null, ...(pago?.suscripcionId ? { suscripcionId: pago.suscripcionId } : {}),
+  }
+}
+
+const PAGOS: readonly Pago[] = ['plan', 'aparte', 'prueba']
+
+/** Lo de Gimnasio en el campo libre de una reserva: cómo se paga el lugar. Lo que no tenga esa forma es "sin definir". */
+export function pagoDeDatos(datos: unknown): { pago: Pago; suscripcionId?: string; planId?: string } | null {
+  if (!datos || typeof datos !== 'object') return null
+  const g = (datos as Record<string, unknown>).gimnasio
+  if (!g || typeof g !== 'object') return null
+  const { pago, suscripcionId, planId } = g as Record<string, unknown>
+  if (typeof pago !== 'string' || !(PAGOS as readonly string[]).includes(pago)) return null
+  return { pago: pago as Pago, ...(typeof suscripcionId === 'string' && suscripcionId ? { suscripcionId } : {}), ...(typeof planId === 'string' && planId ? { planId } : {}) }
 }
 
 const PREFIJO_ESPERA = 'espera:'
@@ -241,30 +275,123 @@ export function inscripcionesDeApi(reservas: Reserva[], esperas: Espera[], clase
   ]
 }
 
+// ─── Planes y alumnos (la API de Gimnasio) ───────────────────────────────────
+
+/** Los estados de una reserva que cuentan como un lugar usado (los mismos que cuenta la API para un pack). */
+const OCUPAN: readonly Reserva['estado'][] = ['PENDIENTE', 'CONFIRMADA', 'COMPLETADA', 'AUSENTE']
+
+const TIPO_PANEL: Record<TipoPlanApi, TipoPlan> = { PRUEBA: 'prueba', SUELTA: 'suelta', PACK: 'pack', MEMBRESIA: 'membresia' }
+const TIPO_API: Record<TipoPlan, TipoPlanApi> = { prueba: 'PRUEBA', suelta: 'SUELTA', pack: 'PACK', membresia: 'MEMBRESIA' }
+
+/** Un plan de la API como lo edita Planes y precios: las clases solo en un pack y el tope semanal solo en una membresía. */
+export function planDeApi(p: PlanApi): Plan {
+  return {
+    id: p.id, tipo: TIPO_PANEL[p.tipo], nombre: p.nombre, precio: p.precio,
+    ...(p.tipo === 'PACK' ? { clases: p.clases ?? 1 } : {}),
+    ...(p.tipo === 'MEMBRESIA' ? { porSemana: p.porSemana ?? 0 } : {}),
+    vigenciaDias: p.vigenciaDias, activo: p.activo,
+  }
+}
+
 /**
- * Los socios que salen de las reservas y de la lista de espera: uno por
- * persona, con el nombre y el contacto de su fila más nueva y, de alta, el día
- * de la primera. Sin planes: dónde viven planes y alumnos se decide aparte.
+ * La lista de planes del panel como la guarda la API (PUT /gimnasio/planes, la lista entera). Los que la API ya
+ * tiene van con su id; los que se cargaron recién llevan un id provisorio del panel, que no viaja: la API los crea.
  */
-export function sociosDeApi(reservas: Reserva[], esperas: Espera[]): Socio[] {
+export function planesParaApi(planes: Plan[], guardados: readonly PlanApi[]): GuardarPlan[] {
+  const ids = new Set(guardados.map(p => p.id))
+  return planes.map(p => ({
+    ...(ids.has(p.id) ? { id: p.id } : {}),
+    tipo: TIPO_API[p.tipo], nombre: p.nombre.trim(), precio: p.precio,
+    clases: p.tipo === 'pack' ? p.clases ?? 1 : null,
+    porSemana: p.tipo === 'membresia' ? p.porSemana ?? 0 : null,
+    vigenciaDias: p.vigenciaDias, activo: p.activo,
+  }))
+}
+
+/** Un plan de un alumno. La clase de prueba y la suelta no se asignan: una fila así no es un plan de nadie. */
+export function planDeSocioDeApi(s: SuscripcionApi): PlanDeSocio | null {
+  if (s.tipo !== 'PACK' && s.tipo !== 'MEMBRESIA') return null
+  return {
+    id: s.id, planId: s.planId, tipo: TIPO_PANEL[s.tipo] as 'pack' | 'membresia', nombre: s.nombre, precio: s.precio, desde: s.desde, hasta: s.hasta,
+    clases: s.tipo === 'PACK' ? s.clases : null, restantes: s.tipo === 'PACK' ? s.restantes ?? 0 : null,
+    porSemana: s.tipo === 'MEMBRESIA' ? s.porSemana ?? 0 : null,
+  }
+}
+
+/**
+ * El resumen de los planes de alguien para la lista de Alumnos (lo que en la demo es su único plan):
+ * - el plan: entre los que valen hoy, el primero que todavía sirve (un pack sin clases no, si tiene otro); si hoy
+ *   no vale ninguno, el que arranca después o el último que tuvo;
+ * - `vence`: hasta cuándo sigue con ese plan, contando la renovación si ya la tiene (la misma membresía, que arranca
+ *   al día siguiente): renovar antes de que venza corre el vencimiento, no lo pisa;
+ * - `clasesRestantes`: si es un pack, las que le quedan entre todos los packs que valen hoy.
+ */
+export function resumenDePlanes(planes: PlanDeSocio[], hoy: ISO): Pick<Socio, 'planId' | 'desde' | 'vence' | 'clasesRestantes'> {
+  const deHoy = planes.filter(p => p.desde <= hoy && hoy <= p.hasta)
+  const actual = deHoy.find(p => p.tipo !== 'pack' || (p.restantes ?? 0) > 0) ?? deHoy[0] ?? planes[0]
+  if (!actual) return { planId: null, desde: null, vence: null, clasesRestantes: null }
+  let vence = actual.hasta
+  if (actual.tipo === 'membresia') {
+    // La cadena de renovaciones: cada una arranca el día siguiente al que termina la anterior.
+    for (let sigue = true; sigue;) {
+      const proxima = planes.find(p => p.planId === actual.planId && p.desde === sumarDias(vence, 1))
+      if (proxima) vence = proxima.hasta
+      else sigue = false
+    }
+  }
+  // Si el que se muestra no vale hoy (venció o todavía no arrancó), hoy no vale ninguno: se dicen las suyas.
+  const packsDeHoy = deHoy.filter(p => p.tipo === 'pack')
+  const clasesRestantes = actual.tipo !== 'pack' ? null : packsDeHoy.length ? packsDeHoy.reduce((t, p) => t + (p.restantes ?? 0), 0) : actual.restantes ?? 0
+  return { planId: actual.planId, desde: actual.desde, vence, clasesRestantes }
+}
+
+/** Un alumno de la API como socio del panel. Su id es su ficha de cliente: el mismo de sus reservas. */
+export function socioDeAlumno(a: AlumnoApi, hoy: ISO): Socio {
+  const planes = [...a.planes, ...(a.planes.length === 0 && a.ultimo ? [a.ultimo] : [])].map(planDeSocioDeApi).filter((p): p is PlanDeSocio => p !== null)
+  return {
+    id: a.clienteId, nombre: a.nombre.trim() || 'Sin nombre', telefono: a.telefono ?? '', ...(a.email ? { email: a.email } : {}),
+    ...resumenDePlanes(planes, hoy), probo: a.probo, ...(a.nota ? { nota: a.nota } : {}), alta: a.alta,
+    fichaId: a.clienteId, alumnoId: a.id, planes,
+  }
+}
+
+/**
+ * Los socios del panel: los alumnos de la API con sus planes y, además, quienes
+ * reservaron o esperan un lugar y todavía no son alumnos (reservaron desde el
+ * sitio). Uno por persona. De quien no es alumno se sabe lo de sus filas: el
+ * nombre y el contacto de la más nueva y, de alta, el día de la primera. Sin
+ * `alumnos` (la API todavía no los tiene), salen todos de las filas.
+ */
+export function sociosDeApi(reservas: Reserva[], esperas: Espera[], alumnos: AlumnoApi[] = [], hoy: ISO = relojArgentina(new Date()).hoy): Socio[] {
   const filas = [
-    ...reservas.map(r => ({ fila: r, nombre: r.clienteNombre, cuando: r.creadaEn })),
-    ...esperas.map(e => ({ fila: e, nombre: e.clienteNombre, cuando: e.createdAt })),
+    ...reservas.map(r => ({ fila: r, nombre: r.clienteNombre, cuando: r.creadaEn, prueba: OCUPAN.includes(r.estado) && pagoDeDatos(r.datos)?.pago === 'prueba' })),
+    ...esperas.map(e => ({ fila: e, nombre: e.clienteNombre, cuando: e.createdAt, prueba: false })),
   ]
-  const por = new Map<string, { nueva: (typeof filas)[number]; primera: string }>()
+  const por = new Map<string, { nueva: (typeof filas)[number]; primera: string; probo: boolean }>()
   for (const f of filas) {
     const k = personaDe(f.fila)
     const ya = por.get(k)
-    por.set(k, { nueva: !ya || f.cuando > ya.nueva.cuando ? f : ya.nueva, primera: !ya || f.cuando < ya.primera ? f.cuando : ya.primera })
+    por.set(k, { nueva: !ya || f.cuando > ya.nueva.cuando ? f : ya.nueva, primera: !ya || f.cuando < ya.primera ? f.cuando : ya.primera, probo: f.prueba || !!ya?.probo })
   }
-  return [...por.entries()].map(([id, { nueva, primera }]) => ({
+  const deAlumnos = alumnos.map(a => {
+    const s = socioDeAlumno(a, hoy)
+    // Si reservó antes de ser alumno, "desde cuándo viene" es su primera reserva.
+    const primera = por.get(s.id)?.primera
+    const antes = primera ? relojArgentina(new Date(primera)).hoy : null
+    return antes && (!s.alta || antes < s.alta) ? { ...s, alta: antes } : s
+  })
+  const yaEstan = new Set(deAlumnos.map(s => s.id))
+  const deFilas = [...por.entries()].filter(([id]) => !yaEstan.has(id)).map(([id, { nueva, primera, probo }]): Socio => ({
     id,
     nombre: nueva.nombre.trim() || 'Sin nombre',
     telefono: nueva.fila.clienteTelefono ?? '',
     ...(nueva.fila.clienteEmail ? { email: nueva.fila.clienteEmail } : {}),
-    planId: null, desde: null, vence: null, clasesRestantes: null, probo: true,
+    // De quien no es alumno solo se sabe si usó la prueba por las reservas leídas: la que decide es la API.
+    planId: null, desde: null, vence: null, clasesRestantes: null, probo,
     alta: relojArgentina(new Date(primera)).hoy,
-  })).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+    fichaId: nueva.fila.clienteId, alumnoId: null, planes: [],
+  }))
+  return [...deAlumnos, ...deFilas].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
 }
 
 // ─── Lo que se manda ─────────────────────────────────────────────────────────
@@ -358,6 +485,45 @@ export function clienteDeSocio(s: Pick<Socio, 'nombre' | 'telefono' | 'email'>):
  */
 export function pedidoDeInscripcion(i: Pick<Inscripcion, 'fecha' | 'cantidad'>, clase: ClaseSemanal, socio: Pick<Socio, 'nombre' | 'telefono' | 'email'>, clave: string): CrearDesdePanel {
   return { modulo: MODULO, recursoId: recursoDeClase(clase.id), fecha: i.fecha, inicioMinutos: clase.inicio, cantidad: lugaresDe(i), cliente: clienteDeSocio(socio), estado: 'CONFIRMADA', clave }
+}
+
+/** A quién se anota o se da de alta: su fila de alumno si la tiene; si no, su ficha de cliente; si no, sus datos. */
+export function quienEs(s: Pick<Socio, 'nombre' | 'telefono' | 'email' | 'alumnoId' | 'fichaId'>): Pick<ReservarConPago, 'alumnoId' | 'clienteId' | 'cliente'> {
+  if (s.alumnoId) return { alumnoId: s.alumnoId }
+  if (s.fichaId) return { clienteId: s.fichaId }
+  return { cliente: clienteDeSocio(s) }
+}
+
+/**
+ * Anotar a alguien en una clase diciendo cómo se paga el lugar (POST /gimnasio/reservas). Sin `pago`, se cobra aparte.
+ * `clave` es un uuid por intento: si el mismo pedido llega dos veces, la API devuelve la misma reserva y no descuenta
+ * dos veces del pack.
+ */
+export function pedidoConPago(i: Pick<Inscripcion, 'fecha' | 'cantidad' | 'pago'>, clase: ClaseSemanal, socio: Pick<Socio, 'nombre' | 'telefono' | 'email' | 'alumnoId' | 'fichaId'>, clave: string): ReservarConPago {
+  const n = lugaresDe(i)
+  return { recursoId: recursoDeClase(clase.id), fecha: i.fecha, inicioMinutos: clase.inicio, ...(n > 1 ? { cantidad: n } : {}), ...quienEs(socio), pago: i.pago ?? 'aparte', clave }
+}
+
+/** Dar de alta a alguien desde Alumnos, con el plan que se le eligió (si se eligió uno). */
+export function altaDeSocio(s: Pick<Socio, 'nombre' | 'telefono' | 'email' | 'nota' | 'planId' | 'fichaId'>): AltaDeAlumno {
+  const nota = s.nota?.trim()
+  return { ...(s.fichaId ? { clienteId: s.fichaId } : { cliente: clienteDeSocio(s) }), ...(nota ? { nota } : {}), ...(s.planId ? { planId: s.planId } : {}) }
+}
+
+/**
+ * Lo que el panel cuenta después de anotar a alguien o de decir cómo paga: cómo quedó su plan ("Le quedan 3 clases
+ * en Pack de 8.") o cuánto se le cobra aparte. `precio` es el de la reserva. Con `yaDicho`, el título del aviso ya
+ * dice cómo paga (se acaba de elegir): solo se suma lo que falta saber, sin repetirlo.
+ */
+export function detalleDePago(p: PagoApi, precio: number, yaDicho = false): string | undefined {
+  if (p.pago === 'plan' && p.plan) {
+    if (p.plan.restantes !== null) return p.plan.restantes === 0 ? `Usó la última clase de ${p.plan.nombre}.` : `Le ${p.plan.restantes === 1 ? 'queda 1 clase' : `quedan ${p.plan.restantes} clases`} en ${p.plan.nombre}.`
+    if (p.usadasEnLaSemana !== null && p.plan.porSemana) return `Va ${p.usadasEnLaSemana} de ${p.plan.porSemana} de esa semana con ${p.plan.nombre}.`
+    return `Con ${p.plan.nombre}.`
+  }
+  if (p.pago === 'aparte') return precio > 0 ? (yaDicho ? `Son ${pesos(precio)}.` : `Se cobra aparte: ${pesos(precio)}.`) : yaDicho ? undefined : 'Se cobra aparte.'
+  if (p.pago === 'prueba') return yaDicho ? undefined : 'Es su clase de prueba.'
+  return undefined
 }
 
 /** Anotar a alguien en la lista de espera de una clase llena. */

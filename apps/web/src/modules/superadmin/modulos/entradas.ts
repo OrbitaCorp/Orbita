@@ -164,6 +164,7 @@ const G9 = '2026-11-09'
 const G10 = '2026-11-10'
 const G11 = '2026-11-11'
 const G12 = '2026-11-12'
+const G17 = '2026-11-17'
 // Lunes 16/11: la tabla rubro → sidebar de Turnos.
 const F16 = '2026-11-16'
 // Jueves 19/11: Servicios de Turnos guarda en la API.
@@ -173,6 +174,7 @@ const F18 = '2026-11-18'
 // Lunes 23/11: Horarios y feriados de Turnos, y Alquileres en producción (la demo para superadmin y el primer negocio real).
 const F23 = '2026-11-23'
 const F24 = '2026-11-24'
+const F25 = '2026-11-25'
 
 export const ENTRADAS: Entrada[] = [
   // ─── Transversal · la sección Módulos ───────────────────────────────────────
@@ -2652,12 +2654,12 @@ Esas tres cosas se resuelven con las tareas de la semana 2.
 - **Rutas de producción:** el panel de un negocio de Gimnasio todavía no tiene dónde abrirse fuera de \`/gimnasio-demo\` (lo mismo marcó Mateo para Turnos). Para probarlo contra la API está \`/gimnasio-demo/panel?origen=api\`, solo en local.
 - **El rubro:** va como en Tienda, \`industry: "gimnasio"\` y el subrubro en \`subrubros\` (\`["crossfit"]\`); por ahora el panel lo toma de \`?rubro=\`.`,
     archivos: [
-      'apps/api/src/reservas/README.md:102',
+      'apps/api/src/reservas/README.md:106',
       'apps/api/src/reservas/reservas-panel.controller.ts:164',
-      'apps/api/src/reservas/disponibilidad.service.ts:84',
+      'apps/api/src/reservas/disponibilidad.service.ts:87',
       'apps/api/src/reservas/reservas.service.ts:464',
-      'apps/api/prisma/schema.prisma:3960',
-      'apps/api/prisma/schema.prisma:65',
+      'apps/api/prisma/schema.prisma:4015',
+      'apps/api/prisma/schema.prisma:70',
       'apps/web/src/lib/reservasApi/cliente.ts:1',
       'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:1',
     ],
@@ -2727,23 +2729,23 @@ La segunda corrida no duplicó nada. Para usarlo: con la API local levantada con
 
 ${comoQuedo('gimnasio', ['Grilla semanal sobre la API · 1280', 'api-grilla-1280.webp'], ['Grilla semanal sobre la API · 390', 'api-grilla-390.webp'])}`,
     archivos: [
-      'apps/web/src/modules/gimnasio/datos/origen/index.ts:61',
-      'apps/web/src/modules/gimnasio/datos/origen/index.ts:137',
-      'apps/web/src/modules/gimnasio/datos/origen/demo.ts:21',
-      'apps/web/src/modules/gimnasio/datos/origen/api.ts:138',
-      'apps/web/src/modules/gimnasio/datos/origen/api.ts:242',
-      'apps/web/src/modules/gimnasio/datos/origen/api.ts:400',
-      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:86',
-      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:299',
-      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:327',
+      'apps/web/src/modules/gimnasio/datos/origen/index.ts:78',
+      'apps/web/src/modules/gimnasio/datos/origen/index.ts:171',
+      'apps/web/src/modules/gimnasio/datos/origen/demo.ts:88',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:177',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:308',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:508',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:94',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:426',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:454',
       'apps/web/src/modules/gimnasio/datos/reloj.ts:76',
       'apps/web/src/modules/gimnasio/admin/Panel.tsx:62',
-      'apps/web/src/modules/gimnasio/admin/Panel.tsx:185',
-      'apps/web/src/modules/gimnasio/admin/Clases.tsx:512',
-      'apps/web/src/modules/gimnasio/admin/Clases.tsx:558',
+      'apps/web/src/modules/gimnasio/admin/Panel.tsx:187',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:614',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:660',
       'apps/web/src/pages/gimnasio-demo/panel.tsx:28',
-      'apps/web/src/modules/gimnasio/datos/origen/__tests__/mapear.test.ts:47',
-      'apps/web/src/modules/gimnasio/datos/origen/__tests__/api.test.ts:63',
+      'apps/web/src/modules/gimnasio/datos/origen/__tests__/mapear.test.ts:49',
+      'apps/web/src/modules/gimnasio/datos/origen/__tests__/api.test.ts:83',
     ],
   }),
   entrada({
@@ -2761,14 +2763,14 @@ ${comoQuedo('gimnasio', ['Grilla semanal sobre la API · 1280', 'api-grilla-1280
 
 ${comoQuedo('gimnasio', ['Clases de hoy sobre la API · 1280', 'api-clases-dia-1280.webp'], ['Clases de hoy sobre la API · 390', 'api-clases-dia-390.webp'])}`,
     archivos: [
-      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:236',
-      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:194',
-      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:249',
-      'apps/web/src/modules/gimnasio/datos/index.ts:583',
-      'apps/web/src/modules/gimnasio/datos/index.ts:287',
-      'apps/web/src/modules/gimnasio/datos/origen/api.ts:138',
-      'apps/web/src/modules/gimnasio/admin/Clases.tsx:187',
-      'apps/web/src/modules/gimnasio/admin/Clases.tsx:444',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:270',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:211',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:365',
+      'apps/web/src/modules/gimnasio/datos/index.ts:742',
+      'apps/web/src/modules/gimnasio/datos/index.ts:325',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:177',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:219',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:546',
     ],
   }),
   entrada({
@@ -2786,13 +2788,13 @@ ${comoQuedo('gimnasio', ['Clases de hoy sobre la API · 1280', 'api-clases-dia-1
 
 ${comoQuedo('gimnasio', ['Clase llena con lista de espera · 1280', 'api-clase-llena-1280.webp'], ['Anotar a alguien nuevo · 390', 'api-clase-detalle-390.webp'])}`,
     archivos: [
-      'apps/web/src/modules/gimnasio/admin/Clases.tsx:276',
-      'apps/web/src/modules/gimnasio/admin/Clases.tsx:310',
-      'apps/web/src/modules/gimnasio/admin/Clases.tsx:383',
-      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:359',
-      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:364',
-      'apps/web/src/modules/gimnasio/datos/origen/api.ts:282',
-      'apps/web/src/modules/gimnasio/datos/origen/api.ts:322',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:308',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:355',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:436',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:486',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:530',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:350',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:427',
       'apps/web/src/modules/gimnasio/datos/origen/demo.ts:47',
       'apps/web/src/modules/gimnasio/admin/piezas.tsx:40',
       'apps/web/src/design-system/reservas/piezas.tsx:240',
@@ -2813,14 +2815,14 @@ ${comoQuedo('gimnasio', ['Clase llena con lista de espera · 1280', 'api-clase-l
 **Verificado:** 5 tests unitarios nuevos del motor (30 en verde), 2 e2e nuevos contra Postgres de dev (17 de 17), entre ellos dos "darle el lugar" a la vez que devuelven la misma reserva, y el aislamiento por negocio en verde. **No está en producción:** va con el próximo \`deploy.sh\` (no lleva migración), cuando Ale lo decida.`,
     archivos: [
       'apps/api/src/reservas/reservas.service.ts:611',
-      'apps/api/src/reservas/reservas.service.ts:669',
-      'apps/api/src/reservas/reservas.service.ts:832',
-      'apps/api/src/reservas/reservas.service.ts:853',
+      'apps/api/src/reservas/reservas.service.ts:671',
+      'apps/api/src/reservas/reservas.service.ts:834',
+      'apps/api/src/reservas/reservas.service.ts:855',
       'apps/api/src/reservas/reservas-panel.controller.ts:164',
       'apps/api/src/reservas/reservas-panel.controller.ts:172',
       'apps/api/src/reservas/reservas-panel.controller.ts:182',
-      'apps/api/src/reservas/reservas.types.ts:210',
-      'apps/api/src/reservas/README.md:102',
+      'apps/api/src/reservas/reservas.types.ts:233',
+      'apps/api/src/reservas/README.md:106',
       'apps/api/test/unit/reservas.service.unit-spec.ts:295',
       'apps/api/test/reservas.e2e-spec.ts:315',
       'apps/web/src/lib/reservasApi/cliente.ts:132',
@@ -2848,11 +2850,11 @@ ${comoQuedo('gimnasio', ['Clase llena con lista de espera · 1280', 'api-clase-l
 
 ${comoQuedo('gimnasio', ['El primero de la espera toma el lugar · 1280', 'api-espera-pasa-1280.webp'], ['Asistencia de una clase que terminó · 1280', 'api-asistencia-1280.webp'])}`,
     archivos: [
-      'apps/web/src/modules/gimnasio/admin/Clases.tsx:342',
-      'apps/web/src/modules/gimnasio/datos/origen/api.ts:294',
-      'apps/web/src/modules/gimnasio/datos/origen/api.ts:306',
-      'apps/web/src/modules/gimnasio/datos/origen/index.ts:61',
-      'apps/web/src/modules/gimnasio/datos/origen/demo.ts:55',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:387',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:369',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:382',
+      'apps/web/src/modules/gimnasio/datos/origen/index.ts:78',
+      'apps/web/src/modules/gimnasio/datos/origen/demo.ts:58',
     ],
   }),
   entrada({
@@ -2883,7 +2885,7 @@ ${comoQuedo('gimnasio', ['El primero de la espera toma el lugar · 1280', 'api-e
       'apps/web/src/lib/manual/modulos.ts:42',
       'apps/web/src/lib/manual/contrato.ts:29',
       'apps/web/src/modules/gimnasio/manual.ts:16',
-      'apps/web/src/modules/gimnasio/__tests__/manual.test.ts:13',
+      'apps/web/src/modules/gimnasio/__tests__/manual.test.ts:15',
       'apps/web/src/modules/orbi/manual/artefacto.ts:23',
       'apps/web/src/modules/orbi/manual/artefacto.ts:29',
       'apps/web/src/modules/orbi/manual/artefacto.test.ts:37',
@@ -2893,7 +2895,7 @@ ${comoQuedo('gimnasio', ['El primero de la espera toma el lugar · 1280', 'api-e
       'apps/api/src/orbi/manual/manual.types.ts:38',
       'apps/api/src/orbi/manual/manual.generated.ts:1055',
       'apps/api/src/orbi/manual/manual.spec.ts:52',
-      'apps/api/prisma/schema.prisma:3796',
+      'apps/api/prisma/schema.prisma:3851',
       'apps/api/prisma/migrations/20261116120000_marketing_tutoriales_modulo/migration.sql:5',
       'apps/api/src/marketing/videos/tutoriales.service.ts:33',
       'apps/api/src/marketing/videos/tutoriales.service.ts:185',
@@ -2920,10 +2922,10 @@ ${comoQuedo('gimnasio', ['Días sin clases sobre la API · 1280', 'api-dias-sin-
     archivos: [
       'apps/web/src/modules/gimnasio/admin/configuracion/Bloqueos.tsx:63',
       'apps/web/src/modules/gimnasio/admin/configuracion/Bloqueos.tsx:145',
-      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:134',
-      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:345',
-      'apps/web/src/modules/gimnasio/datos/origen/api.ts:261',
-      'apps/web/src/modules/gimnasio/datos/index.ts:595',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:142',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:472',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:327',
+      'apps/web/src/modules/gimnasio/datos/index.ts:754',
       'apps/api/src/reservas/reservas-catalogo.service.ts:343',
     ],
   }),
@@ -2937,23 +2939,25 @@ ${comoQuedo('gimnasio', ['Días sin clases sobre la API · 1280', 'api-dias-sin-
 **Lo que queda decidido**
 
 1. **\`gimnasio_planes\`:** el tipo (prueba, suelta, pack o membresía), el nombre, el precio, cuántas clases trae (pack), cuántas por semana (membresía; 0 es libre), los días de vigencia, si se ofrece en el sitio y el orden. Es lo que edita Planes y precios.
-2. **\`gimnasio_alumnos\`:** el alumno del negocio, enganchado a la ficha de cliente que el motor ya vincula a cada reserva por celular o email, más la nota, el día de alta y si ya usó la clase de prueba. Así una reserva hecha desde el sitio cae en su alumno sin pasos de más.
-3. **\`gimnasio_suscripciones\`:** el plan de cada alumno, desde y hasta cuándo, las clases que le quedan (pack), su estado y de cuál renovó: el historial que Ingresos armaba a mano.
-4. **\`gimnasio_movimientos\`:** cada clase que se descuenta de un pack o vuelve al cancelar a tiempo, con la reserva que la generó (una sola vez por reserva) y el porqué.
+2. **\`gimnasio_alumnos\`:** el alumno del negocio, enganchado a la ficha de cliente que el motor ya vincula a cada reserva por celular o email, más la nota y el día de alta. Así una reserva hecha desde el sitio cae en su alumno sin pasos de más.
+3. **\`gimnasio_suscripciones\`:** el plan de cada alumno: una fila por compra o renovación, con una foto del plan (si después cambia el precio, lo vendido no cambia) y desde y hasta qué día vale. Es el historial que Ingresos armaba a mano.
+4. **Las clases usadas de un pack no se guardan aparte: se cuentan de las reservas.** Cada reserva dice con qué se pagó en su campo libre (con el plan, aparte o como clase de prueba), y las usadas de un plan son sus reservas que no se cancelaron. Al cancelar, la clase vuelve sola.
 
-Reservar un lugar con plan pasa por una ruta de Gimnasio: mira el plan (vigente, tope de la semana, clases del pack), le pide la reserva al motor y anota el movimiento. La reserva sigue siendo del motor: el cupo, la espera y el candado no cambian.
+Reservar un lugar con plan pasa por una ruta de Gimnasio: toma el candado del alumno, mira el plan (vigente, tope de la semana, clases del pack) y le pide la reserva al motor. La reserva sigue siendo del motor: el cupo, la espera y el candado del recurso no cambian.
+
+**Corregido el 24/11, al implementarlo.** La propuesta del 16/11 tenía una cuarta tabla, \`gimnasio_movimientos\`, con cada clase descontada o devuelta. Quedó afuera: un contador guardado aparte se puede desfasar de lo reservado, y contando las reservas eso no puede pasar. El campo libre de la reserva lo había sumado Alan al motor el 23/11.
 
 **Lo que queda para después:** el catálogo de actividades y salas y el equipo (el punto 5 de la propuesta) no tiene tarea en el plan todavía. Hasta entonces se siguen escribiendo al cargar una clase.
 
 Se implementa con las tareas del 17 al 19/11. Lleva una migración nueva, que en producción se aplica recién cuando Ale lo diga.`,
-    decision: 'Tablas propias de Gimnasio (`gimnasio_planes`, `gimnasio_alumnos`, `gimnasio_suscripciones` y `gimnasio_movimientos`) en un módulo propio de la API, al lado del motor de reservas y sin tocarlo. Ale la tomó el 24/11, al retomar el módulo: ante la recomendación de este camino contestó "hacé todo".',
-    porque: 'En los datos sueltos de una clase no hay integridad (dos reservas a la vez podrían gastar la misma clase de un pack), ni historial, ni forma de listar o filtrar. En la ficha de cliente de Tienda se mezclaría Tienda con Gimnasio, y el plan y los pases igual necesitarían tablas. Con tablas propias el descuento de un pase va en la misma transacción que su registro, queda el historial de renovaciones y Turnos y Alquileres no se enteran.',
+    decision: 'Tablas propias de Gimnasio (`gimnasio_planes`, `gimnasio_alumnos` y `gimnasio_suscripciones`) en un módulo propio de la API, al lado del motor de reservas y sin tocarlo; las clases usadas de un pack se cuentan de las reservas. Ale la tomó el 24/11, al retomar el módulo: ante la recomendación de este camino contestó "hacé todo".',
+    porque: 'En los datos sueltos de una clase no hay integridad (dos reservas a la vez podrían gastar la misma clase de un pack), ni historial, ni forma de listar o filtrar. En la ficha de cliente de Tienda se mezclaría Tienda con Gimnasio, y el plan y los pases igual necesitarían tablas. Con tablas propias y el candado del alumno, dos reservas a la vez no gastan la misma clase, queda el historial de renovaciones y Turnos y Alquileres no se enteran.',
     archivos: [
       'apps/web/src/modules/gimnasio/datos/index.ts:117',
       'apps/web/src/modules/gimnasio/datos/index.ts:259',
-      'apps/web/src/modules/gimnasio/datos/index.ts:287',
-      'apps/api/prisma/schema.prisma:638',
-      'apps/api/prisma/schema.prisma:4030',
+      'apps/web/src/modules/gimnasio/datos/index.ts:325',
+      'apps/api/prisma/schema.prisma:649',
+      'apps/api/prisma/schema.prisma:4085',
       'apps/api/src/reservas/reservas.service.ts:322',
     ],
   }),
@@ -2991,11 +2995,11 @@ El candado quedó en un solo lugar (\`candado.ts\`) y lo usan el motor y el cat�
     archivos: [
       'apps/api/src/reservas/candado.ts:15',
       'apps/api/src/reservas/reservas.service.ts:611',
-      'apps/api/src/reservas/reservas.service.ts:669',
-      'apps/api/src/reservas/reservas.service.ts:735',
-      'apps/api/src/reservas/reservas.service.ts:755',
-      'apps/api/src/reservas/reservas.service.ts:784',
-      'apps/api/src/reservas/reservas.service.ts:853',
+      'apps/api/src/reservas/reservas.service.ts:671',
+      'apps/api/src/reservas/reservas.service.ts:737',
+      'apps/api/src/reservas/reservas.service.ts:757',
+      'apps/api/src/reservas/reservas.service.ts:786',
+      'apps/api/src/reservas/reservas.service.ts:855',
       'apps/api/src/reservas/reservas-catalogo.service.ts:142',
       'apps/api/src/reservas/reservas-catalogo.service.ts:173',
       'apps/api/src/reservas/reservas-catalogo.service.ts:222',
@@ -3004,10 +3008,10 @@ El candado quedó en un solo lugar (\`candado.ts\`) y lo usan el motor y el cat�
       'apps/api/src/reservas/dto/comunes.dto.ts:78',
       'apps/api/src/reservas/dto/reservas.dto.ts:11',
       'apps/api/src/internal-cron/internal-cron.controller.ts:229',
-      'apps/api/src/reservas/README.md:72',
+      'apps/api/src/reservas/README.md:76',
       'apps/api/test/unit/reservas-catalogo.unit-spec.ts:46',
       'apps/api/test/reservas.e2e-spec.ts:28',
-      'apps/web/src/lib/reservasApi/tipos.ts:242',
+      'apps/web/src/lib/reservasApi/tipos.ts:244',
       'apps/web/src/lib/reservasApi/cliente.ts:167',
     ],
   }),
@@ -3053,28 +3057,28 @@ ${comoQuedo('gimnasio',
     ['El aviso de datos viejos · 1280', 'arreglos-datos-viejos-1280.webp'], ['El aviso de datos viejos · 390', 'arreglos-datos-viejos-390.webp'],
   )}`,
     archivos: [
-      'apps/web/src/modules/gimnasio/datos/origen/api.ts:94',
-      'apps/web/src/modules/gimnasio/datos/origen/api.ts:161',
-      'apps/web/src/modules/gimnasio/datos/origen/api.ts:177',
-      'apps/web/src/modules/gimnasio/datos/origen/api.ts:218',
-      'apps/web/src/modules/gimnasio/datos/origen/api.ts:344',
-      'apps/web/src/modules/gimnasio/datos/origen/index.ts:100',
-      'apps/web/src/modules/gimnasio/datos/origen/index.ts:105',
-      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:299',
-      'apps/web/src/modules/gimnasio/admin/Panel.tsx:186',
-      'apps/web/src/modules/gimnasio/admin/Panel.tsx:225',
-      'apps/web/src/modules/gimnasio/admin/Clases.tsx:276',
-      'apps/web/src/modules/gimnasio/admin/Clases.tsx:423',
-      'apps/web/src/modules/gimnasio/admin/Clases.tsx:512',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:113',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:205',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:226',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:272',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:449',
+      'apps/web/src/modules/gimnasio/datos/origen/index.ts:117',
+      'apps/web/src/modules/gimnasio/datos/origen/index.ts:122',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:426',
+      'apps/web/src/modules/gimnasio/admin/Panel.tsx:188',
+      'apps/web/src/modules/gimnasio/admin/Panel.tsx:227',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:308',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:488',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:614',
       'apps/web/src/modules/gimnasio/admin/configuracion/Bloqueos.tsx:63',
       'apps/web/src/modules/gimnasio/admin/configuracion/Bloqueos.tsx:123',
       'apps/web/src/modules/gimnasio/admin/configuracion/Reglas.tsx:24',
       'apps/web/src/modules/gimnasio/admin/Ingresos.tsx:89',
-      'apps/web/src/modules/gimnasio/admin/Socios.tsx:63',
+      'apps/web/src/modules/gimnasio/admin/Socios.tsx:84',
       'apps/web/src/design-system/reservas/piezas.tsx:240',
       'apps/web/src/modules/gimnasio/manual.ts:46',
-      'apps/web/src/modules/gimnasio/datos/origen/__tests__/api.test.ts:356',
-      'apps/web/src/modules/gimnasio/datos/origen/__tests__/mapear.test.ts:157',
+      'apps/web/src/modules/gimnasio/datos/origen/__tests__/api.test.ts:568',
+      'apps/web/src/modules/gimnasio/datos/origen/__tests__/mapear.test.ts:159',
     ],
   }),
   entrada({
@@ -3103,7 +3107,7 @@ La documentación está en \`docs/marketing/FLUJO-PROSPECCION-Y-VIDEOS.md\` (§ 
       'apps/api/src/marketing/prospeccion/mcp/mcp-prospeccion.ts:208',
       'apps/api/test/unit/tutoriales.unit-spec.ts:77',
       'apps/web/src/modules/superadmin/ListaDeTutoriales.tsx:137',
-      'apps/api/DEPLOYMENT.md:591',
+      'apps/api/DEPLOYMENT.md:617',
     ],
   }),
   entrada({
@@ -3121,12 +3125,212 @@ La documentación está en \`docs/marketing/FLUJO-PROSPECCION-Y-VIDEOS.md\` (§ 
     archivos: [
       'apps/web/src/modules/__tests__/independencia.test.ts:19',
       'apps/web/src/modules/orbi/manual/artefacto.test.ts:56',
-      'apps/web/src/lib/manual/contrato.ts:52',
-      'apps/web/src/modules/gimnasio/__tests__/manual.test.ts:16',
+      'apps/web/src/lib/manual/contrato.ts:56',
+      'apps/web/src/modules/gimnasio/__tests__/manual.test.ts:19',
       'apps/web/src/modules/superadmin/modulos/compartido.ts:63',
       'apps/web/src/modules/superadmin/modulos/reglas.ts:43',
       'apps/web/src/lib/reservas/README.md:62',
       'apps/web/eslint.config.mjs:15',
+    ],
+  }),
+
+  // Las tareas del 17 al 19/11 (hechas el 24 y el 25/11, al retomar el módulo): Alumnos, Planes y los pases sobre la API.
+  entrada({
+    modulo: 'gimnasio', fecha: G17, slug: 'alumnos-sobre-la-api', tipo: 'tarea', quien: 'Ale',
+    titulo: 'Alumnos sobre la API: se dan de alta con su plan y cada uno dice hasta cuándo vale',
+    foco: 'Tarea del 17/11 del plan. Alumnos guarda en la API de Gimnasio: el alta (con o sin plan), el plan que usa hoy con su vencimiento y, para quien reservó sin ser alumno, la ficha de cliente que ya tenía.',
+    que: `La decisión del 16/11 dejó a los alumnos en tablas propias de Gimnasio, al lado del motor de reservas. Hecha el 24 y el 25/11.
+
+**En la API** (\`apps/api/src/gimnasio\`, un módulo nuevo que usa el motor por sus servicios)
+
+- **\`gimnasio_alumnos\`:** un alumno es la ficha de cliente que el motor ya vincula a cada reserva por celular o email, más la nota y el día de alta. Uno por ficha: dar de alta a quien ya era alumno devuelve el mismo.
+- **\`GET /gimnasio/alumnos\`** trae cada alumno con sus planes que valen hoy o arrancan después, lo que usó y lo que le queda de cada uno, el último que tuvo si hoy no le queda ninguno y si ya tomó la clase de prueba.
+- **\`POST /gimnasio/alumnos\`** da de alta con una ficha que ya existe o con nombre y un celular o un email; con \`planId\`, arranca con ese plan.
+- Migración \`20261124130000_gimnasio_planes_alumnos\`: tres tablas nuevas, aditiva. Sin permisos nuevos: usa los de reservas.
+
+**En el panel**
+
+- **La lista** muestra a los alumnos de la API y, además, a quienes reservaron una clase sin ser alumnos todavía (por ejemplo, desde el sitio): figuran sin plan hasta que se les asigne uno. Cada fila dice el plan que usa hoy, cuándo vence y lo que le queda.
+- **Sumar a alguien** espera la respuesta: el formulario no se cierra hasta que se guardó, y el aviso dice con qué plan quedó y hasta cuándo.
+- **La ficha** le asigna un plan a quien solo había reservado (lo da de alta con su misma ficha: sus reservas siguen siendo suyas) y, cuando alguien tiene más de un plan, los muestra todos, cada uno con hasta cuándo vale y lo que le queda.
+- **Si la API todavía no tiene Gimnasio** (el panel se publica antes que la API), Alumnos abre igual y avisa que no guarda.
+
+**Cómo se probó:** en el navegador contra la API local y la base de dev, a 1280 en claro y a 390 en claro y en oscuro: el alta con plan, asignarle un plan a quien solo había reservado y la lista con los dos. Además, los 28 tests del servicio sin base, los de punta a punta contra dev (\`test/gimnasio.e2e-spec.ts\`) y los del panel sin red.
+
+**Falta:** la API no está en producción hasta el próximo \`deploy.sh\`, que necesita la migración aplicada allá. Las dos cosas las decide Ale.
+
+${comoQuedo('gimnasio', ['Alumnos sobre la API · 1280', 'alumnos-api-1280.webp'], ['Alumnos sobre la API · 390', 'alumnos-api-390.webp'], ['La ficha, con una membresía y un pack · 1280', 'alumnos-api-ficha-1280.webp'], ['La ficha · 390', 'alumnos-api-ficha-390.webp'])}`,
+    archivos: [
+      'apps/api/prisma/schema.prisma:4283',
+      'apps/api/prisma/migrations/20261124130000_gimnasio_planes_alumnos/migration.sql:1',
+      'apps/api/src/gimnasio/gimnasio.service.ts:118',
+      'apps/api/src/gimnasio/gimnasio.service.ts:181',
+      'apps/api/src/gimnasio/gimnasio-panel.controller.ts:51',
+      'apps/api/src/gimnasio/README.md:1',
+      'apps/web/src/modules/gimnasio/datos/origen/gimnasioApi.ts:119',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:329',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:349',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:365',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:142',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:399',
+      'apps/web/src/modules/gimnasio/admin/Socios.tsx:198',
+      'apps/web/src/modules/gimnasio/admin/Socios.tsx:312',
+      'apps/api/test/unit/gimnasio.unit-spec.ts:89',
+      'apps/api/test/gimnasio.e2e-spec.ts:113',
+    ],
+  }),
+  entrada({
+    modulo: 'gimnasio', fecha: F18, slug: 'planes-sobre-la-api', tipo: 'tarea', quien: 'Ale',
+    titulo: 'Planes y precios sobre la API: la clase de prueba, la suelta, los packs y las membresías',
+    foco: 'Tarea del 18/11 del plan. Planes y precios guarda en la API de Gimnasio: los cuatro tipos con su precio, cuántos alumnos tiene cada uno y si se ofrece en el sitio, que ya los puede leer sin sesión.',
+    que: `Hecha el 24 y el 25/11, junto con Alumnos.
+
+**En la API**
+
+- **\`gimnasio_planes\`:** el tipo (prueba, suelta, pack o membresía), el nombre, el precio, cuántas clases trae un pack, cuántas por semana una membresía (0 es libre), los días de vigencia, si se ofrece en el sitio y el orden. Un plan quitado no se borra: queda fuera de la lista, y quien lo tiene lo sigue usando.
+- **\`PUT /gimnasio/planes\`** recibe la lista entera como queda, todo o nada: con \`id\` se cambia, sin \`id\` se crea y lo que no viene se quita. Pide el permiso de configurar reservas. Un pack sin clases, un precio negativo o un plan que no existe son 400 y la lista queda como estaba.
+- **\`GET /storefront/:slug/gimnasio/planes\`**, sin sesión: los que el negocio ofrece en su sitio.
+
+**En el panel**
+
+- Un negocio que recién empieza no tiene planes: puede arrancar con los que suele tener su rubro ("Usar los planes sugeridos") y cambiarles el nombre y el precio.
+- Se suman con Membresía y Pack. La clase suelta y la de prueba son una de cada una: su botón aparece solo si falta.
+- Cada pack y cada membresía dice cuántos alumnos lo tienen hoy.
+- "Se ofrece en el sitio" apagado deja de venderlo; quien ya lo tiene lo sigue usando hasta que venza.
+- Un plan sin nombre no se guarda: la barra de guardar dice por qué.
+- Cambiar el precio o las clases de un plan no toca lo que ya tiene nadie: cada alumno guarda su plan como era cuando se lo asignaron.
+
+**Cómo se probó:** en el navegador contra la API local y la base de dev: los sugeridos, guardar, recargar y ver lo mismo, cambiar un precio, sumar un pack, apagar la clase suelta y el nombre vacío. A 1280 y a 390, sin scroll horizontal. Además, los tests de punta a punta contra dev (la lista entera, los 400 y lo que ve el sitio) y los del panel sin red.
+
+**Falta:** lo mismo que Alumnos: el \`deploy.sh\` de la API y su migración en producción.
+
+${comoQuedo('gimnasio', ['Sin planes: los sugeridos del rubro · 1280', 'planes-api-vacio-1280.webp'], ['Planes guardados en la API · 1280', 'planes-api-1280.webp'], ['Planes y precios · 390', 'planes-api-390.webp'])}`,
+    archivos: [
+      'apps/api/prisma/schema.prisma:4253',
+      'apps/api/src/gimnasio/gimnasio.service.ts:56',
+      'apps/api/src/gimnasio/gimnasio.service.ts:71',
+      'apps/api/src/gimnasio/gimnasio-panel.controller.ts:34',
+      'apps/api/src/gimnasio/gimnasio-publico.controller.ts:55',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:287',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:300',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:345',
+      'apps/web/src/modules/gimnasio/admin/configuracion/Planes.tsx:28',
+      'apps/web/src/modules/gimnasio/admin/Panel.tsx:266',
+      'apps/api/test/gimnasio.e2e-spec.ts:113',
+    ],
+  }),
+  entrada({
+    modulo: 'gimnasio', fecha: F19, slug: 'pases-y-renovacion', tipo: 'tarea', quien: 'Ale',
+    titulo: 'Cada lugar dice cómo se paga: el pack se descuenta al reservar y renovar no pierde días',
+    foco: 'Tarea del 19/11 del plan. Al anotar a alguien se dice cómo paga ese lugar (con su plan, aparte o como clase de prueba): el pack descuenta, la membresía cuenta su tope de la semana y, si el plan no alcanza, el panel dice por qué. Renovar la misma membresía la continúa.',
+    que: `Hecha el 24 y el 25/11. Es lo que le da sentido a Alumnos y a Planes: que el plan se use.
+
+**Cómo se cuenta un pack (sin tabla de movimientos)**
+
+Cada reserva dice con qué se pagó en su campo libre, que el motor guarda sin interpretar: con el plan del alumno, aparte (se cobra en el gimnasio, como clase suelta) o como clase de prueba. Las clases usadas de un plan **se cuentan de sus reservas**: las que no se cancelaron. No hay un contador guardado aparte, así que no se puede desfasar de lo reservado: si la reserva se cancela, la clase vuelve sola; quien falta sin avisar la usó igual.
+
+**Las reglas, en la API** (\`dominio/planes.ts\`, puras y con su test)
+
+- **Con su plan:** entre los planes que valen ese día se usa primero el que vence antes. Un pack tiene que alcanzar para todos los lugares; una membresía cubre un lugar por clase y, si tiene tope, hasta sus clases de la semana.
+- **Si no alcanza, no se reserva:** 409 con el motivo ya escrito para mostrar (venció, no le quedan clases, ya usó las de esa semana). El negocio puede anotarlo igual cobrándolo aparte.
+- **Dos pedidos a la vez con la última clase de un pack:** entra uno solo. Anotar con plan, pasar un lugar al plan y asignar un plan toman antes el candado del alumno. Probado con cuatro pedidos simultáneos.
+- **Doble clic:** el pedido lleva una clave por intento; repetirlo devuelve la misma reserva sin descontar dos veces.
+- **La clase de prueba** es una sola vez por persona; si la cancela, puede volver a pedirla.
+- **Renovar:** la misma membresía antes de que venza continúa (arranca al día siguiente de que termina la que tiene: no pierde días); otra membresía reemplaza a la anterior; un pack convive con lo que haya.
+
+**En el panel**
+
+- **Al anotar**, "Cómo paga" ya propone lo que corresponde: su plan si cubre esa clase (dice cuál y, si es un pack, cuántas le quedan); si no, aparte, con el precio de la clase suelta. Si tiene un plan y no se la cubre, una nota dice por qué y qué hacer: renovarlo, o anotarlo con un solo lugar si la membresía no cubre a quien lo acompaña.
+- **En la lista de anotados**, un botón por persona dice cómo paga y deja corregirlo. Pasar un lugar del plan a aparte le devuelve la clase.
+- **"Sin definir"** es el lugar de quien reservó desde el sitio o pasó solo de la lista de espera: se le dice cómo paga desde su fila. Sin sesión no se descuenta un pack con solo escribir un celular.
+- **Dos personas que se llaman igual** se distinguen por el celular en la lista de "Anotar".
+- **La ficha** muestra en el historial cómo se pagó cada clase, y "Quitar este plan" saca uno asignado por error (los lugares ya reservados con él siguen reservados).
+
+**El manual que lee Orbi** suma "Cómo paga cada lugar" y los capítulos de Alumnos y de Planes y precios, con los nombres exactos de los botones.
+
+**Cambió en lo compartido:** \`botonesQueFaltan\` (\`lib/manual/contrato.ts\`) acepta varias carpetas, y el contrato de los manuales de los módulos mira también las piezas del kit: la barra de guardar ("Guardar cambios", "Descartar") se ve en los tres paneles y hasta ahora no se podía nombrar en un manual. A Turnos y a Alquileres no les cambia nada de lo que ya tenían.
+
+**Cómo se probó:** en el navegador contra la API local y la base de dev, a 1280 y a 390: definir tres lugares sin definir (con plan, aparte y prueba), anotar con un pack y verlo bajar de 8 a 7, pasarlo a aparte y verlo volver a 8, una membresía con un pack al lado (un lugar va con la membresía; dos, con el pack), la lista de espera que pasa sola y deja el lugar sin definir, renovar sin perder días y quitar un plan. Además, 30 tests de punta a punta contra dev, 110 del panel sin red y 17 del dominio.
+
+**Falta:** el \`deploy.sh\` de la API y su migración en producción.
+
+${comoQuedo('gimnasio',
+    ['Anotar: el panel propone cómo paga · 1280', 'pases-anotar-1280.webp'], ['Cada lugar con cómo se paga · 1280', 'pases-clase-1280.webp'],
+    ['Lugares sin definir (del sitio o de la espera) · 1280', 'pases-sin-definir-1280.webp'], ['Decir cómo paga un lugar · 1280', 'pases-como-paga-1280.webp'],
+    ['Renovar la misma membresía: sigue sin perder días · 1280', 'pases-renovacion-1280.webp'], ['La clase en el celular · 390', 'pases-clase-390.webp'],
+    ['Si el plan no cubre la clase, dice por qué · 390', 'pases-no-cubre-390.webp'], ['En oscuro · 390', 'pases-clase-oscuro-390.webp'])}`,
+    archivos: [
+      'apps/api/src/gimnasio/dominio/planes.ts:70',
+      'apps/api/src/gimnasio/dominio/planes.ts:89',
+      'apps/api/src/gimnasio/dominio/planes.ts:121',
+      'apps/api/src/gimnasio/dominio/planes.ts:157',
+      'apps/api/src/gimnasio/gimnasio.service.ts:216',
+      'apps/api/src/gimnasio/gimnasio.service.ts:284',
+      'apps/api/src/gimnasio/gimnasio.service.ts:339',
+      'apps/api/src/gimnasio/gimnasio.service.ts:388',
+      'apps/api/src/gimnasio/gimnasio-panel.controller.ts:84',
+      'apps/api/src/gimnasio/README.md:20',
+      'apps/web/src/modules/gimnasio/datos/index.ts:295',
+      'apps/web/src/modules/gimnasio/datos/index.ts:697',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:247',
+      'apps/web/src/modules/gimnasio/datos/origen/mapear.ts:518',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:350',
+      'apps/web/src/modules/gimnasio/datos/origen/api.ts:391',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:75',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:341',
+      'apps/web/src/modules/gimnasio/admin/Clases.tsx:513',
+      'apps/web/src/modules/gimnasio/admin/Socios.tsx:198',
+      'apps/web/src/modules/gimnasio/manual.ts:86',
+      'apps/web/src/modules/gimnasio/manual.ts:169',
+      'apps/web/src/lib/manual/contrato.ts:56',
+      'apps/web/src/modules/orbi/manual/artefacto.test.ts:56',
+      'apps/web/src/modules/gimnasio/datos/__tests__/pagos.test.ts:36',
+      'apps/api/test/gimnasio.e2e-spec.ts:113',
+    ],
+  }),
+  entrada({
+    modulo: 'gimnasio', fecha: F19, slug: 'los-tres-planes-al-dia', tipo: 'tarea', quien: 'Ale', transversal: true,
+    titulo: 'Transversal: cómo viene cada plan: lo que espera confirmación y los atrasos, con su porqué',
+    foco: 'Tarea del 19/11 del plan, con corte al 25/11. Turnos tiene 15 tareas documentadas sin confirmar y le faltan las tres del sitio; Alquileres muestra 14 atrasos porque fue primero con la estadía, que ya está en producción; Gimnasio quedó al día hasta el 19/11.',
+    que: `Revisión de los tres planes de Módulos al **miércoles 25/11**. No toca el plan ni las entradas de Turnos ni de Alquileres: dice cómo están y qué le toca a cada uno.
+
+Cómo se cuenta: una tarea del plan con fecha pasada y sin su entrada es un **atraso**; con su entrada, **espera la confirmación** de su responsable, que la tilda en su navegador.
+
+| Módulo | Tocaban hasta el 25/11 | Con su entrada | Sin entrada |
+|---|---|---|---|
+| Turnos (Mateo) | 18 | 15 | 3 |
+| Alquileres (Alan) | 17 | 3 | 14 |
+| Gimnasio (Ale) | 18 | 14 | 4 |
+
+**Turnos**
+
+- Las 15 documentadas van del 05/11 al 19/11 del plan; sus entradas son del 13 al 24/11. El trabajo viene unos días corrido, pero completo y en orden.
+- Sin entrada: las tres del sitio (elegir servicio y profesional, el calendario desde la disponibilidad, y retener y confirmar), del 23 al 25/11.
+- **Le toca a Mateo:** confirmar las 15, y decir si el sitio mantiene sus fechas o las corre.
+
+**Alquileres**
+
+- Con entrada, las tres del arranque (el mapa, la capa de datos y los negocios de prueba).
+- Los 14 atrasos tienen una explicación: **el orden cambió**. El plan iba de canchas (semana 2) a salones (semana 3) y después a la estadía (semana 4), con el sitio en la semana 5. Alan fue primero con la **estadía por noche, de punta a punta y a producción**: el primer negocio real desde Superadmin, su sitio público con el enlace personal, el precio por temporada en el motor y la prueba en producción. Son seis entradas del 18 al 24/11 que no están enlazadas a ninguna tarea del plan.
+- Lo que el plan muestra atrasado y no se empezó: canchas (cinco tareas, del 09 al 13/11), salones (cinco, del 16 al 19/11) y la definición de cómo entran al backend los paquetes por salón y el alquiler por mes (06/11).
+- Lo que figura atrasado y, por lo que dicen sus entradas, está hecho: las tres de estadía del 23 al 25/11. También hay partes del sitio (30/11 al 03/12) ya adelantadas para la estadía.
+- **Reordenar el plan ya es una decisión abierta de Ale** desde el 18/11 ("lo que Alquileres le pide al backend compartido, y cómo se reordena su plan"). Su propuesta ordenaba canchas, salones y después la estadía; pasó al revés, así que ese punto hay que rehacerlo con lo hecho: la estadía primero y ya en producción, y canchas y salones con fechas nuevas. De esa misma decisión, varios puntos ya los resolvió Alan el 23/11 (el precio de la estadía en el servidor, el campo libre de la reserva y de la config, los bloqueos con el permiso de gestionar y las rutas de producción de Alquileres).
+- **Le toca a Alan**, cuando el plan quede reordenado: enlazar sus entradas de estadía a las tareas que cubren. Mover una tarea de lugar cambia su número, así que conviene hacerlo de una sola vez.
+
+**Gimnasio**
+
+- Al día hasta el 19/11: Alumnos, Planes y los pases tienen su entrada desde hoy.
+- Sin entrada: avisarles a Mateo y a Alan el arranque del ciclo (06/11: falta que los dos confirmen que lo vieron), las dos del sitio (23 y 24/11: el código y sus tests están en \`main\`; falta verlo en un navegador antes de darlas por hechas) y el enlace personal de la clase (25/11).
+
+**Lo que apareció al revisar, y cruza a los tres:** el rubro principal de un negocio decide qué sitio y qué panel ve, y es el mismo campo que una tienda puede escribir a mano en su Configuración. Quedó como decisión abierta de Ale ("El rubro que decide el sitio se puede escribir a mano").
+
+**Cómo se hizo:** contando en \`plan.ts\` las tareas con fecha hasta el 25/11 y cuáles tienen su entrada, y leyendo las entradas de noviembre de cada módulo.`,
+    archivos: [
+      'apps/web/src/modules/superadmin/modulos/plan.ts:119',
+      'apps/web/src/modules/superadmin/modulos/plan.ts:190',
+      'apps/web/src/modules/superadmin/modulos/plan.ts:108',
+      'apps/web/src/modules/superadmin/modulos/decisiones.ts:345',
+      'apps/web/src/modules/superadmin/Modulos.tsx:199',
     ],
   }),
 
@@ -3816,6 +4020,53 @@ Usa el campo libre que sumó Alan (\`ReservaConfig.datos\`, 23/11), sin migraci�
       'apps/api/src/reservas/reservas.types.ts:216',
       'apps/api/test/unit/reservas.service.unit-spec.ts:316',
       'apps/web/src/lib/reservasApi/tipos.ts:353',
+    ],
+  }),
+  entrada({
+    modulo: 'alquileres', fecha: F25, slug: 'calendario-de-airbnb', tipo: 'tarea', quien: 'Alan',
+    titulo: 'El calendario de Airbnb se sincroniza de verdad, en las dos direcciones',
+    foco: 'Un alojamiento conecta el .ics de su aviso de Airbnb: lo que le reservan allá se bloquea acá cada 30 minutos, y Órbita publica un .ics por propiedad para que Airbnb bloquee lo de acá. Si entran dos reservas para las mismas noches, el panel lo avisa con el código. Toca el motor compartido: una tabla nueva y cuatro columnas en los bloqueos.',
+    que: `Etapa 4 del plan de Alquileres en producción (\`docs/superpowers/plans/2026-11-25-alquileres-airbnb-calendario.md\`). Es el faltante F9 del mapa y el punto 5 de la decisión "lo que Alquileres le pide al backend compartido". Solo alojamiento por noche.
+
+**De Órbita a Airbnb.** \`GET /storefront/:slug/reservas/ical/<recurso>.ics\`, público: las reservas que ocupan y los bloqueos del dueño como eventos de día entero. Solo fechas, sin nombres ni montos, y nunca lo que vino de Airbnb.
+
+**De Airbnb a Órbita.** El dueño pega el enlace del aviso en la pantalla nueva **Airbnb** del panel. Cada sincronización baja el archivo y reemplaza los bloqueos de ese calendario. El motor ya respetaba cualquier bloqueo al reservar, así que el sitio deja de ofrecer esas noches sin tocar nada más.
+
+| Qué pasa | Qué hace |
+|---|---|
+| Airbnb tiene una reserva | Bloquea esas noches, siempre |
+| Airbnb devuelve como "no disponible" lo que importó de Órbita (el eco) | No bloquea: se reconoce por las fechas exactas de algo que el .ics de Órbita mostró en los últimos 60 días |
+| Se cancela, se mueve o se desbloquea acá algo que Airbnb ya había importado | Las noches quedan libres acá aunque Airbnb las siga publicando |
+| El dueño cierra noches a mano en Airbnb y después carga esa reserva en su panel | Puede: un "no disponible" de Airbnb no tapa al panel. Una reserva de Airbnb, sí |
+| Airbnb no responde, o responde otra cosa | Se guarda el motivo, se muestra, y los bloqueos anteriores no se tocan |
+| Entran dos reservas para las mismas noches entre una sincronización y la otra | Aviso arriba del calendario y en Airbnb, con el código. No se cancela nada solo |
+| El dueño quiere quitar a mano un bloqueo que vino de Airbnb | No se puede: se va cuando Airbnb libera o al desconectar |
+
+**Tres cosas distintas del diseño del 18/11:**
+- **Sin token** en el enlace que se exporta: muestra lo mismo que el sitio ya publica, y \`datos\` del recurso (donde iba el token) es público.
+- **El eco también vale para lo cancelado.** En foros de anfitriones se ve que Airbnb reexporta lo que importó y a veces no lo libera. El costo: si el dueño cierra a mano en Airbnb exactamente las noches de una reserva que canceló acá, ese cierre no bloquea.
+- **Solo enlaces de Airbnb**, por lista fija de dominios, sin seguir redirecciones, con 8 segundos y 1 MB como máximo. El servidor baja una dirección que escribe un usuario: no se abre a otros sitios sin revisar \`calendarios/descarga.ts\`.
+
+**Para Turnos y Gimnasio** (motor compartido): migraciones \`20261125120000_reservas_calendarios_externos\`, \`20261125120100_rls_reservas_calendarios_externos\` y \`20261125120200_reservas_ical_exportadas\` (dos tablas nuevas y cuatro columnas en los bloqueos). Ningún bloqueo existente cambia: todos quedan con origen \`DUENO\`. El paso nuevo del job de 5 minutos baja hasta 5 calendarios por corrida. Cuando un alojamiento rechaza noches bloqueadas, el mensaje ahora habla de noches; para turnos y canchas es el de siempre.
+
+**Lo que falta y por qué:**
+- **Probarlo con un aviso real de Airbnb.** No se pudo verificar cómo titula hoy sus eventos ni cada cuánto relee el calendario de Órbita. Lo hace Alan con la propiedad de prueba de producción.
+- Importar las ganancias de Airbnb por CSV, otros sitios, calendarios para canchas y salones, y avisar un conflicto por email.
+
+**Revisión:** un revisor independiente leyó toda la rama. Sin problemas de seguridad; sí seis puntos que se corrigieron antes de subir (el principal: la memoria del eco ahora es lo que el .ics mostró, no lo que hay hoy en la base). El detalle y lo que quedó anotado sin corregir están al final del plan.
+
+**Verificado:** tests de la API y del front en verde. Contra la base de dev, con un Airbnb de mentira en la misma máquina: el .ics exportado no trae datos de nadie; el eco no bloquea; reservar en el sitio noches de Airbnb se rechaza; el conflicto aparece con su código; cancelar libera aunque el eco siga; una caída no libera nada. En pantalla, a 1280 y a 390 px: conectar, sincronizar, desconectar y el rechazo de un enlace ajeno.`,
+    archivos: [
+      'apps/api/src/reservas/dominio/ics.ts:1',
+      'apps/api/src/reservas/calendarios/descarga.ts:1',
+      'apps/api/src/reservas/calendarios/reservas-calendarios.service.ts:1',
+      'apps/api/test/unit/reservas.calendarios.unit-spec.ts:1',
+      'apps/api/prisma/migrations/20261125120000_reservas_calendarios_externos/migration.sql:1',
+      'apps/api/src/reservas/reservas-publico.controller.ts:119',
+      'apps/api/src/internal-cron/internal-cron.controller.ts:211',
+      'apps/api/src/reservas/README.md:1',
+      'apps/web/src/modules/alquileres/admin/configuracion/Airbnb.tsx:1',
+      'apps/web/src/lib/reservasApi/cliente.ts:1',
     ],
   }),
 ]

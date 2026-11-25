@@ -2,8 +2,9 @@
 // hace en pantalla, en qué orden y qué se avisa; qué se vuelve a leer después
 // de cada acción (lo que esa acción pudo cambiar, salga bien o mal, y nada
 // más); cómo se lee (la ventana, los días que faltan, un solo día) y qué se
-// le dice a la persona cuando algo falla. Con un cliente falso: nada viaja a
-// la red.
+// le dice a la persona cuando algo falla. Las clases y los lugares van al
+// motor de reservas; los planes, los alumnos y cómo se paga cada lugar, a la
+// API de Gimnasio. Con clientes falsos: nada viaja a la red.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/auth/authClient', () => ({ authedFetch: vi.fn() }))
@@ -12,9 +13,10 @@ import { ReservasApiError } from '@/lib/reservasApi/cliente'
 import type { Bloqueo, Config, Espera, FiltroAgenda, Recurso, Reserva } from '@/lib/reservasApi/tipos'
 import { negocioDe, rubroPorKey, type ClaseSemanal, type Inscripcion, type NegocioGym, type Socio } from '../../index'
 import {
-  ADELANTE, ATRAS, AvisoDelPanel, ColaDeLecturas, accionesApi, alrededorDe, conFecha, conTiempo, leerApi, leerMasDias, leerParte, loQueFalta, mensajeDeFalla,
-  ocupando, reservasEntre, seDejaMirar, type DatosApi, type DepsAcciones, type Leido,
+  ADELANTE, ATRAS, AvisoDelPanel, ColaDeLecturas, SECCIONES_CONECTADAS, SECCIONES_DE_GIMNASIO, accionesApi, alrededorDe, capacidadesApi, conFecha, conGimnasio, conTiempo,
+  leerApi, leerGimnasio, leerMasDias, leerParte, loQueFalta, mensajeDeFalla, ocupando, reservasEntre, seDejaMirar, type DatosApi, type DepsAcciones, type Leido,
 } from '../api'
+import type { AlumnoApi, LugarPago, PlanApi, SuscripcionApi } from '../gimnasioApi'
 
 const recurso = (over: Partial<Recurso> = {}): Recurso => ({
   id: 'r1', modulo: 'GIMNASIO', tipo: 'CLASE', nombre: 'WOD', descripcion: null, cupo: 12, duracionMinutos: 60, pasoMinutos: null, margenMinutos: null,
@@ -24,10 +26,20 @@ const recurso = (over: Partial<Recurso> = {}): Recurso => ({
 })
 const clase = (over: Partial<ClaseSemanal> = {}): ClaseSemanal => ({ id: 'r1', actividadId: 'a1', dia: 0, inicio: 1140, profeId: 'p1', sala: 'Box', cupo: 12, ...over })
 const socio: Socio = { id: 'tel:37550101', nombre: 'Lu Paz', telefono: '3757 55-0101', planId: null, desde: null, vence: null, clasesRestantes: null, probo: true }
-const reservaDeVuelta = (over: Partial<Reserva> = {}) => ({ id: 'res-1', clienteNombre: 'Lu Paz', ...over }) as Reserva
+const reservaDeVuelta = (over: Partial<Reserva> = {}) => ({ id: 'res-1', clienteNombre: 'Lu Paz', precio: 0, cantidad: 1, ...over }) as Reserva
+
+// Lo de la API de Gimnasio: un pack y una membresía, y Ana, que es alumna y tiene el pack.
+const planApi = (over: Partial<PlanApi> = {}): PlanApi => ({ id: 'plan-pack', tipo: 'PACK', nombre: 'Pack de 8', precio: 56000, clases: 8, porSemana: null, vigenciaDias: 90, activo: true, ...over })
+const suscripcion = (over: Partial<SuscripcionApi> = {}): SuscripcionApi => ({
+  id: 'sus-1', planId: 'plan-pack', tipo: 'PACK', nombre: 'Pack de 8', precio: 56000, clases: 8, porSemana: null, desde: '2026-11-01', hasta: '2027-01-30', estado: 'VIGENTE', usadas: 5, restantes: 3, ...over,
+})
+const alumnoApi = (over: Partial<AlumnoApi> = {}): AlumnoApi => ({ id: 'alu-1', clienteId: 'ficha-ana', nombre: 'Ana Sosa', telefono: '3757 55-0202', email: null, nota: null, alta: '2026-11-01', probo: false, planes: [suscripcion()], ultimo: null, ...over })
+/** Ana como la ve el panel: su id es su ficha y trae su fila de alumna. */
+const ana: Socio = { id: 'ficha-ana', nombre: 'Ana Sosa', telefono: '3757 55-0202', planId: 'plan-pack', desde: '2026-11-01', vence: '2027-01-30', clasesRestantes: 3, probo: false, fichaId: 'ficha-ana', alumnoId: 'alu-1', planes: [{ id: 'sus-1', planId: 'plan-pack', tipo: 'pack', nombre: 'Pack de 8', precio: 56000, desde: '2026-11-01', hasta: '2027-01-30', clases: 8, restantes: 3, porSemana: null }] }
+const lugar = (over: Partial<LugarPago['pago']> = {}, reserva: Partial<Reserva> = {}): LugarPago => ({ reserva: reservaDeVuelta(reserva), pago: { pago: 'aparte', plan: null, usadasEnLaSemana: null, ...over } })
 const inscripcion = (over: Partial<Inscripcion>): Inscripcion => ({ id: 'res-1', claseId: 'r1', fecha: '2026-11-16', socioId: socio.id, estado: 'reservada', creada: '2026-11-15', planId: null, ...over })
 
-function armar(over: { recursos?: Recurso[]; clases?: ClaseSemanal[]; negocio?: Partial<NegocioGym>; inscripciones?: Inscripcion[] } = {}) {
+function armar(over: { recursos?: Recurso[]; clases?: ClaseSemanal[]; negocio?: Partial<NegocioGym>; inscripciones?: Inscripcion[]; socios?: Socio[]; planes?: PlanApi[]; sinGimnasio?: boolean } = {}) {
   const recursos = over.recursos ?? [recurso(), recurso({ id: 'r2', horario: { '1': [[600, 660]], '3': [[600, 660]] } })]
   const negocio: NegocioGym = {
     ...negocioDe(rubroPorKey('crossfit')),
@@ -51,11 +63,19 @@ function armar(over: { recursos?: Recurso[]; clases?: ClaseSemanal[]; negocio?: 
     darLugar: vi.fn(async () => reservaDeVuelta()),
     quitarDeEspera: vi.fn(async () => ({ ok: true as const })),
   }
+  const gimnasio = {
+    guardarPlanes: vi.fn(async () => [planApi()]),
+    alta: vi.fn(async () => alumnoApi()),
+    asignarPlan: vi.fn(async () => alumnoApi()),
+    quitarPlan: vi.fn(async () => alumnoApi({ planes: [] })),
+    reservar: vi.fn(async () => lugar()),
+    definirPago: vi.fn(async () => lugar()),
+  }
   const refrescar = vi.fn()
   // Lo que el panel tiene a la vista: una reserva del lunes 16 y alguien esperando el miércoles 18.
   const inscripciones = over.inscripciones ?? [inscripcion({}), inscripcion({ id: 'res-2', fecha: '2026-11-17' }), inscripcion({ id: 'espera:e7', fecha: '2026-11-18', estado: 'espera' })]
-  const deps: DepsAcciones = { cliente, recursos, negocio, socios: [socio], inscripciones, refrescar, clave: () => 'clave-fija' }
-  return { acciones: accionesApi(deps), cliente, refrescar, negocio }
+  const deps: DepsAcciones = { cliente, gimnasio: over.sinGimnasio ? null : gimnasio, planes: over.planes ?? [planApi()], recursos, negocio, socios: over.socios ?? [socio, ana], inscripciones, refrescar, clave: () => 'clave-fija' }
+  return { acciones: accionesApi(deps), cliente, gimnasio, refrescar, negocio }
 }
 
 afterEach(() => { vi.useRealTimers() })
@@ -102,13 +122,16 @@ describe('Gimnasio sobre la API · la grilla', () => {
     expect(refrescar.mock.calls).toEqual([[{ recursos: true, bloqueos: false }]])
   })
 
-  it('lo que no es la grilla ni los días sin clases no se manda: esas secciones todavía no guardan en la API', async () => {
-    const { acciones, cliente, refrescar } = armar()
-    await expect(acciones.configurar({ planes: [] })).rejects.toThrow(/todavía no guarda en la API/)
+  it('lo que no es la grilla, los días sin clases ni los planes no se manda: esas secciones todavía no guardan en la API', async () => {
+    const { acciones, cliente, gimnasio, refrescar } = armar()
+    await expect(acciones.configurar({ anticipacionDias: 30 })).rejects.toThrow(/todavía no guarda en la API/)
     // Las actividades sueltas tampoco: valen solo junto con la grilla.
     await expect(acciones.configurar({ actividades: [] })).rejects.toThrow(/todavía no guarda en la API/)
+    // Y si viene mezclado con algo que sí guarda, no se manda nada.
+    await expect(acciones.configurar({ planes: [], telefono: '3757 000000' })).rejects.toThrow(/todavía no guarda en la API/)
     expect(cliente.crearRecurso).not.toHaveBeenCalled()
-    expect(refrescar).toHaveBeenCalledTimes(2)
+    expect(gimnasio.guardarPlanes).not.toHaveBeenCalled()
+    expect(refrescar).toHaveBeenCalledTimes(3)
   })
 })
 
@@ -125,22 +148,24 @@ describe('Gimnasio sobre la API · días sin clases', () => {
 })
 
 describe('Gimnasio sobre la API · anotar, la espera, presente y ausente', () => {
-  it('anotar es una reserva confirmada con la clave del intento; con la clase llena, la espera dice el lugar en la fila', async () => {
-    const { acciones, cliente, refrescar } = armar()
+  it('anotar va a la API de Gimnasio con la clave del intento (sin decir cómo paga, se cobra aparte); con la clase llena, la espera dice el lugar en la fila', async () => {
+    const { acciones, cliente, gimnasio, refrescar } = armar()
     await acciones.inscribir({ id: 'n1', claseId: 'r2~0-600', fecha: '2026-11-16', socioId: socio.id, estado: 'reservada', creada: '2026-11-15', planId: null, cantidad: 2 })
-    expect(cliente.crear).toHaveBeenCalledWith({ modulo: 'GIMNASIO', recursoId: 'r2', fecha: '2026-11-16', inicioMinutos: 600, cantidad: 2, cliente: { nombre: 'Lu Paz', telefono: '3757 55-0101' }, estado: 'CONFIRMADA', clave: 'clave-fija' })
+    expect(gimnasio.reservar).toHaveBeenCalledWith({ recursoId: 'r2', fecha: '2026-11-16', inicioMinutos: 600, cantidad: 2, cliente: { nombre: 'Lu Paz', telefono: '3757 55-0101' }, pago: 'aparte', clave: 'clave-fija' })
+    // La reserva la crea esa ruta (por el motor): no se manda otra.
+    expect(cliente.crear).not.toHaveBeenCalled()
     const r = await acciones.inscribir({ id: 'n2', claseId: 'r1', fecha: '2026-11-23', socioId: socio.id, estado: 'espera', creada: '2026-11-15', planId: null })
     expect(cliente.anotarEnEspera).toHaveBeenCalledWith({ modulo: 'GIMNASIO', recursoId: 'r1', fecha: '2026-11-23', inicioMinutos: 1140, cliente: { nombre: 'Lu Paz', telefono: '3757 55-0101' } })
     expect(r.detalle).toBe('Está en el lugar 3 de la lista.')
-    // Cada una relee su día.
-    expect(refrescar.mock.calls).toEqual([[{ fecha: '2026-11-16' }], [{ fecha: '2026-11-23' }]])
+    // Cada una relee su día; la que tomó un lugar, también los alumnos (a quien usa su pack le cambia lo que le queda).
+    expect(refrescar.mock.calls).toEqual([[{ fecha: '2026-11-16', alumnos: true }], [{ fecha: '2026-11-23' }]])
   })
 
   it('alguien nuevo se anota con los datos que se cargaron', async () => {
-    const { acciones, cliente } = armar()
+    const { acciones, gimnasio } = armar()
     const nueva: Socio = { ...socio, id: 'sn-1', nombre: 'Sol Ríos', telefono: '11 4444-0000' }
-    await acciones.inscribir({ id: 'n3', claseId: 'r1', fecha: '2026-11-16', socioId: 'sn-1', estado: 'reservada', creada: '2026-11-15', planId: null }, nueva)
-    expect(cliente.crear).toHaveBeenCalledWith(expect.objectContaining({ cliente: { nombre: 'Sol Ríos', telefono: '11 4444-0000' }, cantidad: 1 }))
+    await acciones.inscribir({ id: 'n3', claseId: 'r1', fecha: '2026-11-16', socioId: 'sn-1', estado: 'reservada', creada: '2026-11-15', planId: null, pago: 'prueba' }, nueva)
+    expect(gimnasio.reservar).toHaveBeenCalledWith({ recursoId: 'r1', fecha: '2026-11-16', inicioMinutos: 1140, cliente: { nombre: 'Sol Ríos', telefono: '11 4444-0000' }, pago: 'prueba', clave: 'clave-fija' })
   })
 
   it('presente es completar, faltó es ausente y darle el lugar a quien espera es su ruta propia', async () => {
@@ -158,13 +183,15 @@ describe('Gimnasio sobre la API · anotar, la espera, presente y ausente', () =>
   })
 
   it('liberar un lugar cancela la reserva y avisa si alguien pasó de la espera; sacar de la espera es quitarla', async () => {
-    const { acciones, cliente } = armar()
+    const { acciones, cliente, refrescar } = armar()
     cliente.cancelar.mockResolvedValueOnce({ ...reservaDeVuelta({ estado: 'CANCELADA' }), sena: 'SIN_SENA', promovida: reservaDeVuelta({ id: 'res-9', clienteNombre: 'Sol Ríos' }) })
     const r = await acciones.cancelar('res-1')
     expect(cliente.cancelar).toHaveBeenCalledWith('res-1', { motivo: 'Lugar liberado desde el panel.' })
     expect(r.detalle).toBe('Sol pasó de la lista de espera y ya tiene su lugar.')
     await acciones.cancelar('espera:e7')
     expect(cliente.quitarDeEspera).toHaveBeenCalledWith('e7')
+    // Un lugar liberado puede devolverle la clase a un pack: se releen los alumnos. Salir de la espera no toca ningún plan.
+    expect(refrescar.mock.calls).toEqual([[{ fecha: '2026-11-16', alumnos: true }], [{ fecha: '2026-11-18' }]])
   })
 
   it('si no se sabe de qué día es lo que se tocó, se relee todo', async () => {
@@ -174,9 +201,10 @@ describe('Gimnasio sobre la API · anotar, la espera, presente y ausente', () =>
   })
 
   it('una clase que ya no está en la grilla no se reserva a ciegas', async () => {
-    const { acciones, cliente } = armar()
+    const { acciones, cliente, gimnasio } = armar()
     await expect(acciones.inscribir({ id: 'n4', claseId: 'r-borrada', fecha: '2026-11-16', socioId: socio.id, estado: 'reservada', creada: '2026-11-15', planId: null })).rejects.toThrow(/ya no está en la grilla/)
     expect(cliente.crear).not.toHaveBeenCalled()
+    expect(gimnasio.reservar).not.toHaveBeenCalled()
   })
 
   it('el panel queda ocupado desde que la acción sale: se marca antes de llamar a la API', async () => {
@@ -185,6 +213,139 @@ describe('Gimnasio sobre la API · anotar, la espera, presente y ausente', () =>
     cliente.completar.mockImplementationOnce(async () => { orden.push('api'); return reservaDeVuelta() })
     await ocupando(acciones, () => orden.push('ocupado')).cambiarInscripcion('res-1', { estado: 'asistio' })
     expect(orden).toEqual(['ocupado', 'api'])
+  })
+})
+
+describe('Gimnasio sobre la API · planes y precios', () => {
+  it('se guarda la lista entera: los que la API ya tiene van con su id y los nuevos, sin el id provisorio del panel', async () => {
+    const { acciones, gimnasio, cliente, refrescar } = armar({ planes: [planApi(), planApi({ id: 'plan-libre', tipo: 'MEMBRESIA', nombre: 'Pase libre', clases: null, porSemana: 0, vigenciaDias: 30 })] })
+    await acciones.configurar({ planes: [
+      { id: 'plan-pack', tipo: 'pack', nombre: ' Pack de 10 ', precio: 60000, clases: 10, vigenciaDias: 90, activo: true },
+      { id: 'pl1x2y3', tipo: 'membresia', nombre: '2 veces por semana', precio: 48000, porSemana: 2, vigenciaDias: 30, activo: true },
+      { id: 'pl9z', tipo: 'suelta', nombre: 'Clase suelta', precio: 7000, vigenciaDias: 1, activo: false },
+    ] })
+    // "Pase libre" no viene: la API lo quita. Lo ya vendido no cambia (cada alumno guarda cómo era su plan).
+    expect(gimnasio.guardarPlanes).toHaveBeenCalledWith([
+      { id: 'plan-pack', tipo: 'PACK', nombre: 'Pack de 10', precio: 60000, clases: 10, porSemana: null, vigenciaDias: 90, activo: true },
+      { tipo: 'MEMBRESIA', nombre: '2 veces por semana', precio: 48000, clases: null, porSemana: 2, vigenciaDias: 30, activo: true },
+      { tipo: 'SUELTA', nombre: 'Clase suelta', precio: 7000, clases: null, porSemana: null, vigenciaDias: 1, activo: false },
+    ])
+    expect(cliente.crearRecurso).not.toHaveBeenCalled()
+    expect(refrescar.mock.calls).toEqual([[{ recursos: false, bloqueos: false, planes: true }]])
+  })
+
+  it('lo que la API rechaza (un pack sin clases) sube con su mensaje y se relee igual', async () => {
+    const { acciones, gimnasio, refrescar } = armar()
+    gimnasio.guardarPlanes.mockRejectedValueOnce(new ReservasApiError(400, 'El pack "Malo" tiene que decir cuántas clases trae.'))
+    await expect(acciones.configurar({ planes: [] })).rejects.toThrow(/cuántas clases trae/)
+    expect(refrescar).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('Gimnasio sobre la API · cómo se paga cada lugar', () => {
+  const conPack = (restantes: number) => ({ pago: 'plan' as const, plan: suscripcion({ restantes, usadas: 8 - restantes }), usadasEnLaSemana: null })
+
+  it('anotar a una alumna con su plan manda su fila de alumna y cuenta cómo le quedó el pack', async () => {
+    const { acciones, gimnasio } = armar()
+    gimnasio.reservar.mockResolvedValueOnce(lugar(conPack(2)))
+    const r = await acciones.inscribir({ id: 'n1', claseId: 'r1', fecha: '2026-11-16', socioId: ana.id, estado: 'reservada', creada: '2026-11-15', planId: 'plan-pack', pago: 'plan' })
+    expect(gimnasio.reservar).toHaveBeenCalledWith({ recursoId: 'r1', fecha: '2026-11-16', inicioMinutos: 1140, alumnoId: 'alu-1', pago: 'plan', clave: 'clave-fija' })
+    expect(r.detalle).toBe('Le quedan 2 clases en Pack de 8.')
+    gimnasio.reservar.mockResolvedValueOnce(lugar(conPack(0)))
+    expect((await acciones.inscribir({ id: 'n2', claseId: 'r1', fecha: '2026-11-23', socioId: ana.id, estado: 'reservada', creada: '2026-11-15', planId: 'plan-pack', pago: 'plan' })).detalle).toBe('Usó la última clase de Pack de 8.')
+  })
+
+  it('sin clases en el pack la API no reserva: el motivo llega tal cual y se releen el día y los alumnos', async () => {
+    const { acciones, gimnasio, refrescar } = armar()
+    gimnasio.reservar.mockRejectedValueOnce(new ReservasApiError(409, 'No le quedan clases en el pack. Renovalo desde su ficha, o anotalo y cobrale la clase aparte.'))
+    await expect(acciones.inscribir({ id: 'n1', claseId: 'r1', fecha: '2026-11-16', socioId: ana.id, estado: 'reservada', creada: '2026-11-15', planId: 'plan-pack', pago: 'plan' })).rejects.toThrow('No le quedan clases en el pack. Renovalo desde su ficha, o anotalo y cobrale la clase aparte.')
+    expect(refrescar.mock.calls).toEqual([[{ fecha: '2026-11-16', alumnos: true }]])
+  })
+
+  it('cobrarlo aparte dice cuánto: el precio de la reserva o, si no lo trae, el de la clase suelta por los lugares', async () => {
+    const suelta = { id: 'plan-suelta', tipo: 'suelta' as const, nombre: 'Clase suelta', precio: 7000, vigenciaDias: 1, activo: true }
+    const { acciones, gimnasio } = armar({ negocio: { planes: [suelta] } })
+    gimnasio.reservar.mockResolvedValueOnce(lugar({}, { precio: 14000, cantidad: 2 }))
+    expect((await acciones.inscribir({ id: 'n1', claseId: 'r1', fecha: '2026-11-16', socioId: socio.id, estado: 'reservada', creada: '2026-11-15', planId: null, cantidad: 2, pago: 'aparte' })).detalle).toMatch(/^Se cobra aparte: \$\s?14\.000\.$/)
+    gimnasio.definirPago.mockResolvedValueOnce(lugar({}, { precio: 0, cantidad: 2 }))
+    expect((await acciones.definirPago('res-1', 'aparte')).detalle).toMatch(/^Son \$\s?14\.000\.$/)
+  })
+
+  it('una membresía con tope cuenta cuántas lleva esa semana; la de prueba lo dice', async () => {
+    const { acciones, gimnasio } = armar()
+    gimnasio.reservar.mockResolvedValueOnce(lugar({ pago: 'plan', plan: suscripcion({ tipo: 'MEMBRESIA', nombre: '2 veces por semana', clases: null, porSemana: 2, restantes: null }), usadasEnLaSemana: 2 }))
+    expect((await acciones.inscribir({ id: 'n1', claseId: 'r1', fecha: '2026-11-16', socioId: ana.id, estado: 'reservada', creada: '2026-11-15', planId: null, pago: 'plan' })).detalle).toBe('Va 2 de 2 de esa semana con 2 veces por semana.')
+    gimnasio.reservar.mockResolvedValueOnce(lugar({ pago: 'prueba' }))
+    expect((await acciones.inscribir({ id: 'n2', claseId: 'r1', fecha: '2026-11-23', socioId: socio.id, estado: 'reservada', creada: '2026-11-15', planId: null, pago: 'prueba' })).detalle).toBe('Es su clase de prueba.')
+  })
+
+  it('decir cómo paga un lugar ya reservado es su ruta: se releen ese día y los alumnos; a quien espera todavía no se le dice', async () => {
+    const { acciones, gimnasio, refrescar } = armar()
+    gimnasio.definirPago.mockResolvedValueOnce(lugar(conPack(1)))
+    const r = await acciones.definirPago('res-2', 'plan')
+    expect(gimnasio.definirPago).toHaveBeenCalledWith('res-2', 'plan')
+    expect(r.detalle).toBe('Le queda 1 clase en Pack de 8.')
+    await expect(acciones.definirPago('espera:e7', 'plan')).rejects.toThrow(/cuando tiene su lugar/)
+    expect(gimnasio.definirPago).toHaveBeenCalledTimes(1)
+    expect(refrescar.mock.calls).toEqual([[{ fecha: '2026-11-17', alumnos: true }], [{ fecha: '2026-11-18', alumnos: true }]])
+  })
+})
+
+describe('Gimnasio sobre la API · alumnos y su plan', () => {
+  it('dar de alta manda sus datos y el plan elegido; el aviso dice hasta cuándo vale', async () => {
+    const { acciones, gimnasio, refrescar } = armar()
+    const nueva: Socio = { id: 'sn-1', nombre: ' Ana Sosa ', telefono: '3757 55-0202', email: 'ana@ejemplo.com', planId: 'plan-pack', desde: '2026-11-24', vence: '2027-02-22', clasesRestantes: 8, probo: false }
+    const r = await acciones.agregarSocio(nueva)
+    expect(gimnasio.alta).toHaveBeenCalledWith({ cliente: { nombre: 'Ana Sosa', telefono: '3757 55-0202', email: 'ana@ejemplo.com' }, planId: 'plan-pack' })
+    expect(r.detalle).toBe('Con Pack de 8, hasta el sáb 30 ene.')
+    // Sin plan no hay nada que contar.
+    expect((await acciones.agregarSocio({ ...nueva, planId: null })).detalle).toBeUndefined()
+    expect(gimnasio.alta).toHaveBeenLastCalledWith({ cliente: { nombre: 'Ana Sosa', telefono: '3757 55-0202', email: 'ana@ejemplo.com' } })
+    expect(refrescar.mock.calls).toEqual([[{ alumnos: true }], [{ alumnos: true }]])
+  })
+
+  it('asignarle un plan a una alumna es su ruta; si renueva la misma membresía antes de que venza, el aviso dice que sigue y no pierde días', async () => {
+    const { acciones, gimnasio } = armar()
+    const r = await acciones.asignarPlan(ana.id, 'plan-pack')
+    expect(gimnasio.asignarPlan).toHaveBeenCalledWith('alu-1', 'plan-pack')
+    expect(r.detalle).toBe('Hasta el sáb 30 ene.')
+    const membresia = (over: Partial<SuscripcionApi>) => suscripcion({ planId: 'plan-2x', tipo: 'MEMBRESIA', nombre: '2 veces por semana', clases: null, porSemana: 2, restantes: null, ...over })
+    gimnasio.asignarPlan.mockResolvedValueOnce(alumnoApi({ planes: [membresia({ id: 'm1', desde: '2026-11-10', hasta: '2026-12-10' }), membresia({ id: 'm2', desde: '2026-12-11', hasta: '2027-01-10' })] }))
+    expect((await acciones.asignarPlan(ana.id, 'plan-2x')).detalle).toBe('Sigue del vie 11 dic al dom 10 ene: no pierde días.')
+  })
+
+  it('a quien reservó desde el sitio y todavía no es alumno, asignarle un plan lo da de alta con ese plan, por su ficha', async () => {
+    const delSitio: Socio = { ...socio, id: 'ficha-lu', fichaId: 'ficha-lu', alumnoId: null, planes: [] }
+    const { acciones, gimnasio } = armar({ socios: [delSitio] })
+    await acciones.asignarPlan('ficha-lu', 'plan-pack')
+    expect(gimnasio.alta).toHaveBeenCalledWith({ clienteId: 'ficha-lu', planId: 'plan-pack' })
+    expect(gimnasio.asignarPlan).not.toHaveBeenCalled()
+    await expect(acciones.asignarPlan('nadie', 'plan-pack')).rejects.toThrow(/No encontramos a esa persona/)
+  })
+
+  it('quitar un plan asignado por error dice cuál; sin saber cuál o de quién, no se manda nada', async () => {
+    const { acciones, gimnasio, refrescar } = armar()
+    await acciones.quitarPlan(ana.id, 'sus-1')
+    expect(gimnasio.quitarPlan).toHaveBeenCalledWith('alu-1', 'sus-1')
+    // Sin decir cuál, el que tiene.
+    await acciones.quitarPlan(ana.id)
+    expect(gimnasio.quitarPlan).toHaveBeenLastCalledWith('alu-1', 'sus-1')
+    await expect(acciones.quitarPlan(socio.id, 'sus-1')).rejects.toThrow(/No encontramos ese plan/)
+    expect(gimnasio.quitarPlan).toHaveBeenCalledTimes(2)
+    expect(refrescar).toHaveBeenCalledTimes(3)
+  })
+})
+
+describe('Gimnasio sobre la API · cuando la API todavía no tiene los planes', () => {
+  it('anotar sigue andando con la reserva de siempre; los planes y los alumnos avisan que falta actualizar la API', async () => {
+    const { acciones, cliente, gimnasio } = armar({ sinGimnasio: true })
+    await acciones.inscribir({ id: 'n1', claseId: 'r1', fecha: '2026-11-16', socioId: socio.id, estado: 'reservada', creada: '2026-11-15', planId: null, pago: 'plan' })
+    expect(cliente.crear).toHaveBeenCalledWith({ modulo: 'GIMNASIO', recursoId: 'r1', fecha: '2026-11-16', inicioMinutos: 1140, cantidad: 1, cliente: { nombre: 'Lu Paz', telefono: '3757 55-0101' }, estado: 'CONFIRMADA', clave: 'clave-fija' })
+    expect(gimnasio.reservar).not.toHaveBeenCalled()
+    await expect(acciones.configurar({ planes: [] })).rejects.toThrow(/Falta actualizar la API/)
+    await expect(acciones.agregarSocio(socio)).rejects.toThrow(/Falta actualizar la API/)
+    await expect(acciones.asignarPlan(socio.id, 'plan-pack')).rejects.toThrow(/Falta actualizar la API/)
+    await expect(acciones.definirPago('res-1', 'aparte')).rejects.toThrow(/Falta actualizar la API/)
   })
 })
 
@@ -201,8 +362,8 @@ describe('Gimnasio sobre la API · lo que se dice cuando algo falla', () => {
   })
 
   it('una acción que falla sin conexión sale con el mensaje en castellano, y se relee igual', async () => {
-    const { acciones, cliente, refrescar } = armar()
-    cliente.crear.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const { acciones, gimnasio, refrescar } = armar()
+    gimnasio.reservar.mockRejectedValueOnce(new TypeError('Failed to fetch'))
     await expect(acciones.inscribir(inscripcion({ id: 'n9' }))).rejects.toThrow('No pudimos conectar con el servidor. Revisá tu conexión y probá de nuevo.')
     expect(refrescar).toHaveBeenCalledTimes(1)
   })
@@ -251,13 +412,17 @@ describe('Gimnasio sobre la API · la lectura', () => {
   const config = { modulo: 'GIMNASIO' } as Config
   const ventana = { desde: '2026-10-20', hasta: '2027-01-19' }
   /** Un cliente falso que contesta la agenda y la espera según lo que se le pida. */
-  function lector(over: { agenda?: (f: FiltroAgenda) => Reserva[]; espera?: (fecha?: string) => Espera[]; config?: Config | null } = {}) {
+  function lector(over: { agenda?: (f: FiltroAgenda) => Reserva[]; espera?: (fecha?: string) => Espera[]; config?: Config | null; planes?: () => Promise<PlanApi[]>; alumnos?: () => Promise<AlumnoApi[]> } = {}) {
     return {
       config: vi.fn(async () => (over.config === undefined ? config : over.config)),
       recursos: vi.fn(async () => [recurso({ id: 'leido' })]),
       bloqueos: vi.fn(async () => [{ id: 'b-leido' } as Bloqueo]),
       agenda: vi.fn(async (f: FiltroAgenda = {}) => { const data = over.agenda?.(f) ?? []; return { data, total: data.length, page: f.page ?? 1, limit: f.limit ?? 50 } }),
       espera: vi.fn(async (_modulo: string, _recursoId?: string, fecha?: string) => over.espera?.(fecha) ?? []),
+      gimnasio: {
+        planes: vi.fn(over.planes ?? (async () => [planApi({ id: 'plan-leido' })])),
+        alumnos: vi.fn(over.alumnos ?? (async () => [alumnoApi({ id: 'alu-leido' })])),
+      },
     }
   }
   const leido = (over: Partial<DatosApi> = {}): DatosApi => ({
@@ -265,8 +430,10 @@ describe('Gimnasio sobre la API · la lectura', () => {
     reservas: [res('a', '2026-11-23'), res('b', '2026-11-24'), res('c', '2026-11-24')],
     // 22:00 UTC del 23 son las 19:00 del 23 en Argentina; 01:30 UTC del 25 son las 22:30 del 24.
     esperas: [esp('e1', '2026-11-23T22:00:00.000Z'), esp('e2', '2026-11-25T01:30:00.000Z')],
+    planes: [planApi()], alumnos: [alumnoApi()],
     ...over,
   })
+  const noExiste = async () => { throw new ReservasApiError(404, 'Cannot GET /api/v1/gimnasio/planes') }
 
   it('una ventana larga se pide en tramos de hasta 93 días y cada tramo, en todas sus páginas de 500', async () => {
     const agenda = vi.fn(async (f: FiltroAgenda = {}) => {
@@ -294,6 +461,48 @@ describe('Gimnasio sobre la API · la lectura', () => {
     expect(c.bloqueos).toHaveBeenCalledWith('GIMNASIO', '2026-10-20')
     expect(c.espera).toHaveBeenCalledWith('GIMNASIO')
     expect(datos).toMatchObject({ ventana, reservas: [{ id: 'a' }], recursos: [{ id: 'leido' }], bloqueos: [{ id: 'b-leido' }] })
+    // Y lo de la API de Gimnasio: los planes y los alumnos.
+    expect(datos).toMatchObject({ planes: [{ id: 'plan-leido' }], alumnos: [{ id: 'alu-leido' }] })
+    expect(conGimnasio(datos)).toBe(true)
+  })
+
+  it('si la API todavía no tiene las rutas de Gimnasio (404), el panel abre igual: sin planes ni alumnos, y esas secciones no guardan', async () => {
+    const c = lector({ planes: noExiste, alumnos: noExiste })
+    const datos = await leerApi(c, ventana)
+    expect(datos).toMatchObject({ ventana, recursos: [{ id: 'leido' }] })
+    expect(datos.planes).toBeUndefined()
+    expect(datos.alumnos).toBeUndefined()
+    expect(conGimnasio(datos)).toBe(false)
+    // Los planes y los alumnos van juntos: con una sola de las dos rutas, es como no tener ninguna.
+    expect(await leerGimnasio(lector({ alumnos: noExiste }).gimnasio)).toEqual({})
+    // Lo que el panel ofrece cambia con eso: sin la API de Gimnasio no se elige cómo se paga.
+    expect(capacidadesApi(false)).toMatchObject({ eligePago: false, pagoSinDefinir: false })
+    expect(capacidadesApi(true)).toMatchObject({ eligePago: true, pagoSinDefinir: true, renovarContinua: true, avisoDeVencimiento: false })
+    expect(SECCIONES_DE_GIMNASIO.every(s => SECCIONES_CONECTADAS.includes(s))).toBe(true)
+  })
+
+  it('otro error de la API de Gimnasio (no un 404) no se esconde: la lectura falla', async () => {
+    const c = lector({ alumnos: async () => { throw new ReservasApiError(500, 'Se rompió') } })
+    await expect(leerApi(c, ventana)).rejects.toThrow('Se rompió')
+  })
+
+  it('después de anotar a alguien se releen su día y los alumnos; después de guardar los planes, los planes', async () => {
+    const c = lector({ agenda: () => [res('b', '2026-11-24')] })
+    const datos = await leerParte(c, leido(), { fecha: '2026-11-24', alumnos: true })
+    expect(c.gimnasio.alumnos).toHaveBeenCalledTimes(1)
+    expect(c.gimnasio.planes).not.toHaveBeenCalled()
+    expect(datos.alumnos).toEqual([expect.objectContaining({ id: 'alu-leido' })])
+    expect(datos.planes).toEqual(leido().planes)
+    const otro = lector()
+    const conPlanes = await leerParte(otro, leido(), { planes: true })
+    expect(otro.gimnasio.planes).toHaveBeenCalledTimes(1)
+    expect(otro.gimnasio.alumnos).not.toHaveBeenCalled()
+    expect(conPlanes.planes).toEqual([expect.objectContaining({ id: 'plan-leido' })])
+    // Sin la API de Gimnasio no hay qué releer: no se pide.
+    const sin = lector()
+    const igual = await leerParte(sin, leido({ planes: undefined, alumnos: undefined }), { alumnos: true, planes: true })
+    expect(sin.gimnasio.alumnos).not.toHaveBeenCalled()
+    expect(conGimnasio(igual)).toBe(false)
   })
 
   it('un negocio sin Gimnasio configurado lo dice, y no pide nada más', async () => {
@@ -313,10 +522,13 @@ describe('Gimnasio sobre la API · la lectura', () => {
     expect(datos.reservas.map(r => r.id).sort()).toEqual(['a', 'b', 'd'])
     // La espera se ubica por el día de Argentina: la de las 22:30 del 24 (01:30 UTC del 25) era de ese día y se reemplaza.
     expect(datos.esperas.map(e => e.id).sort()).toEqual(['e1', 'e9'])
-    // Ni las clases ni los días sin clases se volvieron a pedir.
+    // Ni las clases ni los días sin clases se volvieron a pedir. Los planes y los alumnos tampoco.
     expect(c.recursos).not.toHaveBeenCalled()
     expect(c.bloqueos).not.toHaveBeenCalled()
+    expect(c.gimnasio.planes).not.toHaveBeenCalled()
+    expect(c.gimnasio.alumnos).not.toHaveBeenCalled()
     expect(datos.recursos).toEqual(leido().recursos)
+    expect(datos.alumnos).toEqual(leido().alumnos)
   })
 
   it('después de guardar la grilla o los días sin clases se relee eso, sin tocar las reservas', async () => {

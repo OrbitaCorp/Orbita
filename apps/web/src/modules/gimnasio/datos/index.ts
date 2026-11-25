@@ -14,7 +14,7 @@
 // con su plan y su asistencia; check-in; y lista de espera que avanza sola.
 import type { LucideIcon } from 'lucide-react'
 import { Dumbbell, Flame, Activity, Flower2, Music, Swords, Waves, Presentation } from 'lucide-react'
-import { diaSemana, diasEntre, sumarDias, type ISO } from '@/lib/reservas/fechas'
+import { diaSemana, diasEntre, fechaCorta, sumarDias, type ISO } from '@/lib/reservas/fechas'
 
 // ─── El "hoy" de la demo ─────────────────────────────────────────────────────
 // Sábado 14/11/2026 a las 10:40, fijo.
@@ -272,7 +272,45 @@ export interface Socio {
   nota?: string
   /** Desde cuándo es socio: con eso Ingresos cuenta las renovaciones de antes del plan de ahora. */
   alta?: ISO | null
+  /**
+   * Solo con la API. `fichaId` es su ficha de cliente (la de sus reservas) y `alumnoId`, su fila de alumno (null si
+   * todavía no lo es: alguien que reservó desde el sitio y nunca tuvo plan).
+   */
+  fichaId?: string | null
+  alumnoId?: string | null
+  /**
+   * Solo con la API: todos sus planes, del que vence primero al último (ver PlanDeSocio). `planId`, `desde`, `vence`
+   * y `clasesRestantes` son el resumen de estos para la lista: el plan que usa hoy, hasta cuándo sigue (con la
+   * renovación, si ya la tiene) y las clases que le quedan entre sus packs.
+   */
+  planes?: PlanDeSocio[]
 }
+
+/**
+ * Un plan de un socio. En la demo cada socio tiene uno solo (los campos de arriba). Con la API puede tener más de
+ * uno a la vez: un pack que convive con una membresía, dos packs (se gasta primero el que vence antes) o la
+ * renovación de su membresía, que arranca cuando termina la de ahora. Cada uno guarda cómo era el plan cuando se
+ * lo asignaron: si después cambia el precio o se quita de Planes y precios, a quien lo tiene no le cambia.
+ */
+export interface PlanDeSocio {
+  /** El de esta compra (no el del plan): con este se quita uno asignado por error. */
+  id: string
+  planId: string
+  tipo: 'pack' | 'membresia'
+  nombre: string
+  precio: number
+  /** Desde y hasta qué día vale, los dos incluidos. */
+  desde: ISO
+  hasta: ISO
+  /** Pack: cuántas clases trae y cuántas le quedan. */
+  clases: number | null
+  restantes: number | null
+  /** Membresía: clases por semana; 0 = libre. */
+  porSemana: number | null
+}
+
+/** Cómo se paga un lugar: con el plan de la persona, aparte (en el gimnasio, como clase suelta) o con la clase de prueba. */
+export type Pago = 'plan' | 'aparte' | 'prueba'
 
 export type EstadoInscripcion = 'reservada' | 'asistio' | 'ausente' | 'cancelada' | 'espera'
 
@@ -294,6 +332,13 @@ export interface Inscripcion {
   creada: ISO
   /** Con qué se pagó: el plan del socio o una clase suelta. */
   planId: string | null
+  /**
+   * Cómo se paga el lugar. Lo elige quien anota; con la API viene en cada reserva y null es "sin definir" (pasó de
+   * la lista de espera o reservó desde el sitio). Si falta (los datos de ejemplo), lo dice el tipo de `planId`.
+   */
+  pago?: Pago | null
+  /** Solo con la API: con cuál de los planes de la persona se pagó (el `id` de su PlanDeSocio). */
+  suscripcionId?: string
   /** Lugares que ocupa (alguien que viene con una amiga ocupa dos). Sin el dato, uno. */
   cantidad?: number
   /**
@@ -571,6 +616,120 @@ export const profeDe = (n: NegocioGym, id: string) => n.profes.find(p => p.id ==
 export const planDe = (n: NegocioGym, id: string | null) => (id ? n.planes.find(p => p.id === id) ?? null : null)
 export const socioPorId = (id: string, lista: Socio[]) => lista.find(s => s.id === id)
 
+// ─── Los planes de un socio y con qué se paga un lugar ───────────────────────
+
+/**
+ * Los planes de un socio: los que trae (con la API) o, en la demo, el único que tiene, armado con sus campos. La
+ * clase de prueba y la clase suelta no son planes de nadie: se eligen al anotar.
+ */
+export function planesDeSocio(n: NegocioGym, s: Socio): PlanDeSocio[] {
+  if (s.planes) return s.planes
+  const p = planDe(n, s.planId)
+  if (!p || !s.vence || (p.tipo !== 'pack' && p.tipo !== 'membresia')) return []
+  return [{
+    id: `${s.id}:plan`, planId: p.id, tipo: p.tipo, nombre: p.nombre, precio: p.precio, desde: s.desde ?? s.vence, hasta: s.vence,
+    clases: p.tipo === 'pack' ? p.clases ?? null : null, restantes: p.tipo === 'pack' ? s.clasesRestantes : null,
+    porSemana: p.tipo === 'membresia' ? p.porSemana ?? 0 : null,
+  }]
+}
+
+/**
+ * El plan que un socio usa hoy: entre los que valen hoy, el primero que todavía sirve (un pack sin clases no, si
+ * tiene otro); si hoy no vale ninguno, el que arranca después o el último que tuvo. null = nunca tuvo plan.
+ */
+export function planActualDe(n: NegocioGym, s: Socio, hoy: ISO = HOY): PlanDeSocio | null {
+  const suyos = planesDeSocio(n, s)
+  const deHoy = suyos.filter(p => p.desde <= hoy && hoy <= p.hasta)
+  return deHoy.find(p => p.tipo !== 'pack' || (p.restantes ?? 0) > 0) ?? deHoy[0] ?? suyos[0] ?? null
+}
+
+/** Cómo se paga un lugar: lo que dice la inscripción o, si no lo trae, lo que dice el tipo de su plan. null = sin definir. */
+export function pagoDe(n: NegocioGym, i: Pick<Inscripcion, 'pago' | 'planId'>): Pago | null {
+  if (i.pago !== undefined) return i.pago
+  const plan = planDe(n, i.planId)
+  if (!plan) return null
+  return plan.tipo === 'prueba' ? 'prueba' : plan.tipo === 'suelta' ? 'aparte' : 'plan'
+}
+
+/** El plan con el que queda una inscripción según cómo se paga: el del socio, la clase de prueba o la suelta. */
+export function planDelPago(n: NegocioGym, s: Pick<Socio, 'planId'> | undefined, pago: Pago): string | null {
+  if (pago === 'plan') return s?.planId ?? null
+  return n.planes.find(p => p.tipo === (pago === 'prueba' ? 'prueba' : 'suelta'))?.id ?? null
+}
+
+export const PAGO_TXT: Record<Pago, string> = { plan: 'Con su plan', aparte: 'Se cobra aparte', prueba: 'Clase de prueba' }
+
+/** Lo que se le puede ofrecer a quien anota a alguien: con qué puede pagar ese lugar. */
+export interface PagosPosibles {
+  /**
+   * Con su plan: si se puede, con cuál; si no, por qué (ya escrito para mostrar) y, cuando la hay, la salida: qué
+   * hacer para que sí lo use (renovarlo, anotarlo con un solo lugar). Sin salida no hay nada que hacer hoy.
+   */
+  plan: { puede: boolean; con?: PlanDeSocio; motivo?: string; salida?: string }
+  /** La clase de prueba: el negocio la tiene y esa persona no la usó. Es de un solo lugar. */
+  prueba: boolean
+  /** La clase suelta del negocio, para decir el precio de cobrarla aparte (null si no cargó una). */
+  suelta: Plan | null
+}
+
+const primerNombreDe = (nombre: string) => nombre.trim().split(/\s+/)[0] || nombre
+
+/** Las clases de la semana de `fecha` que el socio pagó con sus membresías. */
+function usadasConMembresia(n: NegocioGym, s: Socio, suyos: PlanDeSocio[], fecha: ISO, inscripciones: Inscripcion[]): number {
+  // En la demo hay un solo plan y las inscripciones no dicen con cuál se pagaron: valen todas las de la semana.
+  if (!s.planes) return clasesEnLaSemana(s.id, fecha, inscripciones)
+  const membresias = new Set(suyos.filter(p => p.tipo === 'membresia').map(p => p.id))
+  const lunes = sumarDias(fecha, -diaSemana(fecha))
+  const domingo = sumarDias(lunes, 6)
+  return inscripciones
+    .filter(i => i.socioId === s.id && i.fecha >= lunes && i.fecha <= domingo && (i.estado === 'reservada' || i.estado === 'asistio' || i.estado === 'ausente'))
+    .filter(i => i.pago === 'plan' && !!i.suscripcionId && membresias.has(i.suscripcionId))
+    .reduce((t, i) => t + lugaresDe(i), 0)
+}
+
+/**
+ * Con qué puede pagar alguien `lugares` lugares en una clase del día `fecha`. Son las mismas cuentas que hace la API
+ * al anotar (apps/api/src/gimnasio/dominio/planes.ts): entre los planes que valen ese día se usa primero el que vence
+ * antes; un pack tiene que alcanzar para todos los lugares; una membresía cubre uno por clase y, si tiene tope, hasta
+ * sus clases de la semana. Acá sirve para ofrecer lo que corresponde antes de guardar: la que decide es la API, y si
+ * dice que no, se muestra su motivo. Cobrarlo aparte se puede siempre.
+ */
+export function pagosPosibles(n: NegocioGym, s: Socio | undefined, fecha: ISO, hoy: ISO, inscripciones: Inscripcion[], lugares = 1): PagosPosibles {
+  const suelta = n.planes.find(p => p.tipo === 'suelta') ?? null
+  const hayPrueba = n.planes.some(p => p.tipo === 'prueba') && lugares === 1
+  if (!s) return { plan: { puede: false }, prueba: hayPrueba, suelta }
+  const prueba = hayPrueba && !s.probo && !inscripciones.some(i => i.socioId === s.id && i.estado !== 'cancelada' && i.estado !== 'espera' && pagoDe(n, i) === 'prueba')
+  const nombre = primerNombreDe(s.nombre)
+  const no = (motivo: string, salida?: string): PagosPosibles => ({ plan: { puede: false, motivo, ...(salida ? { salida } : {}) }, prueba, suelta })
+  const RENOVAR = 'Para que use su plan, renovalo antes desde su ficha.'
+  const suyos = planesDeSocio(n, s)
+  if (suyos.length === 0) return no(`${nombre} no tiene un plan.`)
+  const delDia = suyos.filter(p => p.desde <= fecha && fecha <= p.hasta).sort((a, b) => a.hasta.localeCompare(b.hasta) || a.id.localeCompare(b.id))
+  if (delDia.length === 0) {
+    const despues = suyos.filter(p => p.desde > fecha).sort((a, b) => a.desde.localeCompare(b.desde))[0]
+    if (despues) return no(`El plan de ${nombre} arranca el ${fechaCorta(despues.desde)}: esa clase es de antes.`)
+    const ultimo = suyos.reduce((a, b) => (b.hasta > a.hasta ? b : a))
+    return no(ultimo.hasta < hoy ? `El plan de ${nombre} venció el ${fechaCorta(ultimo.hasta)}.` : `El plan de ${nombre} vence el ${fechaCorta(ultimo.hasta)}: esa clase es de después.`, RENOVAR)
+  }
+  // Se dice el motivo del primero que no alcanzó (el que vence antes), con su salida.
+  let primero: { motivo: string; salida?: string } | undefined
+  for (const p of delDia) {
+    let falla: { motivo: string; salida?: string } | undefined
+    if (p.tipo === 'pack') {
+      const quedan = p.restantes ?? 0
+      if (quedan < lugares) falla = { motivo: quedan > 0 ? `A ${nombre} le ${quedan === 1 ? 'queda 1 clase' : `quedan ${quedan} clases`} en el pack: no alcanzan para ${lugares} lugares.` : `A ${nombre} no le quedan clases en el pack.`, salida: RENOVAR }
+    } else if (lugares !== 1) {
+      falla = { motivo: 'La membresía cubre un solo lugar por clase.', salida: 'Para que use su plan, anotalo con un solo lugar y a quien lo acompaña por separado.' }
+    } else if (p.porSemana) {
+      const usadas = usadasConMembresia(n, s, suyos, fecha, inscripciones)
+      if (usadas >= p.porSemana) falla = { motivo: `${nombre} ya usó ${p.porSemana === 1 ? 'su clase' : `sus ${p.porSemana} clases`} de esa semana.` }
+    }
+    if (!falla) return { plan: { puede: true, con: p }, prueba, suelta }
+    primero ??= falla
+  }
+  return primero ? no(primero.motivo, primero.salida) : no(`${nombre} no tiene un plan.`)
+}
+
 /** Las clases de un día (fecha), con su actividad y su profe, ordenadas por hora. */
 export function clasesDelDia(n: NegocioGym, fecha: ISO) {
   const dia = diaSemana(fecha)
@@ -629,7 +788,8 @@ export const ESTADO_PLAN: Record<EstadoPlan, { label: string; tono: 'ok' | 'avis
 export function clasesEnLaSemana(socioId: string, fecha: ISO, inscripciones: Inscripcion[]): number {
   const lunes = sumarDias(fecha, -diaSemana(fecha))
   const domingo = sumarDias(lunes, 6)
-  return inscripciones.filter(i => i.socioId === socioId && i.fecha >= lunes && i.fecha <= domingo && (i.estado === 'reservada' || i.estado === 'asistio' || i.estado === 'ausente')).length
+  // Con la API cada lugar dice cómo se pagó: solo los que fueron con el plan gastan las clases de la semana.
+  return inscripciones.filter(i => i.socioId === socioId && i.fecha >= lunes && i.fecha <= domingo && (i.estado === 'reservada' || i.estado === 'asistio' || i.estado === 'ausente') && (i.pago === undefined || i.pago === 'plan')).length
 }
 
 /**

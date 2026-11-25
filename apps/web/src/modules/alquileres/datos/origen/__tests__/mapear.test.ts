@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { codigoDe } from '../../index'
 import type { Bloqueo as BloqueoApi, Config, Recurso, Reserva as ReservaApi, Servicio } from '@/lib/reservasApi/tipos'
 import {
-  aperturaDeHorario, bloqueosDeApi, bloqueosDeNoches, clienteIdDe, publicoDeConfig, clientesDeReservas, estadoDeApi, fechaArgentina, negocioDeApi,
+  aperturaDeHorario, bloqueosDeApi, bloqueosDeNoches, calendarioDeApi, clienteIdDe, publicoDeConfig, clientesDeReservas, estadoDeApi, fechaArgentina, negocioDeApi,
   negocioDelSitio, propiedadDeApi, reservaDeApi, salonDeApi, tipoDeRecurso, tipoDeRubro, unidadDeApi,
 } from '../mapear'
 
@@ -313,5 +313,38 @@ describe('el código de una reserva', () => {
   })
   it('en la demo, que no tiene código, sale del id', () => {
     expect(codigoDe({ id: 'n1abcdef' })).toBe('ABCDEF')
+  })
+})
+
+describe('calendarios de Airbnb', () => {
+  const bloqueo = (b: Partial<BloqueoApi>): BloqueoApi => ({ id: 'b1', modulo: 'ALQUILERES', recursoId: 'p1', inicio: '2026-12-20T18:00:00.000Z', fin: '2026-12-27T13:00:00.000Z', motivo: 'Airbnb', createdAt: '2026-11-25T00:00:00.000Z', ...b })
+
+  it('un bloqueo que vino de un calendario sale como "ical", con el calendario del que vino', () => {
+    const [b] = bloqueosDeApi([bloqueo({ origen: 'ICAL', calendarioId: 'cal-1', externoTipo: 'RESERVADO' })], ['p1'])
+    expect(b).toMatchObject({ unidadId: 'p1', desde: '2026-12-20', hasta: '2026-12-27', origen: 'ical', calendarioId: 'cal-1', motivo: 'Airbnb' })
+  })
+  it('uno del dueño (o de una API que todavía no manda el origen) sigue siendo del dueño', () => {
+    expect(bloqueosDeApi([bloqueo({ origen: 'DUENO' })], ['p1'])[0].origen).toBe('dueno')
+    expect(bloqueosDeApi([bloqueo({})], ['p1'])[0]).not.toHaveProperty('calendarioId')
+    expect(bloqueosDeApi([bloqueo({})], ['p1'])[0].origen).toBe('dueno')
+  })
+  it('calendarioDeApi traduce el estado: cuándo se bajó, por qué falló y con qué reservas choca', () => {
+    const c = calendarioDeApi({
+      id: 'cal-1', recursoId: 'p1', nombre: 'Airbnb', url: 'https://www.airbnb.com/calendar/ical/1.ics', activo: true,
+      ultimaSync: '2026-11-25T13:10:00.000Z', ultimoError: null,
+      conflictos: [{ reservaId: 'x1', codigo: 'Q2R4PS', desde: '2026-12-21', hasta: '2026-12-24' }],
+    }, '2026-11-25')
+    expect(c).toEqual({
+      id: 'cal-1', unidadId: 'p1', nombre: 'Airbnb', url: 'https://www.airbnb.com/calendar/ical/1.ics',
+      ultimaSync: '2026-11-25', ultimaSyncEn: '2026-11-25T13:10:00.000Z',
+      conflictos: [{ reservaId: 'x1', codigo: 'Q2R4PS', entrada: '2026-12-21', salida: '2026-12-24' }],
+    })
+  })
+  it('uno que nunca se bajó o que falló lo dice', () => {
+    const base = { id: 'cal-1', recursoId: 'p1', nombre: 'Airbnb', url: 'u', activo: true, conflictos: [] }
+    const nunca = calendarioDeApi({ ...base, ultimaSync: null, ultimoError: null }, '2026-11-25')
+    expect(nunca.ultimaSync).toBe('2026-11-25')
+    expect(nunca).not.toHaveProperty('ultimaSyncEn')
+    expect(calendarioDeApi({ ...base, ultimaSync: '2026-11-25T13:10:00.000Z', ultimoError: 'Airbnb respondió 403.' }, '2026-11-25').error).toBe('Airbnb respondió 403.')
   })
 })

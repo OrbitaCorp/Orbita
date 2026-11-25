@@ -32,6 +32,9 @@ function armar(opts: { recurso?: Record<string, unknown>; porDelante?: ReturnTyp
     },
     reservaConfig: { findUnique: jest.fn().mockResolvedValue(config()), findFirst: jest.fn().mockResolvedValue(config()) },
     reserva: { findMany: jest.fn().mockResolvedValue(opts.porDelante ?? []), count: jest.fn().mockResolvedValue((opts.porDelante ?? []).length) },
+    // Al borrar un recurso se van también sus calendarios externos y lo que habían bloqueado (Alquileres).
+    reservaBloqueo: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
+    reservaCalendarioExterno: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
     $transaction: jest.fn(async (fn: (tx: unknown) => unknown) => fn(prisma)),
     $queryRaw: jest.fn().mockResolvedValue([{ id: 'r-clase', cupo: fila.cupo, activo: true, nombre: fila.nombre }]),
   };

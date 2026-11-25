@@ -1,14 +1,16 @@
-// Las traducciones entre la API de reservas y el panel de Gimnasio: días
-// (domingo 0 ↔ lunes 0), clases como recursos CLASE de una sesión, lo propio
-// de Gimnasio en datos.gimnasio, inscripciones, espera, socios, días sin
-// clases, y lo que se manda al guardar.
+// Las traducciones entre la API (la de reservas y la de Gimnasio) y el panel:
+// días (domingo 0 ↔ lunes 0), clases como recursos CLASE de una sesión, lo
+// propio de Gimnasio en datos.gimnasio, inscripciones (con cómo se paga cada
+// lugar), espera, planes, alumnos con sus planes, días sin clases, y lo que se
+// manda al guardar.
 import { describe, expect, it } from 'vitest'
 import type { Bloqueo, Config, Espera, Recurso, Reserva } from '@/lib/reservasApi/tipos'
-import { COLORES_ACTIVIDAD, negocioDe, rubroPorKey, type ClaseSemanal } from '../../index'
+import { COLORES_ACTIVIDAD, estadoPlanDe, negocioDe, rubroPorKey, type ClaseSemanal, type PlanDeSocio } from '../../index'
+import type { AlumnoApi, PlanApi, SuscripcionApi } from '../gimnasioApi'
 import {
-  actividadesDe, aperturaDeHorario, bloqueoParaApi, bloqueosDeApi, claveApi, clasesDeRecurso, datosGimnasio, diaPanel, estadoDeReserva, fechaDeEspera, horarioConSesion,
-  horarioSinSesion, inscripcionesDeApi, negocioDeApi, pedidoDeInscripcion, personaDe, planDeBloqueos, planDeGrilla, profesDe, recursoDeClase, recursoParaClase,
-  salasDe, sociosDeApi,
+  actividadesDe, altaDeSocio, aperturaDeHorario, bloqueoParaApi, bloqueosDeApi, claveApi, clasesDeRecurso, datosGimnasio, detalleDePago, diaPanel, estadoDeReserva, fechaDeEspera,
+  horarioConSesion, horarioSinSesion, inscripcionesDeApi, negocioDeApi, pagoDeDatos, pedidoConPago, pedidoDeInscripcion, personaDe, planDeApi, planDeBloqueos, planDeGrilla,
+  planDeSocioDeApi, planesParaApi, profesDe, quienEs, recursoDeClase, recursoParaClase, resumenDePlanes, salasDe, socioDeAlumno, sociosDeApi,
 } from '../mapear'
 
 // Lunes 16/11/2026: la clave '1' de la API, el día 0 del panel.
@@ -190,6 +192,131 @@ describe('Gimnasio sobre la API · inscripciones y socios', () => {
   })
 })
 
+describe('Gimnasio sobre la API · planes y precios', () => {
+  const pack: PlanApi = { id: 'p-pack', tipo: 'PACK', nombre: 'Pack de 8', precio: 56000, clases: 8, porSemana: null, vigenciaDias: 90, activo: true }
+  const libre: PlanApi = { id: 'p-libre', tipo: 'MEMBRESIA', nombre: 'Pase libre', precio: 60000, clases: null, porSemana: 0, vigenciaDias: 30, activo: true }
+  const prueba: PlanApi = { id: 'p-prueba', tipo: 'PRUEBA', nombre: 'Clase de prueba', precio: 0, clases: null, porSemana: null, vigenciaDias: 30, activo: false }
+
+  it('un plan de la API es el del panel: las clases solo en un pack y el tope de la semana solo en una membresía (0 es libre)', () => {
+    expect(planDeApi(pack)).toEqual({ id: 'p-pack', tipo: 'pack', nombre: 'Pack de 8', precio: 56000, clases: 8, vigenciaDias: 90, activo: true })
+    expect(planDeApi(libre)).toEqual({ id: 'p-libre', tipo: 'membresia', nombre: 'Pase libre', precio: 60000, porSemana: 0, vigenciaDias: 30, activo: true })
+    expect(planDeApi(prueba)).toEqual({ id: 'p-prueba', tipo: 'prueba', nombre: 'Clase de prueba', precio: 0, vigenciaDias: 30, activo: false })
+  })
+
+  it('el negocio muestra los planes de la API en su orden, nunca los de ejemplo', () => {
+    const base = negocioDe(rubroPorKey('crossfit'))
+    expect(base.planes.length).toBeGreaterThan(0)
+    const n = negocioDeApi(base, { config: config(), recursos: [], bloqueos: [], planes: [prueba, pack, libre] })
+    expect(n.planes.map(p => [p.id, p.tipo])).toEqual([['p-prueba', 'prueba'], ['p-pack', 'pack'], ['p-libre', 'membresia']])
+    expect(negocioDeApi(base, { config: config(), recursos: [], bloqueos: [], planes: [] }).planes).toEqual([])
+  })
+
+  it('al guardar va la lista entera: los que la API ya tiene, con su id; los cargados recién, sin el id del panel; ida y vuelta no cambia nada', () => {
+    const delPanel = [planDeApi(pack), planDeApi(libre), planDeApi(prueba)]
+    expect(planesParaApi(delPanel, [pack, libre, prueba])).toEqual([pack, libre, prueba])
+    const nuevo = { id: 'pl1a2b', tipo: 'pack' as const, nombre: '  Pack de 4 ', precio: 30000, clases: 4, vigenciaDias: 60, activo: true }
+    expect(planesParaApi([nuevo, planDeApi(pack)], [pack])).toEqual([
+      { tipo: 'PACK', nombre: 'Pack de 4', precio: 30000, clases: 4, porSemana: null, vigenciaDias: 60, activo: true },
+      pack,
+    ])
+  })
+})
+
+describe('Gimnasio sobre la API · alumnos y sus planes', () => {
+  const HOY = '2026-11-24'
+  const sus = (over: Partial<SuscripcionApi> = {}): SuscripcionApi => ({
+    id: 's1', planId: 'p-pack', tipo: 'PACK', nombre: 'Pack de 8', precio: 56000, clases: 8, porSemana: null, desde: '2026-11-01', hasta: '2027-01-30', estado: 'VIGENTE', usadas: 5, restantes: 3, ...over,
+  })
+  const membresia = (over: Partial<SuscripcionApi> = {}) => sus({ id: 'm1', planId: 'p-2x', tipo: 'MEMBRESIA', nombre: '2 veces por semana', precio: 48000, clases: null, porSemana: 2, restantes: null, usadas: 3, desde: '2026-11-10', hasta: '2026-12-10', ...over })
+  const alumno = (over: Partial<AlumnoApi> = {}): AlumnoApi => ({ id: 'alu-1', clienteId: 'ficha-ana', nombre: 'Ana Sosa', telefono: '3757 55-0202', email: 'ana@ejemplo.com', nota: 'Viene a la mañana', alta: '2026-11-01', probo: true, planes: [sus()], ultimo: null, ...over })
+  const plan = (over: Partial<PlanDeSocio>): PlanDeSocio => ({ id: 'x', planId: 'p', tipo: 'pack', nombre: 'Pack', precio: 1, desde: '2026-11-01', hasta: '2026-12-31', clases: 8, restantes: 3, porSemana: null, ...over })
+
+  it('un alumno con un pack: su id es su ficha, y trae el plan, hasta cuándo vale y las clases que le quedan', () => {
+    const s = socioDeAlumno(alumno(), HOY)
+    expect(s).toMatchObject({
+      id: 'ficha-ana', fichaId: 'ficha-ana', alumnoId: 'alu-1', nombre: 'Ana Sosa', telefono: '3757 55-0202', email: 'ana@ejemplo.com', nota: 'Viene a la mañana', alta: '2026-11-01', probo: true,
+      planId: 'p-pack', desde: '2026-11-01', vence: '2027-01-30', clasesRestantes: 3,
+    })
+    expect(s.planes).toEqual([{ id: 's1', planId: 'p-pack', tipo: 'pack', nombre: 'Pack de 8', precio: 56000, desde: '2026-11-01', hasta: '2027-01-30', clases: 8, restantes: 3, porSemana: null }])
+    expect(estadoPlanDe(s, HOY)).toBe('vigente')
+  })
+
+  it('renovar la misma membresía antes de que venza corre el vencimiento: la lista muestra hasta cuándo sigue, no cuándo termina la de ahora', () => {
+    // Vence el 28/11 (en 4 días) y ya tiene la renovación, que arranca el 29.
+    const s = socioDeAlumno(alumno({ planes: [membresia({ hasta: '2026-11-28' }), membresia({ id: 'm2', desde: '2026-11-29', hasta: '2026-12-29', usadas: 0 })] }), HOY)
+    expect(s).toMatchObject({ planId: 'p-2x', desde: '2026-11-10', vence: '2026-12-29', clasesRestantes: null })
+    expect(estadoPlanDe(s, HOY)).toBe('vigente')
+    // Sin la renovación, vence pronto.
+    expect(estadoPlanDe(socioDeAlumno(alumno({ planes: [membresia({ hasta: '2026-11-28' })] }), HOY), HOY)).toBe('por-vencer')
+    // Otra membresía que arranca después no es la renovación de esta: no corre su vencimiento.
+    expect(resumenDePlanes([plan({ id: 'a', planId: 'p-2x', tipo: 'membresia', hasta: '2026-11-28', restantes: null }), plan({ id: 'b', planId: 'p-libre', tipo: 'membresia', desde: '2026-11-29', hasta: '2026-12-29', restantes: null })], HOY).vence).toBe('2026-11-28')
+  })
+
+  it('con dos packs se muestra el que vence primero y las clases de los dos; un pack sin clases no tapa a otro plan que sirve', () => {
+    const dos = [plan({ id: 'viejo', hasta: '2026-12-05', restantes: 1 }), plan({ id: 'nuevo', hasta: '2027-02-20', restantes: 8 })]
+    expect(resumenDePlanes(dos, HOY)).toEqual({ planId: 'p', desde: '2026-11-01', vence: '2026-12-05', clasesRestantes: 9 })
+    // El pack viejo se quedó sin clases: se muestra el nuevo, con las suyas.
+    expect(resumenDePlanes([plan({ id: 'viejo', hasta: '2026-12-05', restantes: 0 }), plan({ id: 'nuevo', planId: 'p2', hasta: '2027-02-20', restantes: 8 })], HOY)).toMatchObject({ planId: 'p2', vence: '2027-02-20', clasesRestantes: 8 })
+    // Un pack agotado y una membresía al día: está al día, con la membresía.
+    expect(resumenDePlanes([plan({ id: 'viejo', hasta: '2026-12-05', restantes: 0 }), plan({ id: 'm', planId: 'p-2x', tipo: 'membresia', hasta: '2026-12-20', restantes: null, clases: null, porSemana: 2 })], HOY)).toEqual({ planId: 'p-2x', desde: '2026-11-01', vence: '2026-12-20', clasesRestantes: null })
+    // Solo un pack sin clases: agotado.
+    const agotado = socioDeAlumno(alumno({ planes: [sus({ restantes: 0, usadas: 8 })] }), HOY)
+    expect(estadoPlanDe(agotado, HOY)).toBe('agotado')
+  })
+
+  it('sin planes vigentes, el último que tuvo dice cuándo venció; quien nunca tuvo queda sin plan', () => {
+    const vencido = socioDeAlumno(alumno({ planes: [], ultimo: membresia({ hasta: '2026-11-15' }) }), HOY)
+    expect(vencido).toMatchObject({ planId: 'p-2x', vence: '2026-11-15' })
+    expect(vencido.planes).toHaveLength(1)
+    expect(estadoPlanDe(vencido, HOY)).toBe('vencido')
+    const sinPlan = socioDeAlumno(alumno({ planes: [], ultimo: null, telefono: null, email: null, nota: null }), HOY)
+    expect(sinPlan).toMatchObject({ planId: null, desde: null, vence: null, clasesRestantes: null, telefono: '', planes: [] })
+    expect(sinPlan).not.toHaveProperty('email')
+    expect(estadoPlanDe(sinPlan, HOY)).toBe('sin-plan')
+    // La clase de prueba y la suelta no son planes de nadie.
+    expect(planDeSocioDeApi(sus({ tipo: 'SUELTA' }))).toBeNull()
+  })
+
+  it('los socios son los alumnos y, además, quienes reservaron o esperan sin serlo: uno por persona', () => {
+    const socios = sociosDeApi(
+      [
+        // Ana reservó (con su ficha) antes de ser alumna: su alta es esa primera reserva.
+        reserva({ id: 'r-ana', clienteId: 'ficha-ana', clienteNombre: 'Anita', creadaEn: '2026-10-20T15:00:00.000Z' }),
+        // Lu reservó desde el sitio con la clase de prueba y no es alumna.
+        reserva({ id: 'r-lu', clienteId: 'ficha-lu', clienteNombre: 'Lu Paz', datos: { gimnasio: { pago: 'prueba', planId: 'p-prueba' } } }),
+      ],
+      [espera()],
+      [alumno()],
+      HOY,
+    )
+    expect(socios.map(s => [s.id, s.nombre, s.alumnoId ?? null])).toEqual([['ficha-ana', 'Ana Sosa', 'alu-1'], ['ficha-lu', 'Lu Paz', null], ['tel:44440000', 'Sol Ríos', null]])
+    expect(socios[0]).toMatchObject({ alta: '2026-10-20', planId: 'p-pack', clasesRestantes: 3 })
+    // De quien no es alumna se sabe lo de sus filas: si usó la prueba, su ficha para darle un plan, y que no tiene planes.
+    expect(socios[1]).toMatchObject({ fichaId: 'ficha-lu', probo: true, planId: null, planes: [] })
+    expect(socios[2]).toMatchObject({ fichaId: null, probo: false })
+    // Una prueba cancelada no cuenta: la puede volver a pedir.
+    const otra = sociosDeApi([reserva({ clienteId: 'ficha-lu', estado: 'CANCELADA', datos: { gimnasio: { pago: 'prueba' } } })], [], [], HOY)
+    expect(otra[0].probo).toBe(false)
+  })
+
+  it('cada lugar dice cómo se paga; sin eso (pasó de la espera o reservó desde el sitio) queda sin definir', () => {
+    const clases = clasesDeRecurso(recurso())
+    const [conPlan, aparte, sinDefinir] = inscripcionesDeApi([
+      reserva({ id: 'a', datos: { gimnasio: { pago: 'plan', suscripcionId: 's1', planId: 'p-pack' } } }),
+      reserva({ id: 'b', datos: { gimnasio: { pago: 'aparte' }, otra: 'cosa' } }),
+      reserva({ id: 'c', datos: null }),
+    ], [espera()], clases, AHORA)
+    expect(conPlan).toMatchObject({ pago: 'plan', planId: 'p-pack', suscripcionId: 's1' })
+    expect(aparte).toMatchObject({ pago: 'aparte', planId: null })
+    expect(aparte).not.toHaveProperty('suscripcionId')
+    expect(sinDefinir).toMatchObject({ pago: null, planId: null })
+    // Lo que no tenga la forma esperada también es "sin definir".
+    expect(pagoDeDatos({ gimnasio: { pago: 'gratis' } })).toBeNull()
+    expect(pagoDeDatos({ gimnasio: 'plan' })).toBeNull()
+    expect(pagoDeDatos(undefined)).toBeNull()
+  })
+})
+
 describe('Gimnasio sobre la API · lo que se manda', () => {
   const negocio = { actividades: [{ id: 'a1', nombre: 'WOD', duracion: 60, cupo: 12, color: '#7C3AED' }, { id: 'a2', nombre: 'Open box', duracion: 90, cupo: 10, color: '#059669' }], profes: [{ id: 'p1', nombre: 'Nico Paz', color: '#1D4ED8', actividades: ['a1'] }] }
   const clase = (over: Partial<ClaseSemanal> = {}): ClaseSemanal => ({ id: 'r1', actividadId: 'a1', dia: 0, inicio: 1140, profeId: 'p1', sala: 'Box', cupo: 12, ...over })
@@ -254,5 +381,41 @@ describe('Gimnasio sobre la API · lo que se manda', () => {
   it('anotar desde el panel es una reserva confirmada del recurso de la clase, con la cantidad y sin datos vacíos', () => {
     const pedido = pedidoDeInscripcion({ fecha: LUNES, cantidad: 2 }, clase({ id: 'r9~0-1140' }), { nombre: ' Lu Paz ', telefono: '3757 55-0101', email: '' }, 'clave-1')
     expect(pedido).toEqual({ modulo: 'GIMNASIO', recursoId: 'r9', fecha: LUNES, inicioMinutos: 1140, cantidad: 2, cliente: { nombre: 'Lu Paz', telefono: '3757 55-0101' }, estado: 'CONFIRMADA', clave: 'clave-1' })
+  })
+
+  it('anotar diciendo cómo paga: a una alumna por su fila, a quien tiene ficha por su ficha, a alguien nuevo con sus datos', () => {
+    const lu = { nombre: ' Lu Paz ', telefono: '3757 55-0101', email: '' }
+    expect(quienEs({ ...lu, alumnoId: 'alu-1', fichaId: 'ficha-lu' })).toEqual({ alumnoId: 'alu-1' })
+    expect(quienEs({ ...lu, alumnoId: null, fichaId: 'ficha-lu' })).toEqual({ clienteId: 'ficha-lu' })
+    expect(quienEs(lu)).toEqual({ cliente: { nombre: 'Lu Paz', telefono: '3757 55-0101' } })
+    expect(pedidoConPago({ fecha: LUNES, pago: 'plan' }, clase({ id: 'r9~0-1140' }), { ...lu, alumnoId: 'alu-1' }, 'clave-1')).toEqual({ recursoId: 'r9', fecha: LUNES, inicioMinutos: 1140, alumnoId: 'alu-1', pago: 'plan', clave: 'clave-1' })
+    // Sin decir cómo paga, se cobra aparte; la cantidad viaja solo si es más de un lugar.
+    expect(pedidoConPago({ fecha: LUNES, cantidad: 3 }, clase(), lu, 'clave-2')).toEqual({ recursoId: 'r1', fecha: LUNES, inicioMinutos: 1140, cantidad: 3, cliente: { nombre: 'Lu Paz', telefono: '3757 55-0101' }, pago: 'aparte', clave: 'clave-2' })
+  })
+
+  it('dar de alta manda los datos, la nota y el plan solo si los hay', () => {
+    expect(altaDeSocio({ nombre: 'Ana Sosa', telefono: '3757 55-0202', email: 'ana@ejemplo.com', nota: ' Viene a la mañana ', planId: 'p-pack' })).toEqual({ cliente: { nombre: 'Ana Sosa', telefono: '3757 55-0202', email: 'ana@ejemplo.com' }, nota: 'Viene a la mañana', planId: 'p-pack' })
+    expect(altaDeSocio({ nombre: 'Ana Sosa', telefono: '3757 55-0202', planId: null, fichaId: 'ficha-ana' })).toEqual({ clienteId: 'ficha-ana' })
+  })
+
+  it('lo que el panel cuenta después de anotar: cómo quedó el plan o cuánto se cobra aparte', () => {
+    const p = { id: 's1', planId: 'p', tipo: 'PACK' as const, nombre: 'Pack de 8', precio: 1, clases: 8, porSemana: null, desde: LUNES, hasta: LUNES, estado: 'VIGENTE' as const, usadas: 5, restantes: 3 }
+    expect(detalleDePago({ pago: 'plan', plan: p, usadasEnLaSemana: null }, 0)).toBe('Le quedan 3 clases en Pack de 8.')
+    expect(detalleDePago({ pago: 'plan', plan: { ...p, restantes: 1 }, usadasEnLaSemana: null }, 0)).toBe('Le queda 1 clase en Pack de 8.')
+    expect(detalleDePago({ pago: 'plan', plan: { ...p, restantes: 0 }, usadasEnLaSemana: null }, 0)).toBe('Usó la última clase de Pack de 8.')
+    const libre = { ...p, tipo: 'MEMBRESIA' as const, nombre: 'Pase libre', clases: null, porSemana: 0, restantes: null }
+    expect(detalleDePago({ pago: 'plan', plan: libre, usadasEnLaSemana: null }, 0)).toBe('Con Pase libre.')
+    expect(detalleDePago({ pago: 'aparte', plan: null, usadasEnLaSemana: null }, 0)).toBe('Se cobra aparte.')
+    expect(detalleDePago({ pago: null, plan: null, usadasEnLaSemana: null }, 0)).toBeUndefined()
+  })
+
+  it('si el aviso ya dice cómo paga, el detalle no lo repite: suma el monto o cómo quedó el plan', () => {
+    const p = { id: 's1', planId: 'p', tipo: 'PACK' as const, nombre: 'Pack de 8', precio: 1, clases: 8, porSemana: null, desde: LUNES, hasta: LUNES, estado: 'VIGENTE' as const, usadas: 5, restantes: 3 }
+    expect(detalleDePago({ pago: 'aparte', plan: null, usadasEnLaSemana: null }, 14000, true)).toMatch(/^Son \$\s?14\.000\.$/)
+    expect(detalleDePago({ pago: 'aparte', plan: null, usadasEnLaSemana: null }, 0, true)).toBeUndefined()
+    expect(detalleDePago({ pago: 'prueba', plan: null, usadasEnLaSemana: null }, 0, true)).toBeUndefined()
+    expect(detalleDePago({ pago: 'prueba', plan: null, usadasEnLaSemana: null }, 0)).toBe('Es su clase de prueba.')
+    // Con su plan, lo que queda es justo lo que falta saber.
+    expect(detalleDePago({ pago: 'plan', plan: p, usadasEnLaSemana: null }, 0, true)).toBe('Le quedan 3 clases en Pack de 8.')
   })
 })

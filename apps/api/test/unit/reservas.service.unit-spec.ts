@@ -155,6 +155,29 @@ describe('ReservasService · resolverPedido (lo que se verifica antes del candad
     expect(manual.precio).toBe(150_000);
   });
 
+  it('noches bloqueadas de un alojamiento (por el dueño o por Airbnb): se dice en noches, no en horarios', async () => {
+    const cabana = cancha({ id: 'r-cab', tipo: 'ALOJAMIENTO', duracionMinutos: null, maximoSeguidos: 1, precio: 60_000 });
+    const { svc } = armar({ recurso: cabana, bloqueos: [{ inicio: instante('2026-11-14', 840), fin: instante('2026-11-16', 600) }] });
+    await expect(svc.resolverPedido(BIZ, { modulo: 'ALQUILERES', recursoId: 'r-cab', fecha: '2026-11-13', fechaHasta: '2026-11-15' }, 'publico', AHORA))
+      .rejects.toThrow('Esas noches no están disponibles. Elegí otras fechas.');
+  });
+
+  it('lo que el dueño cerró a mano en Airbnb no le impide cargar una reserva en su panel; una reserva de Airbnb sí', async () => {
+    const cabana = cancha({ id: 'r-cab', tipo: 'ALOJAMIENTO', duracionMinutos: null, maximoSeguidos: 1, precio: 60_000 });
+    const pedidoCab = { modulo: 'ALQUILERES' as const, recursoId: 'r-cab', fecha: '2026-11-13', fechaHasta: '2026-11-15' };
+    const cerrado = { inicio: instante('2026-11-12', 840), fin: instante('2026-11-16', 600), origen: 'ICAL', externoTipo: 'CERRADO' };
+    // El dueño cerró esas noches en Airbnb para anotar una reserva que le pidieron por teléfono.
+    await expect(armar({ recurso: cabana, bloqueos: [cerrado] }).svc.resolverPedido(BIZ, pedidoCab, 'panel', AHORA)).resolves.toMatchObject({ precio: 120_000 });
+    // Desde el sitio, esas noches siguen sin poder reservarse.
+    await expect(armar({ recurso: cabana, bloqueos: [cerrado] }).svc.resolverPedido(BIZ, pedidoCab, 'publico', AHORA)).rejects.toThrow('Esas noches no están disponibles. Elegí otras fechas.');
+    // Una reserva hecha en Airbnb no se pisa ni desde el panel, y se dice por qué.
+    const reservado = { ...cerrado, externoTipo: 'RESERVADO' };
+    await expect(armar({ recurso: cabana, bloqueos: [reservado] }).svc.resolverPedido(BIZ, pedidoCab, 'panel', AHORA)).rejects.toThrow('Esas noches están reservadas en Airbnb.');
+    // Un bloqueo que cargó el propio dueño sigue tapando también al panel: lo quita él.
+    const propio = { inicio: cerrado.inicio, fin: cerrado.fin, origen: 'DUENO', externoTipo: null };
+    await expect(armar({ recurso: cabana, bloqueos: [propio] }).svc.resolverPedido(BIZ, pedidoCab, 'panel', AHORA)).rejects.toThrow('Esas noches no están disponibles. Elegí otras fechas.');
+  });
+
   it('con las reservas online pausadas el sitio no reserva, pero el panel sí', async () => {
     const { svc } = armar({ config: config({ activo: false }) });
     await expect(svc.resolverPedido(BIZ, pedido(), 'publico', AHORA)).rejects.toThrow(/pausadas/);

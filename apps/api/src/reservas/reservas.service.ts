@@ -172,7 +172,15 @@ export class ReservasService {
     }
 
     const bloqueos = await this.disponibilidad.bloqueosEntre(businessId, pedido.modulo, recurso.id, inicio, fin);
-    if (bloqueos.length > 0) throw new BadRequestException('Ese horario está bloqueado por el negocio.');
+    // Desde el panel, lo que el dueño cerró a mano en Airbnb ("no disponible") no le impide cargar su propia
+    // reserva: suele cerrarlo allá justamente para anotarla acá, y ese bloqueo no se puede quitar a mano. Una
+    // reserva hecha en Airbnb sí tapa, también para el panel. Desde el sitio tapa todo.
+    const tapan = bloqueos.filter((b) => !(modo === 'panel' && b.origen === 'ICAL' && b.externoTipo === 'CERRADO'));
+    if (tapan.length > 0) {
+      if (modo === 'panel' && tapan.some((b) => b.origen === 'ICAL')) throw new BadRequestException('Esas noches están reservadas en Airbnb.');
+      // En un alojamiento el bloqueo puede venir del dueño o de su calendario de Airbnb: se dice en noches y sin culpar a nadie.
+      throw new BadRequestException(recurso.tipo === 'ALOJAMIENTO' ? 'Esas noches no están disponibles. Elegí otras fechas.' : 'Ese horario está bloqueado por el negocio.');
+    }
 
     const datos = (recurso.datos && typeof recurso.datos === 'object' ? recurso.datos : {}) as Record<string, unknown>;
     const extras = extrasElegidos(datos.extras, pedido.extras);
@@ -904,6 +912,15 @@ export class ReservasService {
       where: { businessId, ...(salvo ? { id: { not: salvo } } : {}), estado: { in: ['PENDIENTE', 'CONFIRMADA'] }, fin: { gt: ahora }, OR: quien },
     });
     if (activas >= maximo) throw new BadRequestException(`Ya tenés ${maximo} ${maximo === 1 ? 'reserva activa' : 'reservas activas'}. Cancelá alguna para reservar otra.`);
+  }
+
+  /**
+   * La ficha de cliente de una persona, por su email o su teléfono (si no está, la crea); null si no trae
+   * ninguno de los dos o si no se pudo. Es la misma que queda vinculada a sus reservas: la usan los módulos que
+   * guardan algo propio de cada cliente al lado del motor (los alumnos de Gimnasio).
+   */
+  fichaDe(businessId: string, cliente: DatosCliente): Promise<string | null> {
+    return this.vincularCliente(businessId, cliente);
   }
 
   /**

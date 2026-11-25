@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, NotFoundException, Param, Post, Query, UnprocessableEntityException } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, NotFoundException, Param, Post, Query, UnprocessableEntityException } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { Public } from '../common/decorators/public.decorator';
 import { OptionalAuth } from '../common/decorators/optional-auth.decorator';
@@ -9,6 +9,7 @@ import { StorefrontService } from '../storefront/storefront.service';
 import { ReservasCatalogoService } from './reservas-catalogo.service';
 import { DisponibilidadService } from './disponibilidad.service';
 import { ReservasService } from './reservas.service';
+import { ReservasCalendariosService } from './calendarios/reservas-calendarios.service';
 import { esToken } from './dominio/codigos';
 import { ModuloQueryDto } from './dto/comunes.dto';
 import {
@@ -34,6 +35,7 @@ export class ReservasPublicoController {
     private readonly catalogo: ReservasCatalogoService,
     private readonly disponibilidad: DisponibilidadService,
     private readonly reservas: ReservasService,
+    private readonly calendarios: ReservasCalendariosService,
   ) {}
 
   /** El negocio del slug, si existe y está publicado y sin pausar. */
@@ -105,6 +107,24 @@ export class ReservasPublicoController {
   async disponibilidadNoches(@Param('slug') slug: string, @Query() q: DisponibilidadRangoQueryDto) {
     const businessId = await this.negocioAbierto(slug);
     return this.disponibilidad.noches(businessId, q);
+  }
+
+  /**
+   * El calendario .ics de una propiedad, para que Airbnb lo importe:
+   * /storefront/<slug>/reservas/ical/<id del recurso>.ics (Airbnb exige que la
+   * URL termine en .ics). Solo noches ocupadas, sin datos de nadie: lo mismo
+   * que disponibilidad/noches. Responde aunque el negocio esté pausado: las
+   * noches siguen tomadas.
+   */
+  @Get('ical/:archivo')
+  @Public()
+  @Header('Content-Type', 'text/calendar; charset=utf-8')
+  @Header('Cache-Control', 'no-store')
+  async ical(@Param('slug') slug: string, @Param('archivo') archivo: string): Promise<string> {
+    const m = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.ics$/i.exec(archivo);
+    if (!m) throw new NotFoundException('Ese calendario no existe.');
+    const businessId = await this.storefront.resolveBusinessId(slug);
+    return this.calendarios.feed(businessId, m[1]);
   }
 
   // ─── Reservar ─────────────────────────────────────────────────────────────
