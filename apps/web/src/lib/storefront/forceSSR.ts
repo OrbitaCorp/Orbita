@@ -9,7 +9,7 @@ import { esSlugDemo } from '@/lib/demo/modo'
 import { temaDePlantilla } from '@/modules/ventas/cliente/inicio/plantillaReal'
 import type { Tema } from '@/modules/ventas/panel/avanzado/plantillas/tipos'
 import { esNavegadorMovil } from '@/hooks/useMovilPlantilla'
-import { esDeAlquileres, sitioConReserva } from '@/lib/reservas/destinoPanel'
+import { esDeAlquileres, esDeTurnos, sitioConReserva } from '@/lib/reservas/destinoPanel'
 
 // Marca/branding de la tienda que el loader necesita para pintarse bien.
 // Viaja serializado en `pageProps` (vía __NEXT_DATA__), así que está
@@ -368,6 +368,17 @@ export function soloAlquileres(base: GetServerSideProps): GetServerSideProps {
   }
 }
 
+/** Como `soloAlquileres`, para lo que es solo de un negocio de Turnos (el enlace personal de un turno). */
+export function soloTurnos(base: GetServerSideProps): GetServerSideProps {
+  return async (ctx) => {
+    const res = await base(ctx)
+    if (!('props' in res)) return res
+    const props = (await res.props) as { __industry?: string | null; __storeMeta?: StoreMetaSSR | null }
+    if (props.__storeMeta && !esDeTurnos(props.__industry)) return { notFound: true }
+    return res
+  }
+}
+
 /**
  * Para /reserva: existe en el sitio de un negocio que reserva (Alquileres,
  * Gimnasio) y en una tienda es un 404. Como `soloAlquileres`: si la config no
@@ -394,6 +405,12 @@ export const getServerSidePropsProducto = crearGetServerSideProps('producto')
 export const getServerSidePropsAlquileres = soloAlquileres(crearGetServerSideProps())
 export const getServerSidePropsReserva = soloSitiosDeReservas(crearGetServerSideProps())
 /** Como la anterior, con el token del enlace personal entre las props (ya resuelto para el primer render). */
+export const getServerSidePropsMiTurno: GetServerSideProps = async (ctx) => {
+  const res = await soloTurnos(crearGetServerSideProps())(ctx)
+  if (!('props' in res)) return res
+  const token = typeof ctx.params?.token === 'string' ? ctx.params.token : null
+  return { props: { ...(await res.props), token } }
+}
 export const getServerSidePropsMiReserva: GetServerSideProps = async (ctx) => {
   const res = await getServerSidePropsAlquileres(ctx)
   if (!('props' in res)) return res

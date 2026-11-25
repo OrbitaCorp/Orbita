@@ -14,6 +14,8 @@ type Rubro = string | undefined | null
 type Subrubros = readonly string[] | undefined | null
 
 export const esDeAlquileres = (industry: Rubro): boolean => industry === 'alquileres'
+/** Un negocio de Turnos: el rubro principal va en `industry` (decisión de Turnos del 15/11). */
+export const esDeTurnos = (industry: Rubro): boolean => industry === 'turnos'
 
 /**
  * Las claves de rubro de Gimnasio (RUBROS_GYM, en modules/gimnasio/datos). Van

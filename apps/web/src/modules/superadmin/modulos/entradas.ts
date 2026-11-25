@@ -4122,4 +4122,36 @@ Usa el campo libre que sumó Alan (\`ReservaConfig.datos\`, 23/11), sin migraci�
       'apps/web/src/pages/turnos-demo/reserva-api.tsx:1',
     ],
   }),
+  entrada({
+    modulo: 'turnos', fecha: F25, slug: 'mi-turno', tipo: 'tarea', quien: 'Mateo',
+    titulo: 'El enlace personal del turno: ver, cambiar el horario y cancelar',
+    foco: 'El enlace que va en los emails de un turno (<slug>.orbita.site/mi-turno/<token>) daba 404: la ruta no existía. Ahora abre el turno con su estado, cuándo, con quién y cuánto sale, y deja cambiar el horario o cancelarlo según la política del negocio. Si la política no lo deja, dice por qué. Es una ruta de producción y solo existe en el sitio de un negocio de Turnos.',
+    que: `Tarea del 26/11 del plan, hecha el 25/11.
+
+**La ruta** \`pages/tienda/[slug]/mi-turno/[token].tsx\` es la misma que arma el motor para los emails (\`RUTA_MI_RESERVA.TURNOS\`). La sirve \`getServerSidePropsMiTurno\` (\`lib/storefront/forceSSR.ts\`): en un negocio que no es de Turnos da 404, con la misma guarda que usa Alquileres para su "mi reserva". El rubro se reconoce por \`industry: "turnos"\` (\`esDeTurnos\`, en \`lib/reservas/destinoPanel.ts\`).
+
+**La página** (\`storefront/MiTurno.tsx\`) tiene un marco propio con el kit de reservas: no depende de la portada de Turnos, que todavía no tiene sus rutas de producción. El token es la única llave.
+
+- **Arriba,** en qué está el turno (confirmado, esperando que el negocio lo confirme, cancelado…) y su código.
+- **Después,** el servicio, el día, la hora, con quién, el precio y la seña (pagada o a coordinar).
+- **Cambiar el horario:** los días con lugar y los horarios libres de la misma persona y el mismo servicio, con cuántos cambios le quedan. Si el horario se ocupó en el medio, se vuelven a traer los de ese día.
+- **Cancelar:** pide confirmación, porque no se deshace, y dice qué pasa con la seña si hay una pagada.
+- **Lo que no se deja** (fuera de plazo, ya cancelado) muestra el motivo de la API.
+
+**Probado contra la API local**, con el negocio de prueba:
+
+- **Abrir el turno recién reservado:** "Barbería de Prueba", con Lucas, y la política (cancelar hasta un día antes, 2 cambios).
+- **Pasarlo a otro día:** queda movido, con 1 cambio hecho, y el horario de antes queda libre.
+- **Un token inventado:** "Esa reserva no existe."
+- **Cancelar:** queda cancelado y ya no se puede volver a cancelar. Repetir el pedido no rompe nada.
+
+**Verificado:** typecheck y eslint de \`apps/web\` sin errores y los tests de Turnos en verde. La página no se abrió a mano en el navegador.`,
+    archivos: [
+      'apps/web/src/pages/tienda/[slug]/mi-turno/[token].tsx:1',
+      'apps/web/src/modules/turnos/storefront/MiTurno.tsx:44',
+      'apps/web/src/lib/storefront/forceSSR.ts:408',
+      'apps/web/src/lib/reservas/destinoPanel.ts:18',
+      'apps/web/src/modules/turnos/storefront/__tests__/miTurno.test.ts:1',
+    ],
+  }),
 ]
