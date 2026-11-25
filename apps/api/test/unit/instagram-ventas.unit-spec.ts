@@ -223,9 +223,31 @@ describe('bot de ventas de Instagram: mensajes', () => {
 
   it('con la IA apagada contesta con el menú y no llama al modelo', async () => {
     const { svc, instagram, llm } = armar({ cfg: { usarIa: false } });
-    await svc.atender([mensaje({ texto: 'hola' })]);
+    await svc.atender([mensaje({ texto: '¿sirve para una ferretería?' })]);
     expect(llm.streamChat).not.toHaveBeenCalled();
     expect(instagram.enviarConRespuestasRapidas).toHaveBeenCalledTimes(1);
+  });
+
+  it('un saludo va con la bienvenida y el menú, sin preguntarle a la IA (y sin derivar)', async () => {
+    const { svc, instagram, prisma, llm } = armar({ ia: '[DERIVAR]' });
+    await svc.atender([mensaje({ texto: 'Hola' })]);
+    expect(llm.streamChat).not.toHaveBeenCalled();
+    expect(instagram.enviarConRespuestasRapidas.mock.calls[0][3]).toBe(BIENVENIDA);
+    expect(prisma.conversation.updateMany).not.toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ botEstado: 'DERIVADO' }) }));
+  });
+
+  it('si la IA falla o no dice nada, contesta con el menú en vez de "no la sé"', async () => {
+    for (const ia of ['', '   ']) {
+      const { svc, instagram, prisma } = armar({ ia });
+      await svc.atender([mensaje({ texto: '¿sirve para una ferretería?' })]);
+      expect(instagram.enviarConRespuestasRapidas.mock.calls[0][3]).toBe(BIENVENIDA);
+      expect(instagram.enviarTexto).not.toHaveBeenCalled();
+      expect(prisma.conversation.updateMany).not.toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ botEstado: 'DERIVADO' }) }));
+    }
+    const { svc, instagram, llm } = armar();
+    llm.streamChat.mockImplementationOnce(async function* () { throw new Error('timeout'); });
+    await svc.atender([mensaje({ texto: '¿sirve para una ferretería?' })]);
+    expect(instagram.enviarConRespuestasRapidas.mock.calls[0][3]).toBe(BIENVENIDA);
   });
 });
 

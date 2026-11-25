@@ -39,6 +39,7 @@ const IA_POR_CHARLA = 20;
 const IA_POR_DIA = 800;
 const ESPERA_IA_MS = 20_000;
 const DIA_MS = 86_400_000;
+const DERIVAR = Symbol('derivar');
 
 export const MOTIVO_PIDIO_PERSONA = 'Pidió hablar con una persona.';
 export const MOTIVO_SIN_RESPUESTA = 'El bot no supo responder y la pasó al equipo.';
@@ -203,11 +204,15 @@ export class InstagramVentasService implements AtencionAlternativa, OnModuleInit
     if (opcion) return this.responderOpcion(m, cfg, opcion);
     // Fotos, audios y archivos no los lee: los ve el equipo en la bandeja.
     if (!m.esTexto || !m.texto) return;
+    // Un saludo no es una pregunta: va la bienvenida con el menú, sin gastar IA (y sin que el modelo, con un historial
+    // de derivaciones, lo tome como algo que no sabe responder).
+    if (esSaludo(m.texto)) return this.enviarTexto(m, BIENVENIDA, MENU);
 
     if (cfg.usarIa && (await this.quedaIa(m.businessId, m.conversationId))) {
       const respuesta = await this.preguntarIa(m);
-      if (respuesta === null) return this.derivar(m, cfg, MOTIVO_SIN_RESPUESTA, DERIVAR_SIN_RESPUESTA);
-      return this.enviarTexto(m, respuesta, MENU);
+      if (respuesta === DERIVAR) return this.derivar(m, cfg, MOTIVO_SIN_RESPUESTA, DERIVAR_SIN_RESPUESTA);
+      // Si la IA falló o no dijo nada, "no la sé" sería mentira: va el menú.
+      return this.enviarTexto(m, respuesta ?? BIENVENIDA, MENU);
     }
     return this.enviarTexto(m, BIENVENIDA, MENU);
   }
@@ -403,7 +408,8 @@ export class InstagramVentasService implements AtencionAlternativa, OnModuleInit
   }
 
   /** La respuesta de la IA, o null si no la sabe (o falló): entonces se deriva al equipo. */
-  private async preguntarIa(m: MensajeDeCliente): Promise<string | null> {
+  /** La respuesta de la IA, DERIVAR si dijo que no sabe, o null si falló o no dijo nada. */
+  private async preguntarIa(m: MensajeDeCliente): Promise<string | typeof DERIVAR | null> {
     const previos = await this.prisma.message.findMany({
       where: { conversationId: m.conversationId, conversation: { businessId: m.businessId }, channel: 'INSTAGRAM' },
       orderBy: { createdAt: 'desc' },
@@ -430,8 +436,8 @@ export class InstagramVentasService implements AtencionAlternativa, OnModuleInit
       clearTimeout(reloj);
     }
     const limpio = texto.replace(/\*+/g, '').trim();
-    if (!limpio || limpio.includes('[DERIVAR]')) return null;
-    return limpio;
+    if (limpio.includes('[DERIVAR]')) return DERIVAR;
+    return limpio || null;
   }
 
   // ── Datos de Órbita ───────────────────────────────────────────────────────
