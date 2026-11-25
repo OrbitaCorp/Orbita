@@ -157,7 +157,8 @@ export class ReservasService {
     }
 
     const bloqueos = await this.disponibilidad.bloqueosEntre(businessId, pedido.modulo, recurso.id, inicio, fin);
-    if (bloqueos.length > 0) throw new BadRequestException('Ese horario está bloqueado por el negocio.');
+    // En un alojamiento el bloqueo puede venir del dueño o de su calendario de Airbnb: se dice en noches y sin culpar a nadie.
+    if (bloqueos.length > 0) throw new BadRequestException(recurso.tipo === 'ALOJAMIENTO' ? 'Esas noches no están disponibles. Elegí otras fechas.' : 'Ese horario está bloqueado por el negocio.');
 
     const datos = (recurso.datos && typeof recurso.datos === 'object' ? recurso.datos : {}) as Record<string, unknown>;
     const extras = extrasElegidos(datos.extras, pedido.extras);

@@ -151,6 +151,13 @@ describe('ReservasService · resolverPedido (lo que se verifica antes del candad
     expect(manual.precio).toBe(150_000);
   });
 
+  it('noches bloqueadas de un alojamiento (por el dueño o por Airbnb): se dice en noches, no en horarios', async () => {
+    const cabana = cancha({ id: 'r-cab', tipo: 'ALOJAMIENTO', duracionMinutos: null, maximoSeguidos: 1, precio: 60_000 });
+    const { svc } = armar({ recurso: cabana, bloqueos: [{ inicio: instante('2026-11-14', 840), fin: instante('2026-11-16', 600) }] });
+    await expect(svc.resolverPedido(BIZ, { modulo: 'ALQUILERES', recursoId: 'r-cab', fecha: '2026-11-13', fechaHasta: '2026-11-15' }, 'publico', AHORA))
+      .rejects.toThrow('Esas noches no están disponibles. Elegí otras fechas.');
+  });
+
   it('con las reservas online pausadas el sitio no reserva, pero el panel sí', async () => {
     const { svc } = armar({ config: config({ activo: false }) });
     await expect(svc.resolverPedido(BIZ, pedido(), 'publico', AHORA)).rejects.toThrow(/pausadas/);

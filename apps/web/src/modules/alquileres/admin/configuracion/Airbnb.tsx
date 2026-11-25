@@ -37,7 +37,7 @@ interface P {
 const CSS = `
   .ala-url { display: flex; gap: 8px; align-items: stretch; }
   .ala-url input { flex: 1; min-width: 0; font-family: var(--rv-mono); font-size: 13px; }
-  .ala-pasos { margin: 12px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--color-body); }
+  .ala-pasos { margin: 12px 0 0; padding-left: 22px; list-style: decimal; display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--color-body); }
   .ala-cal { padding: 12px 0; border-top: 1px solid var(--color-border); display: flex; flex-direction: column; gap: 8px; }
   .ala-cal:first-child { border-top: none; padding-top: 0; }
   .ala-cal-cab { display: flex; align-items: flex-start; gap: 10px; }
