@@ -147,6 +147,7 @@ model Business {
   reservasHistorial    ReservaHistorial[]
   reservasEspera       ReservaEspera[]
   reservasBloqueos     ReservaBloqueo[]
+  reservasCalendarios  ReservaCalendarioExterno[]
 
   @@map("businesses")
 }
@@ -3985,10 +3986,11 @@ model ReservaRecurso {
   createdAt       DateTime           @default(now()) @map("created_at")
   updatedAt       DateTime           @updatedAt @map("updated_at")
 
-  business Business         @relation(fields: [businessId], references: [id])
-  reservas Reserva[]
-  esperas  ReservaEspera[]
-  bloqueos ReservaBloqueo[]
+  business    Business                   @relation(fields: [businessId], references: [id])
+  reservas    Reserva[]
+  esperas     ReservaEspera[]
+  bloqueos    ReservaBloqueo[]
+  calendarios ReservaCalendarioExterno[]
 
   @@index([businessId, modulo])
   @@map("reservas_recursos")
@@ -4146,19 +4148,63 @@ model ReservaEspera {
 // recursoId null tapa a todos los recursos del módulo. No cancela lo ya
 // reservado: el panel avisa cuántas reservas quedaron adentro.
 model ReservaBloqueo {
-  id                String        @id @default(uuid())
-  businessId        String        @map("business_id")
+  id                String               @id @default(uuid())
+  businessId        String               @map("business_id")
   modulo            ReservaModulo
-  recursoId         String?       @map("recurso_id")
+  recursoId         String?              @map("recurso_id")
   inicio            DateTime
   fin               DateTime
-  motivo            String?       @db.VarChar(200)
-  creadoPorMemberId String?       @map("creado_por_member_id")
-  createdAt         DateTime      @default(now()) @map("created_at")
+  motivo            String?              @db.VarChar(200)
+  creadoPorMemberId String?              @map("creado_por_member_id")
+  createdAt         DateTime             @default(now()) @map("created_at")
+  /// DUENO: lo cargó el negocio. ICAL: vino de un calendario externo (Airbnb) y se reemplaza en cada sincronización.
+  origen            ReservaBloqueoOrigen @default(DUENO)
+  /// Solo ICAL: de qué calendario vino. Al borrar el calendario, sus bloqueos se van con él.
+  calendarioId      String?              @map("calendario_id")
+  /// Solo ICAL: 'RESERVADO' (una reserva hecha allá) o 'CERRADO' (noches que allá figuran como no disponibles).
+  externoTipo       String?              @map("externo_tipo") @db.VarChar(12)
+  /// Solo ICAL: el UID del evento en el .ics, para no crear dos veces el mismo.
+  externoUid        String?              @map("externo_uid") @db.VarChar(255)
 
-  business Business        @relation(fields: [businessId], references: [id])
-  recurso  ReservaRecurso? @relation(fields: [recursoId], references: [id])
+  business   Business                  @relation(fields: [businessId], references: [id])
+  recurso    ReservaRecurso?           @relation(fields: [recursoId], references: [id])
+  calendario ReservaCalendarioExterno? @relation(fields: [calendarioId], references: [id], onDelete: Cascade)
 
   @@index([businessId, modulo, inicio])
+  @@index([calendarioId])
   @@map("reservas_bloqueos")
+}
+
+enum ReservaBloqueoOrigen {
+  DUENO
+  ICAL
+}
+
+// Un calendario .ics de afuera conectado a un recurso: hoy, el de un aviso de
+// Airbnb para un ALOJAMIENTO. Cada sincronización baja el archivo y reemplaza
+// los bloqueos de ese calendario (ReservaBloqueo con origen ICAL). Si la
+// descarga falla se guarda el motivo y los bloqueos quedan como estaban.
+// Ver src/reservas/README.md § Calendarios externos.
+model ReservaCalendarioExterno {
+  id          String        @id @default(uuid())
+  businessId  String        @map("business_id")
+  modulo      ReservaModulo
+  recursoId   String        @map("recurso_id")
+  nombre      String        @db.VarChar(80)
+  url         String        @db.VarChar(600)
+  activo      Boolean       @default(true)
+  /// Cuándo se intentó por última vez (haya salido bien o mal): de ahí sale a quién le toca.
+  ultimaSync  DateTime?     @map("ultima_sync")
+  /// Por qué falló la última vez, listo para mostrar. null = salió bien.
+  ultimoError String?       @map("ultimo_error") @db.VarChar(300)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  business Business         @relation(fields: [businessId], references: [id])
+  recurso  ReservaRecurso   @relation(fields: [recursoId], references: [id])
+  bloqueos ReservaBloqueo[]
+
+  @@index([businessId, modulo])
+  @@index([activo, ultimaSync])
+  @@map("reservas_calendarios_externos")
 }
