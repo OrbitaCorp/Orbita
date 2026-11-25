@@ -231,7 +231,9 @@ export default function Panel() {
           {vista === 'mensajes' && <Mensajes key={k} negocio={negocio} reservas={reservas} clientes={clientes} onGuardar={onGuardar} onAviso={avisar} />}
           {vista === 'pagos' && <Pagos key={kForm} negocio={negocio} onGuardar={onGuardar} onIr={irA} real={real} />}
           {vista === 'calendarios' && real && (
-            <Airbnb key={kForm} negocio={negocio}
+            // key = k y no kForm: la pantalla lee todo de `negocio`, así que no hace falta volver a montarla cuando llegan
+            // datos nuevos. Con kForm, cada conectar o sincronizar la devolvía a la primera propiedad.
+            <Airbnb key={k} negocio={negocio}
               onConectar={c => hacer(() => n.agregarCalendario(tipo, c, []), 'Calendario conectado', 'Ya se bajaron las noches que Airbnb tiene tomadas.')}
               onDesconectar={id => hacer(() => n.quitarCalendario(tipo, id), 'Calendario desconectado', 'Las noches que venían de Airbnb quedaron libres.')}
               onSincronizar={id => hacer(() => n.sincronizarCalendario(tipo, id), 'Calendario sincronizado')}

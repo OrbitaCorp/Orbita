@@ -148,6 +148,7 @@ model Business {
   reservasEspera       ReservaEspera[]
   reservasBloqueos     ReservaBloqueo[]
   reservasCalendarios  ReservaCalendarioExterno[]
+  reservasIcalExportadas ReservaIcalExportada[]
 
   @@map("businesses")
 }
@@ -3987,10 +3988,11 @@ model ReservaRecurso {
   updatedAt       DateTime           @updatedAt @map("updated_at")
 
   business    Business                   @relation(fields: [businessId], references: [id])
-  reservas    Reserva[]
-  esperas     ReservaEspera[]
-  bloqueos    ReservaBloqueo[]
-  calendarios ReservaCalendarioExterno[]
+  reservas        Reserva[]
+  esperas         ReservaEspera[]
+  bloqueos        ReservaBloqueo[]
+  calendarios     ReservaCalendarioExterno[]
+  icalExportadas  ReservaIcalExportada[]
 
   @@index([businessId, modulo])
   @@map("reservas_recursos")
@@ -4207,4 +4209,27 @@ model ReservaCalendarioExterno {
   @@index([businessId, modulo])
   @@index([activo, ultimaSync])
   @@map("reservas_calendarios_externos")
+}
+
+// Las noches que el .ics público de un recurso mostró alguna vez (su "memoria").
+// Sirve para reconocer el eco: Airbnb vuelve a publicar como "no disponible" lo
+// que importó de ese .ics, y a veces lo sigue publicando cuando acá ya se
+// canceló, se movió o se desbloqueó. Lo que cuenta no es lo que hay hoy en la
+// base sino lo que el calendario llegó a mostrar: por eso se anota en cada
+// lectura. Se olvida a los 60 días de la última vez que se mostró.
+model ReservaIcalExportada {
+  id         String   @id @default(uuid())
+  businessId String   @map("business_id")
+  recursoId  String   @map("recurso_id")
+  /// Día de entrada y de salida (exclusiva), como salieron en el .ics.
+  desde      String   @db.VarChar(10)
+  hasta      String   @db.VarChar(10)
+  ultimaVez  DateTime @map("ultima_vez")
+
+  business Business       @relation(fields: [businessId], references: [id])
+  recurso  ReservaRecurso @relation(fields: [recursoId], references: [id])
+
+  @@unique([recursoId, desde, hasta])
+  @@index([businessId])
+  @@map("reservas_ical_exportadas")
 }

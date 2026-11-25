@@ -70,6 +70,12 @@ describe('reservas · bajar el calendario', () => {
     expect(r).toEqual({ ok: false, motivo: 'Airbnb no respondió con el calendario. Volvé a copiar el enlace desde Airbnb.' });
   });
 
+  it('un calendario que llegó cortado (sin su cierre) no se toma: no hay que liberar noches por una descarga a medias', async () => {
+    const cortado = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:a\r\nDTSTART;VALUE=DATE:20261220\r\n';
+    const r = await con(() => new Response(cortado, { status: 200 })).bajar();
+    expect(r).toEqual({ ok: false, motivo: 'Airbnb no respondió con el calendario. Volvé a copiar el enlace desde Airbnb.' });
+  });
+
   it('un 403 o un 500 de Airbnb se cuenta con su número', async () => {
     expect(await con(() => new Response('no', { status: 403 })).bajar()).toEqual({ ok: false, motivo: 'Airbnb respondió 403.' });
     expect(await con(() => new Response('no', { status: 500 })).bajar()).toEqual({ ok: false, motivo: 'Airbnb respondió 500.' });

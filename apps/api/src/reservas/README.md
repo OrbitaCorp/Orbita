@@ -154,7 +154,8 @@ Código: `calendarios/` y `dominio/ics.ts`. Plan y decisiones: `docs/superpowers
 
 - **De acá para allá:** `GET /storefront/:slug/reservas/ical/<recursoId>.ics`, público. Trae las reservas que
   ocupan y los bloqueos del dueño como eventos de día entero, sin datos de nadie. Nunca lo que vino de afuera.
-  No lleva token: muestra lo mismo que `disponibilidad/noches`.
+  No lleva token: muestra lo mismo que `disponibilidad/noches`. Responde también con el negocio o la
+  propiedad en pausa: las noches tomadas siguen tomadas.
 - **De allá para acá:** el dueño conecta el enlace `.ics` del aviso (`reservas_calendarios_externos`). Cada
   sincronización baja el archivo y **reemplaza** los bloqueos de ese calendario (`reservas_bloqueos` con
   `origen = ICAL`, `calendario_id`, `externo_tipo` y `externo_uid`). El motor ya respeta cualquier bloqueo al
@@ -163,13 +164,18 @@ Código: `calendarios/` y `dominio/ics.ts`. Plan y decisiones: `docs/superpowers
   bajan hace 30 minutos. Solo corre en producción: en local y en staging se usa "Sincronizar ahora".
 - **Si falla la descarga** se guarda el motivo en el calendario y los bloqueos quedan como estaban.
 - **El eco:** Airbnb vuelve a publicar como "no disponible" lo que importó de acá, y a veces lo sigue
-  publicando cuando acá ya se canceló. Un evento "no disponible" con las fechas exactas de algo que este
-  recurso exportó en los últimos 60 días (también una reserva cancelada) no bloquea. Lo que allá es una
-  **reserva** bloquea siempre.
+  publicando cuando acá ya se canceló, se movió o se desbloqueó. Un evento "no disponible" con las fechas
+  exactas de algo que el `.ics` de este recurso **mostró** en los últimos 60 días no bloquea. Qué mostró
+  se anota en cada lectura del `.ics` (`reservas_ical_exportadas`): no se deduce de lo que hay hoy en la
+  base, porque un bloqueo borrado ya no está y una retención que nadie vio nunca salió. Lo que allá es
+  una **reserva** bloquea siempre.
+- **Desde el panel**, un "no disponible" de Airbnb no impide cargar una reserva propia (el dueño suele
+  cerrar allá para anotarla acá, y ese bloqueo no se quita a mano). Una reserva hecha en Airbnb sí la
+  impide. Desde el sitio tapa todo.
 - **Conflictos:** `GET calendarios` devuelve, por calendario, las reservas activas de acá que pisan noches
   reservadas allá. No se resuelven solos: decide el dueño.
 - **Qué enlaces se aceptan** (`calendarios/descarga.ts`): solo `https://www.airbnb.<país>/….ics`, por lista
-  fija, sin seguir redirecciones, con 8 s y 1 MB como máximo. Es una dirección que escribe un usuario y que
+  fija, sin seguir redirecciones, con 8 s y 1 MB como máximo, y solo si el archivo llegó entero (con su `END:VCALENDAR`). Es una dirección que escribe un usuario y que
   baja el servidor: no se abre a otros sitios sin revisar esto. Fuera de producción vale además el host de
   `RESERVAS_ICAL_HOST_DE_PRUEBA`, para probar con un archivo propio.
 - Un bloqueo `ICAL` no se borra a mano (`DELETE bloqueos/:id` responde 400): se va cuando Airbnb libera las

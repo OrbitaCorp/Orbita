@@ -199,6 +199,14 @@ describe('calendarios de Airbnb en el panel real', () => {
     expect(recargar).toHaveBeenCalledTimes(3)
   })
 
+  it('si quedó conectado pero Airbnb no dejó bajarlo, no se festeja: se avisa con el motivo, y el calendario queda a la vista', async () => {
+    const { e, recargar } = await conCabana()
+    panel.conectarCalendario.mockResolvedValue({ ...deLaApi, ultimaSync: '2026-11-23T13:10:00.000Z', ultimoError: 'Airbnb respondió 403.' })
+    await expect(e.agregarCalendario('estadia', { id: 'tmp', unidadId: 'p1', nombre: 'Airbnb', url: deLaApi.url, ultimaSync: '2026-11-23' }, []))
+      .rejects.toThrow('Quedó conectado, pero todavía no se pudo bajar: Airbnb respondió 403.')
+    expect(recargar).toHaveBeenCalledTimes(1)
+  })
+
   it('si Airbnb rechaza el enlace, llega el mensaje de la API y no se recarga', async () => {
     const { e, recargar } = await conCabana()
     panel.conectarCalendario.mockRejectedValue(new Error('Pegá el enlace de Airbnb que termina en .ics'))

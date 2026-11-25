@@ -172,8 +172,11 @@ export function escriturasDe(d: CargaApi, recargar: () => Promise<void>): Escrit
     // Los bloqueos no viajan: los arma el servidor al bajar el calendario.
     agregarCalendario: async (_tipo, c) => {
       estadia()
-      await panel.conectarCalendario(calendarioParaApi(c))
+      const conectado = await panel.conectarCalendario(calendarioParaApi(c))
       await recargar()
+      // Conectarlo y poder bajarlo son dos cosas: si Airbnb no lo dejó bajar, no bloquea nada todavía.
+      // No se festeja: el calendario queda a la vista con su error, y se dice.
+      if (conectado.ultimoError) throw new Error(`Quedó conectado, pero todavía no se pudo bajar: ${conectado.ultimoError}`)
     },
     quitarCalendario: async (_tipo, id) => {
       await panel.desconectarCalendario(id)

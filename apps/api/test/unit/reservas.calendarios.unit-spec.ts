@@ -65,12 +65,13 @@ const ics = (...eventos: [uid: string, titulo: string, desde: string, hasta: str
   'END:VCALENDAR',
 ].join('\r\n');
 
-function armar(o: { calendarios?: Fila[]; bloqueos?: Fila[]; reservas?: Fila[]; recursos?: Fila[]; descarga?: unknown } = {}) {
+function armar(o: { calendarios?: Fila[]; bloqueos?: Fila[]; reservas?: Fila[]; recursos?: Fila[]; exportadas?: Fila[]; descarga?: unknown } = {}) {
   const t = {
     reservaCalendarioExterno: tabla(o.calendarios ?? [calendario()]),
     reservaBloqueo: tabla(o.bloqueos ?? []),
     reserva: tabla(o.reservas ?? []),
     reservaRecurso: tabla(o.recursos ?? [cabana()]),
+    reservaIcalExportada: tabla(o.exportadas ?? []),
   };
   const prisma = { ...t, $transaction: jest.fn(async (fn: (tx: unknown) => unknown) => fn(prisma)) } as Record<string, unknown>;
   const catalogo = {
@@ -127,30 +128,68 @@ describe('ReservasCalendariosService · sincronizar', () => {
     expect(deCalendario()).toEqual([]);
   });
 
-  it('el eco: lo que Órbita exportó y Airbnb devuelve como no disponible no se vuelve a bloquear', async () => {
+  it('el eco: lo que el .ics de Órbita mostró y Airbnb devuelve como no disponible no se vuelve a bloquear', async () => {
     const { svc, deCalendario } = armar({
       reservas: [reserva('2026-12-10', '2026-12-13')],
       bloqueos: [bloqueoDueno('2026-12-15', '2026-12-17')],
       descarga: { ok: true, texto: ics(['e1', 'Airbnb (Not available)', '2026-12-10', '2026-12-13'], ['e2', 'Airbnb (Not available)', '2026-12-15', '2026-12-17'], ['e3', 'Airbnb (Not available)', '2026-12-20', '2026-12-22']) },
     });
+    await svc.feed(BIZ, 'r-cab', AHORA); // Airbnb lee el calendario de Órbita
     await svc.sincronizar(BIZ, 'cal-1', AHORA);
     expect(deCalendario().map((b) => b.externoUid)).toEqual(['e3']);
   });
 
   it('cancelar en Órbita libera las noches aunque Airbnb las siga publicando como no disponibles', async () => {
+    const a = armar({ reservas: [reserva('2026-12-10', '2026-12-13')], descarga: { ok: true, texto: ics(['e1', 'Airbnb (Not available)', '2026-12-10', '2026-12-13']) } });
+    await a.svc.feed(BIZ, 'r-cab', AHORA); // Airbnb la leyó mientras estaba viva
+    a.t.reserva.filas[0].estado = 'CANCELADA';
+    await a.svc.sincronizar(BIZ, 'cal-1', new Date(AHORA.getTime() + 3 * 3600_000));
+    expect(a.deCalendario()).toEqual([]);
+  });
+
+  it('borrar un bloqueo propio que Airbnb ya había leído no lo trae de vuelta como bloqueo de Airbnb', async () => {
+    const a = armar({ bloqueos: [bloqueoDueno('2026-12-15', '2026-12-17')], descarga: { ok: true, texto: ics(['e2', 'Airbnb (Not available)', '2026-12-15', '2026-12-17']) } });
+    await a.svc.feed(BIZ, 'r-cab', AHORA);
+    a.t.reservaBloqueo.filas.splice(0, 1); // el dueño lo quita
+    await a.svc.sincronizar(BIZ, 'cal-1', new Date(AHORA.getTime() + 3600_000));
+    expect(a.deCalendario()).toEqual([]);
+  });
+
+  it('reprogramar una reserva que Airbnb ya había leído libera las fechas viejas', async () => {
+    const a = armar({ reservas: [reserva('2026-12-10', '2026-12-13')], descarga: { ok: true, texto: ics(['e1', 'Airbnb (Not available)', '2026-12-10', '2026-12-13']) } });
+    await a.svc.feed(BIZ, 'r-cab', AHORA);
+    Object.assign(a.t.reserva.filas[0], { inicio: instante('2026-12-20', 900), fin: instante('2026-12-23', 600) });
+    await a.svc.sincronizar(BIZ, 'cal-1', new Date(AHORA.getTime() + 3600_000));
+    expect(a.deCalendario()).toEqual([]);
+  });
+
+  it('una retención que nadie terminó y que Airbnb nunca leyó no es un eco: un cierre con esas fechas bloquea', async () => {
     const { svc, deCalendario } = armar({
-      reservas: [reserva('2026-12-10', '2026-12-13', { estado: 'CANCELADA' })],
+      reservas: [reserva('2026-12-10', '2026-12-13', { estado: 'VENCIDA' })],
       descarga: { ok: true, texto: ics(['e1', 'Airbnb (Not available)', '2026-12-10', '2026-12-13']) },
     });
     await svc.sincronizar(BIZ, 'cal-1', AHORA);
-    expect(deCalendario()).toEqual([]);
+    expect(deCalendario().map((b) => b.externoUid)).toEqual(['e1']);
   });
 
-  it('una reserva hecha en Airbnb bloquea siempre, aunque coincida con algo de Órbita', async () => {
+  it('la memoria del eco dura 60 días desde la última vez que el .ics mostró esas noches', async () => {
+    const hace = (dias: number) => new Date(AHORA.getTime() - dias * 86_400_000);
+    const exportadas = [
+      { id: 'x1', businessId: BIZ, recursoId: 'r-cab', desde: '2026-12-10', hasta: '2026-12-13', ultimaVez: hace(59) },
+      { id: 'x2', businessId: BIZ, recursoId: 'r-cab', desde: '2026-12-15', hasta: '2026-12-17', ultimaVez: hace(61) },
+      { id: 'x3', businessId: BIZ, recursoId: 'r-otra', desde: '2026-12-20', hasta: '2026-12-22', ultimaVez: hace(1) },
+    ];
+    const { svc, deCalendario } = armar({ exportadas, descarga: { ok: true, texto: ics(['e1', 'Airbnb (Not available)', '2026-12-10', '2026-12-13'], ['e2', 'Airbnb (Not available)', '2026-12-15', '2026-12-17'], ['e3', 'Airbnb (Not available)', '2026-12-20', '2026-12-22']) } });
+    await svc.sincronizar(BIZ, 'cal-1', AHORA);
+    expect(deCalendario().map((b) => b.externoUid)).toEqual(['e2', 'e3']);
+  });
+
+  it('una reserva hecha en Airbnb bloquea siempre, aunque coincida con algo que Órbita mostró', async () => {
     const { svc, deCalendario } = armar({
-      reservas: [reserva('2026-12-10', '2026-12-13', { estado: 'CANCELADA' })],
+      reservas: [reserva('2026-12-10', '2026-12-13')],
       descarga: { ok: true, texto: ics(['e1', 'Reserved', '2026-12-10', '2026-12-13']) },
     });
+    await svc.feed(BIZ, 'r-cab', AHORA);
     await svc.sincronizar(BIZ, 'cal-1', AHORA);
     expect(deCalendario()).toHaveLength(1);
   });
@@ -294,9 +333,13 @@ describe('ReservasCalendariosService · el .ics que se le da a Airbnb', () => {
     for (const id of ['cancelada', 'vencida', 'retenida-vencida', 'pasada', 'de-airbnb']) expect(texto).not.toContain(`UID:${id}@`);
   });
 
-  it('un recurso de otro negocio, inactivo, borrado o que no es alojamiento no tiene calendario', async () => {
+  it('una propiedad pausada sigue publicando su calendario: las noches que tiene tomadas siguen tomadas', async () => {
+    const { svc } = armar({ recursos: [cabana({ activo: false })], reservas: [reserva('2026-12-10', '2026-12-13')] });
+    expect(await svc.feed(BIZ, 'r-cab', AHORA)).toContain('DTSTART;VALUE=DATE:20261210');
+  });
+
+  it('un recurso de otro negocio, borrado o que no es alojamiento no tiene calendario', async () => {
     await expect(armar().svc.feed('otro-negocio', 'r-cab', AHORA)).rejects.toThrow(NotFoundException);
-    await expect(armar({ recursos: [cabana({ activo: false })] }).svc.feed(BIZ, 'r-cab', AHORA)).rejects.toThrow(NotFoundException);
     await expect(armar({ recursos: [cabana({ eliminadoEn: AHORA })] }).svc.feed(BIZ, 'r-cab', AHORA)).rejects.toThrow(NotFoundException);
     await expect(armar({ recursos: [cabana({ tipo: 'CANCHA' })] }).svc.feed(BIZ, 'r-cab', AHORA)).rejects.toThrow(NotFoundException);
     await expect(armar().svc.feed(BIZ, 'no-existe', AHORA)).rejects.toThrow(NotFoundException);
@@ -359,5 +402,24 @@ describe('Calendarios externos · quién puede qué en el panel', () => {
   it('bloquear y desbloquear a mano siguen siendo de quien gestiona las reservas', () => {
     expect(permiso('crearBloqueo')).toBe('reservas.manage');
     expect(permiso('borrarBloqueo')).toBe('reservas.manage');
+  });
+});
+
+describe('ReservasCalendariosService · lo que el .ics mostró queda anotado', () => {
+  it('cada lectura anota las noches que mostró, sin repetirlas, y refresca cuándo fue la última vez', async () => {
+    const a = armar({ reservas: [reserva('2026-12-10', '2026-12-13')], bloqueos: [bloqueoDueno('2026-12-15', '2026-12-17')] });
+    await a.svc.feed(BIZ, 'r-cab', AHORA);
+    const despues = new Date(AHORA.getTime() + 6 * 3600_000);
+    await a.svc.feed(BIZ, 'r-cab', despues);
+    const filas = a.t.reservaIcalExportada.filas.filter((x) => x.recursoId === 'r-cab');
+    expect([...new Set(filas.map((x) => `${x.desde}|${x.hasta}`))].sort()).toEqual(['2026-12-10|2026-12-13', '2026-12-15|2026-12-17']);
+    expect(filas.every((x) => (x.ultimaVez as Date).getTime() === despues.getTime())).toBe(true);
+    expect(filas.every((x) => x.businessId === BIZ)).toBe(true);
+  });
+
+  it('si anotar falla, el calendario se sirve igual', async () => {
+    const a = armar({ reservas: [reserva('2026-12-10', '2026-12-13')] });
+    a.t.reservaIcalExportada.createMany.mockRejectedValue(new Error('la base no responde'));
+    expect(await a.svc.feed(BIZ, 'r-cab', AHORA)).toContain('DTSTART;VALUE=DATE:20261210');
   });
 });

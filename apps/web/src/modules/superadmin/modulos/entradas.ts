@@ -3102,8 +3102,9 @@ El negocio de prueba queda creado, con una propiedad y sin reservas activas.`,
 | Qué pasa | Qué hace |
 |---|---|
 | Airbnb tiene una reserva | Bloquea esas noches, siempre |
-| Airbnb devuelve como "no disponible" lo que importó de Órbita (el eco) | No bloquea: se reconoce por las fechas exactas de algo que Órbita exportó en los últimos 60 días |
-| Se cancela acá una reserva que Airbnb ya había importado | Las noches quedan libres acá aunque Airbnb las siga publicando |
+| Airbnb devuelve como "no disponible" lo que importó de Órbita (el eco) | No bloquea: se reconoce por las fechas exactas de algo que el .ics de Órbita mostró en los últimos 60 días |
+| Se cancela, se mueve o se desbloquea acá algo que Airbnb ya había importado | Las noches quedan libres acá aunque Airbnb las siga publicando |
+| El dueño cierra noches a mano en Airbnb y después carga esa reserva en su panel | Puede: un "no disponible" de Airbnb no tapa al panel. Una reserva de Airbnb, sí |
 | Airbnb no responde, o responde otra cosa | Se guarda el motivo, se muestra, y los bloqueos anteriores no se tocan |
 | Entran dos reservas para las mismas noches entre una sincronización y la otra | Aviso arriba del calendario y en Airbnb, con el código. No se cancela nada solo |
 | El dueño quiere quitar a mano un bloqueo que vino de Airbnb | No se puede: se va cuando Airbnb libera o al desconectar |
@@ -3113,13 +3114,15 @@ El negocio de prueba queda creado, con una propiedad y sin reservas activas.`,
 - **El eco también vale para lo cancelado.** En foros de anfitriones se ve que Airbnb reexporta lo que importó y a veces no lo libera. El costo: si el dueño cierra a mano en Airbnb exactamente las noches de una reserva que canceló acá, ese cierre no bloquea.
 - **Solo enlaces de Airbnb**, por lista fija de dominios, sin seguir redirecciones, con 8 segundos y 1 MB como máximo. El servidor baja una dirección que escribe un usuario: no se abre a otros sitios sin revisar \`calendarios/descarga.ts\`.
 
-**Para Turnos y Gimnasio** (motor compartido): migraciones \`20261125120000_reservas_calendarios_externos\` y \`20261125120100_rls_reservas_calendarios_externos\`. Ningún bloqueo existente cambia: todos quedan con origen \`DUENO\`. El paso nuevo del job de 5 minutos baja hasta 5 calendarios por corrida. Cuando un alojamiento rechaza noches bloqueadas, el mensaje ahora habla de noches; para turnos y canchas es el de siempre.
+**Para Turnos y Gimnasio** (motor compartido): migraciones \`20261125120000_reservas_calendarios_externos\`, \`20261125120100_rls_reservas_calendarios_externos\` y \`20261125120200_reservas_ical_exportadas\` (dos tablas nuevas y cuatro columnas en los bloqueos). Ningún bloqueo existente cambia: todos quedan con origen \`DUENO\`. El paso nuevo del job de 5 minutos baja hasta 5 calendarios por corrida. Cuando un alojamiento rechaza noches bloqueadas, el mensaje ahora habla de noches; para turnos y canchas es el de siempre.
 
 **Lo que falta y por qué:**
 - **Probarlo con un aviso real de Airbnb.** No se pudo verificar cómo titula hoy sus eventos ni cada cuánto relee el calendario de Órbita. Lo hace Alan con la propiedad de prueba de producción.
 - Importar las ganancias de Airbnb por CSV, otros sitios, calendarios para canchas y salones, y avisar un conflicto por email.
 
-**Verificado:** tests de la API (2.864 y 800) y del front (1.446) en verde. Contra la base de dev, con un Airbnb de mentira en la misma máquina: el .ics exportado no trae datos de nadie; el eco no bloquea; reservar en el sitio noches de Airbnb se rechaza; el conflicto aparece con su código; cancelar libera aunque el eco siga; una caída no libera nada. En pantalla, a 1280 y a 390 px: conectar, sincronizar, desconectar y el rechazo de un enlace ajeno.`,
+**Revisión:** un revisor independiente leyó toda la rama. Sin problemas de seguridad; sí seis puntos que se corrigieron antes de subir (el principal: la memoria del eco ahora es lo que el .ics mostró, no lo que hay hoy en la base). El detalle y lo que quedó anotado sin corregir están al final del plan.
+
+**Verificado:** tests de la API y del front en verde. Contra la base de dev, con un Airbnb de mentira en la misma máquina: el .ics exportado no trae datos de nadie; el eco no bloquea; reservar en el sitio noches de Airbnb se rechaza; el conflicto aparece con su código; cancelar libera aunque el eco siga; una caída no libera nada. En pantalla, a 1280 y a 390 px: conectar, sincronizar, desconectar y el rechazo de un enlace ajeno.`,
     archivos: [
       'apps/api/src/reservas/dominio/ics.ts:1',
       'apps/api/src/reservas/calendarios/descarga.ts:1',

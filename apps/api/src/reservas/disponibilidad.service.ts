@@ -91,7 +91,8 @@ export class DisponibilidadService {
   async bloqueosEntre(businessId: string, modulo: ReservaModulo, recursoId: string, desde: Date, hasta: Date) {
     return this.prisma.reservaBloqueo.findMany({
       where: { businessId, modulo, OR: [{ recursoId: null }, { recursoId }], inicio: { lt: hasta }, fin: { gt: desde } },
-      select: { inicio: true, fin: true },
+      // origen y externoTipo: para distinguir, al reservar, lo que cerró el dueño de lo que vino de un calendario externo.
+      select: { inicio: true, fin: true, origen: true, externoTipo: true },
     });
   }
 

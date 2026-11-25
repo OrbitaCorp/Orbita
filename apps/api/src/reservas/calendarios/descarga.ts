@@ -76,7 +76,8 @@ export async function descargarCalendario(url: string, deps: { fetch?: typeof fe
     if (!res.ok) return { ok: false, motivo: `Airbnb respondió ${res.status}.` };
     const texto = await leerHasta(res, MAXIMO_BYTES);
     if (texto === null) return { ok: false, motivo: 'El calendario es demasiado grande.' };
-    if (!texto.includes('BEGIN:VCALENDAR')) return { ok: false, motivo: NO_ES_EL_CALENDARIO };
+    // Con su apertura y su cierre: un archivo que llegó cortado traería menos noches de las que hay, y liberaría de más.
+    if (!texto.includes('BEGIN:VCALENDAR') || !texto.includes('END:VCALENDAR')) return { ok: false, motivo: NO_ES_EL_CALENDARIO };
     return { ok: true, texto };
   } catch (e) {
     const nombre = e instanceof Error ? e.name : '';

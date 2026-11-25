@@ -439,3 +439,24 @@ Qué cambia para un negocio real (la demo queda como está):
 - Un job propio de sincronización: mientras haya pocos calendarios alcanza con el de 5 minutos
   (5 por corrida = 30 calendarios cada 30 minutos). Si se pasa, se sube `POR_CORRIDA` o se separa.
 - Avisar por email o WhatsApp cuando hay un conflicto: por ahora se ve en el panel.
+
+## Después de la revisión del código (25/11)
+
+Una revisión independiente de toda la rama no encontró problemas de seguridad ni críticos, y sí estos, que se
+corrigieron antes de producción (cada uno con su test, primero en rojo):
+
+| Qué estaba mal | Qué quedó |
+|---|---|
+| La memoria del eco salía del estado actual de la base: se olvidaba de un bloqueo propio borrado o de una reserva reprogramada (sus noches volvían como bloqueo de Airbnb, imposible de quitar) y "recordaba" retenciones que Airbnb nunca vio (un cierre real con esas fechas no bloqueaba) | Se anota lo que el `.ics` **mostró** en cada lectura (tabla nueva `reservas_ical_exportadas`, migración `20261125120200`) y el eco se compara contra eso |
+| El dueño no podía cargar en su panel una reserva sobre noches que él mismo había cerrado en Airbnb | Desde el panel, un "no disponible" de Airbnb no tapa; una reserva de Airbnb sí |
+| El `.ics` de una propiedad en pausa daba 404 | Responde igual: las noches tomadas siguen tomadas |
+| Un archivo que llegaba cortado se tomaba por bueno y podía liberar noches | Tiene que traer su `END:VCALENDAR` |
+| "Calendario conectado" aunque Airbnb no hubiera dejado bajarlo | Se avisa con el motivo y el calendario queda a la vista con su error |
+| La pantalla volvía a la primera propiedad después de cada acción | Ya no se vuelve a montar |
+
+Quedaron anotados, sin corregir: el `.catch` del panel que trata cualquier falla de `GET calendarios` como "no
+hay calendarios"; la campanita que dice "sincronizado" aunque haya fallado; dos sincronizaciones a la vez del
+mismo calendario pueden duplicar sus bloqueos hasta la corrida siguiente; el mismo aviso conectado por
+`airbnb.com` y por `airbnb.com.ar` cuenta doble; la respuesta de la API devuelve el enlace entero de Airbnb
+(con su clave) a cualquier miembro que pueda ver reservas; y si Airbnb redirige un dominio de país al `.com`,
+ese calendario falla hasta que el dueño pegue el otro enlace.
