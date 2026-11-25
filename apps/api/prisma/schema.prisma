@@ -4402,3 +4402,40 @@ model GimnasioSuscripcion {
   @@index([businessId, desde])
   @@map("gimnasio_suscripciones")
 }
+
+// ─── Marketing de Órbita: Leads y Pilotos por rubro (Superadmin → Marketing → Leads) ─
+// Reemplaza a Prospección en el panel: guarda en base de datos el listado maestro de tiendas
+// online y de nuevos rubros (Turnos, Alquileres, Gimnasio, POS) para que todo el equipo
+// (Mateo, Alan, Mili, Ale) comparta en vivo qué negocios ya fueron contactados, su estado,
+// responsable y notas.
+model MarketingLead {
+  id            String    @id @default(uuid())
+  clave         String?   @unique
+  rubro         String
+  subrubro      String
+  clasificacion String    @default("LEAD")
+  negocio       String
+  zona          String
+  departamento  String
+  localidad     String
+  telefono      String?
+  whatsappUrl   String?   @map("whatsapp_url")
+  instagram     String?
+  webActual     String?   @map("web_actual")
+  resenas       String?
+  direccion     String?
+  fuente        String?
+  contactado    Boolean   @default(false)
+  contactadoPor String?   @map("contactado_por")
+  contactadoAt  DateTime? @map("contactado_at")
+  estado        String    @default("NUEVO")
+  asignadoA     String?   @map("asignado_a")
+  notas         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([rubro, localidad])
+  @@index([rubro, clasificacion])
+  @@index([estado, contactado])
+  @@map("marketing_leads")
+}

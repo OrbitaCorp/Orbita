@@ -3,9 +3,9 @@ import { platformApi } from '@/lib/platform/api'
 import type { ToastVariant } from '@/design-system/components/Toast'
 import { ConfirmModal, useFetch } from './ui'
 
-// Conectar el Claude de cada persona a Órbita. Es UN solo conector para todo Marketing (prospección y videos): se agrega una vez
-// en Claude, se autoriza con la cuenta de la organización y vale para las dos herramientas. Desconectar corta todos los Claude
-// conectados con tu usuario. Servidor del conector: apps/api/src/marketing/prospeccion/mcp/.
+// Conectar el Claude de cada persona a Órbita para generar videos y gestionar tutoriales. Se agrega una vez en Claude,
+// se autoriza con la cuenta de la organización y vale para todo el equipo. Servidor del conector:
+// apps/api/src/marketing/prospeccion/mcp/.
 //
 // Es la única pieza de color de la pantalla a propósito: tiene que verse. Muestra si ESTA persona ya tiene Claude conectado
 // (GET /platform/mcp/estado); si no, los pasos quedan abiertos para que no haya que buscar nada.
@@ -65,7 +65,7 @@ export function ConectarClaude({ puedeEditar, setAviso }: { puedeEditar: boolean
             </span>
             <h2 style={{ margin: '10px 0 6px', fontSize: 21, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.2 }}>Conectá tu Claude a Órbita</h2>
             <p style={{ margin: 0, maxWidth: 580, fontSize: 13.5, lineHeight: 1.6, color: 'rgba(255,255,255,.92)' }}>
-              Un solo conector para buscar clientes y generar videos con el Claude que ya usás. Se conecta una vez por persona, y todo lo que haga queda para que lo revise el equipo.
+              Un solo conector para generar videos y actualizar tutoriales con el Claude que ya usás. Se conecta una vez por persona, y todo lo que haga queda para que lo revise el equipo.
             </p>
           </div>
 

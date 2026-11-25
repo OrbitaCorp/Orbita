@@ -14,11 +14,13 @@ import { VideosPublicarService } from './videos/videos-publicar.service';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { InstagramVentasController } from './instagram-ventas/instagram-ventas.controller';
 import { InstagramVentasService } from './instagram-ventas/instagram-ventas.service';
+import { LeadsController } from './leads/leads.controller';
+import { LeadsService } from './leads/leads.service';
 
 // Pantalla Marketing del super panel. TikTok tiene su propio módulo (marketing/tiktok).
 @Module({
   imports: [ConversationsModule, InstagramModule, TiktokModule, VideosModule, SubscriptionsModule], // SubscriptionsModule: los precios que dice el bot de ventas // contestar y desconectar Instagram con los mismos servicios del panel
-  controllers: [MarketingController, InstagramBandejaController, InstagramContenidoController, InstagramVentasController, VideosController, TutorialesController, TutorialesPanelController],
-  providers: [CanalesService, InstagramBandejaService, InstagramContenidoService, InstagramVentasService, VideosPublicarService],
+  controllers: [MarketingController, InstagramBandejaController, InstagramContenidoController, InstagramVentasController, VideosController, TutorialesController, TutorialesPanelController, LeadsController],
+  providers: [CanalesService, InstagramBandejaService, InstagramContenidoService, InstagramVentasService, VideosPublicarService, LeadsService],
 })
 export class MarketingModule {}

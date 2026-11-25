@@ -6,7 +6,7 @@ import { InstagramBandeja } from './InstagramBandeja'
 import { InstagramBotVentas } from './InstagramBotVentas'
 import { InstagramComentarios, InstagramEstadisticas, InstagramPublicaciones } from './InstagramContenido'
 import { TiktokContenido } from './TiktokContenido'
-import { PanelProspeccion } from './Prospeccion'
+import { PanelLeads } from './Leads'
 import { PanelVideos } from './Videos'
 import { ConectarClaude } from './ConectarClaude'
 import {
@@ -49,7 +49,7 @@ const URL_MARCA = 'https://www.tiktok.com/legal/page/global/bc-policy/en'
 
 const textarea: React.CSSProperties = { ...inputStyle, height: 'auto', minHeight: 96, padding: '11px 13px', lineHeight: 1.5, resize: 'vertical', width: '100%' }
 
-type Canal = 'tiktok' | 'instagram' | 'whatsapp' | 'prospeccion' | 'videos'
+type Canal = 'tiktok' | 'instagram' | 'whatsapp' | 'leads' | 'videos'
 type Tono = 'green' | 'amber' | 'gray'
 type Estado = { texto: string; tono: Tono }
 
@@ -92,7 +92,7 @@ export function TabMarketing({ puedePublicar }: { puedePublicar: boolean }) {
     { id: 'tiktok', texto: 'TikTok', punto: tiktok?.conectado ? 'ok' : 'sin', grupo: 'canales' },
     { id: 'instagram', texto: 'Instagram', punto: ig?.conectado ? 'ok' : 'sin', cuenta: sinLeer, grupo: 'canales' },
     { id: 'whatsapp', texto: 'WhatsApp', grupo: 'canales' },
-    { id: 'prospeccion', texto: 'Prospección', grupo: 'herramientas' },
+    { id: 'leads', texto: 'Leads', grupo: 'herramientas' },
     { id: 'videos', texto: 'Videos', cuenta: porRevisar, grupo: 'herramientas' },
   ]
 
@@ -114,7 +114,7 @@ export function TabMarketing({ puedePublicar }: { puedePublicar: boolean }) {
         @media (prefers-reduced-motion: reduce) { .mk-tab { transition: none; } }
       `}</style>
 
-      <PageHeader title="Marketing" subtitle="Los canales de la empresa, la prospección de clientes y los videos del equipo, en un solo lugar" />
+      <PageHeader title="Marketing" subtitle="Los canales de la empresa, los leads y pilotos por rubro, y los videos del equipo, en un solo lugar" />
 
       <ConectarClaude puedeEditar={puedePublicar} setAviso={setAviso} />
 
@@ -135,7 +135,7 @@ export function TabMarketing({ puedePublicar }: { puedePublicar: boolean }) {
       {canal === 'tiktok' && <PanelTiktok estado={tiktok} puedePublicar={puedePublicar} refrescar={tick} onCambio={() => setTick((n) => n + 1)} onDesconectar={() => setConfirmar('tiktok')} setAviso={setAviso} />}
       {canal === 'instagram' && <PanelInstagram canales={canales} puedeVer={puedePublicar} onCambio={() => setTickCanales((n) => n + 1)} onDesconectar={() => setConfirmar('instagram')} setAviso={setAviso} />}
       {canal === 'whatsapp' && <PanelWhatsapp />}
-      {canal === 'prospeccion' && <PanelProspeccion puedeEditar={puedePublicar} setAviso={setAviso} />}
+      {canal === 'leads' && <PanelLeads puedeEditar={puedePublicar} setAviso={setAviso} />}
       {canal === 'videos' && <PanelVideos puedeEditar={puedePublicar} setAviso={setAviso} />}
 
       {confirmar === 'tiktok' && (

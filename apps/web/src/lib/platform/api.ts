@@ -248,31 +248,81 @@ export type TiktokPublicar = {
   isAigc?: boolean
 }
 
-// ─── Marketing → Prospección (apps/api/src/marketing/prospeccion) ──────────────
-export type ProspectoNivel = 'A' | 'B' | 'C' | 'D' | '—'
-export type ProspectoEstado = 'NUEVO' | 'CONTACTADO' | 'RESPONDIO' | 'DEMO' | 'CLIENTE' | 'DESCARTADO' | 'NO_CONTACTAR'
-export type ProspectoEvaluacion = { puntaje: number | null; nivel: ProspectoNivel; accion: string; motivo: string; subrubro: string | null; partes: Record<string, number> }
-export type ProspectoDatos = {
-  usuario: string; nombre: string | null; bio: string; web: string | null; enlace: string
-  seguidores: number; publicaciones: number; postsPorSemana: number | null; diasDesdeUltimo: number | null; engagementPct: number | null; local: boolean
+// ─── Marketing → Leads (apps/api/src/marketing/leads) ─────────────────────────
+export type LeadRubro = 'TIENDA' | 'TURNOS' | 'ALQUILERES' | 'GIMNASIO' | 'POS'
+export type LeadClasificacion = 'POTENCIAL_LOCAL' | 'PILOTO' | 'LEAD'
+export type LeadEstado = 'NUEVO' | 'CONTACTADO' | 'RESPONDIO' | 'DEMO' | 'PILOTO_ACTIVO' | 'CLIENTE' | 'DESCARTADO' | 'NO_CONTACTAR'
+
+export type MarketingLead = {
+  id: string
+  clave: string | null
+  rubro: LeadRubro
+  subrubro: string
+  clasificacion: LeadClasificacion
+  negocio: string
+  zona: string
+  departamento: string
+  localidad: string
+  telefono: string | null
+  whatsappUrl: string | null
+  instagram: string | null
+  webActual: string | null
+  resenas: string | null
+  direccion: string | null
+  fuente: string | null
+  contactado: boolean
+  contactadoPor: string | null
+  contactadoAt: string | null
+  estado: LeadEstado
+  asignadoA: string | null
+  notas: string | null
+  createdAt: string
+  updatedAt: string
 }
-export type ProspectoAnalisis = {
-  usuario: string; subrubro: string; confianza: 'alta' | 'media' | 'baja'; vende_productos: boolean | null; canal_venta: string
-  senales_dolor: string[]; nivel_final: 'A' | 'B' | 'C' | 'D'; motivo: string; angulo: string; mensaje_sugerido: string
+
+export type MarketingLeadsResumen = {
+  total: number
+  contactados: number
+  potencialesLocales: number
+  maxPilotosPorRubro: number
+  porRubro: Record<LeadRubro, { total: number; contactados: number; pilotos: number; maxPilotos: number; potencialesLocales: number }>
 }
-export type Prospecto = {
-  id: string; usuario: string; datos: ProspectoDatos; evaluacion: ProspectoEvaluacion; analisis: ProspectoAnalisis | null
-  analizadoAt: string | null; estado: ProspectoEstado; notas: string | null; ultimaConsultaAt: string
+
+export type MarketingLeadsRespuesta = {
+  resumen: MarketingLeadsResumen
+  leads: MarketingLead[]
 }
-export type ProspeccionLote = { id: string; createdAt: string; creadoPor: string; cuentas: number; sinDatos: number; niveles: Record<string, number>; analizadas: number }
-export type ProspeccionLoteDetalle = { id: string; createdAt: string; versionCriterio: string; sinDatos: { usuario: string; motivo: string }[]; prospectos: Prospecto[] }
-export type ProspeccionConsulta = {
-  lote: { id: string; createdAt: string }
-  conDatos: number
-  sinDatos: { usuario: string; motivo: string }[]
-  resumen: { usuario: string; puntaje: number | null; nivel: ProspectoNivel; subrubro: string | null; estado: ProspectoEstado }[]
-  aviso: string | null
+
+export type CrearLeadInput = {
+  rubro: LeadRubro
+  subrubro: string
+  clasificacion?: LeadClasificacion
+  negocio: string
+  localidad: string
+  telefono?: string
+  instagram?: string
+  webActual?: string
+  direccion?: string
+  asignadoA?: string
+  notas?: string
 }
+
+export type ActualizarLeadInput = {
+  rubro?: LeadRubro
+  subrubro?: string
+  clasificacion?: LeadClasificacion
+  negocio?: string
+  localidad?: string
+  telefono?: string | null
+  instagram?: string | null
+  webActual?: string | null
+  direccion?: string | null
+  contactado?: boolean
+  estado?: LeadEstado
+  asignadoA?: string | null
+  notas?: string | null
+}
+
 export type McpSolicitud = { cliente: string; retorno: string; permisos: string[]; dominios: string[]; usuario: string }
 
 export type VideoEstado = 'PENDIENTE' | 'APROBADO' | 'PUBLICADO' | 'RECHAZADO'
@@ -1293,12 +1343,20 @@ export const platformApi = {
   tiktokBorrador: (videoUrl: string) => sendJSON<{ id: string; publishId: string; status: string }>('/platform/marketing/tiktok/posts/draft', 'POST', { videoUrl }),
   tiktokEstadoPublicacion: (publishId: string) => getJSON<TiktokPublicacion>(`/platform/marketing/tiktok/posts/${publishId}`),
   tiktokDesconectar: () => sendJSON<{ ok: true }>('/platform/marketing/tiktok', 'DELETE'),
-  // Prospección: las cuentas se consultan por la API de Meta y se guardan en un lote; el análisis lo hace el Claude de
-  // cada superadmin por el conector MCP. Las rutas de "mcp" son la pantalla de consentimiento y el botón Desconectar.
-  prospeccionLotes: () => getJSONConMensaje<ProspeccionLote[]>('/platform/marketing/prospeccion/lotes'),
-  prospeccionLote: (id: string) => getJSONConMensaje<ProspeccionLoteDetalle>(`/platform/marketing/prospeccion/lotes/${id}`),
-  prospeccionConsultar: (usuarios: string[]) => sendJSON<ProspeccionConsulta>('/platform/marketing/prospeccion/lotes', 'POST', { usuarios }),
-  prospeccionActualizar: (id: string, cambios: { estado?: ProspectoEstado; notas?: string }) => sendJSON<Prospecto>(`/platform/marketing/prospeccion/prospectos/${id}`, 'PATCH', cambios),
+  // Leads y pilotos por rubro (apps/api/src/marketing/leads). Las rutas de "mcp" quedan para Videos y Tutoriales.
+  leadsListar: (filtros?: { rubro?: LeadRubro; clasificacion?: LeadClasificacion; estado?: LeadEstado; localidad?: string; q?: string }) => {
+    const qs = new URLSearchParams()
+    if (filtros?.rubro) qs.set('rubro', filtros.rubro)
+    if (filtros?.clasificacion) qs.set('clasificacion', filtros.clasificacion)
+    if (filtros?.estado) qs.set('estado', filtros.estado)
+    if (filtros?.localidad) qs.set('localidad', filtros.localidad)
+    if (filtros?.q) qs.set('q', filtros.q)
+    const suf = qs.toString()
+    return getJSONConMensaje<MarketingLeadsRespuesta>(`/platform/marketing/leads${suf ? `?${suf}` : ''}`)
+  },
+  leadsCrear: (body: CrearLeadInput) => sendJSON<MarketingLead>('/platform/marketing/leads', 'POST', body),
+  leadsActualizar: (id: string, cambios: ActualizarLeadInput) => sendJSON<MarketingLead>(`/platform/marketing/leads/${id}`, 'PATCH', cambios),
+  leadsEliminar: (id: string) => sendJSON<{ ok: true }>(`/platform/marketing/leads/${id}`, 'DELETE'),
   mcpSolicitud: (req: string) => getJSONConMensaje<McpSolicitud>(`/platform/mcp/solicitud?req=${encodeURIComponent(req)}`),
   mcpResolver: (req: string, decision: 'aprobar' | 'cancelar') => sendJSON<{ redirect: string }>('/platform/mcp/resolver', 'POST', { req, decision }),
   mcpDesconectar: () => sendJSON<{ revocados: number }>('/platform/mcp/conexiones', 'DELETE'),
