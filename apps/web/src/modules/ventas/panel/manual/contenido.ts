@@ -576,7 +576,7 @@ export const CAPITULOS: Capitulo[] = [
             bloques: [
                 { tipo: 'parrafo', texto: 'En el módulo **Difusión** del menú lateral conectás la cuenta profesional de Instagram de tu negocio. Una vez conectada podés responder tus mensajes directos, publicar, responder comentarios y ver estadísticas, todo desde Difusión.' },
                 { tipo: 'parrafo', texto: 'Instagram está en acceso anticipado: si todavía no lo tenés, escribí el usuario de tu cuenta y tocá [[Pedir acceso]]. El pedido queda pendiente de confirmación hasta que sumemos tu cuenta como cuenta de prueba de la app; recién ahí te mandamos la invitación de Instagram y aparece el botón para conectar.' },
-                { tipo: 'parrafo', texto: 'Mientras no hayas conectado, la primera pantalla de **Difusión** muestra un video de cómo funciona. La ventana de conexión se abre sola únicamente cuando ya podés conectar (el **Paso 3 de 3**); antes de eso la abrís vos con el botón de la tarjeta de Instagram.' },
+                { tipo: 'parrafo', texto: 'Mientras no hayas conectado, la primera pantalla de **Difusión** muestra un video de cómo funciona y, al lado, lo que vas a poder hacer: cada función abre su pantalla. La ventana de conexión se abre sola únicamente cuando ya podés conectar (el **Paso 3 de 3**); antes de eso la abrís vos con el botón de la tarjeta de Instagram.' },
                 { tipo: 'nota', variante: 'tip', texto: 'Al conectar desde Difusión se piden de una vez todos los permisos: mensajes, publicar, comentarios y estadísticas. Si tu conexión es vieja y le falta alguno, la pantalla que lo necesita te muestra [[Autorizar]] para darlo.' },
             ],
             ir: { label: 'Ir a Difusión', seccion: 'difusion' },
