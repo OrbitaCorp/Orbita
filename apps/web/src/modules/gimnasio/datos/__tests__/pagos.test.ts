@@ -41,16 +41,17 @@ describe('con qué puede pagar un lugar', () => {
     // La clase suelta se usa para cobrar aparte aunque no se ofrezca en el sitio.
     expect(uno.suelta?.id).toBe('p-suelta')
     expect(pagosPosibles(negocio, ana, LUNES, HOY, [], 3).plan.puede).toBe(true)
-    expect(pagosPosibles(negocio, ana, LUNES, HOY, [], 4).plan).toEqual({ puede: false, motivo: 'A Ana le quedan 3 clases en el pack: no alcanzan para 4 lugares.' })
-    expect(pagosPosibles(negocio, conPlanes([plan({ restantes: 0 })]), LUNES, HOY, []).plan).toEqual({ puede: false, motivo: 'A Ana no le quedan clases en el pack.' })
+    expect(pagosPosibles(negocio, ana, LUNES, HOY, [], 4).plan).toEqual({ puede: false, motivo: 'A Ana le quedan 3 clases en el pack: no alcanzan para 4 lugares.', salida: 'Para que use su plan, renovalo antes desde su ficha.' })
+    expect(pagosPosibles(negocio, conPlanes([plan({ restantes: 0 })]), LUNES, HOY, []).plan).toEqual({ puede: false, motivo: 'A Ana no le quedan clases en el pack.', salida: 'Para que use su plan, renovalo antes desde su ficha.' })
   })
 
   it('sin plan, vencido, o con un plan que no llega a esa clase o todavía no arrancó: no, y dice por qué', () => {
     expect(pagosPosibles(negocio, conPlanes([]), LUNES, HOY, []).plan).toEqual({ puede: false, motivo: 'Ana no tiene un plan.' })
-    expect(pagosPosibles(negocio, conPlanes([plan({ hasta: '2026-11-10' })]), LUNES, HOY, []).plan.motivo).toBe('El plan de Ana venció el mar 10 nov.')
+    expect(pagosPosibles(negocio, conPlanes([plan({ hasta: '2026-11-10' })]), LUNES, HOY, []).plan).toEqual({ puede: false, motivo: 'El plan de Ana venció el mar 10 nov.', salida: 'Para que use su plan, renovalo antes desde su ficha.' })
     // Vale hoy, pero la clase es de después de que venza.
     expect(pagosPosibles(negocio, conPlanes([plan({ hasta: '2026-11-20' })]), '2026-11-23', HOY, []).plan.motivo).toBe('El plan de Ana vence el vie 20 nov: esa clase es de después.')
-    expect(pagosPosibles(negocio, conPlanes([membresia({ desde: '2026-12-02', hasta: '2027-01-01' })]), LUNES, HOY, []).plan.motivo).toBe('El plan de Ana arranca el mié 2 dic: esa clase es de antes.')
+    // Renovar no arregla una clase que es de antes de que arranque el plan: ahí no hay salida que ofrecer.
+    expect(pagosPosibles(negocio, conPlanes([membresia({ desde: '2026-12-02', hasta: '2027-01-01' })]), LUNES, HOY, []).plan).toEqual({ puede: false, motivo: 'El plan de Ana arranca el mié 2 dic: esa clase es de antes.' })
   })
 
   it('una membresía con tope cubre hasta sus clases de la semana, un lugar por clase; el pase libre no tiene tope', () => {
@@ -64,7 +65,7 @@ describe('con qué puede pagar un lugar', () => {
     // No cuentan: una cancelada, una que se cobró aparte, una sin definir, ni la de otra persona.
     const noCuentan = [lugar({ id: 'a', fecha: martes }), lugar({ id: 'b', estado: 'cancelada' }), lugar({ id: 'c', pago: 'aparte' }), lugar({ id: 'd', pago: null }), lugar({ id: 'e', socioId: 'otra' })]
     expect(pagosPosibles(negocio, ana, LUNES, HOY, noCuentan).plan.puede).toBe(true)
-    expect(pagosPosibles(negocio, ana, LUNES, HOY, [], 2).plan).toEqual({ puede: false, motivo: 'La membresía cubre un lugar por clase: los demás van aparte.' })
+    expect(pagosPosibles(negocio, ana, LUNES, HOY, [], 2).plan).toEqual({ puede: false, motivo: 'La membresía cubre un solo lugar por clase.', salida: 'Para que use su plan, anotalo con un solo lugar y a quien lo acompaña por separado.' })
     const libre = conPlanes([membresia({ id: 's-libre', planId: 'p-libre', porSemana: 0 })])
     expect(pagosPosibles(negocio, libre, LUNES, HOY, Array.from({ length: 6 }, (_, k) => lugar({ id: `l${k}`, suscripcionId: 's-libre' }))).plan.puede).toBe(true)
   })

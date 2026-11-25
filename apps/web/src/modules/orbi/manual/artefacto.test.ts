@@ -54,8 +54,10 @@ describe('artefacto de Orbi (manual.generated.ts)', () => {
     })
 
     it('cada botón que nombra el manual de un módulo existe, con ese nombre, en las pantallas de ese módulo', () => {
+        // Las pantallas de un módulo son las suyas más las piezas del kit que usan: la barra de guardar
+        // ("Guardar cambios", "Descartar") es del kit y se ve en los tres paneles.
         for (const m of MANUALES_DE_MODULOS) {
-            expect(botonesQueFaltan(botonesDelManual(m), `${SRC}modules/${m.modulo}`), `manual de ${m.nombre}`).toEqual([])
+            expect(botonesQueFaltan(botonesDelManual(m), [`${SRC}modules/${m.modulo}`, `${SRC}design-system/reservas`]), `manual de ${m.nombre}`).toEqual([])
         }
     })
 

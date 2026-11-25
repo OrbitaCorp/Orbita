@@ -335,6 +335,10 @@ function DetalleClase({ negocio, clase, fecha, inscripciones, socios, pasada, si
   // El lugar al que se le está diciendo (o corrigiendo) cómo paga.
   const [aPagar, setAPagar] = useState<Inscripcion | null>(null)
   const libres = socios.filter(s => !suyas.some(i => i.socioId === s.id))
+  // Dos personas que se llaman igual se distinguen por el celular: si no, en la lista parecen la misma.
+  const mismoNombre = (s: Socio) => s.nombre.trim().toLowerCase()
+  const repetidos = new Set(libres.map(mismoNombre).filter((n, i, l) => l.indexOf(n) !== i))
+  const enLaLista = (s: Socio) => (repetidos.has(mismoNombre(s)) && s.telefono ? `${s.nombre} · ${s.telefono}` : s.nombre)
   const esNueva = anotar === NUEVA
   const elegido = anotar && !esNueva ? socioPorId(anotar, socios) : undefined
   // Varios lugares para la misma persona (viene con amigas): hasta los que quedan. Con la clase llena, a la espera va de a una.
@@ -344,7 +348,7 @@ function DetalleClase({ negocio, clase, fecha, inscripciones, socios, pasada, si
   const opciones = puede.eligePago && !k.lleno && (elegido || esNueva) ? pagosPosibles(negocio, elegido, fecha, hoy, inscripciones, cuantos) : null
   const pagoElegido: Pago = opciones && pago && (pago !== 'plan' || opciones.plan.puede) && (pago !== 'prueba' || opciones.prueba) ? pago : opciones?.plan.puede ? 'plan' : 'aparte'
   // Tiene (o tuvo) un plan y esta clase no se la cubre: se dice por qué. Quien nunca tuvo plan no necesita el aviso.
-  const noCubre = opciones && elegido && !opciones.plan.puede && planesDeSocio(negocio, elegido).length > 0 ? opciones.plan.motivo : undefined
+  const noCubre = opciones && elegido && !opciones.plan.puede && opciones.plan.motivo && planesDeSocio(negocio, elegido).length > 0 ? opciones.plan : undefined
   const nombreMal = esNueva && nueva.nombre.trim().length < 2
   const celularMal = esNueva && !celularValido(nueva.telefono)
   const puedeAnotar = esNueva ? !nombreMal && !celularMal : !!elegido
@@ -429,7 +433,7 @@ function DetalleClase({ negocio, clase, fecha, inscripciones, socios, pasada, si
       {!pasada && !sinClases && (
         <>
           <div className="rv-fila gic-anotar" style={{ marginTop: 18, alignItems: 'flex-end' }}>
-            <div style={{ flex: 1, minWidth: 200 }}><Selector label={`Anotar ${socioTxt.toLowerCase()}`} valor={anotar} onChange={setAnotar} opciones={[{ id: '', label: 'Elegí a alguien' }, { id: NUEVA, label: 'Alguien nuevo…' }, ...libres.map(s => ({ id: s.id, label: s.nombre }))]} /></div>
+            <div style={{ flex: 1, minWidth: 200 }}><Selector label={`Anotar ${socioTxt.toLowerCase()}`} valor={anotar} onChange={setAnotar} opciones={[{ id: '', label: 'Elegí a alguien' }, { id: NUEVA, label: 'Alguien nuevo…' }, ...libres.map(s => ({ id: s.id, label: enLaLista(s) }))]} /></div>
             {!k.lleno && maxLugares > 1 && <div className="gic-lugares"><Selector label="Lugares" valor={Math.min(lugares, maxLugares)} onChange={setLugares} opciones={Array.from({ length: maxLugares }, (_, n) => ({ id: n + 1, label: String(n + 1) }))} /></div>}
           </div>
           {esNueva && (
@@ -449,7 +453,7 @@ function DetalleClase({ negocio, clase, fecha, inscripciones, socios, pasada, si
           {k.lleno && <p className="rv-ayuda" style={{ margin: '8px 0 0' }}>La clase está llena: queda en la lista de espera y, si alguien cancela, pasa sola.{puede.pagoSinDefinir ? ' Cuando tenga su lugar, decí cómo paga desde su fila.' : ''}</p>}
           {noCubre && (
             <div style={{ marginTop: 10 }}>
-              <Nota tono="aviso">{noCubre} Si lo anotás igual, se cobra aparte; para que use su plan, renovalo antes desde su ficha.</Nota>
+              <Nota tono="aviso">{noCubre.motivo} Si lo anotás igual, se cobra aparte.{noCubre.salida ? ` ${noCubre.salida}` : ''}</Nota>
             </div>
           )}
         </>

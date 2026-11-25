@@ -163,6 +163,6 @@ export function motivoParaElNegocio(m: SinPlan): string {
       ? `Le ${m.restantes === 1 ? 'queda 1 clase' : `quedan ${m.restantes} clases`} en el pack: no alcanzan para esos lugares.`
       : 'No le quedan clases en el pack. Renovalo desde su ficha, o anotalo y cobrale la clase aparte.';
     case 'tope-semanal': return `Ya usó ${m.porSemana === 1 ? 'su clase' : `sus ${m.porSemana} clases`} de esa semana. Si viene igual, cobrale la clase aparte.`;
-    case 'un-lugar': return 'La membresía cubre un lugar por clase: los demás van aparte.';
+    case 'un-lugar': return 'La membresía cubre un solo lugar por clase. Anotalo con un solo lugar para que use su plan, o cobrale los lugares aparte.';
   }
 }

@@ -268,7 +268,7 @@ describe('Gimnasio sobre la API · cómo se paga cada lugar', () => {
     gimnasio.reservar.mockResolvedValueOnce(lugar({}, { precio: 14000, cantidad: 2 }))
     expect((await acciones.inscribir({ id: 'n1', claseId: 'r1', fecha: '2026-11-16', socioId: socio.id, estado: 'reservada', creada: '2026-11-15', planId: null, cantidad: 2, pago: 'aparte' })).detalle).toMatch(/^Se cobra aparte: \$\s?14\.000\.$/)
     gimnasio.definirPago.mockResolvedValueOnce(lugar({}, { precio: 0, cantidad: 2 }))
-    expect((await acciones.definirPago('res-1', 'aparte')).detalle).toMatch(/^Se cobra aparte: \$\s?14\.000\.$/)
+    expect((await acciones.definirPago('res-1', 'aparte')).detalle).toMatch(/^Son \$\s?14\.000\.$/)
   })
 
   it('una membresía con tope cuenta cuántas lleva esa semana; la de prueba lo dice', async () => {

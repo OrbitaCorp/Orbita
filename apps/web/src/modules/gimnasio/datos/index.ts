@@ -661,8 +661,11 @@ export const PAGO_TXT: Record<Pago, string> = { plan: 'Con su plan', aparte: 'Se
 
 /** Lo que se le puede ofrecer a quien anota a alguien: con qué puede pagar ese lugar. */
 export interface PagosPosibles {
-  /** Con su plan: si se puede, con cuál; si no, por qué (ya escrito para mostrar). */
-  plan: { puede: boolean; con?: PlanDeSocio; motivo?: string }
+  /**
+   * Con su plan: si se puede, con cuál; si no, por qué (ya escrito para mostrar) y, cuando la hay, la salida: qué
+   * hacer para que sí lo use (renovarlo, anotarlo con un solo lugar). Sin salida no hay nada que hacer hoy.
+   */
+  plan: { puede: boolean; con?: PlanDeSocio; motivo?: string; salida?: string }
   /** La clase de prueba: el negocio la tiene y esa persona no la usó. Es de un solo lugar. */
   prueba: boolean
   /** La clase suelta del negocio, para decir el precio de cobrarla aparte (null si no cargó una). */
@@ -697,7 +700,8 @@ export function pagosPosibles(n: NegocioGym, s: Socio | undefined, fecha: ISO, h
   if (!s) return { plan: { puede: false }, prueba: hayPrueba, suelta }
   const prueba = hayPrueba && !s.probo && !inscripciones.some(i => i.socioId === s.id && i.estado !== 'cancelada' && i.estado !== 'espera' && pagoDe(n, i) === 'prueba')
   const nombre = primerNombreDe(s.nombre)
-  const no = (motivo: string): PagosPosibles => ({ plan: { puede: false, motivo }, prueba, suelta })
+  const no = (motivo: string, salida?: string): PagosPosibles => ({ plan: { puede: false, motivo, ...(salida ? { salida } : {}) }, prueba, suelta })
+  const RENOVAR = 'Para que use su plan, renovalo antes desde su ficha.'
   const suyos = planesDeSocio(n, s)
   if (suyos.length === 0) return no(`${nombre} no tiene un plan.`)
   const delDia = suyos.filter(p => p.desde <= fecha && fecha <= p.hasta).sort((a, b) => a.hasta.localeCompare(b.hasta) || a.id.localeCompare(b.id))
@@ -705,24 +709,25 @@ export function pagosPosibles(n: NegocioGym, s: Socio | undefined, fecha: ISO, h
     const despues = suyos.filter(p => p.desde > fecha).sort((a, b) => a.desde.localeCompare(b.desde))[0]
     if (despues) return no(`El plan de ${nombre} arranca el ${fechaCorta(despues.desde)}: esa clase es de antes.`)
     const ultimo = suyos.reduce((a, b) => (b.hasta > a.hasta ? b : a))
-    return no(ultimo.hasta < hoy ? `El plan de ${nombre} venció el ${fechaCorta(ultimo.hasta)}.` : `El plan de ${nombre} vence el ${fechaCorta(ultimo.hasta)}: esa clase es de después.`)
+    return no(ultimo.hasta < hoy ? `El plan de ${nombre} venció el ${fechaCorta(ultimo.hasta)}.` : `El plan de ${nombre} vence el ${fechaCorta(ultimo.hasta)}: esa clase es de después.`, RENOVAR)
   }
-  let primero: string | undefined
+  // Se dice el motivo del primero que no alcanzó (el que vence antes), con su salida.
+  let primero: { motivo: string; salida?: string } | undefined
   for (const p of delDia) {
-    let motivo: string | undefined
+    let falla: { motivo: string; salida?: string } | undefined
     if (p.tipo === 'pack') {
       const quedan = p.restantes ?? 0
-      if (quedan < lugares) motivo = quedan > 0 ? `A ${nombre} le ${quedan === 1 ? 'queda 1 clase' : `quedan ${quedan} clases`} en el pack: no alcanzan para ${lugares} lugares.` : `A ${nombre} no le quedan clases en el pack.`
+      if (quedan < lugares) falla = { motivo: quedan > 0 ? `A ${nombre} le ${quedan === 1 ? 'queda 1 clase' : `quedan ${quedan} clases`} en el pack: no alcanzan para ${lugares} lugares.` : `A ${nombre} no le quedan clases en el pack.`, salida: RENOVAR }
     } else if (lugares !== 1) {
-      motivo = 'La membresía cubre un lugar por clase: los demás van aparte.'
+      falla = { motivo: 'La membresía cubre un solo lugar por clase.', salida: 'Para que use su plan, anotalo con un solo lugar y a quien lo acompaña por separado.' }
     } else if (p.porSemana) {
       const usadas = usadasConMembresia(n, s, suyos, fecha, inscripciones)
-      if (usadas >= p.porSemana) motivo = `${nombre} ya usó ${p.porSemana === 1 ? 'su clase' : `sus ${p.porSemana} clases`} de esa semana.`
+      if (usadas >= p.porSemana) falla = { motivo: `${nombre} ya usó ${p.porSemana === 1 ? 'su clase' : `sus ${p.porSemana} clases`} de esa semana.` }
     }
-    if (!motivo) return { plan: { puede: true, con: p }, prueba, suelta }
-    primero ??= motivo
+    if (!falla) return { plan: { puede: true, con: p }, prueba, suelta }
+    primero ??= falla
   }
-  return no(primero ?? `${nombre} no tiene un plan.`)
+  return primero ? no(primero.motivo, primero.salida) : no(`${nombre} no tiene un plan.`)
 }
 
 /** Las clases de un día (fecha), con su actividad y su profe, ordenadas por hora. */

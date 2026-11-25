@@ -504,16 +504,17 @@ export function altaDeSocio(s: Pick<Socio, 'nombre' | 'telefono' | 'email' | 'no
 
 /**
  * Lo que el panel cuenta después de anotar a alguien o de decir cómo paga: cómo quedó su plan ("Le quedan 3 clases
- * en Pack de 8.") o cuánto se le cobra aparte. `precio` es el de la reserva.
+ * en Pack de 8.") o cuánto se le cobra aparte. `precio` es el de la reserva. Con `yaDicho`, el título del aviso ya
+ * dice cómo paga (se acaba de elegir): solo se suma lo que falta saber, sin repetirlo.
  */
-export function detalleDePago(p: PagoApi, precio: number): string | undefined {
+export function detalleDePago(p: PagoApi, precio: number, yaDicho = false): string | undefined {
   if (p.pago === 'plan' && p.plan) {
     if (p.plan.restantes !== null) return p.plan.restantes === 0 ? `Usó la última clase de ${p.plan.nombre}.` : `Le ${p.plan.restantes === 1 ? 'queda 1 clase' : `quedan ${p.plan.restantes} clases`} en ${p.plan.nombre}.`
     if (p.usadasEnLaSemana !== null && p.plan.porSemana) return `Va ${p.usadasEnLaSemana} de ${p.plan.porSemana} de esa semana con ${p.plan.nombre}.`
     return `Con ${p.plan.nombre}.`
   }
-  if (p.pago === 'aparte') return precio > 0 ? `Se cobra aparte: ${pesos(precio)}.` : 'Se cobra aparte.'
-  if (p.pago === 'prueba') return 'Es su clase de prueba.'
+  if (p.pago === 'aparte') return precio > 0 ? (yaDicho ? `Son ${pesos(precio)}.` : `Se cobra aparte: ${pesos(precio)}.`) : yaDicho ? undefined : 'Se cobra aparte.'
+  if (p.pago === 'prueba') return yaDicho ? undefined : 'Es su clase de prueba.'
   return undefined
 }
 

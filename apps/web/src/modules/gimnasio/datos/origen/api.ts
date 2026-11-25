@@ -391,7 +391,8 @@ export function accionesApi(d: DepsAcciones): AccionesGimnasio {
     definirPago: (id, pago) => con(delDiaDe(id, true), async () => {
       if (esEspera(id)) throw new AvisoDelPanel('A quien espera se le dice cómo paga cuando tiene su lugar.')
       const r = await gimnasio().definirPago(id, pago)
-      const detalle = detalleDePago(r.pago, aparte(r.reserva.precio, r.reserva.cantidad))
+      // El aviso ya dice cómo paga ("A Caro se le cobra aparte"): el detalle suma cuánto, o cómo quedó su plan.
+      const detalle = detalleDePago(r.pago, aparte(r.reserva.precio, r.reserva.cantidad), true)
       return detalle ? { detalle } : hecho
     }),
 

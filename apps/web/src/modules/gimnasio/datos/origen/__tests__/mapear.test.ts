@@ -408,4 +408,14 @@ describe('Gimnasio sobre la API · lo que se manda', () => {
     expect(detalleDePago({ pago: 'aparte', plan: null, usadasEnLaSemana: null }, 0)).toBe('Se cobra aparte.')
     expect(detalleDePago({ pago: null, plan: null, usadasEnLaSemana: null }, 0)).toBeUndefined()
   })
+
+  it('si el aviso ya dice cómo paga, el detalle no lo repite: suma el monto o cómo quedó el plan', () => {
+    const p = { id: 's1', planId: 'p', tipo: 'PACK' as const, nombre: 'Pack de 8', precio: 1, clases: 8, porSemana: null, desde: LUNES, hasta: LUNES, estado: 'VIGENTE' as const, usadas: 5, restantes: 3 }
+    expect(detalleDePago({ pago: 'aparte', plan: null, usadasEnLaSemana: null }, 14000, true)).toMatch(/^Son \$\s?14\.000\.$/)
+    expect(detalleDePago({ pago: 'aparte', plan: null, usadasEnLaSemana: null }, 0, true)).toBeUndefined()
+    expect(detalleDePago({ pago: 'prueba', plan: null, usadasEnLaSemana: null }, 0, true)).toBeUndefined()
+    expect(detalleDePago({ pago: 'prueba', plan: null, usadasEnLaSemana: null }, 0)).toBe('Es su clase de prueba.')
+    // Con su plan, lo que queda es justo lo que falta saber.
+    expect(detalleDePago({ pago: 'plan', plan: p, usadasEnLaSemana: null }, 0, true)).toBe('Le quedan 3 clases en Pack de 8.')
+  })
 })
