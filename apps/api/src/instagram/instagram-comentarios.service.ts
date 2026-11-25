@@ -21,6 +21,9 @@ interface IgRespuesta {
   id: string;
   text?: string;
   username?: string;
+  // Quién lo escribió. Con el login de Instagram, `username` suele venir vacío y el nombre llega acá (lo mismo
+  // que en el webhook de comentarios).
+  from?: { id?: string; username?: string };
   timestamp?: string;
 }
 interface IgComentario extends IgRespuesta {
@@ -61,7 +64,7 @@ export interface PublicacionConComentarios {
 
 const aRespuesta = (r: IgRespuesta): RespuestaDeComentario => ({
   id: r.id,
-  usuario: r.username ?? 'usuario',
+  usuario: r.from?.username || r.username || 'usuario',
   texto: r.text ?? '',
   fecha: r.timestamp ?? null,
 });
@@ -95,7 +98,7 @@ export class InstagramComentariosService {
       conComentarios.map((m) =>
         this.instagram.graph<{ data?: IgComentario[] }>(businessId, SCOPE_COMENTAR, `${m.id}/comments`, {
           query: {
-            fields: 'id,text,username,timestamp,like_count,hidden,replies{id,text,username,timestamp}',
+            fields: 'id,text,username,from,timestamp,like_count,hidden,replies{id,text,username,from,timestamp}',
             limit: String(MAX_COMENTARIOS_POR_PUBLICACION),
           },
         }),

@@ -98,6 +98,18 @@ describe('InstagramComentariosService (unit)', () => {
     expect(graph.mock.calls.every(([, permiso]) => permiso === COMENTAR)).toBe(true);
   });
 
+  it('el nombre sale de `from` cuando Instagram no manda `username`, también en las respuestas', async () => {
+    const graph = jest.fn().mockImplementation(async (_b: string, _p: string, ruta: string) => {
+      if (ruta === '{ig}/media') return { data: [medio('22222', 1)] };
+      return { data: [{ id: '501', text: 'Precio?', from: { id: '9', username: 'ana' }, replies: { data: [{ id: '601', text: '35.000', from: { id: '1', username: 'tienda' } }] } }] };
+    });
+    const { svc } = crear(graph);
+    const [c] = (await svc.listar(BIZ)).publicaciones[0].comentarios;
+    expect(c.usuario).toBe('ana');
+    expect(c.respuestas[0].usuario).toBe('tienda');
+    expect(graph.mock.calls[1][3].query.fields).toContain('from');
+  });
+
   it('si una publicación falla, las otras se muestran; si fallan todas, se informa el error', async () => {
     const parcial = jest.fn().mockImplementation(async (_b: string, _p: string, ruta: string) => {
       if (ruta === '{ig}/media') return { data: [medio('22222', 1), medio('33333', 1)] };
