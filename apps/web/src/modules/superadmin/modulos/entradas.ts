@@ -4154,4 +4154,36 @@ Usa el campo libre que sumó Alan (\`ReservaConfig.datos\`, 23/11), sin migraci�
       'apps/web/src/modules/turnos/storefront/__tests__/miTurno.test.ts:1',
     ],
   }),
+  entrada({
+    modulo: 'turnos', fecha: F25, slug: 'sena-y-emails', tipo: 'tarea', quien: 'Mateo',
+    titulo: 'La seña y los emails del turno dicen lo mismo que la config',
+    foco: 'El sitio y los emails ahora dicen lo mismo sobre la seña: cuánto es (el mismo cálculo que el motor), si ya está pagada o se coordina con el negocio, y si se devuelve y hasta cuándo, según la config. Los emails dicen "confirmada" y "cancelada" cuando corresponde, y en psicología no nombran el servicio. El cobro de la seña en línea (Mercado Pago) sigue pendiente.',
+    que: `Tarea del 27/11 del plan, hecha el 25/11.
+
+**La seña en el sitio** (\`Reserva.tsx\`). El monto ya era el mismo que calcula el motor (el porcentaje sobre el precio, redondeado igual). Con la API, el texto del paso del servicio ahora dice que la seña se coordina con el negocio y, según la config, si se devuelve y hasta cuántas horas antes: "Si cancelás hasta 24 horas antes, se devuelve." o "Si cancelás, la seña no se devuelve." (\`senaDevolucionTxt\`, con \`senaReembolsable\` y \`cancelacionHastaHoras\`).
+
+**Los emails** (\`reservas-avisos.service.ts\`, compartido):
+
+- **La seña** dice si está pagada o a pagar ("la coordinás con el negocio") y si se devuelve, con las mismas reglas que el sitio. Va en la confirmación y en el aviso de "pendiente".
+- **Concordancia:** "Tu reserva … está confirmada" y "fue cancelada" en Alquileres (antes decía "confirmado" y "cancelado"). Turnos y Gimnasio siguen en masculino.
+- **Psicología:** el email no nombra el servicio, solo con quién, el día y el lugar ("Turno con Lic. Sosa"). Es el alcance en salud del 15/11.
+
+**Probado:**
+
+- **Unitario:** un test nuevo de los emails (\`reservas-avisos.unit-spec.ts\`, 5 casos): la seña a pagar con su devolución, la pagada que no se devuelve, psicología sin el servicio, la concordancia en Alquileres y que sin email no se manda nada.
+- **Los emails de verdad,** con la API local en modo de prueba del correo (sin clave de Resend), reservando y cancelando desde el sitio con la seña al 30%. Salieron "Tu turno en Barbería de Prueba está confirmado" (con Corte clásico, Lucas, el día, la hora, el total y la seña) y "fue cancelado". Una dirección \`.invalid\` no manda nada, porque el correo la descarta como de la demo, así que la prueba se hizo con una de \`example.com\`.
+
+**Lo que queda:**
+
+- **El cobro de la seña en línea:** Mercado Pago, faltante 8 del mapa (toca plata, lo decide Ale).
+- **El recordatorio** antes del turno: semana 6, con Recordatorios y mensajes.
+
+**Del motor compartido** cambió solo el texto de los emails. La API se despliega con este cambio.`,
+    archivos: [
+      'apps/api/src/reservas/reservas-avisos.service.ts:77',
+      'apps/api/test/unit/reservas-avisos.unit-spec.ts:1',
+      'apps/web/src/modules/turnos/storefront/Reserva.tsx:93',
+      'apps/web/src/modules/turnos/storefront/origenSitio.ts:42',
+    ],
+  }),
 ]

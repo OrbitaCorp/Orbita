@@ -89,6 +89,13 @@ function FlujoApi({ slug, rubro, t, simple }: { slug: string; rubro: RubroTurnos
 /** Cuántos días de la tira se piden a la API. */
 const DIAS_TIRA = 21
 
+/** Lo que dice la config sobre devolver la seña, igual que el email de la reserva (reservas-avisos.service.ts). */
+export function senaDevolucionTxt(a: Pick<SitioApi, 'senaSeDevuelve' | 'politica'>): string {
+  if (!a.senaSeDevuelve) return ' Si cancelás, la seña no se devuelve.'
+  const h = a.politica.cancelaHasta
+  return h > 0 ? ` Si cancelás hasta ${h} ${h === 1 ? 'hora' : 'horas'} antes, se devuelve.` : ' Si cancelás, se devuelve.'
+}
+
 type Paso = 'servicio' | 'recurso' | 'fecha' | 'datos' | 'pago'
 
 /** Lo que ya viene elegido por la URL, y en qué paso conviene arrancar. */
@@ -352,7 +359,9 @@ function Flujo({ rubro, t, simple, api }: { rubro: RubroTurnos; t: TemaNegocio; 
 
             {actual === 'servicio' && (
               <Bloque refTitulo={titulo} titulo={rubro.familia === 'salud' ? '¿Qué turno necesitás?' : '¿Qué te querés hacer?'}
-                sub={rubro.sena ? `Para reservar se pide una seña del ${rubro.sena}%, que se descuenta del total.` : 'Elegí un servicio. El precio que ves es el final.'}>
+                sub={!rubro.sena ? 'Elegí un servicio. El precio que ves es el final.'
+                  : api ? `Se pide una seña del ${rubro.sena}%, que coordinás con el negocio y se descuenta del total.${senaDevolucionTxt(api)}`
+                    : `Para reservar se pide una seña del ${rubro.sena}%, que se descuenta del total.`}>
                 <PasoServicio rubro={rubro} t={t} elegido={servicioIdx} onElegir={i => { setServicioIdx(i); setFecha(null); setHora(null); avanzar() }} />
               </Bloque>
             )}

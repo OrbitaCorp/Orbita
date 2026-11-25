@@ -27,6 +27,7 @@ describe('el sitio con la API', () => {
     expect(s.rubro.sena).toBe(30)
     expect(s.recursos.map(r => r.id)).toEqual(['r1', 'r2'])
     expect(s.politica).toEqual({ cancelaHasta: 12, tolerancia: 15 })
+    expect(s.senaSeDevuelve).toBe(true)
   })
 
   it('con "Cualquiera" suma los días de todas y en cada horario gana la primera libre', async () => {
@@ -62,5 +63,14 @@ describe('el sitio con la API', () => {
     api.retener.mockResolvedValue({ token: 'tok', estado: 'CONFIRMADA', codigo: 'ABCDEF', precio: 12000, sena: 0 })
     await s.reservar({ recursoId: 'r1', servicioId: 'a', fecha: '2026-11-26', inicio: 540, clave: 'c1', nombre: 'Ana' })
     expect(api.confirmar).not.toHaveBeenCalled()
+  })
+})
+
+describe('lo que el sitio dice de la seña', () => {
+  it('es lo mismo que dice el email: si se devuelve y hasta cuándo', async () => {
+    const { senaDevolucionTxt } = await import('../Reserva')
+    expect(senaDevolucionTxt({ senaSeDevuelve: true, politica: { cancelaHasta: 24 } })).toBe(' Si cancelás hasta 24 horas antes, se devuelve.')
+    expect(senaDevolucionTxt({ senaSeDevuelve: true, politica: { cancelaHasta: 1 } })).toBe(' Si cancelás hasta 1 hora antes, se devuelve.')
+    expect(senaDevolucionTxt({ senaSeDevuelve: false, politica: { cancelaHasta: 24 } })).toBe(' Si cancelás, la seña no se devuelve.')
   })
 })

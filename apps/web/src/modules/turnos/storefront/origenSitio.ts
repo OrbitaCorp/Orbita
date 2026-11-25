@@ -38,6 +38,8 @@ export interface SitioApi {
   minutos: number
   /** La política de la config: plazo para cancelar y, si el negocio la puso, tolerancia y seña fuera de plazo. */
   politica: Partial<PoliticaReserva> & { cancelaHasta: number }
+  /** Si la seña se devuelve al cancelar a tiempo (config del motor). */
+  senaSeDevuelve: boolean
   /** Cuántos lugares hay cada día, desde `desde`, sumando las agendas pedidas. */
   rango(recursoIds: string[], servicioId: string, desde: ISO, dias: number): Promise<Map<ISO, { libres: number; cerrado: boolean }>>
   horarios(recursoIds: string[], servicioId: string, fecha: ISO): Promise<HorarioLibre[]>
@@ -58,6 +60,7 @@ export async function cargarSitio(slug: string, rubro: RubroTurnos): Promise<Sit
     slug, semana, hoy, minutos, recursos: agendas,
     rubro: { ...rubro, sena: config.senaPorcentaje, servicios: activos.map(s => ({ nombre: s.nombre, duracion: s.duracionMinutos, precio: s.precio })) },
     servicioIds: activos.map(s => s.id),
+    senaSeDevuelve: config.senaReembolsable,
     politica: {
       cancelaHasta: config.cancelacionHastaHoras,
       ...(publico.tolerancia !== undefined ? { tolerancia: publico.tolerancia } : {}),
