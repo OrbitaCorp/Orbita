@@ -93,11 +93,16 @@ export default function Difusion() {
       ) : (
         <>
           <EstadoInstagram estado={estado} onAbrir={() => setAbierto(true)} />
-          {vista === 'instagram' && estado?.connected ? (
-            <Tablero estado={estado} />
+          {estado && !estado.connected ? (
+            // Sin conectar, todas las pantallas de Difusión muestran lo mismo: el video y la lista. Las
+            // pantallas de cada función no tienen nada que mostrar hasta conectar. Con el estado sin
+            // cargar no se muestra (a quien ya conectó no le tiene que parpadear).
+            <Presentacion
+              actual={vista === 'instagram' ? null : vista}
+              onAbrir={(f) => router.push({ query: { ...router.query, vista: f } })}
+            />
           ) : vista === 'instagram' ? (
-            // Recién con el estado cargado: a quien ya conectó no le tiene que parpadear la presentación.
-            estado && <Presentacion onAbrir={(f) => router.push({ query: { ...router.query, vista: f } })} />
+            estado && <Tablero estado={estado} />
           ) : vista === 'mensajes' ? (
             <Mensajes estado={estado} onAbrirConexion={() => setAbierto(true)} />
           ) : vista === 'publicaciones' ? (
@@ -160,8 +165,9 @@ function EstadoInstagram({ estado, onAbrir }: { estado: InstagramEstado | null; 
 // ─── Presentación (sin conectar) ───────────────────────────────────────────────
 
 // Un solo bloque: a la izquierda el video de cómo funciona Difusión (el de la demo), a la derecha
-// lo que se puede hacer, como lista corta. Cada fila abre su pantalla, que explica cómo conectar.
-function Presentacion({ onAbrir }: { onAbrir: (f: Funcion) => void }) {
+// lo que se puede hacer, como lista corta. Si se entró por una función (desde el menú), esa fila
+// queda marcada; las demás cambian de pantalla.
+function Presentacion({ actual, onAbrir }: { actual: Funcion | null; onAbrir: (f: Funcion) => void }) {
   return (
     <section className="dif-tarjeta dif-presentacion" aria-labelledby="dif-que-podes">
       <div className="dif-presentacion-video"><VideoDeFuncion funcion="difusion" /></div>
@@ -170,7 +176,12 @@ function Presentacion({ onAbrir }: { onAbrir: (f: Funcion) => void }) {
         <ul className="dif-funciones">
           {(Object.keys(FUNCIONES) as Funcion[]).map((f) => (
             <li key={f}>
-              <button type="button" className="dif-funcion" onClick={() => onAbrir(f)}>
+              <button
+                type="button"
+                className={`dif-funcion${f === actual ? ' dif-funcion-actual' : ''}`}
+                aria-current={f === actual ? 'page' : undefined}
+                onClick={() => onAbrir(f)}
+              >
                 <span className="dif-funcion-textos">
                   <span className="dif-funcion-titulo">{FUNCIONES[f].titulo}</span>
                   <span className="dif-funcion-texto">{FUNCIONES[f].texto}</span>
@@ -211,7 +222,7 @@ const CSS = `
 .dif-funciones { list-style: none; margin: 0; padding: 0; }
 .dif-funciones li + li { border-top: 1px solid var(--color-border); }
 .dif-funcion { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 9px 10px; border: 0; border-radius: 10px; background: none; font: inherit; text-align: left; cursor: pointer; transition: background-color 150ms; }
-.dif-funcion:hover { background: var(--color-surface-alt); }
+.dif-funcion:hover, .dif-funcion-actual { background: var(--color-surface-alt); }
 .dif-funcion:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
 .dif-funcion-textos { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .dif-funcion-titulo { font-size: 13.5px; font-weight: 600; color: var(--color-text); }
