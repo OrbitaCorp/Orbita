@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, Clock, ExternalLink, Play, X } from 'lucide-react'
+import { Check, Clock, ExternalLink, X } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
 import { parseVideoEmbed } from '@/lib/storefront/utils'
 import { ApiError, disconnectInstagram, requestInstagramAccess, startInstagramConnect, type InstagramEstado } from '@/lib/api'
@@ -24,8 +24,8 @@ const PASOS_EVALUADOR = 'Configuración → Apps y sitios web → Invitaciones d
 const URL_INVITACIONES = 'https://www.instagram.com/accounts/manage_access/'
 
 // Video que muestra dónde aceptar la invitación de prueba en Instagram. Pegá acá la dirección de
-// YouTube, Vimeo o un archivo .mp4/.webm y aparece en el paso 3; mientras sea null, el espacio dice
-// "Próximamente". Se borra junto con PASOS_EVALUADOR cuando Meta apruebe el acceso avanzado.
+// YouTube, Vimeo o un archivo .mp4/.webm y aparece en el paso 3; mientras sea null, no se muestra.
+// Se borra junto con PASOS_EVALUADOR cuando Meta apruebe el acceso avanzado.
 const VIDEO_EVALUADOR_URL: string | null = null
 
 const TITULOS_PASOS = ['Dejá tu usuario', 'Confirmamos tu cuenta', 'Aceptá la invitación y conectá']
@@ -113,7 +113,7 @@ export function InstagramModal({ estado, resultado = null, desde = 'mensajes', o
             <header className="igm-cabecera">
               <Marca />
               <h2 id={tituloId} className="igm-titulo">Conectá tu Instagram</h2>
-              <p className="igm-bajada">Recibí y respondé tus mensajes directos desde la bandeja de Órbita, y muy pronto publicá tus productos.</p>
+              <p className="igm-bajada">Respondé tus mensajes y comentarios, publicá tus productos y mirá tus estadísticas sin salir de Órbita.</p>
             </header>
             {resultado === 'sin-suscripcion' && (
               <p className="igm-aviso" role="alert">
@@ -237,23 +237,17 @@ function PendienteDeConfirmacion({ usuario }: { usuario: string }) {
   )
 }
 
-// Espacio del video de "dónde aceptar la invitación". Sin URL cargada (VIDEO_EVALUADOR_URL) muestra
-// el lugar reservado; con URL, el reproductor.
+// Video de "dónde aceptar la invitación". Sin URL cargada (VIDEO_EVALUADOR_URL) no se muestra nada.
 function VideoTutorial() {
   const video = parseVideoEmbed(VIDEO_EVALUADOR_URL)
+  if (!video) return null
   const titulo = 'Cómo aceptar la invitación de prueba en Instagram'
   return (
     <figure className="igm-video">
-      {video?.tipo === 'file' ? (
+      {video.tipo === 'file' ? (
         <video src={video.src} controls preload="metadata" playsInline aria-label={titulo} />
-      ) : video ? (
-        <iframe src={video.src} title={titulo} loading="lazy" allow="fullscreen; picture-in-picture" allowFullScreen />
       ) : (
-        <div className="igm-video-vacio">
-          <span className="igm-video-play" aria-hidden><Play size={16} strokeWidth={2} fill="currentColor" /></span>
-          <p className="igm-video-titulo">Video tutorial</p>
-          <p className="igm-video-texto">Próximamente: te mostramos paso a paso a dónde ir para aceptar la invitación.</p>
-        </div>
+        <iframe src={video.src} title={titulo} loading="lazy" allow="fullscreen; picture-in-picture" allowFullScreen />
       )}
     </figure>
   )
@@ -281,7 +275,7 @@ function ConectarCuenta({ desde }: { desde: 'mensajes' | 'difusion' }) {
         Cuando la hayas aceptado, tocá <strong>Verificar y conectar</strong>: Instagram te muestra tu cuenta (si ya la tenés abierta en el navegador, no te pide la contraseña) y le das permiso a Órbita para{' '}
         {desde === 'mensajes'
           ? 'leer y responder tus mensajes directos.'
-          : 'leer y responder tus mensajes directos y publicar tus productos cuando vos lo confirmes. Los permisos se piden una sola vez.'}
+          : 'leer y responder tus mensajes directos y comentarios, publicar tus productos cuando vos lo confirmes y ver tus estadísticas. Los permisos se piden una sola vez.'}
       </p>
       <a className="igm-externo" href={URL_INVITACIONES} target="_blank" rel="noopener noreferrer">
         Abrir invitaciones en Instagram <ExternalLink size={15} strokeWidth={2} aria-hidden />
@@ -320,7 +314,7 @@ function Conectado({ username, tituloId, onCambio, onCerrar }: { username: strin
       <header className="igm-cabecera">
         <Marca />
         <h2 id={tituloId} className="igm-titulo">Instagram conectado</h2>
-        <p className="igm-bajada">Los mensajes directos que te lleguen por Instagram aparecen en la bandeja de Mensajes y tus respuestas salen por el mismo canal.</p>
+        <p className="igm-bajada">Tus mensajes directos están en Difusión → Mensajes. Desde Difusión también publicás, respondés comentarios y mirás tus estadísticas.</p>
       </header>
       <div className="igm-cuerpo">
         <div className="igm-cuenta">
@@ -348,16 +342,18 @@ function Conectado({ username, tituloId, onCambio, onCerrar }: { username: strin
 function Incluye() {
   return (
     <footer className="igm-incluye">
-      <Fila icono={<Check size={14} strokeWidth={2.5} />}>Mensajes directos en tu bandeja</Fila>
-      <Fila icono={<Clock size={14} strokeWidth={2} />} suave>Publicar productos, comentarios y estadísticas · próximamente</Fila>
+      <Fila>Mensajes directos en tu bandeja</Fila>
+      <Fila>Publicar y programar publicaciones</Fila>
+      <Fila>Responder y moderar comentarios</Fila>
+      <Fila>Estadísticas de tu cuenta</Fila>
     </footer>
   )
 }
 
-function Fila({ icono, suave, children }: { icono: ReactNode; suave?: boolean; children: ReactNode }) {
+function Fila({ children }: { children: ReactNode }) {
   return (
-    <p className={`igm-fila${suave ? ' igm-fila-suave' : ''}`}>
-      <span aria-hidden>{icono}</span>
+    <p className="igm-fila">
+      <span aria-hidden><Check size={14} strokeWidth={2.5} /></span>
       {children}
     </p>
   )
@@ -435,10 +431,6 @@ const CSS = `
 .igm-nota p { margin: 0; }
 .igm-video { position: relative; aspect-ratio: 16 / 9; margin: 0 0 12px; overflow: hidden; border-radius: 12px; border: 1px solid var(--color-border); background: var(--color-surface-alt); }
 .igm-video video, .igm-video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #000; }
-.igm-video-vacio { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 12px; text-align: center; }
-.igm-video-play { width: 38px; height: 38px; margin-bottom: 6px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--color-muted); background: var(--color-surface); border: 1px solid var(--color-border); }
-.igm-video-titulo { margin: 0; font-size: 13px; font-weight: 600; color: var(--color-text); }
-.igm-video-texto { margin: 0; max-width: 30ch; font-size: 12px; line-height: 1.45; color: var(--color-muted); }
 .igm-centro, .igm-centro .igm-suave, .igm-centro .igm-error { text-align: center; }
 .igm-pie { margin: 10px 0 0; font-size: 12px; }
 .igm-externo {
@@ -455,7 +447,6 @@ const CSS = `
 .igm-incluye { display: flex; flex-direction: column; gap: 8px; padding: 16px 28px 22px; border-top: 1px solid var(--color-border); border-radius: 0 0 22px 22px; }
 .igm-fila { display: flex; align-items: flex-start; gap: 9px; margin: 0; font-size: 12.5px; line-height: 1.4; color: var(--color-text); }
 .igm-fila > span { display: inline-flex; margin-top: 1px; flex-shrink: 0; }
-.igm-fila-suave { color: var(--color-muted); }
 
 .igm-cuenta { display: flex; align-items: center; gap: 12px; padding: 14px 16px; margin-bottom: 14px; border: 1px solid var(--color-border); border-radius: 14px; background: var(--color-surface-alt); }
 .igm-cuenta-nombre { margin: 0 0 1px; font-size: 15px; font-weight: 600; color: var(--color-text); }
