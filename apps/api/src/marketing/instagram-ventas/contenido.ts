@@ -68,6 +68,8 @@ export const RESPUESTAS_PUBLICAS_POR_DEFECTO = ['¡Te escribimos por privado!', 
 export const PALABRAS_CLAVE_POR_DEFECTO = ['info', 'precio', 'precios', 'quiero', 'cuanto', 'costo', 'me interesa'];
 export const BIENVENIDA = '¡Hola! ¿En qué te ayudo? Podés escribirme o tocar una opción: cómo funciona, precios, la demo o hablar con alguien.';
 
+export const PIDE_DATOS_AL_DERIVAR = 'Listo, le aviso al equipo y te respondemos por acá.\nAsí llegamos con la respuesta: ¿qué vendés y más o menos cuántos productos tenés?';
+
 export interface Enlaces {
   sitio: string;
   alta: string;
@@ -171,7 +173,7 @@ export function respuestaDe(opcion: Opcion, e: Enlaces, p: Precios): Respuesta {
       };
     case OPCION.PERSONA:
       return {
-        piezas: [{ texto: 'Listo, le aviso al equipo y te respondemos por acá.\nAsí llegamos con la respuesta: ¿qué vendés y más o menos cuántos productos tenés?' }],
+        piezas: [{ texto: PIDE_DATOS_AL_DERIVAR }],
         siguientes: [],
         derivar: true,
       };
@@ -179,6 +181,13 @@ export function respuestaDe(opcion: Opcion, e: Enlaces, p: Precios): Respuesta {
 }
 
 export const DERIVAR_SIN_RESPUESTA = 'Esa no la sé con seguridad, y prefiero no inventarte. Le paso tu pregunta al equipo y te responden por acá.';
+
+/**
+ * Después de derivar, el bot se calla. Pero si lo último que dijo fue una pregunta (o un "le paso tu pregunta") y la
+ * persona contesta, quedarse mudo se lee como que nadie la leyó: agradece UNA vez y le pasa al equipo lo que contó.
+ */
+export const GRACIAS_AL_DERIVAR = '¡Gracias! Ya se lo pasé al equipo con lo que me contaste. Te responden por acá en cuanto puedan.';
+export const ULTIMOS_DEL_BOT_AL_DERIVAR = [DERIVAR_SIN_RESPUESTA];
 
 // ── Lo que la IA sabe de Órbita ──────────────────────────────────────────────
 // Copiado de la web (ver el test). La IA responde solo con esto y, si no alcanza, deriva.

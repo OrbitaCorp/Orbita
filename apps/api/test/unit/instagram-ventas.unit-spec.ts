@@ -2,7 +2,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { Prisma } from '@prisma/client';
 import {
-  MENU, OPCION, OPCIONES, PREGUNTAS_DE_LA_WEB, PREGUNTAS_FRECUENTES, TITULO_OPCION, enlacesDe, promptDeVentas, respuestaDe,
+  GRACIAS_AL_DERIVAR, MENU, OPCION, OPCIONES, PIDE_DATOS_AL_DERIVAR, PREGUNTAS_DE_LA_WEB, PREGUNTAS_FRECUENTES, TITULO_OPCION, enlacesDe, promptDeVentas, respuestaDe,
   tienePalabraClave, type Opcion,
 } from '../../src/marketing/instagram-ventas/contenido';
 import { InstagramVentasService, opcionDe } from '../../src/marketing/instagram-ventas/instagram-ventas.service';
@@ -91,7 +91,11 @@ function armar(o: { cfg?: Record<string, unknown> | null; botEstado?: string; ia
     business: { findFirst: jest.fn().mockResolvedValue({ id: o.negocio ?? NEGOCIO }) },
     marketingInstagramBot: { findUnique: jest.fn().mockResolvedValue(cfg) },
     conversation: { findFirst: jest.fn().mockResolvedValue({ botEstado: o.botEstado ?? 'DEFAULT' }), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
-    message: { create: jest.fn().mockResolvedValue({}), count: jest.fn().mockResolvedValue(0), findMany: jest.fn().mockResolvedValue([{ sender: 'CUSTOMER', text: 'hola' }]) },
+    message: {
+      create: jest.fn().mockResolvedValue({}), count: jest.fn().mockResolvedValue(0),
+      findMany: jest.fn().mockResolvedValue([{ sender: 'CUSTOMER', text: 'hola' }]),
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
     customer: { findFirst: jest.fn().mockResolvedValue({ firstName: 'Lu' }) },
     marketingInstagramComentario: { create: jest.fn().mockResolvedValue({ id: 'fila' }), update: jest.fn().mockResolvedValue({}) },
   };
@@ -168,6 +172,25 @@ describe('bot de ventas de Instagram: mensajes', () => {
     await svc.atender([mensaje({ texto: 'Hablar con alguien', opcionId: OPCION.PERSONA })]);
     expect(prisma.conversation.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ botEstado: 'DERIVADO' }) }));
     expect(mail.sendCustomEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it('derivado: si contesta la pregunta del bot, agradece una sola vez y le pasa al equipo lo que contó', async () => {
+    const { svc, instagram, prisma, mail, llm } = armar({ botEstado: 'DERIVADO' });
+    prisma.message.findFirst.mockResolvedValueOnce({ viaOrbi: true, text: PIDE_DATOS_AL_DERIVAR });
+    await svc.atender([mensaje({ texto: 'Vendo zapatos' })]);
+    expect(instagram.enviarTexto.mock.calls[0][3]).toBe(GRACIAS_AL_DERIVAR);
+    expect(mail.sendCustomEmail).toHaveBeenCalledWith('equipo@orbita.test', expect.any(String), expect.stringContaining('Vendo zapatos'));
+    expect(llm.streamChat).not.toHaveBeenCalled();
+
+    // Lo siguiente que escriba ya no lo contesta: lo último del bot es el agradecimiento.
+    prisma.message.findFirst.mockResolvedValueOnce({ viaOrbi: true, text: GRACIAS_AL_DERIVAR });
+    await svc.atender([mensaje({ texto: 'unos 200 productos' })]);
+    expect(instagram.enviarTexto).toHaveBeenCalledTimes(1);
+
+    // Si ya contestó alguien del equipo, tampoco.
+    prisma.message.findFirst.mockResolvedValueOnce({ viaOrbi: false, text: 'Hola, soy Mateo' });
+    await svc.atender([mensaje({ texto: 'genial' })]);
+    expect(instagram.enviarTexto).toHaveBeenCalledTimes(1);
   });
 
   it('con la IA apagada contesta con el menú y no llama al modelo', async () => {

@@ -13,7 +13,7 @@ import type { MensajeDeCliente } from '../../orbi/atencion/estado';
 import { describeError } from '../../common/utils/describe-error.util';
 import { escaparHtml } from '../../common/utils/html';
 import {
-  BIENVENIDA, DERIVAR_SIN_RESPUESTA, MENU, OPCION, OPCIONES, PALABRAS_CLAVE_POR_DEFECTO, PREGUNTAS_FRECUENTES,
+  BIENVENIDA, DERIVAR_SIN_RESPUESTA, GRACIAS_AL_DERIVAR, MENU, PIDE_DATOS_AL_DERIVAR, OPCION, OPCIONES, PALABRAS_CLAVE_POR_DEFECTO, PREGUNTAS_FRECUENTES,
   RESPUESTAS_PUBLICAS_POR_DEFECTO, SALUDO_COMENTARIO_POR_DEFECTO, TITULO_OPCION, enlacesDe, normalizar, promptDeVentas,
   respuestaDe, tienePalabraClave, type Opcion, type Precios, type Tarjeta,
 } from './contenido';
@@ -195,7 +195,9 @@ export class InstagramVentasService implements AtencionAlternativa, OnModuleInit
     const cfg = await this.leer(m.businessId);
     if (!cfg?.activo) return;
     const conv = await this.prisma.conversation.findFirst({ where: { id: m.conversationId, businessId: m.businessId }, select: { botEstado: true } });
-    if (!conv || conv.botEstado === 'PAUSADO' || conv.botEstado === 'DERIVADO' || conv.botEstado === 'OFF') return;
+    if (!conv) return;
+    if (conv.botEstado === 'DERIVADO') return this.agradecerUnaVez(m, cfg);
+    if (conv.botEstado === 'PAUSADO' || conv.botEstado === 'OFF') return;
 
     const opcion = opcionDe(m);
     if (opcion) return this.responderOpcion(m, cfg, opcion);
@@ -228,6 +230,23 @@ export class InstagramVentasService implements AtencionAlternativa, OnModuleInit
       data: { botEstado: 'DERIVADO', botMotivo: motivo, botCambiadoAt: new Date(), isUnread: true },
     });
     await this.avisarAlEquipo(cfg, m, motivo);
+  }
+
+  /**
+   * La charla ya es del equipo. Si lo último que dijo el bot fue la pregunta de "¿qué vendés?" (o el aviso de que no
+   * sabía) y la persona contesta, agradece una sola vez y le reenvía al equipo lo que contó. Si después de eso sigue
+   * escribiendo, o si ya contestó alguien del equipo, no dice nada más.
+   */
+  private async agradecerUnaVez(m: MensajeDeCliente, cfg: MarketingInstagramBot): Promise<void> {
+    if (!m.esTexto || !m.texto) return;
+    const ultimo = await this.prisma.message.findFirst({
+      where: { conversationId: m.conversationId, conversation: { businessId: m.businessId }, sender: 'STORE' },
+      orderBy: { createdAt: 'desc' },
+      select: { viaOrbi: true, text: true },
+    });
+    if (!ultimo?.viaOrbi || (ultimo.text !== PIDE_DATOS_AL_DERIVAR && ultimo.text !== DERIVAR_SIN_RESPUESTA)) return;
+    await this.enviarTexto(m, GRACIAS_AL_DERIVAR, []);
+    await this.avisarAlEquipo(cfg, m, 'Contó más sobre lo que necesita.');
   }
 
   private async avisarAlEquipo(cfg: MarketingInstagramBot, m: MensajeDeCliente, motivo: string): Promise<void> {
