@@ -19,6 +19,7 @@ import { MailService } from '../mail/mail.service';
 import { PANTALLAS_DE_RETORNO, type PantallaDeRetorno } from './dto/conectar-instagram.dto';
 import { InstagramAjustesService } from './instagram-ajustes.service';
 import { InstagramMediosService } from './instagram-medios.service';
+import { InstagramRuteoService, type ComentarioNuevo } from './instagram-ruteo.service';
 import { orbiAtiendeAhora, pausarSiAtendiaOrbi, type MensajeDeCliente } from '../orbi/atencion/estado';
 
 // Instagram (mensajes directos) dentro de la bandeja de Mensajes.
@@ -49,6 +50,10 @@ const ESPERA_ECO_MS = 3000;
 // Respuestas rápidas (botones bajo el mensaje) que entran en uno, y el largo de su título.
 const MAX_RESPUESTAS_RAPIDAS = 13;
 const MAX_TITULO_RESPUESTA_RAPIDA = 20;
+// Tarjetas (generic template): hasta 10 por carrusel, 80 caracteres de título y subtítulo, 3 botones cada una.
+const MAX_TARJETAS = 10;
+const MAX_TEXTO_TARJETA = 80;
+const MAX_BOTONES_TARJETA = 3;
 // Kit de difusión: publicar, comentarios y estadísticas. Se piden cuando la persona se conecta desde Difusión (o
 // autoriza el kit desde ahí), para que quien solo quiere mensajes no vea en Instagram una pantalla que pide más
 // de lo que usa.
@@ -102,10 +107,28 @@ interface IgMessaging {
   recipient?: { id?: string };
   timestamp?: number;
   message?: IgMessage;
+  /** Tocó un botón de una tarjeta o una pregunta frecuente (webhook messaging_postbacks). */
+  postback?: { mid?: string; title?: string; payload?: string };
+}
+/** Un comentario nuevo (webhook `comments`). */
+interface IgCambioComentario {
+  id?: string;
+  text?: string;
+  from?: { id?: string; username?: string };
+  media?: { id?: string };
+  parent_id?: string;
 }
 export interface IgWebhookBody {
   object?: string;
-  entry?: { id?: string; messaging?: IgMessaging[] }[];
+  entry?: { id?: string; messaging?: IgMessaging[]; changes?: { field?: string; value?: IgCambioComentario }[] }[];
+}
+
+/** Una tarjeta del carrusel (generic template): hasta 80 caracteres de título y subtítulo, hasta 3 botones. */
+export interface TarjetaDeInstagram {
+  titulo: string;
+  subtitulo: string;
+  imagen?: string;
+  botones: ({ titulo: string; url: string } | { titulo: string; payload: string })[];
 }
 
 type ConexionDescifrada = { ig_user_id: string; access_token: string };
@@ -146,6 +169,8 @@ export class InstagramService {
     @Optional() private readonly medios?: InstagramMediosService,
     // Opcional: las respuestas automáticas (bienvenida y ausencia) de los mensajes.
     @Optional() private readonly ajustes?: InstagramAjustesService,
+    // Opcional: quién atiende en lugar de Orbi (el bot de ventas de la cuenta de la empresa).
+    @Optional() private readonly ruteo?: InstagramRuteoService,
   ) {}
 
   // Las credenciales se leen al usarlas y no al arrancar: la API sigue
@@ -710,7 +735,11 @@ export class InstagramService {
   }
 
   private async guardarMensaje(entryId: string | undefined, m: IgMessaging): Promise<MensajeDeCliente | null> {
-    const msg = m.message;
+    // Un botón de una tarjeta o una pregunta frecuente llega como postback: se guarda como lo que dice el botón, y su
+    // payload viaja como el de una respuesta rápida.
+    const msg: IgMessage | undefined = m.message ?? (m.postback?.mid
+      ? { mid: m.postback.mid, text: m.postback.title || '[Botón]', ...(m.postback.payload ? { quick_reply: { payload: m.postback.payload } } : {}) }
+      : undefined);
     if (!msg?.mid) return null;
     const texto = this.textoDe(msg);
     if (!texto) return null;
@@ -742,7 +771,7 @@ export class InstagramService {
 
     // Un eco que no conocemos en un chat que atiende Orbi puede ser la respuesta de Orbi que todavía se está guardando: se
     // espera un poco y se vuelve a mirar antes de tomarlo como escrito por una persona (que callaría a Orbi).
-    if (eco && !esNueva && (await this.orbiAtiendeSinFallar(conexion.businessId, conv.id))) {
+    if (eco && !esNueva && ((await this.orbiAtiendeSinFallar(conexion.businessId, conv.id)) || (await this.otroAtiende(conexion.businessId)))) {
       await new Promise((r) => setTimeout(r, Number(this.config.get<string>('INSTAGRAM_ESPERA_ECO_MS') ?? ESPERA_ECO_MS)));
       if (await this.yaGuardado(msg.mid)) return null;
     }
@@ -769,10 +798,14 @@ export class InstagramService {
       } catch (err) {
         this.logger.warn(`No se pudo pausar a Orbi en ${conv.id}: ${describeError(err)}`);
       }
+      if (await this.otroAtiende(conexion.businessId)) await this.ruteo?.pausarPorPersona(conexion.businessId, conv.id);
       return null;
     }
     // Si Orbi atiende el chat, la bienvenida y la ausencia no salen: se presenta y contesta Orbi.
-    if (!(await this.orbiAtiendeSinFallar(conexion.businessId, conv.id))) await this.responderSolo(conexion.businessId, conv.id, idCliente, esNueva, creado);
+    // Lo mismo si la cuenta la atiende otro bot (el de ventas de la empresa): contesta él.
+    if (!(await this.orbiAtiendeSinFallar(conexion.businessId, conv.id)) && !(await this.otroAtiende(conexion.businessId))) {
+      await this.responderSolo(conexion.businessId, conv.id, idCliente, esNueva, creado);
+    }
     if (!guardado?.id) return null;
     const conTexto = msg.text?.trim();
     return {
@@ -785,6 +818,63 @@ export class InstagramService {
       ...(conTexto ? { texto: conTexto } : {}),
       ...(msg.quick_reply?.payload ? { opcionId: msg.quick_reply.payload } : {}),
     };
+  }
+
+  private otroAtiende(businessId: string): Promise<boolean> {
+    return this.ruteo ? this.ruteo.atiende(businessId) : Promise.resolve(false);
+  }
+
+  /**
+   * Los comentarios nuevos que trae el webhook (campo `comments`), de cuentas con conexión activa. Se descartan los que
+   * escribió la propia cuenta (sus respuestas también llegan por acá y no hay que contestarse a sí misma).
+   */
+  async comentariosDelWebhook(body: IgWebhookBody): Promise<ComentarioNuevo[]> {
+    const salida: ComentarioNuevo[] = [];
+    if (body.object !== 'instagram') return salida;
+    for (const entry of body.entry ?? []) {
+      for (const cambio of entry.changes ?? []) {
+        const v = cambio.value;
+        if (cambio.field !== 'comments' || !v?.id || !v.from?.id || !v.text?.trim()) continue;
+        if (v.from.id === entry.id) continue;
+        try {
+          const conexion = await this.conexionActiva([entry.id]);
+          if (!conexion) continue;
+          salida.push({
+            businessId: conexion.businessId, commentId: v.id, texto: v.text.trim().slice(0, 1000),
+            autorId: v.from.id, autorUsuario: v.from.username ?? null, mediaId: v.media?.id ?? null,
+          });
+        } catch (e) {
+          this.logger.warn(`No se pudo leer el comentario ${v.id}: ${describeError(e)}`);
+        }
+      }
+    }
+    return salida;
+  }
+
+  /**
+   * La charla con alguien que todavía no escribió (por ejemplo, quien comentó una publicación): crea el cliente y la
+   * conversación si hace falta, para guardar ahí el mensaje privado.
+   */
+  async asegurarConversacion(businessId: string, igsid: string, usuario: string | null): Promise<string | null> {
+    const existente = await this.prisma.customer.findUnique({
+      where: { businessId_instagramId: { businessId, instagramId: igsid } },
+      select: { id: true, deletedAt: true },
+    });
+    let customerId: string;
+    if (existente) {
+      if (existente.deletedAt) return null;
+      customerId = existente.id;
+    } else {
+      const creado = await this.prisma.customer.create({
+        data: { businessId, firstName: usuario ? `@${usuario}` : `Instagram ${igsid.slice(-4)}`, instagramId: igsid, isChatContact: true },
+        select: { id: true },
+      });
+      customerId = creado.id;
+    }
+    const conv =
+      (await this.prisma.conversation.findFirst({ where: { businessId, customerId }, select: { id: true } })) ??
+      (await this.prisma.conversation.create({ data: { businessId, customerId, isUnread: false }, select: { id: true } }));
+    return conv.id;
   }
 
   private async yaGuardado(mid: string): Promise<boolean> {
@@ -896,6 +986,88 @@ export class InstagramService {
       text: texto,
       quick_replies: opciones.slice(0, MAX_RESPUESTAS_RAPIDAS).map((o) => ({ content_type: 'text', title: o.titulo.slice(0, MAX_TITULO_RESPUESTA_RAPIDA), payload: o.payload })),
     });
+  }
+
+  /** Un carrusel de tarjetas con foto y botones (generic template). Mismas reglas de plazo que el texto. */
+  async enviarTarjetas(businessId: string, conversationId: string, igsid: string, tarjetas: TarjetaDeInstagram[]): Promise<string> {
+    const elements = tarjetas.slice(0, MAX_TARJETAS).map((t) => ({
+      title: t.titulo.slice(0, MAX_TEXTO_TARJETA),
+      subtitle: t.subtitulo.slice(0, MAX_TEXTO_TARJETA),
+      ...(t.imagen ? { image_url: t.imagen } : {}),
+      buttons: t.botones.slice(0, MAX_BOTONES_TARJETA).map((b) =>
+        'url' in b ? { type: 'web_url', url: b.url, title: b.titulo } : { type: 'postback', title: b.titulo, payload: b.payload },
+      ),
+    }));
+    return this.enviarCarga(businessId, conversationId, igsid, { attachment: { type: 'template', payload: { template_type: 'generic', elements } } });
+  }
+
+  /**
+   * Respuesta privada a un comentario: el mensaje directo a quien comentó, aunque nunca haya escrito. Instagram deja
+   * mandar UNO solo por comentario, hasta 7 días después; para seguir, la persona tiene que contestar. Por eso va con
+   * respuestas rápidas: tocar una cuenta como respuesta. Si Instagram no acepta los botones, sale solo el texto.
+   */
+  async responderComentarioPorPrivado(
+    businessId: string,
+    commentId: string,
+    texto: string,
+    opciones: { titulo: string; payload: string }[] = [],
+  ): Promise<{ messageId: string; destinatario: string | null }> {
+    const cred = await this.credenciales(businessId);
+    if (!cred) throw new BadRequestException('Instagram no está conectado');
+    const enviar = (mensaje: Record<string, unknown>) =>
+      this.llamar<{ message_id?: string; recipient_id?: string }>(`https://graph.instagram.com/${this.version}/${cred.ig_user_id}/messages`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${cred.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipient: { comment_id: commentId }, message: mensaje }),
+      });
+    const base = { text: texto };
+    let res: { message_id?: string; recipient_id?: string };
+    if (opciones.length > 0) {
+      try {
+        res = await enviar({
+          ...base,
+          quick_replies: opciones.slice(0, MAX_RESPUESTAS_RAPIDAS).map((o) => ({ content_type: 'text', title: o.titulo.slice(0, MAX_TITULO_RESPUESTA_RAPIDA), payload: o.payload })),
+        });
+      } catch (e) {
+        if (e instanceof InstagramApiError && (e.code === 190 || e.tipo === 'OAuthException')) throw e;
+        this.logger.warn(`Instagram no aceptó botones en la respuesta privada al comentario ${commentId}; va solo el texto: ${describeError(e)}`);
+        res = await enviar(base);
+      }
+    } else {
+      res = await enviar(base);
+    }
+    if (!res.message_id) throw new BadGatewayException('Instagram no confirmó el envío');
+    return { messageId: res.message_id, destinatario: res.recipient_id ?? null };
+  }
+
+  /** Carga (o borra, con null) las preguntas frecuentes que Instagram muestra al abrir un chat nuevo. Hasta 4. */
+  async configurarPreguntasFrecuentes(businessId: string, preguntas: { pregunta: string; payload: string }[] | null): Promise<void> {
+    const cred = await this.credenciales(businessId);
+    if (!cred) throw new BadRequestException('Instagram no está conectado');
+    const url = `https://graph.instagram.com/${this.version}/me/messenger_profile`;
+    const headers = { Authorization: `Bearer ${cred.access_token}`, 'Content-Type': 'application/json' };
+    if (!preguntas || preguntas.length === 0) {
+      await this.llamar(url, { method: 'DELETE', headers, body: JSON.stringify({ platform: 'instagram', fields: ['ice_breakers'] }) });
+      return;
+    }
+    await this.llamar(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        platform: 'instagram',
+        ice_breakers: [{ call_to_actions: preguntas.slice(0, 4).map((p) => ({ question: p.pregunta, payload: p.payload })) }],
+      }),
+    });
+  }
+
+  /** Suscribe la cuenta a más campos del webhook (por ejemplo, comentarios y botones). Al conectar solo se pide `messages`. */
+  async suscribirCampos(businessId: string, campos: string[]): Promise<void> {
+    const cred = await this.credenciales(businessId);
+    if (!cred) throw new BadRequestException('Instagram no está conectado');
+    await this.llamar(
+      `https://graph.instagram.com/${this.version}/me/subscribed_apps?${new URLSearchParams({ subscribed_fields: campos.join(','), access_token: cred.access_token }).toString()}`,
+      { method: 'POST' },
+    );
   }
 
   /** Manda una imagen (de una dirección pública) por mensaje directo; mismas reglas de plazo que el texto. */

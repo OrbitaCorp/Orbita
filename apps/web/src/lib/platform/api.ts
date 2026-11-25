@@ -191,7 +191,24 @@ export type IgConversacion = {
   sinLeer: boolean
   ultimo: { texto: string; esMio: boolean; fecha: string } | null
   actualizadaEl: string
+  /** En manos del equipo: la persona pidió alguien, el bot no supo o contestó alguien del equipo. Opcional: la API puede ir atrás. */
+  bot?: { enManosDelEquipo: boolean; motivo: string | null }
 }
+/** El bot de ventas de la cuenta de Instagram de la empresa (Marketing → Instagram → Respuestas automáticas). */
+export type IgBotVentas = {
+  activo: boolean
+  usarIa: boolean
+  responderComentarios: boolean
+  todosLosComentarios: boolean
+  palabrasClave: string[]
+  respuestasPublicas: string[]
+  saludoComentario: string
+  correosAviso: string[]
+  estadoMeta: { preguntasFrecuentes: string; suscripcion: string; al: string } | null
+  comentariosRecientes: { id: string; usuario: string | null; texto: string; privado: boolean; publico: boolean; error: string | null; createdAt: string }[]
+  resumen: { charlasEsperandoAlEquipo: number; respuestasUltimos7Dias: number }
+}
+export type IgBotVentasInput = Omit<IgBotVentas, 'estadoMeta' | 'comentariosRecientes' | 'resumen'>
 export type IgMensaje = { id: string; sender: 'CUSTOMER' | 'STORE'; text: string; channel: string; createdAt: string }
 export type TiktokEstado = {
   configurado: boolean
@@ -1220,6 +1237,9 @@ export const platformApi = {
   igConversaciones: () => getJSON<IgConversacion[]>('/platform/marketing/instagram/conversations'),
   igMensajes: (id: string) => getJSON<IgMensaje[]>(`/platform/marketing/instagram/conversations/${id}/messages`),
   igConectar: () => sendJSON<{ url: string }>('/platform/marketing/instagram/connect', 'POST'),
+  igBot: () => getJSON<IgBotVentas | null>('/platform/marketing/instagram/bot'),
+  igGuardarBot: (input: IgBotVentasInput) => sendJSON<IgBotVentas>('/platform/marketing/instagram/bot', 'PUT', input),
+  igReactivarBot: (conversationId: string) => sendJSON<{ ok: true }>(`/platform/marketing/instagram/conversations/${conversationId}/bot`, 'POST'),
   // Contenido de la cuenta: publicaciones, comentarios y estadísticas (mismas formas que Difusión en el panel de un negocio).
   igPublicacionesDeLaCuenta: () => getJSONConMensaje<IgPublicacionDeLaCuenta[]>('/platform/marketing/instagram/posts/account'),
   igPublicacionesDeOrbita: () => getJSONConMensaje<InstagramPublicacion[]>('/platform/marketing/instagram/posts'),

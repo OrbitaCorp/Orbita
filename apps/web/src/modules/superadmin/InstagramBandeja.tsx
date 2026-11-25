@@ -40,6 +40,7 @@ export function InstagramBandeja({ permitido, onCambio }: { permitido: boolean; 
   const [texto, setTexto] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [errorEnvio, setErrorEnvio] = useState('')
+  const [reactivando, setReactivando] = useState(false)
   const fin = useRef<HTMLDivElement>(null)
 
   const cargarLista = useCallback(async () => {
@@ -101,6 +102,19 @@ export function InstagramBandeja({ permitido, onCambio }: { permitido: boolean; 
     }
   }
 
+  // La charla estaba en manos del equipo: el bot de ventas vuelve a contestar ahí.
+  const reactivarBot = async (id: string) => {
+    setReactivando(true)
+    try {
+      await platformApi.igReactivarBot(id)
+      await cargarLista()
+    } catch (e) {
+      setErrorEnvio(e instanceof PlatformApiError ? e.message : 'No se pudo reactivar el bot.')
+    } finally {
+      setReactivando(false)
+    }
+  }
+
   if (!permitido) {
     return <Card title="Mensajes directos"><Empty text="Solo los superadmin pueden ver y contestar los mensajes de la cuenta de la empresa." /></Card>
   }
@@ -156,6 +170,7 @@ export function InstagramBandeja({ permitido, onCambio }: { permitido: boolean; 
                     <span style={{ fontSize: 12.5, color: c.sinLeer ? 'var(--color-text)' : 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                       {c.ultimo ? `${c.ultimo.esMio ? 'Vos: ' : ''}${c.ultimo.texto}` : 'Sin mensajes'}
                     </span>
+                    {c.bot?.enManosDelEquipo && <span style={{ fontSize: 11.5, color: 'var(--color-muted)', flexShrink: 0 }}>Equipo</span>}
                     {c.sinLeer && <span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--color-primary)', flexShrink: 0 }} />}
                   </span>
                 </span>
@@ -178,6 +193,16 @@ export function InstagramBandeja({ permitido, onCambio }: { permitido: boolean; 
                   <div style={{ fontSize: 11.5, color: 'var(--color-muted)' }}>Instagram</div>
                 </div>
               </div>
+              {actual?.bot?.enManosDelEquipo && (
+                <div role="status" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', padding: '9px 16px', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)', fontSize: 12.5, color: 'var(--color-body)' }}>
+                  <span>{actual.bot.motivo ?? 'El bot no contesta en esta charla.'}</span>
+                  {permitido && (
+                    <button type="button" onClick={() => void reactivarBot(actual.id)} disabled={reactivando} style={{ background: 'none', border: 'none', padding: 0, minHeight: 32, color: 'var(--color-primary)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      {reactivando ? 'Reactivando…' : 'Volver a activar el bot'}
+                    </button>
+                  )}
+                </div>
+              )}
 
               <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 8px', display: 'flex', flexDirection: 'column', gap: 8 }} aria-live="polite">
                 {cargandoHilo || !mensajes ? <Loader />

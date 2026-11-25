@@ -488,6 +488,32 @@ su cantidad.
 Sin los tres secretos cargados, la pantalla de Marketing avisa que TikTok no está configurado y el resto
 de la API sigue igual.
 
+## Bot de ventas de Órbita en Instagram (Marketing → Instagram → Respuestas automáticas)
+
+Contesta los mensajes directos y los comentarios de la cuenta de Instagram de la EMPRESA (la conectada al negocio
+`MARKETING_NEGOCIO`) para llevar a la persona a crear su cuenta. Código: `src/marketing/instagram-ventas/` (lo que dice
+está en `contenido.ts`). Las tiendas siguen con Orbi: el webhook único reparte por negocio (`InstagramRuteoService`).
+Migración `20261124120000_marketing_instagram_bot` (dos tablas nuevas, con RLS). No usa secretos nuevos: la IA es la
+misma cadena barata del bot de Orbi (Groq → Workers AI → Gemini) y el correo de aviso sale por Resend.
+
+Para que ande de punta a punta hacen falta, una sola vez, dos cosas en Meta:
+
+1. En la app de Meta (Instagram → Webhooks), además de `messages`, suscribir los campos **`messaging_postbacks`**
+   (botones de las tarjetas y preguntas frecuentes) y **`comments`** (comentarios nuevos). Sin `comments`, el bot
+   contesta los mensajes pero no se entera de los comentarios.
+2. Que la cuenta tenga el permiso `instagram_business_manage_comments` (se pide al conectar con el kit: «Renovar la
+   conexión» en Marketing si faltara).
+
+Al guardar con el bot prendido, la API suscribe la cuenta a `messages,messaging_postbacks,comments` y carga las cuatro
+preguntas frecuentes; el resultado queda a la vista en la pantalla. Mientras Meta no apruebe la revisión de la app,
+la cuenta CONECTADA tiene que tener un rol en la app (la de Órbita lo tiene); quien le escribe o comenta puede ser
+cualquier persona.
+
+Límites de Instagram que el bot respeta: un solo mensaje privado por comentario y hasta 7 días después (por eso lleva
+botones); responder solo dentro de las 24 h del último mensaje de la persona; tarjetas, botones y preguntas frecuentes
+no se ven desde la computadora (cada respuesta trae los enlaces también en el texto). Topes de IA: 20 respuestas por
+charla y 800 por día; pasados, contesta con los botones.
+
 ## Rol Marketing del super panel
 
 Tercer rol de `platform_admins.role` (`MARKETING`, migración `20261021010000_platform_admin_rol_marketing`: agrega el valor al enum, no toca datos).
