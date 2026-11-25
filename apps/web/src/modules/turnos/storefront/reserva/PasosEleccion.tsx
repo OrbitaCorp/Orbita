@@ -44,16 +44,18 @@ export function PasoServicio({ rubro, t, elegido, onElegir }: { rubro: RubroTurn
 
 const cuandoCorto = (f: Fecha, m: number) => `${esHoy(f) ? 'Hoy' : `${nombreDiaCorto(f)} ${f.dia}`} ${horaTxt(m)}`
 
-export function PasoRecurso({ rubro, t, recursos, duracion, elegido, onElegir }: {
+export function PasoRecurso({ rubro, t, recursos, duracion, elegido, onElegir, sinProximos }: {
   rubro: RubroTurnos; t: TemaNegocio; recursos: Recurso[]; duracion: number; elegido: string | null; onElegir: (id: string) => void
+  /** Con la API: los próximos libres de cada uno no se inventan (se ven al elegir el día). */
+  sinProximos?: boolean
 }) {
   const persona = rubro.modo === 'profesional'
   // Los próximos horarios libres de la agenda de ejemplo. Cada quien tiene los suyos: salen de los
   // días y las horas en que atiende, dentro del horario del negocio. Se reparten para que no den
   // todos el mismo.
   const libresDe = (semana: typeof t.horarios) => proximosDias(semana, duracion, 7).flatMap(d => d.grilla.filter(g => g.libre).map(g => ({ f: d.f, m: g.m })))
-  const proximo = (r: Recurso, i: number) => { const l = libresDe(semanaDeRecurso(r, t.horarios)); return l[Math.min(i, l.length - 1)] }
-  const primero = libresDe(t.horarios)[0]
+  const proximo = (r: Recurso, i: number) => { if (sinProximos) return undefined; const l = libresDe(semanaDeRecurso(r, t.horarios)); return l[Math.min(i, l.length - 1)] }
+  const primero = sinProximos ? undefined : libresDe(t.horarios)[0]
   // Solo se aclara cuándo atiende quien no sigue el horario completo del negocio.
   const cuandoAtiende = (r: Recurso) => [r.horario ? tramosFrase(tramosDe(r.horario)) : '', r.atiende.length < t.horarios.filter(([, h]) => h).length ? diasTxt(r.atiende).toLowerCase() : ''].filter(Boolean).join(' · ')
 

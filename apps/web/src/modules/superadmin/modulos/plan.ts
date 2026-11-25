@@ -153,9 +153,9 @@ const TURNOS = plan('turnos', 'Turnos', 'Mateo',
     documentada(t('2026-11-19', 'Mateo', 'Pagos: registrar seña y saldo (POST :id/pago) y el detalle de la reserva con su historial', 'El pago nunca supera el total; el detalle muestra cada cambio con quién y por qué'), 'auditoria.turnos.2026-11-24-agenda-real-historial-y-espera'),
     documentada(t('2026-11-19', 'Mateo', 'Lista de espera del panel sobre /reservas/espera', 'Se ve quién espera cada horario y se lo puede quitar'), 'auditoria.turnos.2026-11-24-lista-de-espera-en-turnos'),
     // Semana 4 · el sitio
-    t('2026-11-23', 'Mateo', 'Sitio: elegir servicio y profesional desde la API (config pública, servicios y recursos)', 'El sitio lista lo mismo que el panel, sin datos del navegador'),
-    t('2026-11-24', 'Mateo', 'Sitio: calendario y horarios desde GET disponibilidad, con la anticipación mínima y máxima', 'Los horarios ofrecidos son los libres de verdad; un horario ya tomado no se ofrece'),
-    t('2026-11-25', 'Mateo', 'Sitio: retener y confirmar con clave de idempotencia (POST /retener y /mi/:token/confirmar)', 'Doble clic no duplica; la reserva vence si no se confirma en el tiempo de retención'),
+    documentada(t('2026-11-23', 'Mateo', 'Sitio: elegir servicio y profesional desde la API (config pública, servicios y recursos)', 'El sitio lista lo mismo que el panel, sin datos del navegador'), 'auditoria.turnos.2026-11-25-sitio-sobre-la-api'),
+    documentada(t('2026-11-24', 'Mateo', 'Sitio: calendario y horarios desde GET disponibilidad, con la anticipación mínima y máxima', 'Los horarios ofrecidos son los libres de verdad; un horario ya tomado no se ofrece'), 'auditoria.turnos.2026-11-25-sitio-sobre-la-api'),
+    documentada(t('2026-11-25', 'Mateo', 'Sitio: retener y confirmar con clave de idempotencia (POST /retener y /mi/:token/confirmar)', 'Doble clic no duplica; la reserva vence si no se confirma en el tiempo de retención'), 'auditoria.turnos.2026-11-25-sitio-sobre-la-api'),
     t('2026-11-26', 'Mateo', 'Sitio: /mi-turno/<token> con cancelar y reprogramar según la política del negocio', 'El enlace del email abre la reserva; cancelar fuera de plazo se rechaza con el mensaje de la API'),
     t('2026-11-27', 'Mateo', 'Sitio: la seña (monto y si se devuelve) y los emails de confirmación y cancelación revisados', 'Los emails llegan en STUB con los datos correctos; el aviso de seña dice lo mismo que la config'),
     // Semana 5 · alta real, Mis turnos y Resumen

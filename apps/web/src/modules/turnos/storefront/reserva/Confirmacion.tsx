@@ -37,9 +37,12 @@ interface Props {
   /** Reservó como invitado, creó su cuenta o entró con la que ya tenía. */
   cuenta: Cuenta
   beneficios: BeneficiosCuenta
+  /** Con la API: el código de la reserva de verdad, si la seña se paga después y si el negocio todavía la tiene que confirmar. */
+  real?: { codigo: string; senaAPagar: number; pendiente: boolean }
 }
 
-export function Confirmacion({ rubro, t, servicio, fecha, inicio, duracion, recurso, nombre, precio, sena, recordatorio, lugar, domicilio, cuenta, beneficios }: Props) {
+export function Confirmacion({ rubro, t, servicio, fecha, inicio, duracion, recurso, nombre, precio, sena, recordatorio, lugar, domicilio, cuenta, beneficios, real }: Props) {
+  const codigo = real?.codigo ?? CODIGO_DEMO
   const titulo = useRef<HTMLHeadingElement>(null)
   const forma = useForma()
   // Al llegar, arriba de todo y con el foco en el título: el lector de pantalla anuncia que salió bien.
@@ -81,7 +84,9 @@ export function Confirmacion({ rubro, t, servicio, fecha, inicio, duracion, recu
             {`¡Listo${primero ? `, ${primero}` : ''}! ${cierre}`}
           </h1>
           <p className="tur-bajada tur-entra" style={{ margin: '14px auto 0', maxWidth: 470, fontSize: 17, ['--i' as string]: 1 }}>
-            {`${sena ? `Recibimos tu seña de ${pesos(sena)}. ` : ''}Tu turno quedó reservado para ${cuando.toLowerCase()}.`}
+            {real
+              ? `${real.pendiente ? `Pediste tu turno para ${cuando.toLowerCase()}: el negocio lo confirma y te avisa.` : `Tu turno quedó reservado para ${cuando.toLowerCase()}.`}${real.senaAPagar > 0 ? ` La seña de ${pesos(real.senaAPagar)} la coordinás con el negocio.` : ''}`
+              : `${sena ? `Recibimos tu seña de ${pesos(sena)}. ` : ''}Tu turno quedó reservado para ${cuando.toLowerCase()}.`}
           </p>
         </div>
 
@@ -110,13 +115,14 @@ export function Confirmacion({ rubro, t, servicio, fecha, inicio, duracion, recu
               {lugar === 'local' && <Dato k="Dónde" v={t.direccion} sub={t.barrio} />}
               {lugar === 'domicilio' && <Dato k="Dónde" v="A domicilio" sub={domicilio.trim() || undefined} />}
               {sena > 0 && <Dato k="Seña" v={<span className="tur-num">{pesos(sena)} pagados</span>} sub={`Resta ${pesos(precio - sena)} el día del turno`} />}
+              {real && real.senaAPagar > 0 && <Dato k="Seña" v={<span className="tur-num">{pesos(real.senaAPagar)} a pagar</span>} sub="La coordinás con el negocio" />}
             </div>
           </div>
           <div className="tur-entrada-talon">
-            <div className="tur-qr"><QR texto={urlTurno(t.nombre)} size={132} titulo={`Código QR de la reserva ${CODIGO_DEMO}`} /></div>
+            <div className="tur-qr"><QR texto={urlTurno(t.nombre)} size={132} titulo={`Código QR de la reserva ${codigo}`} /></div>
             <div>
               <div className="tur-rotulo">Reserva</div>
-              <div className="tur-num" style={{ fontSize: 19, fontWeight: 600, letterSpacing: '0.06em', color: 'var(--color-text)', marginTop: 2 }}>{CODIGO_DEMO}</div>
+              <div className="tur-num" style={{ fontSize: 19, fontWeight: 600, letterSpacing: '0.06em', color: 'var(--color-text)', marginTop: 2 }}>{codigo}</div>
               <div style={{ fontSize: 13.5, lineHeight: 1.45, color: 'var(--color-body)', marginTop: 6 }}>{lugar === 'local' ? 'Mostrá el QR cuando llegues.' : 'Es el comprobante de tu reserva.'}</div>
             </div>
           </div>

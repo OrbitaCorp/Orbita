@@ -15,18 +15,26 @@
 // Acá vive solo el estado y el orden de los pasos; cada paso y cada pieza está
 // en ./reserva. Manda la marca del negocio (tema) y Órbita aparece como motivo:
 // el progreso es una órbita, el resumen es un ticket y la confirmación cierra
-// un anillo. Todo es de ejemplo: no reserva nada ni llama a Mercado Pago.
-import { useEffect, useMemo, useRef, useState } from 'react'
+// un anillo.
+//
+// En /turnos-demo todo es de ejemplo: no reserva nada ni llama a Mercado Pago.
+// En el sitio de un negocio real (adentro de SitioApiProvider, origenSitio.ts)
+// los servicios, las agendas, los días y los horarios libres salen de la API,
+// y confirmar retiene el horario y lo confirma con los datos de la persona. La
+// seña no se cobra todavía en línea: se muestra y se coordina con el negocio.
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import type { ParsedUrlQuery } from 'querystring'
 import { ArrowRight, CalendarClock, ChevronLeft, Clock, Home, Lock, MapPin, ShieldCheck, Sparkles, UserRound } from 'lucide-react'
 import { pesos, duracionTxt, horaTxt, recursosDe, semanaDeRecurso, type RubroTurnos } from '@/modules/turnos/datos'
 import { cancelacionTxt, useNegocioDemo, type FormaSitio, type Modalidad } from '@/modules/turnos/datos/negocio'
-import { tramosDe, tramosFrase } from '@/modules/turnos/horario'
+import { fijarReloj, tramosDe, tramosFrase } from '@/modules/turnos/horario'
+import { ReservasApiError, claveDeIntento } from '@/lib/reservasApi/cliente'
+import { cargarSitio, useSlugSitio, type HorarioLibre, type ReservaHecha, type SitioApi } from './origenSitio'
 import SitioNegocio from './SitioNegocio'
 import { RETRATOS, type TemaNegocio } from './tema'
 import { EstiloReserva } from './reserva/estilo'
-import { fechaLarga, primerLibre, HOY, type Fecha } from './reserva/calendario'
+import { fechaLarga, fijarHoy, isoDe, primerLibre, sumarDias, HOY, type DiaAgenda, type Fecha } from './reserva/calendario'
 import { OrbitaPasos } from './reserva/OrbitaPasos'
 import { PasoServicio, PasoRecurso } from './reserva/PasosEleccion'
 import { PasoFecha } from './reserva/PasoFecha'
@@ -39,17 +47,47 @@ export default function Reserva({ rubro }: { rubro: RubroTurnos }) {
   const router = useRouter()
   // ?forma=simple: se llegó desde la página simple del negocio y la reserva se abre con el encabezado mínimo.
   const forma: FormaSitio = router.query.forma === 'simple' ? 'simple' : 'web'
+  // En el sitio de un negocio real, su subdominio: los datos salen de la API.
+  const slug = useSlugSitio()
   return (
     <SitioNegocio rubro={rubro} pagina="reserva" forma={forma} ctaMovil={false}>
       {t => (
         <>
           <EstiloReserva />
-          <Flujo rubro={rubro} t={t} simple={forma === 'simple'} />
+          {slug ? <FlujoApi slug={slug} rubro={rubro} t={t} simple={forma === 'simple'} /> : <Flujo rubro={rubro} t={t} simple={forma === 'simple'} />}
         </>
       )}
     </SitioNegocio>
   )
 }
+
+/** Con la API: trae los servicios, las agendas y el horario del negocio antes de mostrar el flujo. */
+function FlujoApi({ slug, rubro, t, simple }: { slug: string; rubro: RubroTurnos; t: TemaNegocio; simple: boolean }) {
+  const [estado, setEstado] = useState<{ api: SitioApi | null; error: string | null }>({ api: null, error: null })
+  const [vuelta, setVuelta] = useState(0)
+  const cargar = useEffectEvent(() => cargarSitio(slug, rubro))
+  useEffect(() => {
+    let vivo = true
+    cargar().then(
+      api => { if (vivo) setEstado({ api, error: null }) },
+      (e: unknown) => { if (vivo) setEstado({ api: null, error: e instanceof Error && e.message ? e.message : 'No pudimos abrir la agenda.' }) },
+    )
+    return () => { vivo = false }
+  }, [slug, vuelta])
+  if (estado.error) {
+    return (
+      <div className="tur" data-oscuro={t.oscuro}><div className="tur-cont tur-flujo">
+        <p role="alert" style={{ textAlign: 'center', margin: '48px 0 12px', fontSize: 16 }}>{estado.error}</p>
+        <p style={{ textAlign: 'center' }}><button type="button" className="tur-volver" onClick={() => { setEstado({ api: null, error: null }); setVuelta(n => n + 1) }}>Probar de nuevo</button></p>
+      </div></div>
+    )
+  }
+  if (!estado.api) return <div className="tur"><div className="tur-cont tur-flujo"><p aria-busy="true" style={{ textAlign: 'center', margin: '48px 0', color: 'var(--color-muted)' }}>Abriendo la agenda…</p></div></div>
+  return <Flujo rubro={estado.api.rubro} t={t} simple={simple} api={estado.api} />
+}
+
+/** Cuántos días de la tira se piden a la API. */
+const DIAS_TIRA = 21
 
 type Paso = 'servicio' | 'recurso' | 'fecha' | 'datos' | 'pago'
 
@@ -65,10 +103,13 @@ function preseleccion(q: ParsedUrlQuery, rubro: RubroTurnos, recursos: { id: str
   return out
 }
 
-function Flujo({ rubro, t, simple }: { rubro: RubroTurnos; t: TemaNegocio; simple: boolean }) {
+function Flujo({ rubro, t, simple, api }: { rubro: RubroTurnos; t: TemaNegocio; simple: boolean; api?: SitioApi }) {
   const router = useRouter()
-  const vacio = router.query.estado === 'vacio'
-  const recursos = useMemo(() => recursosDe(rubro), [rubro])
+  // El "hoy" y la hora: los de Argentina con la API, los de la demo sin ella. Antes de cualquier cálculo.
+  fijarHoy(api?.hoy ?? null)
+  fijarReloj(api ? { hoy: api.hoy, minutos: api.minutos } : null)
+  const vacio = router.query.estado === 'vacio' || (!!api && rubro.servicios.length === 0)
+  const recursos = useMemo(() => (api ? api.recursos : recursosDe(rubro)), [api, rubro])
 
   // La página se sirve con getServerSideProps: la query ya está en el primer render,
   // así que lo preseleccionado entra como estado inicial y no hace falta un effect.
@@ -84,7 +125,9 @@ function Flujo({ rubro, t, simple }: { rubro: RubroTurnos; t: TemaNegocio; simpl
   const lugar = lugarPedido && t.modalidades.includes(lugarPedido) ? lugarPedido : t.modalidades[0]
   // La cuenta es opcional: lo normal es reservar como invitado.
   const { demo } = useNegocioDemo()
-  const beneficios = demo.cuentas
+  // Con la API: la política de la config, y sin cuenta de clientes (todavía no existe para Turnos).
+  const politica = api ? { ...demo.politica, ...api.politica } : demo.politica
+  const beneficios = api ? { ...demo.cuentas, activo: false } : demo.cuentas
   const [cuentaPedida, setCuenta] = useState<Cuenta>('invitado')
   const cuenta: Cuenta = beneficios.activo ? cuentaPedida : 'invitado'
   const [intento, setIntento] = useState(false)
@@ -96,7 +139,8 @@ function Flujo({ rubro, t, simple }: { rubro: RubroTurnos; t: TemaNegocio; simpl
   const idxRecurso = recursos.findIndex(r => r.id === recursoId)
   // Los horarios que se ofrecen: los del negocio (su mañana y su tarde) y, si ya eligió con quién,
   // solo los días y las horas en que esa persona atiende.
-  const agenda = useMemo(() => (recurso ? semanaDeRecurso(recurso, t.horarios) : t.horarios), [recurso, t.horarios])
+  const horariosBase = api ? api.semana : t.horarios
+  const agenda = useMemo(() => (recurso ? semanaDeRecurso(recurso, horariosBase) : horariosBase), [recurso, horariosBase])
   const elegido = !!servicio
   const precio = servicio?.precio ?? 0
   const duracion = servicio?.duracion ?? 30
@@ -107,7 +151,8 @@ function Flujo({ rubro, t, simple }: { rubro: RubroTurnos; t: TemaNegocio; simpl
   const pideSena = rubro.sena > 0 && !(elegido && precio === 0)
   const sena = pideSena && aPagar ? Math.round((aPagar * rubro.sena) / 100) : 0
 
-  const pasos: Paso[] = ['servicio', ...(simple ? [] : ['recurso' as Paso]), 'fecha', 'datos', ...(pideSena ? ['pago' as Paso] : [])]
+  // Con la API la seña no se cobra en línea todavía: no hay paso de pago (se coordina con el negocio).
+  const pasos: Paso[] = ['servicio', ...(simple ? [] : ['recurso' as Paso]), 'fecha', 'datos', ...(pideSena && !api ? ['pago' as Paso] : [])]
   const rotuloRecurso = rubro.modo === 'profesional' ? rubro.profesional : 'Espacio'
   const NOMBRE: Record<Paso, string> = { servicio: 'Servicio', recurso: rotuloRecurso, fecha: 'Día y hora', datos: 'Tus datos', pago: 'Seña' }
 
@@ -116,8 +161,46 @@ function Flujo({ rubro, t, simple }: { rubro: RubroTurnos; t: TemaNegocio; simpl
   const actual = pasos[Math.min(paso, pasos.length - 1)]
   const ultimo = paso >= pasos.length - 1
 
+  // ── Con la API: los días y los horarios libres de verdad ──
+  const servicioId = api && servicioIdx !== null ? api.servicioIds[servicioIdx] ?? null : null
+  const agendasPedidas = api ? (recursoId && recursoId !== 'cualquiera' ? [recursoId] : api.recursos.map(r => r.id)) : []
+  const claveAgenda = servicioId && recursoId ? `${servicioId}|${recursoId}` : null
+  const [rango, setRango] = useState<{ clave: string; dias: Map<string, { libres: number; cerrado: boolean }> } | null>(null)
+  const [horariosDia, setHorariosDia] = useState<Record<string, HorarioLibre[]>>({})
+  const [errorApi, setErrorApi] = useState<string | null>(null)
+  const [clave, setClave] = useState<string | null>(null)
+  const [hecha, setHecha] = useState<ReservaHecha | null>(null)
+  const pedirRango = useEffectEvent((c: string) => {
+    if (!api || !servicioId) return
+    api.rango(agendasPedidas, servicioId, api.hoy, DIAS_TIRA).then(
+      dias => setRango({ clave: c, dias }),
+      (e: unknown) => setErrorApi(e instanceof Error && e.message ? e.message : 'No pudimos traer los días.'),
+    )
+  })
+  useEffect(() => { if (claveAgenda && actual === 'fecha' && rango?.clave !== claveAgenda) pedirRango(claveAgenda) }, [claveAgenda, actual, rango?.clave])
+  const diasApi: DiaAgenda[] | undefined = api && claveAgenda && rango?.clave === claveAgenda
+    ? Array.from({ length: DIAS_TIRA }, (_, i) => {
+      const f = sumarDias(HOY, i)
+      const r = rango.dias.get(isoDe(f))
+      const grilla = (horariosDia[`${claveAgenda}|${isoDe(f)}`] ?? []).map(h => ({ m: h.m, libre: h.libre }))
+      return { f, grilla, libres: r?.libres ?? 0, cerrado: r ? r.cerrado : true }
+    })
+    : undefined
+
   // Si todavía no eligió día, se muestra el primero con lugar para ese servicio (estado derivado).
-  const fechaVista = fecha ?? primerLibre(agenda, duracion)?.f ?? HOY
+  const fechaVista = fecha ?? (api ? diasApi?.find(d => d.libres > 0)?.f : primerLibre(agenda, duracion)?.f) ?? HOY
+  const claveDia = claveAgenda ? `${claveAgenda}|${isoDe(fechaVista)}` : null
+  const pedirHorarios = useEffectEvent((c: string, fechaIso: string) => {
+    if (!api || !servicioId) return
+    api.horarios(agendasPedidas, servicioId, fechaIso).then(
+      hs => setHorariosDia(h => ({ ...h, [c]: hs })),
+      (e: unknown) => setErrorApi(e instanceof Error && e.message ? e.message : 'No pudimos traer los horarios.'),
+    )
+  })
+  const hayDias = !!diasApi
+  useEffect(() => {
+    if (claveDia && hayDias && actual === 'fecha' && !horariosDia[claveDia]) pedirHorarios(claveDia, claveDia.split('|')[2])
+  }, [claveDia, hayDias, actual, horariosDia])
   const fechaTurno = hora !== null ? fechaVista : null
   const inicioTurno = hora
   const cuando = fechaTurno && inicioTurno !== null ? `${fechaLarga(fechaTurno)} · ${horaTxt(inicioTurno)}` : null
@@ -143,12 +226,12 @@ function Flujo({ rubro, t, simple }: { rubro: RubroTurnos; t: TemaNegocio; simpl
     }
   }, [actual])
 
-  // El "envío" simulado: mientras dura, el botón queda trabado con el giro.
+  // El "envío" simulado (solo en la demo): mientras dura, el botón queda trabado con el giro.
   useEffect(() => {
-    if (!enviando) return
+    if (!enviando || api) return
     const x = setTimeout(() => { setEnviando(false); setListo(true) }, pideSena ? 1700 : 1100)
     return () => clearTimeout(x)
-  }, [enviando, pideSena])
+  }, [enviando, pideSena, api])
 
   const ir = (p: number) => {
     if (enviando) return
@@ -162,7 +245,36 @@ function Flujo({ rubro, t, simple }: { rubro: RubroTurnos; t: TemaNegocio; simpl
       if (mal) { setIntento(true); document.getElementById(idCampo(mal))?.focus(); return }
     }
     if (!ultimo) ir(paso + 1)
+    else if (api) void confirmarEnApi(api)
     else setEnviando(true)
+  }
+
+  // Con la API: retener el horario y confirmarlo. Si se ocupó en el medio (409), vuelve a elegir
+  // horario con los de ese día traídos de nuevo; cualquier otro error, el mensaje de la API.
+  const confirmarEnApi = async (a: SitioApi) => {
+    if (!servicioId || hora === null || !claveDia) return
+    const recursoReal = recursoId === 'cualquiera' ? horariosDia[claveDia]?.find(h => h.m === hora && h.libre)?.recursoId : recursoId
+    const volverAElegir = (msg: string) => {
+      setErrorApi(msg); setHora(null)
+      setHorariosDia(h => { const resto = { ...h }; delete resto[claveDia]; return resto })
+      setRango(null)
+      ir(pasos.indexOf('fecha'))
+    }
+    if (!recursoReal) { volverAElegir('Ese horario ya no está libre. Elegí otro.'); return }
+    setEnviando(true); setErrorApi(null)
+    try {
+      const r = await a.reservar({
+        recursoId: recursoReal, servicioId, fecha: isoDe(fechaVista), inicio: hora, clave: clave ?? claveDeIntento(),
+        nombre: datos.nombre.trim(), telefono: datos.tel.trim() || undefined, email: datos.email.trim() || undefined, notas: datos.nota.trim() || undefined,
+      })
+      setHecha(r); setListo(true)
+    } catch (e) {
+      const msg = e instanceof Error && e.message ? e.message : 'No pudimos reservar. Probá de nuevo.'
+      if (e instanceof ReservasApiError && e.esConflicto) volverAElegir(msg)
+      else setErrorApi(msg)
+    } finally {
+      setEnviando(false)
+    }
   }
 
   // Reserva simple: elegir ya avanza, sin pasar por "Continuar".
@@ -174,8 +286,9 @@ function Flujo({ rubro, t, simple }: { rubro: RubroTurnos; t: TemaNegocio; simpl
     return (
       <Confirmacion rubro={rubro} t={t} servicio={servicio?.nombre ?? ''} fecha={fechaTurno} inicio={inicioTurno} duracion={duracion}
         recurso={nombreRecurso ? { rotulo: rubro.modo === 'profesional' ? 'Con' : rotuloRecurso, nombre: nombreRecurso, retrato: rubro.modo === 'profesional' && idxRecurso >= 0 ? RETRATOS[idxRecurso % RETRATOS.length] : undefined } : undefined}
-        nombre={datos.nombre} precio={aPagar} sena={sena} recordatorio={datos.recordatorio}
-        lugar={lugar} domicilio={datos.domicilio} cuenta={cuenta} beneficios={beneficios} />
+        nombre={datos.nombre} precio={api ? hecha?.precio ?? aPagar : aPagar} sena={api ? 0 : sena} recordatorio={datos.recordatorio}
+        lugar={lugar} domicilio={datos.domicilio} cuenta={cuenta} beneficios={beneficios}
+        real={api && hecha ? { codigo: hecha.codigo, senaAPagar: hecha.sena, pendiente: hecha.estado === 'PENDIENTE' } : undefined} />
     )
   }
 
@@ -247,27 +360,29 @@ function Flujo({ rubro, t, simple }: { rubro: RubroTurnos; t: TemaNegocio; simpl
             {actual === 'recurso' && (
               <Bloque refTitulo={titulo} titulo={rubro.modo === 'profesional' ? '¿Con quién te querés atender?' : '¿Dónde te atendés?'}
                 sub="Si te da lo mismo, dejá la primera opción: es la que tiene más horarios.">
-                <PasoRecurso rubro={rubro} t={t} recursos={recursos} duracion={duracion} elegido={recursoId} onElegir={id => { setRecursoId(id); setFecha(null); setHora(null) }} />
+                <PasoRecurso rubro={rubro} t={t} recursos={recursos} duracion={duracion} elegido={recursoId} onElegir={id => { setRecursoId(id); setFecha(null); setHora(null) }} sinProximos={!!api} />
               </Bloque>
             )}
 
             {actual === 'fecha' && servicio && (
               <Bloque refTitulo={titulo} titulo="Elegí día y horario"
                 sub={`${servicio.nombre} · ${duracionTxt(servicio.duracion)}${nombreRecurso ? ` · ${rubro.modo === 'profesional' && recurso ? `con ${recurso.nombre.split(' ')[0]}` : nombreRecurso.toLowerCase()}` : ''}${recurso?.horario ? `, que atiende ${tramosFrase(tramosDe(recurso.horario))}` : ''}`}>
-                <PasoFecha horarios={agenda} duracion={servicio.duracion} fecha={fechaVista} hora={hora} onFecha={f => { setFecha(f); setHora(null) }} onHora={(f, m) => { setFecha(f); setHora(m); avanzar() }} />
+                <PasoFecha horarios={agenda} duracion={servicio.duracion} fecha={fechaVista} hora={hora} onFecha={f => { setFecha(f); setHora(null) }}
+                  onHora={(f, m) => { setFecha(f); setHora(m); setClave(api ? claveDeIntento() : null); setErrorApi(null); avanzar() }}
+                  dias={diasApi} buscando={!!api && (!diasApi || (!!claveDia && !horariosDia[claveDia]))} />
               </Bloque>
             )}
 
             {actual === 'datos' && (
               <Bloque refTitulo={titulo} titulo="Tus datos" sub="Sin registrarte: con tu nombre y tu celular alcanza para confirmarte el turno.">
                 <PasoDatos rubro={rubro} t={t} datos={datos} onDatos={setDatos} intento={intento} conSena={sena > 0} onEnviar={siguiente}
-                  lugar={lugar} onLugar={setLugar} cuenta={cuenta} onCuenta={setCuenta} beneficios={beneficios} politica={demo.politica} />
+                  lugar={lugar} onLugar={setLugar} cuenta={cuenta} onCuenta={setCuenta} beneficios={beneficios} politica={politica} />
               </Bloque>
             )}
 
             {actual === 'pago' && (
               <Bloque refTitulo={titulo} titulo="Confirmá con la seña" sub="Tu turno queda reservado cuando se acredita el pago.">
-                <PasoPago rubro={rubro} precio={aPagar} sena={sena} pagando={enviando} onPagar={siguiente} politica={demo.politica} />
+                <PasoPago rubro={rubro} precio={aPagar} sena={sena} pagando={enviando} onPagar={siguiente} politica={politica} />
               </Bloque>
             )}
           </div>
@@ -280,8 +395,9 @@ function Flujo({ rubro, t, simple }: { rubro: RubroTurnos; t: TemaNegocio; simpl
             <p id="tur-falta" style={{ minHeight: 22, margin: '10px 0 0', textAlign: 'center', fontSize: 13.5, color: 'var(--color-muted)' }}>
               {puede[actual] ? '' : falta[actual]}
             </p>
+            {errorApi && <p role="alert" style={{ margin: '4px 0 0', textAlign: 'center', fontSize: 13.5, color: 'var(--color-error)' }}>{errorApi}</p>}
             <p style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, margin: '4px 0 0', fontSize: 13.5, color: 'var(--color-muted)' }}>
-              <ShieldCheck size={15} aria-hidden /> {cancelacionTxt(demo.politica)}
+              <ShieldCheck size={15} aria-hidden /> {cancelacionTxt(politica)}
             </p>
           </aside>
         </div>

@@ -9,7 +9,7 @@ import { ArrowRight, Check, ChevronLeft, ChevronRight, Clock, Moon, Sun, Sunset,
 import { duracionTxt, horaTxt } from '@/modules/turnos/datos'
 import { corteDe, type Semana } from '@/modules/turnos/horario'
 import { teclasRadio } from './acciones'
-import { esHoy, fechaLarga, fechaRelativa, gruposDel, mesCorto, mismaFecha, nombreDiaCorto, primerLibre, proximosDias, tramosDeFecha, type Fecha, type GrupoHoras } from './calendario'
+import { esHoy, fechaLarga, fechaRelativa, gruposDel, mesCorto, mismaFecha, nombreDiaCorto, primerLibre, proximosDias, tramosDeFecha, type DiaAgenda, type Fecha, type GrupoHoras } from './calendario'
 
 interface Props {
   /** La semana en la que se puede reservar: la del negocio o, si ya se eligió con quién, la de esa persona. */
@@ -19,17 +19,30 @@ interface Props {
   hora: number | null
   onFecha: (f: Fecha) => void
   onHora: (f: Fecha, m: number) => void
+  /** Con la API: los días con su disponibilidad (los horarios de un día llegan cuando se lo mira). Sin ellos, los de ejemplo. */
+  dias?: DiaAgenda[]
+  /** Con la API: se están trayendo los horarios del día elegido. */
+  buscando?: boolean
 }
 
 const ICONO: Record<GrupoHoras['nombre'], typeof Sun> = { Mañana: Sun, Tarde: Sunset, Noche: Moon }
 
-export function PasoFecha({ horarios, duracion, fecha, hora, onFecha, onHora }: Props) {
+/** El primer horario libre entre los días que ya tienen sus horarios. */
+function primerDe(dias: DiaAgenda[]): { f: Fecha; m: number } | null {
+  for (const d of dias) {
+    const x = d.grilla.find(g => g.libre)
+    if (x) return { f: d.f, m: x.m }
+  }
+  return null
+}
+
+export function PasoFecha({ horarios, duracion, fecha, hora, onFecha, onHora, dias: diasDados, buscando }: Props) {
   const tira = useRef<HTMLDivElement>(null)
-  const dias = proximosDias(horarios, duracion)
+  const dias = diasDados ?? proximosDias(horarios, duracion)
   const tope = Math.max(...dias.map(d => d.libres), 1)
   const dia = dias.find(d => mismaFecha(d.f, fecha)) ?? dias[0]
   const masProximo = dia.grilla.find(g => g.libre)?.m
-  const rapido = primerLibre(horarios, duracion)
+  const rapido = diasDados ? primerDe(diasDados) : primerLibre(horarios, duracion)
   // Los turnos de atención del día elegido que tienen horarios para mostrar, y el corte entre ellos.
   const grupos = gruposDel(horarios, fecha).map(g => ({ ...g, lista: dia.grilla.filter(x => x.m >= g.desde && x.m < g.hasta) })).filter(g => g.lista.length > 0)
   const corte = corteDe(tramosDeFecha(horarios, fecha))
@@ -80,7 +93,8 @@ export function PasoFecha({ horarios, duracion, fecha, hora, onFecha, onHora }: 
         <h2 className="tur-h" style={{ fontSize: 22, fontWeight: 700, marginTop: 14 }}>
           {fechaLarga(fecha)}{esHoy(fecha) ? ' · hoy' : ''}
         </h2>
-        {grupos.length === 0 && (
+        {grupos.length === 0 && buscando && <p className="tur-sin-horas" aria-busy="true">Buscando horarios libres…</p>}
+        {grupos.length === 0 && !buscando && (
           <p className="tur-sin-horas">{dia.cerrado ? 'Ese día no se atiende. Elegí otro.' : esHoy(fecha) ? 'Por hoy ya no quedan horarios para este servicio. Elegí otro día.' : 'Ese día no quedan horarios para este servicio. Elegí otro.'}</p>
         )}
         {grupos.map((fr, k) => {

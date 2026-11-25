@@ -4069,4 +4069,57 @@ Usa el campo libre que sumó Alan (\`ReservaConfig.datos\`, 23/11), sin migraci�
       'apps/web/src/lib/reservasApi/cliente.ts:1',
     ],
   }),
+  entrada({
+    modulo: 'turnos', fecha: F25, slug: 'sitio-sobre-la-api', tipo: 'tarea', quien: 'Mateo',
+    titulo: 'El sitio de Turnos reserva de verdad: servicios, días, horarios y confirmación desde la API',
+    foco: 'La reserva del sitio de un negocio real sale de la API pública de reservas. Los servicios, las agendas, el horario, la seña y la política son los del negocio. Los días y los horarios libres son los de verdad, y confirmar retiene el horario y lo confirma con una clave por intento: dos clics no dan dos turnos. Si alguien lo toma en el medio, la persona vuelve a elegir con el mensaje de la API. La demo sigue igual.',
+    que: `Tareas del 23/11 (servicio y profesional), del 24/11 (calendario y horarios) y del 25/11 (retener y confirmar), hechas el 25/11.
+
+**El calendario con fechas reales** (\`reserva/calendario.ts\`). El sitio tenía un calendario de ejemplo con septiembre y octubre de 2026, "hoy" fijo en el 26/09 y horarios libres inventados. Ahora una fecha se cuenta desde enero del año de "hoy" (13 es enero del año siguiente) y se calcula con el calendario de verdad. En la demo todo sigue en el sábado 26/09. Con la API, "hoy" y la hora son los de Argentina (\`fijarHoy\` y el reloj del panel).
+
+**El origen del sitio** (\`storefront/origenSitio.ts\`), sobre \`/storefront/:slug/reservas\`, sin sesión:
+
+- **Lo del negocio:** los servicios que se reservan online (en su orden, con duración y precio), las agendas del modo del rubro, el horario, la seña y la política de la config: plazo para cancelar, y la tolerancia y la seña fuera de plazo si el negocio las puso en Reglas.
+- **Los días** salen de \`disponibilidad/rango\` y los horarios del día que se mira, de \`disponibilidad\`. Con "Cualquiera" se pregunta a todas las agendas y en cada horario gana la primera libre.
+- **Reservar** es \`retener\` y después \`confirmar\` con el nombre, el teléfono, el email y la nota. La clave se arma al elegir el horario: repetir el pedido devuelve la misma reserva.
+
+**El flujo** (\`Reserva.tsx\`):
+
+- **Pantallas:** las mismas de siempre, con los datos de la API.
+- **Con quién:** ya no muestra "próximos libres" inventados.
+- **Día y hora:** muestra "Buscando horarios libres…" mientras llegan.
+- **Si el horario se ocupó en el medio (409),** vuelve a elegir con los horarios traídos de nuevo y el mensaje de la API.
+- **La confirmación** muestra el código de verdad y, si el negocio confirma a mano, que lo va a confirmar.
+- **La seña** todavía no se cobra en línea: con la API no hay paso de pago, y la confirmación dice que se coordina con el negocio.
+
+**Para probarla:** \`localhost:3001/turnos-demo/reserva-api\` (\`?slug=\` para otro negocio), con la API local y el negocio de prueba sembrado. Solo existe en local.
+
+**Probado contra la API local**, con el código real del sitio y el negocio de prueba:
+
+- **Lo que trae:** 5 servicios con sus precios, 3 agendas (Nico solo de 16 a 20), la política (24 h) y hoy en 25/11.
+- **Días y horarios:** los lugares de cada día de la semana, con el domingo cerrado, y los horarios libres de hoy después de la hora actual.
+- **Reservar:** da la reserva LSQXFW, confirmada.
+- **El mismo intento otra vez:** devuelve la misma reserva.
+- **Otra persona al mismo horario:** "Ese horario se acaba de ocupar. Elegí otro."
+- **Ese horario después:** queda ocupado.
+
+**Lo que falta de la semana 4:**
+
+- **El enlace personal del turno** (\`/mi-turno/<token>\`) con cancelar y reprogramar (26/11).
+- **La seña en línea y los emails** de confirmación y cancelación (27/11).
+- **La portada del sitio** (próximo libre, la semana) y "Mis turnos" siguen con los datos de ejemplo.
+- **La marca del sitio** (nombre, colores, fotos) sigue siendo la de la demo del rubro hasta que estén las rutas de producción.
+
+**Verificado:** typecheck y eslint de \`apps/web\` sin errores y los tests de Turnos en verde (74: el calendario, el origen del sitio y lo anterior). El sitio no se abrió a mano en el navegador.`,
+    archivos: [
+      'apps/web/src/modules/turnos/storefront/origenSitio.ts:47',
+      'apps/web/src/modules/turnos/storefront/Reserva.tsx:254',
+      'apps/web/src/modules/turnos/storefront/reserva/calendario.ts:29',
+      'apps/web/src/modules/turnos/storefront/reserva/PasoFecha.tsx:23',
+      'apps/web/src/modules/turnos/storefront/reserva/Confirmacion.tsx:41',
+      'apps/web/src/modules/turnos/storefront/__tests__/origenSitio.test.ts:1',
+      'apps/web/src/modules/turnos/storefront/__tests__/calendario.test.ts:1',
+      'apps/web/src/pages/turnos-demo/reserva-api.tsx:1',
+    ],
+  }),
 ]
