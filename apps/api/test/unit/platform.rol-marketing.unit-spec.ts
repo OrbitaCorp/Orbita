@@ -9,6 +9,7 @@ import { InstagramAdminController } from '../../src/instagram/instagram-admin.co
 import { InstagramBandejaController } from '../../src/marketing/instagram-bandeja.controller';
 import { InstagramContenidoController } from '../../src/marketing/instagram-contenido.controller';
 import { InstagramVentasController } from '../../src/marketing/instagram-ventas/instagram-ventas.controller';
+import { LeadsController } from '../../src/marketing/leads/leads.controller';
 import { MarketingController } from '../../src/marketing/marketing.controller';
 import { McpConsentimientoController } from '../../src/marketing/prospeccion/mcp/mcp.controller';
 import { ProspeccionController } from '../../src/marketing/prospeccion/prospeccion.controller';
@@ -29,7 +30,7 @@ import { SupportAdminController } from '../../src/support/support-admin.controll
 // habilita un endpoint más (o se le cierra uno), este test se rompe y obliga a decidirlo a conciencia.
 
 const CONTROLADORES = [
-  InstagramAdminController, InstagramBandejaController, InstagramContenidoController, InstagramVentasController, MarketingController, McpConsentimientoController,
+  InstagramAdminController, InstagramBandejaController, InstagramContenidoController, InstagramVentasController, LeadsController, MarketingController, McpConsentimientoController,
   ProspeccionController, TiktokController, VideosController, TutorialesController, PlatformAuditController, CorreoPlataformaController,
   CostsController, OrbiSaludController, ConversacionesPlataformaController, OrbiUsoPlataformaController, PlatformController, SupportAdminController,
   SeguimientoController,
@@ -67,6 +68,8 @@ const ABIERTO_A_MARKETING = [
   'McpConsentimientoController.solicitud', 'McpConsentimientoController.resolver', 'McpConsentimientoController.estado', 'McpConsentimientoController.desconectar',
   // Prospección
   'ProspeccionController.criterio', 'ProspeccionController.consultar', 'ProspeccionController.lotes', 'ProspeccionController.lote', 'ProspeccionController.guardarAnalisis', 'ProspeccionController.prospectos', 'ProspeccionController.actualizar',
+  // Leads y Pilotos por rubro
+  'LeadsController.listar', 'LeadsController.crear', 'LeadsController.actualizar', 'LeadsController.eliminar',
 ].sort();
 
 describe('Rol MARKETING — acceso por lista cerrada', () => {
