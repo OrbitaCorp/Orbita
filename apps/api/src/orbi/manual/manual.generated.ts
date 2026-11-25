@@ -10,7 +10,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "1c992559c8806ee9",
+  "version": "5b5d634a07b4a657",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -361,7 +361,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "instagram-conexion",
       "capitulo": "Difusión",
       "titulo": "Conectar tu Instagram",
-      "texto": "En el módulo Difusión del menú lateral conectás la cuenta profesional de Instagram de tu negocio. Una vez conectada podés responder tus mensajes directos, publicar, responder comentarios y ver estadísticas, todo desde Difusión.\n\nInstagram está en acceso anticipado: si todavía no lo tenés, escribí el usuario de tu cuenta y tocá \"Pedir acceso\". El pedido queda pendiente de confirmación hasta que sumemos tu cuenta como cuenta de prueba de la app; recién ahí te mandamos la invitación de Instagram y aparece el botón para conectar.\n\nConsejo: Al conectar desde Difusión se piden de una vez todos los permisos: mensajes, publicar, comentarios y estadísticas. Si tu conexión es vieja y le falta alguno, la pantalla que lo necesita te muestra \"Autorizar\" para darlo.",
+      "texto": "En el módulo Difusión del menú lateral conectás la cuenta profesional de Instagram de tu negocio. Una vez conectada podés responder tus mensajes directos, publicar, responder comentarios y ver estadísticas, todo desde Difusión.\n\nInstagram está en acceso anticipado: si todavía no lo tenés, escribí el usuario de tu cuenta y tocá \"Pedir acceso\". El pedido queda pendiente de confirmación hasta que sumemos tu cuenta como cuenta de prueba de la app; recién ahí te mandamos la invitación de Instagram y aparece el botón para conectar.\n\nMientras no hayas conectado, la primera pantalla de Difusión muestra un video de cómo funciona. La ventana de conexión se abre sola únicamente cuando ya podés conectar (el Paso 3 de 3); antes de eso la abrís vos con el botón de la tarjeta de Instagram.\n\nConsejo: Al conectar desde Difusión se piden de una vez todos los permisos: mensajes, publicar, comentarios y estadísticas. Si tu conexión es vieja y le falta alguno, la pantalla que lo necesita te muestra \"Autorizar\" para darlo.",
       "destino": {
         "seccion": "difusion",
         "label": "Ir a Difusión"

@@ -12,15 +12,17 @@ import { Tablero } from './Tablero'
 import { InstagramModal, Marca } from '../mensajes/components/InstagramModal'
 import { useInstagramEstado } from '../mensajes/components/InstagramConexion'
 import type { InstagramEstado } from '@/lib/api'
+import { abreElModalSolo, pasosHechos } from './conexion'
 import { esVisitanteDemo } from '@/lib/demo/modo'
-import { SoloConTienda } from '@/modules/demo/SoloConTienda'
+import { SoloConTienda, VideoDeFuncion } from '@/modules/demo/SoloConTienda'
 
 // Difusión: darle a conocer el negocio en redes. Hoy está la conexión con Instagram (la misma que
 // se ve en Mensajes); publicar productos, responder comentarios y ver estadísticas se suman acá
 // a medida que se construyan. Cada pantalla es una ?vista= (ver Sidebar.tsx).
 //
-// Mientras la conexión no esté completa, el modal de Instagram se abre cada vez que se entra al
-// módulo (en cualquier pantalla): es lo único que hay para hacer hasta que quede conectada.
+// Sin conectar, la pantalla principal muestra el video de cómo funciona Difusión (el de la demo). El
+// modal de Instagram se abre solo nada más que en el paso 3 (ya puede conectar, ver conexion.ts): en
+// los pasos anteriores no hay nada que hacer en el momento y abrirlo molestaba en cada visita.
 
 type Vista = 'instagram' | 'mensajes' | 'publicaciones' | 'sugeridas' | 'calendario' | 'comentarios' | 'estadisticas'
 type Funcion = Exclude<Vista, 'instagram'>
@@ -62,15 +64,6 @@ function esVista(v: unknown): v is Vista {
   return v === 'instagram' || v === 'mensajes' || v === 'publicaciones' || v === 'sugeridas' || v === 'calendario' || v === 'comentarios' || v === 'estadisticas'
 }
 
-// Cuántos de los 3 pasos de la conexión están hechos: 0 sin pedido, 1 pedido enviado (pendiente de
-// confirmación), 2 habilitado para conectar, 3 conectado.
-function pasosHechos(estado: InstagramEstado | null): number {
-  if (!estado) return 0
-  if (estado.connected) return 3
-  if (estado.habilitado === false) return estado.solicitud ? 1 : 0
-  return 2
-}
-
 export default function Difusion() {
   const router = useRouter()
   const vista: Vista = esVista(router.query.vista) ? router.query.vista : 'instagram'
@@ -79,13 +72,13 @@ export default function Difusion() {
   const [yaSeOfrecio, setYaSeOfrecio] = useState(false)
   const [resultadoIg, setResultadoIg] = useState<string | null>(null)
 
-  // Cada vez que se entra a Difusión sin la conexión completa, el modal se abre solo. Si se cierra,
-  // no vuelve a abrirse hasta volver a entrar al módulo o tocar el botón.
+  // Al entrar a Difusión en el paso 3, el modal se abre solo. Si se cierra, no vuelve a abrirse hasta
+  // volver a entrar al módulo o tocar el botón.
   // Demo pública: Difusión pide la cuenta de Instagram del negocio; se explica en vez de ofrecer conectar.
   const demo = esVisitanteDemo()
   useEffect(() => {
     if (demo) return
-    if (visible && estado && !estado.connected && !yaSeOfrecio) {
+    if (visible && abreElModalSolo(estado) && !yaSeOfrecio) {
       setAbierto(true)
       setYaSeOfrecio(true)
     }
@@ -126,11 +119,15 @@ export default function Difusion() {
           {vista === 'instagram' && estado?.connected ? (
             <Tablero estado={estado} />
           ) : vista === 'instagram' ? (
-            <div className="dif-grilla">
-              {(Object.keys(FUNCIONES) as Funcion[]).map((f) => (
-                <TarjetaFuncion key={f} funcion={f} onAbrir={() => router.push({ query: { ...router.query, vista: f } })} />
-              ))}
-            </div>
+            <>
+              {/* Recién con el estado cargado: a quien ya conectó no le tiene que parpadear el video. */}
+              {estado && <VideoDeFuncion funcion="difusion" />}
+              <div className="dif-grilla">
+                {(Object.keys(FUNCIONES) as Funcion[]).map((f) => (
+                  <TarjetaFuncion key={f} funcion={f} onAbrir={() => router.push({ query: { ...router.query, vista: f } })} />
+                ))}
+              </div>
+            </>
           ) : vista === 'mensajes' ? (
             <Mensajes estado={estado} onAbrirConexion={() => setAbierto(true)} />
           ) : vista === 'publicaciones' ? (

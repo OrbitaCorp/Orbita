@@ -80,6 +80,16 @@ function VideoDemo({ titulo, video }: { titulo: string; video: (typeof VIDEOS)[F
   )
 }
 
+// El mismo video, suelto: Difusión se lo muestra a quien todavía no conectó su Instagram.
+export function VideoDeFuncion({ funcion }: { funcion: FuncionSoloConTienda }) {
+  return (
+    <>
+      <style>{CSS}</style>
+      <VideoDemo titulo={TEXTOS[funcion].titulo} video={VIDEOS[funcion]} />
+    </>
+  )
+}
+
 export function SoloConTienda({ funcion }: { funcion: FuncionSoloConTienda }) {
   const t = TEXTOS[funcion]
   return (
