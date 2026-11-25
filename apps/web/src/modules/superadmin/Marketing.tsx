@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import { platformApi, type MarketingCanales, type TiktokCreador, type TiktokEstado, type TiktokPublicacion } from '@/lib/platform/api'
 import { Toast, type ToastVariant } from '@/design-system/components/Toast'
 import { InstagramBandeja } from './InstagramBandeja'
+import { InstagramBotVentas } from './InstagramBotVentas'
 import { InstagramComentarios, InstagramEstadisticas, InstagramPublicaciones } from './InstagramContenido'
 import { TiktokContenido } from './TiktokContenido'
 import { PanelProspeccion } from './Prospeccion'
@@ -254,9 +255,10 @@ function PanelTiktok({ estado, puedePublicar, refrescar, onCambio, onDesconectar
 
 // ─── Instagram ──────────────────────────────────────────────────────────────────
 
-type VistaInstagram = 'mensajes' | 'publicaciones' | 'comentarios' | 'estadisticas'
+type VistaInstagram = 'mensajes' | 'bot' | 'publicaciones' | 'comentarios' | 'estadisticas'
 const VISTAS_INSTAGRAM: { id: VistaInstagram; texto: string }[] = [
   { id: 'mensajes', texto: 'Mensajes' },
+  { id: 'bot', texto: 'Respuestas automáticas' },
   { id: 'publicaciones', texto: 'Publicaciones' },
   { id: 'comentarios', texto: 'Comentarios' },
   { id: 'estadisticas', texto: 'Estadísticas' },
@@ -334,6 +336,7 @@ function PanelInstagram({ canales, puedeVer, onCambio, onDesconectar, setAviso }
       )}
 
       {ig.conectado && vista === 'mensajes' && <InstagramBandeja permitido={puedeVer} onCambio={onCambio} />}
+      {ig.conectado && vista === 'bot' && <InstagramBotVentas permitido={puedeVer} />}
       {ig.conectado && vista === 'publicaciones' && <InstagramPublicaciones puedePublicar={puedeVer} permisoDePublicar={ig.permisos.publicar} setAviso={setAviso} />}
       {ig.conectado && vista === 'comentarios' && <InstagramComentarios puedePublicar={puedeVer} setAviso={setAviso} />}
       {ig.conectado && vista === 'estadisticas' && <InstagramEstadisticas />}

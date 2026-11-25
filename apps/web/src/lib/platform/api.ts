@@ -191,7 +191,24 @@ export type IgConversacion = {
   sinLeer: boolean
   ultimo: { texto: string; esMio: boolean; fecha: string } | null
   actualizadaEl: string
+  /** En manos del equipo: la persona pidió alguien, el bot no supo o contestó alguien del equipo. Opcional: la API puede ir atrás. */
+  bot?: { enManosDelEquipo: boolean; motivo: string | null }
 }
+/** El bot de ventas de la cuenta de Instagram de la empresa (Marketing → Instagram → Respuestas automáticas). */
+export type IgBotVentas = {
+  activo: boolean
+  usarIa: boolean
+  responderComentarios: boolean
+  todosLosComentarios: boolean
+  palabrasClave: string[]
+  respuestasPublicas: string[]
+  saludoComentario: string
+  correosAviso: string[]
+  estadoMeta: { preguntasFrecuentes: string; suscripcion: string; al: string } | null
+  comentariosRecientes: { id: string; usuario: string | null; texto: string; privado: boolean; publico: boolean; error: string | null; createdAt: string }[]
+  resumen: { charlasEsperandoAlEquipo: number; respuestasUltimos7Dias: number }
+}
+export type IgBotVentasInput = Omit<IgBotVentas, 'estadoMeta' | 'comentariosRecientes' | 'resumen'>
 export type IgMensaje = { id: string; sender: 'CUSTOMER' | 'STORE'; text: string; channel: string; createdAt: string }
 export type TiktokEstado = {
   configurado: boolean
@@ -457,6 +474,8 @@ export interface Overview {
     paused: number
     draft: number
     newLast30Days: number
+    /** Negocios de prueba y la demo: aparte, no están sumados en ninguna cifra de arriba. */
+    test: number
     byMode: Record<string, number>
     byIndustry: { industry: string; count: number }[]
   }
@@ -477,6 +496,8 @@ export interface Overview {
 export interface BusinessRow {
   id: string
   name: string
+  /** De prueba del equipo o la demo pública: no cuenta en las métricas. */
+  esPrueba: boolean
   subdomain: string
   industry: string
   mode: string
@@ -488,11 +509,15 @@ export interface BusinessRow {
   counts: { products: number; orders: number; customers: number }
 }
 
+export type TipoDeNegocios = 'reales' | 'pruebas'
+
 export interface BusinessList {
   data: BusinessRow[]
   total: number
   page: number
   limit: number
+  /** Cuántos hay de cada tipo, sin importar el filtro de la lista. */
+  tipos: { reales: number; pruebas: number }
 }
 
 export interface BusinessDetail {
@@ -507,6 +532,10 @@ export interface BusinessDetail {
   /** Moderación: la tienda sigue en línea, pero Órbita no la ofrece a Google ni al directorio. */
   hiddenFromSearch: boolean
   hiddenFromSearchReason: string | null
+  /** De prueba del equipo: sigue funcionando pero no cuenta en las métricas. */
+  isTest: boolean
+  /** La demo pública: ya está aparte de los reales y no se marca a mano. */
+  isDemo: boolean
   createdAt: string
   team: { id: string; name: string; email: string; role: string; status: string; lastAccessAt: string | null; emailVerified: boolean }[]
   branches: { id: string; name: string; isDefault: boolean }[]
@@ -1180,7 +1209,7 @@ function toQuery(params: Record<string, string | number | undefined | null>): st
 
 export const platformApi = {
   overview: () => getJSON<Overview>('/platform/overview'),
-  businesses: (params: { search?: string; status?: string; mode?: string; subscription?: string; page?: number; limit?: number } = {}) => {
+  businesses: (params: { search?: string; status?: string; mode?: string; subscription?: string; tipo?: TipoDeNegocios; page?: number; limit?: number } = {}) => {
     const qs = new URLSearchParams()
     Object.entries(params).forEach(([k, v]) => {
       if (v !== undefined && v !== '' && v !== null) qs.set(k, String(v))
@@ -1198,6 +1227,8 @@ export const platformApi = {
   instagramDeshabilitar: (businessId: string) => sendJSON<unknown>(`/platform/instagram/acceso/${businessId}/deshabilitar`, 'POST'),
   suspendBusiness: (id: string, reason?: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/suspend`, 'POST', { reason }),
   reactivateBusiness: (id: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/reactivate`, 'POST'),
+  markBusinessTest: (id: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/mark-test`, 'POST'),
+  unmarkBusinessTest: (id: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/unmark-test`, 'POST'),
   hideBusinessFromSearch: (id: string, reason?: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/hide-from-search`, 'POST', { reason }),
   showBusinessInSearch: (id: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/show-in-search`, 'POST'),
   businessSearchConsole: (id: string) => getJSON<GoogleResumen>(`/platform/businesses/${id}/search-console`),
@@ -1206,6 +1237,9 @@ export const platformApi = {
   igConversaciones: () => getJSON<IgConversacion[]>('/platform/marketing/instagram/conversations'),
   igMensajes: (id: string) => getJSON<IgMensaje[]>(`/platform/marketing/instagram/conversations/${id}/messages`),
   igConectar: () => sendJSON<{ url: string }>('/platform/marketing/instagram/connect', 'POST'),
+  igBot: () => getJSON<IgBotVentas | null>('/platform/marketing/instagram/bot'),
+  igGuardarBot: (input: IgBotVentasInput) => sendJSON<IgBotVentas>('/platform/marketing/instagram/bot', 'PUT', input),
+  igReactivarBot: (conversationId: string) => sendJSON<{ ok: true }>(`/platform/marketing/instagram/conversations/${conversationId}/bot`, 'POST'),
   // Contenido de la cuenta: publicaciones, comentarios y estadísticas (mismas formas que Difusión en el panel de un negocio).
   igPublicacionesDeLaCuenta: () => getJSONConMensaje<IgPublicacionDeLaCuenta[]>('/platform/marketing/instagram/posts/account'),
   igPublicacionesDeOrbita: () => getJSONConMensaje<InstagramPublicacion[]>('/platform/marketing/instagram/posts'),

@@ -313,6 +313,25 @@ describe('ReservasService · lista de espera desde el panel', () => {
     return { ...armado, espera: p.reservaEspera as Record<string, jest.Mock>, reservas: p.reserva as Record<string, jest.Mock> };
   };
 
+  it('Turnos: se anota con su servicio y, al darle el lugar, la reserva sale con el precio y la seña de ese servicio', async () => {
+    const { svc, espera: tabla, reservas, prisma } = conEspera(null);
+    const delDia = jest.spyOn((svc as unknown as { disponibilidad: { delDia: (...a: unknown[]) => unknown } }).disponibilidad, 'delDia')
+      .mockResolvedValue({ fecha: '2026-11-10', franjas: [{ inicioMinutos: 630, finMinutos: 690, libres: 0, cupo: 1 }] } as never);
+    const pedido = { modulo: 'TURNOS' as const, recursoId: 'r-clase', fecha: '2026-11-10', inicioMinutos: 630, servicioId: 'srv-corte', cliente: { nombre: 'Lu Paz', telefono: '11 5555 0000' } };
+    await svc.anotarseEnEspera(BIZ, pedido, undefined, AHORA, { modo: 'panel', memberId: 'm-1' });
+    expect(delDia).toHaveBeenCalledWith(BIZ, expect.objectContaining({ servicioId: 'srv-corte' }), 'panel', AHORA);
+    expect(tabla.create.mock.calls[0][0].data).toMatchObject({ servicioId: 'srv-corte' });
+
+    // Darle el lugar: la reserva toma el servicio guardado en la espera.
+    tabla.findFirst.mockResolvedValue(espera({ modulo: 'TURNOS', servicioId: 'srv-corte' }));
+    (prisma as unknown as { reservaServicio: Record<string, jest.Mock> }).reservaServicio = {
+      findFirst: jest.fn().mockResolvedValue({ id: 'srv-corte', nombre: 'Corte', duracionMinutos: 60, precio: 12000 }),
+    };
+    reservas.findMany.mockResolvedValue([]);
+    await svc.darLugarDesdeEspera(BIZ, 'esp-1', 'm-1', AHORA);
+    expect(reservas.create.mock.calls.at(-1)![0].data).toMatchObject({ servicioId: 'srv-corte', precio: 12000, servicio: { nombre: 'Corte', precio: 12000 } });
+  });
+
   it('el negocio anota en la espera una clase de hoy que el sitio ya no ofrece por la anticipación', async () => {
     const { svc, espera: tabla, reservas, audit, prisma } = conEspera(null);
     // Lunes 10:00; la clase de las 10:30 está llena (dos lugares tomados). Con 60 minutos de anticipación, el sitio ya no la muestra.

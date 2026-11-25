@@ -3642,4 +3642,180 @@ El negocio de prueba queda creado, con una propiedad y sin reservas activas.`,
       'apps/web/src/modules/alquileres/admin/Panel.tsx:183',
     ],
   }),
+  entrada({
+    modulo: 'turnos', fecha: F24, slug: 'donde-vive-lo-que-el-motor-no-tiene', tipo: 'decisión', quien: 'Mateo',
+    titulo: 'Dónde vive lo que el motor no tiene: horario propio, reglas extra y equipo',
+    foco: 'Mateo resolvió los tres pendientes de Turnos sobre el backend. En Turnos, el horario propio de una agenda va dentro del del negocio, y lo cruza el motor. Las reglas extra van en `datos` de la config: lo que ve el sitio en `publico`, lo del panel en `turnos`. El equipo también va en `datos` hasta que existan las cuentas del equipo, que van sobre Member. Del motor compartido solo cambió el cruce de horario, y solo para PROFESIONAL y ESPACIO: Alquileres y Gimnasio quedan igual.',
+    que: `Pedido de Mateo el 24/11: "los pendientes con Ale, hacelo vos con la mejor recomendación, prácticas y escalabilidad". Implementado y probado el mismo día contra la API local.
+
+**1. El horario propio va dentro del del negocio, y lo cruza el motor.**
+
+- **Qué cambió en el motor:** \`horarioEfectivo\` (\`dominio/horario.ts\`) cruza día por día el horario propio de una agenda PROFESIONAL o ESPACIO con el del negocio, al dar disponibilidad y al reservar. CANCHA, SALON, ALOJAMIENTO y CLASE siguen usando el suyo tal cual: una cancha o una clase pueden abrir cuando el negocio "no abre".
+- **Qué cambió en el panel:** ya no recorta ni reescribe agendas al guardar Horarios. Guarda cada agenda como es (sus días, y su horario o "todo el día") y avisa quién se queda sin días.
+- **Por qué:** el recorte del panel se perdía. Si el negocio achicaba y después volvía a agrandar, la agenda no volvía sola. Ahora la regla vive en un solo lugar, el motor, y vale igual para el panel, el sitio y cualquier cliente futuro de la API.
+- **Probado:** con el sábado solo a la mañana, Nico (16 a 20) queda cerrado el sábado sin que se toque su agenda. Al volver a abrir el sábado a la tarde, recupera sus 8 franjas.
+
+**2. Las reglas extra van en \`datos\` de la config.**
+
+Usa el campo libre que sumó Alan (\`ReservaConfig.datos\`, 23/11), sin migración propia. Lo de Turnos se lee y se escribe en \`datos/origen/datosConfig.ts\`:
+
+- **\`datos.publico\`** (lo ve el sitio, en la config pública): elegir profesional y "Cualquiera", qué datos del paciente se piden (DNI, obra social, motivo), tolerancia, qué pasa con la seña fuera de plazo y la cuenta de clientes con sus beneficios.
+- **\`datos.turnos\`** (solo el panel): la grilla. El motor ya la sabe aplicar: se escribe como \`pasoMinutos\` de cada agenda, y una agenda nueva arranca con ella.
+- **Cómo se escribe:** el motor reemplaza \`datos\` entero, así que cada pantalla lee lo último guardado y cambia solo su parte (\`conCambios\`). Las claves que no son de Turnos se conservan. Lo que se lee se valida campo por campo y lo que no tiene forma vale lo de fábrica.
+- **Lo que no se guardó, a propósito:**
+  - **La seña de monto fijo** sigue sin dejar guardar, porque el motor cobra en porcentaje y el sitio cobraría otra cosa. Sumarla es una columna del motor, para cuando un rubro la pida de verdad.
+  - **"Pedir seña a quien faltó" y "tiempo para aceptar un lugar"** no se muestran con la API: el motor no los hace (le da el lugar al primero de la lista en el acto). Una opción que no hace nada confunde más que no tenerla.
+- **Probado:** con la grilla de 15, Martín pasa de 16 a 30 franjas el martes y las tres agendas quedan con paso 15. La config pública muestra \`publico\` y al releer vuelve igual.
+
+**3. El equipo va en \`datos\` ahora, y sobre Member cuando haya cuentas.**
+
+- **Ahora (fase A):** las personas, los roles y cómo cobra cada uno se guardan en \`datos.turnos.equipo\`. El panel lo guarda solo cuando cambia, con medio segundo de espera para juntar cambios seguidos. Al leer, quien apunta a una agenda borrada la suelta, y una agenda sin persona suma a quien atiende ahí. Con esto Ganancias deja de estar vacía con la API.
+- **Por qué no una tabla nueva ya:** un negocio de Turnos tiene pocas personas (entra holgado en el tope de 20.000 caracteres) y todavía nadie del equipo entra con su cuenta. Una tabla propia sería un segundo sistema de personas al lado de Member.
+- **Fase B (las cuentas del equipo):**
+  - Cada persona pasa a ser un \`Member\` del negocio, con la invitación que ya existe (\`/aceptar-invitacion\`), y su agenda la apunta con \`memberId\`.
+  - Los roles de Turnos pasan a \`Role\` con permisos nuevos de alcance "lo propio" (ver solo su agenda, sus clientes y sus ganancias), aplicados en la API y no solo en el panel.
+  - Cómo cobra cada uno sale de \`datos\` a un lugar que solo lean quienes tienen permiso de ver ganancias. Hoy \`datos\` lo lee cualquiera con \`reservas.view\`, y hoy eso es solo el dueño. **Tiene que estar resuelto antes de invitar al primer empleado.**
+
+**Del motor compartido** cambió solo el cruce de horario (con sus tests), y el README de reservas lo dice. Lo demás usa lo que ya existía (\`datos\`, \`pasoMinutos\`). El negocio de prueba ahora vuelve a las reglas de fábrica y sin \`datos\` en cada corrida del seed.`,
+    decision: 'En Turnos, el horario propio de una agenda va dentro del horario del negocio y lo cruza el motor (solo PROFESIONAL y ESPACIO). Las reglas que el motor no tiene van en datos de la config: lo que ve el sitio en datos.publico y la grilla en datos.turnos, que se aplica como paso de cada agenda. El equipo va en datos.turnos.equipo hasta las cuentas del equipo, que van sobre Member con permisos de alcance propio. La seña fija y las reglas que el motor no hace no se ofrecen con la API.',
+    porque: 'Decidido por Mateo el 24/11/2026: delegó los pendientes pidiendo la mejor práctica y que escale. Cada regla vive en un solo lugar: lo que aplica el motor, en el motor; lo que es de Turnos, en su espacio de la config, sin un sistema de personas paralelo a Member. El cambio al motor compartido es chico, va con tests y no cambia nada para Alquileres ni Gimnasio.',
+    archivos: [
+      'apps/api/src/reservas/dominio/horario.ts:46',
+      'apps/api/src/reservas/disponibilidad.service.ts:74',
+      'apps/api/src/reservas/dominio/horario.spec.ts:1',
+      'apps/web/src/modules/turnos/datos/origen/datosConfig.ts:1',
+      'apps/web/src/modules/turnos/datos/origen/api.ts:1',
+      'apps/web/src/modules/turnos/datos/origen/mapear.ts:1',
+      'apps/web/src/modules/turnos/admin/configuracion/Reservas.tsx:1',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:1',
+      'apps/web/src/modules/turnos/datos/origen/__tests__/datosConfig.test.ts:1',
+      'apps/api/prisma/seed-turnos-prueba.ts:161',
+    ],
+  }),
+  entrada({
+    modulo: 'turnos', fecha: F24, slug: 'agenda-sobre-la-api', tipo: 'tarea', quien: 'Mateo',
+    titulo: 'La agenda de Turnos da, cambia, mueve y cobra turnos en la API',
+    foco: 'En un negocio real la agenda del panel ya opera sobre la API. Dar un turno (a alguien de la lista o nuevo), confirmarlo, marcarlo atendido o ausente, cancelarlo, moverlo y registrar la seña van a /reservas, y el turno queda como lo devolvió la API. Si la API dice que no (el horario se ocupó, todavía no es la hora), el aviso trae su mensaje y nada cambia. Falta de la semana 3: el "ahora" real de la agenda, ver el historial en el detalle del turno y la lista de espera.',
+    que: `Tareas del 17/11 (dar un turno) y del 18/11 (cambiar y mover), y la seña de la del 19/11, hechas el 24/11.
+
+**El origen opera turnos** (\`datos/origen/index.ts\`, \`turnos\`): crear, cambiar de estado, mover y registrar la seña. Cada acción devuelve el turno como quedó. La demo no lo tiene, así que en \`/turnos-demo\` todo sigue en el estado del panel.
+
+| En la agenda | En la API |
+|---|---|
+| Nuevo turno | \`POST /reservas\` con el servicio, la agenda, el día, la hora, la nota interna y una clave de intento (dos clics no dan dos turnos) |
+| A alguien con ficha | Por su \`clienteId\` |
+| A alguien sin ficha o nuevo | Con su nombre y su teléfono: la API la encuentra o la arma |
+| Confirmar, atendido, ausente | \`confirmar\`, \`completar\`, \`ausente\` |
+| Cancelar | \`cancelar\`, y se vuelve a leer la reserva (la respuesta dice qué pasó con la seña, no cómo quedó) |
+| Mover | \`reprogramar\` con la fecha y la hora nuevas: es el mismo turno, no uno nuevo |
+| Registrar la seña | \`pago\` por lo que falta de la seña |
+
+**El panel** (\`PanelTurnos.tsx\`) espera a la API y pone el turno devuelto en lugar del que trajo la carga. Si la API dice que no, el aviso trae su mensaje: "Ese horario se acaba de ocupar. Elegí otro." o "Todavía no es la hora: no se puede marcar como atendida ni ausente."
+
+**Probado contra la API local**, con el código real del panel y el negocio de prueba, con la seña al 30%:
+
+- Un turno sin confirmar para alguien nuevo, con la nota.
+- El mismo horario otra vez: rechazado por la API.
+- Confirmarlo y registrar la seña: queda pagado $3.600.
+- Moverlo a otro día: es el mismo turno.
+- Marcarlo atendido antes de hora: rechazado.
+- Cancelarlo: el historial queda con cada cambio.
+- Uno de hoy que ya había empezado: marcado como atendido.
+
+**Lo que falta de la semana 3:**
+
+- **El "ahora" de la agenda** (la línea de la hora y "en curso") sigue en la hora fija de la demo.
+- **El detalle del turno** todavía no muestra su historial (la API ya lo da en \`GET /reservas/:id\`).
+- **La lista de espera del panel.**
+- **Pagos**, que todavía calcula la seña con la del rubro de la demo y no con la config.
+
+**Verificado:** typecheck y eslint de \`apps/web\` sin errores y los tests de Turnos en verde (62, 7 nuevos). El panel no se abrió a mano en el navegador.`,
+    archivos: [
+      'apps/web/src/modules/turnos/datos/origen/index.ts:138',
+      'apps/web/src/modules/turnos/datos/origen/api.ts:221',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:267',
+      'apps/web/src/modules/turnos/datos/origen/__tests__/turnos.test.ts:1',
+    ],
+  }),
+  entrada({
+    modulo: 'turnos', fecha: F24, slug: 'agenda-real-historial-y-espera', tipo: 'tarea', quien: 'Mateo',
+    titulo: 'La agenda de Turnos con el día y la hora reales, la seña de las reglas y el historial de cada turno',
+    foco: 'En un negocio real el panel ya no vive en el sábado 26/09 a las 10:40 de la demo: usa el día y la hora de Argentina, y los actualiza solos. La seña sale de las reglas del negocio y no del rubro. El detalle de cada turno muestra su historial. La lista de espera del panel está hecha, pero el motor no deja anotar a nadie en Turnos: se arregla en el backend compartido.',
+    que: `Tareas del 16/11 (la agenda del día) y del 19/11 (pagos y el detalle con su historial), y la vista de la lista de espera, hechas el 24/11.
+
+**El día y la hora reales** (\`horario.ts\`, \`fijarReloj\`). Con la API, el panel tomaba el día de la semana, las fechas y la hora de la demo. Una agenda de un martes mostraba los horarios de un sábado de septiembre y la línea de "ahora" estaba a las 10:40.
+
+- **Cómo:** ahora el reloj es uno solo, con exports vivos: \`AHORA\`, \`HOY_DIA\`, \`HOY_TXT\` y \`HOY_FECHA\`. En la demo vale la hora de siempre. Con la API, el panel lo fija con la hora de Argentina al cargar.
+- **Qué lo usa:** la agenda, el resumen, los espacios y el detalle del turno lo leen sin cambiar, y lo mismo las fechas de la agenda (\`fechaDe\`, \`indiceDia\`, \`fechaLarga\`).
+- **Cómo avanza:** se actualiza cada minuto. Si cambia el día, el panel vuelve a cargar, porque los días se cuentan desde el de la carga.
+- **El sitio público** sigue con la hora de la demo hasta la semana 4.
+
+**La seña de las reglas.** Con la API, la seña del panel (Pagos, el detalle, el aviso al registrarla) es la de la config del negocio y no la típica del rubro. Cada turno trae el monto exacto que calculó el motor.
+
+**El historial del turno.** El detalle muestra cada cambio, del más nuevo al más viejo: qué pasó (dado, confirmado, movido, cancelado…), quién (el cliente, el negocio o automático), cuándo y el motivo si lo hay. En salud, la "ficha del paciente" de ejemplo (con alergias y motivo inventados) ya no se muestra con la API: Turnos en salud no guarda nada clínico (decisión del 15/11).
+
+**Cancelar con lista de espera.** Si alguien esperaba ese horario, la API le da el lugar en el acto. El panel ahora muestra ese turno nuevo y avisa a quién le tocó. Antes el horario se veía libre estando tomado.
+
+**La lista de espera del panel** (\`ListaEspera.tsx\`) aparece arriba de la Agenda cuando hay alguien esperando. Muestra quién espera, qué día, a qué hora, con quién y su teléfono si el rol lo deja ver. Tiene dos acciones, "Darle el lugar" y "Quitar", que se apagan mientras guardan.
+
+**Lo que encontré en el motor compartido:** en Turnos no se puede anotar a nadie en la lista de espera. La API calcula la duración por el servicio, y la espera no guarda el servicio: anotarse siempre responde "Elegí un servicio." (\`disponibilidad.service.ts:58\`). Arreglarlo es una columna nueva en la espera (\`servicioId\`, opcional, así Gimnasio y Alquileres no cambian) y usarla al anotar, al darle el lugar y al cancelar. Es la próxima tarea. Hasta entonces la lista del panel no se llena en Turnos.
+
+**Probado contra la API local**, con el código real del panel y el negocio de prueba:
+
+- **Mover y cancelar:** el historial muestra "Cancelado" y "Movido", con quién y la hora.
+- **La espera:** vuelve vacía sin romper nada.
+- **Darle el lugar a alguien que no está:** trae el mensaje de la API.
+- **El reloj:** con un test, el martes 24/11 da martes, las fechas siguen desde ese día, y sin reloj real vuelve el sábado de la demo.
+
+**Verificado:** typecheck y eslint de \`apps/web\` sin errores y los tests de Turnos en verde (66). El panel no se abrió a mano en el navegador.`,
+    archivos: [
+      'apps/web/src/modules/turnos/horario.ts:54',
+      'apps/web/src/modules/turnos/datos/agenda.ts:46',
+      'apps/web/src/modules/turnos/admin/PanelTurnos.tsx:144',
+      'apps/web/src/modules/turnos/admin/Turnos.tsx:203',
+      'apps/web/src/modules/turnos/admin/ListaEspera.tsx:1',
+      'apps/web/src/modules/turnos/datos/origen/mapear.ts:448',
+      'apps/web/src/modules/turnos/__tests__/reloj.test.ts:1',
+      'apps/api/src/reservas/disponibilidad.service.ts:58',
+    ],
+  }),
+  entrada({
+    modulo: 'turnos', fecha: F24, slug: 'lista-de-espera-en-turnos', tipo: 'tarea', quien: 'Mateo',
+    titulo: 'La lista de espera funciona en Turnos: la espera guarda el servicio',
+    foco: 'En Turnos no se podía anotar a nadie en la lista de espera: el motor calcula la duración de un turno por el servicio, y la espera no lo guardaba. Ahora la espera guarda el servicio, como dato opcional para que Gimnasio y Alquileres no cambien. Al pasarle el lugar a alguien, su turno sale con ese servicio, su precio y su seña. Probado con los e2e de reservas contra Postgres y con el panel contra la API.',
+    que: `Tarea del 19/11 (la lista de espera del panel), terminada el 24/11 con un arreglo en el motor compartido.
+
+**Lo que pasaba:** anotarse en la espera de un turno respondía siempre "Elegí un servicio." (\`disponibilidad.service.ts:58\`). Y si alguien llegaba a tomar el lugar, la reserva salía con el precio del recurso, que en Turnos es 0. La lista del panel (\`ListaEspera.tsx\`, del mismo día) no se podía llenar nunca.
+
+**El arreglo en el motor** (compartido, aditivo):
+
+- **Migración** \`20261124180000_reservas_espera_servicio\`: \`reservas_espera.servicio_id\`, opcional y sin default. Lo que ya existe no cambia.
+- **Al anotarse,** \`servicioId\` es opcional en \`AnotarseEnEsperaDto\`, para el panel y para el sitio. Si viene, la franja se busca con la duración de ese servicio y se guarda en la espera.
+- **Al tomar el lugar** (por una cancelación o con "Darle el lugar"), la reserva sale con ese servicio: su id, la foto con el nombre, la duración y el precio, y la seña calculada sobre ese precio. Si el servicio ya no está, el precio del recurso, como antes.
+- **Para el panel y el sitio:** la espera devuelve \`servicioId\`, y el cliente de la web (\`lib/reservasApi/tipos.ts\`) lo tiene.
+- **Gimnasio y Alquileres** no mandan servicio y siguen igual.
+
+**Probado:**
+
+- **Unitario:** Turnos se anota con su servicio, la disponibilidad se pide con él, la espera lo guarda y la reserva que toma el lugar sale con el servicio, el precio y la seña (\`reservas.service.unit-spec.ts\`). Los 46 tests del servicio de reservas pasan.
+- **E2E contra Postgres de dev:** los 22 de reservas pasan, con los de concurrencia (seis a la vez por una cancha, ocho por tres lugares de una clase) y el de la lista de espera de una clase.
+- **El panel contra la API local,** con el negocio de prueba y la seña al 30%:
+  - Anotarse sin servicio sigue respondiendo "Elegí un servicio." y con servicio se anota.
+  - "Darle el lugar" con el horario lleno: "No queda lugar en ese horario."
+  - Al cancelar al titular, el lugar pasa al primero de la lista: "Corte clásico", $12.000, seña de $3.600, confirmado. Su historial dice "Tomó el lugar desde la lista de espera."
+  - Quitar al otro de la lista lo saca.
+
+**Lo que queda dicho para más adelante:** la espera es por horario exacto. Un lugar que se libera pasa solo a quien esperaba ese mismo inicio y ese mismo fin, y en Turnos los servicios duran distinto. Si se libera un turno de 45 minutos y alguien esperaba uno de 30 en ese horario, no pasa solo: queda "Darle el lugar" desde el panel, que mira si entra.
+
+**Del motor compartido** cambió solo esto (aditivo, con su migración) y el README de reservas lo dice.`,
+    archivos: [
+      'apps/api/prisma/migrations/20261124180000_reservas_espera_servicio/migration.sql:1',
+      'apps/api/prisma/schema.prisma:4188',
+      'apps/api/src/reservas/dto/reservas.dto.ts:249',
+      'apps/api/src/reservas/reservas.service.ts:878',
+      'apps/api/src/reservas/reservas.types.ts:216',
+      'apps/api/test/unit/reservas.service.unit-spec.ts:316',
+      'apps/web/src/lib/reservasApi/tipos.ts:353',
+    ],
+  }),
 ]

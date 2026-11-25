@@ -63,6 +63,7 @@ function Detalle({ businessId }: { businessId: string }) {
   const [reactivando, setReactivando] = useState(false)
   const [ocultando, setOcultando] = useState(false)
   const [mostrando, setMostrando] = useState(false)
+  const [marcandoPrueba, setMarcandoPrueba] = useState(false)
   const [cediendo, setCediendo] = useState(false)
   const [modificando, setModificando] = useState(false)
   const [range, setRange] = useRange(30)
@@ -83,7 +84,14 @@ function Detalle({ businessId }: { businessId: string }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', margin: 0, letterSpacing: '-0.01em' }}>{d.name}</h1>
           <StatusBadge status={d.status} />
+          {(d.isTest || d.isDemo) && <Chip text={d.isDemo ? 'Demo pública' : 'De prueba'} tone="gray" />}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {/* Los de prueba siguen funcionando, pero no cuentan en las métricas ni en Seguimiento. */}
+            {!d.isDemo && (
+              <button onClick={() => setMarcandoPrueba(true)} className="ds-hover" style={btnGhostSm}>
+                {d.isTest ? 'Marcar como real' : 'Marcar como de prueba'}
+              </button>
+            )}
             {/* Moderación suave: la tienda sigue vendiendo, solo deja de ofrecerse a Google y al directorio. */}
             {d.hiddenFromSearch ? (
               <button onClick={() => setMostrando(true)} className="ds-hover" style={btnGhostSm}>Volver a mostrar en Google</button>
@@ -341,6 +349,21 @@ function Detalle({ businessId }: { businessId: string }) {
           onConfirm={async (reason) => {
             await platformApi.hideBusinessFromSearch(d.id, reason)
             setOcultando(false)
+            onChanged()
+          }}
+        />
+      )}
+      {marcandoPrueba && (
+        <ConfirmModal
+          title={d.isTest ? `¿Marcar ${d.name} como real?` : `¿Marcar ${d.name} como de prueba?`}
+          body={d.isTest
+            ? 'Vuelve a contar en las métricas del superadmin (negocios, suscripciones, ingresos) y en Seguimiento.'
+            : 'Sigue funcionando igual, pero deja de contar en las métricas del superadmin (negocios, suscripciones, ingresos) y en Seguimiento. Aparece en Negocios → De prueba.'}
+          confirmLabel={d.isTest ? 'Marcar como real' : 'Marcar como de prueba'}
+          onCancel={() => setMarcandoPrueba(false)}
+          onConfirm={async () => {
+            await (d.isTest ? platformApi.unmarkBusinessTest(d.id) : platformApi.markBusinessTest(d.id))
+            setMarcandoPrueba(false)
             onChanged()
           }}
         />

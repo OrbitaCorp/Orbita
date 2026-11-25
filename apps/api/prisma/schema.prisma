@@ -42,6 +42,11 @@ model Business {
   // su localStorage; el servidor rechaza cualquier escritura pública sobre
   // este negocio (ver DemoGuard). Se marca a mano, nunca desde la app.
   isDemo                 Boolean   @default(false) @map("is_demo")
+  // Negocio de prueba del equipo (24/11/2026): sigue funcionando igual, pero no
+  // cuenta en las métricas del superadmin (resumen, series, suscripciones,
+  // seguimiento) y la lista de Negocios lo separa de los reales. Lo marca solo
+  // el superadmin, con registro en PlatformAdminLog; el dueño no lo ve.
+  isTest                 Boolean   @default(false) @map("is_test")
   // Moderación (06/10/2026): el equipo de Órbita saca la tienda de Google y del
   // directorio (orbita.site/tiendas) SIN suspenderla, así que la tienda sigue
   // vendiendo. Es la palanca para un caso dudoso o una denuncia que se está
@@ -107,6 +112,8 @@ model Business {
   instagramPosts       InstagramPost[]
   instagramSettings    InstagramSettings?
   instagramBotConfig   InstagramBotConfig?
+  marketingInstagramBot MarketingInstagramBot?
+  marketingInstagramComentarios MarketingInstagramComentario[]
   discounts            Discount[]
   discountRedemptions  DiscountRedemption[]
   returns              Return[]
@@ -1909,6 +1916,49 @@ model InstagramBotConfig {
   business Business @relation(fields: [businessId], references: [id])
 
   @@map("instagram_bot_configs")
+}
+
+// Bot de ventas de Órbita en la cuenta de Instagram de la EMPRESA (Superadmin → Marketing → Instagram → Respuestas
+// automáticas). Una fila por negocio; en la práctica, solo el negocio al que está conectada la cuenta de Órbita
+// (MARKETING_NEGOCIO). Lo que dice está en marketing/instagram-ventas/contenido.ts.
+model MarketingInstagramBot {
+  id                   String   @id @default(uuid())
+  businessId           String   @unique @map("business_id")
+  activo               Boolean  @default(false)
+  usarIa               Boolean  @default(true) @map("usar_ia") // las preguntas sueltas las contesta la IA con lo que dice la web
+  responderComentarios Boolean  @default(true) @map("responder_comentarios")
+  todosLosComentarios  Boolean  @default(false) @map("todos_los_comentarios") // false = solo los que tienen una palabra clave
+  palabrasClave        String[] @default([]) @map("palabras_clave")
+  respuestasPublicas   String[] @default([]) @map("respuestas_publicas") // se alternan; vacío = no contesta en público
+  saludoComentario     String?  @map("saludo_comentario")
+  correosAviso         String[] @default([]) @map("correos_aviso") // a quién avisar cuando alguien pide una persona
+  estadoMeta           Json?    @map("estado_meta") // resultado de suscribir comentarios y cargar las preguntas frecuentes
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@map("marketing_instagram_bots")
+}
+
+// Comentarios a los que el bot de ventas ya les mandó el mensaje privado. commentId único: Meta reintenta el aviso y
+// Instagram deja mandar UN solo mensaje privado por comentario.
+model MarketingInstagramComentario {
+  id         String   @id @default(uuid())
+  businessId String   @map("business_id")
+  commentId  String   @unique @map("comment_id")
+  mediaId    String?  @map("media_id")
+  usuario    String?
+  texto      String
+  privado    Boolean  @default(false) // salió el mensaje privado
+  publico    Boolean  @default(false) // salió la respuesta pública
+  error      String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@index([businessId, createdAt])
+  @@map("marketing_instagram_comentarios")
 }
 
 enum WhatsappConnectionStatus {
@@ -4139,6 +4189,8 @@ model ReservaEspera {
   clienteNombre   String              @map("cliente_nombre") @db.VarChar(120)
   clienteTelefono String?             @map("cliente_telefono") @db.VarChar(30)
   clienteEmail    String?             @map("cliente_email") @db.VarChar(200)
+  /// Turnos: el servicio que eligió (da la duración y el precio del turno). Los demás módulos no lo usan.
+  servicioId      String?             @map("servicio_id")
   tokenAcceso     String              @unique @map("token_acceso")
   estado          ReservaEsperaEstado @default(ESPERANDO)
   reservaId       String?             @map("reserva_id")

@@ -112,6 +112,8 @@ export interface EsperaDto {
   clienteNombre: string;
   clienteTelefono: string | null;
   clienteEmail: string | null;
+  /** Turnos: el servicio que eligió. */
+  servicioId: string | null;
   estado: ReservaEspera['estado'];
   reservaId: string | null;
   createdAt: string;
@@ -211,7 +213,7 @@ export function esperaDto(e: ReservaEspera): EsperaDto {
   return {
     id: e.id, modulo: e.modulo, recursoId: e.recursoId, inicio: e.inicio.toISOString(), fin: e.fin.toISOString(),
     clienteId: e.clienteId, clienteNombre: e.clienteNombre, clienteTelefono: e.clienteTelefono, clienteEmail: e.clienteEmail,
-    estado: e.estado, reservaId: e.reservaId, createdAt: e.createdAt.toISOString(),
+    servicioId: e.servicioId, estado: e.estado, reservaId: e.reservaId, createdAt: e.createdAt.toISOString(),
   };
 }
 

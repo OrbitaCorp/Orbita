@@ -113,8 +113,8 @@ export class SeguimientoService {
 
   private negocios(where: { id?: string } = {}) {
     return this.prisma.business.findMany({
-      // La demo pública no es un cliente; un borrado definitivo, tampoco.
-      where: { ...where, isDemo: false, deletedAt: null },
+      // La demo pública y los negocios de prueba no son clientes; un borrado definitivo, tampoco.
+      where: { ...where, isDemo: false, isTest: false, deletedAt: null },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true, name: true, subdomain: true, createdAt: true, isActive: true, isPaused: true, cancelledAt: true,

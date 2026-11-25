@@ -28,11 +28,12 @@
 // horarios (13/11). El mapa completo, con lo que el backend no cubre, está en
 // la entrada "mapa-de-turnos-sobre-el-backend" de Auditoría.
 import { createContext, createElement, useCallback, useContext, useEffect, useEffectEvent, useState, type ReactNode } from 'react'
-import type { Cliente, Recurso, RubroTurnos } from '@/modules/turnos/datos'
+import type { Cliente, EstadoTurno, Recurso, RubroTurnos } from '@/modules/turnos/datos'
 import type { Semana } from '@/modules/turnos/horario'
 import type { ServicioBase, TurnoAgenda } from '@/modules/turnos/datos/agenda'
 import type { Persona, Rol } from '@/modules/turnos/datos/equipo'
-import type { DiasCerrados, ReglasApi } from './mapear'
+import type { DiasCerrados, EnEspera, PasoTurno, ReglasApi } from './mapear'
+import type { ExtrasReglas } from './datosConfig'
 import { origenDemo } from './demo'
 
 /**
@@ -56,6 +57,10 @@ export interface DatosPanel {
   personas: Persona[]
   roles: Rol[]
   agenda: FuenteAgenda
+  /** Con la API: hoy y la hora de Argentina al cargar. Sin él, el panel usa el reloj de la demo. */
+  reloj?: { hoy: string; minutos: number }
+  /** Con la API: la seña de las reglas del negocio (en %). Sin ella, la del rubro. */
+  senaPct?: number
 }
 
 /**
@@ -91,10 +96,8 @@ export interface SemanaGuardada {
   semana: Semana
   /** Las agendas con el horario nuevo. */
   recursos: Recurso[]
-  /** Quienes tenían horario propio y se recortaron al nuevo. */
-  ajustadas: string[]
-  /** A quienes no se les pudo recortar: siguen con el horario de antes. */
-  sinAjustar: string[]
+  /** Quienes, con su horario propio, no atienden ningún día del horario nuevo. */
+  sinDias: string[]
 }
 
 /**
@@ -103,7 +106,7 @@ export interface SemanaGuardada {
  * queda en la pantalla, por eso solo los usa el origen de la API.
  */
 export interface EscrituraHorarios {
-  /** Falla, sin tocar nada, si alguien con horario propio quedaría sin ningún día. */
+  /** Las agendas no se tocan: la API cruza cada horario propio con el del negocio. */
   guardarSemana(semana: Semana, rubro: RubroTurnos): Promise<SemanaGuardada>
   /** Lo guardado de hoy en adelante. */
   diasCerrados(): Promise<DiasCerrados>
@@ -113,8 +116,47 @@ export interface EscrituraHorarios {
 
 /** Las reglas de reserva que guarda la config (Reservas → Reglas). Como Horarios, solo en la API. */
 export interface EscrituraReglas {
-  leer(rubro: RubroTurnos): Promise<ReglasApi>
-  guardar(reglas: ReglasApi, rubro: RubroTurnos): Promise<ReglasApi>
+  /** Las de la config y las que viven en su `datos` (las que falten, de fábrica). */
+  leer(rubro: RubroTurnos): Promise<{ reglas: ReglasApi; extras: Partial<ExtrasReglas> }>
+  /** Una sola escritura de la config; si cambia la grilla, también el paso de cada agenda. */
+  guardar(reglas: ReglasApi, extras: ExtrasReglas, rubro: RubroTurnos): Promise<void>
+}
+
+/**
+ * El equipo (personas, roles y cómo cobra cada uno) mientras no existan las
+ * cuentas del equipo: vive en `datos` de la config, solo para el panel.
+ */
+export interface EscrituraEquipo {
+  guardar(personas: Persona[], roles: Rol[]): Promise<void>
+}
+
+/** Quién reserva un turno dado desde el panel: alguien de la lista (con su ficha o sus datos) o alguien nuevo. */
+export interface ClienteDelTurno { id?: string; nombre: string; telefono?: string; email?: string }
+
+/**
+ * Lo que el panel hace con un turno (semana 3 del plan). Cada acción devuelve
+ * el turno como quedó en el origen; si el origen dice que no (el horario se
+ * ocupó, alguien ya lo cambió), el error trae su mensaje. La demo no lo tiene:
+ * ahí los turnos viven en el estado del panel.
+ */
+export interface EscrituraTurnos {
+  crear(t: Omit<TurnoAgenda, 'id'>, cliente: ClienteDelTurno, servicioId?: string): Promise<TurnoAgenda>
+  /**
+   * Confirmar, atender, ausente o cancelar. Al cancelar, si alguien esperaba ese horario la API
+   * le da el lugar en el acto: vuelve como `promovido`.
+   */
+  estado(id: string, estado: EstadoTurno): Promise<{ turno: TurnoAgenda; promovido?: TurnoAgenda }>
+  /** A otro día (contado desde hoy) y otra hora, y si se pide, a otra agenda. */
+  mover(id: string, dia: number, inicio: number, recursoId?: string): Promise<TurnoAgenda>
+  /** Registra lo que falta pagar de la seña. */
+  sena(id: string): Promise<TurnoAgenda>
+  /** Cada cambio del turno, del más nuevo al más viejo. */
+  historial(id: string): Promise<PasoTurno[]>
+  /** Quiénes esperan un horario, de hoy en adelante. */
+  espera(): Promise<EnEspera[]>
+  /** Le da el lugar a quien espera: vuelve su turno nuevo. */
+  darLugar(id: string): Promise<TurnoAgenda>
+  quitarDeEspera(id: string): Promise<void>
 }
 
 export interface OrigenTurnos {
@@ -125,6 +167,8 @@ export interface OrigenTurnos {
   agendas: EscrituraAgendas
   horarios?: EscrituraHorarios
   reglas?: EscrituraReglas
+  equipo?: EscrituraEquipo
+  turnos?: EscrituraTurnos
 }
 
 const Contexto = createContext<OrigenTurnos>(origenDemo)

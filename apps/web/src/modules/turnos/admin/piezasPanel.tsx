@@ -13,7 +13,7 @@ import type { LucideIcon } from 'lucide-react'
 import { ArrowLeft, Copy, Check, CheckCheck, Clock3, Search, Send, Share2, Trash2, PhoneOff, Sun, Sunset, CalendarX } from 'lucide-react'
 import { Modal } from '@/design-system/reservas/piezas'
 import { DIAS, DIAS_CORTOS, horaTxt, type Recurso, type Turno } from '@/modules/turnos/datos'
-import { AHORA_DEMO, MEDIAS_HORAS, diasAbiertos, diasTxt, errorJornada, hhmm, jornadaDe, jornadaTxt, tramosDe, type Bloque, type Jornada, type Semana, type Tramo } from '@/modules/turnos/horario'
+import { AHORA, MEDIAS_HORAS, diasAbiertos, diasTxt, errorJornada, hhmm, jornadaDe, jornadaTxt, tramosDe, type Bloque, type Jornada, type Semana, type Tramo } from '@/modules/turnos/horario'
 import { Segmentado } from './configuracion/ui'
 import { copiar, fechaDe, indiceDia, type Avisar, type GrupoLibres, type MensajeWA } from '../datos/agenda'
 
@@ -426,7 +426,7 @@ export function MensajeWhatsApp({ mensaje, onCerrar, avisar }: { mensaje: Mensaj
         <div className="tu-wa-fondo">
           <div className="tu-wa-burbuja">
             {texto.trim() || '…'}
-            <span className="tu-wa-hora">{horaTxt(AHORA_DEMO)} {enviado ? <CheckCheck size={13} style={{ color: 'var(--color-primary)' }} /> : <Clock3 size={11} />}</span>
+            <span className="tu-wa-hora">{horaTxt(AHORA)} {enviado ? <CheckCheck size={13} style={{ color: 'var(--color-primary)' }} /> : <Clock3 size={11} />}</span>
           </div>
         </div>
       </div>

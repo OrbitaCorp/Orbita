@@ -11,12 +11,14 @@
 // Lo que se puede hacer depende del rol de quien mira: sin permiso para cambiar
 // turnos el detalle es de solo lectura, y sin permiso para ver contactos el
 // teléfono va tapado y no hay WhatsApp.
-import { useState } from 'react'
-import { Phone, MessageCircle, CalendarClock, Check, UserX, Ban, Coins, FileText, ShieldCheck, Timer, Wallet, StickyNote, Lock } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { History, Phone, MessageCircle, CalendarClock, Check, UserX, Ban, Coins, FileText, ShieldCheck, Timer, Wallet, StickyNote, Lock } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { Avatar } from '@/design-system/components/Avatar'
 import { DIAS, horaTxt, duracionTxt, pesos, esSalud, type Cliente, type Recurso, type RubroTurnos, type EstadoTurno } from '@/modules/turnos/datos'
-import { AHORA_DEMO, ChipEstado } from '@/modules/turnos/_shared/components/ChipEstado'
+import type { PasoTurno } from '../datos/origen/mapear'
+import { ChipEstado } from '@/modules/turnos/_shared/components/ChipEstado'
+import { AHORA } from '@/modules/turnos/horario'
 import { TiraDias, HorasLibres } from './piezasPanel'
 import { Modal } from '@/design-system/reservas/piezas'
 import { fechaDe, fechaLarga, indiceDia, type GrupoLibres, type TurnoAgenda } from '../datos/agenda'
@@ -57,9 +59,11 @@ interface Props {
   onSena: () => void
   onAgendarOtro: () => void
   onWhatsApp: () => void
+  /** Con la API: trae cada cambio del turno. Sin él (la demo) no hay historial, y se ve la ficha de ejemplo. */
+  historial?: (id: string) => Promise<PasoTurno[]>
 }
 
-export default function DetalleTurno({ turno, rubro, cliente, recurso, diasMover, libresMover, puedeEditar, puedeCobrar, verContacto, onCerrar, onEstado, onMover, onSena, onAgendarOtro, onWhatsApp }: Props) {
+export default function DetalleTurno({ turno, rubro, cliente, recurso, diasMover, libresMover, puedeEditar, puedeCobrar, verContacto, onCerrar, onEstado, onMover, onSena, onAgendarOtro, onWhatsApp, historial }: Props) {
   const dia = turno.dia ?? 0
   const [moviendo, setMoviendo] = useState(false)
   const [aDia, setADia] = useState(Math.max(0, dia))
@@ -69,8 +73,8 @@ export default function DetalleTurno({ turno, rubro, cliente, recurso, diasMover
   const salud = esSalud(rubro)
   const cerrado = turno.estado === 'cancelado' || turno.estado === 'completado' || turno.estado === 'ausente'
   const nombrePila = cliente?.nombre.split(' ')[0]
-  const porVenir = dia > 0 || (dia === 0 && turno.inicio > AHORA_DEMO)
-  const senaMonto = rubro.sena > 0 ? Math.round(turno.precio * rubro.sena / 100) : 0
+  const porVenir = dia > 0 || (dia === 0 && turno.inicio > AHORA)
+  const senaMonto = turno.sena ?? (rubro.sena > 0 ? Math.round(turno.precio * rubro.sena / 100) : 0)
   const grupos = moviendo ? libresMover(aDia) : []
   const elegida = aHora !== null && grupos.some(g => g.libres.includes(aHora)) ? aHora : null
   // "a las", "a mañana, a las", "al lunes 28, a las": adónde va el turno, para el botón.
@@ -166,8 +170,11 @@ export default function DetalleTurno({ turno, rubro, cliente, recurso, diasMover
           </section>
         )}
 
-        {/* Ficha mínima (solo salud): estructura, sin datos clínicos reales */}
-        {salud && (
+        {historial && <Historial id={turno.id} cargar={historial} />}
+
+        {/* Ficha mínima (solo salud, solo en la demo): estructura, sin datos clínicos reales.
+            En un negocio real no va: Turnos en salud no guarda nada clínico (decisión del 15/11). */}
+        {salud && !historial && (
           <section className="rv-card tu-det-sec" aria-label="Ficha del paciente">
             <div className="rv-rotulo" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}><FileText size={13} aria-hidden /> Ficha del paciente</div>
             {[['Motivo de la consulta', 'Control de rutina'], ['Alergias', 'No registra'], ['Última atención', cliente?.ultima ?? '—']].map(([k, v]) => (
@@ -186,6 +193,37 @@ export default function DetalleTurno({ turno, rubro, cliente, recurso, diasMover
         )}
       </div>
     </Modal>
+  )
+}
+
+/**
+ * Cada cambio del turno, del más nuevo al más viejo: qué pasó, quién y cuándo. Se trae al abrir el
+ * detalle (la key del detalle es el turno, así que un turno nuevo lo vuelve a traer).
+ */
+function Historial({ id, cargar }: { id: string; cargar: (id: string) => Promise<PasoTurno[]> }) {
+  const [pasos, setPasos] = useState<PasoTurno[] | null>(null)
+  const [error, setError] = useState(false)
+  useEffect(() => {
+    let vivo = true
+    cargar(id).then(p => { if (vivo) setPasos(p) }, () => { if (vivo) setError(true) })
+    return () => { vivo = false }
+  }, [id, cargar])
+  return (
+    <section className="rv-card tu-det-sec" aria-label="Historial del turno">
+      <div className="rv-rotulo" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}><History size={13} aria-hidden /> Historial</div>
+      {error ? <p className="rv-ayuda" style={{ margin: 0 }}>No pudimos traer el historial.</p>
+        : !pasos ? <p className="rv-ayuda" style={{ margin: 0 }} aria-busy="true">Cargando…</p>
+          : pasos.map((p, i) => (
+            <div key={i} className="tu-det-fila">
+              <span style={{ minWidth: 0 }}>
+                <span style={{ color: 'var(--color-text)', fontWeight: 500 }}>{p.titulo}</span>
+                <span style={{ color: 'var(--color-muted)' }}> · {p.quien}</span>
+                {p.motivo && <span style={{ display: 'block', color: 'var(--color-muted)', fontSize: 12.5 }}>{p.motivo}</span>}
+              </span>
+              <span className="rv-num" style={{ color: 'var(--color-muted)', flexShrink: 0 }}>{p.cuando}</span>
+            </div>
+          ))}
+    </section>
   )
 }
 

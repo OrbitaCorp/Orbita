@@ -1,4 +1,4 @@
-import { aperturaDelDia, errorDeHorario, sesionesDelDia } from './horario';
+import { aperturaDelDia, errorDeHorario, horarioEfectivo, sesionesDelDia, type HorarioSemanal } from './horario';
 
 const LUNES = '2026-11-09';
 const DOMINGO = '2026-11-08';
@@ -30,5 +30,25 @@ describe('reservas · horario semanal', () => {
   it('sesionesDelDia no une: dos clases pegadas siguen siendo dos', () => {
     const h = { '1': [[1200, 1260], [1140, 1200]] as [number, number][] };
     expect(sesionesDelDia(h, LUNES)).toEqual([[1140, 1200], [1200, 1260]]);
+  });
+});
+
+describe('reservas · horario efectivo de un recurso', () => {
+  const negocio = { '1': [[540, 780], [960, 1200]], '6': [[540, 780]] } as HorarioSemanal;
+
+  it('sin horario propio, el del negocio', () => {
+    expect(horarioEfectivo('PROFESIONAL', null, negocio)).toEqual(negocio);
+    expect(horarioEfectivo('CANCHA', undefined, negocio)).toEqual(negocio);
+  });
+
+  it('en Turnos el propio va dentro del del negocio, día por día', () => {
+    const propio = { '1': [[0, 1440]], '3': [[0, 1440]], '6': [[960, 1200]] } as HorarioSemanal;
+    expect(horarioEfectivo('PROFESIONAL', propio, negocio)).toEqual({ '1': [[540, 780], [960, 1200]] });
+    expect(horarioEfectivo('ESPACIO', { '1': [[600, 1000]] } as HorarioSemanal, negocio)).toEqual({ '1': [[600, 780], [960, 1000]] });
+  });
+
+  it('en los demás módulos el propio vale tal cual', () => {
+    const propio = { '0': [[600, 720]] } as HorarioSemanal;
+    for (const tipo of ['CANCHA', 'SALON', 'ALOJAMIENTO', 'CLASE']) expect(horarioEfectivo(tipo, propio, negocio)).toBe(propio);
   });
 });

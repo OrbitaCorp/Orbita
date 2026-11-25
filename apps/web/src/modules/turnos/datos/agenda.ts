@@ -7,7 +7,7 @@
 // mediodía) y, dentro de ese horario, los días y las horas de cada agenda: nada
 // cae cuando el negocio está cerrado ni cuando esa persona no atiende.
 import { DIAS, horaTxt, tramosDeRecurso, turnosDe, type Recurso, type RubroTurnos, type ServicioTipo, type Turno } from '@/modules/turnos/datos'
-import { AHORA_DEMO, type Semana, type Tramo } from '@/modules/turnos/horario'
+import { AHORA, AHORA_DEMO, HOY_FECHA, type Semana, type Tramo } from '@/modules/turnos/horario'
 
 /** Turno con su día: `dia` son los días contados desde hoy (0 = hoy, -1 = ayer). */
 export type TurnoAgenda = Turno & { dia?: number }
@@ -43,7 +43,7 @@ export const SLOT = 30
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
 const MS_DIA = 24 * 60 * 60 * 1000
 
-export const fechaDe = (dia: number) => new Date(2026, 8, 26 + dia)
+export const fechaDe = (dia: number) => new Date(HOY_FECHA.getFullYear(), HOY_FECHA.getMonth(), HOY_FECHA.getDate() + dia)
 /** Los días que hay de hoy (la fecha de la demo) a una fecha. */
 const diaDesde = (f: Date) => Math.round((f.getTime() - fechaDe(0).getTime()) / MS_DIA)
 /** 0 = lunes … 6 = domingo, igual que DIAS. */
@@ -122,7 +122,7 @@ export function horariosLibres(turnos: Turno[], tramos: Tramo[], recursoId: stri
   const libres: number[] = []
   for (const [abre, cierra] of tramos) {
     for (let m = abre; m + duracion <= cierra; m += SLOT) {
-      if (dia === 0 && m < AHORA_DEMO) continue
+      if (dia === 0 && m < AHORA) continue
       if (!ocupados.some(t => m < t.inicio + t.duracion && m + duracion > t.inicio)) libres.push(m)
     }
   }

@@ -3,7 +3,7 @@ import { ReservaConfig, ReservaModulo, ReservaRecurso, ReservaServicio } from '@
 import { PrismaService } from '../prisma/prisma.service';
 import { ReservasCatalogoService, datosAlojamiento } from './reservas-catalogo.service';
 import { franjasDelDia, seguidasDesde, sesionesConCupo, type OcupacionDelDia } from './dominio/disponibilidad';
-import { aperturaDelDia, sesionesDelDia, type HorarioSemanal } from './dominio/horario';
+import { aperturaDelDia, horarioEfectivo, sesionesDelDia, type HorarioSemanal } from './dominio/horario';
 import { diasEntre, esFecha, fechaYMinutos, instante, MINUTOS_DIA, sumarDias, tramoEnElDia, type Tramo } from './dominio/tiempo';
 import { DisponibilidadDiaDto, DisponibilidadRangoDto, NochesDto } from './reservas.types';
 
@@ -71,7 +71,8 @@ export class DisponibilidadService {
       config, recurso, servicio, duracionBase: base, duracion,
       paso: recurso.pasoMinutos ?? base,
       margen: DisponibilidadService.margenDe(recurso, config),
-      horario: (recurso.horario ?? config.horario) as HorarioSemanal | null,
+      // En Turnos el horario propio va dentro del del negocio; en los demás módulos vale tal cual.
+      horario: horarioEfectivo(recurso.tipo, recurso.horario as HorarioSemanal | null, config.horario as HorarioSemanal | null),
     };
   }
 

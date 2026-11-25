@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConversationsService } from '../conversations/conversations.service';
 import { InstagramService } from '../instagram/instagram.service';
 import { SendMessageDto } from '../conversations/dto/send-message.dto';
+import { InstagramVentasService } from './instagram-ventas/instagram-ventas.service';
 
 // La bandeja de mensajes directos de Instagram de la EMPRESA, dentro del super panel.
 //
@@ -25,6 +26,8 @@ export type ConversacionDeInstagram = {
   sinLeer: boolean;
   ultimo: { texto: string; esMio: boolean; fecha: Date } | null;
   actualizadaEl: Date;
+  /** Si la charla está en manos del equipo (la persona pidió alguien, el bot no supo o escribió alguien del equipo). */
+  bot: { enManosDelEquipo: boolean; motivo: string | null };
 };
 
 @Injectable()
@@ -35,6 +38,8 @@ export class InstagramBandejaService {
     private readonly conversations: ConversationsService,
     // Opcional por compatibilidad con los specs que construyen el servicio a mano; en la app real Nest lo inyecta siempre.
     private readonly instagram?: InstagramService,
+    // Opcional por lo mismo: el bot de ventas se calla cuando contesta alguien del equipo.
+    @Optional() private readonly ventas?: InstagramVentasService,
   ) {}
 
   private async negocioId(): Promise<string> {
@@ -68,6 +73,7 @@ export class InstagramBandejaService {
       sinLeer: c.isUnread,
       ultimo: c.messages[0] ? { texto: c.messages[0].text, esMio: c.messages[0].sender === 'STORE', fecha: c.messages[0].createdAt } : null,
       actualizadaEl: c.updatedAt,
+      bot: { enManosDelEquipo: c.botEstado === 'DERIVADO' || c.botEstado === 'PAUSADO', motivo: c.botMotivo },
     }));
   }
 
@@ -111,6 +117,9 @@ export class InstagramBandejaService {
   async responder(conversationId: string, dto: SendMessageDto) {
     const businessId = await this.negocioId();
     await this.asegurarDeInstagram(businessId, conversationId);
-    return this.conversations.sendMessage(businessId, conversationId, { text: dto.text });
+    const enviado = await this.conversations.sendMessage(businessId, conversationId, { text: dto.text });
+    // Contestó una persona del equipo: el bot de ventas deja de responder en esta charla hasta que lo reactiven.
+    await this.ventas?.pausarPorPersona(businessId, conversationId);
+    return enviado;
   }
 }

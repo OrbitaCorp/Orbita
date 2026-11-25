@@ -31,6 +31,39 @@ export const FECHA_DEMO = 'Sábado 26 de septiembre'
 /** Hoy en una Semana (0 = lunes): sábado. */
 export const HOY_SEMANA = 5
 
+// ─── El reloj del panel ──────────────────────────────────────────────────────
+// El panel de la demo vive en el sábado 26/09 a las 10:40 (arriba). El de un
+// negocio real, en el día y la hora de Argentina: lo fija PanelTurnos al
+// cargar los datos de la API, y lo actualiza cada minuto. Son exports vivos
+// (`let`): quien los importa lee siempre el valor de ahora. El sitio público
+// sigue con la hora de la demo hasta que se conecte (semana 4).
+
+const MESES_TXT = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+const DIAS_TXT = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+
+/** Minutos desde las 00:00 de hoy. */
+export let AHORA = AHORA_DEMO
+/** Hoy en una Semana (0 = lunes). */
+export let HOY_DIA = HOY_SEMANA
+/** "Sábado 26 de septiembre". */
+export let HOY_TXT = FECHA_DEMO
+/** Las 00:00 de hoy (hora local del navegador, solo para contar días y nombrarlos). */
+export let HOY_FECHA = new Date(2026, 8, 26)
+
+/** El reloj de un negocio real (AAAA-MM-DD y minutos de Argentina), o null para el de la demo. */
+export function fijarReloj(real: { hoy: string; minutos: number } | null) {
+  if (!real) {
+    AHORA = AHORA_DEMO; HOY_DIA = HOY_SEMANA; HOY_TXT = FECHA_DEMO; HOY_FECHA = new Date(2026, 8, 26)
+    return
+  }
+  const [a, m, d] = real.hoy.split('-').map(Number)
+  const fecha = new Date(a, m - 1, d)
+  AHORA = real.minutos
+  HOY_FECHA = fecha
+  HOY_DIA = (fecha.getDay() + 6) % 7
+  HOY_TXT = `${DIAS_TXT[HOY_DIA]} ${d} de ${MESES_TXT[m - 1]}`
+}
+
 // ─── Texto ↔ minutos ─────────────────────────────────────────────────────────
 
 const dd = (n: number) => String(n).padStart(2, '0')
