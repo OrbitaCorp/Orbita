@@ -5,8 +5,8 @@
 // Por ahora, solo estadía por noche (etapa 1 del plan
 // docs/superpowers/plans/2026-11-23-alquileres-en-produccion.md). El precio no
 // viaja nunca: lo calcula el servidor (precio por noche × noches).
-import type { CrearBloqueo, CrearDesdePanel, GuardarConfig, GuardarRecurso, Reserva as ReservaApi, Reservar } from '@/lib/reservasApi/tipos'
-import type { Bloqueo, Cliente, NegocioAlquiler, Propiedad, Reserva } from '../index'
+import type { ConectarCalendario, CrearBloqueo, CrearDesdePanel, GuardarConfig, GuardarRecurso, Reserva as ReservaApi, Reservar } from '@/lib/reservasApi/tipos'
+import type { Bloqueo, CalendarioExterno, Cliente, NegocioAlquiler, Propiedad, Reserva } from '../index'
 
 /** Una propiedad como recurso ALOJAMIENTO: lo que el servidor usa para reservar va en sus campos; lo descriptivo, en `datos`. */
 export function recursoDePropiedad(p: Propiedad, orden: number): GuardarRecurso {
@@ -128,6 +128,12 @@ export function bloqueoParaApi(b: Bloqueo, propiedad: Pick<Propiedad, 'checkIn' 
 
 /** El id de la API de un bloqueo del panel (uno de todo el negocio se muestra como "<id>:<unidad>", ver mapear.ts). */
 export const idDeBloqueo = (id: string) => id.split(':')[0]
+
+/** Conectar el calendario de un aviso a una propiedad. Sin nombre, el servidor lo llama "Airbnb". */
+export function calendarioParaApi(c: CalendarioExterno): ConectarCalendario {
+  const nombre = c.nombre.trim()
+  return { modulo: 'ALQUILERES', recursoId: c.unidadId, ...(nombre ? { nombre } : {}), url: c.url.trim() }
+}
 
 // ─── El sitio público ────────────────────────────────────────────────────────
 

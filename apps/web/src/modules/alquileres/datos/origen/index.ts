@@ -23,7 +23,7 @@ import type { DemoAlquiler, useDemoAlquiler } from '../negocio'
 import { origenDemo } from './demo'
 
 /** Lo que escribe el panel: las mismas firmas que el almacén de la demo. */
-export type Escrituras = Pick<ReturnType<typeof useDemoAlquiler>, 'configurar' | 'reservar' | 'cambiarReserva' | 'agregarBloqueo' | 'quitarBloqueo' | 'agregarCalendario' | 'quitarCalendario'>
+export type Escrituras = Pick<ReturnType<typeof useDemoAlquiler>, 'configurar' | 'reservar' | 'cambiarReserva' | 'agregarBloqueo' | 'quitarBloqueo' | 'agregarCalendario' | 'quitarCalendario' | 'sincronizarCalendario'>
 
 /** Todo lo que el panel necesita, con el estado de la carga. */
 export interface DatosPanelAlquiler extends Escrituras {

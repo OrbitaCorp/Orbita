@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Reserva as ReservaApi } from '@/lib/reservasApi/tipos'
 import { NEGOCIOS_DEMO, type Bloqueo, type Propiedad, type Reserva } from '../../index'
-import { bloqueoParaApi, cambiosDePropiedades, configDeCambio, idDeBloqueo, pasosDeCambio, pedidoDeReserva, pedidoDelSitio, recursoDePropiedad } from '../escribir'
+import { bloqueoParaApi, calendarioParaApi, cambiosDePropiedades, configDeCambio, idDeBloqueo, pasosDeCambio, pedidoDeReserva, pedidoDelSitio, recursoDePropiedad } from '../escribir'
 import { propiedadDeApi } from '../mapear'
 
 const PROP: Propiedad = { ...NEGOCIOS_DEMO.estadia.propiedades[0], id: 'p1', nombre: 'Cabaña Arrayán', modalidad: 'noche', checkIn: 900, checkOut: 600, tarifa: { precioNoche: 85000, temporadas: [], finDeSemanaPct: 0, limpieza: 0, minNoches: 2 } }
@@ -124,5 +124,15 @@ describe('configDeCambio: lo que el sitio muestra para coordinar la seña', () =
   })
   it('sin saber qué hay guardado no toca datos', () => {
     expect(configDeCambio({ telefono: '0000 15-0000' })).toBeNull()
+  })
+})
+
+describe('calendarioParaApi', () => {
+  it('conecta el enlace a la propiedad, con su nombre', () => {
+    expect(calendarioParaApi({ id: 'tmp', unidadId: 'p1', nombre: ' Airbnb ', url: ' https://www.airbnb.com/calendar/ical/1.ics?s=a ', ultimaSync: '2026-11-25' }))
+      .toEqual({ modulo: 'ALQUILERES', recursoId: 'p1', nombre: 'Airbnb', url: 'https://www.airbnb.com/calendar/ical/1.ics?s=a' })
+  })
+  it('sin nombre no manda nombre: el servidor lo llama "Airbnb"', () => {
+    expect(calendarioParaApi({ id: 'tmp', unidadId: 'p1', nombre: '  ', url: 'https://www.airbnb.com/calendar/ical/1.ics', ultimaSync: '2026-11-25' })).not.toHaveProperty('nombre')
   })
 })

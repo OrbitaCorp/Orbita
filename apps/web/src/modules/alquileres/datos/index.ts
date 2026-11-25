@@ -223,7 +223,20 @@ export interface Bloqueo {
   calendarioId?: string
 }
 
-export interface CalendarioExterno { id: string; unidadId: string; nombre: string; url: string; ultimaSync: ISO }
+export interface CalendarioExterno {
+  id: string
+  unidadId: string
+  nombre: string
+  url: string
+  /** El día de la última sincronización. */
+  ultimaSync: ISO
+  /** Negocio real: el instante exacto, para decir "hace 12 min". Sin esto, todavía no se bajó nunca. */
+  ultimaSyncEn?: string
+  /** Negocio real: por qué falló la última descarga. */
+  error?: string
+  /** Negocio real: reservas de acá que pisan noches reservadas allá. */
+  conflictos?: { reservaId: string; codigo: string; entrada: ISO; salida: ISO }[]
+}
 
 // ─── Mensajes automáticos, pagos y equipo ────────────────────────────────────
 // Lo que el panel configura en "Recordatorios y mensajes", "Pagos y señas" y

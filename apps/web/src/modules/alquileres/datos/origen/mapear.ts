@@ -16,13 +16,13 @@
 //   F12 equipo y roles             equipo = []
 // Todo lo descriptivo de una propiedad o de un salón vive en `datos` del
 // recurso y se lee con cuidado: un campo con otro tipo toma su default.
-import type { Bloqueo as BloqueoApi, Config, Estado, Noches, Recurso, Reserva as ReservaApi, Servicio } from '@/lib/reservasApi/tipos'
+import type { Bloqueo as BloqueoApi, CalendarioExterno as CalendarioApi, Config, Estado, Noches, Recurso, Reserva as ReservaApi, Servicio } from '@/lib/reservasApi/tipos'
 import type { Extra } from '@/lib/reservas/precio'
 import type { Temporada, TarifaMensual } from '@/lib/reservas/estadia'
 import { sumarDias, type ISO } from '@/lib/reservas/fechas'
 import {
   RUBROS_ALQUILERES, TIPOS_PROPIEDAD, mensajesDeFabrica,
-  type Apertura, type Bloqueo, type Cliente, type EstadoReserva, type NegocioAlquiler, type Paquete, type Propiedad,
+  type Apertura, type Bloqueo, type CalendarioExterno, type Cliente, type EstadoReserva, type NegocioAlquiler, type Paquete, type Propiedad,
   type Reserva, type Salon, type TipoAlquiler, type TipoPropiedad, type Unidad,
 } from '../index'
 
@@ -216,7 +216,9 @@ export function reservaDeApi(r: ReservaApi, tipo: TipoAlquiler): Reserva | null 
 /** Los bloqueos del negocio por unidad: uno de todo el negocio se reparte en cada una, como en la demo. */
 export function bloqueosDeApi(bs: BloqueoApi[], unidadIds: string[]): Bloqueo[] {
   return bs.flatMap(b => {
-    const base = { desde: fechaArgentina(b.inicio), hasta: fechaArgentina(b.fin), motivo: b.motivo ?? 'Bloqueado', origen: 'dueno' as const }
+    // Lo que vino de un calendario externo (Airbnb) se distingue: se ve distinto y no se quita a mano.
+    const deAfuera = b.origen === 'ICAL'
+    const base = { desde: fechaArgentina(b.inicio), hasta: fechaArgentina(b.fin), motivo: b.motivo ?? (deAfuera ? 'Airbnb' : 'Bloqueado'), origen: deAfuera ? 'ical' as const : 'dueno' as const, ...(deAfuera && b.calendarioId ? { calendarioId: b.calendarioId } : {}) }
     return b.recursoId ? [{ id: b.id, unidadId: b.recursoId, ...base }] : unidadIds.map(u => ({ id: `${b.id}:${u}`, unidadId: u, ...base }))
   })
 }
@@ -251,6 +253,23 @@ export interface PublicoDeConfig { alias: string; titular: string; telefono: str
 /** Lee `publico` con cuidado: lo que falte o no sea texto queda vacío. */
 export function publicoDeConfig(publico: unknown): PublicoDeConfig {
   return { alias: campo(publico, 'alias', esTexto, ''), titular: campo(publico, 'titular', esTexto, ''), telefono: campo(publico, 'telefono', esTexto, '') }
+}
+
+/**
+ * Un calendario conectado, como lo muestra el panel. `hoy` es para el que
+ * todavía no se bajó nunca (su día de sincronización no puede quedar vacío).
+ */
+export function calendarioDeApi(c: CalendarioApi, hoy: ISO): CalendarioExterno {
+  return {
+    id: c.id,
+    unidadId: c.recursoId,
+    nombre: c.nombre,
+    url: c.url,
+    ultimaSync: c.ultimaSync ? fechaArgentina(c.ultimaSync) : hoy,
+    ...(c.ultimaSync ? { ultimaSyncEn: c.ultimaSync } : {}),
+    ...(c.ultimoError ? { error: c.ultimoError } : {}),
+    conflictos: c.conflictos.map(x => ({ reservaId: x.reservaId, codigo: x.codigo, entrada: x.desde, salida: x.hasta })),
+  }
 }
 
 // ─── El negocio ──────────────────────────────────────────────────────────────

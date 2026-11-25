@@ -6,6 +6,7 @@ const panel = vi.hoisted(() => ({
   crearRecurso: vi.fn(), editarRecurso: vi.fn(), borrarRecurso: vi.fn(), guardarConfig: vi.fn(),
   crear: vi.fn(), pago: vi.fn(), confirmar: vi.fn(), completar: vi.fn(), cancelar: vi.fn(),
   crearBloqueo: vi.fn(), borrarBloqueo: vi.fn(),
+  calendarios: vi.fn(), conectarCalendario: vi.fn(), desconectarCalendario: vi.fn(), sincronizarCalendario: vi.fn(),
 }))
 const panelGetBusiness = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/reservasApi/cliente', () => ({ panel }))
@@ -39,6 +40,7 @@ beforeEach(() => {
   panel.servicios.mockResolvedValue([])
   panel.bloqueos.mockResolvedValue([])
   panel.agenda.mockResolvedValue(pagina(0, 0))
+  panel.calendarios.mockResolvedValue([])
 })
 
 describe('tramosDeFechas', () => {
@@ -165,5 +167,42 @@ describe('lo que el panel real escribe en la API (estadía)', () => {
 describe('origenApi', () => {
   it('es el origen de la API', () => {
     expect(origenApi.tipo).toBe('api')
+  })
+})
+
+describe('calendarios de Airbnb en el panel real', () => {
+  const deLaApi = { id: 'cal-1', recursoId: 'p1', nombre: 'Airbnb', url: 'https://www.airbnb.com/calendar/ical/1.ics', activo: true, ultimaSync: '2026-11-23T13:10:00.000Z', ultimoError: null, conflictos: [] }
+
+  it('carga los calendarios conectados con su estado', async () => {
+    panel.calendarios.mockResolvedValue([deLaApi])
+    const { datos } = await conCabana()
+    expect(panel.calendarios).toHaveBeenCalledWith('ALQUILERES')
+    expect(datos.negocio.calendariosExternos).toEqual([{ id: 'cal-1', unidadId: 'p1', nombre: 'Airbnb', url: deLaApi.url, ultimaSync: '2026-11-23', ultimaSyncEn: '2026-11-23T13:10:00.000Z', conflictos: [] }])
+  })
+
+  it('si la API todavía no tiene calendarios (se desplegó el front antes), el panel carga igual, sin ellos', async () => {
+    panel.calendarios.mockRejectedValue(new Error('Cannot GET /reservas/calendarios'))
+    const { datos } = await conCabana()
+    expect(datos.negocio.calendariosExternos).toEqual([])
+    expect(datos.negocio.propiedades).toHaveLength(1)
+  })
+
+  it('conectar manda el enlace a la API y recarga; desconectar y sincronizar, lo mismo', async () => {
+    const { e, recargar } = await conCabana()
+    panel.conectarCalendario.mockResolvedValue(deLaApi)
+    await e.agregarCalendario('estadia', { id: 'tmp', unidadId: 'p1', nombre: 'Airbnb', url: deLaApi.url, ultimaSync: '2026-11-23' }, [])
+    expect(panel.conectarCalendario).toHaveBeenCalledWith({ modulo: 'ALQUILERES', recursoId: 'p1', nombre: 'Airbnb', url: deLaApi.url })
+    await e.quitarCalendario('estadia', 'cal-1')
+    expect(panel.desconectarCalendario).toHaveBeenCalledWith('cal-1')
+    await e.sincronizarCalendario('estadia', 'cal-1')
+    expect(panel.sincronizarCalendario).toHaveBeenCalledWith('cal-1')
+    expect(recargar).toHaveBeenCalledTimes(3)
+  })
+
+  it('si Airbnb rechaza el enlace, llega el mensaje de la API y no se recarga', async () => {
+    const { e, recargar } = await conCabana()
+    panel.conectarCalendario.mockRejectedValue(new Error('Pegá el enlace de Airbnb que termina en .ics'))
+    await expect(e.agregarCalendario('estadia', { id: 'tmp', unidadId: 'p1', nombre: '', url: 'https://otro.sitio/a.ics', ultimaSync: '2026-11-23' }, [])).rejects.toThrow(/enlace de Airbnb/)
+    expect(recargar).not.toHaveBeenCalled()
   })
 })

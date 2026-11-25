@@ -34,6 +34,7 @@ export const origenDemo: OrigenAlquileres = {
       quitarBloqueo: n.quitarBloqueo,
       agregarCalendario: n.agregarCalendario,
       quitarCalendario: n.quitarCalendario,
+      sincronizarCalendario: n.sincronizarCalendario,
     }
   },
 }

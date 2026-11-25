@@ -14,7 +14,7 @@
 import { authedFetch } from '@/lib/auth/authClient'
 import { mensajeDeError } from '@/lib/api'
 import type {
-  AnotarseEnEspera, Bloqueo, CambioDeEstado, Cancelar, Config, ConfigPublica, Confirmar, CrearBloqueo, CrearDesdePanel,
+  AnotarseEnEspera, Bloqueo, CalendarioExterno, CambioDeEstado, Cancelar, ConectarCalendario, Config, ConfigPublica, Confirmar, CrearBloqueo, CrearDesdePanel,
   DisponibilidadDia, DisponibilidadRango, Espera, FiltroAgenda, GuardarConfig, GuardarRecurso, GuardarServicio, Historial, MiEspera,
   MiReserva, Modulo, Noches, Pago, Paginado, Recurso, Reprogramar, Reserva, ReservaConToken, Reservar, Resumen, Retener, SenaAlCancelar,
   Servicio,
@@ -100,6 +100,13 @@ export const panel = {
   crearBloqueo: (datos: CrearBloqueo) => delPanel<{ id: string; inicio: string; fin: string; afectadas: number }>('/bloqueos', json(datos)),
   borrarBloqueo: (id: string) => delPanel<{ ok: true }>(`/bloqueos/${id}`, { method: 'DELETE' }),
 
+  calendarios: (modulo: Modulo) => delPanel<CalendarioExterno[]>(`/calendarios${query({ modulo })}`),
+  /** Lo conecta y lo baja en el momento: la respuesta ya trae si el enlace sirvió (`ultimoError`). */
+  conectarCalendario: (datos: ConectarCalendario) => delPanel<CalendarioExterno>('/calendarios', json(datos)),
+  /** Se lleva sus bloqueos: devuelve cuántos eran. */
+  desconectarCalendario: (id: string) => delPanel<{ ok: true; bloqueos: number }>(`/calendarios/${id}`, { method: 'DELETE' }),
+  sincronizarCalendario: (id: string) => delPanel<CalendarioExterno>(`/calendarios/${id}/sincronizar`, json({})),
+
   disponibilidad: (p: { modulo: Modulo; recursoId: string; fecha: string; servicioId?: string; duracionMinutos?: number; salvo?: string }) =>
     delPanel<DisponibilidadDia>(`/disponibilidad${query(p)}`),
   disponibilidadRango: (p: { modulo: Modulo; recursoId: string; desde: string; hasta: string; servicioId?: string; duracionMinutos?: number }) =>
@@ -121,6 +128,13 @@ export const panel = {
   espera: (modulo: Modulo, recursoId?: string, fecha?: string) => delPanel<Espera[]>(`/espera${query({ modulo, recursoId, fecha })}`),
   quitarDeEspera: (id: string) => delPanel<{ ok: true }>(`/espera/${id}`, { method: 'DELETE' }),
 }
+
+/**
+ * La dirección pública del .ics de un recurso, para pegar en Airbnb ("Importar
+ * calendario"). Trae solo noches ocupadas, sin datos de nadie.
+ */
+export const urlDelCalendario = (slug: string, recursoId: string): string =>
+  `${API_BASE}/storefront/${encodeURIComponent(slug)}/reservas/ical/${encodeURIComponent(recursoId)}.ics`
 
 // ─── Sitio público ───────────────────────────────────────────────────────────
 
