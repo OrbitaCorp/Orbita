@@ -73,7 +73,9 @@ function armar(o: { calendarios?: Fila[]; bloqueos?: Fila[]; reservas?: Fila[]; 
     reservaRecurso: tabla(o.recursos ?? [cabana()]),
     reservaIcalExportada: tabla(o.exportadas ?? []),
   };
-  const prisma = { ...t, $transaction: jest.fn(async (fn: (tx: unknown) => unknown) => fn(prisma)) } as Record<string, unknown>;
+  // $queryRaw es el candado del recurso (candado.ts): devuelve su fila si sigue existiendo.
+  const candado = jest.fn(async () => t.reservaRecurso.filas.filter((r) => r.eliminadoEn === null).map((r) => ({ id: r.id, cupo: 1, activo: r.activo, nombre: r.nombre })));
+  const prisma = { ...t, $transaction: jest.fn(async (fn: (tx: unknown) => unknown) => fn(prisma)), $queryRaw: candado } as Record<string, unknown>;
   const catalogo = {
     recurso: jest.fn(async (_b: string, id: string) => {
       const r = t.reservaRecurso.filas.find((x) => x.id === id);
@@ -86,7 +88,7 @@ function armar(o: { calendarios?: Fila[]; bloqueos?: Fila[]; reservas?: Fila[]; 
   const descargar = jest.fn(async () => o.descarga ?? { ok: true, texto: ics() });
   svc.descargar = descargar as never;
   const deCalendario = (id = 'cal-1') => t.reservaBloqueo.filas.filter((b) => b.calendarioId === id);
-  return { svc, t, descargar, audit, deCalendario };
+  return { svc, t, descargar, audit, deCalendario, candado, prisma };
 }
 
 describe('ReservasCalendariosService · sincronizar', () => {
@@ -200,6 +202,14 @@ describe('ReservasCalendariosService · sincronizar', () => {
     expect(deCalendario().map((b) => b.externoUid)).toEqual(['a']);
   });
 
+  it('reemplaza los bloqueos con el recurso tomado: dos sincronizaciones a la vez entran de a una y no duplican', async () => {
+    const a = armar({ descarga: { ok: true, texto: ics(['a', 'Reserved', '2026-12-20', '2026-12-27']) } });
+    await a.svc.sincronizar(BIZ, 'cal-1', AHORA);
+    expect(a.candado).toHaveBeenCalledTimes(1);
+    expect(a.candado.mock.invocationCallOrder[0]).toBeLessThan(a.t.reservaBloqueo.deleteMany.mock.invocationCallOrder[0]);
+    expect(a.candado.mock.invocationCallOrder[0]).toBeLessThan(a.t.reservaBloqueo.createMany.mock.invocationCallOrder[0]);
+  });
+
   it('si el calendario se desconectó mientras bajaba, no deja bloqueos', async () => {
     const a = armar({ descarga: { ok: true, texto: ics(['a', 'Reserved', '2026-12-20', '2026-12-27']) } });
     a.descargar.mockImplementation(async () => { a.t.reservaCalendarioExterno.filas.splice(0, 1); return { ok: true, texto: ics(['a', 'Reserved', '2026-12-20', '2026-12-27']) }; });
@@ -238,13 +248,38 @@ describe('ReservasCalendariosService · conflictos', () => {
   });
 });
 
+describe('ReservasCalendariosService · lo que se le muestra al panel', () => {
+  it('el enlace sale sin su clave: quien solo puede ver reservas no se lleva el calendario de Airbnb', async () => {
+    const { svc } = armar();
+    const [c] = await svc.listar(BIZ, 'ALQUILERES', AHORA);
+    expect(c.url).toBe('https://www.airbnb.com.ar/calendar/ical/123.ics');
+    expect(JSON.stringify(c)).not.toContain('s=abc');
+  });
+
+  it('dice cuántas noches tiene bloqueadas de acá en adelante, también las que el panel no llega a cargar', async () => {
+    const deAirbnb = (id: string, entrada: string, salida: string, over: Fila = {}): Fila => ({ id, businessId: BIZ, modulo: 'ALQUILERES', recursoId: 'r-cab', origen: 'ICAL', calendarioId: 'cal-1', externoTipo: 'RESERVADO', inicio: instante(entrada, 900), fin: instante(salida, 600), ...over });
+    const { svc } = armar({
+      bloqueos: [
+        deAirbnb('b1', '2026-12-20', '2026-12-27'),
+        deAirbnb('b2', '2027-09-01', '2027-09-03', { externoTipo: 'CERRADO' }),
+        deAirbnb('pasado', '2026-10-01', '2026-10-05'),
+        deAirbnb('de-otro', '2026-12-01', '2026-12-04', { calendarioId: 'cal-2' }),
+        bloqueoDueno('2026-12-10', '2026-12-12'),
+      ],
+    });
+    expect((await svc.listar(BIZ, 'ALQUILERES', AHORA))[0].noches).toBe(9);
+  });
+});
+
 describe('ReservasCalendariosService · conectar y desconectar', () => {
   const dto = { modulo: 'ALQUILERES' as const, recursoId: 'r-cab', nombre: 'Airbnb', url: URL_OK };
 
   it('conectar guarda el calendario, lo sincroniza en el momento y lo devuelve con su estado', async () => {
     const { svc, t, descargar, audit } = armar({ calendarios: [], descarga: { ok: true, texto: ics(['a', 'Reserved', '2026-12-20', '2026-12-27']) } });
     const r = await svc.conectar(BIZ, 'm-1', dto, AHORA);
-    expect(r).toMatchObject({ recursoId: 'r-cab', nombre: 'Airbnb', url: URL_OK, ultimoError: null, conflictos: [] });
+    expect(r).toMatchObject({ recursoId: 'r-cab', nombre: 'Airbnb', url: 'https://www.airbnb.com.ar/calendar/ical/123.ics', noches: 7, ultimoError: null, conflictos: [] });
+    // Guardado queda entero: es lo que se baja.
+    expect(t.reservaCalendarioExterno.filas[0].url).toBe(URL_OK);
     expect(r.ultimaSync).toBe(AHORA.toISOString());
     expect(descargar).toHaveBeenCalledWith(URL_OK);
     expect(t.reservaBloqueo.filas).toHaveLength(1);
@@ -266,6 +301,14 @@ describe('ReservasCalendariosService · conectar y desconectar', () => {
     const tres = [1, 2, 3].map((n) => calendario({ id: `c${n}`, url: `https://www.airbnb.com/calendar/ical/${n}.ics` }));
     await expect(armar({ calendarios: tres }).svc.conectar(BIZ, 'm-1', dto, AHORA)).rejects.toThrow(/Hasta 3 calendarios/);
     await expect(armar({ calendarios: [calendario()] }).svc.conectar(BIZ, 'm-1', dto, AHORA)).rejects.toThrow(ConflictException);
+  });
+
+  it('el mismo aviso por otro dominio de Airbnb es el mismo calendario: no se conecta dos veces', async () => {
+    const { svc, t } = armar({ calendarios: [calendario()] });
+    await expect(svc.conectar(BIZ, 'm-1', { ...dto, url: 'https://www.airbnb.com/calendar/ical/123.ics?s=abc' }, AHORA)).rejects.toThrow(ConflictException);
+    expect(t.reservaCalendarioExterno.filas).toHaveLength(1);
+    // Otro aviso (otro número) sí es otro calendario.
+    await expect(svc.conectar(BIZ, 'm-1', { ...dto, url: 'https://www.airbnb.com/calendar/ical/999.ics?s=abc' }, AHORA)).resolves.toMatchObject({ recursoId: 'r-cab' });
   });
 
   it('desconectar borra el calendario y solo sus bloqueos, y dice cuántos eran', async () => {
@@ -295,6 +338,22 @@ describe('ReservasCalendariosService · la corrida automática', () => {
     expect(a.descargar).toHaveBeenCalledTimes(5);
     expect(a.t.reservaCalendarioExterno.filas.find((c) => c.id === 'reciente')?.ultimaSync).toEqual(hace(10));
     expect(a.t.reservaCalendarioExterno.filas.find((c) => c.id === 'apagado')?.ultimaSync).toBeNull();
+  });
+
+  it('uno que se rompe al guardar pasa al final de la cola con su motivo: no traba a los que vienen atrás', async () => {
+    const hace = (min: number) => new Date(AHORA.getTime() - min * 60_000);
+    const viejo = { id: 'viejo', businessId: BIZ, modulo: 'ALQUILERES', recursoId: 'r-cab', origen: 'ICAL', calendarioId: 'roto', inicio: instante('2026-12-01', 900), fin: instante('2026-12-03', 600) };
+    const a = armar({ calendarios: [calendario({ id: 'roto', ultimaSync: hace(90) }), calendario({ id: 'sano', ultimaSync: hace(60) })], bloqueos: [viejo] });
+    a.descargar.mockImplementation(async () => { if (a.descargar.mock.calls.length === 1) throw new Error('la base no responde'); return { ok: true, texto: ics() }; });
+    expect(await a.svc.sincronizarVencidos(AHORA)).toEqual({ revisados: 2, conError: 1 });
+    const roto = a.t.reservaCalendarioExterno.filas.find((c) => c.id === 'roto');
+    expect(roto?.ultimaSync).toEqual(AHORA);
+    expect(roto?.ultimoError).toMatch(/No se pudo/);
+    // Lo que ya tenía bloqueado sigue bloqueado.
+    expect(a.deCalendario('roto').map((b) => b.id)).toEqual(['viejo']);
+    // En la corrida siguiente ya no le toca hasta dentro de 30 minutos.
+    a.descargar.mockClear();
+    expect(await a.svc.sincronizarVencidos(new Date(AHORA.getTime() + 5 * 60_000))).toEqual({ revisados: 0, conError: 0 });
   });
 });
 

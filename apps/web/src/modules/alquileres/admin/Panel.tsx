@@ -16,7 +16,7 @@
 // se hace desde el sitio aparece acá (y en la campanita). Eso es con el origen
 // de la demo, el de fábrica; el panel de un negocio real monta el origen de la
 // API de reservas (datos/origen), que por ahora solo lee.
-import { useEffect, useEffectEvent } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import { useRouter } from 'next/router'
 import { Ban, Building2, CalendarCheck, CalendarDays, CalendarSearch, Contact, HandCoins, Home, Link2, LogIn, LogOut, MessageSquare, Package, PartyPopper, Settings, ShieldCheck, Sparkles, Sun, Tag, Trophy, Wallet, type LucideIcon } from 'lucide-react'
 import LayoutPanel, { type AvisoNav, type ItemBusqueda, type ItemNav } from '@/design-system/reservas/LayoutPanel'
@@ -26,6 +26,8 @@ import { DIAS_CORTOS, MESES_CORTOS, diaSemana, fechaCorta, hhmm, partes, rangoTx
 import { pesos } from '@/lib/reservas/precio'
 import { AHORA, HOY, capital, clientePorId, cuenta, duracionEstadiaTxt, fechaDeReserva, palabrasDe, reservasDelDia, rolDe, rubroPorKey, tituloEvento, unidadPorId, unidadesDe, type Bloqueo, type NegocioAlquiler, type Reserva } from '../datos'
 import { deCalendario } from '../datos/negocio'
+import { hace } from '../datos/textos'
+import { avisoDeCalendario, ejecutar } from './acciones'
 import { useOrigenAlquileres } from '../datos/origen'
 import { ruta } from '../storefront/Sitio'
 import { debeCorregirRuta, resolverRuta, seccionesDe, type TabConfiguracion, type Vista } from './navegacion'
@@ -81,6 +83,8 @@ export default function Panel() {
   const n = origen.useDatos()
   const { tipo, negocio, reservas, clientes, listo } = n
   const [avisar, aviso] = useAviso()
+  // El "ahora" de la campanita, tomado al abrir el panel: alcanza para decir "hace 12 min".
+  const [ahoraMs] = useState(() => Date.now())
   const palabras = palabrasDe(negocio)
   // La espera fingida es solo de la demo (ver skeleton.tsx); con la API se espera a que lleguen los datos.
   const simulada = useCargaSimulada()
@@ -154,7 +158,9 @@ export default function Panel() {
   }
   for (const c of negocio.calendariosExternos) {
     const suyos = negocio.bloqueos.filter(b => b.origen === 'ical' && deCalendario(b, c.id)).length
-    avisos.push({ id: `cal-${c.id}`, Icon: Link2, titulo: `${c.nombre}: sincronizado`, detalle: `${cuenta(suyos, 'fecha bloqueada', 'fechas bloqueadas')} en ${unidadPorId(negocio, c.unidadId)?.nombre ?? ''}`, cuando: `Hoy ${hhmm(AHORA)}`, onAbrir: () => irA('calendarios') })
+    // En un negocio real se dice hace cuánto se bajó de verdad, y si falló no se dice "sincronizado".
+    const cuando = c.ultimaSyncEn ? capital(hace(c.ultimaSyncEn, ahoraMs)) : `Hoy ${hhmm(AHORA)}`
+    avisos.push({ id: `cal-${c.id}`, Icon: Link2, ...avisoDeCalendario(c, { fechas: suyos, propiedad: unidadPorId(negocio, c.unidadId)?.nombre ?? '', cuando }), onAbrir: () => irA('calendarios') })
   }
 
   // ── El buscador (Ctrl K): secciones, gente, lo de hoy y lo que se alquila ──
@@ -182,19 +188,13 @@ export default function Panel() {
   // En la demo la escritura es al instante; con la API es un pedido que puede fallar. El aviso sale
   // cuando terminó: "guardado" si salió bien, o el motivo de la API si no (un 409, una regla del negocio).
   const conflictosDeAirbnb = negocio.calendariosExternos.flatMap(c => c.conflictos ?? [])
-  const hacer = (accion: () => void | Promise<void>, texto?: string, detalle?: string) => {
-    // En un negocio real guardar tarda (va a la API y vuelve a cargar): se dice mientras tanto, y el resultado lo reemplaza.
-    if (real) avisar('Guardando…')
-    Promise.resolve().then(accion).then(
-      () => { if (texto) avisar(texto, detalle) },
-      (e: unknown) => avisar('No se pudo guardar', e instanceof Error && e.message ? e.message : 'Probá de nuevo.'),
-    )
-  }
-  const onGuardar = (cambio: Partial<NegocioAlquiler>, texto?: string, detalle?: string) => hacer(() => n.configurar(tipo, cambio), texto ?? 'Cambios guardados', detalle)
-  const cambiar = (id: string, cambio: Partial<Reserva>, texto?: string) => hacer(() => n.cambiarReserva(id, cambio), texto)
-  const reservar = (x: Reserva, c: Parameters<typeof n.reservar>[2]) => hacer(() => n.reservar(tipo, x, c), x.meses ? 'Contrato agendado' : 'Reserva agendada', real ? 'Ya figura en la agenda.' : 'Ya figura en la agenda y en Mis reservas.')
-  const bloquear = (b: Bloqueo) => hacer(() => n.agregarBloqueo(tipo, b), tipo === 'estadia' ? 'Fechas bloqueadas' : 'Día bloqueado', tipo === 'estadia' ? 'No se van a poder reservar.' : 'No se va a poder reservar.')
-  const quitarBloqueo = (id: string) => hacer(() => n.quitarBloqueo(tipo, id), 'Bloqueo quitado')
+  // Devuelve si quedó hecho, para la pantalla que necesita saberlo (acciones.ts).
+  const hacer = (accion: () => void | Promise<void>, texto?: string, detalle?: string) => ejecutar(accion, avisar, { real, texto, detalle })
+  const onGuardar = (cambio: Partial<NegocioAlquiler>, texto?: string, detalle?: string) => { void hacer(() => n.configurar(tipo, cambio), texto ?? 'Cambios guardados', detalle) }
+  const cambiar = (id: string, cambio: Partial<Reserva>, texto?: string) => { void hacer(() => n.cambiarReserva(id, cambio), texto) }
+  const reservar = (x: Reserva, c: Parameters<typeof n.reservar>[2]) => void hacer(() => n.reservar(tipo, x, c), x.meses ? 'Contrato agendado' : 'Reserva agendada', real ? 'Ya figura en la agenda.' : 'Ya figura en la agenda y en Mis reservas.')
+  const bloquear = (b: Bloqueo) => void hacer(() => n.agregarBloqueo(tipo, b), tipo === 'estadia' ? 'Fechas bloqueadas' : 'Día bloqueado', tipo === 'estadia' ? 'No se van a poder reservar.' : 'No se va a poder reservar.')
+  const quitarBloqueo = (id: string) => void hacer(() => n.quitarBloqueo(tipo, id), 'Bloqueo quitado')
 
   return (
     <LayoutPanel producto="Alquileres" negocio={negocio.nombre} rubro={rubroPorKey(negocio.rubro).label} fecha={fechaDelHeader()} items={items} activo={vista} tab={tab} onIr={ir} sitio={real ? '/' : ruta('inicio', tipo)}

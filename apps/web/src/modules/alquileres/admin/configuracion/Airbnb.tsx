@@ -28,9 +28,10 @@ const MAXIMO = 3
 
 interface P {
   negocio: NegocioAlquiler
-  onConectar: (c: CalendarioExterno) => void
-  onDesconectar: (id: string) => void
-  onSincronizar: (id: string) => void
+  /** Las tres devuelven si quedó hecho: la pantalla espera para decir qué está pasando y para no perder lo escrito. */
+  onConectar: (c: CalendarioExterno) => Promise<boolean>
+  onDesconectar: (id: string) => Promise<boolean>
+  onSincronizar: (id: string) => Promise<boolean>
   onVerReserva: (id: string) => void
 }
 
@@ -46,6 +47,9 @@ const CSS = `
   .ala-cal-txt b { font-size: 14.5px; color: var(--color-text); overflow-wrap: anywhere; }
   .ala-cal-txt span { font-size: 13px; color: var(--color-muted); overflow-wrap: anywhere; }
   .ala-cal-acc { display: flex; gap: 8px; flex-wrap: wrap; padding-left: 26px; }
+  .ala-gira { animation: ala-gira 900ms linear infinite; }
+  @keyframes ala-gira { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .ala-gira { animation: none; } }
   .ala-conflicto { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 6px 0; }
   @media (max-width: 480px) { .ala-url { flex-direction: column; } .ala-cal-acc { padding-left: 0; } .ala-cal-acc .rv-btn { flex: 1 1 100%; } }
 `
@@ -56,6 +60,13 @@ export default function Airbnb({ negocio, onConectar, onDesconectar, onSincroniz
   const [propiedadId, setPropiedadId] = useState(propiedades[0]?.id ?? '')
   const [url, setUrl] = useState('')
   const [copiado, setCopiado] = useState(false)
+  // Qué se está haciendo ahora ("conectar", o el id del calendario que se baja o se desconecta): mientras
+  // tanto el botón lo dice y no se puede pedir dos veces lo mismo.
+  const [ocupado, setOcupado] = useState<string | null>(null)
+  const mientras = async (que: string, accion: () => Promise<boolean>) => {
+    setOcupado(que)
+    try { return await accion() } finally { setOcupado(null) }
+  }
   // El "ahora" de esta pantalla, tomado al abrirla: alcanza para decir "hace 12 min" sin volver a dibujar cada segundo.
   const [ahora] = useState(() => Date.now())
   const propiedad = propiedades.find(p => p.id === propiedadId)
@@ -66,12 +77,14 @@ export default function Airbnb({ negocio, onConectar, onDesconectar, onSincroniz
   const copiar = () => {
     void navigator.clipboard?.writeText(exportar).then(() => { setCopiado(true); window.setTimeout(() => setCopiado(false), 2000) }, () => undefined)
   }
-  const conectar = () => {
-    if (!propiedad || !url.trim()) return
-    onConectar({ id: '', unidadId: propiedad.id, nombre: 'Airbnb', url: url.trim(), ultimaSync: '' })
-    setUrl('')
+  const conectar = async () => {
+    if (!propiedad || !url.trim() || ocupado) return
+    const pegado = url.trim()
+    // El campo se vacía recién cuando quedó conectado: si la API rechaza el enlace, sigue ahí para corregirlo.
+    if (await mientras('conectar', () => onConectar({ id: '', unidadId: propiedad.id, nombre: 'Airbnb', url: pegado, ultimaSync: '' }))) setUrl(actual => (actual.trim() === pegado ? '' : actual))
   }
-  const nochesDe = (c: CalendarioExterno) => negocio.bloqueos.filter(b => b.origen === 'ical' && b.calendarioId === c.id).reduce((s, b) => s + Math.max(1, diasEntre(b.desde, b.hasta)), 0)
+  // Las noches que bloquea un calendario: las cuenta el servidor (el panel carga solo medio año para adelante).
+  const nochesDe = (c: CalendarioExterno) => c.noches ?? negocio.bloqueos.filter(b => b.origen === 'ical' && b.calendarioId === c.id).reduce((s, b) => s + Math.max(1, diasEntre(b.desde, b.hasta)), 0)
 
   if (propiedades.length === 0) {
     return (
@@ -136,8 +149,12 @@ export default function Airbnb({ negocio, onConectar, onDesconectar, onSincroniz
                       </span>
                     </div>
                     <div className="ala-cal-acc">
-                      <button type="button" className="rv-btn rv-btn--sm" onClick={() => onSincronizar(c.id)}><RefreshCw size={14} aria-hidden /> Sincronizar ahora</button>
-                      <BotonConfirmar pregunta={noches > 0 ? `¿Desconectar? Se ${noches === 1 ? 'libera 1 noche' : `liberan ${noches} noches`} que venían de Airbnb.` : '¿Desconectar este calendario?'} si="Sí, desconectar" onConfirmar={() => onDesconectar(c.id)}><Unplug size={14} aria-hidden /> Desconectar</BotonConfirmar>
+                      <button type="button" className="rv-btn rv-btn--sm" disabled={ocupado !== null} aria-busy={ocupado === c.id} onClick={() => void mientras(c.id, () => onSincronizar(c.id))}>
+                        <RefreshCw size={14} aria-hidden className={ocupado === c.id ? 'ala-gira' : undefined} /> {ocupado === c.id ? 'Sincronizando…' : 'Sincronizar ahora'}
+                      </button>
+                      {ocupado === `quitar:${c.id}`
+                        ? <button type="button" className="rv-btn rv-btn--sm" disabled aria-busy><Unplug size={14} aria-hidden /> Desconectando…</button>
+                        : <BotonConfirmar pregunta={noches > 0 ? `¿Desconectar? Se ${noches === 1 ? 'libera 1 noche' : `liberan ${noches} noches`} que venían de Airbnb.` : '¿Desconectar este calendario?'} si="Sí, desconectar" onConfirmar={() => { if (!ocupado) void mientras(`quitar:${c.id}`, () => onDesconectar(c.id)) }}><Unplug size={14} aria-hidden /> Desconectar</BotonConfirmar>}
                     </div>
                   </div>
                 )
@@ -145,10 +162,10 @@ export default function Airbnb({ negocio, onConectar, onDesconectar, onSincroniz
             </div>
           )}
           {suyos.length < MAXIMO ? (
-            <form className="rv-pila" onSubmit={e => { e.preventDefault(); conectar() }}>
+            <form className="rv-pila" onSubmit={e => { e.preventDefault(); void conectar() }}>
               <Campo label="Enlace del calendario de Airbnb" value={url} onChange={setUrl} placeholder="https://www.airbnb.com.ar/calendar/ical/…ics" inputMode="text" autoComplete="off"
                 ayuda="En Airbnb: Calendario → Disponibilidad → Conectar calendarios → Exportar calendario. Copiá el enlace que termina en .ics." />
-              <button type="submit" className="rv-btn rv-btn--primario" style={{ alignSelf: 'flex-start' }} disabled={!url.trim()}><Link2 size={15} aria-hidden /> Conectar</button>
+              <button type="submit" className="rv-btn rv-btn--primario" style={{ alignSelf: 'flex-start' }} disabled={!url.trim() || ocupado !== null} aria-busy={ocupado === 'conectar'}><Link2 size={15} aria-hidden /> {ocupado === 'conectar' ? 'Conectando…' : 'Conectar'}</button>
             </form>
           ) : <p className="rv-ayuda" style={{ margin: 0 }}>Hasta {MAXIMO} calendarios por propiedad. Desconectá uno para sumar otro.</p>}
         </Seccion>

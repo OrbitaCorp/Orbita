@@ -4186,4 +4186,42 @@ Usa el campo libre que sumó Alan (\`ReservaConfig.datos\`, 23/11), sin migraci�
       'apps/web/src/modules/turnos/storefront/origenSitio.ts:42',
     ],
   }),
+  entrada({
+    modulo: 'alquileres', fecha: F25, slug: 'airbnb-probado-en-produccion-y-sus-menores', tipo: 'tarea', quien: 'Alan',
+    titulo: 'El calendario de Airbnb, probado en producción y con sus pendientes menores corregidos',
+    foco: 'La pantalla de Airbnb se probó en producción con el negocio de prueba (conectar, sincronizar, desconectar y el rechazo de un enlace ajeno) y se corrigió lo que había quedado anotado: el enlace viaja al panel sin su clave, dos sincronizaciones a la vez no duplican, y un error se ve como error.',
+    que: `Después de subir la etapa 4, se probó en \`prueba-alquileres.orbita.site\`: la pantalla muestra el enlace del .ics, rechaza un enlace que no es de Airbnb, y conecta, sincroniza y desconecta (con un enlace de Airbnb inventado, que Airbnb contesta con 404). El negocio quedó sin calendarios. **No se probó una descarga exitosa en producción:** hace falta un aviso real.
+
+Esa prueba mostró dos cosas más, y con ellas se corrigió todo lo que la revisión había dejado anotado:
+
+| Qué estaba mal | Qué quedó |
+|---|---|
+| Un rechazo salía con el ícono de éxito | El aviso es de error |
+| "Sincronizar ahora" decía "Calendario sincronizado" aunque Airbnb no lo hubiera dejado bajar | Dice que no se pudo y por qué. Los botones dicen qué están haciendo mientras tanto |
+| El campo del enlace se vaciaba aunque la API lo rechazara | Se vacía recién cuando conectó |
+| La campanita decía "sincronizado" con un calendario caído | Dice "no se pudo sincronizar", con el motivo |
+| El panel escondía cualquier falla al traer los calendarios como "no hay calendarios" | Solo si la API todavía no los tiene (404) |
+| La API devolvía el enlace de Airbnb con su clave a quien pudiera ver reservas | Lo devuelve sin la clave |
+| Dos sincronizaciones a la vez podían duplicar bloqueos | Entran de a una, con el candado del recurso |
+| Un calendario que fallaba al guardar trababa la cola | Pasa al final |
+| El mismo aviso por \`.com\` y por \`.com.ar\` contaba doble | No se conecta dos veces |
+| Un dominio de país que redirige al \`.com\` fallaba | Se sigue esa redirección, una vez y solo dentro de Airbnb |
+| Las noches a liberar al desconectar podían quedar cortas | Las cuenta el servidor |
+
+**Para Turnos y Gimnasio** (motor compartido): sin migraciones. La sincronización de un calendario ahora toma el candado del recurso (el mismo de \`candado.ts\`), solo en alojamientos con Airbnb conectado.
+
+**Para la grilla de ocupación** (otra tarea en curso): el panel ahora sabe, de cada bloqueo de Airbnb, si allá es una reserva o un cierre a mano (\`externoTipo\`), y de cada reserva, si la cargó el negocio o entró por el sitio (\`canal\`).
+
+**Verificado:** tests de la API y del front en verde, y la pantalla contra la base de dev con un Airbnb de mentira, a 1280 y a 390 px.`,
+    archivos: [
+      'apps/api/src/reservas/calendarios/reservas-calendarios.service.ts:1',
+      'apps/api/src/reservas/calendarios/descarga.ts:1',
+      'apps/api/test/unit/reservas.calendarios.unit-spec.ts:1',
+      'apps/web/src/modules/alquileres/admin/acciones.ts:1',
+      'apps/web/src/modules/alquileres/admin/configuracion/Airbnb.tsx:1',
+      'apps/web/src/modules/alquileres/datos/origen/api.ts:1',
+      'apps/web/src/modules/alquileres/datos/origen/aviso.ts:1',
+      'apps/web/src/modules/alquileres/datos/origen/mapear.ts:1',
+    ],
+  }),
 ]

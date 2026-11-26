@@ -323,6 +323,17 @@ describe('calendarios de Airbnb', () => {
     const [b] = bloqueosDeApi([bloqueo({ origen: 'ICAL', calendarioId: 'cal-1', externoTipo: 'RESERVADO' })], ['p1'])
     expect(b).toMatchObject({ unidadId: 'p1', desde: '2026-12-20', hasta: '2026-12-27', origen: 'ical', calendarioId: 'cal-1', motivo: 'Airbnb' })
   })
+  it('uno de Airbnb dice si allá es una reserva o un cierre a mano; uno del dueño no lleva ese dato', () => {
+    expect(bloqueosDeApi([bloqueo({ origen: 'ICAL', calendarioId: 'cal-1', externoTipo: 'RESERVADO' })], ['p1'])[0].externoTipo).toBe('RESERVADO')
+    expect(bloqueosDeApi([bloqueo({ origen: 'ICAL', calendarioId: 'cal-1', externoTipo: 'CERRADO' })], ['p1'])[0].externoTipo).toBe('CERRADO')
+    expect(bloqueosDeApi([bloqueo({ origen: 'ICAL', calendarioId: 'cal-1' })], ['p1'])[0]).not.toHaveProperty('externoTipo')
+    expect(bloqueosDeApi([bloqueo({ origen: 'DUENO' })], ['p1'])[0]).not.toHaveProperty('externoTipo')
+  })
+  it('una reserva dice por dónde entró: la que cargó el negocio es "directo", la del sitio es "sitio"', () => {
+    expect(reservaDeApi(reserva({ origen: 'PANEL' }), 'cancha')?.canal).toBe('directo')
+    expect(reservaDeApi(reserva({ origen: 'TIENDA' }), 'cancha')?.canal).toBe('sitio')
+    expect(reservaDeApi(reserva({ origen: 'PANEL', datos: { canal: 'sitio' } }), 'cancha')?.canal).toBe('sitio')
+  })
   it('uno del dueño (o de una API que todavía no manda el origen) sigue siendo del dueño', () => {
     expect(bloqueosDeApi([bloqueo({ origen: 'DUENO' })], ['p1'])[0].origen).toBe('dueno')
     expect(bloqueosDeApi([bloqueo({})], ['p1'])[0]).not.toHaveProperty('calendarioId')

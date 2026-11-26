@@ -13,6 +13,7 @@ vi.mock('@/lib/reservasApi/cliente', () => ({ panel }))
 vi.mock('@/lib/api', () => ({ panelGetBusiness }))
 
 import { DIAS_POR_PEDIDO, cargarApi, escriturasDe, origenApi, reservasEntre, tramosDeFechas } from '../api'
+import { HechoConAviso } from '../aviso'
 import type { Bloqueo, Propiedad, Reserva as ReservaPanel } from '../../index'
 
 /** Un negocio de estadía ya cargado, con una cabaña y una reserva pendiente, y las escrituras sobre él. */
@@ -180,11 +181,24 @@ describe('calendarios de Airbnb en el panel real', () => {
     expect(datos.negocio.calendariosExternos).toEqual([{ id: 'cal-1', unidadId: 'p1', nombre: 'Airbnb', url: deLaApi.url, ultimaSync: '2026-11-23', ultimaSyncEn: '2026-11-23T13:10:00.000Z', conflictos: [] }])
   })
 
-  it('si la API todavía no tiene calendarios (se desplegó el front antes), el panel carga igual, sin ellos', async () => {
-    panel.calendarios.mockRejectedValue(new Error('Cannot GET /reservas/calendarios'))
+  it('si la API todavía no tiene calendarios (un 404: se desplegó el front antes), el panel carga igual, sin ellos', async () => {
+    panel.calendarios.mockRejectedValue(Object.assign(new Error('Cannot GET /reservas/calendarios'), { status: 404 }))
     const { datos } = await conCabana()
     expect(datos.negocio.calendariosExternos).toEqual([])
     expect(datos.negocio.propiedades).toHaveLength(1)
+  })
+
+  it('cualquier otra falla al traer los calendarios no se esconde como "no hay calendarios": la carga falla y se puede reintentar', async () => {
+    panel.calendarios.mockRejectedValue(Object.assign(new Error('No pudimos traer los calendarios.'), { status: 500 }))
+    await expect(conCabana()).rejects.toThrow('No pudimos traer los calendarios.')
+    panel.calendarios.mockRejectedValue(new Error('Failed to fetch'))
+    await expect(conCabana()).rejects.toThrow('Failed to fetch')
+  })
+
+  it('trae cuántas noches bloquea cada calendario, contadas por el servidor', async () => {
+    panel.calendarios.mockResolvedValue([{ ...deLaApi, noches: 9 }])
+    const { datos } = await conCabana()
+    expect(datos.negocio.calendariosExternos[0].noches).toBe(9)
   })
 
   it('conectar manda el enlace a la API y recarga; desconectar y sincronizar, lo mismo', async () => {
@@ -194,6 +208,7 @@ describe('calendarios de Airbnb en el panel real', () => {
     expect(panel.conectarCalendario).toHaveBeenCalledWith({ modulo: 'ALQUILERES', recursoId: 'p1', nombre: 'Airbnb', url: deLaApi.url })
     await e.quitarCalendario('estadia', 'cal-1')
     expect(panel.desconectarCalendario).toHaveBeenCalledWith('cal-1')
+    panel.sincronizarCalendario.mockResolvedValue(deLaApi)
     await e.sincronizarCalendario('estadia', 'cal-1')
     expect(panel.sincronizarCalendario).toHaveBeenCalledWith('cal-1')
     expect(recargar).toHaveBeenCalledTimes(3)
@@ -202,8 +217,18 @@ describe('calendarios de Airbnb en el panel real', () => {
   it('si quedó conectado pero Airbnb no dejó bajarlo, no se festeja: se avisa con el motivo, y el calendario queda a la vista', async () => {
     const { e, recargar } = await conCabana()
     panel.conectarCalendario.mockResolvedValue({ ...deLaApi, ultimaSync: '2026-11-23T13:10:00.000Z', ultimoError: 'Airbnb respondió 403.' })
-    await expect(e.agregarCalendario('estadia', { id: 'tmp', unidadId: 'p1', nombre: 'Airbnb', url: deLaApi.url, ultimaSync: '2026-11-23' }, []))
-      .rejects.toThrow('Quedó conectado, pero todavía no se pudo bajar: Airbnb respondió 403.')
+    const intento = e.agregarCalendario('estadia', { id: 'tmp', unidadId: 'p1', nombre: 'Airbnb', url: deLaApi.url, ultimaSync: '2026-11-23' }, [])
+    await expect(intento).rejects.toBeInstanceOf(HechoConAviso)
+    await expect(intento).rejects.toMatchObject({ titulo: 'Quedó conectado, pero todavía no se pudo bajar', message: 'Airbnb respondió 403. Probá con “Sincronizar ahora” en un rato.' })
+    expect(recargar).toHaveBeenCalledTimes(1)
+  })
+
+  it('sincronizar ahora y que Airbnb no deje bajarlo no es "Calendario sincronizado": se dice el motivo, con lo nuevo ya a la vista', async () => {
+    const { e, recargar } = await conCabana()
+    panel.sincronizarCalendario.mockResolvedValue({ ...deLaApi, ultimoError: 'Airbnb respondió 404.' })
+    const intento = e.sincronizarCalendario('estadia', 'cal-1')
+    await expect(intento).rejects.toBeInstanceOf(HechoConAviso)
+    await expect(intento).rejects.toMatchObject({ titulo: 'No se pudo bajar el calendario', message: 'Airbnb respondió 404. Lo que ya estaba bloqueado sigue bloqueado.' })
     expect(recargar).toHaveBeenCalledTimes(1)
   })
 

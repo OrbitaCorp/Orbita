@@ -220,8 +220,11 @@ export interface CalendarioExterno {
   id: string
   recursoId: string
   nombre: string
+  /** El enlace sin su clave (`?s=…`): sirve para reconocerlo, no para bajarlo. */
   url: string
   activo: boolean
+  /** Las noches que tiene bloqueadas de acá en adelante. Una API anterior no lo manda. */
+  noches?: number
   /** Cuándo se intentó bajar por última vez (instante ISO); null si nunca. */
   ultimaSync: string | null
   /** Por qué falló la última vez, listo para mostrar; null si salió bien. */

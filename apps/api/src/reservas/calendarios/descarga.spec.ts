@@ -60,9 +60,33 @@ describe('reservas · bajar el calendario', () => {
     expect(fetchFalso).not.toHaveBeenCalled();
   });
 
-  it('no sigue redirecciones: una redirección no es el calendario', async () => {
-    const r = await con(() => new Response(null, { status: 302, headers: { location: 'https://www.airbnb.com/login' } })).bajar();
-    expect(r).toEqual({ ok: false, motivo: 'Airbnb no respondió con el calendario. Volvé a copiar el enlace desde Airbnb.' });
+  it('una redirección a otra cosa (el login, por ejemplo) no es el calendario, y no se sigue', async () => {
+    const { fetchFalso, bajar } = con(() => new Response(null, { status: 302, headers: { location: 'https://www.airbnb.com/login' } }));
+    expect(await bajar()).toEqual({ ok: false, motivo: 'Airbnb no respondió con el calendario. Volvé a copiar el enlace desde Airbnb.' });
+    expect(fetchFalso).toHaveBeenCalledTimes(1);
+  });
+
+  it('si Airbnb manda el calendario a otro de sus dominios (del país al .com), se sigue una vez, con las mismas reglas', async () => {
+    const otra = 'https://www.airbnb.com/calendar/ical/123.ics?s=abc';
+    const { fetchFalso, bajar } = con(() => (fetchFalso.mock.calls.length === 1 ? new Response(null, { status: 301, headers: { location: otra } }) : new Response(ICS, { status: 200 })));
+    expect(await bajar()).toEqual({ ok: true, texto: ICS });
+    expect(fetchFalso.mock.calls.map((c) => (c as unknown as [string])[0])).toEqual([BUENA, otra]);
+    expect((fetchFalso.mock.calls[1] as unknown as [string, RequestInit])[1].redirect).toBe('manual');
+  });
+
+  it('una redirección relativa al mismo dominio también vale si sigue siendo un .ics', async () => {
+    const { fetchFalso, bajar } = con(() => (fetchFalso.mock.calls.length === 1 ? new Response(null, { status: 302, headers: { location: '/calendar/ical/456.ics?s=abc' } }) : new Response(ICS, { status: 200 })));
+    expect(await bajar()).toEqual({ ok: true, texto: ICS });
+    expect(new URL((fetchFalso.mock.calls[1] as unknown as [string])[0]).pathname).toBe('/calendar/ical/456.ics');
+  });
+
+  it('nunca se sigue una redirección hacia afuera de Airbnb, ni una segunda redirección', async () => {
+    const afuera = con(() => new Response(null, { status: 302, headers: { location: 'https://169.254.169.254/latest/meta.ics' } }));
+    expect(await afuera.bajar()).toMatchObject({ ok: false });
+    expect(afuera.fetchFalso).toHaveBeenCalledTimes(1);
+    const enCadena = con(() => new Response(null, { status: 302, headers: { location: 'https://www.airbnb.com/calendar/ical/123.ics?s=abc' } }));
+    expect(await enCadena.bajar()).toEqual({ ok: false, motivo: 'Airbnb no respondió con el calendario. Volvé a copiar el enlace desde Airbnb.' });
+    expect(enCadena.fetchFalso).toHaveBeenCalledTimes(2);
   });
 
   it('una página HTML o un archivo sin BEGIN:VCALENDAR no es un calendario', async () => {

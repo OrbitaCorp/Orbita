@@ -5,8 +5,10 @@
 //   campo sería una forma de hacer que el servidor le pida cosas a la red
 //   interna o a quien sea.
 // - Solo https, sin usuario ni puerto, y la ruta termina en .ics.
-// - Sin seguir redirecciones: si Airbnb redirige (al login, por ejemplo), eso
-//   no es el calendario.
+// - Las redirecciones no se siguen solas: si Airbnb redirige al login, eso no
+//   es el calendario. La única que se sigue, y una sola vez, es la que lleva a
+//   otro calendario de Airbnb (pasa cuando el dominio de un país manda al
+//   .com): el destino tiene que cumplir las mismas reglas que el enlace.
 // - Con tiempo y tamaño máximos.
 //
 // Nunca tira: devuelve el texto o el motivo, ya en castellano para mostrar.
@@ -66,13 +68,58 @@ async function leerHasta(res: Response, maximo: number): Promise<string | null> 
   return Buffer.concat(partes).toString('utf8');
 }
 
+/** A dónde manda una redirección, resuelta contra el enlace pedido (puede venir relativa); null si no se entiende. */
+function destinoDe(location: string | null, base: string): string | null {
+  if (!location) return null;
+  try {
+    return new URL(location, base).toString();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * El mismo calendario con otro dominio de Airbnb (airbnb.com y airbnb.com.ar
+ * sirven el mismo aviso) tiene la misma ruta y la misma clave: eso es lo que
+ * lo identifica. null si no es una dirección.
+ */
+export function claveDelCalendario(url: string): string | null {
+  try {
+    const u = new URL(url.trim());
+    return `${u.pathname}${u.search}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * El enlace como se le muestra al panel: sin la clave (`?s=…`), que es lo que
+ * deja leer el calendario del aviso. Alcanza para reconocer cuál es.
+ */
+export function urlSinClave(url: string): string {
+  try {
+    const u = new URL(url.trim());
+    return `${u.origin}${u.pathname}`;
+  } catch {
+    return '';
+  }
+}
+
 export async function descargarCalendario(url: string, deps: { fetch?: typeof fetch; env?: NodeJS.ProcessEnv } = {}): Promise<Descarga> {
   const error = errorDeUrl(url, deps.env);
   if (error) return { ok: false, motivo: error };
   const pedir = deps.fetch ?? fetch;
+  // El tiempo máximo es uno solo, para el enlace y para su redirección si la hay.
+  const opciones: RequestInit = { redirect: 'manual', signal: AbortSignal.timeout(ESPERA_MS), headers: { accept: 'text/calendar, text/plain;q=0.9, */*;q=0.1' } };
+  const esRedireccion = (r: Response) => r.status >= 300 && r.status < 400;
   try {
-    const res = await pedir(url.trim(), { redirect: 'manual', signal: AbortSignal.timeout(ESPERA_MS), headers: { accept: 'text/calendar, text/plain;q=0.9, */*;q=0.1' } });
-    if (res.status >= 300 && res.status < 400) return { ok: false, motivo: NO_ES_EL_CALENDARIO };
+    let res = await pedir(url.trim(), opciones);
+    if (esRedireccion(res)) {
+      const destino = destinoDe(res.headers.get('location'), url.trim());
+      if (!destino || errorDeUrl(destino, deps.env)) return { ok: false, motivo: NO_ES_EL_CALENDARIO };
+      res = await pedir(destino, opciones);
+    }
+    if (esRedireccion(res)) return { ok: false, motivo: NO_ES_EL_CALENDARIO };
     if (!res.ok) return { ok: false, motivo: `Airbnb respondió ${res.status}.` };
     const texto = await leerHasta(res, MAXIMO_BYTES);
     if (texto === null) return { ok: false, motivo: 'El calendario es demasiado grande.' };
