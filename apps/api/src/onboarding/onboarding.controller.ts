@@ -8,6 +8,7 @@ import { assertMemberContext } from '../common/utils/assert-member-context';
 import { OnboardingService } from './onboarding.service';
 import { RegisterBusinessDto } from './dto/register-business.dto';
 import { UpdateOnboardingBusinessDto } from './dto/update-onboarding-business.dto';
+import { AltaTurnosDto } from './dto/alta-turnos.dto';
 
 // El alta de verdad pasa por el pago: POST /subscription/checkout guarda los
 // datos y SubscriptionsService.confirmAndCreate crea la cuenta recién cuando
@@ -68,5 +69,17 @@ export class OnboardingController {
   updateDraft(@CurrentBusiness() ctx: AuthContext, @Body() dto: UpdateOnboardingBusinessDto) {
     const member = assertMemberContext(ctx);
     return this.onboardingService.updateDraft(member.businessId, dto);
+  }
+
+  // La agenda inicial de un negocio de Turnos, para el atajo de desarrollo del
+  // alta (completeOnboarding en el frontend, el mismo que usa register-business):
+  // el alta de verdad la siembra confirmAndCreate() con el wizard del checkout.
+  // Solo el dueño, y una sola vez por negocio (sembrarTurnos no pisa nada).
+  @Post('turnos')
+  @Roles('owner')
+  sembrarTurnos(@CurrentBusiness() ctx: AuthContext, @Body() dto: AltaTurnosDto) {
+    if (!registroDirectoHabilitado()) throw new NotFoundException();
+    const member = assertMemberContext(ctx);
+    return this.onboardingService.sembrarTurnos(member.businessId, member.memberId, dto);
   }
 }

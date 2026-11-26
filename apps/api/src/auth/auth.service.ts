@@ -1325,7 +1325,9 @@ export class AuthService implements OnModuleInit {
         // `industry` (el rubro del onboarding) viaja solo acá — /me es lo que
         // rearma la sesión del panel en cada carga, y el rubro se usa para
         // adaptar la UI (ej: los motivos de devolución según qué se vende).
-        business: { id: member.business.id, name: member.business.name, subdomain: member.business.subdomain, mode: member.business.mode, industry: member.business.industry },
+        // `subrubros`: con el rubro principal, dice a qué panel va /panel (Turnos: industry
+        // "turnos" y su rubro, barberia…, en subrubros; ver lib/reservas/destinoPanel.ts).
+        business: { id: member.business.id, name: member.business.name, subdomain: member.business.subdomain, mode: member.business.mode, industry: member.business.industry, subrubros: member.business.subrubros },
       };
     }
 

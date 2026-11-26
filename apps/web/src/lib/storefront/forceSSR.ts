@@ -373,8 +373,8 @@ export function soloTurnos(base: GetServerSideProps): GetServerSideProps {
   return async (ctx) => {
     const res = await base(ctx)
     if (!('props' in res)) return res
-    const props = (await res.props) as { __industry?: string | null; __storeMeta?: StoreMetaSSR | null }
-    if (props.__storeMeta && !esDeTurnos(props.__industry)) return { notFound: true }
+    const props = (await res.props) as { __industry?: string | null; __subrubros?: string[] | null; __storeMeta?: StoreMetaSSR | null }
+    if (props.__storeMeta && !esDeTurnos(props.__industry, props.__subrubros)) return { notFound: true }
     return res
   }
 }

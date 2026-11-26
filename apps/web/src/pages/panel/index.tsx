@@ -35,7 +35,7 @@ function PanelHome() {
     // (ver lib/tenant.ts#adminPath). La query viaja entera (ej: ?tutorial=
     // para forzar una variante del tutorial — ver tutoriales/estado.ts).
     // Un negocio de Alquileres va a su propio panel (lib/reservas/destinoPanel); el resto, como siempre.
-    window.location.href = destinoDelPanel(user.business.industry, window.location.search)
+    window.location.href = destinoDelPanel(user.business.industry, window.location.search, user.business.subrubros)
   }, [user])
 
   return <PageLoader visible message="Entrando al panel…" />

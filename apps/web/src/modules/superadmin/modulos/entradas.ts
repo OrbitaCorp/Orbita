@@ -175,6 +175,8 @@ const F18 = '2026-11-18'
 const F23 = '2026-11-23'
 const F24 = '2026-11-24'
 const F25 = '2026-11-25'
+// Jueves 26/11: el alta real de Turnos.
+const F26 = '2026-11-26'
 
 export const ENTRADAS: Entrada[] = [
   // ─── Transversal · la sección Módulos ───────────────────────────────────────
@@ -4250,6 +4252,47 @@ Esa prueba mostró dos cosas más, y con ellas se corrigió todo lo que la revis
       'apps/web/src/modules/alquileres/datos/origen/api.ts:1',
       'apps/web/src/modules/alquileres/datos/origen/aviso.ts:1',
       'apps/web/src/modules/alquileres/datos/origen/mapear.ts:1',
+    ],
+  }),
+  entrada({
+    modulo: 'turnos', fecha: F26, slug: 'alta-real', tipo: 'tarea', quien: 'Mateo',
+    titulo: 'El alta real de Turnos crea el negocio con su agenda armada',
+    foco: 'El alta de Turnos crea el negocio de verdad por el mismo camino que una tienda: plan y pago (o un código del 100%) y confirmAndCreate. El negocio nace con su config de reservas (horario y seña), la agenda del dueño (o el primer espacio) y los servicios que cargó, y /panel lo lleva a su panel de Turnos. Para el público sigue en "Próximamente" hasta que el sitio esté entero: se prende con NEXT_PUBLIC_ALTA_TURNOS=true.',
+    que: `Tarea del 30/11 del plan, hecha el 26/11.
+
+**El mismo camino que Tienda.** El alta real ya no se queda en la demo: al terminar "Tu cuenta" pasa al wizard y a la pantalla de plan y pago de siempre (\`/onboarding/plan\`), con \`rubro: "turnos"\` y el rubro de Turnos en \`subrubros\` (\`["barberia"]\`), como se decidió el 15/11. Lo propio de Turnos viaja en \`wizard.turnos\` (\`altaTurnos.ts\`): el horario de "Tu negocio" en la forma del motor (0 = domingo), la seña, la primera agenda y los servicios (sin ninguno cargado, los típicos del rubro). Los planes y los precios son los mismos de Tienda, y se manejan desde el superadmin como siempre. Los precios propios de Turnos se definen cuando esté el modelo de negocio.
+
+**Lo que crea la API** (\`OnboardingService.sembrarTurnos\`, en una transacción):
+
+- **La config de reservas de Turnos,** con el horario y la seña del alta. El resto de las reglas, con los valores de fábrica. Sin esta config el motor contesta 404 en todo el módulo.
+- **La primera agenda:** la del dueño (PROFESIONAL, con su memberId y \`rolId: "dueno"\`, como la arma Equipo) o, en los rubros por sala, el primer espacio.
+- **Los servicios,** en el orden del alta y en todas las agendas.
+
+Se hace una sola vez: si el negocio ya tiene config de Turnos, no se toca nada, así un reintento del pago no duplica. La llama \`confirmAndCreate()\` (el alta paga y la del código del 100%) y \`POST /onboarding/turnos\` (el atajo de desarrollo, apagado en producción como \`register-business\`). De paso se arregló el log de \`confirmAndCreate\`, que nombraba mal la tarea que fallaba cuando el negocio no tiene local.
+
+**El panel en producción.** \`/panel\` lleva a un negocio de Turnos a \`/panel/turnos\` (\`destinoDelPanel\`), que ahora es ruta de producción: el rubro es el del negocio y no el \`?rubro=\` de la demo, el nombre es el suyo, y un negocio que no es de Turnos vuelve a su panel. Para eso \`GET /auth/me\` trae los \`subrubros\`. Un negocio de Turnos es el de rubro "turnos" con un rubro de Turnos en subrubros, igual que Gimnasio: "turnos" escrito a mano como rubro de una tienda no la cambia de panel.
+
+**Probado:**
+
+- **Unitarios:** 4 de la API (lo que se crea, el espacio sin dueño, el reintento que no duplica y el horario inválido) y 3 del alta (el horario, la seña, la agenda y los servicios que viajan), más el ruteo de /panel y la lista de rubros copiada.
+- **Contra la API local y la base de dev, por el camino real:** el checkout con un código del 100% de prueba y la confirmación crearon el negocio (psicología, sin seña, tres días) con su config, la agenda "Lic. Sosa" y su servicio, y el sitio público ya los lista. \`/auth/me\` devuelve \`industry: "turnos"\` y \`subrubros: ["psico"]\`. Un \`wizard.turnos\` inválido da 400 en el checkout.
+
+**Lo que queda:**
+
+- **El sitio público del negocio** (portada y reserva en \`<slug>.orbita.site\`): la portada usa las rutas y los datos de la demo. Va con la tarea de sacar lo que quedó de la demo. Hasta entonces el alta de Turnos sigue en "Próximamente" para el público.
+- **La forma del sitio, la cuenta del cliente y las zonas** que pide el alta todavía no se guardan: el sitio real no las lee.
+- **Los precios propios de Turnos** en el superadmin, cuando esté el modelo de negocio.`,
+    archivos: [
+      'apps/web/src/modules/onboarding/alta/altaTurnos.ts:17',
+      'apps/web/src/modules/onboarding/alta/Alta.tsx:366',
+      'apps/web/src/modules/onboarding/alta/modelo.ts:71',
+      'apps/api/src/onboarding/onboarding.service.ts:476',
+      'apps/api/src/onboarding/dto/alta-turnos.dto.ts:41',
+      'apps/api/src/subscriptions/subscriptions.service.ts:1017',
+      'apps/web/src/lib/reservas/destinoPanel.ts:33',
+      'apps/web/src/pages/panel/turnos.tsx:30',
+      'apps/api/test/unit/onboarding-alta-turnos.unit-spec.ts:27',
+      'apps/web/src/modules/onboarding/alta/__tests__/altaTurnos.test.ts:11',
     ],
   }),
 ]

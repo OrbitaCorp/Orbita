@@ -15,6 +15,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { RegisterBusinessDto } from '../../onboarding/dto/register-business.dto';
+import { AltaTurnosDto } from '../../onboarding/dto/alta-turnos.dto';
 import { EsSubdominio } from '../../common/utils/subdominio';
 
 // Datos del wizard de onboarding (ver WizardData en apps/web/src/lib/api.ts),
@@ -63,6 +64,9 @@ export class PendingWizardDto {
   @IsString()
   @Matches(/^data:image\/[a-z0-9.+-]{1,40};base64,/, { message: 'El logo tiene que ser una imagen' })
   logoDataUrl?: string;
+  // Solo el alta de Turnos (rubro "turnos"): horario, seña, primera agenda y
+  // servicios, que confirmAndCreate() siembra con OnboardingService.sembrarTurnos().
+  @IsOptional() @ValidateNested() @Type(() => AltaTurnosDto) turnos?: AltaTurnosDto;
 }
 
 export class StartPendingCheckoutDto {

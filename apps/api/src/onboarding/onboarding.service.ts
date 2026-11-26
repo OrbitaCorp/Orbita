@@ -12,6 +12,8 @@ import { AuthService } from '../auth/auth.service';
 import { MailService } from '../mail/mail.service';
 import { RegisterBusinessDto } from './dto/register-business.dto';
 import { UpdateOnboardingBusinessDto } from './dto/update-onboarding-business.dto';
+import { AltaTurnosDto } from './dto/alta-turnos.dto';
+import { errorDeHorario } from '../reservas/dominio/horario';
 import { motivoSubdominioInvalido } from '../common/utils/subdominio';
 import { PERMISSIONS } from '../common/permisos/catalogo';
 import * as argon2 from 'argon2';
@@ -456,5 +458,44 @@ export class OnboardingService {
       candidate = `${base}-${suffix}`;
     }
     throw new BadRequestException('No se pudo generar un subdominio único, intentá con otro nombre de negocio');
+  }
+
+  // ── Alta de Turnos ───────────────────────────────────────────────────────
+  // El negocio de Turnos nace por el mismo camino que una tienda (checkout →
+  // confirmAndCreate, o el atajo de desarrollo) y acá recibe lo que el alta
+  // dejó armado: la config de reservas (horario y seña), su primera agenda y
+  // sus servicios. Es lo que hace andar el panel de Turnos y el sitio: sin
+  // ReservaConfig de TURNOS, el motor contesta 404 en todo el módulo.
+  //
+  // La agenda PROFESIONAL es la del dueño (memberId y rolId "dueno", como la
+  // arma el panel en Equipo); en los rubros por sala es el primer espacio.
+  // Los servicios no llevan recursoIds: se dan en todas las agendas.
+  //
+  // Una sola vez: si el negocio ya tiene config de Turnos no se toca nada, así
+  // un reintento (el webhook y la vuelta del pago casi juntos) no duplica.
+  async sembrarTurnos(businessId: string, ownerMemberId: string, dto: AltaTurnosDto): Promise<{ creado: boolean }> {
+    const error = errorDeHorario(dto.horario);
+    if (error) throw new BadRequestException(error);
+    return this.prisma.$transaction(async (tx) => {
+      const ya = await tx.reservaConfig.findUnique({ where: { businessId_modulo: { businessId, modulo: 'TURNOS' } } });
+      if (ya) return { creado: false };
+      await tx.reservaConfig.create({
+        data: { businessId, modulo: 'TURNOS', activo: true, horario: dto.horario as Prisma.InputJsonValue, senaPorcentaje: dto.senaPorcentaje },
+      });
+      const persona = dto.agenda.tipo === 'PROFESIONAL';
+      await tx.reservaRecurso.create({
+        data: {
+          businessId, modulo: 'TURNOS', tipo: dto.agenda.tipo, nombre: dto.agenda.nombre.trim(), cupo: 1, orden: 0,
+          datos: { rol: dto.agenda.rol, color: dto.agenda.color, ...(persona ? { rolId: 'dueno' } : {}) },
+          ...(persona ? { memberId: ownerMemberId } : {}),
+        },
+      });
+      await tx.reservaServicio.createMany({
+        data: dto.servicios.map((s, orden) => ({
+          businessId, modulo: 'TURNOS' as const, nombre: s.nombre.trim(), duracionMinutos: s.duracionMinutos, precio: s.precio, orden,
+        })),
+      });
+      return { creado: true };
+    });
   }
 }
