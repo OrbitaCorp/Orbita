@@ -2,8 +2,8 @@
 //
 // Todo sale de lo que ya dice la web de Órbita: las preguntas frecuentes de la portada (Cierre.tsx), las prestaciones
 // de los planes (planesDatos.ts) y los precios vigentes de la API. Un test (instagram-ventas.unit-spec.ts) compara las
-// preguntas frecuentes con la web: si cambian allá, este archivo tiene que cambiar también, porque es lo único que la IA
-// sabe de Órbita.
+// preguntas frecuentes con la web: si cambian allá, este archivo tiene que cambiar también. Además, la IA conoce la
+// lista completa de funcionalidades con su plan (funcionalidades.ts).
 //
 // Límites de Instagram (verificados en la documentación de Meta, 24/11/2026):
 // - respuestas rápidas: hasta 13, título de hasta 20 caracteres;
@@ -12,6 +12,8 @@
 // - texto: hasta 1000 bytes.
 // Las tarjetas, los botones y las preguntas frecuentes NO se ven desde la computadora: cada mensaje lleva en el texto
 // lo necesario para seguir sin ellos.
+
+import { funcionalidadesParaPrompt } from './funcionalidades';
 
 export const OPCION = {
   COMO: 'ORB_COMO',
@@ -286,6 +288,9 @@ export function promptDeVentas(e: Enlaces, p: Precios): string {
     '',
     'Preguntas frecuentes:',
     ...PREGUNTAS_DE_LA_WEB.map((x) => `- ${x.q} ${x.a}`),
+    '',
+    'Todas las funcionalidades, por área. Entre corchetes, en qué plan están: Base va incluido en cualquier plan; Avanzado es el paquete Avanzado, que se suma a la suscripción (cuando preguntan por algo Avanzado, aclaralo); "en acceso anticipado" se pide desde el panel y se habilita cuenta por cuenta.',
+    ...funcionalidadesParaPrompt(),
   ].join('\n');
 }
 

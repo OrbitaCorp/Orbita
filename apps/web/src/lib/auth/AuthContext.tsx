@@ -20,6 +20,9 @@ export interface Business {
   // login puede faltar, por eso es opcional. Se usa para adaptar la UI al
   // rubro (ej: motivos de devolución según qué se vende).
   industry?: string
+  // Los subrubros del alta (Tienda: indumentaria…; Turnos: el rubro, barberia…).
+  // Igual que `industry`, solo en GET /auth/me. Con él /panel sabe a qué panel ir.
+  subrubros?: string[]
 }
 
 export type AuthUser =

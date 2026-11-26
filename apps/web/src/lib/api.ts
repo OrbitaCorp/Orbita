@@ -181,6 +181,19 @@ export type WizardData = {
   // de la persistencia en localStorage (puede pesar varios MB en base64).
   // Se sube recién si el pago se aprueba, ver plan.tsx.
   logoDataUrl: string
+  // Solo el alta de Turnos (rubro "turnos"): la agenda con la que nace el
+  // negocio. La API la siembra al crearlo (ver altaTurnos.ts).
+  turnos?: AltaTurnos
+}
+
+/** Lo que el alta de Turnos le deja a la API: ver modules/onboarding/alta/altaTurnos.ts. */
+export interface AltaTurnos {
+  rubro: string
+  /** Como ReservaConfig.horario: { "0".."6": [[desde, hasta]] } en minutos, 0 = domingo. */
+  horario: Record<string, [number, number][]>
+  senaPorcentaje: number
+  agenda: { tipo: 'PROFESIONAL' | 'ESPACIO'; nombre: string; rol: string; color: string }
+  servicios: { nombre: string; duracionMinutos: number; precio: number }[]
 }
 
 // Crea la cuenta + el negocio recién cuando el pago se aprobó, y de
@@ -227,6 +240,10 @@ export async function completeOnboarding(
     }))
   }
   await Promise.all(tareas)
+  // Turnos: la agenda del alta, igual que la siembra el alta paga (confirmAndCreate).
+  if (wizard.rubro === 'turnos' && wizard.turnos) {
+    await request('/onboarding/turnos', { method: 'POST', body: JSON.stringify(wizard.turnos) })
+  }
 
   return result
 }
@@ -424,6 +441,7 @@ export function startPendingCheckout(
         // pagos/transferAlias/teamSize ya no se piden en el wizard: el DTO los
         // tiene opcionales y el backend aplica sus defaults al crear la config.
         logoDataUrl: wizard.logoDataUrl || undefined,
+        ...(wizard.rubro === 'turnos' && wizard.turnos ? { turnos: wizard.turnos } : {}),
       },
     }),
   })

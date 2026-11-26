@@ -159,7 +159,7 @@ const TURNOS = plan('turnos', 'Turnos', 'Mateo',
     documentada(t('2026-11-26', 'Mateo', 'Sitio: /mi-turno/<token> con cancelar y reprogramar según la política del negocio', 'El enlace del email abre la reserva; cancelar fuera de plazo se rechaza con el mensaje de la API'), 'auditoria.turnos.2026-11-25-mi-turno'),
     documentada(t('2026-11-27', 'Mateo', 'Sitio: la seña (monto y si se devuelve) y los emails de confirmación y cancelación revisados', 'Los emails llegan en STUB con los datos correctos; el aviso de seña dice lo mismo que la config'), 'auditoria.turnos.2026-11-25-sena-y-emails'),
     // Semana 5 · alta real, Mis turnos y Resumen
-    t('2026-11-30', 'Mateo', 'El alta real de Turnos crea el negocio con su ReservaConfig y sus profesionales', 'Un alta de prueba en dev termina con la config y los recursos creados por la API'),
+    documentada(t('2026-11-30', 'Mateo', 'El alta real de Turnos crea el negocio con su ReservaConfig y sus profesionales', 'Un alta de prueba en dev termina con la config y los recursos creados por la API'), 'auditoria.turnos.2026-11-26-alta-real'),
     t('2026-12-01', 'Mateo', 'Mis turnos del cliente con sesión (reservas vinculadas a la cuenta)', 'Un cliente logueado ve sus turnos futuros y pasados'),
     t('2026-12-02', 'Mateo', 'Resumen del panel (hoy, semana, ocupación) sobre GET /reservas/resumen', 'Los indicadores del Resumen salen de la API y coinciden con la agenda'),
     t('2026-12-03', 'Mateo', 'Sacar lo que quedó de la demo en las secciones conectadas (datos del navegador, cálculos locales)', 'localStorage solo en la demo de modules/turnos; typecheck y eslint en cero'),

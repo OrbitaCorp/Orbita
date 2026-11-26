@@ -44,7 +44,7 @@ import { SkeletonVista, useCargaSimulada, type FormaSkeleton } from '@/design-sy
 import { temaDe } from '@/modules/turnos/storefront/tema'
 import { useRubroDemo } from '@/modules/turnos/demo/BarraDemo'
 import { useNegocioDemo } from '@/modules/turnos/datos/negocio'
-import { ESTADO_TURNO, semanaDe, tramosDeRecurso, esSalud, horaTxt, duracionTxt, pesos, type EstadoTurno, type Turno, type Cliente, type Recurso, type RubroTurnos } from '@/modules/turnos/datos'
+import { ESTADO_TURNO, rubroPorKey, semanaDe, tramosDeRecurso, esSalud, horaTxt, duracionTxt, pesos, type EstadoTurno, type Turno, type Cliente, type Recurso, type RubroTurnos } from '@/modules/turnos/datos'
 import { AHORA, HOY_DIA, extremos, fijarReloj, tramosDelDia, type Semana, type Tramo } from '@/modules/turnos/horario'
 import ResumenDia from './KPIs'
 import ListaEspera from './ListaEspera'
@@ -94,18 +94,23 @@ const FORMAS: Record<Vista, FormaSkeleton> = {
 }
 const esVista = (v: string): v is Vista => v in FORMAS
 
-export default function PanelTurnos() {
-  const [rubro] = useRubroDemo()
+/** El negocio real del panel (pages/panel/turnos.tsx): su rubro de Turnos (Business.subrubros) y su nombre. */
+export interface NegocioReal { rubro: string; nombre: string }
+
+export default function PanelTurnos({ real }: { real?: NegocioReal }) {
+  const [demo] = useRubroDemo()
+  // Un negocio real es de su rubro, no del ?rubro= de la demo.
+  const rubro = useMemo(() => (real ? rubroPorKey(real.rubro) : demo), [real, demo])
   // key: cada rubro arranca con sus propios datos de ejemplo, sin arrastrar lo
   // que se cargó en otro. Y si para este rubro se hizo el alta, el panel se arma
   // de nuevo con ese negocio (nombre, servicios, horarios) en lugar del de muestra.
-  return <PanelDeRubro key={rubro.alta ? `${rubro.key}:alta` : rubro.key} rubro={rubro} />
+  return <PanelDeRubro key={rubro.alta ? `${rubro.key}:alta` : rubro.key} rubro={rubro} real={real} />
 }
 
-function PanelDeRubro({ rubro: rubroBase }: { rubro: RubroTurnos }) {
+function PanelDeRubro({ rubro: rubroBase, real }: { rubro: RubroTurnos; real?: NegocioReal }) {
   const router = useRouter()
-  // Mismo nombre que muestra el sitio público de ese rubro.
-  const negocio = temaDe(rubroBase).nombre
+  // Mismo nombre que muestra el sitio público de ese rubro; el de un negocio real, el suyo.
+  const negocio = real?.nombre || temaDe(rubroBase).nombre
   const { demo, guardar: guardarDemo } = useNegocioDemo()
   // De dónde salen los datos: la demo por defecto, la API en el panel de un negocio real.
   const origen = useOrigenTurnos()
@@ -371,7 +376,8 @@ function PanelDeRubro({ rubro: rubroBase }: { rubro: RubroTurnos }) {
     const pila = c.nombre.split(' ')[0]
     const d = t.dia ?? 0
     const cuando = `${d === 0 ? 'hoy' : d === 1 ? 'mañana' : d === -1 ? 'ayer' : `el ${fechaLarga(d).toLowerCase()}`} a las ${horaTxt(t.inicio)}`
-    const reservar = `${window.location.origin}/turnos-demo/reserva?rubro=${encodeURIComponent(rubro.key)}`
+    // En un negocio real, la reserva de su sitio (<slug>.orbita.site/reserva).
+    const reservar = real ? `${window.location.origin}/reserva` : `${window.location.origin}/turnos-demo/reserva?rubro=${encodeURIComponent(rubro.key)}`
     const textos: Record<EstadoTurno, string> = {
       pendiente: `¡Hola ${pila}! Te escribimos de ${negocio}. Tenés un turno de ${t.servicio} ${cuando}. ¿Nos confirmás que venís?`,
       confirmado: `¡Hola ${pila}! Te recordamos tu turno de ${t.servicio} ${cuando} en ${negocio}. Si no podés venir, avisanos así le damos el lugar a otra persona.`,
@@ -644,7 +650,7 @@ function PanelDeRubro({ rubro: rubroBase }: { rubro: RubroTurnos }) {
       activo={vista}
       tab={vista === 'configuracion' ? tab : undefined}
       onIr={ir}
-      sitio={`/turnos-demo/negocio?rubro=${encodeURIComponent(rubro.key)}`}
+      sitio={real ? '/' : `/turnos-demo/negocio?rubro=${encodeURIComponent(rubro.key)}`}
       avisos={avisos}
       busqueda={busqueda}
       buscar="Buscar turno o cliente"

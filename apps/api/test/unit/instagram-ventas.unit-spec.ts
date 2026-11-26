@@ -6,6 +6,7 @@ import {
   BIENVENIDA, OFRECE_DEMO, SALUDO, esPedidoDeInfo, esSaludo, esSi, tienePalabraClave, type Opcion,
 } from '../../src/marketing/instagram-ventas/contenido';
 import { InstagramVentasService, opcionDe } from '../../src/marketing/instagram-ventas/instagram-ventas.service';
+import { FUNCIONALIDADES, funcionalidadesParaPrompt } from '../../src/marketing/instagram-ventas/funcionalidades';
 
 const enlaces = enlacesDe('https://orbita.site');
 const precios = { base: 16500, avanzado: 21700, campania: null };
@@ -84,6 +85,18 @@ describe('bot de ventas de Instagram: contenido', () => {
     const prompt = promptDeVentas(enlaces, precios);
     expect(prompt).toContain('[DERIVAR]');
     expect(prompt).toContain('$16.500');
+  });
+
+  it('la IA conoce todas las funcionalidades con su plan, sin precios escritos a mano', () => {
+    const prompt = promptDeVentas(enlaces, precios);
+    expect(prompt).toContain('Orbi atiende tu WhatsApp');
+    expect(prompt).toContain('Orbi atiende tu Instagram');
+    expect(prompt).toMatch(/Juegos con premio:.*\[Avanzado\]/);
+    expect(FUNCIONALIDADES.reduce((n, a) => n + a.items.length, 0)).toBeGreaterThanOrEqual(115);
+    // Los precios salen de la API: la lista de funcionalidades no tiene montos.
+    expect(funcionalidadesParaPrompt().join('\n')).not.toMatch(/\$\s?\d/);
+    // Que entre holgado en el contexto de los modelos de la cadena (Workers AI, Groq, Gemini).
+    expect(prompt.length).toBeLessThan(30_000);
   });
 
   it('palabras clave: palabras enteras, sin importar acentos ni mayúsculas', () => {

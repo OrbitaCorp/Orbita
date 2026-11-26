@@ -2,7 +2,8 @@
 // principal del negocio (Business.industry: llega en la sesión por GET
 // /auth/me y en la config pública del sitio). Tienda va a su panel y muestra
 // su tienda, como siempre; Alquileres, a su panel (pages/panel/alquileres.tsx)
-// y a su sitio de reservas; Gimnasio muestra su sitio de clases (su panel
+// y a su sitio de reservas; Turnos, a su panel (pages/panel/turnos.tsx; su sitio
+// todavía no tiene ruta de producción salvo /mi-turno); Gimnasio muestra su sitio de clases (su panel
 // todavía no tiene ruta de producción: sigue yendo al de siempre). Sin rubro,
 // o con cualquier otro, no cambia nada: es el camino de Tienda.
 //
@@ -14,8 +15,27 @@ type Rubro = string | undefined | null
 type Subrubros = readonly string[] | undefined | null
 
 export const esDeAlquileres = (industry: Rubro): boolean => industry === 'alquileres'
-/** Un negocio de Turnos: el rubro principal va en `industry` (decisión de Turnos del 15/11). */
-export const esDeTurnos = (industry: Rubro): boolean => industry === 'turnos'
+/**
+ * Las claves de rubro de Turnos (RUBROS_TURNOS, en modules/turnos/datos), copiadas
+ * por lo mismo que las de Gimnasio; un test de Turnos cuida que sean las mismas.
+ */
+export const RUBROS_DE_TURNOS: readonly string[] = [
+  'barberia', 'peluqueria', 'estilista', 'maquillaje', 'estetica', 'unas', 'pestanas', 'depilacion', 'spa', 'tatuajes', 'consulta', 'centro-medico',
+  'clinica', 'odonto', 'medicina-estetica', 'kinesio', 'psico', 'nutricion', 'podologia', 'fono', 'medicina-alternativa', 'electro', 'clases',
+]
+
+/**
+ * Un negocio de Turnos: rubro principal "turnos" (decisión del 15/11) y su rubro
+ * de Turnos en subrubros (así lo guarda el alta: industry "turnos", subrubros
+ * ["barberia"]). Mismo criterio que Gimnasio: "turnos" escrito a mano como rubro
+ * de una tienda no la convierte en un negocio de Turnos.
+ */
+export const esDeTurnos = (industry: Rubro, subrubros: Subrubros): boolean =>
+  industry === 'turnos' && (subrubros ?? []).some(s => RUBROS_DE_TURNOS.includes(s))
+
+/** El rubro de Turnos del negocio (barberia, psico…), o null si no es de Turnos. */
+export const rubroDeTurnos = (industry: Rubro, subrubros: Subrubros): string | null =>
+  esDeTurnos(industry, subrubros) ? (subrubros ?? []).find(s => RUBROS_DE_TURNOS.includes(s)) ?? null : null
 
 /**
  * Las claves de rubro de Gimnasio (RUBROS_GYM, en modules/gimnasio/datos). Van
@@ -36,8 +56,9 @@ export const esDeGimnasio = (industry: Rubro, subrubros: Subrubros): boolean =>
   industry === 'gimnasio' && (subrubros ?? []).some(s => RUBROS_DE_GIMNASIO.includes(s))
 
 /** `query` es `window.location.search` ("" o "?a=b"): viaja entera. */
-export function destinoDelPanel(industry: Rubro, query: string): string {
+export function destinoDelPanel(industry: Rubro, query: string, subrubros?: Subrubros): string {
   if (esDeAlquileres(industry)) return `/panel/alquileres${query}`
+  if (esDeTurnos(industry, subrubros)) return `/panel/turnos${query}`
   return `/admin/ventas/dashboard${query}`
 }
 

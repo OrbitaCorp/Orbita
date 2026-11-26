@@ -64,7 +64,12 @@ export const esPasoReservas = (id: PasoId) => PASOS_RESERVAS.includes(id)
 // como "Próximamente" y Tienda sigue su flujo de siempre. En las demos
 // (localhost) se recorren los cuatro. Para habilitar uno en producción alcanza
 // con sacarlo de acá: su recorrido ya está armado.
-export const MODULOS_PROXIMAMENTE: readonly Modulo[] = ['turnos', 'alquileres', 'gimnasio']
+//
+// Turnos ya crea el negocio de verdad (altaTurnos.ts), pero se abre al público
+// recién cuando esté entero: hasta entonces se prende con
+// NEXT_PUBLIC_ALTA_TURNOS=true (en local o en staging) para probarlo.
+const ALTA_TURNOS = process.env.NEXT_PUBLIC_ALTA_TURNOS === 'true'
+export const MODULOS_PROXIMAMENTE: readonly Modulo[] = ALTA_TURNOS ? ['alquileres', 'gimnasio'] : ['turnos', 'alquileres', 'gimnasio']
 export const moduloHabilitado = (m: Modulo | null, real: boolean): m is Modulo => m !== null && (!real || !MODULOS_PROXIMAMENTE.includes(m))
 
 // ─── Datos ───────────────────────────────────────────────────────────────────

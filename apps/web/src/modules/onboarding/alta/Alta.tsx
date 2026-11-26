@@ -80,6 +80,7 @@ import { Listo } from './Listo'
 import { useReservas } from './cargaReservas'
 import type { Destino } from './CierreReservas'
 import { TEXTOS, TITULOS, rotuloQueAlquilas } from './textos'
+import { altaTurnosDe } from './altaTurnos'
 import {
   EMAIL_OK, aSlug, chequeoEmail, chequeoSubdominio, esModulo, esPasoReservas, identidadDe, modalidadesAlta, moduloHabilitado, pasosDe, serviciosIniciales, validar,
   type Chequeo, type ContextoAlta, type DatosAlta, type Modulo, type PasoId, type ServicioAlta,
@@ -363,17 +364,22 @@ export default function Alta({ real = false, modulo: pedido }: {
    * el logo quedan solo en memoria: el store no los persiste.
    */
   const pasarAlPago = () => {
-    const modalidades = modalidadesAlta(datos, null)
+    const turnos = datos.modulo === 'turnos' && rubro ? altaTurnosDe(datos, rubro, servicios, sena) : undefined
+    const modalidades = modalidadesAlta(datos, turnos ? rubro : null)
     const conLocal = modalidades.includes('local')
     setWizard({
-      rubro: 'tienda', subrubros: datos.tipos,
+      // Turnos va por el mismo camino que Tienda: el rubro del negocio es
+      // "turnos", el de Turnos (barberia…) va en subrubros y la agenda en `turnos`.
+      ...(turnos && rubro
+        ? { rubro: 'turnos', subrubros: [rubro.key], modoVenta: '' as const, turnos }
+        : { rubro: 'tienda', subrubros: datos.tipos, modoVenta: datos.modoVenta, turnos: undefined }),
       nombre: datos.negocio.trim(), descripcion: datos.descripcion.trim(), telefono: datos.telefono.trim(),
-      subdominio, modoVenta: datos.modoVenta, logoDataUrl: datos.logo ?? '',
+      subdominio, logoDataUrl: datos.logo ?? '',
       direccion: conLocal ? [datos.direccion.trim(), datos.ciudad.trim()].filter(Boolean).join(', ') : '',
       latLng: datos.latLng, operatesPhysical: conLocal, operatesOnline: modalidades.includes('domicilio'),
       ownerName: datos.nombre.trim(), ownerEmail: email, ownerPassword: datos.clave,
     })
-    track('wizard_complete', { step: paso, stepName: 'cuenta', rubro: 'tienda' })
+    track('wizard_complete', { step: paso, stepName: 'cuenta', rubro: turnos ? 'turnos' : 'tienda' })
     flushAnalitica()
     void router.push(PANTALLA_DE_PAGO)
   }

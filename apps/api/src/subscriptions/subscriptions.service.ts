@@ -1005,10 +1005,19 @@ export class SubscriptionsService implements OnModuleInit {
         }),
       );
     }
+    const nombres = ['updateDraft', 'updateConfig'];
+    if (wizard.operatesPhysical) nombres.push('branch.update');
     if (wizard.logoDataUrl) {
       tareas.push(this.businessesService.uploadLogo(business.id, this.decodeDataUrl(wizard.logoDataUrl)));
+      nombres.push('uploadLogo');
     }
-    const nombres = ['updateDraft', 'updateConfig', 'branch.update', 'uploadLogo'];
+    // Un negocio de Turnos nace con su agenda armada (config, primera agenda y
+    // servicios del alta). Si falla, el negocio igual existe: el panel de
+    // Turnos lo dice y el dueño lo arma desde Configuración.
+    if (wizard.rubro === 'turnos' && wizard.turnos) {
+      tareas.push(this.onboardingService.sembrarTurnos(business.id, memberId, wizard.turnos));
+      nombres.push('sembrarTurnos');
+    }
     const resultados = await Promise.allSettled(tareas);
     resultados.forEach((r, i) => {
       if (r.status === 'rejected') {
