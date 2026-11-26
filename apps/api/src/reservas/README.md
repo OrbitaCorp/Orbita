@@ -192,6 +192,10 @@ Código: `calendarios/` y `dominio/ics.ts`. Plan y decisiones: `docs/superpowers
   sincronización baja el archivo y **reemplaza** los bloqueos de ese calendario (`reservas_bloqueos` con
   `origen = ICAL`, `calendario_id`, `externo_tipo` y `externo_uid`). El motor ya respeta cualquier bloqueo al
   reservar, así que no hay nada más que tocar.
+- **Lo que ya pasó se conserva:** al reemplazar se borran los bloqueos del calendario que todavía no
+  terminaron y los que vuelven a venir en el archivo. Airbnb deja de publicar una estadía cuando termina:
+  esos bloqueos quedan como historia (las Estadísticas de Alquileres cuentan con ellos la ocupación). Se
+  van al desconectar el calendario o al borrar la propiedad.
 - **Cada cuánto:** el job `instagram-cada-5-minutos` baja hasta 5 calendarios por corrida, los que no se
   bajan hace 30 minutos. Solo corre en producción: en local y en staging se usa "Sincronizar ahora".
 - **Si falla la descarga** se guarda el motivo en el calendario y los bloqueos quedan como estaban. Si lo

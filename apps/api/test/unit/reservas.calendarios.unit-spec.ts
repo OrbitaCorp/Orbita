@@ -210,6 +210,42 @@ describe('ReservasCalendariosService · sincronizar', () => {
     expect(a.candado.mock.invocationCallOrder[0]).toBeLessThan(a.t.reservaBloqueo.createMany.mock.invocationCallOrder[0]);
   });
 
+  // ── La historia: Airbnb deja de publicar una estadía cuando termina. Esas noches no se pierden. ──
+  const deAirbnbViejo = (id: string, entrada: string, salida: string, externoUid: string): Fila =>
+    ({ id, businessId: BIZ, modulo: 'ALQUILERES', recursoId: 'r-cab', origen: 'ICAL', calendarioId: 'cal-1', externoTipo: 'RESERVADO', externoUid, inicio: instante(entrada, 900), fin: instante(salida, 600) });
+
+  it('una estadía de Airbnb que ya terminó y que Airbnb dejó de publicar queda como historia', async () => {
+    const { svc, deCalendario } = armar({ bloqueos: [deAirbnbViejo('pasado', '2026-11-10', '2026-11-14', 'viejo')], descarga: { ok: true, texto: ics(['a', 'Reserved', '2026-12-20', '2026-12-27']) } });
+    await svc.sincronizar(BIZ, 'cal-1', AHORA);
+    expect(deCalendario().map((b) => b.externoUid).sort()).toEqual(['a', 'viejo']);
+    // Y sigue ahí en la corrida siguiente.
+    await svc.sincronizar(BIZ, 'cal-1', new Date(AHORA.getTime() + 3600_000));
+    expect(deCalendario().map((b) => b.externoUid).sort()).toEqual(['a', 'viejo']);
+  });
+
+  it('una que todavía no terminó y ya no viene en el archivo se libera, como siempre', async () => {
+    const { svc, deCalendario } = armar({
+      bloqueos: [deAirbnbViejo('futura', '2026-12-01', '2026-12-05', 'se-cancelo'), deAirbnbViejo('en-curso', '2026-11-24', '2026-11-28', 'se-fue-antes')],
+      descarga: { ok: true, texto: ics(['a', 'Reserved', '2026-12-20', '2026-12-27']) },
+    });
+    await svc.sincronizar(BIZ, 'cal-1', AHORA);
+    expect(deCalendario().map((b) => b.externoUid)).toEqual(['a']);
+  });
+
+  it('una que termina hoy y sigue viniendo en el archivo no queda duplicada', async () => {
+    // Salió hoy a las 10:00 y son las 10:00 pasadas: el bloqueo ya terminó, pero Airbnb todavía la publica.
+    const despues = new Date(AHORA.getTime() + 3600_000);
+    const { svc, deCalendario } = armar({ bloqueos: [deAirbnbViejo('hoy', '2026-11-22', '2026-11-25', 'hoy')], descarga: { ok: true, texto: ics(['hoy', 'Reserved', '2026-11-22', '2026-11-25']) } });
+    await svc.sincronizar(BIZ, 'cal-1', despues);
+    expect(deCalendario().map((b) => b.externoUid)).toEqual(['hoy']);
+  });
+
+  it('desconectar el calendario se lleva también la historia', async () => {
+    const { svc, t } = armar({ bloqueos: [deAirbnbViejo('pasado', '2026-11-10', '2026-11-14', 'viejo')] });
+    expect(await svc.desconectar(BIZ, 'm-1', 'cal-1')).toEqual({ ok: true, bloqueos: 1 });
+    expect(t.reservaBloqueo.filas).toEqual([]);
+  });
+
   it('si el calendario se desconectó mientras bajaba, no deja bloqueos', async () => {
     const a = armar({ descarga: { ok: true, texto: ics(['a', 'Reserved', '2026-12-20', '2026-12-27']) } });
     a.descargar.mockImplementation(async () => { a.t.reservaCalendarioExterno.filas.splice(0, 1); return { ok: true, texto: ics(['a', 'Reserved', '2026-12-20', '2026-12-27']) }; });

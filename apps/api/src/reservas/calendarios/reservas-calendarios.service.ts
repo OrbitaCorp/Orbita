@@ -29,6 +29,10 @@ import { claveDelCalendario, descargarCalendario, errorDeUrl, urlSinClave, type 
 //   se cruzan con alguien que está reservando esas noches.
 // - Al panel el enlace le llega sin su clave (urlSinClave): con `reservas.view`
 //   se ve qué calendario es, no se puede leer el calendario del aviso.
+// - Lo que ya terminó no se borra al reemplazar: Airbnb deja de publicar una
+//   estadía cuando pasa, y esas noches quedan como historia del calendario
+//   (las usa la ocupación de las Estadísticas de Alquileres). Se van al
+//   desconectar el calendario.
 // - Todo filtra por negocio, menos la corrida automática, que recorre los
 //   calendarios de todos.
 //
@@ -240,7 +244,10 @@ export class ReservasCalendariosService {
       // Si lo desconectaron mientras bajaba, no se crea nada.
       const sigue = await tx.reservaCalendarioExterno.findFirst({ where: { id: c.id, businessId }, select: { id: true } });
       if (!sigue) return;
-      await tx.reservaBloqueo.deleteMany({ where: { businessId, calendarioId: c.id } });
+      // Se reemplaza lo que todavía no terminó y lo que vuelve a venir en el archivo. Lo que ya terminó y
+      // Airbnb dejó de publicar (lo hace cuando la estadía pasa) queda como historia: sin eso, la
+      // ocupación de las Estadísticas de Alquileres bajaría sola al día siguiente de cada salida.
+      await tx.reservaBloqueo.deleteMany({ where: { businessId, calendarioId: c.id, OR: [{ fin: { gt: ahora } }, { externoUid: { in: [...vistos] } }] } });
       if (nuevos.length) await tx.reservaBloqueo.createMany({ data: nuevos });
       await tx.reservaCalendarioExterno.updateMany({ where: { id: c.id, businessId }, data: { ultimaSync: ahora, ultimoError: null } });
     }, TRANSACCION_CON_CANDADO);
