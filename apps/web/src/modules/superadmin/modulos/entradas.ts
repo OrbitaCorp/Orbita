@@ -4186,4 +4186,30 @@ Usa el campo libre que sumó Alan (\`ReservaConfig.datos\`, 23/11), sin migraci�
       'apps/web/src/modules/turnos/storefront/origenSitio.ts:42',
     ],
   }),
+  entrada({
+    modulo: 'alquileres', fecha: F25, slug: 'grilla-de-ocupacion', tipo: 'diseño', quien: 'Alan',
+    titulo: 'El calendario de alojamiento muestra todas las propiedades en una grilla',
+    foco: 'Calendario, en alojamiento: una fila por propiedad y una columna por noche, con cada estadía como una barra (huésped y canal), 7, 14 o 30 días y hoy marcado. La vista de una propiedad por mes sigue en "Por propiedad". Componente nuevo compartido en design-system/reservas.',
+    que: `Pedido de Alan: una vista tipo hotel para ver de un vistazo qué está libre y cuándo hay recambio, coordinada con la sesión de planificación de Alquileres. Solo alojamiento (por noche y por mes); canchas y salones siguen como estaban.
+
+**Qué se ve.** Calendario arranca en **Todas**: una fila por propiedad, una columna por noche, desde ayer (para ver quién salió hoy). Se elige **7 días**, **14 días** o **30 días**; las flechas mueven la ventana entera y **Hoy** vuelve. La cabecera de días y la columna de nombres quedan fijas, y la grilla scrollea adentro de su caja, nunca la página.
+
+**Las barras.** Cada estadía es una barra de la noche de entrada a la anterior a la salida: el día de salida queda libre, así dos estadías seguidas quedan una al lado de la otra. Dice el huésped y, cuando el dato llegue del mapeo, el canal (Directo o Sitio). Los tonos: confirmada, seña pendiente, ya se fue, reservado en Airbnb (sin nombre: el .ics solo trae fechas), cerrado en Airbnb y bloqueada por vos. La leyenda nombra solo los que se ven.
+
+**Qué se toca.** Una reserva abre su detalle. Un bloqueo abre el modal de fechas bloqueadas de siempre: los de Airbnb no se quitan a mano y nunca abren Agendar a mano. Una noche libre (de hoy en adelante) abre **Agendar a mano** con la propiedad, la entrada y el mínimo de noches (o de meses) ya puestos; el precio lo sigue calculando ese modal.
+
+**Compartido.** \`GrillaOcupacion\` es nueva en \`design-system/reservas\`, pura y controlada (filas, barras, ventana y qué pasa al tocar), sin nada de Alquileres: la pueden usar Turnos o Gimnasio. La cuenta de dónde cae cada barra está aparte, con tests (\`ocupacion.ts\`). **Hay que avisarles a Mateo y a Ale** antes de que la toquen.
+
+**Lo que falta:** el canal de cada reserva (\`Reserva.canal\`) y si un bloqueo de Airbnb es una reserva o un cierre (\`externoTipo\`) los suma al mapeo la sesión de planificación; hasta entonces las reservas no muestran canal y todo lo de Airbnb se pinta como reservado. El manual de Alquileres para Orbi todavía no existe (tarea del 21/12): cuando se escriba, nombrar **Todas**, **Por propiedad** y **Hoy**.`,
+    archivos: [
+      'apps/web/src/design-system/reservas/GrillaOcupacion.tsx:115',
+      'apps/web/src/design-system/reservas/ocupacion.ts:50',
+      'apps/web/src/design-system/reservas/ocupacion.test.ts:1',
+      'apps/web/src/modules/alquileres/admin/Reservas.tsx:486',
+      'apps/web/src/modules/alquileres/admin/Reservas.tsx:505',
+      'apps/web/src/modules/alquileres/admin/Reservas.tsx:534',
+    ],
+    antes: { 1280: 'grilla-ocupacion-antes-1280.webp', 390: 'grilla-ocupacion-antes-390.webp' },
+    despues: { 1280: 'grilla-ocupacion-despues-1280.webp', 390: 'grilla-ocupacion-despues-390.webp' },
+  }),
 ]

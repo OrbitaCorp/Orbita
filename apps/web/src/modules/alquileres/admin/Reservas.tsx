@@ -1,7 +1,8 @@
 // La agenda del panel de Alquileres, una por modo:
 //   canchas:  el día, cancha por cancha, hora por hora; en celular, una lista por cancha
 //   salones:  el mes con los días que tienen evento y los eventos del día elegido, salón por salón
-//   estadía:  la ocupación de cada propiedad en el mes, con llegadas y salidas (por noche o por mes)
+//   estadía:  la grilla de todas las propiedades (una fila por propiedad, una columna por noche,
+//             cada estadía una barra con su canal) o el mes de una sola, con llegadas y salidas
 // Desde cualquiera se abre el detalle (registrar seña, saldo o depósito,
 // cancelar, marcar realizada) y se agenda a mano. Los bloqueos (del dueño o
 // de un calendario externo) cierran la cancha, el salón o la propiedad ese
@@ -18,7 +19,9 @@ import { pesos, precioBloque, precioTurnosSeguidos } from '@/lib/reservas/precio
 import { motivoNoReservable, motivoNoReservableMes, nochesOcupadas, precioEstadia, precioMensual, salidaMaxima } from '@/lib/reservas/estadia'
 import { AHORA, codigoDe, ESTADO_RESERVA, HOY, aperturaDe, bloqueoEn, bloquesDe, bloquesLibresEn, capital, clientePorId, cuenta, duracionEstadiaTxt, esMensual, fechaDeReserva, mesesTxt, ocupadoDelDia, palabrasDe, rangosOcupados, reservasDelDia, salonDe, senaPara, tituloEvento, unidadPorId, type Bloqueo, type Cliente, type NegocioAlquiler, type Reserva } from '../datos'
 import { CalendarioDia, CalendarioRango, type Rango } from '@/design-system/reservas/Calendario'
-import { Area, Campo, Chip, Encabezado, FilaSwitch, Modal, Nota, Selector, Sigla, Vacio } from '@/design-system/reservas/piezas'
+import { Area, Campo, Chip, Encabezado, FilaSwitch, Modal, Nota, Segmentado, Selector, Sigla, Vacio } from '@/design-system/reservas/piezas'
+import GrillaOcupacion, { type BarraGrilla, type DiasGrilla, type TonoBarra } from '@/design-system/reservas/GrillaOcupacion'
+import { inicioConHoy } from '@/design-system/reservas/ocupacion'
 import { linkLlamar, linkWhatsApp } from '../datos/textos'
 import { BloquearDia, BloquearFechas } from './Bloquear'
 import { BotonConfirmar } from './piezas'
@@ -129,7 +132,7 @@ export default function Reservas(p: P) {
         </>} />
       {tipo === 'cancha' && <AgendaCanchas {...p} onAbrir={p.onAbrirReserva} onNueva={setNueva} />}
       {tipo === 'bloque' && <AgendaSalones {...p} onAbrir={p.onAbrirReserva} onNueva={setNueva} />}
-      {tipo === 'estadia' && <Ocupacion {...p} onAbrir={p.onAbrirReserva} onNueva={setNueva} />}
+      {tipo === 'estadia' && <Estadias {...p} onAbrir={p.onAbrirReserva} onNueva={setNueva} />}
       {reserva && <Detalle negocio={p.negocio} reserva={reserva} cliente={clientePorId(reserva.clienteId, p.clientes)} onCerrar={() => p.onAbrirReserva(null)} onCambiar={p.onCambiar} />}
       {nueva && <NuevaReserva negocio={p.negocio} reservas={p.reservas} clientes={p.clientes} pre={nueva} onCerrar={() => setNueva(null)} onReservar={(r, c) => { p.onReservar(r, c); setNueva(null) }} />}
       {bloquear && (tipo === 'estadia'
@@ -444,14 +447,98 @@ function Ocupacion({ negocio, reservas, clientes, onAbrir, onNueva, onQuitarBloq
           </section>
         </div>
       </div>
-      {bloqueo && (
-        <Modal titulo="Fechas bloqueadas" onCerrar={() => setBloqueoAbierto(null)}
-          pie={<><button type="button" className="rv-btn" onClick={() => setBloqueoAbierto(null)}>Cerrar</button>{bloqueo.origen === 'dueno' && <BotonConfirmar className="rv-btn rv-btn--peligro" pregunta="¿Quitar? Esas fechas quedan libres." onConfirmar={() => { onQuitarBloqueo(bloqueo.id); setBloqueoAbierto(null) }}>Quitar el bloqueo</BotonConfirmar>}</>}>
-          <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>{rangoTxt(bloqueo.desde, bloqueo.hasta)}</p>
-          <p style={{ margin: '6px 0 0', fontSize: 14 }}>{bloqueo.motivo}</p>
-          <p className="rv-ayuda" style={{ marginTop: 8 }}>{bloqueo.origen === 'ical' ? 'Vino de un calendario externo: se quita desconectando el calendario en Configuración.' : 'Lo pusiste vos. Mientras esté, nadie puede reservar esas fechas.'}</p>
-        </Modal>
-      )}
+      {bloqueo && <ModalBloqueo bloqueo={bloqueo} onCerrar={() => setBloqueoAbierto(null)} onQuitar={onQuitarBloqueo} />}
+    </>
+  )
+}
+
+/** Unas fechas bloqueadas, abiertas desde el calendario o la grilla: las del dueño se quitan acá; las de un calendario externo, desconectándolo. */
+function ModalBloqueo({ bloqueo, onCerrar, onQuitar }: { bloqueo: Bloqueo; onCerrar: () => void; onQuitar: (id: string) => void }) {
+  return (
+    <Modal titulo="Fechas bloqueadas" onCerrar={onCerrar}
+      pie={<><button type="button" className="rv-btn" onClick={onCerrar}>Cerrar</button>{bloqueo.origen === 'dueno' && <BotonConfirmar className="rv-btn rv-btn--peligro" pregunta="¿Quitar? Esas fechas quedan libres." onConfirmar={() => { onQuitar(bloqueo.id); onCerrar() }}>Quitar el bloqueo</BotonConfirmar>}</>}>
+      <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>{rangoTxt(bloqueo.desde, bloqueo.hasta)}</p>
+      <p style={{ margin: '6px 0 0', fontSize: 14 }}>{bloqueo.motivo}</p>
+      <p className="rv-ayuda" style={{ marginTop: 8 }}>{bloqueo.origen === 'ical' ? 'Vino de un calendario externo: se quita desconectando el calendario en Configuración.' : 'Lo pusiste vos. Mientras esté, nadie puede reservar esas fechas.'}</p>
+    </Modal>
+  )
+}
+
+// ─── Estadía: la grilla de todas las propiedades ─────────────────────────────
+
+/** El canal de una reserva (lo trae la API: lo cargó el dueño o entró por el sitio). Opcional hasta que todos los orígenes lo copien. */
+type ConCanal = Reserva & { canal?: 'directo' | 'sitio' }
+const CANAL: Record<NonNullable<ConCanal['canal']>, string> = { directo: 'Directo', sitio: 'Sitio' }
+/** Reservado allá (una estadía de Airbnb) o cerrado a mano allá. Opcional: sin el dato, se toma como reservado. */
+type ConExterno = Bloqueo & { externoTipo?: 'RESERVADO' | 'CERRADO' }
+
+/** De qué calendario externo vino un bloqueo, por su nombre: "Airbnb · Cabaña Lapacho" → "Airbnb". */
+function canalExterno(n: NegocioAlquiler, b: Bloqueo): string {
+  const nombre = n.calendariosExternos.find(c => c.id === b.calendarioId)?.nombre ?? b.motivo
+  return /airbnb/i.test(nombre) ? 'Airbnb' : nombre.split(' · ')[0] || 'Externo'
+}
+
+/**
+ * Las barras de la grilla: las reservas (menos las canceladas) y los bloqueos, del dueño o de un
+ * calendario externo. Una estadía de Airbnb llega solo con fechas (el .ics no trae el huésped):
+ * su barra dice el canal y "Reservado".
+ */
+function barrasDeEstadia(n: NegocioAlquiler, reservas: Reserva[], clientes: Cliente[]): BarraGrilla[] {
+  const deReservas = reservas
+    .filter(r => r.estado !== 'cancelada' && r.entrada && r.salida)
+    .map((r: ConCanal): BarraGrilla => ({
+      id: r.id, filaId: r.unidadId, desde: r.entrada!, hasta: r.salida!,
+      titulo: clientePorId(r.clienteId, clientes)?.nombre ?? 'Sin nombre',
+      etiqueta: r.canal ? CANAL[r.canal] : undefined,
+      tono: r.estado === 'pendiente' ? 'pendiente' : r.estado === 'completada' || r.salida! <= HOY ? 'pasada' : 'reserva',
+    }))
+  const deBloqueos = n.bloqueos.map((b: ConExterno): BarraGrilla => {
+    if (b.origen === 'dueno') return { id: b.id, filaId: b.unidadId, desde: b.desde, hasta: b.hasta, titulo: b.motivo || 'Bloqueado', etiqueta: 'Bloqueo', tono: 'bloqueo' }
+    const cerrado = b.externoTipo === 'CERRADO'
+    return { id: b.id, filaId: b.unidadId, desde: b.desde, hasta: b.hasta, titulo: cerrado ? 'Cerrado' : canalExterno(n, b), etiqueta: cerrado ? canalExterno(n, b) : 'Reservado', tono: cerrado ? 'cerrado' : 'externo' }
+  })
+  return [...deReservas, ...deBloqueos]
+}
+
+const LEYENDA: Record<TonoBarra, string> = { reserva: 'Confirmada', pendiente: 'Seña pendiente', pasada: 'Ya se fue', externo: 'Reservado en Airbnb', cerrado: 'Cerrado en Airbnb', bloqueo: 'Bloqueada por vos' }
+
+function GrillaEstadias({ negocio, reservas, clientes, onAbrir, onNueva, onQuitarBloqueo }: Sub) {
+  const palabras = palabrasDe(negocio)
+  const [desde, setDesde] = useState<ISO>(() => inicioConHoy(HOY))
+  const [dias, setDias] = useState<DiasGrilla>(14)
+  const [bloqueoAbierto, setBloqueoAbierto] = useState<string | null>(null)
+  if (!negocio.propiedades.length) return <Vacio titulo={`Sin ${palabras.unidades}`} texto="Cargá la primera en Configuración." />
+  const filas = negocio.propiedades.map(p => ({ id: p.id, nombre: p.nombre, detalle: `${p.tipo} · ${esMensual(p) ? 'por mes' : cuenta(p.huespedes, 'huésped', 'huéspedes')}` }))
+  const barras = barrasDeEstadia(negocio, reservas, clientes)
+  const bloqueo = bloqueoAbierto ? negocio.bloqueos.find(b => b.id === bloqueoAbierto) ?? null : null
+  // Una noche libre abre Agendar a mano con la entrada puesta y el mínimo de noches (o de meses); el precio lo calcula NuevaReserva.
+  const libre = (unidadId: string, entrada: ISO) => {
+    const prop = negocio.propiedades.find(x => x.id === unidadId)
+    if (!prop) return
+    if (esMensual(prop) && prop.mensual) onNueva({ unidadId, entrada, meses: prop.mensual.minMeses })
+    else onNueva({ unidadId, entrada, salida: sumarDias(entrada, Math.max(1, prop.tarifa.minNoches)) })
+  }
+  return (
+    <>
+      <GrillaOcupacion filas={filas} barras={barras} hoy={HOY} desde={desde} dias={dias} onDesde={setDesde} onDias={setDias}
+        rotuloFilas={capital(palabras.unidad)}
+        onBarra={b => { if (b.tono === 'bloqueo' || b.tono === 'externo' || b.tono === 'cerrado') setBloqueoAbierto(b.id); else onAbrir(b.id) }}
+        onLibre={libre}
+        leyenda={LEYENDA} />
+      {bloqueo && <ModalBloqueo bloqueo={bloqueo} onCerrar={() => setBloqueoAbierto(null)} onQuitar={onQuitarBloqueo} />}
+    </>
+  )
+}
+
+/** Estadía: la grilla de todas las propiedades o el mes de una sola, con sus llegadas y salidas. */
+function Estadias(p: Sub) {
+  const [vista, setVista] = useState<'grilla' | 'propiedad'>('grilla')
+  return (
+    <>
+      <div style={{ marginBottom: 16 }}>
+        <Segmentado label="Cómo ver el calendario" valor={vista} onChange={setVista} opciones={[{ id: 'grilla', label: 'Todas' }, { id: 'propiedad', label: `Por ${palabrasDe(p.negocio).unidad}` }]} />
+      </div>
+      {vista === 'grilla' ? <GrillaEstadias {...p} /> : <Ocupacion {...p} />}
     </>
   )
 }
