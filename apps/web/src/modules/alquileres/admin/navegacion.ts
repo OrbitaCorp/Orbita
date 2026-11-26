@@ -60,7 +60,8 @@ export function seccionesDe(tipo: TipoAlquiler, palabras: Pick<Palabras, 'unidad
 function todasLasSecciones(tipo: TipoAlquiler, palabras: Pick<Palabras, 'unidades' | 'clientes'>): SeccionNav[] {
   const unidades = capital(palabras.unidades)
   const disponibilidad: SeccionNav = { id: 'disponibilidad', label: 'Qué hay libre', grupo: HOY }
-  const ingresos: SeccionNav = { id: 'ingresos', label: 'Ingresos', grupo: HOY }
+  // En la estadía la sección de la plata es Estadísticas (ocupación, canales, Airbnb); en canchas y salones, Ingresos.
+  const ingresos: SeccionNav = { id: 'ingresos', label: tipo === 'estadia' ? 'Estadísticas' : 'Ingresos', grupo: HOY }
   const reglas: SeccionNav = { id: 'reglas', label: 'Reglas de reserva', grupo: RESERVAS }
   const mensajes: SeccionNav = { id: 'mensajes', label: 'Recordatorios y mensajes', grupo: RESERVAS }
   const pagos: SeccionNav = { id: 'pagos', label: 'Pagos y señas', grupo: RESERVAS }

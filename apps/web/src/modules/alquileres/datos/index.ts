@@ -582,6 +582,9 @@ export const NEGOCIOS_DEMO: Record<TipoAlquiler, NegocioAlquiler> = {
     bloqueos: [
       { id: 'bl1', unidadId: 'c1', desde: '2026-11-23', hasta: '2026-11-26', motivo: 'Mantenimiento del deck', origen: 'dueno' },
       { id: 'bl2', unidadId: 'c2', desde: '2026-12-24', hasta: '2026-12-27', motivo: 'Reservado por Airbnb', origen: 'ical', calendarioId: 'ce1' },
+      // Dos estadías de Airbnb que ya pasaron: quedan como historia del calendario, y abajo están sus ganancias importadas.
+      { id: 'bl3', unidadId: 'c2', desde: '2026-10-16', hasta: '2026-10-20', motivo: 'Reservado por Airbnb', origen: 'ical', calendarioId: 'ce1' },
+      { id: 'bl4', unidadId: 'c2', desde: '2026-11-06', hasta: '2026-11-09', motivo: 'Reservado por Airbnb', origen: 'ical', calendarioId: 'ce1' },
     ],
     calendariosExternos: [{ id: 'ce1', unidadId: 'c2', nombre: 'Airbnb · Cabaña Lapacho', url: 'https://www.airbnb.com/calendar/ical/demo.ics', ultimaSync: HOY }],
     ingresosExternos: [

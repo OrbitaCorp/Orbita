@@ -37,6 +37,7 @@ import Disponibilidad from './Disponibilidad'
 import Clientes from './Clientes'
 import Eventos from './Eventos'
 import Ingresos from './Ingresos'
+import Estadisticas from './Estadisticas'
 import Negocio from './configuracion/Negocio'
 import Horarios from './configuracion/Horarios'
 import Equipo from './configuracion/Equipo'
@@ -218,7 +219,12 @@ export default function Panel() {
           {vista === 'disponibilidad' && <Disponibilidad key={k} negocio={negocio} reservas={reservas} clientes={clientes} onReservar={reservar} onCambiar={cambiar} />}
           {vista === 'eventos' && <Eventos key={k} negocio={negocio} reservas={reservas} clientes={clientes} abierta={reservaAbierta} onAbrir={abrirReserva} onCambiar={cambiar} />}
           {vista === 'clientes' && <Clientes key={k} negocio={negocio} reservas={reservas} clientes={clientes} abierto={clienteAbierto} onAbrir={abrirCliente} />}
-          {vista === 'ingresos' && <Ingresos key={k} negocio={negocio} reservas={reservas} clientes={clientes} onAbrirReserva={verReserva} />}
+          {vista === 'ingresos' && tipo !== 'estadia' && <Ingresos key={k} negocio={negocio} reservas={reservas} clientes={clientes} onAbrirReserva={verReserva} />}
+          {/* La estadía tiene su propia pantalla: Estadísticas (ocupación, canales, Airbnb). */}
+          {vista === 'ingresos' && tipo === 'estadia' && (
+            <Estadisticas key={k} negocio={negocio} reservas={reservas} clientes={clientes} onAbrirReserva={verReserva}
+              onIrAAirbnb={real ? () => irA('calendarios') : undefined} importadoHasta={n.ganancias?.resumen.hasta} />
+          )}
           {vista === 'unidades' && <Canchas key={k} negocio={negocio} reservas={reservas} onGuardar={onGuardar} />}
           {vista === 'extras' && <Extras key={k} negocio={negocio} reservas={reservas} onGuardar={onGuardar} />}
           {vista === 'precios' && <Precios key={k} negocio={negocio} onGuardar={onGuardar} />}

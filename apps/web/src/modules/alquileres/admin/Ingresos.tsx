@@ -1,11 +1,14 @@
-// Ingresos: cuánto entró, cuántas reservas, qué tan ocupado está el negocio y
-// qué falta cobrar, en el período elegido y contra el período anterior. Dos
-// series con un solo color (el acento del sistema): por semana y por cancha,
-// bloque o propiedad; una tercera según el modo (las franjas más reservadas
-// en canchas, los paquetes en el salón, las llegadas y salidas en la estadía);
-// y la lista de lo que falta cobrar, que abre cada reserva para registrar el
-// pago. Las variaciones se miden contra el período anterior del mismo largo;
-// sin datos previos no se inventa un porcentaje.
+// Ingresos (canchas y salones): cuánto entró, cuántas reservas, qué tan ocupado
+// está el negocio y qué falta cobrar, en el período elegido y contra el
+// período anterior. Dos series con un solo color (el acento del sistema): por
+// semana y por cancha o bloque; una tercera según el modo (las franjas más
+// reservadas en canchas, los paquetes en el salón); y la lista de lo que falta
+// cobrar, que abre cada reserva para registrar el pago. Las variaciones se
+// miden contra el período anterior del mismo largo; sin datos previos no se
+// inventa un porcentaje.
+//
+// La estadía tiene su propia pantalla, Estadisticas.tsx, que reusa de acá los
+// períodos, "Por cobrar" y "Llegadas y salidas".
 //
 // Sin useMemo: son cuentas chicas y react-compiler ya memoiza el componente;
 // a mano no se podía, porque las listas se arman en cada render.
@@ -16,12 +19,12 @@ import { pesos } from '@/lib/reservas/precio'
 import { Barras, Chip, Encabezado, Filtros, Kpi, Segmentado } from '@/design-system/reservas/piezas'
 import { HOY, bloquesDe, cadaUna, clientePorId, cuenta, duracionEstadiaTxt, fechaDeReserva, lasUnidades, palabrasDe, tituloEvento, unidadPorId, unidadesDe, type Cliente, type NegocioAlquiler, type Reserva } from '../datos'
 
-type Periodo = 'mes' | 'anterior' | 'trimestre'
-const PERIODOS: { id: Periodo; label: string }[] = [{ id: 'mes', label: 'Este mes' }, { id: 'anterior', label: 'Mes pasado' }, { id: 'trimestre', label: 'Últimos 3 meses' }]
-const VS: Record<Periodo, string> = { mes: 'el mes pasado', anterior: 'el mes anterior', trimestre: 'los 3 meses anteriores' }
+export type Periodo = 'mes' | 'anterior' | 'trimestre'
+export const PERIODOS: { id: Periodo; label: string }[] = [{ id: 'mes', label: 'Este mes' }, { id: 'anterior', label: 'Mes pasado' }, { id: 'trimestre', label: 'Últimos 3 meses' }]
+export const VS: Record<Periodo, string> = { mes: 'el mes pasado', anterior: 'el mes anterior', trimestre: 'los 3 meses anteriores' }
 
 /** Primer y último día del período, contando desde el mes de HOY. Los tres meses son este y los dos anteriores. */
-function periodoDe(p: Periodo): [ISO, ISO] {
+export function periodoDe(p: Periodo): [ISO, ISO] {
   const primero = moverMes(HOY, 0)
   const finDeMes = sumarDias(moverMes(HOY, 1), -1)
   if (p === 'mes') return [primero, finDeMes]
@@ -30,14 +33,82 @@ function periodoDe(p: Periodo): [ISO, ISO] {
 }
 
 /** El período de antes, del mismo largo: contra ese se mide la variación. */
-function periodoAnterior(p: Periodo): [ISO, ISO] {
+export function periodoAnterior(p: Periodo): [ISO, ISO] {
   if (p === 'mes') return [moverMes(HOY, -1), sumarDias(moverMes(HOY, 0), -1)]
   if (p === 'anterior') return [moverMes(HOY, -2), sumarDias(moverMes(HOY, -1), -1)]
   return [moverMes(HOY, -5), sumarDias(moverMes(HOY, -2), -1)]
 }
 
 /** Variación en %, o null si antes no hubo nada: no se inventa un porcentaje contra cero. */
-const variacion = (ahora: number, antes: number) => (antes > 0 ? ((ahora - antes) / antes) * 100 : null)
+export const variacion = (ahora: number, antes: number) => (antes > 0 ? ((ahora - antes) / antes) * 100 : null)
+
+/** Lo que falta cobrar, de cualquier fecha: señas que no entraron (si no se pagan, la reserva se cae) y saldos de reservas ya realizadas. */
+export function porCobrarDe(reservas: Reserva[]) {
+  const senas = reservas.filter(r => r.estado === 'pendiente' && fechaDeReserva(r) >= HOY).map(r => ({ r, que: 'Seña', monto: r.sena }))
+  const saldos = reservas.filter(r => r.estado === 'confirmada' && !r.saldoPagado && r.total - r.sena > 0 && fechaDeReserva(r) < HOY).map(r => ({ r, que: 'Saldo', monto: r.total - r.sena }))
+  return {
+    lista: [...senas, ...saldos].sort((a, b) => fechaDeReserva(a.r).localeCompare(fechaDeReserva(b.r))),
+    totalSenas: senas.reduce((s, x) => s + x.monto, 0),
+    totalSaldos: saldos.reduce((s, x) => s + x.monto, 0),
+  }
+}
+
+interface DeLista { negocio: NegocioAlquiler; reservas: Reserva[]; clientes: Cliente[]; onAbrirReserva: (id: string) => void }
+
+/** La lista de lo que falta cobrar: cada fila abre su reserva para registrar el pago. */
+export function PorCobrar({ negocio, reservas, clientes, onAbrirReserva }: DeLista) {
+  const { lista, totalSenas, totalSaldos } = porCobrarDe(reservas)
+  const nombre = (r: Reserva) => clientePorId(r.clienteId, clientes)?.nombre ?? '—'
+  const donde = (r: Reserva) => unidadPorId(negocio, r.unidadId)?.nombre ?? negocio.nombre
+  const cuando = (r: Reserva) => (r.entrada && r.salida ? rangoTxt(r.entrada, r.salida) : `${fechaCorta(r.fecha ?? HOY)} ${hhmm(r.inicio ?? 0)}`)
+  return (
+    <section className="rv-card rv-card--pad">
+      <div className="ala-cab-lista">
+        <div style={{ minWidth: 0 }}><h2 className="rv-h2">Por cobrar</h2><p className="rv-ayuda" style={{ margin: '2px 0 0' }}>Señas que no entraron y saldos de reservas ya realizadas. Tocá una para registrar el pago.</p></div>
+        <Chip tono={lista.length ? 'aviso' : 'ok'}>{lista.length ? pesos(totalSenas + totalSaldos) : 'Al día'}</Chip>
+      </div>
+      {lista.length === 0 ? <p className="rv-ayuda" style={{ margin: 0 }}>No hay nada pendiente de cobro.</p> : (
+        <div className="rv-lista">
+          {lista.slice(0, 8).map(({ r, que, monto }) => (
+            <button key={`${que}-${r.id}`} type="button" className="rv-item" onClick={() => onAbrirReserva(r.id)}>
+              <span className="rv-item-cuerpo"><span className="rv-item-titulo">{negocio.tipo === 'bloque' ? tituloEvento(r.evento) : nombre(r)}</span><span className="rv-item-sub">{donde(r)} · {cuando(r)}</span></span>
+              <span className="rv-num" style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)' }}>{pesos(monto)}</span>
+              <Chip tono={que === 'Seña' ? 'aviso' : 'gris'}>{que}</Chip>
+            </button>
+          ))}
+          {lista.length > 8 && <p className="rv-ayuda" style={{ margin: '8px 0 0' }}>Y {cuenta(lista.length - 8, 'más', 'más')}: están en la agenda.</p>}
+        </div>
+      )}
+    </section>
+  )
+}
+
+/** Estadía: las llegadas y las salidas de los próximos siete días, en todas las propiedades. */
+export function LlegadasYSalidas({ negocio, reservas, clientes, onAbrirReserva }: DeLista) {
+  const enSemana = (f: ISO) => { const d = diasEntre(HOY, f); return d >= 0 && d < 7 }
+  const movimientos = reservas.filter(r => r.estado !== 'cancelada' && r.entrada && r.salida)
+    .flatMap(r => [...(enSemana(r.entrada!) ? [{ r, llega: true, f: r.entrada! }] : []), ...(enSemana(r.salida!) ? [{ r, llega: false, f: r.salida! }] : [])])
+    .sort((a, b) => a.f.localeCompare(b.f) || Number(b.llega) - Number(a.llega))
+  const nombre = (r: Reserva) => clientePorId(r.clienteId, clientes)?.nombre ?? '—'
+  const donde = (r: Reserva) => unidadPorId(negocio, r.unidadId)?.nombre ?? negocio.nombre
+  const horaDe = (r: Reserva, llega: boolean) => { const p = negocio.propiedades.find(x => x.id === r.unidadId); return hhmm(llega ? p?.checkIn ?? 15 * 60 : p?.checkOut ?? 10 * 60) }
+  return (
+    <section className="rv-card rv-card--pad">
+      <div className="ala-cab-lista"><div style={{ minWidth: 0 }}><h2 className="rv-h2">Llegadas y salidas</h2><p className="rv-ayuda" style={{ margin: '2px 0 0' }}>Los próximos siete días, en todas las propiedades.</p></div></div>
+      {movimientos.length === 0 ? <p className="rv-ayuda" style={{ margin: 0 }}>Sin llegadas ni salidas esta semana.</p> : (
+        <div className="rv-lista">
+          {movimientos.slice(0, 10).map(({ r, llega, f }) => (
+            <button key={`${llega ? 'in' : 'out'}-${r.id}`} type="button" className="rv-item" onClick={() => onAbrirReserva(r.id)}>
+              <span className="rv-kpi-ico" aria-hidden style={{ width: 30, height: 30, ...(llega ? {} : { background: 'var(--color-surface-alt)', color: 'var(--color-muted)' }) }}>{llega ? <LogIn size={15} strokeWidth={1.7} /> : <LogOut size={15} strokeWidth={1.7} />}</span>
+              <span className="rv-item-cuerpo"><span className="rv-item-titulo">{nombre(r)}</span><span className="rv-item-sub">{donde(r)} · {r.meses ? duracionEstadiaTxt(r) : cuenta(r.huespedes ?? 1, 'huésped', 'huéspedes')} · {horaDe(r, llega)}</span></span>
+              <Chip tono={llega ? 'ok' : 'gris'}>{llega ? (r.meses ? 'Entra' : 'Llega') : 'Sale'} {fechaRelativa(f, HOY).toLowerCase()}</Chip>
+            </button>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
 
 function resumir(n: NegocioAlquiler, reservas: Reserva[], desde: ISO, hasta: ISO) {
   const enPeriodo = reservas.filter(r => { const f = fechaDeReserva(r); return f >= desde && f <= hasta })
@@ -54,16 +125,7 @@ export default function Ingresos({ negocio, reservas, clientes, onAbrirReserva }
   const tipo = negocio.tipo
   const palabras = palabrasDe(negocio)
   const unSalon = tipo === 'bloque' && negocio.salones.length === 1
-  const nombre = (r: Reserva) => clientePorId(r.clienteId, clientes)?.nombre ?? '—'
-  const donde = (r: Reserva) => unidadPorId(negocio, r.unidadId)?.nombre ?? negocio.nombre
-  const cuando = (r: Reserva) => (r.entrada && r.salida ? rangoTxt(r.entrada, r.salida) : `${fechaCorta(r.fecha ?? HOY)} ${hhmm(r.inicio ?? 0)}`)
-
-  // Lo que falta cobrar, de cualquier fecha: señas que no entraron (si no se pagan, la reserva se cae) y saldos de reservas ya realizadas.
-  const senas = reservas.filter(r => r.estado === 'pendiente' && fechaDeReserva(r) >= HOY).map(r => ({ r, que: 'Seña', monto: r.sena }))
-  const saldos = reservas.filter(r => r.estado === 'confirmada' && !r.saldoPagado && r.total - r.sena > 0 && fechaDeReserva(r) < HOY).map(r => ({ r, que: 'Saldo', monto: r.total - r.sena }))
-  const porCobrar = [...senas, ...saldos].sort((a, b) => fechaDeReserva(a.r).localeCompare(fechaDeReserva(b.r)))
-  const totalSenas = senas.reduce((s, x) => s + x.monto, 0)
-  const totalSaldos = saldos.reduce((s, x) => s + x.monto, 0)
+  const { lista: porCobrar, totalSenas, totalSaldos } = porCobrarDe(reservas)
 
   // Por semana: las semanas del período, con el lunes como rótulo.
   const semanas: { rotulo: string; valor: number }[] = []
@@ -87,16 +149,7 @@ export default function Ingresos({ negocio, reservas, clientes, onAbrirReserva }
   }
   // Los paquetes de cada salón; con varios, el rótulo lleva el salón ("Jardín · 30").
   const paquetes = tipo === 'bloque' ? negocio.salones.flatMap(s => s.paquetes.map(p => ({ rotulo: unSalon ? p.nombre : `${s.nombre.split(' ').pop()} · ${p.hastaInvitados}`, valor: ahora.cobradas.filter(r => r.paqueteId === p.id).length }))) : []
-  // Estadía: llegadas y salidas de los próximos siete días.
-  const enSemana = (f: ISO) => { const d = diasEntre(HOY, f); return d >= 0 && d < 7 }
-  const movimientos = tipo === 'estadia'
-    ? reservas.filter(r => r.estado !== 'cancelada' && r.entrada && r.salida)
-      .flatMap(r => [...(enSemana(r.entrada!) ? [{ r, llega: true, f: r.entrada! }] : []), ...(enSemana(r.salida!) ? [{ r, llega: false, f: r.salida! }] : [])])
-      .sort((a, b) => a.f.localeCompare(b.f) || Number(b.llega) - Number(a.llega))
-    : []
-  const horaDe = (r: Reserva, llega: boolean) => { const p = negocio.propiedades.find(x => x.id === r.unidadId); return hhmm(llega ? p?.checkIn ?? 15 * 60 : p?.checkOut ?? 10 * 60) }
-
-  const ocupacionNota = tipo === 'estadia' ? 'de las noches hasta hoy' : tipo === 'bloque' ? 'de los bloques hasta hoy' : 'de las horas abiertas hasta hoy'
+  const ocupacionNota = tipo === 'bloque' ? 'de los bloques hasta hoy' : 'de las horas abiertas hasta hoy'
 
   return (
     <div className="rv-pagina">
@@ -121,24 +174,7 @@ export default function Ingresos({ negocio, reservas, clientes, onAbrirReserva }
         </section>
       </div>
       <div className="rv-grid rv-grid--2">
-        <section className="rv-card rv-card--pad">
-          <div className="ala-cab-lista">
-            <div style={{ minWidth: 0 }}><h2 className="rv-h2">Por cobrar</h2><p className="rv-ayuda" style={{ margin: '2px 0 0' }}>Señas que no entraron y saldos de reservas ya realizadas. Tocá una para registrar el pago.</p></div>
-            <Chip tono={porCobrar.length ? 'aviso' : 'ok'}>{porCobrar.length ? pesos(totalSenas + totalSaldos) : 'Al día'}</Chip>
-          </div>
-          {porCobrar.length === 0 ? <p className="rv-ayuda" style={{ margin: 0 }}>No hay nada pendiente de cobro.</p> : (
-            <div className="rv-lista">
-              {porCobrar.slice(0, 8).map(({ r, que, monto }) => (
-                <button key={`${que}-${r.id}`} type="button" className="rv-item" onClick={() => onAbrirReserva(r.id)}>
-                  <span className="rv-item-cuerpo"><span className="rv-item-titulo">{tipo === 'bloque' ? tituloEvento(r.evento) : nombre(r)}</span><span className="rv-item-sub">{donde(r)} · {cuando(r)}</span></span>
-                  <span className="rv-num" style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)' }}>{pesos(monto)}</span>
-                  <Chip tono={que === 'Seña' ? 'aviso' : 'gris'}>{que}</Chip>
-                </button>
-              ))}
-              {porCobrar.length > 8 && <p className="rv-ayuda" style={{ margin: '8px 0 0' }}>Y {cuenta(porCobrar.length - 8, 'más', 'más')}: están en la agenda.</p>}
-            </div>
-          )}
-        </section>
+        <PorCobrar negocio={negocio} reservas={reservas} clientes={clientes} onAbrirReserva={onAbrirReserva} />
         {tipo === 'cancha' && (
           <section className="rv-card rv-card--pad">
             <h2 className="rv-h2" style={{ marginBottom: 4 }}>Horas reservadas por franja</h2>
@@ -153,39 +189,16 @@ export default function Ingresos({ negocio, reservas, clientes, onAbrirReserva }
             <Barras datos={paquetes} formato={v => cuenta(v, 'evento', 'eventos')} label="Eventos por paquete" />
           </section>
         )}
-        {tipo === 'estadia' && (
-          <section className="rv-card rv-card--pad">
-            <div className="ala-cab-lista"><div style={{ minWidth: 0 }}><h2 className="rv-h2">Llegadas y salidas</h2><p className="rv-ayuda" style={{ margin: '2px 0 0' }}>Los próximos siete días, en todas las propiedades.</p></div></div>
-            {movimientos.length === 0 ? <p className="rv-ayuda" style={{ margin: 0 }}>Sin llegadas ni salidas esta semana.</p> : (
-              <div className="rv-lista">
-                {movimientos.slice(0, 10).map(({ r, llega, f }) => (
-                  <button key={`${llega ? 'in' : 'out'}-${r.id}`} type="button" className="rv-item" onClick={() => onAbrirReserva(r.id)}>
-                    <span className="rv-kpi-ico" aria-hidden style={{ width: 30, height: 30, ...(llega ? {} : { background: 'var(--color-surface-alt)', color: 'var(--color-muted)' }) }}>{llega ? <LogIn size={15} strokeWidth={1.7} /> : <LogOut size={15} strokeWidth={1.7} />}</span>
-                    <span className="rv-item-cuerpo"><span className="rv-item-titulo">{nombre(r)}</span><span className="rv-item-sub">{donde(r)} · {r.meses ? duracionEstadiaTxt(r) : cuenta(r.huespedes ?? 1, 'huésped', 'huéspedes')} · {horaDe(r, llega)}</span></span>
-                    <Chip tono={llega ? 'ok' : 'gris'}>{llega ? (r.meses ? 'Entra' : 'Llega') : 'Sale'} {fechaRelativa(f, HOY).toLowerCase()}</Chip>
-                  </button>
-                ))}
-              </div>
-            )}
-          </section>
-        )}
       </div>
     </div>
   )
 }
 
-/** Qué parte de lo disponible se reservó: horas, bloques o noches, según el modo. Solo mira hasta hoy. */
+/** Qué parte de lo disponible se reservó: horas o bloques, según el modo. Solo mira hasta hoy. (La estadía hace su cuenta en datos/estadisticas.ts.) */
 function calcularOcupacion(n: NegocioAlquiler, cobradas: Reserva[], desde: ISO, hasta: ISO): number {
   const fin = hasta < HOY ? hasta : HOY
   const dias = Math.max(0, diasEntre(desde, fin) + 1)
   if (!dias) return 0
-  if (n.tipo === 'estadia') {
-    // Las noches van de `desde` a `fin` inclusive: la de `fin` también cuenta, por eso el tope es el día siguiente.
-    const tope = sumarDias(fin, 1)
-    const disponibles = dias * n.propiedades.length
-    const ocupadas = cobradas.reduce((s, r) => s + (r.entrada && r.salida ? Math.max(0, diasEntre(r.entrada < desde ? desde : r.entrada, r.salida > tope ? tope : r.salida)) : 0), 0)
-    return disponibles ? Math.min(1, ocupadas / disponibles) : 0
-  }
   const abiertos = Array.from({ length: dias }, (_, i) => sumarDias(desde, i)).filter(f => n.apertura.dias.includes(diaSemana(f))).length
   if (n.tipo === 'bloque') {
     const disponibles = abiertos * n.salones.reduce((s, x) => s + bloquesDe(n, x).length, 0)
