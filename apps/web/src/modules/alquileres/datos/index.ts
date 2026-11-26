@@ -242,6 +242,30 @@ export interface CalendarioExterno {
   conflictos?: { reservaId: string; codigo: string; entrada: ISO; salida: ISO }[]
 }
 
+/**
+ * Una estadía cobrada afuera de Órbita (hoy, por Airbnb), importada del
+ * archivo de ganancias. No es una Reserva: sus noches llegan como bloqueo del
+ * calendario y su plata y su huésped, por acá (ver datos/estadisticas.ts).
+ */
+export interface IngresoExterno {
+  id: string
+  unidadId: string
+  canal: 'airbnb'
+  /** El código de confirmación del canal. */
+  codigo: string
+  /** [entrada, salida): el día `salida` ya está libre. */
+  entrada: ISO
+  salida: ISO
+  noches: number
+  huesped?: string
+  /** Lo que le quedó al dueño (neto de comisión). Cero o menos es una devolución: no se cuenta. */
+  neto: number
+  bruto: number
+  comision: number
+  /** Tres letras. Solo lo que está en ARS se suma a los pesos. */
+  moneda: string
+}
+
 // ─── Mensajes automáticos, pagos y equipo ────────────────────────────────────
 // Lo que el panel configura en "Recordatorios y mensajes", "Pagos y señas" y
 // "Equipo". Es demo: no se manda ningún WhatsApp, no se conecta ninguna cuenta
@@ -328,6 +352,8 @@ export interface NegocioAlquiler {
   propiedades: Propiedad[]
   bloqueos: Bloqueo[]
   calendariosExternos: CalendarioExterno[]
+  /** Solo estadía: lo cobrado afuera (Airbnb), importado. Opcional: lo guardado en el navegador de la demo no lo trae. */
+  ingresosExternos?: IngresoExterno[]
   mensajes: MensajeAuto[]
   pagos: Pagos
   /** El primero es quien figura como dueño del panel. */
@@ -558,6 +584,10 @@ export const NEGOCIOS_DEMO: Record<TipoAlquiler, NegocioAlquiler> = {
       { id: 'bl2', unidadId: 'c2', desde: '2026-12-24', hasta: '2026-12-27', motivo: 'Reservado por Airbnb', origen: 'ical', calendarioId: 'ce1' },
     ],
     calendariosExternos: [{ id: 'ce1', unidadId: 'c2', nombre: 'Airbnb · Cabaña Lapacho', url: 'https://www.airbnb.com/calendar/ical/demo.ics', ultimaSync: HOY }],
+    ingresosExternos: [
+      { id: 'ie1', unidadId: 'c2', canal: 'airbnb', codigo: 'HMDEMO2610', entrada: '2026-10-16', salida: '2026-10-20', noches: 4, huesped: 'Marina Costa', neto: 312000, bruto: 322000, comision: 10000, moneda: 'ARS' },
+      { id: 'ie2', unidadId: 'c2', canal: 'airbnb', codigo: 'HMDEMO0611', entrada: '2026-11-06', salida: '2026-11-09', noches: 3, huesped: 'Diego Funes', neto: 243000, bruto: 250500, comision: 7500, moneda: 'ARS' },
+    ],
   },
 }
 
