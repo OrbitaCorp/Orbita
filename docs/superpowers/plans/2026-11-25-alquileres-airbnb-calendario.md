@@ -454,9 +454,21 @@ corrigieron antes de producción (cada uno con su test, primero en rojo):
 | "Calendario conectado" aunque Airbnb no hubiera dejado bajarlo | Se avisa con el motivo y el calendario queda a la vista con su error |
 | La pantalla volvía a la primera propiedad después de cada acción | Ya no se vuelve a montar |
 
-Quedaron anotados, sin corregir: el `.catch` del panel que trata cualquier falla de `GET calendarios` como "no
-hay calendarios"; la campanita que dice "sincronizado" aunque haya fallado; dos sincronizaciones a la vez del
-mismo calendario pueden duplicar sus bloqueos hasta la corrida siguiente; el mismo aviso conectado por
-`airbnb.com` y por `airbnb.com.ar` cuenta doble; la respuesta de la API devuelve el enlace entero de Airbnb
-(con su clave) a cualquier miembro que pueda ver reservas; y si Airbnb redirige un dominio de país al `.com`,
-ese calendario falla hasta que el dueño pegue el otro enlace.
+Lo que había quedado anotado sin corregir se corrigió el mismo 25/11, después de probar la pantalla en
+producción con el negocio de prueba (cada punto con su test, primero en rojo):
+
+| Qué estaba mal | Qué quedó |
+|---|---|
+| El panel trataba cualquier falla de `GET calendarios` como "no hay calendarios" | Solo un 404 (una API anterior); cualquier otra falla se ve y se puede reintentar |
+| La campanita decía "sincronizado" aunque la descarga hubiera fallado | Dice "no se pudo sincronizar", con el motivo, y hace cuánto fue |
+| Dos sincronizaciones a la vez del mismo calendario podían duplicar sus bloqueos | Se reemplazan con el candado del recurso tomado (`candado.ts`) |
+| Uno que fallaba al guardar quedaba primero en la cola y trababa a los demás | Pasa al final con su motivo |
+| El mismo aviso conectado por `airbnb.com` y por `airbnb.com.ar` contaba doble | Es el mismo calendario (misma ruta y clave): no se conecta dos veces |
+| La API le devolvía el enlace de Airbnb con su clave a quien pudiera ver reservas | Devuelve el enlace sin la clave |
+| Si Airbnb redirigía un dominio de país al `.com`, el calendario fallaba | Se sigue esa redirección, una sola vez y solo hacia otro enlace que cumple las mismas reglas |
+| Las noches que se liberan al desconectar salían de lo que el panel tenía cargado (medio año) | Las cuenta el servidor |
+| El campo del enlace se vaciaba antes de saber si había conectado | Se vacía recién cuando conectó; un enlace rechazado queda para corregirlo |
+| Un rechazo salía con el ícono de éxito, y "Sincronizar ahora" decía "Calendario sincronizado" aunque Airbnb no lo hubiera dejado bajar (visto en producción) | El aviso de error es de error, y sincronizar dice el motivo. Los botones dicen "Conectando…", "Sincronizando…" y "Desconectando…" mientras tanto |
+
+Sigue sin verificar: cómo titula Airbnb sus eventos hoy y cada cuánto relee el calendario de Órbita. Se ve
+con un aviso real (tarea 10).

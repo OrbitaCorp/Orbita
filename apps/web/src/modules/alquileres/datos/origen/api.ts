@@ -27,6 +27,7 @@ import type { Reserva as ReservaApi } from '@/lib/reservasApi/tipos'
 import { sumarDias, type ISO } from '@/lib/reservas/fechas'
 import { NEGOCIOS_DEMO } from '../index'
 import { calendarioDeApi, clientesDeReservas, fechaArgentina, negocioDeApi, reservaDeApi, soloPorNoche, tipoDeRecurso, tipoDeRubro } from './mapear'
+import { HechoConAviso } from './aviso'
 import { bloqueoParaApi, calendarioParaApi, cambiosDePropiedades, configDeCambio, idDeBloqueo, pasosDeCambio, pedidoDeReserva, recursoDePropiedad } from './escribir'
 import type { DatosPanelAlquiler, Escrituras, OrigenAlquileres } from './index'
 
@@ -86,8 +87,9 @@ export async function cargarApi(hoy: ISO): Promise<CargaApi> {
     panel.servicios('ALQUILERES'),
     panel.bloqueos('ALQUILERES', desde, hasta),
     reservasEntre(desde, hasta),
-    // Si la API todavía no tiene calendarios (el front se despliega unos minutos antes), el panel carga igual.
-    panel.calendarios('ALQUILERES').catch(() => []),
+    // Si la API todavía no tiene calendarios (un 404: el front se despliega unos minutos antes), el panel
+    // carga igual. Cualquier otra falla no se esconde como "no hay calendarios": la carga falla y se reintenta.
+    panel.calendarios('ALQUILERES').catch((e: unknown) => { if ((e as { status?: number } | null)?.status === 404) return []; throw e }),
   ])
   if (!config) throw new Error('Este negocio todavía no tiene Alquileres configurado.')
   const { tipo, rubro } = tipoDeRubro(negocio.subrubros)
@@ -168,7 +170,6 @@ export function escriturasDe(d: CargaApi, recargar: () => Promise<void>): Escrit
       await panel.borrarBloqueo(idDeBloqueo(id))
       await recargar()
     },
-    // Los calendarios externos de verdad (Airbnb) son la etapa 4: la sección no se muestra en el panel real.
     // Los bloqueos no viajan: los arma el servidor al bajar el calendario.
     agregarCalendario: async (_tipo, c) => {
       estadia()
@@ -176,15 +177,17 @@ export function escriturasDe(d: CargaApi, recargar: () => Promise<void>): Escrit
       await recargar()
       // Conectarlo y poder bajarlo son dos cosas: si Airbnb no lo dejó bajar, no bloquea nada todavía.
       // No se festeja: el calendario queda a la vista con su error, y se dice.
-      if (conectado.ultimoError) throw new Error(`Quedó conectado, pero todavía no se pudo bajar: ${conectado.ultimoError}`)
+      if (conectado.ultimoError) throw new HechoConAviso('Quedó conectado, pero todavía no se pudo bajar', `${conectado.ultimoError} Probá con “Sincronizar ahora” en un rato.`)
     },
     quitarCalendario: async (_tipo, id) => {
       await panel.desconectarCalendario(id)
       await recargar()
     },
     sincronizarCalendario: async (_tipo, id) => {
-      await panel.sincronizarCalendario(id)
+      const quedo = await panel.sincronizarCalendario(id)
       await recargar()
+      // Pedir que lo baje y que lo haya bajado son dos cosas: si falló, no se dice "sincronizado".
+      if (quedo?.ultimoError) throw new HechoConAviso('No se pudo bajar el calendario', `${quedo.ultimoError} Lo que ya estaba bloqueado sigue bloqueado.`)
     },
   }
 }

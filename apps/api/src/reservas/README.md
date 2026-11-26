@@ -194,7 +194,12 @@ Código: `calendarios/` y `dominio/ics.ts`. Plan y decisiones: `docs/superpowers
   reservar, así que no hay nada más que tocar.
 - **Cada cuánto:** el job `instagram-cada-5-minutos` baja hasta 5 calendarios por corrida, los que no se
   bajan hace 30 minutos. Solo corre en producción: en local y en staging se usa "Sincronizar ahora".
-- **Si falla la descarga** se guarda el motivo en el calendario y los bloqueos quedan como estaban.
+- **Si falla la descarga** se guarda el motivo en el calendario y los bloqueos quedan como estaban. Si lo
+  que falla es guardar (la base), en la corrida automática el calendario pasa igual al final de la cola con
+  un motivo genérico: uno roto no traba a los que vienen atrás.
+- **De a uno por recurso:** los bloqueos de un calendario se reemplazan con el candado del recurso tomado
+  (`candado.ts`). Dos sincronizaciones a la vez (el job y "Sincronizar ahora") no duplican bloqueos, y
+  tampoco se cruzan con alguien que está reservando esas noches.
 - **El eco:** Airbnb vuelve a publicar como "no disponible" lo que importó de acá, y a veces lo sigue
   publicando cuando acá ya se canceló, se movió o se desbloqueó. Un evento "no disponible" con las fechas
   exactas de algo que el `.ics` de este recurso **mostró** en los últimos 60 días no bloquea. Qué mostró
@@ -206,9 +211,16 @@ Código: `calendarios/` y `dominio/ics.ts`. Plan y decisiones: `docs/superpowers
   impide. Desde el sitio tapa todo.
 - **Conflictos:** `GET calendarios` devuelve, por calendario, las reservas activas de acá que pisan noches
   reservadas allá. No se resuelven solos: decide el dueño.
+- **Lo que ve el panel de cada calendario:** el enlace **sin su clave** (`?s=…`), que es lo que deja leer el
+  calendario del aviso: con `reservas.view` se reconoce cuál es, no se puede bajar. Y `noches`: cuántas tiene
+  bloqueadas de acá en adelante, contadas en el servidor (el panel no carga todos los bloqueos).
 - **Qué enlaces se aceptan** (`calendarios/descarga.ts`): solo `https://www.airbnb.<país>/….ics`, por lista
-  fija, sin seguir redirecciones, con 8 s y 1 MB como máximo, y solo si el archivo llegó entero (con su `END:VCALENDAR`). Es una dirección que escribe un usuario y que
-  baja el servidor: no se abre a otros sitios sin revisar esto. Fuera de producción vale además el host de
-  `RESERVAS_ICAL_HOST_DE_PRUEBA`, para probar con un archivo propio.
+  fija, con 8 s y 1 MB como máximo, y solo si el archivo llegó entero (con su `END:VCALENDAR`). Las
+  redirecciones no se siguen solas; la única excepción, una sola vez, es la que lleva a otro enlace que
+  también cumple estas reglas (el dominio de un país que manda al `.com`). Es una dirección que escribe un
+  usuario y que baja el servidor: no se abre a otros sitios sin revisar esto. Fuera de producción vale
+  además el host de `RESERVAS_ICAL_HOST_DE_PRUEBA`, para probar con un archivo propio.
+- **El mismo aviso no se conecta dos veces** a una propiedad, tampoco por otro dominio de Airbnb (`.com` y
+  `.com.ar` sirven el mismo calendario: misma ruta y misma clave). Contaría todo doble.
 - Un bloqueo `ICAL` no se borra a mano (`DELETE bloqueos/:id` responde 400): se va cuando Airbnb libera las
   noches o al desconectar el calendario. Borrar el recurso se lleva sus calendarios y sus bloqueos importados.

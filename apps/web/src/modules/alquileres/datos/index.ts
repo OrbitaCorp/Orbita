@@ -221,6 +221,8 @@ export interface Bloqueo {
   origen: 'dueno' | 'ical'
   /** Si vino de un calendario externo, cuál: al desconectarlo se van sus bloqueos. */
   calendarioId?: string
+  /** Negocio real, si vino de Airbnb: allá es una reserva, o noches que el dueño cerró a mano. */
+  externoTipo?: 'RESERVADO' | 'CERRADO'
 }
 
 export interface CalendarioExterno {
@@ -234,6 +236,8 @@ export interface CalendarioExterno {
   ultimaSyncEn?: string
   /** Negocio real: por qué falló la última descarga. */
   error?: string
+  /** Negocio real: las noches que tiene bloqueadas de acá en adelante, contadas por el servidor (el panel no carga todas). */
+  noches?: number
   /** Negocio real: reservas de acá que pisan noches reservadas allá. */
   conflictos?: { reservaId: string; codigo: string; entrada: ISO; salida: ISO }[]
 }
@@ -356,6 +360,8 @@ export interface Reserva {
   id: string
   /** El código que recibió quien reservó. Lo pone la API; en la demo no viene y sale del id (codigoDe). */
   codigo?: string
+  /** Negocio real: por dónde entró. "directo" la cargó el negocio en su panel; "sitio" entró por el sitio propio. */
+  canal?: 'directo' | 'sitio'
   /** La cancha, el salón o la propiedad. */
   unidadId: string
   clienteId: string

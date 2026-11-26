@@ -466,11 +466,8 @@ function ModalBloqueo({ bloqueo, onCerrar, onQuitar }: { bloqueo: Bloqueo; onCer
 
 // ─── Estadía: la grilla de todas las propiedades ─────────────────────────────
 
-/** El canal de una reserva (lo trae la API: lo cargó el dueño o entró por el sitio). Opcional hasta que todos los orígenes lo copien. */
-type ConCanal = Reserva & { canal?: 'directo' | 'sitio' }
-const CANAL: Record<NonNullable<ConCanal['canal']>, string> = { directo: 'Directo', sitio: 'Sitio' }
-/** Reservado allá (una estadía de Airbnb) o cerrado a mano allá. Opcional: sin el dato, se toma como reservado. */
-type ConExterno = Bloqueo & { externoTipo?: 'RESERVADO' | 'CERRADO' }
+/** El canal de una reserva: la cargó el dueño (directo) o entró por el sitio. La demo no lo trae: sin canal, la barra no lleva etiqueta. */
+const CANAL: Record<NonNullable<Reserva['canal']>, string> = { directo: 'Directo', sitio: 'Sitio' }
 
 /** De qué calendario externo vino un bloqueo, por su nombre: "Airbnb · Cabaña Lapacho" → "Airbnb". */
 function canalExterno(n: NegocioAlquiler, b: Bloqueo): string {
@@ -486,13 +483,13 @@ function canalExterno(n: NegocioAlquiler, b: Bloqueo): string {
 function barrasDeEstadia(n: NegocioAlquiler, reservas: Reserva[], clientes: Cliente[]): BarraGrilla[] {
   const deReservas = reservas
     .filter(r => r.estado !== 'cancelada' && r.entrada && r.salida)
-    .map((r: ConCanal): BarraGrilla => ({
+    .map((r): BarraGrilla => ({
       id: r.id, filaId: r.unidadId, desde: r.entrada!, hasta: r.salida!,
       titulo: clientePorId(r.clienteId, clientes)?.nombre ?? 'Sin nombre',
       etiqueta: r.canal ? CANAL[r.canal] : undefined,
       tono: r.estado === 'pendiente' ? 'pendiente' : r.estado === 'completada' || r.salida! <= HOY ? 'pasada' : 'reserva',
     }))
-  const deBloqueos = n.bloqueos.map((b: ConExterno): BarraGrilla => {
+  const deBloqueos = n.bloqueos.map((b): BarraGrilla => {
     if (b.origen === 'dueno') return { id: b.id, filaId: b.unidadId, desde: b.desde, hasta: b.hasta, titulo: b.motivo || 'Bloqueado', etiqueta: 'Bloqueo', tono: 'bloqueo' }
     const cerrado = b.externoTipo === 'CERRADO'
     return { id: b.id, filaId: b.unidadId, desde: b.desde, hasta: b.hasta, titulo: cerrado ? 'Cerrado' : canalExterno(n, b), etiqueta: cerrado ? canalExterno(n, b) : 'Reservado', tono: cerrado ? 'cerrado' : 'externo' }

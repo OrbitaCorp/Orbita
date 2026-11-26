@@ -4200,16 +4200,56 @@ Usa el campo libre que sumó Alan (\`ReservaConfig.datos\`, 23/11), sin migraci�
 
 **Compartido.** \`GrillaOcupacion\` es nueva en \`design-system/reservas\`, pura y controlada (filas, barras, ventana y qué pasa al tocar), sin nada de Alquileres: la pueden usar Turnos o Gimnasio. La cuenta de dónde cae cada barra está aparte, con tests (\`ocupacion.ts\`). **Hay que avisarles a Mateo y a Ale** antes de que la toquen.
 
-**Lo que falta:** el canal de cada reserva (\`Reserva.canal\`) y si un bloqueo de Airbnb es una reserva o un cierre (\`externoTipo\`) los suma al mapeo la sesión de planificación; hasta entonces las reservas no muestran canal y todo lo de Airbnb se pinta como reservado. El manual de Alquileres para Orbi todavía no existe (tarea del 21/12): cuando se escriba, nombrar **Todas**, **Por propiedad** y **Hoy**.`,
+**El canal y Airbnb:** la grilla usa \`Reserva.canal\` (Directo o Sitio) y \`Bloqueo.externoTipo\` (reservado o cerrado en Airbnb), que copia el mapeo de la API. La demo no carga canal en sus reservas, así que ahí las barras van sin etiqueta.
+
+**Lo que falta:** el manual de Alquileres para Orbi todavía no existe (tarea del 21/12): cuando se escriba, nombrar **Todas**, **Por propiedad** y **Hoy**.`,
     archivos: [
       'apps/web/src/design-system/reservas/GrillaOcupacion.tsx:115',
       'apps/web/src/design-system/reservas/ocupacion.ts:50',
       'apps/web/src/design-system/reservas/ocupacion.test.ts:1',
-      'apps/web/src/modules/alquileres/admin/Reservas.tsx:486',
-      'apps/web/src/modules/alquileres/admin/Reservas.tsx:505',
-      'apps/web/src/modules/alquileres/admin/Reservas.tsx:534',
+      'apps/web/src/modules/alquileres/admin/Reservas.tsx:483',
+      'apps/web/src/modules/alquileres/admin/Reservas.tsx:502',
+      'apps/web/src/modules/alquileres/admin/Reservas.tsx:531',
     ],
     antes: { 1280: 'grilla-ocupacion-antes-1280.webp', 390: 'grilla-ocupacion-antes-390.webp' },
     despues: { 1280: 'grilla-ocupacion-despues-1280.webp', 390: 'grilla-ocupacion-despues-390.webp' },
+  }),
+  entrada({
+    modulo: 'alquileres', fecha: F25, slug: 'airbnb-probado-en-produccion-y-sus-menores', tipo: 'tarea', quien: 'Alan',
+    titulo: 'El calendario de Airbnb, probado en producción y con sus pendientes menores corregidos',
+    foco: 'La pantalla de Airbnb se probó en producción con el negocio de prueba (conectar, sincronizar, desconectar y el rechazo de un enlace ajeno) y se corrigió lo que había quedado anotado: el enlace viaja al panel sin su clave, dos sincronizaciones a la vez no duplican, y un error se ve como error.',
+    que: `Después de subir la etapa 4, se probó en \`prueba-alquileres.orbita.site\`: la pantalla muestra el enlace del .ics, rechaza un enlace que no es de Airbnb, y conecta, sincroniza y desconecta (con un enlace de Airbnb inventado, que Airbnb contesta con 404). El negocio quedó sin calendarios. **No se probó una descarga exitosa en producción:** hace falta un aviso real.
+
+Esa prueba mostró dos cosas más, y con ellas se corrigió todo lo que la revisión había dejado anotado:
+
+| Qué estaba mal | Qué quedó |
+|---|---|
+| Un rechazo salía con el ícono de éxito | El aviso es de error |
+| "Sincronizar ahora" decía "Calendario sincronizado" aunque Airbnb no lo hubiera dejado bajar | Dice que no se pudo y por qué. Los botones dicen qué están haciendo mientras tanto |
+| El campo del enlace se vaciaba aunque la API lo rechazara | Se vacía recién cuando conectó |
+| La campanita decía "sincronizado" con un calendario caído | Dice "no se pudo sincronizar", con el motivo |
+| El panel escondía cualquier falla al traer los calendarios como "no hay calendarios" | Solo si la API todavía no los tiene (404) |
+| La API devolvía el enlace de Airbnb con su clave a quien pudiera ver reservas | Lo devuelve sin la clave |
+| Dos sincronizaciones a la vez podían duplicar bloqueos | Entran de a una, con el candado del recurso |
+| Un calendario que fallaba al guardar trababa la cola | Pasa al final |
+| El mismo aviso por \`.com\` y por \`.com.ar\` contaba doble | No se conecta dos veces |
+| Un dominio de país que redirige al \`.com\` fallaba | Se sigue esa redirección, una vez y solo dentro de Airbnb |
+| Las noches a liberar al desconectar podían quedar cortas | Las cuenta el servidor |
+
+**Para Turnos y Gimnasio** (motor compartido): sin migraciones. La sincronización de un calendario ahora toma el candado del recurso (el mismo de \`candado.ts\`), solo en alojamientos con Airbnb conectado.
+
+**Para la grilla de ocupación** (otra tarea en curso): el panel ahora sabe, de cada bloqueo de Airbnb, si allá es una reserva o un cierre a mano (\`externoTipo\`), y de cada reserva, si la cargó el negocio o entró por el sitio (\`canal\`).
+
+**Verificado:** tests de la API y del front en verde, y la pantalla contra la base de dev con un Airbnb de mentira, a 1280 y a 390 px.`,
+    archivos: [
+      'apps/api/src/reservas/calendarios/reservas-calendarios.service.ts:1',
+      'apps/api/src/reservas/calendarios/descarga.ts:1',
+      'apps/api/test/unit/reservas.calendarios.unit-spec.ts:1',
+      'apps/web/src/modules/alquileres/admin/acciones.ts:1',
+      'apps/web/src/modules/alquileres/admin/configuracion/Airbnb.tsx:1',
+      'apps/web/src/modules/alquileres/datos/origen/api.ts:1',
+      'apps/web/src/modules/alquileres/datos/origen/aviso.ts:1',
+      'apps/web/src/modules/alquileres/datos/origen/mapear.ts:1',
+    ],
   }),
 ]

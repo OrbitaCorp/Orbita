@@ -5,8 +5,9 @@ import { AuditService } from '../../audit/audit.service';
 import { describeError } from '../../common/utils/describe-error.util';
 import { ReservasCatalogoService, datosAlojamiento } from '../reservas-catalogo.service';
 import { clasificarEvento, generarICS, leerICS, sinEco, type EventoParaExportar, type NochesExportadas } from '../dominio/ics';
-import { fechaYMinutos, instante, sumarDias } from '../dominio/tiempo';
-import { descargarCalendario, errorDeUrl, type Descarga } from './descarga';
+import { diasEntre, fechaYMinutos, instante, sumarDias } from '../dominio/tiempo';
+import { tomarRecurso, TRANSACCION_CON_CANDADO } from '../candado';
+import { claveDelCalendario, descargarCalendario, errorDeUrl, urlSinClave, type Descarga } from './descarga';
 
 // Calendarios externos: el .ics de un aviso de Airbnb conectado a un
 // alojamiento. Cada sincronización baja el archivo y REEMPLAZA los bloqueos de
@@ -23,6 +24,11 @@ import { descargarCalendario, errorDeUrl, type Descarga } from './descarga';
 //   se anota cada vez que alguien lee el .ics (ReservaIcalExportada). Así se
 //   recuerda un bloqueo que el dueño ya borró y no se "recuerda" una retención
 //   que nadie llegó a ver.
+// - Los bloqueos se reemplazan con el recurso tomado (candado.ts): dos
+//   sincronizaciones del mismo calendario a la vez entran de a una, y tampoco
+//   se cruzan con alguien que está reservando esas noches.
+// - Al panel el enlace le llega sin su clave (urlSinClave): con `reservas.view`
+//   se ve qué calendario es, no se puede leer el calendario del aviso.
 // - Todo filtra por negocio, menos la corrida automática, que recorre los
 //   calendarios de todos.
 //
@@ -38,6 +44,8 @@ const DIAS_DE_MEMORIA_DEL_ECO = 60;
 const DIA_MS = 24 * 60 * 60 * 1000;
 /** Hasta cuánto para adelante se exporta. */
 const DIAS_QUE_SE_EXPORTAN = 365;
+/** Lo que se le dice al dueño cuando el archivo bajó pero no se pudo guardar (lo de la base no se le cuenta). */
+const NO_SE_PUDO_GUARDAR = 'No se pudo guardar lo que trajo el calendario. Se vuelve a intentar solo.';
 
 export interface ConflictoDto { reservaId: string; codigo: string; desde: string; hasta: string }
 
@@ -45,10 +53,13 @@ export interface CalendarioDto {
   id: string;
   recursoId: string;
   nombre: string;
+  /** El enlace sin su clave: para reconocerlo, no para bajarlo. */
   url: string;
   activo: boolean;
   ultimaSync: string | null;
   ultimoError: string | null;
+  /** Las noches que tiene bloqueadas de acá en adelante (lo que se libera si se desconecta). */
+  noches: number;
   /** Reservas activas de Órbita que pisan noches que el calendario trae como reservadas allá. */
   conflictos: ConflictoDto[];
 }
@@ -85,8 +96,8 @@ export class ReservasCalendariosService {
     if (calendarios.length === 0) return [];
     const [bloqueos, reservas] = await Promise.all([
       this.prisma.reservaBloqueo.findMany({
-        where: { businessId, calendarioId: { in: calendarios.map((c) => c.id) }, externoTipo: 'RESERVADO', fin: { gt: ahora } },
-        select: { calendarioId: true, inicio: true, fin: true },
+        where: { businessId, calendarioId: { in: calendarios.map((c) => c.id) }, fin: { gt: ahora } },
+        select: { calendarioId: true, inicio: true, fin: true, externoTipo: true },
       }),
       this.prisma.reserva.findMany({
         where: {
@@ -99,12 +110,14 @@ export class ReservasCalendariosService {
     ]);
     return calendarios.map((c) => {
       const suyos = bloqueos.filter((b) => b.calendarioId === c.id);
+      const reservados = suyos.filter((b) => b.externoTipo === 'RESERVADO');
       const conflictos = reservas
-        .filter((r) => r.recursoId === c.recursoId && suyos.some((b) => r.inicio < b.fin && b.inicio < r.fin))
+        .filter((r) => r.recursoId === c.recursoId && reservados.some((b) => r.inicio < b.fin && b.inicio < r.fin))
         .map((r) => ({ reservaId: r.id, codigo: r.codigo, desde: fechaYMinutos(r.inicio).fecha, hasta: fechaYMinutos(r.fin).fecha }));
+      const noches = suyos.reduce((n, b) => n + Math.max(1, diasEntre(fechaYMinutos(b.inicio).fecha, fechaYMinutos(b.fin).fecha)), 0);
       return {
-        id: c.id, recursoId: c.recursoId, nombre: c.nombre, url: c.url, activo: c.activo,
-        ultimaSync: c.ultimaSync?.toISOString() ?? null, ultimoError: c.ultimoError, conflictos,
+        id: c.id, recursoId: c.recursoId, nombre: c.nombre, url: urlSinClave(c.url), activo: c.activo,
+        ultimaSync: c.ultimaSync?.toISOString() ?? null, ultimoError: c.ultimoError, noches, conflictos,
       };
     });
   }
@@ -119,7 +132,9 @@ export class ReservasCalendariosService {
     if (recurso.modulo !== dto.modulo) throw new BadRequestException('Ese recurso es de otro módulo.');
     if (recurso.tipo !== 'ALOJAMIENTO') throw new BadRequestException('Por ahora se conectan calendarios solo a alojamientos.');
     const yaHay = await this.prisma.reservaCalendarioExterno.findMany({ where: { businessId, recursoId: recurso.id }, select: { url: true } });
-    if (yaHay.some((c) => c.url === url)) throw new ConflictException('Ese calendario ya está conectado a esta propiedad.');
+    // El mismo aviso por otro dominio de Airbnb (.com y .com.ar) es el mismo calendario: contaría todo dos veces.
+    const clave = claveDelCalendario(url);
+    if (yaHay.some((c) => c.url === url || claveDelCalendario(c.url) === clave)) throw new ConflictException('Ese calendario ya está conectado a esta propiedad.');
     if (yaHay.length >= MAXIMO_POR_RECURSO) throw new BadRequestException(`Hasta ${MAXIMO_POR_RECURSO} calendarios por propiedad. Desconectá uno para sumar otro.`);
 
     const creado = await this.prisma.reservaCalendarioExterno.create({ data: { businessId, modulo: dto.modulo, recursoId: recurso.id, nombre: dto.nombre.trim() || 'Airbnb', url } });
@@ -176,6 +191,11 @@ export class ReservasCalendariosService {
       } catch (e) {
         conError++;
         this.logger.error(`Calendario ${c.id}: no se pudo sincronizar — ${describeError(e)}`);
+        // Pasa al final de la cola con su motivo: si quedara primero, la corrida siguiente volvería a
+        // tropezar con él y los de atrás no se bajarían nunca. Sus bloqueos no se tocan.
+        await this.prisma.reservaCalendarioExterno
+          .updateMany({ where: { id: c.id, businessId: c.businessId }, data: { ultimaSync: ahora, ultimoError: NO_SE_PUDO_GUARDAR } })
+          .catch((otro: unknown) => this.logger.error(`Calendario ${c.id}: tampoco se pudo anotar el error — ${describeError(otro)}`));
       }
     }
     return { revisados: pendientes.length, conError };
@@ -213,13 +233,17 @@ export class ReservasCalendariosService {
     }
 
     await this.prisma.$transaction(async (tx) => {
+      // Con el recurso tomado: otra sincronización de este calendario (el job y "Sincronizar ahora" a la
+      // vez) espera a que esta termine, y al entrar borra lo que esta dejó. Sin esto, las dos borraban
+      // primero y creaban después, y los bloqueos quedaban duplicados hasta la corrida siguiente.
+      await tomarRecurso(tx, businessId, recurso.id);
       // Si lo desconectaron mientras bajaba, no se crea nada.
       const sigue = await tx.reservaCalendarioExterno.findFirst({ where: { id: c.id, businessId }, select: { id: true } });
       if (!sigue) return;
       await tx.reservaBloqueo.deleteMany({ where: { businessId, calendarioId: c.id } });
       if (nuevos.length) await tx.reservaBloqueo.createMany({ data: nuevos });
       await tx.reservaCalendarioExterno.updateMany({ where: { id: c.id, businessId }, data: { ultimaSync: ahora, ultimoError: null } });
-    });
+    }, TRANSACCION_CON_CANDADO);
     return true;
   }
 

@@ -193,10 +193,11 @@ export function reservaDeApi(r: ReservaApi, tipo: TipoAlquiler): Reserva | null 
     ? { entrada: r.fecha, salida: fechaArgentina(r.fin) }
     : { fecha: r.fecha, inicio: r.inicioMinutos, fin: r.finMinutos }
   const nota = r.notaInterna ?? r.notas ?? undefined
-  const huespedes = comoDatos(r.datos).huespedes
+  const { huespedes, canal } = comoDatos(r.datos)
   return {
     id: r.id,
     codigo: r.codigo,
+    canal: r.origen === 'TIENDA' || canal === 'sitio' ? 'sitio' : 'directo',
     unidadId: r.recursoId,
     clienteId: clienteIdDe(r),
     estado,
@@ -218,7 +219,7 @@ export function bloqueosDeApi(bs: BloqueoApi[], unidadIds: string[]): Bloqueo[] 
   return bs.flatMap(b => {
     // Lo que vino de un calendario externo (Airbnb) se distingue: se ve distinto y no se quita a mano.
     const deAfuera = b.origen === 'ICAL'
-    const base = { desde: fechaArgentina(b.inicio), hasta: fechaArgentina(b.fin), motivo: b.motivo ?? (deAfuera ? 'Airbnb' : 'Bloqueado'), origen: deAfuera ? 'ical' as const : 'dueno' as const, ...(deAfuera && b.calendarioId ? { calendarioId: b.calendarioId } : {}) }
+    const base = { desde: fechaArgentina(b.inicio), hasta: fechaArgentina(b.fin), motivo: b.motivo ?? (deAfuera ? 'Airbnb' : 'Bloqueado'), origen: deAfuera ? 'ical' as const : 'dueno' as const, ...(deAfuera && b.calendarioId ? { calendarioId: b.calendarioId } : {}), ...(deAfuera && b.externoTipo ? { externoTipo: b.externoTipo } : {}) }
     return b.recursoId ? [{ id: b.id, unidadId: b.recursoId, ...base }] : unidadIds.map(u => ({ id: `${b.id}:${u}`, unidadId: u, ...base }))
   })
 }
@@ -268,6 +269,7 @@ export function calendarioDeApi(c: CalendarioApi, hoy: ISO): CalendarioExterno {
     ultimaSync: c.ultimaSync ? fechaArgentina(c.ultimaSync) : hoy,
     ...(c.ultimaSync ? { ultimaSyncEn: c.ultimaSync } : {}),
     ...(c.ultimoError ? { error: c.ultimoError } : {}),
+    ...(typeof c.noches === 'number' ? { noches: c.noches } : {}),
     conflictos: c.conflictos.map(x => ({ reservaId: x.reservaId, codigo: x.codigo, entrada: x.desde, salida: x.hasta })),
   }
 }
