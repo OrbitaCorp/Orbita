@@ -18,6 +18,8 @@ import { consecutivasDesde, franjasDelDia } from '@/lib/reservas/disponibilidad'
 import { pesos, precioBloque, precioTurnosSeguidos } from '@/lib/reservas/precio'
 import { motivoNoReservable, motivoNoReservableMes, nochesOcupadas, precioEstadia, precioMensual, salidaMaxima } from '@/lib/reservas/estadia'
 import { AHORA, codigoDe, ESTADO_RESERVA, HOY, aperturaDe, bloqueoEn, bloquesDe, bloquesLibresEn, capital, clientePorId, cuenta, duracionEstadiaTxt, esMensual, fechaDeReserva, mesesTxt, ocupadoDelDia, palabrasDe, rangosOcupados, reservasDelDia, salonDe, senaPara, tituloEvento, unidadPorId, type Bloqueo, type Cliente, type NegocioAlquiler, type Reserva } from '../datos'
+import { estadiaDelBloqueo } from '../datos/estadisticas'
+import type { IngresoExterno } from '../datos'
 import { CalendarioDia, CalendarioRango, type Rango } from '@/design-system/reservas/Calendario'
 import { Area, Campo, Chip, Encabezado, FilaSwitch, Modal, Nota, Segmentado, Selector, Sigla, Vacio } from '@/design-system/reservas/piezas'
 import GrillaOcupacion, { type BarraGrilla, type DiasGrilla, type TonoBarra } from '@/design-system/reservas/GrillaOcupacion'
@@ -447,18 +449,24 @@ function Ocupacion({ negocio, reservas, clientes, onAbrir, onNueva, onQuitarBloq
           </section>
         </div>
       </div>
-      {bloqueo && <ModalBloqueo bloqueo={bloqueo} onCerrar={() => setBloqueoAbierto(null)} onQuitar={onQuitarBloqueo} />}
+      {bloqueo && <ModalBloqueo bloqueo={bloqueo} estadia={estadiaDelBloqueo(bloqueo, negocio.ingresosExternos)} onCerrar={() => setBloqueoAbierto(null)} onQuitar={onQuitarBloqueo} />}
     </>
   )
 }
 
 /** Unas fechas bloqueadas, abiertas desde el calendario o la grilla: las del dueño se quitan acá; las de un calendario externo, desconectándolo. */
-function ModalBloqueo({ bloqueo, onCerrar, onQuitar }: { bloqueo: Bloqueo; onCerrar: () => void; onQuitar: (id: string) => void }) {
+/** `estadia`: si el bloqueo es de Airbnb y se importaron sus ganancias, quién fue y cuánto pagó Airbnb. */
+function ModalBloqueo({ bloqueo, estadia, onCerrar, onQuitar }: { bloqueo: Bloqueo; estadia?: IngresoExterno; onCerrar: () => void; onQuitar: (id: string) => void }) {
   return (
     <Modal titulo="Fechas bloqueadas" onCerrar={onCerrar}
       pie={<><button type="button" className="rv-btn" onClick={onCerrar}>Cerrar</button>{bloqueo.origen === 'dueno' && <BotonConfirmar className="rv-btn rv-btn--peligro" pregunta="¿Quitar? Esas fechas quedan libres." onConfirmar={() => { onQuitar(bloqueo.id); onCerrar() }}>Quitar el bloqueo</BotonConfirmar>}</>}>
       <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>{rangoTxt(bloqueo.desde, bloqueo.hasta)}</p>
       <p style={{ margin: '6px 0 0', fontSize: 14 }}>{bloqueo.motivo}</p>
+      {estadia && (
+        <p style={{ margin: '6px 0 0', fontSize: 14 }}>
+          {estadia.huesped ? <>Huésped: <b>{estadia.huesped}</b> · </> : null}Airbnb pagó <b className="rv-num">{estadia.moneda === 'ARS' ? pesos(estadia.neto) : `${estadia.moneda} ${estadia.neto.toLocaleString('es-AR', { maximumFractionDigits: 2 })}`}</b> (neto de comisión)
+        </p>
+      )}
       <p className="rv-ayuda" style={{ marginTop: 8 }}>{bloqueo.origen === 'ical' ? 'Vino de un calendario externo: se quita desconectando el calendario en Configuración.' : 'Lo pusiste vos. Mientras esté, nadie puede reservar esas fechas.'}</p>
     </Modal>
   )
@@ -522,7 +530,7 @@ function GrillaEstadias({ negocio, reservas, clientes, onAbrir, onNueva, onQuita
         onBarra={b => { if (b.tono === 'bloqueo' || b.tono === 'externo' || b.tono === 'cerrado') setBloqueoAbierto(b.id); else onAbrir(b.id) }}
         onLibre={libre}
         leyenda={LEYENDA} />
-      {bloqueo && <ModalBloqueo bloqueo={bloqueo} onCerrar={() => setBloqueoAbierto(null)} onQuitar={onQuitarBloqueo} />}
+      {bloqueo && <ModalBloqueo bloqueo={bloqueo} estadia={estadiaDelBloqueo(bloqueo, negocio.ingresosExternos)} onCerrar={() => setBloqueoAbierto(null)} onQuitar={onQuitarBloqueo} />}
     </>
   )
 }

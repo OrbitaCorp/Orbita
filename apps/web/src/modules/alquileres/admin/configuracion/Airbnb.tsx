@@ -6,6 +6,8 @@
 // - De Airbnb a Órbita: el enlace del aviso. El servidor lo baja cada 30
 //   minutos y bloquea esas noches; acá se ve cuándo fue la última vez, si
 //   falló y por qué, y se puede pedir que lo baje ahora.
+// - Ganancias de Airbnb: el calendario no trae la plata; se importa del
+//   archivo que el dueño descarga (GananciasAirbnb.tsx).
 //
 // Lo que no se esconde: entre una sincronización y la otra pueden entrar dos
 // reservas para las mismas noches. Si pasa, se avisa acá y arriba del
@@ -22,6 +24,9 @@ import { TIPOS, cuenta, palabrasDe, type CalendarioExterno, type NegocioAlquiler
 import { hace } from '../../datos/textos'
 import { PaginaForm } from './comun'
 import { BotonConfirmar } from '../piezas'
+import type { Ganancias } from '../../datos/origen'
+import type { Avisar } from '../acciones'
+import GananciasAirbnb from './GananciasAirbnb'
 
 /** Tope de calendarios por propiedad (el mismo que aplica el servidor). */
 const MAXIMO = 3
@@ -33,6 +38,9 @@ interface P {
   onDesconectar: (id: string) => Promise<boolean>
   onSincronizar: (id: string) => Promise<boolean>
   onVerReserva: (id: string) => void
+  /** Importar las ganancias de Airbnb. Sin esto (una API que todavía no las tiene), la sección no se muestra. */
+  ganancias?: Ganancias
+  avisar: Avisar
 }
 
 const CSS = `
@@ -54,7 +62,7 @@ const CSS = `
   @media (max-width: 480px) { .ala-url { flex-direction: column; } .ala-cal-acc { padding-left: 0; } .ala-cal-acc .rv-btn { flex: 1 1 100%; } }
 `
 
-export default function Airbnb({ negocio, onConectar, onDesconectar, onSincronizar, onVerReserva }: P) {
+export default function Airbnb({ negocio, onConectar, onDesconectar, onSincronizar, onVerReserva, ganancias, avisar }: P) {
   const palabras = palabrasDe(negocio)
   const propiedades = negocio.propiedades
   const [propiedadId, setPropiedadId] = useState(propiedades[0]?.id ?? '')
@@ -169,6 +177,8 @@ export default function Airbnb({ negocio, onConectar, onDesconectar, onSincroniz
             </form>
           ) : <p className="rv-ayuda" style={{ margin: 0 }}>Hasta {MAXIMO} calendarios por propiedad. Desconectá uno para sumar otro.</p>}
         </Seccion>
+
+        {ganancias && <GananciasAirbnb ganancias={ganancias} propiedades={propiedades.map(p => ({ id: p.id, nombre: p.nombre }))} avisar={avisar} />}
 
         <Nota tono="info">
           <span>Órbita baja el calendario de Airbnb <b>cada 30 minutos</b>, y Airbnb lee el de Órbita cada pocas horas. En ese rato pueden entrar dos reservas para las mismas noches: si pasa, te avisamos acá y arriba del calendario.</span>

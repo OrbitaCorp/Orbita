@@ -243,7 +243,7 @@ export default function Panel() {
               onConectar={c => hacer(() => n.agregarCalendario(tipo, c, []), 'Calendario conectado', 'Ya se bajaron las noches que Airbnb tiene tomadas.')}
               onDesconectar={id => hacer(() => n.quitarCalendario(tipo, id), 'Calendario desconectado', 'Las noches que venían de Airbnb quedaron libres.')}
               onSincronizar={id => hacer(() => n.sincronizarCalendario(tipo, id), 'Calendario sincronizado')}
-              onVerReserva={verReserva} />
+              onVerReserva={verReserva} ganancias={n.ganancias} avisar={avisar} />
           )}
           {vista === 'calendarios' && !real && <Calendarios key={k} negocio={negocio} reservas={reservas} onCalendario={(c, b) => { n.agregarCalendario(tipo, c, b); avisar('Calendario conectado', `${b.length} ${b.length === 1 ? 'fecha bloqueada' : 'fechas bloqueadas'}. Demo: sincronización simulada.`) }} onQuitarCalendario={id => { n.quitarCalendario(tipo, id); avisar('Calendario desconectado') }} />}
           {vista === 'configuracion' && tab === 'negocio' && <Negocio key={k} negocio={negocio} onGuardar={onGuardar} />}
