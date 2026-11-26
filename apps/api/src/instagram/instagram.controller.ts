@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, HttpCode, Logger, Param, Patch, Post, Put, Query, Req, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, HttpCode, Logger, Param, Optional, Patch, Post, Put, Query, Req, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
@@ -27,6 +27,7 @@ import { InstagramMediosService } from './instagram-medios.service';
 import { InstagramOrbiService } from './instagram-orbi.service';
 import { InstagramPublicacionesService } from './instagram-publicaciones.service';
 import { InstagramService } from './instagram.service';
+import { InstagramImportacionService } from './instagram-importacion.service';
 
 // `express` es solo dependencia transitiva — mismo motivo que en
 // mercadopago.controller.ts.
@@ -53,6 +54,8 @@ export class InstagramController {
     private readonly ajustes: InstagramAjustesService,
     private readonly bot: InstagramBotService,
     config: ConfigService,
+    // Opcional por los specs que construyen el controller a mano: trae las charlas que la cuenta ya tenía al conectarla.
+    @Optional() private readonly importacion?: InstagramImportacionService,
   ) {
     this.frontendUrl = config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
   }
@@ -397,7 +400,10 @@ export class InstagramController {
     try {
       if (error || !code) throw new Error(error ?? 'Falta el code de Instagram');
       // Instagram agrega "#_" al final del code en algunos redirects.
-      const { suscripta, retorno } = await this.instagram.manejarCallback(code.replace(/#_$/, ''), state);
+      const { businessId, suscripta, retorno } = await this.instagram.manejarCallback(code.replace(/#_$/, ''), state);
+      // Las charlas que la cuenta ya tenía: se lanza la importación y no se la espera (ver instagram-importacion.service.ts).
+      // Vale también para la cuenta de la empresa (Superadmin → Marketing), que vuelve por este mismo callback.
+      await this.importacion?.lanzar(businessId);
       res.redirect(`${retorno}${retorno.includes('?') ? '&' : '?'}ig=${suscripta ? 'conectado' : 'sin-suscripcion'}`);
     } catch (e) {
       this.logger.warn(`Conexión de Instagram fallida: ${describeError(e)}`);

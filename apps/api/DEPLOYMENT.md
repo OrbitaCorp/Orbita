@@ -488,6 +488,24 @@ su cantidad.
 Sin los tres secretos cargados, la pantalla de Marketing avisa que TikTok no está configurado y el resto
 de la API sigue igual.
 
+## Instagram: importación de las charlas al conectar
+
+Al conectar una cuenta de Instagram (Difusión o Superadmin → Marketing, el mismo callback de OAuth), la API trae
+las charlas que la cuenta ya tenía con la API de Conversaciones: las 50 más recientes, con sus últimos 20 mensajes
+(Meta no da el detalle de más), leídas y sin disparar a Orbi ni al bot de ventas. Código y razones:
+`src/instagram/instagram-importacion.service.ts`.
+
+- **Corre en pedidos propios**, porque con `--cpu-throttling` lo que queda corriendo después de responder no tiene
+  CPU: el callback le pega a `POST /api/v1/instagram/importacion/:businessId` (header `x-cron-secret` = `CRON_SECRET`,
+  la misma dirección pública del callback) y no espera. Cada pedido trabaja hasta 40 s (Firebase Hosting corta a los
+  60) y encadena el siguiente si quedan charlas. Sin `CRON_SECRET` (local) corre en el mismo proceso.
+- **Volver a lanzarla:** `POST /api/v1/platform/instagram/importar/:businessId` (solo SUPERADMIN), o reconectar la
+  cuenta. Es idempotente (el `mid` es `messages.external_id`).
+- **Logs:** `Importación de Instagram (negocio …)` con charlas, mensajes y el corte si lo hubo (`limite` = Meta pidió
+  frenar; `conexion` = token o permiso rechazado).
+- Ajustes opcionales (no hace falta cargarlos): `INSTAGRAM_IMPORTAR_MAX`, `INSTAGRAM_IMPORTAR_PRESUPUESTO_MS`,
+  `INSTAGRAM_IMPORTAR_PAUSA_MS`, `INSTAGRAM_IMPORTAR_URL`.
+
 ## Bot de ventas de Órbita en Instagram (Marketing → Instagram → Respuestas automáticas)
 
 Contesta los mensajes directos y los comentarios de la cuenta de Instagram de la EMPRESA (la conectada al negocio
