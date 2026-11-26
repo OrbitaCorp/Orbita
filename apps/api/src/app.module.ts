@@ -69,6 +69,7 @@ import { SupportModule } from './support/support.module';
 import { ImageStudioModule } from './image-studio/image-studio.module';
 import { ReservasModule } from './reservas/reservas.module';
 import { GimnasioModule } from './gimnasio/gimnasio.module';
+import { AlquileresModule } from './alquileres/alquileres.module';
 
 @Module({
   imports: [
@@ -136,6 +137,8 @@ import { GimnasioModule } from './gimnasio/gimnasio.module';
     ReservasModule,
     // Gimnasio: lo que no es una reserva (planes, alumnos y el plan de cada alumno), al lado del motor (24/11/2026).
     GimnasioModule,
+    // Alquileres: lo que un alojamiento cobró afuera (las ganancias de Airbnb), al lado del motor (26/11/2026).
+    AlquileresModule,
   ],
   controllers: [AppController],
   providers: [
