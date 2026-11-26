@@ -150,6 +150,15 @@ En este orden: calendario de Airbnb de verdad (URL para copiar, sincronización,
 todas las propiedades juntas y estadísticas → seña online con Mercado Pago → canchas → salones.
 Cada una con su plan propio; las ideas están en `docs/alquileres/informe-ux-alquileres.md`.
 
+| Etapa | Estado |
+|---|---|
+| 4 · Calendario de Airbnb | Hecha, en producción (25/11). `plans/2026-11-25-alquileres-airbnb-calendario.md` |
+| Vista de todas las propiedades juntas | Hecha, en producción (25/11): la grilla de ocupación |
+| 5 · Estadísticas y ganancias de Airbnb | Hecha (26/11). `plans/2026-11-26-alquileres-estadisticas-y-csv-airbnb.md` |
+| Seña online con Mercado Pago | Pendiente. Es transversal: la decide Ale |
+| Canchas | Pendiente |
+| Salones | Pendiente |
+
 ---
 
 ## Cómo sale cada etapa a producción

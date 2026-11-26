@@ -21,7 +21,7 @@ import { AlertTriangle, BedDouble, CalendarClock, Gauge, HandCoins, Moon, Tag, W
 import { diasEntre, fechaCorta, rangoTxt, sumarDias, type ISO } from '@/lib/reservas/fechas'
 import { pesos } from '@/lib/reservas/precio'
 import { Barras, Encabezado, Filtros, Kpi, Nota, Segmentado } from '@/design-system/reservas/piezas'
-import { HOY, cuenta, type Cliente, type NegocioAlquiler, type Reserva } from '../datos'
+import { HOY, clientePorId, cuenta, type Cliente, type NegocioAlquiler, type Reserva } from '../datos'
 import { estadisticasDeEstadia } from '../datos/estadisticas'
 import { LlegadasYSalidas, PERIODOS, PorCobrar, VS, periodoAnterior, periodoDe, porCobrarDe, variacion, type Periodo } from './Ingresos'
 
@@ -57,6 +57,13 @@ export default function Estadisticas({ negocio, reservas, clientes, onAbrirReser
 
   const { lista: porCobrar, totalSenas, totalSaldos } = porCobrarDe(reservas)
   const nombreDe = (unidadId: string) => negocio.propiedades.find(p => p.id === unidadId)?.nombre ?? ''
+  /** Con qué reserva se cruza una estadía de Airbnb: quién es y sus fechas. */
+  const conQuien = (reservaId: string) => {
+    const r = reservas.find(x => x.id === reservaId)
+    if (!r?.entrada || !r.salida) return ''
+    const quien = clientePorId(r.clienteId, clientes)?.nombre
+    return ` · pisa la reserva${quien ? ` de ${quien}` : ''} del ${rangoTxt(r.entrada, r.salida)}`
+  }
   const importadas = negocio.ingresosExternos ?? []
   const conAirbnb = negocio.calendariosExternos.length > 0 || importadas.length > 0
   const canales = [
@@ -71,7 +78,7 @@ export default function Estadisticas({ negocio, reservas, clientes, onAbrirReser
   return (
     <div className="rv-pagina">
       <Encabezado rotulo={`${fechaCorta(desde)} al ${fechaCorta(hasta)}`} titulo="Estadísticas"
-        bajada={`Todo se mide por noches, del inicio del período hasta hoy: la plata de cada estadía se reparte entre sus noches. Cada variación es contra ${vs}.`}
+        bajada={`Todo se mide por noches${completo ? '' : ', del inicio del período hasta hoy'}: la plata de cada estadía se reparte entre sus noches. Cada variación es contra ${vs}.`}
         acciones={<Filtros resumen={PERIODOS.find(p => p.id === periodo)?.label}><Segmentado label="Período" valor={periodo} onChange={setPeriodo} opciones={PERIODOS} /></Filtros>} />
 
       {ahora.cruces.length > 0 && (
@@ -81,7 +88,7 @@ export default function Estadisticas({ negocio, reservas, clientes, onAbrirReser
               <b style={{ display: 'flex', alignItems: 'center', gap: 6 }}><AlertTriangle size={15} aria-hidden /> Airbnb tiene una estadía sobre noches que también tenés reservadas acá</b>
               {ahora.cruces.map(x => (
                 <span key={`${x.codigo}-${x.reservaId}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', padding: '6px 0' }}>
-                  <span>{nombreDe(x.unidadId)} · {rangoTxt(x.entrada, x.salida)} · código <span className="rv-num">{x.codigo}</span></span>
+                  <span>{nombreDe(x.unidadId)} · {rangoTxt(x.entrada, x.salida)} · código <span className="rv-num">{x.codigo}</span>{conQuien(x.reservaId)}</span>
                   <button type="button" className="rv-btn rv-btn--sm" onClick={() => onAbrirReserva(x.reservaId)}>Ver la reserva</button>
                 </span>
               ))}
@@ -94,10 +101,10 @@ export default function Estadisticas({ negocio, reservas, clientes, onAbrirReser
       <div className="rv-kpis" style={{ marginBottom: 14 }}>
         <Kpi i={0} label="Ocupación" Icon={Gauge} valor={`${Math.round(ahora.ocupacion * 100)}%`}
           delta={{ valor: hayAntes ? Math.round((ahora.ocupacion - antes.ocupacion) * 100) : null, unidades: true, sufijo: ' pts', vs }}
-          nota={`${cuenta(ahora.nochesOcupadas, 'noche', 'noches')} de ${ahora.nochesDisponibles} hasta hoy`} />
+          nota={`${cuenta(ahora.nochesOcupadas, 'noche', 'noches')} de ${ahora.nochesDisponibles}${completo ? '' : ' hasta hoy'}`} />
         <Kpi i={1} label="Ingresos" Icon={HandCoins} valor={pesos(Math.round(ahora.ingresos))}
           delta={{ valor: variacion(ahora.ingresos, antes.ingresos), vs }}
-          nota={conAirbnb ? 'de las noches hasta hoy · Airbnb, neto de comisión' : 'de las noches hasta hoy'} />
+          nota={`de las noches ${completo ? 'del período' : 'hasta hoy'}${conAirbnb ? ' · Airbnb, neto de comisión' : ''}`} />
         <Kpi i={2} label="Precio por noche" Icon={Tag} valor={ahora.precioPorNoche === null ? '—' : pesos(Math.round(ahora.precioPorNoche))}
           delta={{ valor: ahora.precioPorNoche !== null && antes.precioPorNoche ? variacion(ahora.precioPorNoche, antes.precioPorNoche) : null, vs }}
           nota={`ingresos ÷ ${cuenta(ahora.nochesVendidas, 'noche vendida', 'noches vendidas')}`} />

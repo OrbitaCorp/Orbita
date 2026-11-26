@@ -175,6 +175,7 @@ const F18 = '2026-11-18'
 const F23 = '2026-11-23'
 const F24 = '2026-11-24'
 const F25 = '2026-11-25'
+const F26 = '2026-11-26'
 
 export const ENTRADAS: Entrada[] = [
   // ─── Transversal · la sección Módulos ───────────────────────────────────────
@@ -4250,6 +4251,65 @@ Esa prueba mostró dos cosas más, y con ellas se corrigió todo lo que la revis
       'apps/web/src/modules/alquileres/datos/origen/api.ts:1',
       'apps/web/src/modules/alquileres/datos/origen/aviso.ts:1',
       'apps/web/src/modules/alquileres/datos/origen/mapear.ts:1',
+    ],
+  }),
+  entrada({
+    modulo: 'alquileres', fecha: F26, slug: 'estadisticas-y-ganancias-de-airbnb', tipo: 'tarea', quien: 'Alan',
+    titulo: 'Estadísticas de la estadía, con las ganancias de Airbnb importadas',
+    foco: 'En alojamiento, "Ingresos" pasa a ser "Estadísticas": ocupación, ingresos por canal, precio por noche e ingreso por noche disponible, contando lo de Airbnb. El dueño importa el archivo de ganancias que descarga de Airbnb y esa plata, esas noches y esos huéspedes entran a sus números, una sola vez.',
+    que: `Etapa 5 del plan de Alquileres en producción (\`docs/superpowers/plans/2026-11-26-alquileres-estadisticas-y-csv-airbnb.md\`, con su diseño al lado). Es el faltante F18 del mapa y los puntos 7.2 y 7.6 del diseño del 18/11.
+
+**Por qué hacía falta.** El calendario de Airbnb trae fechas, no plata ni huésped. Y cuando una estadía termina Airbnb deja de publicarla: al día siguiente esas noches desaparecían del panel. Sin las ganancias, los números de un dueño que alquila sobre todo por Airbnb quedaban a la mitad.
+
+**Importar las ganancias** (pantalla Airbnb, solo en un alojamiento real). El dueño elige el archivo CSV que descarga de Airbnb, ve qué trae (cuántas estadías, de qué fechas, cuánto por moneda, qué filas quedaron afuera y por qué), dice a qué propiedad corresponde cada aviso y lo importa. La unión de cada aviso con su propiedad se recuerda.
+
+| Qué pasa | Qué hace Órbita |
+|---|---|
+| Se importa dos veces el mismo archivo | No duplica: una fila por código de confirmación |
+| Un archivo más nuevo trae otro monto | Lo corrige |
+| Al archivo le falta una columna, o no es el de Airbnb | No guarda nada y dice qué falta |
+| Una reserva pagada en partes, o con un ajuste | Se suma en una sola estadía |
+| Una devolución total | Se guarda, y las estadísticas no la cuentan |
+| Un aviso que no es de este negocio | Se marca "no importar" |
+| Se subió el archivo equivocado | "Borrar todo lo importado", con confirmación |
+
+El archivo se lee **por nombre de columna** (en inglés o en castellano), nunca por posición, porque Airbnb no documenta el formato y el anfitrión elige qué columnas baja. El texto del archivo no se guarda.
+
+**Estadísticas** (reemplaza a Ingresos en alojamiento; canchas y salones siguen con Ingresos):
+
+- Ocupación, ingresos, precio por noche e ingreso por noche disponible, en total y por propiedad, contra el período anterior.
+- De dónde vienen: directo, el sitio propio y Airbnb.
+- Estadía promedio y anticipación (días entre que reservan y entran).
+- Por cobrar y llegadas y salidas, como antes.
+
+Las reglas de las cuentas, que son las que evitan números engañosos:
+
+- **Todo se mide por noches, del inicio del período hasta hoy.** La plata de cada estadía se reparte entre sus noches. Lo ya reservado para el resto del período va en una línea aparte. Un período que no terminó se compara contra los mismos días del anterior.
+- **Una noche que está por dos lados cuenta una vez** (el bloqueo de Airbnb y su estadía importada).
+- **Pesos y dólares no se suman.** Lo que Airbnb pagó en otra moneda se muestra aparte, con su moneda, y no entra en los promedios.
+- Lo que el dueño bloqueó, o cerró a mano en Airbnb, no cuenta como noche disponible.
+- Si una estadía importada pisa noches de una reserva propia, se avisa con el código y con qué reserva es. No se descuenta nada solo.
+
+**Las noches de Airbnb que ya pasaron se conservan.** La sincronización del calendario ya no borra los bloqueos de estadías terminadas: quedan como historia. La ficha de un bloqueo de Airbnb muestra el huésped y lo cobrado cuando hay una estadía importada con sus fechas.
+
+**Para Turnos y Gimnasio** (motor compartido): una migración, \`20261126120000_alquileres_ingresos_externos\`, con dos tablas nuevas de Alquileres que no tocan ninguna otra. Del motor cambia una sola cosa, en la sincronización de un calendario de Airbnb (qué bloqueos borra), que solo corre en alojamientos con Airbnb conectado. El módulo nuevo de la API, \`apps/api/src/alquileres/\`, vive al lado del motor como el de Gimnasio.
+
+**Verificado:** tests de la API y del front en verde. Contra la base de dev, por API y en pantalla a 1280 y a 390 px: vista previa, importar, reimportar sin duplicar, los rechazos sin guardar nada, las estadísticas con pesos y dólares, la ficha del bloqueo con su huésped, y una estadía ya terminada que sigue contando después de que Airbnb la deja de publicar.
+
+**Sin verificar:** un archivo real de Airbnb. El formato en castellano se armó con los nombres de columna más probables; si un archivo real no se entiende, la importación lo dice y no guarda nada, y se ajusta la lista de nombres.
+
+${comoQuedo('alquileres', ['Estadísticas · 1280', 'estadisticas-1280.webp'], ['Estadísticas · 390', 'estadisticas-390.webp'], ['Importar ganancias de Airbnb · 1280', 'ganancias-airbnb-1280.webp'])}`,
+    archivos: [
+      'apps/api/src/alquileres/dominio/csv-airbnb.ts:1',
+      'apps/api/src/alquileres/alquileres-ingresos.service.ts:1',
+      'apps/api/src/alquileres/alquileres-panel.controller.ts:1',
+      'apps/api/src/alquileres/README.md:1',
+      'apps/api/prisma/migrations/20261126120000_alquileres_ingresos_externos/migration.sql:1',
+      'apps/api/src/reservas/calendarios/reservas-calendarios.service.ts:1',
+      'apps/web/src/modules/alquileres/datos/estadisticas.ts:1',
+      'apps/web/src/modules/alquileres/admin/Estadisticas.tsx:1',
+      'apps/web/src/modules/alquileres/admin/configuracion/GananciasAirbnb.tsx:1',
+      'apps/web/src/modules/alquileres/datos/origen/alquileresApi.ts:1',
     ],
   }),
 ]
