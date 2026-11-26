@@ -46,7 +46,8 @@ export function cadenaDeRespaldos(proveedores: { nombre: string; adapter: LlmAda
 }
 
 /**
- * LLM del bot de atención de WhatsApp: primero Groq, después Workers AI (Cloudflare) y al final Gemini, que es el más
+ * LLM del bot de atención (Orbi en WhatsApp e Instagram, y el bot de ventas de Órbita): primero Workers AI (Cloudflare,
+ * con el modelo que contesta mejor por chat, ver workers-ai.adapter.ts), después Groq y al final Gemini, que es el más
  * caro. Si uno se cae (429, 5xx, red o no contesta a tiempo) antes de emitir algo, sigue el próximo. Los que no tienen
  * credenciales cargadas se saltean. Gemini va último aunque no tenga clave: es lo que ya pasaba antes con Orbi.
  */
@@ -55,8 +56,8 @@ export const llmAdapterDelBotProvider: Provider = {
   useFactory: (config: ConfigService) => {
     const workers = new WorkersAiAdapter(config);
     return cadenaDeRespaldos([
-      { nombre: 'Groq', adapter: new GroqAdapter(config), disponible: !!config.get<string>('GROQ_API_KEY') },
       { nombre: 'Workers AI', adapter: workers, disponible: workers.configurado },
+      { nombre: 'Groq', adapter: new GroqAdapter(config), disponible: !!config.get<string>('GROQ_API_KEY') },
       { nombre: 'Gemini', adapter: new GeminiAdapter(config), disponible: true },
     ]);
   },

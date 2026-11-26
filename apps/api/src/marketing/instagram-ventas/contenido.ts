@@ -62,13 +62,28 @@ export const PREGUNTAS_FRECUENTES: { pregunta: string; opcion: Opcion }[] = [
 
 export const MENU: Opcion[] = [OPCION.COMO, OPCION.PRECIOS, OPCION.DEMO, OPCION.PERSONA];
 
+// Cómo escribe el bot (pedido del equipo, 25/11/2026): como una persona por chat. Mensajes cortos, de a uno, con el
+// "escribiendo…" entre uno y otro (cada texto de `piezas` es un mensaje aparte), sin tirar toda la información junta, y
+// ofreciendo antes de mandar: "¿Querés ver una tienda de ejemplo?" en vez de pegar los links de la demo.
+
+// Instagram deja UN solo mensaje privado por comentario: este va en uno, corto y con las opciones.
 export const SALUDO_COMENTARIO_POR_DEFECTO =
-  '¡Hola! Te escribo por tu comentario. Órbita es tu tienda online con panel, stock y pedidos, sin comisiones por venta. ¿Qué querés ver primero? Respondé con una opción: cómo funciona, precios, la demo o hablar con alguien.';
+  '¡Hola! Te escribo por tu comentario. ¿Querés que te cuente cómo funciona Órbita, los precios o ver una tienda de ejemplo?';
 export const RESPUESTAS_PUBLICAS_POR_DEFECTO = ['¡Te escribimos por privado!', '¡Listo, te mandamos un mensaje!', 'Te contamos todo por mensaje privado.'];
 export const PALABRAS_CLAVE_POR_DEFECTO = ['info', 'precio', 'precios', 'quiero', 'cuanto', 'costo', 'me interesa'];
-export const BIENVENIDA = '¡Hola! ¿En qué te ayudo? Podés escribirme o tocar una opción: cómo funciona, precios, la demo o hablar con alguien.';
 
-export const PIDE_DATOS_AL_DERIVAR = 'Listo, le aviso al equipo y te respondemos por acá.\nAsí llegamos con la respuesta: ¿qué vendés y más o menos cuántos productos tenés?';
+/** El saludo: dos mensajes cortos. El último lleva el menú (y lo dice en el texto, para la computadora). */
+export const SALUDO = '¡Hola! Gracias por escribirnos.';
+export const BIENVENIDA = '¿Querés vender online? Contame qué vendés, o elegí: cómo funciona, precios, la demo o hablar con alguien.';
+
+/**
+ * La pregunta con la que el bot ofrece la demo. Si la persona contesta que sí ("dale", "sí"), le llega la demo: por eso la
+ * IA la tiene que usar tal cual (está en el prompt).
+ */
+export const OFRECE_DEMO = '¿Querés ver una tienda de ejemplo?';
+
+export const AVISA_AL_DERIVAR = 'Listo, le aviso al equipo y te responden por acá.';
+export const PIDE_DATOS_AL_DERIVAR = '¿Qué vendés y más o menos cuántos productos tenés? Así llegamos con la respuesta.';
 
 export interface Enlaces {
   sitio: string;
@@ -108,43 +123,27 @@ export interface Precios {
 
 const pesos = (n: number) => `$${Math.round(n).toLocaleString('es-AR')}`;
 
-function lineaDePrecio(nombre: string, lista: number, promo: number | null) {
-  return promo !== null ? `${nombre} · ${pesos(promo)} por mes` : `${nombre} · ${pesos(lista)} por mes`;
-}
-
 export function respuestaDe(opcion: Opcion, e: Enlaces, p: Precios): Respuesta {
   switch (opcion) {
     case OPCION.COMO:
       return {
         piezas: [
-          { texto: 'En tres pasos: elegís tu rubro, cargás tus productos y tu tienda queda publicada.\nCobrás con tu Mercado Pago o por transferencia, y Órbita no se queda con nada de lo que vendés.' },
-          {
-            tarjetas: [
-              { titulo: 'Tu tienda online', subtitulo: 'Entiende tu rubro: talles y colores, o venta por metro, kilo y litro.', imagen: e.imagen('tienda.jpg'), botones: [{ titulo: 'Ver una tienda', url: e.demoTienda }, { titulo: 'Precios', opcion: OPCION.PRECIOS }] },
-              { titulo: 'Pedidos y stock', subtitulo: 'Pedidos de punta a punta, stock por variante y reportes que se entienden.', imagen: e.imagen('panel.png'), botones: [{ titulo: 'Probar el panel', url: e.demoPanel }] },
-              { titulo: 'Orbi, tu asistente', subtitulo: 'Te responde sobre tus ventas, tu stock y tus pedidos.', imagen: e.imagen('orbi.png'), botones: [{ titulo: 'Ver la demo', opcion: OPCION.DEMO }] },
-            ],
-          },
-          { texto: `Podés ver una tienda de ejemplo en ${e.demoTienda}` },
+          { texto: 'Órbita es tu tienda online con panel propio: catálogo, stock y pedidos en un solo lugar.' },
+          { texto: 'La armás en minutos eligiendo tu rubro, cobrás con tu Mercado Pago y no te cobramos comisión por venta.' },
+          { texto: OFRECE_DEMO },
         ],
-        siguientes: [OPCION.PRECIOS, OPCION.EMPEZAR, OPCION.PERSONA],
+        siguientes: [OPCION.DEMO, OPCION.PRECIOS, OPCION.PERSONA],
       };
     case OPCION.PRECIOS: {
       const c = p.campania;
+      const lista = c
+        ? `Base: ${pesos(c.base)} por mes los primeros ${c.meses} ${c.meses === 1 ? 'mes' : 'meses'} (después ${pesos(p.base)}).\nCon el paquete Avanzado: ${pesos(c.avanzado)} (después ${pesos(p.avanzado)}).`
+        : `Base: ${pesos(p.base)} por mes.\nCon el paquete Avanzado (juegos, anuncios, plantillas y más): ${pesos(p.avanzado)} por mes.`;
       return {
         piezas: [
-          { texto: 'Un solo panel, con todo incluido y sin comisiones por venta. Elegís si sumás el paquete Avanzado:' },
-          {
-            tarjetas: [
-              { titulo: lineaDePrecio('Base', p.base, c?.base ?? null), subtitulo: 'Panel completo, subdominio .orbita.site y soporte por WhatsApp.', imagen: e.imagen('planes.png'), botones: [{ titulo: 'Empezar con Base', url: e.alta }, { titulo: 'Comparar planes', url: e.planes }] },
-              { titulo: lineaDePrecio('Base + Avanzado', p.avanzado, c?.avanzado ?? null), subtitulo: 'Suma juegos con premio, anuncios, oferta relámpago y plantillas.', imagen: e.imagen('planes.png'), botones: [{ titulo: 'Empezar con Avanzado', url: e.alta }, { titulo: 'Comparar planes', url: e.planes }] },
-            ],
-          },
-          {
-            texto: c
-              ? `Es un precio promocional por ${c.meses} ${c.meses === 1 ? 'mes' : 'meses'} (después, ${pesos(p.base)} y ${pesos(p.avanzado)}). Sin permanencia: cancelás cuando quieras. Todos los planes: ${e.planes}`
-              : `Sin permanencia: cancelás cuando quieras desde tu panel. Todos los planes: ${e.planes}`,
-          },
+          { texto: 'Es un solo panel con todo incluido y sin comisión por venta.' },
+          { texto: lista },
+          { texto: `Sin permanencia: cancelás cuando quieras. ${OFRECE_DEMO}` },
         ],
         siguientes: [OPCION.DEMO, OPCION.EMPEZAR, OPCION.PERSONA],
       };
@@ -152,28 +151,31 @@ export function respuestaDe(opcion: Opcion, e: Enlaces, p: Precios): Respuesta {
     case OPCION.DEMO:
       return {
         piezas: [
-          { texto: 'Podés recorrer una tienda de ejemplo y su panel sin crear cuenta. Lo que cambies queda solo en tu navegador.' },
+          { texto: '¡Dale! Podés recorrer una tienda y su panel sin crear cuenta.' },
           {
             tarjetas: [
               { titulo: 'Tienda de ejemplo', subtitulo: 'Navegá, armá un carrito y mirá el checkout como lo vería tu cliente.', imagen: e.imagen('tienda.jpg'), botones: [{ titulo: 'Abrir la tienda', url: e.demoTienda }] },
               { titulo: 'Panel de ejemplo', subtitulo: 'Cargá un producto, mirá los pedidos y los reportes.', imagen: e.imagen('panel.png'), botones: [{ titulo: 'Abrir el panel', url: e.demoPanel }] },
             ],
           },
+          // En la computadora no se ven las tarjetas: los links van también en el texto.
           { texto: `Tienda: ${e.demoTienda}\nPanel: ${e.demoPanel}` },
+          { texto: 'Cuando la recorras, contame qué te pareció.' },
         ],
         siguientes: [OPCION.PRECIOS, OPCION.EMPEZAR, OPCION.PERSONA],
       };
     case OPCION.EMPEZAR:
       return {
         piezas: [
-          { texto: `¡Buenísimo! Desde acá creás tu cuenta en unos minutos. Elegís tu rubro y el plan, y pagás el primer mes al final:\n${e.alta}` },
+          { texto: '¡Buenísimo! Creás tu cuenta acá, te lleva unos minutos:' },
+          { texto: e.alta },
           { texto: 'Si te trabás en algún paso, escribime por acá.' },
         ],
         siguientes: [OPCION.PERSONA],
       };
     case OPCION.PERSONA:
       return {
-        piezas: [{ texto: PIDE_DATOS_AL_DERIVAR }],
+        piezas: [{ texto: AVISA_AL_DERIVAR }, { texto: PIDE_DATOS_AL_DERIVAR }],
         siguientes: [],
         derivar: true,
       };
@@ -205,6 +207,27 @@ export function esSaludo(texto: string): boolean {
   const palabras = normalizar(texto).replace(/[^a-z0-9ñ ]/g, ' ').split(' ').filter(Boolean)
     .map((p) => p.replace(/(.)\1+$/, '$1'));
   return palabras.length > 0 && palabras.length <= 6 && palabras.every((p) => PALABRAS_DE_SALUDO.has(p));
+}
+
+const PALABRAS_DE_INFO = new Set([
+  ...PALABRAS_DE_SALUDO, 'necesito', 'necesitaria', 'quiero', 'quisiera', 'queria', 'info', 'informacion', 'mas', 'me', 'das', 'pasas', 'pasan',
+  'podes', 'podrias', 'pueden', 'dar', 'pasar', 'por', 'favor', 'porfa', 'una', 'consulta', 'consultar', 'sobre', 'orbita', 'de', 'la', 'el', 'y', 'mi', 'te',
+]);
+
+/**
+ * ¿Pide información en general ("Hola necesito info", "quisiera más información por favor")? Sin una pregunta puntual:
+ * va la presentación corta de Órbita (con la pregunta de la demo) en vez de que la IA conteste todo de una.
+ */
+export function esPedidoDeInfo(texto: string): boolean {
+  const palabras = normalizar(texto).replace(/[^a-z0-9ñ ]/g, ' ').split(' ').filter(Boolean).map((p) => p.replace(/(.)\1+$/, '$1'));
+  return palabras.length > 0 && palabras.length <= 12 && palabras.some((p) => p === 'info' || p === 'informacion' || p === 'consulta')
+    && palabras.every((p) => PALABRAS_DE_INFO.has(p));
+}
+
+/** ¿Contestó que sí ("dale", "sí, porfa", "obvio")? Se usa para la pregunta de la demo. */
+export function esSi(texto: string): boolean {
+  const t = normalizar(texto).replace(/[^a-z0-9ñ ]/g, ' ').replace(/\s+/g, ' ').trim().replace(/(.)\1+/g, '$1');
+  return /^(si|dale|ok|oka|okey|obvio|claro|bueno|de una|me encantaria|me interesa|si dale|dale si|si porfa|si por favor|si quiero|quiero|si me interesa|si claro|claro que si|porfa|mostrame|si mostrame)$/.test(t);
 }
 
 // ── Lo que la IA sabe de Órbita ──────────────────────────────────────────────
@@ -246,8 +269,11 @@ export function promptDeVentas(e: Enlaces, p: Precios): string {
     'Reglas:',
     '- Respondé SOLO con la información de abajo. No inventes funciones, integraciones, plazos, descuentos ni precios.',
     '- Si la respuesta no está abajo, o te piden algo que solo puede resolver una persona (un caso puntual, un reclamo, una factura), respondé exactamente [DERIVAR] y nada más.',
-    '- Español rioplatense, cálido y directo. Máximo 3 oraciones, sin listas, sin asteriscos ni negritas, sin emojis.',
-    '- Si la persona muestra interés, cerrá con una invitación concreta: ver la demo o crear la cuenta.',
+    '- Español rioplatense, cálido y natural, como una persona del equipo que contesta por chat. Sin listas, sin asteriscos ni negritas, sin emojis.',
+    '- Escribí corto: de 1 a 3 mensajes separados por una línea en blanco (cada parte le llega como un mensaje aparte), de una o dos oraciones cada uno.',
+    '- Respondé solo lo que te preguntaron. No sueltes todo junto (funciones, precios y links a la vez): contá lo justo y dejá algo para después, que la persona quiera seguir preguntando.',
+    '- Terminá con UNA pregunta corta que despierte curiosidad y lleve a probar Órbita (por ejemplo "¿Querés ver cómo queda una tienda de ropa?", "¿Te cuento cuánto sale?").',
+    `- No pegues links si no los pidieron: ofrecé primero. Para ofrecer la demo usá exactamente esta pregunta: "${OFRECE_DEMO}". El link para crear la cuenta pasalo solo cuando la persona quiera empezar.`,
     '- No pidas datos personales (DNI, tarjeta, contraseñas).',
     '',
     `Precios vigentes: ${precios} No hay comisión por venta. El primer mes se paga al crear la cuenta.`,

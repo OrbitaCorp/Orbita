@@ -512,7 +512,7 @@ Contesta los mensajes directos y los comentarios de la cuenta de Instagram de la
 `MARKETING_NEGOCIO`) para llevar a la persona a crear su cuenta. Código: `src/marketing/instagram-ventas/` (lo que dice
 está en `contenido.ts`). Las tiendas siguen con Orbi: el webhook único reparte por negocio (`InstagramRuteoService`).
 Migración `20261124120000_marketing_instagram_bot` (dos tablas nuevas, con RLS). No usa secretos nuevos: la IA es la
-misma cadena barata del bot de Orbi (Groq → Workers AI → Gemini) y el correo de aviso sale por Resend.
+misma cadena barata del bot de Orbi (Workers AI con Inkling 2 Small → Groq → Gemini) y el correo de aviso sale por Resend.
 
 Para que ande de punta a punta hacen falta, una sola vez, dos cosas en Meta:
 

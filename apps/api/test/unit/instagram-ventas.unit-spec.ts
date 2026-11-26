@@ -3,7 +3,7 @@ import { join } from 'path';
 import { Prisma } from '@prisma/client';
 import {
   GRACIAS_AL_DERIVAR, MENU, OPCION, OPCIONES, PIDE_DATOS_AL_DERIVAR, PREGUNTAS_DE_LA_WEB, PREGUNTAS_FRECUENTES, TITULO_OPCION, enlacesDe, promptDeVentas, respuestaDe,
-  BIENVENIDA, esSaludo, tienePalabraClave, type Opcion,
+  BIENVENIDA, OFRECE_DEMO, SALUDO, esPedidoDeInfo, esSaludo, esSi, tienePalabraClave, type Opcion,
 } from '../../src/marketing/instagram-ventas/contenido';
 import { InstagramVentasService, opcionDe } from '../../src/marketing/instagram-ventas/instagram-ventas.service';
 
@@ -37,9 +37,33 @@ describe('bot de ventas de Instagram: contenido', () => {
   });
 
   it('cada respuesta con tarjetas lleva también los enlaces en el texto (en la computadora no se ven las tarjetas)', () => {
-    expect(JSON.stringify(respuestaDe(OPCION.DEMO, enlaces, precios).piezas.filter((p) => 'texto' in p))).toContain(enlaces.demoTienda);
-    expect(JSON.stringify(respuestaDe(OPCION.PRECIOS, enlaces, precios).piezas.filter((p) => 'texto' in p))).toContain(enlaces.planes);
+    for (const o of OPCIONES) {
+      const r = respuestaDe(o as Opcion, enlaces, precios);
+      const textos = JSON.stringify(r.piezas.filter((p) => 'texto' in p));
+      for (const p of r.piezas) if ('tarjetas' in p) for (const t of p.tarjetas) for (const b of t.botones) if (b.url) expect(textos).toContain(b.url);
+    }
     expect(JSON.stringify(respuestaDe(OPCION.EMPEZAR, enlaces, precios).piezas)).toContain('utm_source=instagram');
+  });
+
+  it('escribe corto y en partes: mensajes breves, y "cómo funciona" y "precios" ofrecen la demo en vez de mandarla', () => {
+    for (const o of OPCIONES) {
+      for (const p of respuestaDe(o as Opcion, enlaces, precios).piezas) if ('texto' in p) expect(p.texto.length).toBeLessThanOrEqual(160);
+    }
+    for (const o of [OPCION.COMO, OPCION.PRECIOS]) {
+      const r = respuestaDe(o, enlaces, precios);
+      const ultima = r.piezas[r.piezas.length - 1];
+      expect('texto' in ultima && ultima.texto.endsWith(OFRECE_DEMO)).toBe(true);
+      expect(JSON.stringify(r)).not.toContain(enlaces.demoTienda);
+      expect(r.siguientes[0]).toBe(OPCION.DEMO);
+    }
+    expect(promptDeVentas(enlaces, precios)).toContain(OFRECE_DEMO);
+  });
+
+  it('reconoce un pedido de información general y un "sí"', () => {
+    for (const t of ['Hola necesito info', 'info', 'quisiera más información por favor', 'Hola! me pasás info?']) expect(esPedidoDeInfo(t)).toBe(true);
+    for (const t of ['info de precios para una ferretería', 'Hola', '¿cuánto sale?']) expect(esPedidoDeInfo(t)).toBe(false);
+    for (const t of ['Sí', 'si', 'dale', 'Siii', 'sí, porfa', 'obvio', 'Claro que sí']) expect(esSi(t)).toBe(true);
+    for (const t of ['no', 'sí pero cuánto sale', 'después']) expect(esSi(t)).toBe(false);
   });
 
   it('los precios salen de la API: lista o promo vigente', () => {
@@ -102,13 +126,14 @@ function armar(o: { cfg?: Record<string, unknown> | null; botEstado?: string; ia
     customer: { findFirst: jest.fn().mockResolvedValue({ firstName: 'Lu' }) },
     marketingInstagramComentario: { create: jest.fn().mockResolvedValue({ id: 'fila' }), update: jest.fn().mockResolvedValue({}), findMany: jest.fn().mockResolvedValue([]) },
   };
-  const config = { get: jest.fn((k: string) => (k === 'FRONTEND_URL' ? 'https://orbita.site' : undefined)) };
+  const config = { get: jest.fn((k: string) => ({ FRONTEND_URL: 'https://orbita.site', ORBI_PAUSA_BLOQUES_MS: '0' } as Record<string, string>)[k]) };
   const instagram = {
     enviarTexto: jest.fn().mockResolvedValue('mid-t'),
     enviarConRespuestasRapidas: jest.fn().mockResolvedValue('mid-q'),
     enviarTarjetas: jest.fn().mockResolvedValue('mid-c'),
     responderComentarioPorPrivado: jest.fn().mockResolvedValue({ messageId: 'mid-p', destinatario: 'igsid-1' }),
     asegurarConversacion: jest.fn().mockResolvedValue('conv-c'),
+    mostrarEscribiendo: jest.fn().mockResolvedValue(undefined),
   };
   const comentarios = { responder: jest.fn().mockResolvedValue({ id: 'r1' }) };
   const ruteo = { registrar: jest.fn() };
@@ -153,13 +178,14 @@ describe('bot de ventas de Instagram: mensajes', () => {
     expect(prisma.marketingInstagramBot.upsert.mock.calls[1][0].update).not.toHaveProperty('cuenta');
   });
 
-  it('una opción manda el texto, las tarjetas y los botones para seguir', async () => {
+  it('una opción manda sus mensajes de a uno, con "escribiendo…" antes de cada uno y los botones en el último', async () => {
     const { svc, instagram, prisma } = armar();
-    await svc.atender([mensaje({ texto: 'Precios', opcionId: OPCION.PRECIOS })]);
-    expect(instagram.enviarTexto).toHaveBeenCalledTimes(1);
+    await svc.atender([mensaje({ texto: 'Ver la demo', opcionId: OPCION.DEMO })]);
+    expect(instagram.enviarTexto).toHaveBeenCalledTimes(2);
     expect(instagram.enviarTarjetas).toHaveBeenCalledTimes(1);
     expect(instagram.enviarConRespuestasRapidas).toHaveBeenCalledTimes(1);
-    expect(prisma.message.create).toHaveBeenCalledTimes(3);
+    expect(instagram.mostrarEscribiendo).toHaveBeenCalledTimes(4);
+    expect(prisma.message.create).toHaveBeenCalledTimes(4);
     expect(prisma.message.create.mock.calls.every((c: { data: { viaOrbi: boolean } }[]) => c[0].data.viaOrbi)).toBe(true);
   });
 
@@ -224,8 +250,8 @@ describe('bot de ventas de Instagram: mensajes', () => {
     prisma.message.findFirst.mockResolvedValueOnce({ viaOrbi: true, text: GRACIAS_AL_DERIVAR, createdAt: new Date() });
     await svc.atender([mensaje({ texto: 'Hola' })]);
     expect(prisma.conversation.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ botEstado: 'DEFAULT' }) }));
+    expect(instagram.enviarTexto.mock.calls.map((c: unknown[]) => c[3])).toEqual([SALUDO]);
     expect(instagram.enviarConRespuestasRapidas.mock.calls[0][3]).toBe(BIENVENIDA);
-    expect(instagram.enviarTexto).not.toHaveBeenCalled();
   });
 
   it('derivado: pasado el plazo, lo nuevo no es la respuesta a la pregunta y el bot vuelve a atender', async () => {
@@ -255,8 +281,36 @@ describe('bot de ventas de Instagram: mensajes', () => {
     const { svc, instagram, prisma, llm } = armar({ ia: '[DERIVAR]' });
     await svc.atender([mensaje({ texto: 'Hola' })]);
     expect(llm.streamChat).not.toHaveBeenCalled();
+    expect(instagram.enviarTexto.mock.calls[0][3]).toBe(SALUDO);
     expect(instagram.enviarConRespuestasRapidas.mock.calls[0][3]).toBe(BIENVENIDA);
     expect(prisma.conversation.updateMany).not.toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ botEstado: 'DERIVADO' }) }));
+  });
+
+  it('"Hola, necesito info" va con la presentación corta, que termina ofreciendo la demo (sin IA)', async () => {
+    const { svc, instagram, llm } = armar();
+    await svc.atender([mensaje({ texto: 'Hola necesito info' })]);
+    expect(llm.streamChat).not.toHaveBeenCalled();
+    expect(instagram.enviarTexto).toHaveBeenCalledTimes(2);
+    const [, , , ultimo, opciones] = instagram.enviarConRespuestasRapidas.mock.calls[0];
+    expect(ultimo).toBe(OFRECE_DEMO);
+    expect(opciones[0].payload).toBe(OPCION.DEMO);
+  });
+
+  it('si contesta que sí a la pregunta de la demo, le llega la demo', async () => {
+    const { svc, instagram, prisma, llm } = armar();
+    prisma.message.findFirst.mockResolvedValueOnce({ viaOrbi: true, text: OFRECE_DEMO });
+    await svc.atender([mensaje({ texto: 'Dale!' })]);
+    expect(llm.streamChat).not.toHaveBeenCalled();
+    expect(instagram.enviarTarjetas).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(instagram.enviarTexto.mock.calls)).toContain(enlacesDe('https://orbita.site').demoTienda);
+  });
+
+  it('la respuesta de la IA sale en mensajes cortos (los separa con una línea en blanco), con el menú en el último', async () => {
+    const { svc, instagram } = armar({ ia: 'Sí, sirve para ferreterías.\n\nPodés vender por metro o por kilo.\n\n¿Querés ver una tienda de ejemplo?' });
+    await svc.atender([mensaje({ texto: '¿sirve para una ferretería?' })]);
+    expect(instagram.enviarTexto.mock.calls.map((c: unknown[]) => c[3])).toEqual(['Sí, sirve para ferreterías.', 'Podés vender por metro o por kilo.']);
+    expect(instagram.enviarConRespuestasRapidas.mock.calls[0][3]).toBe(OFRECE_DEMO);
+    expect(instagram.mostrarEscribiendo).toHaveBeenCalledTimes(3);
   });
 
   it('si la IA falla o no dice nada, contesta con el menú en vez de "no la sé"', async () => {

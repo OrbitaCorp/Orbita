@@ -657,3 +657,15 @@ describe('ConversationsService → Instagram', () => {
     expect(enviar).not.toHaveBeenCalled();
   });
 });
+
+describe('preguntas frecuentes de Instagram: formas que se prueban', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { variantesDePreguntasFrecuentes } = require('../../src/instagram/instagram.service');
+  it('empieza por la cuenta con su id y el token en el encabezado, y nunca deja el token en una URL sin pedirlo la variante', () => {
+    const v = variantesDePreguntasFrecuentes('v23.0', '1789', 'TOKEN', [{ question: '¿Qué es Órbita?', payload: 'ORB_COMO' }]);
+    expect(v[0].url).toBe('https://graph.instagram.com/v23.0/1789/messenger_profile');
+    expect(v[0].headers.Authorization).toBe('Bearer TOKEN');
+    expect(v.some((x: { cuerpo: { ice_breakers: { locale?: string }[] } }) => x.cuerpo.ice_breakers[0].locale === 'default')).toBe(true);
+    for (const x of v) expect(x.cuerpo.platform).toBe('instagram');
+  });
+});

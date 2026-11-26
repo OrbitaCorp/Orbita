@@ -146,6 +146,12 @@ export class WhatsappBotService extends AtencionDeOrbi<WhatsappBotConfig> {
     return m.destinatario;
   }
 
+  /** WhatsApp muestra "escribiendo…" sobre el mensaje que se contesta: hace falta su id en Meta. */
+  protected async mostrarEscribiendo(m: MensajeDeCliente): Promise<void> {
+    const entrante = await this.prisma.message.findUnique({ where: { id: m.messageId }, select: { externalId: true, conversationId: true } });
+    if (entrante?.externalId && entrante.conversationId === m.conversationId) await this.whatsapp.mostrarEscribiendo(m.businessId, entrante.externalId);
+  }
+
   protected usaIa(cfg: WhatsappBotConfig): boolean {
     return cfg.modalidad !== 'SOLO_MENU';
   }

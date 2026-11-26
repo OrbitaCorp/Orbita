@@ -13,6 +13,7 @@ import { herramientasDelBot, HerramientasDelBot, type ContextoDelBot } from './h
 import { ID_CAMBIAR, ID_CONFIRMAR, type PedidosPorChatService, borradorVigente, esAfirmativo, esNegativo, textoDelResumen } from './pedidos';
 import { NOMBRE_DEL_CANAL, orbiAtiendeElChat, type BotChatEstado, type BotModo, type CanalDeOrbi, type MensajeDeCliente } from './estado';
 import { MENSAJE_DE_DERIVACION, MENSAJE_SIN_MEDIOS, promptDelBot } from './prompt';
+import { dormir, partirEnBloques, pausaDeEscritura } from './bloques';
 
 // Orbi como atención al público por chat (función del paquete Avanzado), igual en todos los canales. Cuando un cliente
 // escribe, si Orbi atiende ese chat, espera unos segundos (por si manda varios mensajes seguidos), lee el catálogo y los
@@ -29,13 +30,12 @@ const VUELTAS_MAX = 4;
 const HISTORIAL = 12;
 const RESPUESTAS_POR_HORA = 20;
 const CREDITOS_MES_POR_DEFECTO = 2000;
-// Tope de todo el pedido al modelo, con la cadena de respaldos adentro (Groq y Workers AI tienen 15 s cada uno).
+// Tope de todo el pedido al modelo, con la cadena de respaldos adentro (Workers AI y Groq tienen 15 s cada uno).
 const TIEMPO_MAX_MS = 50_000;
 // Un aviso de "necesita atención" por chat cada 30 minutos: sin esto llegaría un correo por cada mensaje del cliente.
 const AVISO_CADA_MS = 30 * 60 * 1000;
 // Fotos de producto que Orbi puede mandar en una misma respuesta (cada una es un mensaje más en el chat).
 const FOTOS_MAX_POR_RESPUESTA = 3;
-const dormir = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /** Lo que todos los canales configuran igual. */
 export interface ConfigDeAtencion {
@@ -103,7 +103,12 @@ export interface TurnoParaGuardar {
   errorCategory?: string;
 }
 
-export type DatosDeLaRespuesta = Omit<TurnoParaGuardar, 'businessId' | 'conversationId'> & { derivar: string | null; sinAviso?: boolean };
+export type DatosDeLaRespuesta = Omit<TurnoParaGuardar, 'businessId' | 'conversationId'> & {
+  derivar: string | null;
+  sinAviso?: boolean;
+  /** La respuesta del modelo: sale en mensajes cortos (los separa con una línea en blanco), con "escribiendo…" entre uno y otro. */
+  enBloques?: boolean;
+};
 
 /** Una foto que Orbi mandó: su id en el canal, la dirección con que quedó guardada y el texto con que se guarda en el chat. */
 export type FotoEnviada = { externalId: string; url: string; texto: string };
@@ -160,6 +165,18 @@ export abstract class AtencionDeOrbi<Cfg extends ConfigDeAtencion> {
   /** Una línea más para el correo de "necesita atención" (Instagram: el plazo de 24 h). */
   protected notaParaElDueno(): string {
     return '';
+  }
+  /** Muestra "escribiendo…" en el chat del cliente. Cada canal lo hace a su manera; nunca tira (es un detalle). */
+  protected async mostrarEscribiendo(_m: MensajeDeCliente): Promise<void> {
+    /* sin "escribiendo…" en este canal */
+  }
+
+  private async escribiendo(m: MensajeDeCliente): Promise<void> {
+    try {
+      await this.mostrarEscribiendo(m);
+    } catch {
+      /* es un detalle: la respuesta sale igual */
+    }
   }
 
   protected get nombreDelCanal(): string {
@@ -361,7 +378,7 @@ export abstract class AtencionDeOrbi<Cfg extends ConfigDeAtencion> {
     return !!cfg.tomaPedidos && this.usaIa(cfg) && !!this.pedidos;
   }
 
-  /** Contesta con la IA (Groq → Workers AI → Gemini). `pedido`: lo que el cliente quiso decir al tocar una opción del menú. */
+  /** Contesta con la IA (Workers AI → Groq → Gemini). `pedido`: lo que el cliente quiso decir al tocar una opción del menú. */
   protected async responderConModelo(m: MensajeDeCliente, cfg: Cfg, negocio: Negocio, ctx: ContextoDelBot, pedido?: string) {
     const { businessId, conversationId } = m;
     // Cupo del mes: agotado, Orbi se calla y avisa al dueño.
@@ -372,6 +389,8 @@ export abstract class AtencionDeOrbi<Cfg extends ConfigDeAtencion> {
     }
 
     const inicio = Date.now();
+    // Mientras el modelo piensa (unos segundos), el cliente ve "escribiendo…" en vez de silencio.
+    await this.escribiendo(m);
     try {
       const cliente = await this.prisma.customer.findFirst({ where: { id: m.customerId, businessId }, select: { firstName: true } });
       const previas = await this.prisma.message.count({ where: { conversationId, viaOrbi: true, channel: this.canal } });
@@ -418,7 +437,7 @@ export abstract class AtencionDeOrbi<Cfg extends ConfigDeAtencion> {
         await this.contestar(m, MENSAJE_DE_DERIVACION, { status: 'error', derivar: 'Orbi no pudo armar una respuesta.', ...r.metricas, latencyMs: Date.now() - inicio });
         return;
       }
-      await this.contestar(m, texto || MENSAJE_DE_DERIVACION, { status: r.derivar ? 'derivado' : 'ok', derivar: r.derivar, ...r.metricas, latencyMs: Date.now() - inicio });
+      await this.contestar(m, texto || MENSAJE_DE_DERIVACION, { status: r.derivar ? 'derivado' : 'ok', derivar: r.derivar, enBloques: true, ...r.metricas, latencyMs: Date.now() - inicio });
     } catch (e) {
       this.logger.error(`Orbi falló al responder en ${conversationId}: ${describeError(e)}`);
       // Si mientras tanto ya contestó otra corrida (o una persona), el chat está atendido: no hace falta derivarlo.
@@ -555,21 +574,41 @@ export abstract class AtencionDeOrbi<Cfg extends ConfigDeAtencion> {
   /** Manda la respuesta por el canal, la guarda en el chat marcada como de Orbi y, si hay que derivar, deja el chat para una persona. */
   protected async contestar(m: MensajeDeCliente, textoCrudo: string, d: DatosDeLaRespuesta, enviar?: () => Promise<string>) {
     const { businessId, conversationId } = m;
-    const { derivar, sinAviso, ...turno } = d;
-    const texto = this.ajustarTexto(textoCrudo);
-    let externalId: string;
-    try {
-      externalId = enviar ? await enviar() : await this.enviarTexto(m, texto);
-    } catch (e) {
-      this.logger.warn(`Orbi no pudo enviar la respuesta en ${conversationId}: ${describeError(e)}`);
-      await this.derivar(businessId, conversationId, 'Orbi no pudo enviar su respuesta: lo revisa una persona.');
-      await this.registrar({ ...turno, businessId, conversationId, status: 'error', errorCategory: 'envio' });
-      return;
-    }
-    await this.prisma.$transaction([
+    const { derivar, sinAviso, enBloques, ...turno } = d;
+    // La respuesta del modelo sale en mensajes cortos; lo fijo (menú, resumen del pedido, avisos) sale tal cual, en uno.
+    const partes = !enviar && enBloques ? partirEnBloques(textoCrudo) : [];
+    const bloques = (partes.length > 0 ? partes : [textoCrudo]).map((b) => this.ajustarTexto(b));
+    const guardar = (texto: string, externalId: string) =>
       this.prisma.message.create({
         data: { conversationId, sender: 'STORE', text: texto, channel: this.canal, externalId, deliveryStatus: 'sent', viaOrbi: true },
-      }),
+      });
+
+    // Todos menos el último se guardan apenas salen (así quedan en orden en el chat); el último va con el cambio de la charla.
+    // El que salió y todavía no se guardó.
+    let pendiente: { texto: string; externalId: string } | null = null;
+    for (let i = 0; i < bloques.length; i++) {
+      const texto = bloques[i];
+      try {
+        if (pendiente) {
+          await guardar(pendiente.texto, pendiente.externalId);
+          pendiente = null;
+          await this.escribiendo(m);
+          await dormir(pausaDeEscritura(texto, this.config));
+        }
+        pendiente = { texto, externalId: i === 0 && enviar ? await enviar() : await this.enviarTexto(m, texto) };
+      } catch (e) {
+        this.logger.warn(`Orbi no pudo enviar la respuesta en ${conversationId}: ${describeError(e)}`);
+        if (i === 0) {
+          await this.derivar(businessId, conversationId, 'Orbi no pudo enviar su respuesta: lo revisa una persona.');
+          await this.registrar({ ...turno, businessId, conversationId, status: 'error', errorCategory: 'envio' });
+          return;
+        }
+        // Ya salió una parte: la charla sigue con lo que llegó.
+        break;
+      }
+    }
+    await this.prisma.$transaction([
+      ...(pendiente ? [guardar(pendiente.texto, pendiente.externalId)] : []),
       // Orbi ya contestó: el chat deja de figurar como sin leer, salvo que haya que derivarlo a una persona.
       this.prisma.conversation.updateMany({
         where: { id: conversationId, businessId },

@@ -11,10 +11,11 @@ import { InstagramRuteoService, type AtencionAlternativa, type ComentarioNuevo }
 import { recortarABytes } from '../../instagram/instagram-bot.service';
 import { LLM_ADAPTER_BOT, type LlmAdapter, type LlmMessage } from '../../orbi/llm/llm-adapter.interface';
 import type { MensajeDeCliente } from '../../orbi/atencion/estado';
+import { dormir, partirEnBloques, pausaDeEscritura } from '../../orbi/atencion/bloques';
 import { describeError } from '../../common/utils/describe-error.util';
 import { escaparHtml } from '../../common/utils/html';
 import {
-  BIENVENIDA, DERIVAR_SIN_RESPUESTA, GRACIAS_AL_DERIVAR, MENU, PIDE_DATOS_AL_DERIVAR, PLAZO_DERIVADO_MS, esSaludo, OPCION, OPCIONES, PALABRAS_CLAVE_POR_DEFECTO, PREGUNTAS_FRECUENTES,
+  BIENVENIDA, DERIVAR_SIN_RESPUESTA, GRACIAS_AL_DERIVAR, MENU, OFRECE_DEMO, PIDE_DATOS_AL_DERIVAR, PLAZO_DERIVADO_MS, SALUDO, esPedidoDeInfo, esSaludo, esSi, OPCION, OPCIONES, PALABRAS_CLAVE_POR_DEFECTO, PREGUNTAS_FRECUENTES,
   RESPUESTAS_PUBLICAS_POR_DEFECTO, SALUDO_COMENTARIO_POR_DEFECTO, TITULO_OPCION, enlacesDe, normalizar, promptDeVentas,
   respuestaDe, tienePalabraClave, type Opcion, type Precios, type Tarjeta,
 } from './contenido';
@@ -210,36 +211,69 @@ export class InstagramVentasService implements AtencionAlternativa, OnModuleInit
     if (conv.botEstado === 'DERIVADO' && !(await this.atenderDerivada(m, cfg))) return;
     if (conv.botEstado === 'PAUSADO' || conv.botEstado === 'OFF') return;
 
-    const opcion = opcionDe(m);
+    const opcion = opcionDe(m) ?? (await this.aceptoLaDemo(m));
     if (opcion) return this.responderOpcion(m, cfg, opcion);
     // Fotos, audios y archivos no los lee: los ve el equipo en la bandeja.
     if (!m.esTexto || !m.texto) return;
     // Un saludo no es una pregunta: va la bienvenida con el menú, sin gastar IA (y sin que el modelo, con un historial
     // de derivaciones, lo tome como algo que no sabe responder).
-    if (esSaludo(m.texto)) return this.enviarTexto(m, BIENVENIDA, MENU);
+    if (esSaludo(m.texto)) return this.enviarBloques(m, [SALUDO, BIENVENIDA], MENU);
+    // "Hola, necesito info": la presentación corta, que termina ofreciendo la demo, en vez de todo de una.
+    if (esPedidoDeInfo(m.texto)) return this.responderOpcion(m, cfg, OPCION.COMO);
 
     if (cfg.usarIa && (await this.quedaIa(m.businessId, m.conversationId))) {
+      // Mientras la IA piensa, la persona ve "escribiendo…".
+      await this.instagram.mostrarEscribiendo(m.businessId, m.destinatario);
       const respuesta = await this.preguntarIa(m);
-      if (respuesta === DERIVAR) return this.derivar(m, cfg, MOTIVO_SIN_RESPUESTA, DERIVAR_SIN_RESPUESTA);
+      if (respuesta === DERIVAR) return this.derivar(m, cfg, MOTIVO_SIN_RESPUESTA, [DERIVAR_SIN_RESPUESTA]);
       // Si la IA falló o no dijo nada, "no la sé" sería mentira: va el menú.
-      return this.enviarTexto(m, respuesta ?? BIENVENIDA, MENU);
+      if (!respuesta) return this.enviarBloques(m, [BIENVENIDA], MENU, { primeroYa: true });
+      return this.enviarBloques(m, partirEnBloques(respuesta), MENU, { primeroYa: true });
     }
-    return this.enviarTexto(m, BIENVENIDA, MENU);
+    return this.enviarBloques(m, [BIENVENIDA], MENU);
+  }
+
+  /** Contestó que sí a la pregunta de la demo (lo último que dijo el bot): le llega la demo. */
+  private async aceptoLaDemo(m: MensajeDeCliente): Promise<Opcion | null> {
+    if (!m.esTexto || !m.texto || !esSi(m.texto)) return null;
+    const ultimo = await this.prisma.message.findFirst({
+      where: { conversationId: m.conversationId, conversation: { businessId: m.businessId }, sender: 'STORE' },
+      orderBy: { createdAt: 'desc' },
+      select: { viaOrbi: true, text: true },
+    });
+    return ultimo?.viaOrbi && ultimo.text.trim().endsWith(OFRECE_DEMO) ? OPCION.DEMO : null;
   }
 
   private async responderOpcion(m: MensajeDeCliente, cfg: MarketingInstagramBot, opcion: Opcion): Promise<void> {
     const r = respuestaDe(opcion, this.enlaces(), await this.precios());
-    if (r.derivar) return this.derivar(m, cfg, MOTIVO_PIDIO_PERSONA, (r.piezas[0] as { texto: string }).texto);
+    if (r.derivar) return this.derivar(m, cfg, MOTIVO_PIDIO_PERSONA, r.piezas.flatMap((p) => ('texto' in p ? [p.texto] : [])));
     for (let i = 0; i < r.piezas.length; i++) {
       const pieza = r.piezas[i];
       const ultima = i === r.piezas.length - 1;
+      await this.escribirUnRato(m, 'texto' in pieza ? pieza.texto : '');
       if ('tarjetas' in pieza) await this.enviarTarjetas(m, pieza.tarjetas);
       else await this.enviarTexto(m, pieza.texto, ultima ? r.siguientes : []);
     }
   }
 
-  private async derivar(m: MensajeDeCliente, cfg: MarketingInstagramBot, motivo: string, texto: string): Promise<void> {
-    await this.enviarTexto(m, texto, []);
+  /**
+   * Manda varios mensajes cortos, uno detrás de otro, con el "escribiendo…" antes de cada uno: se lee como una persona y
+   * no como un bloque de texto. Los botones van en el último. `primeroYa`: el primero sale sin esperar (la IA ya tardó).
+   */
+  private async enviarBloques(m: MensajeDeCliente, textos: string[], siguientes: Opcion[], o: { primeroYa?: boolean } = {}): Promise<void> {
+    for (let i = 0; i < textos.length; i++) {
+      if (i > 0 || !o.primeroYa) await this.escribirUnRato(m, textos[i]);
+      await this.enviarTexto(m, textos[i], i === textos.length - 1 ? siguientes : []);
+    }
+  }
+
+  private async escribirUnRato(m: MensajeDeCliente, texto: string): Promise<void> {
+    await this.instagram.mostrarEscribiendo(m.businessId, m.destinatario);
+    await dormir(pausaDeEscritura(texto || 'tarjetas', this.config));
+  }
+
+  private async derivar(m: MensajeDeCliente, cfg: MarketingInstagramBot, motivo: string, textos: string[]): Promise<void> {
+    await this.enviarBloques(m, textos, []);
     await this.prisma.conversation.updateMany({
       where: { id: m.conversationId, businessId: m.businessId },
       data: { botEstado: 'DERIVADO', botMotivo: motivo, botCambiadoAt: new Date(), isUnread: true },

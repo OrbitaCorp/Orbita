@@ -138,4 +138,8 @@ export class InstagramBotService extends AtencionDeOrbi<InstagramBotConfig> {
   protected notaParaElDueno(): string {
     return '\nOjo: Instagram solo te deja responderle dentro de las 24 horas de su último mensaje.';
   }
+
+  protected mostrarEscribiendo(m: MensajeDeCliente): Promise<void> {
+    return this.instagram.mostrarEscribiendo(m.businessId, m.destinatario);
+  }
 }

@@ -74,5 +74,5 @@ export interface LlmAdapter {
 }
 
 export const LLM_ADAPTER = Symbol('LLM_ADAPTER');
-/** El modelo del bot de atención de WhatsApp: cadena Groq → Workers AI (Cloudflare) → Gemini, del más barato al más caro. */
+/** El modelo del bot de atención (WhatsApp, Instagram y el bot de ventas): cadena Workers AI (Cloudflare) → Groq → Gemini. */
 export const LLM_ADAPTER_BOT = Symbol('LLM_ADAPTER_BOT');

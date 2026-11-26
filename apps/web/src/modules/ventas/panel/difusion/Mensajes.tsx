@@ -335,15 +335,15 @@ function Hilo({ charla, bot, onConfigurarOrbi, onVolver, onLeida, onCambio, onVi
         {bot?.disponible && (
           <button
             type="button" className={`msg-cliente-boton msg-orbi-boton${atiendeOrbi ? ' msg-cliente-boton-activo' : ''}`} disabled={cambiandoOrbi}
-            aria-pressed={atiendeOrbi}
+            aria-pressed={atiendeOrbi} aria-label={atiendeOrbi ? 'Orbi atiende' : 'Activar Orbi'}
             onClick={() => (bot.enabled ? void cambiarOrbi(atiendeOrbi ? 'OFF' : 'ON') : onConfigurarOrbi())}
             title={!bot.enabled ? 'Primero encendé a Orbi para Instagram' : atiendeOrbi ? 'Orbi está contestando acá: tocá para atenderla vos' : 'Que Orbi atienda esta charla'}
           >
-            <Sparkles size={15} aria-hidden /> {atiendeOrbi ? 'Orbi atiende' : 'Activar Orbi'}
+            <Sparkles size={15} aria-hidden /> <span className="msg-boton-texto">{atiendeOrbi ? 'Orbi atiende' : 'Activar Orbi'}</span>
           </button>
         )}
-        <button type="button" className={`msg-cliente-boton${panelAbierto ? ' msg-cliente-boton-activo' : ''}`} aria-pressed={panelAbierto} onClick={alternarPanel}>
-          <UserRound size={15} aria-hidden /> Cliente
+        <button type="button" className={`msg-cliente-boton${panelAbierto ? ' msg-cliente-boton-activo' : ''}`} aria-pressed={panelAbierto} aria-label="Cliente" onClick={alternarPanel}>
+          <UserRound size={15} aria-hidden /> <span className="msg-boton-texto">Cliente</span>
         </button>
       </header>
 
@@ -460,7 +460,7 @@ function Adjunto({ adjunto, propio }: { adjunto: InstagramMensaje['adjuntos'][nu
 
 const CSS = `
 .msg-raiz { margin-top: 16px; }
-.msg-caja { display: grid; grid-template-columns: 340px minmax(0, 1fr); height: clamp(520px, calc(100vh - 300px), 760px); overflow: hidden; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-surface); box-shadow: var(--shadow-card); }
+.msg-caja { container: bandeja / inline-size; display: grid; grid-template-columns: clamp(260px, 32%, 340px) minmax(0, 1fr); height: clamp(520px, calc(100vh - 300px), 760px); overflow: hidden; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-surface); box-shadow: var(--shadow-card); }
 .msg-suave { margin: 0; font-size: 13px; line-height: 1.5; color: var(--color-muted); }
 .msg-centro { text-align: center; padding: 24px 0; }
 .msg-negrita { font-weight: 700; color: var(--color-text) !important; }
@@ -471,7 +471,7 @@ const CSS = `
 .msg-ajustes { width: 34px; height: 34px; flex-shrink: 0; padding: 0; border: none; border-radius: 50%; background: transparent; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; color: var(--color-muted); transition: background-color 150ms, color 150ms; }
 .msg-ajustes:hover { color: var(--color-text); background: var(--color-surface-alt); }
 .msg-ajustes:focus-visible, .msg-cliente-boton:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-.msg-cliente-boton { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-surface); cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 500; color: var(--color-muted); transition: background-color 150ms, color 150ms; }
+.msg-cliente-boton { margin-left: auto; flex-shrink: 0; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-surface); cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 500; color: var(--color-muted); transition: background-color 150ms, color 150ms; }
 .msg-cliente-boton:hover { color: var(--color-text); background: var(--color-surface-alt); }
 .msg-cliente-boton:disabled { opacity: 0.5; cursor: not-allowed; }
 .msg-orbi-boton + .msg-cliente-boton { margin-left: 0; }
@@ -516,9 +516,10 @@ const CSS = `
 .msg-hilo-interno { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .msg-hilo-cabecera { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--color-border); }
 .msg-volver { display: none; width: 36px; height: 36px; margin-left: -8px; padding: 0; border: none; border-radius: 50%; background: transparent; cursor: pointer; align-items: center; justify-content: center; color: var(--color-text); }
-.msg-hilo-nombre { min-width: 0; }
+.msg-hilo-nombre { flex: 1; min-width: 0; }
 .msg-hilo-titulo { margin: 0; font-size: 14.5px; font-weight: 600; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.msg-hilo-sub { margin: 1px 0 0; font-size: 12px; color: var(--color-muted); }
+.msg-hilo-sub { margin: 1px 0 0; font-size: 12px; color: var(--color-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msg-hilo-interno { container: hilo / inline-size; }
 
 .msg-mensajes { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 16px 16px; display: flex; flex-direction: column; }
 .msg-dia { margin: 18px 0 10px; text-align: center; font-size: 12px; color: var(--color-muted); }
@@ -566,6 +567,15 @@ const CSS = `
   .msg-lista { border-right: none; }
   .msg-volver { display: inline-flex; }
   .msg-columna { max-width: 80%; }
+}
+/* Sin lugar para las tres columnas, la ficha del cliente se abre encima del chat en vez de achicarlo. */
+@container bandeja (max-width: 1080px) {
+  .msg-hilo-fila > .pc-raiz { position: absolute; top: 0; right: 0; bottom: 0; z-index: 20; width: min(300px, 100%); box-shadow: -16px 0 32px rgba(15, 23, 42, 0.14); }
+}
+/* Chat angosto: los botones de la cabecera quedan solo con el ícono. */
+@container hilo (max-width: 460px) {
+  .msg-boton-texto { display: none; }
+  .msg-hilo-cabecera .msg-cliente-boton { padding: 0 9px; }
 }
 @media (prefers-reduced-motion: reduce) { .msg-giro { animation: none; } .msg-charla, .msg-buscador, .msg-filtros button { transition: none; } }
 `

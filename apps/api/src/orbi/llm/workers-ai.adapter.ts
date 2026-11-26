@@ -6,9 +6,14 @@ import type { LlmAdapter, LlmEvent, LlmMessage, LlmToolDefinition } from './llm-
 // mismo token que ya usa la generación de imágenes (R2_ACCOUNT_ID + CF_WORKERS_AI_API_TOKEN, que necesita el permiso de
 // Workers AI). Sin streaming a propósito: las respuestas de WhatsApp son cortas y se mandan enteras.
 //
-// Es un eslabón de respaldo (ver llmAdapterDelBotProvider): si Groq se cae, sigue este; si este también, Gemini.
+// Es el primer eslabón del bot de atención (ver llmAdapterDelBotProvider): si se cae, sigue Groq y al final Gemini.
+//
+// El modelo se eligió el 26/11/2026 probando el prompt real de Orbi con charlas de ejemplo (consulta, envío, queja,
+// compra, agradecimiento): Inkling 2 Small contestó bien, con las herramientas, en 1 a 4 s y a ~USD 0,0015 por respuesta.
+// DeepSeek v4.1 Flash también anduvo bien pero tardó hasta 12 s; Gemma 4, 25 a 35 s. gpt-oss-120b (el de antes) da 400
+// en Workers AI apenas tiene que devolver el resultado de una herramienta. Se cambia con CF_LLM_MODEL.
 
-export const WORKERS_AI_MODELO_POR_DEFECTO = '@cf/openai/gpt-oss-120b';
+export const WORKERS_AI_MODELO_POR_DEFECTO = '@cf/thinkingmachines/inkling-2-small';
 
 interface RespuestaCompatible {
   choices?: { message?: { content?: string | null; tool_calls?: { id?: string; function?: { name?: string; arguments?: string } }[] } }[];

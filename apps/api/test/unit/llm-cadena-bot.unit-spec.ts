@@ -91,7 +91,7 @@ describe('WorkersAiAdapter', () => {
     expect(url).toBe('https://api.cloudflare.com/client/v4/accounts/acc123/ai/v1/chat/completions');
     expect(init.headers.Authorization).toBe('Bearer tok');
     const cuerpo = JSON.parse(init.body);
-    expect(cuerpo.model).toBe('@cf/openai/gpt-oss-120b');
+    expect(cuerpo.model).toBe('@cf/thinkingmachines/inkling-2-small');
     expect(cuerpo.stream).toBe(false);
     expect(eventos.map((e) => e.type)).toEqual(['text', 'usage', 'done']);
     expect(eventos[1]).toMatchObject({ usage: { provider: 'workers-ai', promptTokens: 100, completionTokens: 20 } });

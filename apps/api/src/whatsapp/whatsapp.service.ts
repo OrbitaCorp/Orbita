@@ -691,6 +691,23 @@ export class WhatsappService {
     return this.medios.prepararFotoDelPanel(businessId, archivo);
   }
 
+  /**
+   * Marca como leído el mensaje del cliente y le muestra "escribiendo…" (WhatsApp lo saca al llegar la respuesta, o a los
+   * 25 segundos). `wamid` es el id en Meta del mensaje que se está contestando. Es un detalle: si falla, la respuesta sale igual.
+   */
+  async mostrarEscribiendo(businessId: string, wamid: string): Promise<void> {
+    try {
+      const cred = await this.credenciales(businessId);
+      if (!cred) return;
+      await this.graphCall(`/${cred.phone_number_id}/messages`, cred.access_token, {
+        method: 'POST',
+        body: JSON.stringify({ messaging_product: 'whatsapp', status: 'read', message_id: wamid, typing_indicator: { type: 'text' } }),
+      });
+    } catch (e) {
+      this.logger.warn(`WhatsApp no mostró "escribiendo…": ${describeError(e)}`);
+    }
+  }
+
   private async enviarCarga(businessId: string, conversationId: string, waId: string, carga: Record<string, unknown>): Promise<string> {
     const ultimo = await this.prisma.message.findFirst({
       where: { conversationId, channel: 'WHATSAPP', sender: 'CUSTOMER' },

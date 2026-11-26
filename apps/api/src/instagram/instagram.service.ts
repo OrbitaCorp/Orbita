@@ -1048,24 +1048,55 @@ export class InstagramService {
     return { messageId: res.message_id, destinatario: res.recipient_id ?? null };
   }
 
-  /** Carga (o borra, con null) las preguntas frecuentes que Instagram muestra al abrir un chat nuevo. Hasta 4. */
+  /**
+   * Carga (o borra, con null) las preguntas frecuentes que Instagram muestra al abrir un chat nuevo. Hasta 4.
+   *
+   * La forma que usábamos (`/me/messenger_profile`, token en el encabezado, sin `locale`) Instagram la rechazaba siempre
+   * con "Invalid parameter" (24 y 25/11/2026), aunque coincide con la documentación. No hay cómo probarlo fuera de
+   * producción, así que se prueban en orden las variantes que admite la documentación y queda la primera que Instagram
+   * acepta: la cuenta por su id (como los mensajes), el token en la query (como el ejemplo de Meta) y `locale: default`
+   * (como en Messenger). Cargarlas de nuevo es idempotente: reintentar no duplica nada.
+   */
   async configurarPreguntasFrecuentes(businessId: string, preguntas: { pregunta: string; payload: string }[] | null): Promise<void> {
     const cred = await this.credenciales(businessId);
     if (!cred) throw new BadRequestException('Instagram no está conectado');
-    const url = `https://graph.instagram.com/${this.version}/me/messenger_profile`;
-    const headers = { Authorization: `Bearer ${cred.access_token}`, 'Content-Type': 'application/json' };
-    if (!preguntas || preguntas.length === 0) {
-      await this.llamar(url, { method: 'DELETE', headers, body: JSON.stringify({ platform: 'instagram', fields: ['ice_breakers'] }) });
-      return;
+    const acciones = (preguntas ?? []).slice(0, 4).map((p) => ({ question: p.pregunta, payload: p.payload }));
+    const borrar = acciones.length === 0;
+    const variantes = variantesDePreguntasFrecuentes(this.version, cred.ig_user_id, cred.access_token, acciones);
+    let ultimo: unknown;
+    for (const v of variantes) {
+      try {
+        await this.llamar(v.url, borrar
+          ? { method: 'DELETE', headers: v.headers, body: JSON.stringify({ platform: 'instagram', fields: ['ice_breakers'] }) }
+          : { method: 'POST', headers: v.headers, body: JSON.stringify(v.cuerpo) });
+        if (v.nombre !== variantes[0].nombre) this.logger.log(`Preguntas frecuentes de Instagram: las aceptó la variante "${v.nombre}"`);
+        return;
+      } catch (e) {
+        ultimo = e;
+        // Un token rechazado no se arregla cambiando la forma del pedido.
+        if (!(e instanceof InstagramApiError) || e.code === 190 || e.tipo === 'OAuthException') throw e;
+        if (borrar) break; // borrar con la forma base alcanza: lo demás es para cargarlas
+      }
     }
-    await this.llamar(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        platform: 'instagram',
-        ice_breakers: [{ call_to_actions: preguntas.slice(0, 4).map((p) => ({ question: p.pregunta, payload: p.payload })) }],
-      }),
-    });
+    throw ultimo;
+  }
+
+  /**
+   * Muestra "escribiendo…" en el chat (se va solo al llegar el mensaje, o a los ~20 segundos). Es un detalle: si
+   * Instagram no lo acepta, la respuesta sale igual.
+   */
+  async mostrarEscribiendo(businessId: string, igsid: string): Promise<void> {
+    try {
+      const cred = await this.credenciales(businessId);
+      if (!cred) return;
+      await this.llamar(`https://graph.instagram.com/${this.version}/${cred.ig_user_id}/messages`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${cred.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipient: { id: igsid }, sender_action: 'typing_on' }),
+      });
+    } catch {
+      /* el aviso ya quedó en el log de llamar() */
+    }
   }
 
   /** Suscribe la cuenta a más campos del webhook (por ejemplo, comentarios y botones). Al conectar solo se pide `messages`. */
@@ -1187,4 +1218,24 @@ export class InstagramService {
     }
     return json;
   }
+}
+
+type AccionDePreguntaFrecuente = { question: string; payload: string };
+
+/**
+ * Las formas de cargar las preguntas frecuentes que se prueban en orden (ver configurarPreguntasFrecuentes). La primera es
+ * la de los mensajes, que Instagram acepta: la cuenta por su id y el token en el encabezado.
+ */
+export function variantesDePreguntasFrecuentes(version: string, igUserId: string, token: string, acciones: AccionDePreguntaFrecuente[]) {
+  const json = { 'Content-Type': 'application/json' };
+  const conEncabezado = { Authorization: `Bearer ${token}`, ...json };
+  const enLaQuery = (cuenta: string) => `https://graph.instagram.com/${version}/${cuenta}/messenger_profile?${new URLSearchParams({ platform: 'instagram', access_token: token }).toString()}`;
+  const simple = { platform: 'instagram', ice_breakers: [{ call_to_actions: acciones }] };
+  const conLocale = { platform: 'instagram', ice_breakers: [{ call_to_actions: acciones, locale: 'default' }] };
+  return [
+    { nombre: 'id de la cuenta', url: `https://graph.instagram.com/${version}/${igUserId}/messenger_profile`, headers: conEncabezado, cuerpo: simple },
+    { nombre: 'token en la query', url: enLaQuery(igUserId), headers: json, cuerpo: simple },
+    { nombre: 'locale default', url: enLaQuery(igUserId), headers: json, cuerpo: conLocale },
+    { nombre: 'me con locale', url: enLaQuery('me'), headers: json, cuerpo: conLocale },
+  ];
 }

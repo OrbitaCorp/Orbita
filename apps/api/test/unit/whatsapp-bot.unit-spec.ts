@@ -125,7 +125,7 @@ function armar(o: Opciones = {}) {
     order: { findMany: jest.fn().mockResolvedValue([]) },
     $transaction: jest.fn().mockResolvedValue([]),
   };
-  const config: any = { get: (k: string) => ({ WHATSAPP_BOT_ESPERA_MS: '0' } as Record<string, string>)[k] };
+  const config: any = { get: (k: string) => ({ WHATSAPP_BOT_ESPERA_MS: '0', ORBI_PAUSA_BLOQUES_MS: '0' } as Record<string, string>)[k] };
   const whatsapp: any = {
     enviarTexto: o.falloEnvio ? jest.fn().mockRejectedValue(new Error('rechazado')) : jest.fn().mockResolvedValue('wamid.ORBI'),
     enviarInteractivo: jest.fn().mockResolvedValue('wamid.MENU'),
@@ -222,6 +222,14 @@ describe('WhatsappBotService.atender', () => {
     const t = armar({ ultimo: { id: 'respuesta', sender: 'STORE' } });
     await t.bot.atender([MSG]);
     expect(t.whatsapp.enviarTexto).not.toHaveBeenCalled();
+  });
+
+  it('la respuesta sale en mensajes cortos (los separa el modelo con una línea en blanco), cada uno guardado en el chat', async () => {
+    const t = armar({ eventos: [[{ type: 'text', chunk: 'Hola, soy el asistente de Rama.\n\nSí, tenemos la Zapatilla Run en 40 y 41.\n\n¿Querés que te muestre una foto?' }, uso(), { type: 'done' }]] });
+    await t.bot.atender([MSG]);
+    expect(t.whatsapp.enviarTexto.mock.calls.map((c: unknown[]) => c[3])).toEqual(['Hola, soy el asistente de Rama.', 'Sí, tenemos la Zapatilla Run en 40 y 41.', '¿Querés que te muestre una foto?']);
+    expect(t.prisma.message.create.mock.calls.map((c: any[]) => c[0].data.text)).toEqual(['Hola, soy el asistente de Rama.', 'Sí, tenemos la Zapatilla Run en 40 y 41.', '¿Querés que te muestre una foto?']);
+    expect(t.prisma.whatsappBotTurn.create).toHaveBeenCalledTimes(1);
   });
 
   it('un cliente que manda varios mensajes en un aviso se atiende una sola vez', async () => {

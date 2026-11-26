@@ -46,6 +46,8 @@ export const PRECIOS_IA: Record<string, Record<string, Tramo[]>> = {
   // Workers AI de Cloudflare (chat del bot de WhatsApp). Aparte de 'cloudflare', que es la factura externa de R2 y de las imágenes.
   'workers-ai': {
     '@cf/openai/gpt-oss-120b': [{ entrada: 0.35, salida: 0.75 }],
+    '@cf/thinkingmachines/inkling-2-small': [{ entrada: 0.3, cacheada: 0.1, salida: 1 }],
+    '@cf/deepseek-ai/deepseek-v4.1-flash-1017': [{ entrada: 0.3, cacheada: 0.006, salida: 1.2 }],
   },
 };
 
@@ -55,7 +57,7 @@ export const PRECIOS_IA: Record<string, Record<string, Tramo[]>> = {
 const MODELO_POR_DEFECTO: Record<string, string> = {
   gemini: 'gemini-3.6-flash',
   groq: 'openai/gpt-oss-120b',
-  'workers-ai': '@cf/openai/gpt-oss-120b',
+  'workers-ai': '@cf/thinkingmachines/inkling-2-small',
 };
 
 // El resto: USD por unidad de la categoría del evento.
