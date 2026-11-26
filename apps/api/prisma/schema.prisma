@@ -156,6 +156,9 @@ model Business {
   reservasBloqueos     ReservaBloqueo[]
   reservasCalendarios  ReservaCalendarioExterno[]
   reservasIcalExportadas ReservaIcalExportada[]
+  // Alquileres: lo que se cobró afuera (Airbnb) y con qué propiedad va cada aviso, ver el bloque al final de reservas.
+  alquileresIngresosExternos AlquilerIngresoExterno[]
+  alquileresAvisosExternos AlquilerAvisoExterno[]
   // Gimnasio: lo que no es una reserva (planes, alumnos y el plan de cada alumno), ver el bloque al final.
   gimnasioPlanes       GimnasioPlan[]
   gimnasioAlumnos      GimnasioAlumno[]
@@ -4060,6 +4063,8 @@ model ReservaRecurso {
   bloqueos        ReservaBloqueo[]
   calendarios     ReservaCalendarioExterno[]
   icalExportadas  ReservaIcalExportada[]
+  ingresosExternos AlquilerIngresoExterno[]
+  avisosExternos  AlquilerAvisoExterno[]
 
   @@index([businessId, modulo])
   @@map("reservas_recursos")
@@ -4301,6 +4306,62 @@ model ReservaIcalExportada {
   @@unique([recursoId, desde, hasta])
   @@index([businessId])
   @@map("reservas_ical_exportadas")
+}
+
+// ─── Alquileres ──────────────────────────────────────────────────────────────
+// Lo que el módulo Alquileres guarda y NO es una reserva del motor: las
+// estadías que el dueño cobró afuera (hoy, Airbnb) y con qué propiedad va
+// cada aviso de afuera. Tablas propias, al lado del motor y sin tocarlo, como
+// las de Gimnasio. Ver apps/api/src/alquileres/README.md.
+
+// Una estadía cobrada afuera, importada del archivo de ganancias del canal.
+// Una estadía de Airbnb nunca es una Reserva: sus noches llegan como bloqueo
+// del .ics (ReservaBloqueo con origen ICAL) y su plata y su huésped, por acá.
+// Única por negocio, canal y código: importar dos veces el mismo archivo no
+// duplica, y uno más nuevo corrige los montos.
+model AlquilerIngresoExterno {
+  id            String   @id @default(uuid())
+  businessId    String   @map("business_id")
+  recursoId     String   @map("recurso_id")
+  /// Hoy solo "airbnb".
+  canal         String   @db.VarChar(20)
+  /// El código de confirmación del canal.
+  codigoExterno String   @map("codigo_externo") @db.VarChar(40)
+  /// AAAA-MM-DD de entrada y de salida (exclusiva).
+  entrada       String   @db.VarChar(10)
+  salida        String   @db.VarChar(10)
+  noches        Int
+  huesped       String?  @db.VarChar(120)
+  montoBruto    Decimal  @map("monto_bruto") @db.Decimal(14, 2)
+  comision      Decimal  @db.Decimal(14, 2)
+  limpieza      Decimal  @db.Decimal(14, 2)
+  /// Lo que le quedó al dueño. Cero o menos: una devolución; las estadísticas no la cuentan.
+  montoNeto     Decimal  @map("monto_neto") @db.Decimal(14, 2)
+  moneda        String   @db.VarChar(3)
+  importadoEn   DateTime @map("importado_en")
+
+  business Business       @relation(fields: [businessId], references: [id])
+  recurso  ReservaRecurso @relation(fields: [recursoId], references: [id])
+
+  @@unique([businessId, canal, codigoExterno])
+  @@index([businessId, entrada])
+  @@map("alquileres_ingresos_externos")
+}
+
+// A qué propiedad corresponde cada aviso de afuera, por su nombre: el dueño
+// lo dice la primera vez que importa y las siguientes ya vienen unidas.
+model AlquilerAvisoExterno {
+  id            String @id @default(uuid())
+  businessId    String @map("business_id")
+  canal         String @db.VarChar(20)
+  nombreExterno String @map("nombre_externo") @db.VarChar(200)
+  recursoId     String @map("recurso_id")
+
+  business Business       @relation(fields: [businessId], references: [id])
+  recurso  ReservaRecurso @relation(fields: [recursoId], references: [id])
+
+  @@unique([businessId, canal, nombreExterno])
+  @@map("alquileres_avisos_externos")
 }
 
 // ─── Gimnasio ────────────────────────────────────────────────────────────────
