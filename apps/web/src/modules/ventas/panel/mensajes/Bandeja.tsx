@@ -8,7 +8,7 @@ import { WhatsappModal } from './components/WhatsappConexion'
 import { ConectarWhatsapp } from './whatsapp/ConectarWhatsapp'
 import { WhatsAppWeb } from './whatsapp/WhatsAppWeb'
 import { useConexionIntegrada } from './whatsapp/useConexionIntegrada'
-import { repartirCharlas, type CanalDeMensajes } from './whatsapp/utilidades'
+import { canalVisible, repartirCharlas, type CanalDeMensajes } from './whatsapp/utilidades'
 import type { Conversacion, Plantilla, CategoriaPlantilla } from './mock/mensajes.mock'
 import {
   ApiError, getWhatsappConnection, listConversations, updateConversation, listMessageTemplates,
@@ -112,7 +112,10 @@ function BandejaSkeleton() {
 // ─── Vista Bandeja (split panel) ─────────────────────────────────────────────
 
 interface BandejaProps {
-  canal:    CanalDeMensajes
+  /** El que pidió la dirección (?canal=); null = el de entrada (ver canalVisible). */
+  canalPedido: CanalDeMensajes | null
+  /** Hay un chat abierto en la dirección (?conv=). */
+  conConversacion: boolean
   onCanal:  (c: CanalDeMensajes) => void
   convId:   string | null
   onAbrir:  (id: string) => void
@@ -123,12 +126,13 @@ interface BandejaProps {
   onPedido: (orderId: string) => void
 }
 
-function BandejaMensajes({ canal, onCanal, convId, onAbrir, onCerrar, ir, onToast, onPerfil, onPedido }: BandejaProps) {
+function BandejaMensajes({ canalPedido, conConversacion, onCanal, convId, onAbrir, onCerrar, ir, onToast, onPerfil, onPedido }: BandejaProps) {
   const [loading, setLoading] = useState(true)
   const [rows, setRows] = useState<ConversationRow[]>([])
   const [plantillas, setPlantillas] = useState<Plantilla[]>([])
   const [whatsapp, setWhatsapp] = useState<EstadoDeWhatsapp>('cargando')
   const [modalWhatsapp, setModalWhatsapp] = useState(false)
+  const canal = canalVisible(canalPedido, conConversacion, whatsapp === 'no-disponible')
 
   // Si hay una cuenta conectada, y si WhatsApp está habilitado para este negocio. 403/404: no está disponible
   // (negocio no habilitado, o la API todavía no tiene el endpoint).
@@ -287,7 +291,8 @@ export function MensajesHub() {
   const router  = useRouter()
   const { vista } = router.query
   const convId = (router.query.conv as string) ?? null
-  const canal: CanalDeMensajes = router.query.canal === 'whatsapp' ? 'whatsapp' : 'sistema'
+  const canalPedido: CanalDeMensajes | null =
+    router.query.canal === 'whatsapp' ? 'whatsapp' : router.query.canal === 'sistema' ? 'sistema' : null
   const [toast, setToast] = useState<string | null>(null)
 
   useEffect(() => {
@@ -303,10 +308,10 @@ export function MensajesHub() {
     router.push({ query: q })
   }
 
-  // Cambiar de bandeja cierra el chat abierto (era de la otra).
+  // Cambiar de bandeja cierra el chat abierto (era de la otra). La elegida queda en la dirección.
   const cambiarCanal = (c: CanalDeMensajes) => {
     const { conv: _c, canal: _k, ...rest } = router.query
-    void router.push({ query: c === 'whatsapp' ? { ...rest, canal: 'whatsapp' } : rest })
+    void router.push({ query: { ...rest, canal: c } })
   }
   const abrirConv = (id: string) => router.push({ query: { ...router.query, conv: id } })
   const cerrarConv = () => {
@@ -350,7 +355,7 @@ export function MensajesHub() {
       <style>{`@media (max-width: 768px) { .msg-hub { padding: 16px !important; } }`}</style>
       {esPlantillas
         ? <PlantillasInline onToast={setToast} />
-        : <BandejaMensajes canal={canal} onCanal={cambiarCanal} convId={convId} onAbrir={abrirConv} onCerrar={cerrarConv} ir={ir} onToast={setToast} onPerfil={irPerfil} onPedido={irPedido} />
+        : <BandejaMensajes canalPedido={canalPedido} conConversacion={!!convId} onCanal={cambiarCanal} convId={convId} onAbrir={abrirConv} onCerrar={cerrarConv} ir={ir} onToast={setToast} onPerfil={irPerfil} onPedido={irPedido} />
       }
       {toast && (
         <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9000, background: 'var(--color-text)', color: 'var(--color-bg)', padding: '10px 18px', borderRadius: 8, fontSize: 13, fontWeight: 500, boxShadow: '0 4px 16px rgba(0,0,0,.2)', whiteSpace: 'nowrap' }}>

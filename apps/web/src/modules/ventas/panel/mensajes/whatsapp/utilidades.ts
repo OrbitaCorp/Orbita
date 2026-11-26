@@ -7,6 +7,18 @@ import { orbiAtiende } from '../../_shared/orbiAtencion'
 const HORA_MS = 60 * 60 * 1000
 export const VENTANA_WHATSAPP_MS = 24 * HORA_MS
 
+/**
+ * Qué bandeja se ve al entrar a Mensajes. WhatsApp es la principal (es por donde más venden los negocios);
+ * la del chat de la tienda queda como segunda pestaña. Se respeta la que pide la dirección (?canal=), y los
+ * links viejos a un chat (?conv= sin canal) eran siempre de la tienda. Si WhatsApp no está habilitado para
+ * el negocio, se entra a la de la tienda.
+ */
+export function canalVisible(pedido: CanalDeMensajes | null, conConversacion: boolean, whatsappNoDisponible: boolean): CanalDeMensajes {
+  if (pedido) return pedido
+  if (conConversacion || whatsappNoDisponible) return 'sistema'
+  return 'whatsapp'
+}
+
 export type CanalDeMensajes = 'sistema' | 'whatsapp'
 
 export const esDeWhatsapp = (c: Pick<ConversationRow, 'lastChannel'>): boolean => c.lastChannel === 'WHATSAPP'
