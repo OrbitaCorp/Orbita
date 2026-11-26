@@ -117,6 +117,13 @@ export class InternalCronController {
       'nightly-subscriptions-maintenance',
       CronRunsService.claveDelDia(),
       async () => {
+        // Antes que la mora: un link de activación pagado cuya confirmación se
+        // perdió tiene que activarse acá, no terminar en una suspensión.
+        try {
+          await this.subscriptions.rescatarActivacionesPendientes();
+        } catch (e) {
+          this.logger.error(`Links de activación pendientes: no se pudo correr — ${describeError(e)}`);
+        }
         await this.subscriptions.reconcileOverdueSubscriptions();
         await this.subscriptions.processLifecycleNotices();
         await this.subscriptions.processCancellationWindow();

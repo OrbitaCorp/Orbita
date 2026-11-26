@@ -2,8 +2,9 @@ import { BadRequestException } from '@nestjs/common';
 import { CORTESIA_VENTANA_PAGO_DIAS, SubscriptionsService } from '../src/subscriptions/subscriptions.service';
 
 // Código de descuento al ACTIVAR el plan (Configuración → Suscripción): vale
-// solo para el primer cobro. La preapproval de MP se crea con el monto rebajado
-// y, registrado ese primer cobro, se le devuelve el precio de lista.
+// solo para el primer cobro. El link (un plan de MP) sale con el monto rebajado,
+// la fila del descuento se crea cuando alguien lo paga y, registrado ese primer
+// cobro, se le devuelve a la suscripción el precio de lista.
 
 const LISTA_MENSUAL = 16500;
 
@@ -23,6 +24,13 @@ function armar() {
       updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
     subscriptionPayment: { count: jest.fn() },
+    subscriptionPlanCheckout: {
+      create: jest.fn().mockImplementation(({ data }: any) => Promise.resolve({ id: 'chk-1', ...data })),
+      findMany: jest.fn().mockResolvedValue([]),
+      findUnique: jest.fn().mockResolvedValue(null),
+      update: jest.fn().mockResolvedValue({}),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
     platformDiscountCode: { findUnique: jest.fn() },
     member: { findUnique: jest.fn().mockResolvedValue({ email: 'dueña@x.com' }), findFirst: jest.fn().mockResolvedValue({ email: 'dueña@x.com' }) },
     business: { findUnique: jest.fn().mockResolvedValue({ subdomain: 'tienda' }) },
@@ -38,9 +46,14 @@ function armar() {
     get: jest.fn(),
   };
   (service as any)._preapproval = preapproval;
+  const preapprovalPlan = {
+    create: jest.fn().mockResolvedValue({ id: 'PLAN-1', init_point: 'https://mp/pagar' }),
+    update: jest.fn().mockResolvedValue({}),
+  };
+  (service as any)._preapprovalPlan = preapprovalPlan;
   jest.spyOn(service as any, 'syncAddonAvanzado').mockResolvedValue(undefined);
   jest.spyOn(service as any, 'notificarReactivacion').mockResolvedValue(undefined);
-  return { service, prisma, tx, preapproval, mail };
+  return { service, prisma, tx, preapproval, preapprovalPlan, mail };
 }
 
 const subVencida = (extra: Record<string, unknown> = {}) => ({
@@ -59,47 +72,50 @@ const subVencida = (extra: Record<string, unknown> = {}) => ({
 const codigo = (percentOff: number) => ({ id: 'code1', code: 'PRUEBA', percentOff, isActive: true, expiresAt: null, maxUses: 5, usedCount: 0 });
 
 describe('activatePlan con código de descuento', () => {
-  it('le manda a MP el monto rebajado y deja anotado el precio de lista', async () => {
-    const { service, prisma, preapproval } = armar();
+  it('le manda a MP el monto rebajado y deja anotado el precio de lista en el link', async () => {
+    const { service, prisma, preapprovalPlan } = armar();
     prisma.subscription.findUnique.mockResolvedValue(subVencida());
     prisma.platformDiscountCode.findUnique.mockResolvedValue(codigo(99));
 
     const r = await service.activatePlan('b1', 'm1', 'prueba');
 
     expect(r.initPoint).toBe('https://mp/pagar');
-    expect(preapproval.create.mock.calls[0][0].body.auto_recurring.transaction_amount).toBe(165);
-    const fila = prisma.subscriptionActivationDiscount.create.mock.calls[0][0].data;
-    expect(fila).toMatchObject({ businessId: 'b1', preapprovalId: 'PRE-1', codeId: 'code1', plan: 'mensual' });
+    expect(preapprovalPlan.create.mock.calls[0][0].body.auto_recurring.transaction_amount).toBe(165);
+    const fila = prisma.subscriptionPlanCheckout.create.mock.calls[0][0].data;
+    expect(fila).toMatchObject({ businessId: 'b1', mpPlanId: 'PLAN-1', discounted: true, codeId: 'code1', plan: 'mensual' });
+    // La fila del descuento recién existe cuando alguien paga el link.
+    expect(prisma.subscriptionActivationDiscount.create).not.toHaveBeenCalled();
     expect(Number(fila.amountList)).toBe(LISTA_MENSUAL);
     expect(Number(fila.amountFinal)).toBe(165);
   });
 
   it('sin código cobra el precio de lista y no guarda ningún descuento', async () => {
-    const { service, prisma, preapproval } = armar();
+    const { service, prisma, preapprovalPlan } = armar();
     prisma.subscription.findUnique.mockResolvedValue(subVencida());
 
     await service.activatePlan('b1', 'm1');
 
-    expect(preapproval.create.mock.calls[0][0].body.auto_recurring.transaction_amount).toBe(LISTA_MENSUAL);
+    expect(preapprovalPlan.create.mock.calls[0][0].body.auto_recurring.transaction_amount).toBe(LISTA_MENSUAL);
+    expect(prisma.subscriptionPlanCheckout.create.mock.calls[0][0].data).toMatchObject({ discounted: false, codeId: null });
     expect(prisma.subscriptionActivationDiscount.create).not.toHaveBeenCalled();
   });
 
   it('rechaza un código del 100%: es un alta gratis, no un descuento sobre el plan', async () => {
-    const { service, prisma, preapproval } = armar();
+    const { service, prisma, preapprovalPlan } = armar();
     prisma.subscription.findUnique.mockResolvedValue(subVencida());
     prisma.platformDiscountCode.findUnique.mockResolvedValue({ ...codigo(100), expiresAt: new Date(Date.now() + 86_400_000) });
 
     await expect(service.activatePlan('b1', 'm1', 'prueba')).rejects.toBeInstanceOf(BadRequestException);
-    expect(preapproval.create).not.toHaveBeenCalled();
+    expect(preapprovalPlan.create).not.toHaveBeenCalled();
   });
 
   it('rechaza un código que no existe sin llamar a MP', async () => {
-    const { service, prisma, preapproval } = armar();
+    const { service, prisma, preapprovalPlan } = armar();
     prisma.subscription.findUnique.mockResolvedValue(subVencida());
     prisma.platformDiscountCode.findUnique.mockResolvedValue(null);
 
     await expect(service.activatePlan('b1', 'm1', 'nada')).rejects.toBeInstanceOf(BadRequestException);
-    expect(preapproval.create).not.toHaveBeenCalled();
+    expect(preapprovalPlan.create).not.toHaveBeenCalled();
   });
 
   it('cierra los descuentos que habían quedado a medias de una activación anterior', async () => {
@@ -119,7 +135,7 @@ describe('activatePlan en cortesía (COMP) por vencer', () => {
   const DIA = 86_400_000;
 
   it(`permite pagar por adelantado dentro de los últimos ${CORTESIA_VENTANA_PAGO_DIAS} días`, async () => {
-    const { service, prisma, preapproval } = armar();
+    const { service, prisma, preapprovalPlan } = armar();
     prisma.subscription.findUnique.mockResolvedValue(
       subVencida({
         origin: 'COMP',
@@ -132,11 +148,11 @@ describe('activatePlan en cortesía (COMP) por vencer', () => {
     const r = await service.activatePlan('b1', 'm1');
 
     expect(r.initPoint).toBe('https://mp/pagar');
-    expect(preapproval.create).toHaveBeenCalledTimes(1);
+    expect(preapprovalPlan.create).toHaveBeenCalledTimes(1);
   });
 
   it(`rechaza si a la cortesía todavía le faltan más de ${CORTESIA_VENTANA_PAGO_DIAS} días`, async () => {
-    const { service, prisma, preapproval } = armar();
+    const { service, prisma, preapprovalPlan } = armar();
     prisma.subscription.findUnique.mockResolvedValue(
       subVencida({
         origin: 'COMP',
@@ -147,11 +163,11 @@ describe('activatePlan en cortesía (COMP) por vencer', () => {
     );
 
     await expect(service.activatePlan('b1', 'm1')).rejects.toBeInstanceOf(BadRequestException);
-    expect(preapproval.create).not.toHaveBeenCalled();
+    expect(preapprovalPlan.create).not.toHaveBeenCalled();
   });
 
   it('una cuenta paga (no cortesía) sigue sin poder activar antes del vencimiento', async () => {
-    const { service, prisma, preapproval } = armar();
+    const { service, prisma, preapprovalPlan } = armar();
     prisma.subscription.findUnique.mockResolvedValue(
       subVencida({
         origin: 'PAID',
@@ -161,7 +177,7 @@ describe('activatePlan en cortesía (COMP) por vencer', () => {
     );
 
     await expect(service.activatePlan('b1', 'm1')).rejects.toBeInstanceOf(BadRequestException);
-    expect(preapproval.create).not.toHaveBeenCalled();
+    expect(preapprovalPlan.create).not.toHaveBeenCalled();
   });
 });
 

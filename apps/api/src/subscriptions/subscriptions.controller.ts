@@ -163,8 +163,9 @@ export class SubscriptionsController {
   // preapproval de su plan (back_url de activatePlan). Público por el mismo
   // motivo que /confirm: nunca confía en el body, siempre vuelve a
   // preguntarle a MP el estado real — y a diferencia de /confirm, acá el
-  // negocio YA existe (se identifica por external_reference, que
-  // activatePlan seteó al businessId), no hace falta sesión para esto.
+  // negocio YA existe (se identifica por el link de plan del que salió la
+  // suscripción, o por external_reference en las de antes del 26/11), no hace
+  // falta sesión para esto.
   @Post('confirm-plan-activation')
   @Public()
   @Throttle({ default: { limit: 30, ttl: 60000 } })
