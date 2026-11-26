@@ -58,6 +58,7 @@ const MAX_BOTONES_TARJETA = 3;
 // Kit de difusión: publicar, comentarios y estadísticas. Se piden cuando la persona se conecta desde Difusión (o
 // autoriza el kit desde ahí), para que quien solo quiere mensajes no vea en Instagram una pantalla que pide más
 // de lo que usa.
+export const SCOPE_MENSAJES = 'instagram_business_manage_messages';
 export const SCOPE_PUBLICAR = 'instagram_business_content_publish';
 export const SCOPE_COMENTAR = 'instagram_business_manage_comments';
 export const SCOPE_ESTADISTICAS = 'instagram_business_manage_insights';
@@ -147,7 +148,7 @@ const ETIQUETA_ADJUNTO: Record<string, string> = {
 
 // Error de la API de Instagram. Extiende BadGatewayException para que el panel
 // reciba un 502 con el motivo real y no un 500 genérico.
-class InstagramApiError extends BadGatewayException {
+export class InstagramApiError extends BadGatewayException {
   constructor(
     message: string,
     readonly code?: number,

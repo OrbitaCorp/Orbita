@@ -593,6 +593,7 @@ export const CAPITULOS: Capitulo[] = [
             id: 'mensajes-instagram', titulo: 'Responder los mensajes de Instagram',
             bloques: [
                 { tipo: 'parrafo', texto: 'En **Difusión → Mensajes** están los mensajes directos que te escriben por Instagram, con el aspecto de la bandeja de la app: la lista de conversaciones a la izquierda y el chat a la derecha. Se actualiza sola. Los mensajes de Instagram no aparecen en el módulo Mensajes.' },
+                { tipo: 'nota', variante: 'dato', texto: 'Al conectar la cuenta, Órbita **trae tus charlas recientes** de Instagram: hasta 50 conversaciones, cada una con sus **últimos 20 mensajes** (es lo que Instagram deja leer). Aparecen en un par de minutos, ya marcadas como leídas, y ni Orbi ni las respuestas automáticas les contestan. Las solicitudes de mensaje que no tuvieron actividad en los últimos 30 días no se pueden traer.' },
                 { tipo: 'lista', items: [
                     'Con **Sin leer** ves solo las conversaciones que todavía no abriste, y con el buscador encontrás a alguien por su nombre.',
                     'Respondés con texto, con una foto (el botón de la imagen al lado del campo) o con las dos cosas: salen como dos mensajes, igual que en Instagram. Las fotos que te mandan los clientes se ven en el chat.',
