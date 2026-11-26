@@ -16,6 +16,11 @@
 //   con neto mayor que cero (cero o menos es una devolución).
 // - Nunca se suman monedas distintas: los pesos suman solo ARS; lo demás va
 //   aparte, con su moneda, y no entra en los promedios.
+// - El panel no trae las propiedades pausadas o borradas, pero sí sus reservas
+//   y lo importado de ellas. Si tienen noches en el tramo entran igual, plata y
+//   noches juntas, como una fila aparte; sus noches disponibles son las que
+//   vendieron (no se sabe desde cuándo dejaron de ofrecerse). Si solo entrara
+//   la plata, el ingreso por noche disponible saldría inflado.
 // - Sin redondear acá: la pantalla redondea al mostrar.
 import { diasEntre, sumarDias, type ISO } from '@/lib/reservas/fechas'
 import type { Bloqueo, IngresoExterno, NegocioAlquiler, Reserva } from './index'
@@ -55,12 +60,20 @@ export interface EstadisticasEstadia {
   /** Lo ya reservado de mañana al fin del período (pesos y noches); ceros si el período ya terminó. */
   porVenir: { ingresos: number; noches: number }
   porPropiedad: NumerosDePropiedad[]
+  /**
+   * Noches del tramo que Airbnb tiene reservadas (están en el calendario) y que no tienen una estadía
+   * importada encima: cuentan como ocupadas, pero su plata todavía no está.
+   */
+  nochesDeAirbnbSinImportar: number
   /** Estadías importadas que pisan noches de una reserva propia de la misma propiedad. */
   cruces: { codigo: string; unidadId: string; entrada: ISO; salida: ISO; reservaId: string }[]
 }
 
 /** Una estadía, propia o de Airbnb, con lo que hace falta para contarla. */
 interface Estadia { unidadId: string; entrada: ISO; salida: ISO; monto: number; moneda: string; canal: Canal; creada?: ISO; reservaId?: string; codigo?: string }
+
+/** Cómo se nombra, en "Por propiedad", una que el panel ya no trae (pausada o borrada) y tiene estadías en el período. */
+const YA_NO_ESTA = 'Una propiedad que ya no está'
 
 const mayor = (a: ISO, b: ISO) => (a > b ? a : b)
 const menor = (a: ISO, b: ISO) => (a < b ? a : b)
@@ -126,16 +139,26 @@ export function estadisticasDeEstadia(
     pesosDe.set(e.unidadId, { ingresos: p.ingresos + parte, noches: p.noches + enTramo })
   }
 
-  const porPropiedad: NumerosDePropiedad[] = n.propiedades.map(p => {
+  // Las propiedades del panel y, aparte, las que ya no están (pausadas o borradas) pero tienen estadías en el tramo.
+  const queYaNoEstan = [...new Set(estadias.filter(e => !n.propiedades.some(p => p.id === e.unidadId) && nochesEn(e.entrada, e.salida, desde, tope) > 0).map(e => e.unidadId))]
+  let nochesDeAirbnbSinImportar = 0
+  const porPropiedad: NumerosDePropiedad[] = [...n.propiedades.map(p => ({ id: p.id, nombre: p.nombre, vigente: true })), ...queYaNoEstan.map(id => ({ id, nombre: YA_NO_ESTA, vigente: false }))].map(p => {
     const ocupadas = new Set<ISO>()
     const anotar = (entrada: ISO, salida: ISO) => cadaNoche(entrada, salida, desde, tope, noche => ocupadas.add(noche))
     for (const e of estadias) if (e.unidadId === p.id) anotar(e.entrada, e.salida)
     const bloqueos = n.bloqueos.filter(b => b.unidadId === p.id)
-    for (const b of bloqueos) if (esEstadiaDeAirbnb(b)) anotar(b.desde, b.hasta)
+    // Lo importado de esta propiedad, cuente o no (una devuelta también está importada): para saber qué noches de Airbnb no tienen su plata.
+    const conGanancias = new Set<ISO>()
+    for (const e of n.ingresosExternos ?? []) if (e.unidadId === p.id) cadaNoche(e.entrada, e.salida, desde, tope, noche => conGanancias.add(noche))
+    for (const b of bloqueos) {
+      if (!esEstadiaDeAirbnb(b)) continue
+      anotar(b.desde, b.hasta)
+      cadaNoche(b.desde, b.hasta, desde, tope, noche => { if (!conGanancias.has(noche)) nochesDeAirbnbSinImportar++ })
+    }
     // No disponibles: lo que bloqueó el dueño o cerró a mano en Airbnb, salvo que igual esté ocupado.
     const cerradas = new Set<ISO>()
     for (const b of bloqueos) if (!esEstadiaDeAirbnb(b)) cadaNoche(b.desde, b.hasta, desde, tope, noche => { if (!ocupadas.has(noche)) cerradas.add(noche) })
-    const disponibles = nochesDelTramo - cerradas.size
+    const disponibles = p.vigente ? nochesDelTramo - cerradas.size : ocupadas.size
     const plata = pesosDe.get(p.id) ?? { ingresos: 0, noches: 0 }
     return {
       unidadId: p.id, nombre: p.nombre, nochesDisponibles: disponibles, nochesOcupadas: ocupadas.size,
@@ -161,12 +184,12 @@ export function estadisticasDeEstadia(
     precioPorNoche: nochesVendidas > 0 ? ingresos / nochesVendidas : null,
     ingresoPorNocheDisponible: nochesDisponibles > 0 ? ingresos / nochesDisponibles : null,
     estadiaPromedio: promedio(largos), anticipacionPromedio: promedio(anticipaciones),
-    porVenir, porPropiedad, cruces,
+    porVenir, porPropiedad, nochesDeAirbnbSinImportar, cruces,
   }
 }
 
-/** La estadía importada que corresponde a un bloqueo de Airbnb: misma propiedad y mismas fechas. */
+/** La estadía importada que corresponde a un bloqueo de Airbnb: misma propiedad y mismas fechas. Una devuelta (neto en cero) no cuenta. */
 export function estadiaDelBloqueo(b: Bloqueo, externos: IngresoExterno[] | undefined): IngresoExterno | undefined {
   if (b.origen !== 'ical') return undefined
-  return externos?.find(e => e.unidadId === b.unidadId && e.entrada === b.desde && e.salida === b.hasta)
+  return externos?.find(e => e.unidadId === b.unidadId && e.entrada === b.desde && e.salida === b.hasta && e.neto > 0)
 }

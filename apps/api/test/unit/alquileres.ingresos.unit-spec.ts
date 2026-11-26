@@ -50,8 +50,8 @@ function tabla(filas: Fila[]) {
 }
 
 const CABECERA = 'Date,Type,Confirmation Code,Start Date,Nights,Guest,Listing,Details,Reference,Currency,Amount,Paid Out,Host Fee,Cleaning Fee';
-const fila = (codigo: string, inicio: string, noches: number, aviso: string, moneda: string, monto: number, huesped = 'Ana') =>
-  `,Reservation,${codigo},${inicio},${noches},${huesped},${aviso},,,${moneda},${monto},,0,0`;
+const fila = (codigo: string, inicio: string, noches: number | string, aviso: string, moneda: string, monto: number, huesped = 'Ana', tipo = 'Reservation', fecha = '') =>
+  `${fecha},${tipo},${codigo},${inicio},${noches},${huesped},${aviso},,,${moneda},${monto},,0,0`;
 const csv = (...filas: string[]) => [CABECERA, ...filas].join('\n');
 /** Dos estadías en pesos de la Cabaña y una en dólares del Depto. */
 const TRES = csv(
@@ -86,7 +86,7 @@ describe('AlquileresIngresosService · vista previa', () => {
   it('cuenta estadías, rango y totales por moneda, y no guarda nada', async () => {
     const { svc, t } = armar();
     const v = await svc.vistaPrevia(BIZ, TRES);
-    expect(v).toMatchObject({ estadias: 3, desde: '2026-11-29', hasta: '2026-12-30', descartadas: [], otrasFilas: 0 });
+    expect(v).toMatchObject({ estadias: 3, desde: '2026-11-29', hasta: '2026-12-30', descartadas: [], otrasFilas: 0, ajustes: 0 });
     expect(v.totales).toEqual([{ moneda: 'ARS', neto: 700000, estadias: 2 }, { moneda: 'USD', neto: 300, estadias: 1 }]);
     expect(t.alquilerIngresoExterno.filas).toEqual([]);
     expect(t.alquilerAvisoExterno.filas).toEqual([]);
@@ -120,7 +120,9 @@ describe('AlquileresIngresosService · importar', () => {
     expect(t.alquilerIngresoExterno.filas.find((f) => f.codigoExterno === 'HM1')).toMatchObject({
       businessId: BIZ, recursoId: P1, canal: 'airbnb', entrada: '2026-12-20', salida: '2026-12-27', noches: 7, huesped: 'Ana', montoNeto: 580000, moneda: 'ARS', importadoEn: AHORA,
     });
-    expect(t.alquilerIngresoExterno.filas.find((f) => f.codigoExterno === 'HM3')).toMatchObject({ recursoId: P2, moneda: 'USD' });
+    expect(t.alquilerIngresoExterno.filas.find((f) => f.codigoExterno === 'HM3')).toMatchObject({ recursoId: P2, moneda: 'USD', aviso: 'Depto Centro' });
+    // Cada fila guarda sus movimientos: es lo que deja juntar después otro archivo sin duplicar ni pisar.
+    expect(t.alquilerIngresoExterno.filas.find((f) => f.codigoExterno === 'HM1')?.movimientos).toEqual([expect.objectContaining({ neto: 580000, clave: expect.any(String) })]);
     expect(t.alquilerAvisoExterno.filas.map((a) => [a.businessId, a.canal, a.nombreExterno, a.recursoId])).toEqual([
       [BIZ, 'airbnb', 'Cabaña del Monte', P1], [BIZ, 'airbnb', 'Depto Centro', P2],
     ]);
@@ -131,16 +133,63 @@ describe('AlquileresIngresosService · importar', () => {
     expect(registrado).not.toContain('Ana');
   });
 
-  it('importar el mismo archivo otra vez no duplica; uno más nuevo con otro monto actualiza', async () => {
+  it('importar el mismo archivo otra vez no duplica ni cambia los montos', async () => {
     const { svc, t } = armar();
     await svc.importar(BIZ, 'm-1', { texto: TRES, avisos: UNIONES }, AHORA);
     expect(await svc.importar(BIZ, 'm-1', { texto: TRES, avisos: UNIONES }, AHORA)).toEqual({ creadas: 0, actualizadas: 3, sinImportar: 0 });
     expect(t.alquilerIngresoExterno.filas).toHaveLength(3);
     expect(t.alquilerAvisoExterno.filas).toHaveLength(2);
-    const corregido = csv(fila('HM1', '12/20/2026', 7, 'Cabaña del Monte', 'ARS', 500000), fila('HM4', '01/05/2027', 2, 'Cabaña del Monte', 'ARS', 90000));
-    expect(await svc.importar(BIZ, 'm-1', { texto: corregido, avisos: [UNIONES[0]] }, AHORA)).toEqual({ creadas: 1, actualizadas: 1, sinImportar: 0 });
-    expect(t.alquilerIngresoExterno.filas).toHaveLength(4);
-    expect(t.alquilerIngresoExterno.filas.find((f) => f.codigoExterno === 'HM1')?.montoNeto).toBe(500000);
+    expect(t.alquilerIngresoExterno.filas.find((f) => f.codigoExterno === 'HM1')?.montoNeto).toBe(580000);
+  });
+
+  // El archivo es un historial de movimientos y Airbnb lo da por período: una estadía puede estar repartida en dos.
+  const del2026 = csv(fila('HM1', '12/20/2026', 7, 'Cabaña del Monte', 'ARS', 580000, 'Ana', 'Reservation', '12/21/2026'));
+  const del2027 = csv(
+    fila('HM1', '12/20/2026', 7, 'Cabaña del Monte', 'ARS', -50000, 'Ana', 'Resolution Adjustment', '01/05/2027'),
+    fila('HM4', '01/10/2027', 2, 'Cabaña del Monte', 'ARS', 90000, 'Luis', 'Reservation', '01/11/2027'),
+  );
+  const netoDe = (t: ReturnType<typeof armar>['t'], codigo: string) => t.alquilerIngresoExterno.filas.find((f) => f.codigoExterno === codigo)?.montoNeto;
+
+  it('un archivo de otro período con otro movimiento de la misma estadía se suma: no pisa lo que ya estaba', async () => {
+    const { svc, t } = armar();
+    await svc.importar(BIZ, 'm-1', { texto: del2026, avisos: [UNIONES[0]] }, AHORA);
+    expect(await svc.importar(BIZ, 'm-1', { texto: del2027, avisos: [UNIONES[0]] }, AHORA)).toEqual({ creadas: 1, actualizadas: 1, sinImportar: 0 });
+    expect(netoDe(t, 'HM1')).toBe(530000);
+    expect(t.alquilerIngresoExterno.filas).toHaveLength(2);
+    // Volver a importar cualquiera de los dos no cambia nada.
+    await svc.importar(BIZ, 'm-1', { texto: del2026, avisos: [UNIONES[0]] }, AHORA);
+    await svc.importar(BIZ, 'm-1', { texto: del2027, avisos: [UNIONES[0]] }, AHORA);
+    expect(netoDe(t, 'HM1')).toBe(530000);
+    expect(t.alquilerIngresoExterno.filas).toHaveLength(2);
+  });
+
+  it('da lo mismo en qué orden se importen los archivos', async () => {
+    const { svc, t } = armar();
+    await svc.importar(BIZ, 'm-1', { texto: del2027, avisos: [UNIONES[0]] }, AHORA);
+    await svc.importar(BIZ, 'm-1', { texto: del2026, avisos: [UNIONES[0]] }, AHORA);
+    expect(netoDe(t, 'HM1')).toBe(530000);
+  });
+
+  it('un ajuste suelto (sin los datos de la estadía) se suma a la que ya estaba importada; si no estaba, no se guarda nada suyo', async () => {
+    const { svc, t } = armar();
+    await svc.importar(BIZ, 'm-1', { texto: del2026, avisos: [UNIONES[0]] }, AHORA);
+    const sueltos = csv(fila('HM1', '', '', '', 'ARS', -30000, '', 'Resolution Adjustment', '02/01/2027'), fila('HM-QUE-NO-ESTA', '', '', '', 'ARS', -999, '', 'Resolution Adjustment', '02/01/2027'));
+    expect(await svc.vistaPrevia(BIZ, sueltos)).toMatchObject({ estadias: 0, ajustes: 1, otrasFilas: 1 });
+    expect(await svc.importar(BIZ, 'm-1', { texto: sueltos, avisos: [] }, AHORA)).toEqual({ creadas: 0, actualizadas: 1, sinImportar: 0 });
+    expect(netoDe(t, 'HM1')).toBe(550000);
+    expect(t.alquilerIngresoExterno.filas.map((f) => f.codigoExterno)).toEqual(['HM1']);
+    // La estadía sigue con su propiedad, sus fechas y su huésped.
+    expect(t.alquilerIngresoExterno.filas[0]).toMatchObject({ recursoId: P1, entrada: '2026-12-20', salida: '2026-12-27', huesped: 'Ana', aviso: 'Cabaña del Monte' });
+    await svc.importar(BIZ, 'm-1', { texto: sueltos, avisos: [] }, AHORA);
+    expect(netoDe(t, 'HM1')).toBe(550000);
+  });
+
+  it('cambiar la unión de un aviso mueve también sus estadías de archivos anteriores', async () => {
+    const { svc, t } = armar();
+    await svc.importar(BIZ, 'm-1', { texto: del2026, avisos: [UNIONES[0]] }, AHORA);
+    const otroArchivo = csv(fila('HM4', '01/20/2027', 2, 'Cabaña del Monte', 'ARS', 90000, 'Luis', 'Reservation', '01/21/2027'));
+    await svc.importar(BIZ, 'm-1', { texto: otroArchivo, avisos: [{ nombre: 'Cabaña del Monte', recursoId: P2 }] }, AHORA);
+    expect(t.alquilerIngresoExterno.filas.map((f) => [f.codigoExterno, f.recursoId])).toEqual(expect.arrayContaining([['HM1', P2], ['HM4', P2]]));
   });
 
   it('un aviso marcado "no importar" deja sus estadías afuera y se cuenta', async () => {

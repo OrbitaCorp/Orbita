@@ -18,16 +18,30 @@ export function unionesListas(avisos: { nombre: string }[], elegidas: Elegidas):
 
 /**
  * Lo que se propone al abrir la vista previa: la unión que ya estaba guardada
- * (si esa propiedad sigue en la lista) y, con una sola propiedad, esa. Con
- * varias y sin unión guardada no se adivina: lo decide el dueño.
+ * (si esa propiedad sigue en la lista) y, con un solo aviso y una sola
+ * propiedad, esa. En cualquier otro caso no se adivina: lo decide el dueño.
+ * (Con dos avisos y una propiedad cargada, uno puede no ser de este negocio.)
  */
 export function unionesPropuestas(avisos: { nombre: string; recursoId: string | null }[], propiedades: { id: string }[]): Elegidas {
   const elegidas: Elegidas = {}
   for (const a of avisos) {
     if (a.recursoId && propiedades.some(p => p.id === a.recursoId)) elegidas[a.nombre] = a.recursoId
-    else if (propiedades.length === 1) elegidas[a.nombre] = propiedades[0].id
+    else if (avisos.length === 1 && propiedades.length === 1) elegidas[a.nombre] = propiedades[0].id
   }
   return elegidas
+}
+
+/**
+ * El texto del archivo. Airbnb lo da en UTF-8; si alguien lo abrió y lo guardó
+ * con Excel puede venir en ANSI (Windows-1252), y leído como UTF-8 los
+ * encabezados con acento ("Código de confirmación") no se reconocerían.
+ */
+export function decodificar(bytes: Uint8Array): string {
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+  } catch {
+    return new TextDecoder('windows-1252').decode(bytes)
+  }
 }
 
 /** Un monto con su moneda: los pesos con su signo, lo demás con su código ("USD 300,5"). */

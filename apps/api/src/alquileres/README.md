@@ -21,12 +21,22 @@ abierta. Lo único que el dueño puede sacar con la plata es ese archivo.
 - **El archivo se lee por nombre de columna**, en inglés o en castellano, nunca por posición
   (`dominio/csv-airbnb.ts`, función pura con sus tests). Airbnb no documenta el formato y el
   anfitrión elige qué columnas baja. Si falta una columna necesaria no se lee nada y se dice cuál.
-- **Las filas del mismo código de confirmación se suman**: una reserva pagada en partes, o con un
-  ajuste o una devolución, es una sola estadía. Si el neto da cero o menos se guarda igual (para
-  que un archivo más nuevo corrija a uno viejo) y las Estadísticas no la cuentan.
+- **El archivo es un historial de movimientos.** Cada fila con código de confirmación es un
+  movimiento de esa estadía (el pago, otra cuota, un ajuste, una devolución), con una clave que
+  sale de lo que dice la fila: la fecha del pago, el tipo y los montos. La estadía es la suma de
+  sus movimientos. Si el neto da cero o menos se guarda igual y las Estadísticas no la cuentan.
 - **Importar es todo o nada.** Se valida todo antes de escribir y se escribe en una transacción.
-- **Una fila por negocio, canal y código.** Importar dos veces el mismo archivo no duplica; uno
-  más nuevo corrige los montos y, si cambió la unión, la propiedad.
+- **Una fila por negocio, canal y código, que guarda sus movimientos.** Al importar, los
+  movimientos del archivo se juntan con los que la estadía ya tenía, por su clave. El mismo
+  archivo dos veces no duplica. El de otro período suma lo que trae de nuevo sin pisar lo
+  anterior, en cualquier orden: Airbnb da el historial por período, y una estadía puede quedar
+  repartida en dos archivos (una cuota en cada uno, o un ajuste al año siguiente).
+- **Un ajuste suelto** (una fila con código cuya estadía no está en el archivo) se suma a la ya
+  importada de ese código; si no hay ninguna, no se guarda.
+- **Si cambia la unión de un aviso**, sus estadías de archivos anteriores se mudan a la propiedad
+  nueva (cada fila guarda de qué aviso vino).
+- **Lo que no resuelve:** una fila que Airbnb cambie de un archivo a otro (el mismo pago con otro
+  monto) se cuenta como dos movimientos. Si pasa: borrar lo importado y volver a importar.
 - **El servidor no recuerda nada entre la vista previa y la importación.** El panel manda el texto
   las dos veces. No se confía en filas armadas por el navegador.
 - **El texto del archivo no se guarda** ni se escribe en ningún registro. En auditoría queda
@@ -53,7 +63,8 @@ falta decidir un aviso o si la propiedad no es un alojamiento; 404 si la propied
 - `alquileres_ingresos_externos`: una fila por estadía cobrada afuera.
 - `alquileres_avisos_externos`: a qué propiedad corresponde cada aviso de afuera, por su nombre.
 
-Las dos con RLS. Migración `20261126120000_alquileres_ingresos_externos`.
+Las dos con RLS. Migraciones `20261126120000_alquileres_ingresos_externos` y
+`20261126120100_alquileres_ingresos_movimientos` (las columnas `aviso` y `movimientos`).
 
 ## Lo que falta confirmar
 

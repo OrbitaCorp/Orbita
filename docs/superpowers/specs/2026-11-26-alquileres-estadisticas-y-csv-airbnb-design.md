@@ -36,6 +36,8 @@ alquila sobre todo por ahí quedan a la mitad.
 
 - Que la plata se cuente dos veces (la misma estadía por el archivo y por una reserva), o que
   importar dos veces el mismo archivo duplique.
+- Que importar el archivo de otro período pise lo que ya estaba de una estadía (una cuota en cada
+  archivo, o un ajuste que llega al año siguiente).
 - Que se sumen pesos con dólares en un mismo total.
 - Que un archivo con otro formato se importe "más o menos" sin avisar: si no se entiende, se dice
   qué falta y no se guarda nada.
@@ -95,7 +97,9 @@ nada; se les avisa porque hay una migración.
 - `alquileres_ingresos_externos`: una fila por estadía cobrada afuera. `business_id`,
   `recurso_id`, `canal` (hoy solo `airbnb`), `codigo_externo` (el código de confirmación),
   `entrada`, `salida`, `noches`, `huesped`, `monto_bruto`, `comision`, `limpieza`, `monto_neto`,
-  `moneda`, `importado_en`. Única por negocio, canal y código.
+  `moneda`, `importado_en`. Única por negocio, canal y código. Guarda también `aviso` (de qué
+  aviso vino) y `movimientos`: las filas del archivo que la forman, cada una con su clave. Los
+  montos son la suma de sus movimientos.
 - `alquileres_avisos_externos`: la unión guardada entre el nombre de un aviso de Airbnb y una
   propiedad. `business_id`, `canal`, `nombre_externo`, `recurso_id`. Única por negocio, canal y
   nombre.
@@ -121,10 +125,13 @@ nada; se les avisa porque hay una migración.
 - Plata de cada fila: `monto_neto` es lo que le quedó al anfitrión por esa reserva (la columna
   Amount). `comision` es la tarifa de servicio. `monto_bruto` es la columna de ganancias brutas si
   viene; si no, neto más comisión.
-- Varias filas con el mismo código (una reserva pagada en partes, o con un ajuste): se suman en
-  una. Si la suma del neto da cero o menos (una devolución total), la estadía se guarda igual,
-  para que un archivo más nuevo corrija a uno viejo, y las estadísticas no la cuentan: ni su
-  plata ni sus noches.
+- El archivo es un historial de movimientos. Cada fila con código es un **movimiento** de esa
+  estadía (el pago, otra cuota, un ajuste, una devolución) y lleva una clave que sale de lo que
+  dice la fila: la fecha del pago, el tipo y los montos. La estadía es la suma de sus
+  movimientos. Si el neto da cero o menos (una devolución total) se guarda igual y las
+  estadísticas no la cuentan: ni su plata ni sus noches.
+- Un movimiento de una estadía que no está en el archivo (un ajuste suelto) se suma a la que ya
+  esté importada con ese código; si no hay ninguna, no se guarda.
 - Topes: 2 MB de texto y 5.000 filas. Más que eso se rechaza.
 
 ### Importar (dos pasos, el servidor no recuerda nada entre uno y otro)
@@ -133,8 +140,15 @@ nada; se les avisa porque hay una migración.
    fechas, el total por moneda, las filas que quedaron afuera con su motivo, y la lista de avisos
    con la propiedad que ya tienen unida, si la tienen.
 2. **Guardar.** El panel manda el mismo texto y, por cada aviso, una propiedad o "no importar".
-   Se guarda la unión y se crean o actualizan las estadías por su código: importar dos veces no
-   duplica, y un archivo más nuevo corrige montos.
+   Se guarda la unión y, por cada estadía, **se juntan sus movimientos con los que ya tenía, por
+   su clave**. Importar dos veces el mismo archivo no duplica. Importar el de otro período suma
+   lo que trae de nuevo sin pisar lo anterior, en cualquier orden. Airbnb da el historial por
+   período, y una estadía puede quedar repartida en dos archivos. Si cambia la unión de un aviso,
+   sus estadías de archivos anteriores se mudan con ella.
+
+   Lo que esto no resuelve: una fila que Airbnb cambie de un archivo a otro (el mismo pago con
+   otro monto) se contaría como dos movimientos. En el historial de lo ya pagado no debería pasar;
+   si pasa, se borra lo importado y se vuelve a importar.
 
 Solo quien puede configurar reservas importa o borra. Quien puede ver reservas ve lo importado.
 Hay un "Borrar todo lo importado de Airbnb", con confirmación, por si se subió un archivo
@@ -195,9 +209,12 @@ inflado (toda la plata del mes sobre tres noches).
 con su moneda ("USD 1.240 de Airbnb"), y no entra en el precio promedio ni en el ingreso por
 noche disponible; sus noches sí cuentan para la ocupación. Cuando pasa, la pantalla lo dice.
 
-**Hasta dónde llega lo de Airbnb:** la pantalla dice hasta qué fecha llegan las ganancias
-importadas. Si el período pasa de esa fecha, lo dice ("Las ganancias de Airbnb están importadas
-hasta el 5 de enero: lo de después cuenta como ocupación, sin plata").
+**Lo de Airbnb que no tiene su plata:** si en el período hay noches que Airbnb tiene reservadas
+en el calendario y que no están en las ganancias importadas, la pantalla dice cuántas son ("Hay
+3 noches de Airbnb sin su plata") y ofrece importar.
+
+**Una propiedad pausada o borrada** que tiene estadías en el período entra igual, con su plata y
+sus noches juntas, como una fila aparte. Sus noches disponibles son las que vendió.
 
 Cada número lleva una línea que dice qué cuenta.
 

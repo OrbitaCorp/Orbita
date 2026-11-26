@@ -4307,8 +4307,8 @@ Se hace una sola vez: si el negocio ya tiene config de Turnos, no se toca nada, 
 
 | Qué pasa | Qué hace Órbita |
 |---|---|
-| Se importa dos veces el mismo archivo | No duplica: una fila por código de confirmación |
-| Un archivo más nuevo trae otro monto | Lo corrige |
+| Se importa dos veces el mismo archivo | No duplica: cada fila del archivo es un movimiento y se reconoce |
+| Se importa el archivo de otro período, con otra cuota o un ajuste de una estadía ya importada | Se suma a lo que estaba, en cualquier orden. No lo pisa |
 | Al archivo le falta una columna, o no es el de Airbnb | No guarda nada y dice qué falta |
 | Una reserva pagada en partes, o con un ajuste | Se suma en una sola estadía |
 | Una devolución total | Se guarda, y las estadísticas no la cuentan |
@@ -4334,7 +4334,9 @@ Las reglas de las cuentas, que son las que evitan números engañosos:
 
 **Las noches de Airbnb que ya pasaron se conservan.** La sincronización del calendario ya no borra los bloqueos de estadías terminadas: quedan como historia. La ficha de un bloqueo de Airbnb muestra el huésped y lo cobrado cuando hay una estadía importada con sus fechas.
 
-**Para Turnos y Gimnasio** (motor compartido): una migración, \`20261126120000_alquileres_ingresos_externos\`, con dos tablas nuevas de Alquileres que no tocan ninguna otra. Del motor cambia una sola cosa, en la sincronización de un calendario de Airbnb (qué bloqueos borra), que solo corre en alojamientos con Airbnb conectado. El módulo nuevo de la API, \`apps/api/src/alquileres/\`, vive al lado del motor como el de Gimnasio.
+**Para Turnos y Gimnasio** (motor compartido): dos migraciones, \`20261126120000_alquileres_ingresos_externos\` y \`20261126120100_alquileres_ingresos_movimientos\`, con dos tablas nuevas de Alquileres que no tocan ninguna otra. Del motor cambia una sola cosa, en la sincronización de un calendario de Airbnb (qué bloqueos borra), que solo corre en alojamientos con Airbnb conectado. El módulo nuevo de la API, \`apps/api/src/alquileres/\`, vive al lado del motor como el de Gimnasio.
+
+**Revisión:** un revisor independiente leyó toda la rama. Sin problemas de seguridad ni de aislamiento; sí dos defectos que se corrigieron antes de subir (importar un archivo parcial pisaba el total de una estadía; una propiedad pausada sumaba plata pero no noches) y varios menores. El detalle está al final del plan.
 
 **Verificado:** tests de la API y del front en verde. Contra la base de dev, por API y en pantalla a 1280 y a 390 px: vista previa, importar, reimportar sin duplicar, los rechazos sin guardar nada, las estadísticas con pesos y dólares, la ficha del bloqueo con su huésped, y una estadía ya terminada que sigue contando después de que Airbnb la deja de publicar.
 

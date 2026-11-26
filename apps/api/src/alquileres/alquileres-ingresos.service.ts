@@ -1,9 +1,10 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { ReservasCatalogoService } from '../reservas/reservas-catalogo.service';
 import { esFecha } from '../reservas/dominio/tiempo';
-import { leerCsvDeAirbnb, type EstadiaLeida, type FilaDescartada } from './dominio/csv-airbnb';
+import { leerCsvDeAirbnb, totalesDe, type AjusteSuelto, type EstadiaLeida, type FilaDescartada, type Movimiento } from './dominio/csv-airbnb';
 
 // Lo que un alojamiento cobró afuera de Órbita (hoy, por Airbnb), importado del
 // archivo de ganancias que el dueño descarga. Reglas que no se negocian:
@@ -12,8 +13,12 @@ import { leerCsvDeAirbnb, type EstadiaLeida, type FilaDescartada } from './domin
 //   como bloqueo del .ics y su plata y su huésped, por acá.
 // - Importar es todo o nada: si el archivo no se entiende, o una propiedad no
 //   es del negocio, no se guarda nada.
-// - Una fila por negocio, canal y código de confirmación: importar dos veces
-//   el mismo archivo no duplica, y uno más nuevo corrige los montos.
+// - Una fila por negocio, canal y código de confirmación, que guarda sus
+//   MOVIMIENTOS (las filas del archivo que la forman). Importar junta los
+//   movimientos por su clave: el mismo archivo dos veces no duplica, y otro
+//   archivo (otro período) suma lo que trae de nuevo sin pisar lo que estaba.
+//   Airbnb da el historial por período, y una estadía puede estar repartida
+//   en dos archivos (una cuota en cada uno, o un ajuste al año siguiente).
 // - El servidor no recuerda nada entre la vista previa y la importación: lee
 //   el texto las dos veces, y no confía en filas armadas por el navegador.
 // - El texto del archivo no se guarda ni se escribe en ningún registro.
@@ -31,8 +36,10 @@ export interface VistaPreviaDto {
   hasta: string | null;
   totales: { moneda: string; neto: number; estadias: number }[];
   descartadas: FilaDescartada[];
-  /** Filas que no son de una estadía (transferencias al banco): no se importan. */
+  /** Filas que no son de una estadía (transferencias al banco, o ajustes de estadías que no están importadas): no se importan. */
   otrasFilas: number;
+  /** Ajustes sueltos que se sumarían a estadías ya importadas. */
+  ajustes: number;
   /** Cada aviso del archivo, con la propiedad que ya tiene unida si la tiene. */
   avisos: { nombre: string; estadias: number; recursoId: string | null }[];
 }
@@ -63,6 +70,24 @@ export interface IngresosDto {
 
 const redondo = (n: number) => Math.round(n * 100) / 100;
 
+/** Los movimientos guardados de una fila, tal como salen de la columna JSON (lo que no tenga la forma se ignora). */
+function movimientosDe(guardado: unknown): Movimiento[] {
+  if (!Array.isArray(guardado)) return [];
+  return guardado.flatMap((m: unknown) => {
+    const x = m as Partial<Movimiento> | null;
+    return x && typeof x.clave === 'string' && [x.neto, x.comision, x.limpieza, x.bruto].every((n) => typeof n === 'number')
+      ? [{ clave: x.clave, neto: x.neto as number, comision: x.comision as number, limpieza: x.limpieza as number, bruto: x.bruto as number }]
+      : [];
+  });
+}
+
+/** Los movimientos de antes más los nuevos, uno por clave: lo que se repite no se duplica. */
+function juntar(antes: Movimiento[], nuevos: Movimiento[]): Movimiento[] {
+  const porClave = new Map(antes.map((m) => [m.clave, m]));
+  for (const m of nuevos) porClave.set(m.clave, m);
+  return [...porClave.values()];
+}
+
 @Injectable()
 export class AlquileresIngresosService {
   constructor(
@@ -72,7 +97,7 @@ export class AlquileresIngresosService {
     private readonly audit?: AuditService,
   ) {}
 
-  private leer(texto: string): { estadias: EstadiaLeida[]; descartadas: FilaDescartada[]; otrasFilas: number } {
+  private leer(texto: string): { estadias: EstadiaLeida[]; ajustes: AjusteSuelto[]; descartadas: FilaDescartada[]; otrasFilas: number } {
     const leido = leerCsvDeAirbnb(texto);
     if (!leido.ok) throw new BadRequestException(leido.motivo);
     return leido;
@@ -88,13 +113,23 @@ export class AlquileresIngresosService {
     }
   }
 
+  /** De los ajustes sueltos del archivo, los que tienen una estadía ya importada a la que sumarse (misma moneda). */
+  private aplicables(ajustes: AjusteSuelto[], guardadas: { codigoExterno: string; moneda: string }[]): AjusteSuelto[] {
+    const monedaDe = new Map(guardadas.map((g) => [g.codigoExterno, g.moneda]));
+    return ajustes.filter((a) => monedaDe.has(a.codigo) && (a.moneda === null || a.moneda === monedaDe.get(a.codigo)));
+  }
+
   async vistaPrevia(businessId: string, texto: string): Promise<VistaPreviaDto> {
-    const { estadias, descartadas, otrasFilas } = this.leer(texto);
+    const { estadias, ajustes, descartadas, otrasFilas } = this.leer(texto);
     const guardadas = await this.prisma.alquilerAvisoExterno.findMany({ where: { businessId, canal: AIRBNB } });
     const union = new Map<string, string>();
     for (const g of guardadas) {
       if (await this.esAlojamiento(businessId, g.recursoId)) union.set(g.nombreExterno, g.recursoId);
     }
+    const yaImportadas = ajustes.length
+      ? await this.prisma.alquilerIngresoExterno.findMany({ where: { businessId, canal: AIRBNB, codigoExterno: { in: [...new Set(ajustes.map((a) => a.codigo))] } }, select: { codigoExterno: true, moneda: true } })
+      : [];
+    const seSuman = this.aplicables(ajustes, yaImportadas).length;
 
     const porMoneda = new Map<string, { neto: number; estadias: number }>();
     const porAviso = new Map<string, number>();
@@ -110,7 +145,8 @@ export class AlquileresIngresosService {
       hasta: estadias.reduce<string | null>((m, e) => (m === null || e.salida > m ? e.salida : m), null),
       totales: [...porMoneda].sort(([a], [b]) => pesosPrimero(a, b)).map(([moneda, t]) => ({ moneda, neto: redondo(t.neto), estadias: t.estadias })),
       descartadas,
-      otrasFilas,
+      otrasFilas: otrasFilas + (ajustes.length - seSuman),
+      ajustes: seSuman,
       avisos: [...porAviso].sort(([a], [b]) => a.localeCompare(b)).map(([nombre, cuantas]) => ({ nombre, estadias: cuantas, recursoId: union.get(nombre) ?? null })),
     };
   }
@@ -119,7 +155,8 @@ export class AlquileresIngresosService {
    * Guarda las estadías del archivo. `avisos` dice, por cada aviso del
    * archivo, a qué propiedad corresponde, o `null` para no importarlo: tienen
    * que venir todos. Se valida todo antes de escribir, y se escribe en una
-   * transacción.
+   * transacción. Los movimientos de una estadía que ya estaba se juntan con
+   * los nuevos por su clave.
    */
   async importar(
     businessId: string,
@@ -127,7 +164,7 @@ export class AlquileresIngresosService {
     dto: { texto: string; avisos: { nombre: string; recursoId: string | null }[] },
     ahora = new Date(),
   ): Promise<ImportadoDto> {
-    const { estadias } = this.leer(dto.texto);
+    const { estadias, ajustes } = this.leer(dto.texto);
     const decidido = new Map(dto.avisos.map((a) => [a.nombre, a.recursoId]));
     const delArchivo = [...new Set(estadias.map((e) => e.aviso))];
     const sinDecidir = delArchivo.find((nombre) => !decidido.has(nombre));
@@ -141,29 +178,47 @@ export class AlquileresIngresosService {
     }
 
     const aGuardar = estadias.filter((e) => decidido.get(e.aviso));
-    const codigos = aGuardar.map((e) => e.codigo);
+    const deEstadias = new Set(aGuardar.map((e) => e.codigo));
+    const codigos = [...new Set([...deEstadias, ...ajustes.map((a) => a.codigo)])];
     const resultado = await this.prisma.$transaction(async (tx) => {
-      // Las uniones: se guarda (o se corrige) la de cada aviso que se importa.
-      const guardadas = await tx.alquilerAvisoExterno.findMany({ where: { businessId, canal: AIRBNB } });
+      // Las uniones: se guarda (o se corrige) la de cada aviso que se importa. Si cambió, sus estadías de
+      // archivos anteriores se mudan con ella.
+      const uniones = await tx.alquilerAvisoExterno.findMany({ where: { businessId, canal: AIRBNB } });
       for (const nombre of delArchivo) {
         const recursoId = decidido.get(nombre);
         if (!recursoId) continue;
-        const ya = guardadas.find((g) => g.nombreExterno === nombre);
+        const ya = uniones.find((g) => g.nombreExterno === nombre);
         if (!ya) await tx.alquilerAvisoExterno.create({ data: { businessId, canal: AIRBNB, nombreExterno: nombre, recursoId } });
         else if (ya.recursoId !== recursoId) await tx.alquilerAvisoExterno.updateMany({ where: { id: ya.id, businessId }, data: { recursoId } });
+        await tx.alquilerIngresoExterno.updateMany({ where: { businessId, canal: AIRBNB, aviso: nombre }, data: { recursoId } });
       }
-      // Las estadías: las que ya estaban (por su código) se reemplazan por lo que dice este archivo.
-      const { count: actualizadas } = await tx.alquilerIngresoExterno.deleteMany({ where: { businessId, canal: AIRBNB, codigoExterno: { in: codigos } } });
-      if (aGuardar.length) {
-        await tx.alquilerIngresoExterno.createMany({
-          data: aGuardar.map((e) => ({
-            businessId, recursoId: decidido.get(e.aviso) as string, canal: AIRBNB, codigoExterno: e.codigo.slice(0, 40),
-            entrada: e.entrada, salida: e.salida, noches: e.noches, huesped: e.huesped?.slice(0, 120) ?? null,
-            montoBruto: e.montoBruto, comision: e.comision, limpieza: e.limpieza, montoNeto: e.montoNeto, moneda: e.moneda, importadoEn: ahora,
-          })),
-        });
+
+      // Lo que ya estaba de estos códigos: sus movimientos se juntan con los del archivo.
+      const guardadas = await tx.alquilerIngresoExterno.findMany({ where: { businessId, canal: AIRBNB, codigoExterno: { in: codigos } } });
+      const guardada = new Map(guardadas.map((g) => [g.codigoExterno, g]));
+      const filas: Prisma.AlquilerIngresoExternoCreateManyInput[] = [];
+      const fila = (d: Omit<Prisma.AlquilerIngresoExternoCreateManyInput, 'businessId' | 'canal' | 'importadoEn' | 'montoNeto' | 'comision' | 'limpieza' | 'montoBruto' | 'movimientos'>, movimientos: Movimiento[]) =>
+        filas.push({ businessId, canal: AIRBNB, importadoEn: ahora, ...d, ...totalesDe(movimientos), movimientos: movimientos as unknown as Prisma.InputJsonValue });
+
+      for (const e of aGuardar) {
+        const antes = guardada.get(e.codigo);
+        // Si lo guardado estaba en otra moneda, no se mezcla: vale lo del archivo.
+        const movimientos = juntar(antes && antes.moneda === e.moneda ? movimientosDe(antes.movimientos) : [], e.movimientos);
+        fila({ recursoId: decidido.get(e.aviso) as string, codigoExterno: e.codigo, aviso: e.aviso.slice(0, 200), entrada: e.entrada, salida: e.salida, noches: e.noches, huesped: e.huesped?.slice(0, 120) ?? null, moneda: e.moneda }, movimientos);
       }
-      return { creadas: aGuardar.length - actualizadas, actualizadas, sinImportar: estadias.length - aGuardar.length };
+      // Los ajustes sueltos: se suman a la estadía ya importada de su código, que conserva todo lo demás.
+      const sueltos = this.aplicables(ajustes.filter((a) => !deEstadias.has(a.codigo)), guardadas);
+      for (const codigo of new Set(sueltos.map((a) => a.codigo))) {
+        const antes = guardada.get(codigo)!;
+        const movimientos = juntar(movimientosDe(antes.movimientos), sueltos.filter((a) => a.codigo === codigo).map((a) => a.movimiento));
+        fila({ recursoId: antes.recursoId, codigoExterno: codigo, aviso: antes.aviso, entrada: antes.entrada, salida: antes.salida, noches: antes.noches, huesped: antes.huesped, moneda: antes.moneda }, movimientos);
+      }
+
+      const tocados = filas.map((f) => f.codigoExterno);
+      const actualizadas = tocados.filter((c) => guardada.has(c)).length;
+      await tx.alquilerIngresoExterno.deleteMany({ where: { businessId, canal: AIRBNB, codigoExterno: { in: tocados } } });
+      if (filas.length) await tx.alquilerIngresoExterno.createMany({ data: filas });
+      return { creadas: filas.length - actualizadas, actualizadas, sinImportar: estadias.length - aGuardar.length };
     }, { timeout: 30_000 });
 
     await this.audit?.registrar({

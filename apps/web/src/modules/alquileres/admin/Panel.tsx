@@ -223,7 +223,7 @@ export default function Panel() {
           {/* La estadía tiene su propia pantalla: Estadísticas (ocupación, canales, Airbnb). */}
           {vista === 'ingresos' && tipo === 'estadia' && (
             <Estadisticas key={k} negocio={negocio} reservas={reservas} clientes={clientes} onAbrirReserva={verReserva}
-              onIrAAirbnb={real ? () => irA('calendarios') : undefined} importadoHasta={n.ganancias?.resumen.hasta} />
+              onIrAAirbnb={real ? () => irA('calendarios') : undefined} />
           )}
           {vista === 'unidades' && <Canchas key={k} negocio={negocio} reservas={reservas} onGuardar={onGuardar} />}
           {vista === 'extras' && <Extras key={k} negocio={negocio} reservas={reservas} onGuardar={onGuardar} />}

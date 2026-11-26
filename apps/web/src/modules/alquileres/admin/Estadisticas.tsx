@@ -12,13 +12,14 @@
 // - Un período que no terminó se compara contra los mismos días del anterior:
 //   medio mes contra un mes entero daría siempre en baja.
 // - Lo de Airbnb sale de dos lados: las noches, del calendario conectado; la
-//   plata y el huésped, de las ganancias importadas (pantalla Airbnb).
+//   plata y el huésped, de las ganancias importadas (pantalla Airbnb). Si hay
+//   noches del calendario sin su plata, se dice cuántas.
 // - Pesos y otras monedas no se suman.
 //
 // Sin useMemo: son cuentas chicas y react-compiler ya memoiza el componente.
 import { useState } from 'react'
 import { AlertTriangle, BedDouble, CalendarClock, Gauge, HandCoins, Moon, Tag, Wallet } from 'lucide-react'
-import { diasEntre, fechaCorta, rangoTxt, sumarDias, type ISO } from '@/lib/reservas/fechas'
+import { diasEntre, fechaCorta, rangoTxt, sumarDias } from '@/lib/reservas/fechas'
 import { pesos } from '@/lib/reservas/precio'
 import { Barras, Encabezado, Filtros, Kpi, Nota, Segmentado } from '@/design-system/reservas/piezas'
 import { HOY, clientePorId, cuenta, type Cliente, type NegocioAlquiler, type Reserva } from '../datos'
@@ -39,11 +40,9 @@ interface P {
   onAbrirReserva: (id: string) => void
   /** Solo el panel real: lleva a la pantalla de Airbnb, donde se importan las ganancias. */
   onIrAAirbnb?: () => void
-  /** Solo el panel real: hasta qué fecha llegan las ganancias de Airbnb importadas. */
-  importadoHasta?: ISO | null
 }
 
-export default function Estadisticas({ negocio, reservas, clientes, onAbrirReserva, onIrAAirbnb, importadoHasta }: P) {
+export default function Estadisticas({ negocio, reservas, clientes, onAbrirReserva, onIrAAirbnb }: P) {
   const [periodo, setPeriodo] = useState<Periodo>('mes')
   const [desde, hasta] = periodoDe(periodo)
   const [desdeAntes, hastaAntes] = periodoAnterior(periodo)
@@ -72,8 +71,8 @@ export default function Estadisticas({ negocio, reservas, clientes, onAbrirReser
     { rotulo: 'Airbnb', valor: Math.round(ahora.porCanal.airbnb.ingresos), estadias: ahora.porCanal.airbnb.estadias },
   ]
   const sinEstadias = canales.every(c => c.estadias === 0)
-  // Lo importado llega hasta la última salida: si es anterior al tramo que se mira, hay noches de Airbnb sin su plata.
-  const faltaImportar = !!importadoHasta && importadoHasta < hastaHoy
+  // Noches que Airbnb tiene reservadas en el calendario y que no están en las ganancias importadas: ocupación sin plata.
+  const sinPlata = ahora.nochesDeAirbnbSinImportar
 
   return (
     <div className="rv-pagina">
@@ -113,7 +112,7 @@ export default function Estadisticas({ negocio, reservas, clientes, onAbrirReser
           nota="ingresos ÷ noches disponibles" />
       </div>
 
-      {(ahora.porVenir.noches > 0 || ahora.otrasMonedas.length > 0 || faltaImportar) && (
+      {(ahora.porVenir.noches > 0 || ahora.otrasMonedas.length > 0 || sinPlata > 0) && (
         <div className="rv-pila" style={{ marginBottom: 14 }}>
           {ahora.porVenir.noches > 0 && (
             <Nota tono="info"><span>Ya reservado para lo que queda del período: <b>{pesos(Math.round(ahora.porVenir.ingresos))}</b> en {cuenta(ahora.porVenir.noches, 'noche', 'noches')}. Todavía no cuenta arriba.</span></Nota>
@@ -121,9 +120,9 @@ export default function Estadisticas({ negocio, reservas, clientes, onAbrirReser
           {ahora.otrasMonedas.length > 0 && (
             <Nota tono="info"><span>Además, Airbnb te pagó {ahora.otrasMonedas.map(o => `${enMoneda(o.moneda, o.neto)} por ${cuenta(o.estadias, 'estadía', 'estadías')}`).join(' y ')}. No se suma a los pesos ni entra en los promedios; sus noches sí cuentan como ocupadas.</span></Nota>
           )}
-          {faltaImportar && importadoHasta && (
+          {sinPlata > 0 && (
             <Nota tono="info">
-              <span style={{ flex: 1, minWidth: 0 }}>Las ganancias de Airbnb están importadas hasta el {fechaCorta(importadoHasta)}: lo de después cuenta como ocupación, sin plata.</span>
+              <span style={{ flex: 1, minWidth: 0 }}>Hay {cuenta(sinPlata, 'noche de Airbnb', 'noches de Airbnb')} sin su plata: {sinPlata === 1 ? 'cuenta como ocupada' : 'cuentan como ocupadas'}, pero lo que cobraste por {sinPlata === 1 ? 'ella' : 'ellas'} no está importado.</span>
               {onIrAAirbnb && <button type="button" className="rv-btn rv-btn--sm" onClick={onIrAAirbnb}>Importar ganancias</button>}
             </Nota>
           )}
@@ -166,7 +165,7 @@ export default function Estadisticas({ negocio, reservas, clientes, onAbrirReser
         <LlegadasYSalidas negocio={negocio} reservas={reservas} clientes={clientes} onAbrirReserva={onAbrirReserva} />
       </div>
 
-      {onIrAAirbnb && importadas.length === 0 && negocio.calendariosExternos.length > 0 && (
+      {onIrAAirbnb && importadas.length === 0 && negocio.calendariosExternos.length > 0 && sinPlata === 0 && (
         <div style={{ marginTop: 14 }}>
           <Nota tono="info">
             <span style={{ flex: 1, minWidth: 0 }}>De Airbnb acá se ven las noches, no la plata. Importá tus ganancias para sumar lo que cobraste y las estadías de antes de conectar el calendario.</span>

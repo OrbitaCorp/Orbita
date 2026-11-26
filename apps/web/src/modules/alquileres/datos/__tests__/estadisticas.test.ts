@@ -173,4 +173,48 @@ describe('estadiaDelBloqueo', () => {
   it('un bloqueo del dueño nunca es una estadía de Airbnb', () => {
     expect(estadiaDelBloqueo(bloqueo('b1', '2026-12-10', '2026-12-15'), externos)).toBeUndefined()
   })
+
+  it('una estadía devuelta (neto en cero) no se muestra como lo que pagó Airbnb', () => {
+    expect(estadiaDelBloqueo(bloqueo('b1', '2026-12-10', '2026-12-15', { origen: 'ical' }), [deAirbnb('DEVUELTA', '2026-12-10', '2026-12-15', 0)])).toBeUndefined()
+  })
+})
+
+describe('estadisticasDeEstadia · una propiedad pausada o borrada', () => {
+  // El panel no trae las propiedades pausadas o borradas, pero sí sus reservas y lo importado de ellas.
+  it('su plata y sus noches entran juntas: no infla el ingreso por noche disponible', () => {
+    const e = calcular({ reservas: [reserva('r1', '2026-12-10', '2026-12-15', 250000), reserva('vieja', '2026-12-01', '2026-12-11', 500000, { unidadId: 'pausada' })] })
+    expect(e.ingresos).toBe(750000)
+    // Sus noches disponibles son las que vendió: no se sabe desde cuándo dejó de ofrecerse.
+    expect(e.nochesDisponibles).toBe(62 + 10)
+    expect(e.nochesOcupadas).toBe(15)
+    expect(e.porPropiedad.map(p => [p.unidadId, p.nombre, p.ingresos])).toEqual([['p1', 'Cabaña del Monte', 250000], ['p2', 'Depto Centro', 0], ['pausada', 'Una propiedad que ya no está', 500000]])
+    // La suma por propiedad cierra con el total.
+    expect(e.porPropiedad.reduce((s, p) => s + p.ingresos, 0)).toBe(e.ingresos)
+  })
+
+  it('sin estadías en el período, una propiedad que ya no está no aparece', () => {
+    expect(calcular({ reservas: [reserva('vieja', '2026-10-01', '2026-10-05', 1, { unidadId: 'pausada' })] }).porPropiedad.map(p => p.unidadId)).toEqual(['p1', 'p2'])
+  })
+})
+
+describe('estadisticasDeEstadia · noches de Airbnb sin su plata', () => {
+  const reservadoEnAirbnb = (id: string, desde: string, hasta: string) => bloqueo(id, desde, hasta, { origen: 'ical', externoTipo: 'RESERVADO' })
+
+  it('cuenta las noches de bloqueos de Airbnb que no tienen una estadía importada encima', () => {
+    const e = calcular({
+      bloqueos: [reservadoEnAirbnb('b1', '2026-12-10', '2026-12-15'), reservadoEnAirbnb('b2', '2026-12-20', '2026-12-23')],
+      externos: [deAirbnb('HM1', '2026-12-10', '2026-12-15', 400000)],
+    })
+    expect(e.nochesDeAirbnbSinImportar).toBe(3)
+  })
+
+  it('con todo importado es cero, y lo que el dueño cerró a mano no cuenta', () => {
+    expect(calcular({ bloqueos: [reservadoEnAirbnb('b1', '2026-12-10', '2026-12-15')], externos: [deAirbnb('HM1', '2026-12-10', '2026-12-15', 400000)] }).nochesDeAirbnbSinImportar).toBe(0)
+    expect(calcular({ bloqueos: [bloqueo('b1', '2026-12-10', '2026-12-15', { origen: 'ical', externoTipo: 'CERRADO' })] }).nochesDeAirbnbSinImportar).toBe(0)
+    expect(calcular().nochesDeAirbnbSinImportar).toBe(0)
+  })
+
+  it('una estadía importada y devuelta también cuenta como importada: no hay nada que traer', () => {
+    expect(calcular({ bloqueos: [reservadoEnAirbnb('b1', '2026-12-10', '2026-12-15')], externos: [deAirbnb('DEVUELTA', '2026-12-10', '2026-12-15', 0)] }).nochesDeAirbnbSinImportar).toBe(0)
+  })
 })

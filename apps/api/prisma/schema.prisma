@@ -4339,6 +4339,11 @@ model AlquilerIngresoExterno {
   montoNeto     Decimal  @map("monto_neto") @db.Decimal(14, 2)
   moneda        String   @db.VarChar(3)
   importadoEn   DateTime @map("importado_en")
+  /// El nombre del aviso del canal del que vino (para mover sus estadías si cambia la unión con la propiedad).
+  aviso         String   @default("") @db.VarChar(200)
+  /// Las filas del archivo que forman la estadía: [{ clave, neto, comision, limpieza, bruto }]. Los montos de
+  /// arriba son su suma. Juntar por `clave` es lo que deja importar dos archivos sin duplicar ni pisar.
+  movimientos   Json     @default("[]")
 
   business Business       @relation(fields: [businessId], references: [id])
   recurso  ReservaRecurso @relation(fields: [recursoId], references: [id])

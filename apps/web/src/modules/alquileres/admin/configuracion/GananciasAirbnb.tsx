@@ -16,10 +16,12 @@ import type { Ganancias } from '../../datos/origen'
 import type { VistaPreviaApi } from '../../datos/origen/alquileresApi'
 import { ejecutar, type Avisar } from '../acciones'
 import { BotonConfirmar } from '../piezas'
-import { DEMASIADO_GRANDE, MAXIMO_BYTES_CSV, totalesTxt, unionesListas, unionesPropuestas, type Elegidas } from './ganancias'
+import { DEMASIADO_GRANDE, MAXIMO_BYTES_CSV, decodificar, totalesTxt, unionesListas, unionesPropuestas, type Elegidas } from './ganancias'
 
 const SIN_ELEGIR = ''
 const NO_IMPORTAR = '__no__'
+/** Lo que se dice de las filas que no son de una estadía (los pagos al banco). */
+const otras = (n: number) => (n === 1 ? 'Hay 1 fila que no es de una estadía (un pago al banco), y no se importa.' : `Hay ${n} filas que no son de una estadía (pagos al banco), y no se importan.`)
 /** Cuántas filas que quedaron afuera se listan; el resto se cuenta. */
 const A_LA_VISTA = 5
 
@@ -35,6 +37,8 @@ export default function GananciasAirbnb({ ganancias, propiedades, avisar }: { ga
   const { resumen } = ganancias
   const uniones = vista ? unionesListas(vista.avisos, elegidas) : undefined
   const paraImportar = vista ? vista.avisos.filter(a => elegidas[a.nombre]).reduce((s, a) => s + a.estadias, 0) : 0
+  // Un archivo puede traer solo ajustes de estadías ya importadas (otro período): también hay algo para guardar.
+  const hayAlgo = paraImportar > 0 || (vista?.ajustes ?? 0) > 0
 
   const cerrar = () => { setTexto(null); setVista(null); setElegidas({}); setError(null) }
 
@@ -45,7 +49,7 @@ export default function GananciasAirbnb({ ganancias, propiedades, avisar }: { ga
     if (f.size > MAXIMO_BYTES_CSV) { setError(DEMASIADO_GRANDE); return }
     setOcupado('leer')
     try {
-      const leido = await f.text()
+      const leido = decodificar(new Uint8Array(await f.arrayBuffer()))
       const v = await ganancias.vistaPrevia(leido)
       setTexto(leido)
       setVista(v)
@@ -98,14 +102,18 @@ export default function GananciasAirbnb({ ganancias, propiedades, avisar }: { ga
 
       {vista && (
         <div className="rv-pila" style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--color-border)' }}>
-          {vista.estadias === 0 ? (
-            <Nota tono="aviso"><span>El archivo no trae ninguna estadía para importar.{vista.otrasFilas > 0 ? ` Tiene ${cuenta(vista.otrasFilas, 'fila', 'filas')} de pagos al banco, que no se importan.` : ''}</span></Nota>
+          {vista.estadias === 0 && vista.ajustes === 0 ? (
+            <Nota tono="aviso"><span>El archivo no trae ninguna estadía para importar.{vista.otrasFilas > 0 ? ` ${otras(vista.otrasFilas)}` : ''}</span></Nota>
+          ) : vista.estadias === 0 ? (
+            <p style={{ margin: 0, fontSize: 15, color: 'var(--color-text)' }} role="status">
+              <b>{cuenta(vista.ajustes, 'ajuste', 'ajustes')}</b> de estadías que ya importaste: {vista.ajustes === 1 ? 'se suma' : 'se suman'} a lo que cobraste por ellas.
+            </p>
           ) : (
             <p style={{ margin: 0, fontSize: 15, color: 'var(--color-text)' }} role="status">
               <b>{cuenta(vista.estadias, 'estadía', 'estadías')}</b>
               {vista.desde && vista.hasta ? ` del ${fechaCorta(vista.desde)} al ${fechaCorta(vista.hasta)}` : ''} · <span className="rv-num">{totalesTxt(vista.totales)}</span>
               <span className="rv-ayuda" style={{ display: 'block', marginTop: 4 }}>
-                Neto de la comisión de Airbnb.{vista.totales.length > 1 ? ' Cada moneda va por separado: no se suman.' : ''}{vista.otrasFilas > 0 ? ` Además hay ${cuenta(vista.otrasFilas, 'fila', 'filas')} de pagos al banco, que no se importan.` : ''}
+                Neto de la comisión de Airbnb.{vista.totales.length > 1 ? ' Cada moneda va por separado: no se suman.' : ''}{vista.ajustes > 0 ? ` Además, ${cuenta(vista.ajustes, 'ajuste', 'ajustes')} de estadías que ya importaste.` : ''}{vista.otrasFilas > 0 ? ` ${otras(vista.otrasFilas)}` : ''}
               </span>
             </p>
           )}
@@ -128,8 +136,8 @@ export default function GananciasAirbnb({ ganancias, propiedades, avisar }: { ga
           ))}
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <button type="button" className="rv-btn rv-btn--primario" disabled={!uniones || paraImportar === 0 || ocupado !== null} aria-busy={ocupado === 'importar'} onClick={() => void importar()}>
-              <Upload size={15} aria-hidden /> {ocupado === 'importar' ? 'Importando…' : paraImportar > 0 ? `Importar ${cuenta(paraImportar, 'estadía', 'estadías')}` : 'Importar'}
+            <button type="button" className="rv-btn rv-btn--primario" disabled={!uniones || !hayAlgo || ocupado !== null} aria-busy={ocupado === 'importar'} onClick={() => void importar()}>
+              <Upload size={15} aria-hidden /> {ocupado === 'importar' ? 'Importando…' : paraImportar > 0 ? `Importar ${cuenta(paraImportar, 'estadía', 'estadías')}` : vista.ajustes > 0 ? `Sumar ${cuenta(vista.ajustes, 'ajuste', 'ajustes')}` : 'Importar'}
             </button>
             <button type="button" className="rv-btn" disabled={ocupado !== null} onClick={cerrar}>Cancelar</button>
             {vista.estadias > 0 && !uniones && <span className="rv-ayuda" style={{ margin: 0 }}>Decí a qué propiedad corresponde cada aviso.</span>}

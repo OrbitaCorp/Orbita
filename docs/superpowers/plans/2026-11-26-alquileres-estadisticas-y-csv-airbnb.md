@@ -691,3 +691,37 @@ git commit -m "docs(alquileres): Auditoría de las estadísticas y las ganancias
 - Subir a producción (push de `main`, la migración con `prisma-prod.sh` y `deploy.sh`): se pide permiso al terminar.
 - Ajustar los nombres de columna con un archivo real de Airbnb: cuando Alan consiga uno.
 - Otros canales además de Airbnb, convertir moneda, estadísticas de canchas y salones, y el manual de Alquileres para Orbi.
+
+## Después de la revisión del código (26/11)
+
+Una revisión independiente de toda la rama no encontró nada crítico ni problemas de seguridad o de
+aislamiento. Sí esto, que se corrigió antes de producción (cada punto con su test):
+
+| Qué estaba mal | Qué quedó |
+|---|---|
+| Al importar, una estadía se reemplazaba entera por su código. El archivo de otro período (otra cuota, o un ajuste) pisaba el total y la plata se perdía sin aviso | Cada fila del archivo es un movimiento con su clave; al importar se juntan con los que la estadía ya tenía. Dos columnas nuevas (`movimientos`, `aviso`), migración `20261126120100` |
+| Una propiedad pausada o borrada sumaba su plata a los ingresos pero no sus noches: "Por noche disponible" salía inflado y "Por propiedad" no cerraba con el total | Entra con plata y noches juntas, como una fila aparte |
+| Con una sola propiedad cargada, todos los avisos del archivo quedaban preseleccionados para esa | Solo se propone con un aviso y una propiedad; si no, decide el dueño |
+| La nota "ganancias importadas hasta el…" salía casi siempre, aun con todo importado | Se reemplazó por la cuenta exacta: cuántas noches de Airbnb del calendario no tienen su plata importada |
+| Un archivo regrabado en Excel (ANSI) se rechazaba por los acentos de los encabezados | Se lee igual |
+| Un ajuste con el mismo código pero sin noches o sin anuncio se descartaba | Se suma a su estadía |
+| Una comisión devuelta sumaba en vez de restar | Resta |
+| Cambiar la unión de un aviso no movía sus estadías de archivos anteriores | Se mudan con ella |
+| La ficha de un bloqueo con una estadía devuelta decía "Airbnb pagó $ 0" | No la muestra |
+| El número de fila se corría con líneas vacías o celdas de dos líneas; el menos tipográfico se leía positivo; un código de más de 40 caracteres rompía al reimportar | Corregidos |
+
+Quedaron anotados, sin corregir (menores):
+
+- Si la sincronización del calendario no corre desde antes de una cancelación hasta después de la
+  fecha de salida, ese bloqueo queda como historia y cuenta como noches ocupadas.
+- La campanita dice "N fechas bloqueadas" contando también los bloqueos de Airbnb ya pasados.
+- Si importar sale bien pero volver a cargar el panel falla, el aviso dice "No se pudo guardar" y
+  la vista previa queda abierta. Reintentar no duplica.
+- La semilla de dev (`seed-alquileres-prueba.ts`) falla al borrar propiedades de un negocio que
+  tenga algo importado.
+- "No importar" un aviso no borra lo que ya se había importado de ese aviso.
+
+Sin poder juzgar hasta ver un archivo real: el orden de las fechas con encabezados en castellano, y
+si Airbnb manda filas de impuestos con código (se sumarían como ingreso). La historia del calendario
+arranca el día del deploy: quien no importe sus ganancias va a ver la ocupación de los meses
+anteriores más baja de lo que fue.

@@ -24,8 +24,10 @@ export interface VistaPreviaApi {
   totales: { moneda: string; neto: number; estadias: number }[]
   /** Filas que no se pudieron leer, con el número de fila del archivo (el encabezado es la 1). */
   descartadas: { linea: number; motivo: string }[]
-  /** Filas que no son de una estadía (transferencias al banco): no se importan. */
+  /** Filas que no son de una estadía (transferencias al banco, o ajustes de estadías que no están importadas): no se importan. */
   otrasFilas: number
+  /** Ajustes sueltos que se suman a estadías ya importadas (el archivo de otro período). */
+  ajustes: number
   /** Cada aviso del archivo, con la propiedad que ya tiene unida si la tiene. */
   avisos: { nombre: string; estadias: number; recursoId: string | null }[]
 }
