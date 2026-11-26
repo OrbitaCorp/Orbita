@@ -21,6 +21,23 @@ import { createContext, createElement, useContext, type ReactElement, type React
 import type { Cliente, NegocioAlquiler, Reserva, TipoAlquiler } from '../index'
 import type { DemoAlquiler, useDemoAlquiler } from '../negocio'
 import { origenDemo } from './demo'
+import type { ImportadoApi, ResumenDeGanancias, UnionDeAviso, VistaPreviaApi } from './alquileresApi'
+
+/**
+ * Las ganancias de Airbnb de un alojamiento real: importar el archivo que el
+ * dueño descarga, en dos pasos (ver y guardar), y borrar lo importado. Las
+ * estadías ya importadas vienen en `negocio.ingresosExternos`.
+ */
+export interface Ganancias {
+  /** De todo lo importado: cuántas estadías, cuándo fue la última vez y hasta qué fecha llegan. */
+  resumen: ResumenDeGanancias
+  /** Lee el archivo y cuenta qué trae. No guarda nada. */
+  vistaPrevia(texto: string): Promise<VistaPreviaApi>
+  /** Guarda, y vuelve a cargar el panel. */
+  importar(texto: string, avisos: UnionDeAviso[]): Promise<ImportadoApi>
+  /** Borra todo lo importado, y vuelve a cargar el panel. */
+  borrar(): Promise<void>
+}
 
 /** Lo que escribe el panel: las mismas firmas que el almacén de la demo. */
 export type Escrituras = Pick<ReturnType<typeof useDemoAlquiler>, 'configurar' | 'reservar' | 'cambiarReserva' | 'agregarBloqueo' | 'quitarBloqueo' | 'agregarCalendario' | 'quitarCalendario' | 'sincronizarCalendario'>
@@ -42,6 +59,8 @@ export interface DatosPanelAlquiler extends Escrituras {
   version?: number
   /** true si lo que se cambia en el panel todavía no llega a la API. */
   soloLectura: boolean
+  /** Solo un alojamiento real (y con una API que ya las tenga): importar las ganancias de Airbnb. La demo no lo trae. */
+  ganancias?: Ganancias
 }
 
 export interface OrigenAlquileres {

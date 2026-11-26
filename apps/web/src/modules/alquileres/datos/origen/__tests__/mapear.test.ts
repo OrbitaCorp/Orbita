@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { codigoDe } from '../../index'
 import type { Bloqueo as BloqueoApi, Config, Recurso, Reserva as ReservaApi, Servicio } from '@/lib/reservasApi/tipos'
 import {
-  aperturaDeHorario, bloqueosDeApi, bloqueosDeNoches, calendarioDeApi, clienteIdDe, publicoDeConfig, clientesDeReservas, estadoDeApi, fechaArgentina, negocioDeApi,
+  aperturaDeHorario, bloqueosDeApi, bloqueosDeNoches, calendarioDeApi, clienteIdDe, ingresoDeApi, publicoDeConfig, clientesDeReservas, estadoDeApi, fechaArgentina, negocioDeApi,
   negocioDelSitio, propiedadDeApi, reservaDeApi, salonDeApi, tipoDeRecurso, tipoDeRubro, unidadDeApi,
 } from '../mapear'
 
@@ -338,6 +338,11 @@ describe('calendarios de Airbnb', () => {
     expect(bloqueosDeApi([bloqueo({ origen: 'DUENO' })], ['p1'])[0].origen).toBe('dueno')
     expect(bloqueosDeApi([bloqueo({})], ['p1'])[0]).not.toHaveProperty('calendarioId')
     expect(bloqueosDeApi([bloqueo({})], ['p1'])[0].origen).toBe('dueno')
+  })
+  it('ingresoDeApi traduce una estadía importada: la propiedad, el neto y el bruto; sin huésped no deja la clave', () => {
+    const fila = { id: 'i1', recursoId: 'p1', canal: 'airbnb' as const, codigo: 'HM1', entrada: '2026-12-20', salida: '2026-12-27', noches: 7, huesped: 'Ana', montoBruto: 597400, comision: 17400, limpieza: 10000, montoNeto: 580000, moneda: 'ARS' }
+    expect(ingresoDeApi(fila)).toEqual({ id: 'i1', unidadId: 'p1', canal: 'airbnb', codigo: 'HM1', entrada: '2026-12-20', salida: '2026-12-27', noches: 7, huesped: 'Ana', neto: 580000, bruto: 597400, comision: 17400, moneda: 'ARS' })
+    expect(ingresoDeApi({ ...fila, huesped: null })).not.toHaveProperty('huesped')
   })
   it('calendarioDeApi traduce el estado: cuándo se bajó, por qué falló y con qué reservas choca', () => {
     const c = calendarioDeApi({

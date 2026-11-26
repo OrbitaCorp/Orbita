@@ -9,10 +9,12 @@ const panel = vi.hoisted(() => ({
   calendarios: vi.fn(), conectarCalendario: vi.fn(), desconectarCalendario: vi.fn(), sincronizarCalendario: vi.fn(),
 }))
 const panelGetBusiness = vi.hoisted(() => vi.fn())
+const alquileresPanel = vi.hoisted(() => ({ ingresos: vi.fn(), vistaPreviaDeAirbnb: vi.fn(), importarDeAirbnb: vi.fn(), borrarLoDeAirbnb: vi.fn() }))
 vi.mock('@/lib/reservasApi/cliente', () => ({ panel }))
+vi.mock('../alquileresApi', () => ({ alquileresPanel }))
 vi.mock('@/lib/api', () => ({ panelGetBusiness }))
 
-import { DIAS_POR_PEDIDO, cargarApi, escriturasDe, origenApi, reservasEntre, tramosDeFechas } from '../api'
+import { DIAS_POR_PEDIDO, cargarApi, escriturasDe, gananciasDe, origenApi, reservasEntre, tramosDeFechas } from '../api'
 import { HechoConAviso } from '../aviso'
 import type { Bloqueo, Propiedad, Reserva as ReservaPanel } from '../../index'
 
@@ -42,6 +44,7 @@ beforeEach(() => {
   panel.bloqueos.mockResolvedValue([])
   panel.agenda.mockResolvedValue(pagina(0, 0))
   panel.calendarios.mockResolvedValue([])
+  alquileresPanel.ingresos.mockResolvedValue({ filas: [], resumen: { estadias: 0, ultimaImportacion: null, hasta: null } })
 })
 
 describe('tramosDeFechas', () => {
@@ -237,5 +240,76 @@ describe('calendarios de Airbnb en el panel real', () => {
     panel.conectarCalendario.mockRejectedValue(new Error('Pegá el enlace de Airbnb que termina en .ics'))
     await expect(e.agregarCalendario('estadia', { id: 'tmp', unidadId: 'p1', nombre: '', url: 'https://otro.sitio/a.ics', ultimaSync: '2026-11-23' }, [])).rejects.toThrow(/enlace de Airbnb/)
     expect(recargar).not.toHaveBeenCalled()
+  })
+})
+
+describe('ganancias de Airbnb en el panel real', () => {
+  const fila = { id: 'i1', recursoId: 'p1', canal: 'airbnb', codigo: 'HM1', entrada: '2026-12-20', salida: '2026-12-27', noches: 7, huesped: 'Ana', montoBruto: 597400, comision: 17400, limpieza: 10000, montoNeto: 580000, moneda: 'ARS' }
+  const resumen = { estadias: 1, ultimaImportacion: '2026-11-25T10:00:00.000Z', hasta: '2026-12-27' }
+
+  it('carga las estadías importadas del mismo rango que las reservas y las deja en el negocio', async () => {
+    alquileresPanel.ingresos.mockResolvedValue({ filas: [fila], resumen })
+    const { datos } = await conCabana()
+    expect(alquileresPanel.ingresos).toHaveBeenCalledWith('2026-05-21', '2027-05-28')
+    expect(datos.negocio.ingresosExternos).toEqual([{ id: 'i1', unidadId: 'p1', canal: 'airbnb', codigo: 'HM1', entrada: '2026-12-20', salida: '2026-12-27', noches: 7, huesped: 'Ana', neto: 580000, bruto: 597400, comision: 17400, moneda: 'ARS' }])
+    expect(datos.resumenDeGanancias).toEqual(resumen)
+  })
+
+  it('si la API todavía no tiene esa ruta (404), el panel carga igual, sin ganancias', async () => {
+    alquileresPanel.ingresos.mockRejectedValue(Object.assign(new Error('Cannot GET /alquileres/ingresos'), { status: 404 }))
+    const { datos, recargar } = await conCabana()
+    expect(datos.negocio.ingresosExternos).toEqual([])
+    expect(datos.resumenDeGanancias).toBeNull()
+    expect(datos.negocio.propiedades).toHaveLength(1)
+    // Sin la ruta no se ofrece importar.
+    expect(gananciasDe(datos, recargar)).toBeUndefined()
+  })
+
+  it('cualquier otra falla al traerlas hace fallar la carga', async () => {
+    alquileresPanel.ingresos.mockRejectedValue(Object.assign(new Error('No pudimos traer las ganancias.'), { status: 500 }))
+    await expect(conCabana()).rejects.toThrow('No pudimos traer las ganancias.')
+  })
+
+  it('un negocio de canchas no pide ganancias ni ofrece importarlas', async () => {
+    panelGetBusiness.mockResolvedValue({ id: 'b', name: 'Complejo', subdomain: 'complejo', description: null, industry: 'alquileres', subrubros: ['canchas'] })
+    const datos = await cargarApi('2026-11-23')
+    expect(alquileresPanel.ingresos).not.toHaveBeenCalled()
+    expect(datos.resumenDeGanancias).toBeNull()
+    expect(gananciasDe(datos, vi.fn())).toBeUndefined()
+  })
+
+  it('la vista previa le pide a la API con el texto, y no recarga', async () => {
+    alquileresPanel.ingresos.mockResolvedValue({ filas: [], resumen })
+    const { datos, recargar } = await conCabana()
+    const vista = { estadias: 1, desde: '2026-12-20', hasta: '2026-12-27', totales: [], descartadas: [], otrasFilas: 0, avisos: [] }
+    alquileresPanel.vistaPreviaDeAirbnb.mockResolvedValue(vista)
+    const g = gananciasDe(datos, recargar)!
+    expect(g.resumen).toEqual(resumen)
+    await expect(g.vistaPrevia('a,b')).resolves.toEqual(vista)
+    expect(alquileresPanel.vistaPreviaDeAirbnb).toHaveBeenCalledWith('a,b')
+    expect(recargar).not.toHaveBeenCalled()
+  })
+
+  it('importar llama a la API con el texto y las uniones, y recarga', async () => {
+    const { datos, recargar } = await conCabana()
+    alquileresPanel.importarDeAirbnb.mockResolvedValue({ creadas: 1, actualizadas: 0, sinImportar: 0 })
+    await expect(gananciasDe(datos, recargar)!.importar('a,b', [{ nombre: 'Cabaña', recursoId: 'p1' }])).resolves.toEqual({ creadas: 1, actualizadas: 0, sinImportar: 0 })
+    expect(alquileresPanel.importarDeAirbnb).toHaveBeenCalledWith('a,b', [{ nombre: 'Cabaña', recursoId: 'p1' }])
+    expect(recargar).toHaveBeenCalledTimes(1)
+  })
+
+  it('si la API rechaza el archivo, llega su mensaje y no se recarga', async () => {
+    const { datos, recargar } = await conCabana()
+    alquileresPanel.importarDeAirbnb.mockRejectedValue(new Error('Al archivo le falta la columna del monto.'))
+    await expect(gananciasDe(datos, recargar)!.importar('x', [])).rejects.toThrow('Al archivo le falta la columna del monto.')
+    expect(recargar).not.toHaveBeenCalled()
+  })
+
+  it('borrar llama a la API y recarga', async () => {
+    const { datos, recargar } = await conCabana()
+    alquileresPanel.borrarLoDeAirbnb.mockResolvedValue({ ok: true, borradas: 3 })
+    await gananciasDe(datos, recargar)!.borrar()
+    expect(alquileresPanel.borrarLoDeAirbnb).toHaveBeenCalledTimes(1)
+    expect(recargar).toHaveBeenCalledTimes(1)
   })
 })

@@ -26,10 +26,11 @@ import { panel } from '@/lib/reservasApi/cliente'
 import type { Reserva as ReservaApi } from '@/lib/reservasApi/tipos'
 import { sumarDias, type ISO } from '@/lib/reservas/fechas'
 import { NEGOCIOS_DEMO } from '../index'
-import { calendarioDeApi, clientesDeReservas, fechaArgentina, negocioDeApi, reservaDeApi, soloPorNoche, tipoDeRecurso, tipoDeRubro } from './mapear'
+import { calendarioDeApi, clientesDeReservas, fechaArgentina, ingresoDeApi, negocioDeApi, reservaDeApi, soloPorNoche, tipoDeRecurso, tipoDeRubro } from './mapear'
 import { HechoConAviso } from './aviso'
+import { alquileresPanel, type IngresosApi, type ResumenDeGanancias } from './alquileresApi'
 import { bloqueoParaApi, calendarioParaApi, cambiosDePropiedades, configDeCambio, idDeBloqueo, pasosDeCambio, pedidoDeReserva, recursoDePropiedad } from './escribir'
-import type { DatosPanelAlquiler, Escrituras, OrigenAlquileres } from './index'
+import type { DatosPanelAlquiler, Escrituras, Ganancias, OrigenAlquileres } from './index'
 
 /** Cuántos días para cada lado de hoy trae el panel. */
 export const DIAS_ATRAS = 186
@@ -73,6 +74,8 @@ export type CargaApi = Pick<DatosPanelAlquiler, 'tipo' | 'negocio' | 'reservas' 
   reservasApi: ReservaApi[]
   /** El campo libre de la config, tal como está guardado: al escribir se conserva lo que el panel no toca. */
   datosConfig: Record<string, unknown> | null
+  /** Lo importado de Airbnb, en resumen. null si el negocio no es de estadía o la API todavía no tiene esa ruta. */
+  resumenDeGanancias: ResumenDeGanancias | null
 }
 
 /** Todo lo que el panel necesita del negocio con sesión. Sin config de Alquileres, el negocio todavía no lo usa. */
@@ -93,6 +96,11 @@ export async function cargarApi(hoy: ISO): Promise<CargaApi> {
   ])
   if (!config) throw new Error('Este negocio todavía no tiene Alquileres configurado.')
   const { tipo, rubro } = tipoDeRubro(negocio.subrubros)
+  // Las ganancias de Airbnb son solo de la estadía. Si la API todavía no tiene la ruta (un 404: el front se
+  // despliega unos minutos antes), el panel carga igual, sin ellas; cualquier otra falla se ve.
+  const ganancias: IngresosApi | null = tipo === 'estadia'
+    ? await alquileresPanel.ingresos(desde, hasta).catch((e: unknown) => { if ((e as { status?: number } | null)?.status === 404) return null; throw e })
+    : null
   // Lo que se alquila hoy: solo los activos del modo.
   const recursos = recursosTodos.filter(r => r.activo && r.tipo === tipoDeRecurso(tipo))
   const porId = new Map(recursosTodos.map(r => [r.id, r]))
@@ -104,11 +112,15 @@ export async function cargarApi(hoy: ISO): Promise<CargaApi> {
   })
   return {
     tipo,
-    negocio: { ...armado, propiedades: armado.propiedades.map(soloPorNoche), calendariosExternos: calendarios.map(c => calendarioDeApi(c, hoy)) },
+    negocio: {
+      ...armado, propiedades: armado.propiedades.map(soloPorNoche), calendariosExternos: calendarios.map(c => calendarioDeApi(c, hoy)),
+      ...(tipo === 'estadia' ? { ingresosExternos: (ganancias?.filas ?? []).map(ingresoDeApi) } : {}),
+    },
     reservas: delModo.map(r => reservaDeApi(r, tipo)).filter(r => r !== null),
     clientes: clientesDeReservas(delModo),
     reservasApi: delModo,
     datosConfig: config.datos ?? null,
+    resumenDeGanancias: ganancias?.resumen ?? null,
   }
 }
 
@@ -192,8 +204,30 @@ export function escriturasDe(d: CargaApi, recargar: () => Promise<void>): Escrit
   }
 }
 
+/**
+ * Importar las ganancias de Airbnb, para lo ya cargado en `d`. Solo en un
+ * alojamiento y con una API que ya tenga esas rutas; si no, undefined y la
+ * pantalla no lo ofrece. Importar y borrar terminan recargando.
+ */
+export function gananciasDe(d: CargaApi, recargar: () => Promise<void>): Ganancias | undefined {
+  if (d.tipo !== 'estadia' || !d.resumenDeGanancias) return undefined
+  return {
+    resumen: d.resumenDeGanancias,
+    vistaPrevia: texto => alquileresPanel.vistaPreviaDeAirbnb(texto),
+    importar: async (texto, avisos) => {
+      const r = await alquileresPanel.importarDeAirbnb(texto, avisos)
+      await recargar()
+      return r
+    },
+    borrar: async () => {
+      await alquileresPanel.borrarLoDeAirbnb()
+      await recargar()
+    },
+  }
+}
+
 /** Mientras llega lo de verdad, el panel muestra su silueta: lo de abajo no se ve, solo le da forma. */
-const VACIO: CargaApi = { tipo: 'cancha', negocio: { ...NEGOCIOS_DEMO.cancha, nombre: '', unidades: [], salones: [], propiedades: [], bloqueos: [], equipo: [] }, reservas: [], clientes: [], reservasApi: [], datosConfig: null }
+const VACIO: CargaApi = { tipo: 'cancha', negocio: { ...NEGOCIOS_DEMO.cancha, nombre: '', unidades: [], salones: [], propiedades: [], bloqueos: [], equipo: [] }, reservas: [], clientes: [], reservasApi: [], datosConfig: null, resumenDeGanancias: null }
 
 const hoyReal = () => fechaArgentina(new Date().toISOString())
 const mensajeDe = (e: unknown) => (e instanceof Error && e.message ? e.message : 'No pudimos traer los datos del panel.')
@@ -221,6 +255,7 @@ export const origenApi: OrigenAlquileres = {
       tipo: datos.tipo, negocio: datos.negocio, reservas: datos.reservas, clientes: datos.clientes,
       listo: estado.datos !== null, error: estado.error, reintentar, soloLectura: false, version,
       ...escriturasDe(datos, recargar),
+      ganancias: gananciasDe(datos, recargar),
     }
   },
 }

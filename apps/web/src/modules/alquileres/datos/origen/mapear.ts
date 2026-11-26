@@ -16,6 +16,8 @@
 //   F12 equipo y roles             equipo = []
 // Todo lo descriptivo de una propiedad o de un salón vive en `datos` del
 // recurso y se lee con cuidado: un campo con otro tipo toma su default.
+import type { IngresoExternoApi } from './alquileresApi'
+import type { IngresoExterno } from '../index'
 import type { Bloqueo as BloqueoApi, CalendarioExterno as CalendarioApi, Config, Estado, Noches, Recurso, Reserva as ReservaApi, Servicio } from '@/lib/reservasApi/tipos'
 import type { Extra } from '@/lib/reservas/precio'
 import type { Temporada, TarifaMensual } from '@/lib/reservas/estadia'
@@ -271,6 +273,15 @@ export function calendarioDeApi(c: CalendarioApi, hoy: ISO): CalendarioExterno {
     ...(c.ultimoError ? { error: c.ultimoError } : {}),
     ...(typeof c.noches === 'number' ? { noches: c.noches } : {}),
     conflictos: c.conflictos.map(x => ({ reservaId: x.reservaId, codigo: x.codigo, entrada: x.desde, salida: x.hasta })),
+  }
+}
+
+/** Una estadía cobrada afuera (Airbnb), como la usa el panel: la propiedad, y la plata con los nombres de acá. */
+export function ingresoDeApi(i: IngresoExternoApi): IngresoExterno {
+  return {
+    id: i.id, unidadId: i.recursoId, canal: i.canal, codigo: i.codigo, entrada: i.entrada, salida: i.salida, noches: i.noches,
+    ...(i.huesped ? { huesped: i.huesped } : {}),
+    neto: i.montoNeto, bruto: i.montoBruto, comision: i.comision, moneda: i.moneda,
   }
 }
 
