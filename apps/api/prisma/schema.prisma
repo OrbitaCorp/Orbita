@@ -3485,6 +3485,43 @@ model SubscriptionActivationDiscount {
   @@map("subscription_activation_discounts")
 }
 
+// Link para activar el plan (Configuración → Suscripción). Es un plan de
+// Mercado Pago (preapproval_plan) armado para ESTE negocio y ESTE monto, sin
+// email: lo autoriza cualquier cuenta de MP. Antes la activación creaba la
+// suscripción con `payer_email` = el email del panel, y MP solo dejaba pagarla
+// a la cuenta con ese mismo email: quien tenía MP con otro correo no podía
+// pagar de ninguna forma (26/11).
+//
+// La suscripción que MP crea desde ese link no trae nuestro external_reference,
+// así que esta fila es la que dice de qué negocio es (por `mpPlanId` al
+// confirmar, y por `preapprovalId` una vez usada). Trae además el descuento
+// que corresponda, porque el id de la suscripción recién existe cuando alguien
+// paga: la fila de SubscriptionActivationDiscount se crea en ese momento.
+model SubscriptionPlanCheckout {
+  id            String    @id @default(uuid())
+  businessId    String    @map("business_id")
+  mpPlanId      String    @unique @map("mp_plan_id")
+  plan          String
+  amountList    Decimal   @map("amount_list") @db.Decimal(12, 2)
+  // Lo que se le pidió a MP por ciclo. Igual a amountList sin descuento.
+  amountFinal   Decimal   @map("amount_final") @db.Decimal(12, 2)
+  discounted    Boolean   @default(false)
+  codeId        String?   @map("code_id")
+  campaignId    String?   @map("campaign_id")
+  chargesTotal  Int       @default(1) @map("charges_total")
+  // PENDING (link vigente) | USED (alguien lo pagó) | SUPERSEDED (se pidió
+  // otro después) | EXPIRED (30 días sin usarse)
+  status        String    @default("PENDING")
+  preapprovalId String?   @map("preapproval_id")
+  usedAt        DateTime? @map("used_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([businessId, status])
+  @@index([preapprovalId])
+  @@map("subscription_plan_checkouts")
+}
+
 // Orbi fase 1 (spec 2026-09-30 §3.4): acciones que Orbi propone y la persona
 // confirma. Viven en Postgres (no en memoria) para sobrevivir reinicios y
 // varias instancias de Cloud Run; el consumo es atómico vía updateMany.

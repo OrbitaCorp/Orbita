@@ -17,6 +17,7 @@ function armar(filas: { plan: string; amount: number }[] = []) {
     pendingSignup: { create: jest.fn().mockResolvedValue({}) },
     subscription: { findUnique: jest.fn(), update: jest.fn().mockResolvedValue({}) },
     subscriptionActivationDiscount: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn(), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+    subscriptionPlanCheckout: { create: jest.fn().mockResolvedValue({ id: 'chk-1' }), findMany: jest.fn().mockResolvedValue([]), findUnique: jest.fn().mockResolvedValue(null) },
     business: { findUnique: jest.fn().mockResolvedValue({ subdomain: 'tienda' }) },
     member: { findUnique: jest.fn().mockResolvedValue({ email: 'ana@x.com' }) },
   };
@@ -28,9 +29,11 @@ function armar(filas: { plan: string; amount: number }[] = []) {
   const preapproval = { create: jest.fn().mockResolvedValue({ id: 'PRE-1', init_point: 'https://mp/debito' }), get: jest.fn() };
   (service as any)._preference = preference;
   (service as any)._preapproval = preapproval;
+  const preapprovalPlan = { create: jest.fn().mockResolvedValue({ id: 'PLAN-1', init_point: 'https://mp/debito' }), update: jest.fn() };
+  (service as any)._preapprovalPlan = preapprovalPlan;
   jest.spyOn(service as any, 'syncAddonAvanzado').mockResolvedValue(undefined);
   jest.spyOn(service as any, 'notificarReactivacion').mockResolvedValue(undefined);
-  return { service, prisma, preference, preapproval };
+  return { service, prisma, preference, preapproval, preapprovalPlan };
 }
 
 const alta = (plan: 'mensual' | 'mensualAvanzado' = 'mensual') => ({
@@ -72,13 +75,13 @@ describe('precios de lista vigentes', () => {
   });
 
   it('al activar el plan, el débito sale al precio nuevo', async () => {
-    const { service, prisma, preapproval } = armar([fila('mensual', 19900, 1)]);
+    const { service, prisma, preapprovalPlan } = armar([fila('mensual', 19900, 1)]);
     prisma.subscription.findUnique.mockResolvedValue({
       id: 's1', businessId: 'b1', plan: 'mensual', nextPlan: null, origin: 'PAID', status: 'ACTIVE', planActive: false,
       mpPreapprovalId: null, frozenAmount: null, frozenChargesLeft: 0, currentPeriodEnd: new Date(Date.now() - 86_400_000),
     });
     await service.activatePlan('b1', 'm1');
-    expect(preapproval.create.mock.calls[0][0].body.auto_recurring.transaction_amount).toBe(19900);
+    expect(preapprovalPlan.create.mock.calls[0][0].body.auto_recurring.transaction_amount).toBe(19900);
   });
 
   it('una campaña que quedó más cara que la lista no se aplica ni gasta un lugar', async () => {

@@ -10,7 +10,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "4649ccd5eb7a116b",
+  "version": "675d506e91127330",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -649,7 +649,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "cfg-suscripcion",
       "capitulo": "Configuración",
       "titulo": "Suscripción",
-      "texto": "Qué plan tenés, qué incluye, cuándo se renueva y cómo cambiarlo. Acá también se activa el paquete Avanzado, que se paga aparte de la suscripción mensual.\n\nAl registrarte pagás el primer mes. Cuando termina, desde acá elegís el plan (mensual, semestral o anual) y autorizás el débito automático en Mercado Pago. Si entraste con un precio congelado, esta pantalla te dice cuánto pagás por mes y cuántos cobros a ese precio te quedan; vale para el plan mensual y después pasás al precio de lista.",
+      "texto": "Qué plan tenés, qué incluye, cuándo se renueva y cómo cambiarlo. Acá también se activa el paquete Avanzado, que se paga aparte de la suscripción mensual.\n\nAl registrarte pagás el primer mes. Cuando termina, desde acá elegís el plan (mensual, semestral o anual) y autorizás el débito automático en Mercado Pago. Lo podés autorizar con cualquier cuenta de Mercado Pago (no tiene que tener el mismo email con el que entrás a Órbita) o sin cuenta, con una tarjeta de crédito o débito. Si entraste con un precio congelado, esta pantalla te dice cuánto pagás por mes y cuántos cobros a ese precio te quedan; vale para el plan mensual y después pasás al precio de lista.",
       "destino": {
         "seccion": "configuracion",
         "vista": "suscripcion",

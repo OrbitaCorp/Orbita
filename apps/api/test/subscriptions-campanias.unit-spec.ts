@@ -49,6 +49,14 @@ function armar() {
       updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
     subscriptionPayment: { count: jest.fn() },
+    subscriptionPlanCheckout: {
+      create: jest.fn().mockImplementation(({ data }: any) => Promise.resolve({ id: 'chk-1', ...data })),
+      findMany: jest.fn().mockResolvedValue([]),
+      findUnique: jest.fn().mockResolvedValue(null),
+      findFirst: jest.fn().mockResolvedValue(null),
+      update: jest.fn().mockResolvedValue({}),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
     member: { findUnique: jest.fn().mockResolvedValue({ email: 'ana@x.com' }) },
   };
   const cfg: any = { get: jest.fn((k: string) => ({ MP_ACCESS_TOKEN: 'tok', FRONTEND_URL: 'https://orbita.site' } as Record<string, string>)[k]) };
@@ -64,8 +72,11 @@ function armar() {
   const preapproval = { create: jest.fn().mockResolvedValue({ id: 'PRE-1', init_point: 'https://mp/debito' }), update: jest.fn().mockResolvedValue({}) };
   (service as any)._preference = preference;
   (service as any)._preapproval = preapproval;
+  // El link de activación es un plan de MP (ver activatePlan).
+  const preapprovalPlan = { create: jest.fn().mockResolvedValue({ id: 'PLAN-1', init_point: 'https://mp/debito' }), update: jest.fn().mockResolvedValue({}) };
+  (service as any)._preapprovalPlan = preapprovalPlan;
   jest.spyOn(service as any, 'syncAddonAvanzado').mockResolvedValue(undefined);
-  return { service, prisma, preference, preapproval };
+  return { service, prisma, preference, preapproval, preapprovalPlan };
 }
 
 const alta = (extra: Record<string, unknown> = {}) => ({
@@ -283,37 +294,37 @@ describe('débito automático con precio congelado', () => {
     ...extra,
   });
 
-  it('la preapproval sale al precio congelado y anota cuántos cobros dura', async () => {
-    const { service, prisma, preapproval } = armar();
+  it('el link sale al precio congelado y anota cuántos cobros dura', async () => {
+    const { service, prisma, preapprovalPlan } = armar();
     prisma.subscription.findUnique.mockResolvedValue(sub());
 
     await service.activatePlan('b1', 'm1');
 
-    expect(preapproval.create.mock.calls[0][0].body.auto_recurring).toMatchObject({ transaction_amount: 10000, frequency: 1, frequency_type: 'months' });
-    const fila = prisma.subscriptionActivationDiscount.create.mock.calls[0][0].data;
-    expect(fila).toMatchObject({ codeId: null, campaignId: 'camp-1', plan: 'mensual', chargesTotal: 2 });
+    expect(preapprovalPlan.create.mock.calls[0][0].body.auto_recurring).toMatchObject({ transaction_amount: 10000, frequency: 1, frequency_type: 'months' });
+    const fila = prisma.subscriptionPlanCheckout.create.mock.calls[0][0].data;
+    expect(fila).toMatchObject({ mpPlanId: 'PLAN-1', discounted: true, codeId: null, campaignId: 'camp-1', plan: 'mensual', chargesTotal: 2 });
     expect(Number(fila.amountList)).toBe(LISTA_BASE);
     expect(Number(fila.amountFinal)).toBe(10000);
   });
 
   it('no se combina con un código de descuento', async () => {
-    const { service, prisma, preapproval } = armar();
+    const { service, prisma, preapprovalPlan } = armar();
     prisma.subscription.findUnique.mockResolvedValue(sub());
     await expect(service.activatePlan('b1', 'm1', 'MITAD')).rejects.toBeInstanceOf(BadRequestException);
-    expect(preapproval.create).not.toHaveBeenCalled();
+    expect(preapprovalPlan.create).not.toHaveBeenCalled();
   });
 
   it.each([
     ['ya no le quedan cobros congelados', { frozenChargesLeft: 0 }, LISTA_BASE],
     ['eligió el plan anual', { plan: 'anual' }, 156000],
   ])('si %s, sale a precio de lista', async (_nombre, extra, monto) => {
-    const { service, prisma, preapproval } = armar();
+    const { service, prisma, preapprovalPlan } = armar();
     prisma.subscription.findUnique.mockResolvedValue(sub(extra));
 
     await service.activatePlan('b1', 'm1');
 
-    expect(preapproval.create.mock.calls[0][0].body.auto_recurring.transaction_amount).toBe(monto);
-    expect(prisma.subscriptionActivationDiscount.create).not.toHaveBeenCalled();
+    expect(preapprovalPlan.create.mock.calls[0][0].body.auto_recurring.transaction_amount).toBe(monto);
+    expect(prisma.subscriptionPlanCheckout.create.mock.calls[0][0].data.discounted).toBe(false);
   });
 
   it('tras el primer cobro de dos: baja lo que queda y NO toca el precio en MP', async () => {

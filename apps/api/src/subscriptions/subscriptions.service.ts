@@ -4,6 +4,8 @@ import { ConfigService } from '@nestjs/config';
 import {
   MercadoPagoConfig,
   PreApproval,
+  // Plan de MP: es lo que arma el link de activación (ver activatePlan).
+  PreApprovalPlan,
   Payment,
   Preference,
   // `Invoice` es el cliente de /authorized_payments: cada cobro recurrente que
@@ -62,6 +64,12 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 //      3 planes tienen frecuencias distintas entre sí (1/6/12 meses). Un
 //      cambio de plan se anota en `Subscription.nextPlan` y se activa recién
 //      cuando termina el período actual, mismo mecanismo que el punto 2.
+//   4. El link para autorizar el plan (puntos 2 y 3) es un PLAN de MP
+//      (preapproval_plan) sin email, que paga cualquier cuenta de MP (desde el
+//      26/11; antes era una preapproval con `payer_email` y solo la podía pagar
+//      la cuenta de MP con el mismo email que el panel). Esas suscripciones no
+//      traen external_reference: el negocio sale de SubscriptionPlanCheckout,
+//      por el plan al confirmar y por la suscripción en cada cobro.
 //
 // DISEÑO (heredado, sin cambios): nada se crea en Business/Member hasta que
 // MP confirma el pago. Los datos de la cuenta + el wizard viajan en
@@ -238,6 +246,11 @@ export class SubscriptionsService implements OnModuleInit {
   private preciosAnteriores: { plan: PlanKey; amount: number }[] = [];
   private preciosLeidosEn = 0;
   private _preapproval: PreApproval | undefined;
+  private _preapprovalPlan: PreApprovalPlan | undefined;
+  // Última vez que getForBusiness le preguntó a MP por el link pendiente de
+  // cada negocio (ver rescatarActivacionesPendientes): el banner del panel lo
+  // llama en cada pantalla y no hace falta consultar MP más de una vez por minuto.
+  private readonly rescateConsultadoEn = new Map<string, number>();
   private _payment: Payment | undefined;
   private _preference: Preference | undefined;
   private _invoice: Invoice | undefined;
@@ -348,6 +361,11 @@ export class SubscriptionsService implements OnModuleInit {
   private get preapproval(): PreApproval {
     if (!this._preapproval) this._preapproval = new PreApproval(this.mpConfig());
     return this._preapproval;
+  }
+
+  private get preapprovalPlan(): PreApprovalPlan {
+    if (!this._preapprovalPlan) this._preapprovalPlan = new PreApprovalPlan(this.mpConfig());
+    return this._preapprovalPlan;
   }
 
   private get payment(): Payment {
@@ -1240,15 +1258,16 @@ export class SubscriptionsService implements OnModuleInit {
   // todavía: recién se aplica cuando MP confirma la autorización (ver
   // confirmPlanActivation, idéntico criterio que confirmAndCreate — nunca se
   // confía en que el dueño "ya volvió", siempre se le vuelve a preguntar a MP).
-  async activatePlan(businessId: string, memberId: string, discountCode?: string) {
+  //
+  // El link es un PLAN de MP (preapproval_plan) armado para este negocio, no
+  // una suscripción con `payer_email`: así la autoriza cualquier cuenta de MP.
+  // Con el email, MP solo dejaba pagar a la cuenta con el mismo correo que el
+  // panel, y quien tenía MP con otro no podía pagar ni con tarjeta (26/11).
+  // De qué negocio es lo dice SubscriptionPlanCheckout (ver schema.prisma).
+  async activatePlan(businessId: string, _memberId: string, discountCode?: string) {
     await this.cargarPrecios();
     const sub = await this.prisma.subscription.findUnique({ where: { businessId } });
     if (!sub) throw new NotFoundException('Este negocio no tiene una suscripción');
-    // El email de quien está pidiendo la activación (siempre owner/admin, ver
-    // el guard del controller) — no hay un "email de cuenta" separado en
-    // Subscription, es el mismo Member autenticado.
-    const member = await this.prisma.member.findUnique({ where: { id: memberId }, select: { email: true } });
-    if (!member) throw new NotFoundException('No se encontró tu usuario');
     // Antes esto bloqueaba a las cuentas de cortesía sin excepción — quedaban
     // en un callejón sin salida: si un superadmin no volvía a tocarlas, no
     // había forma de pasar a un plan pago. Desde el rediseño de ciclo de vida
@@ -1312,42 +1331,71 @@ export class SubscriptionsService implements OnModuleInit {
 
     let response;
     try {
-      response = await this.preapproval.create({
+      response = await this.preapprovalPlan.create({
         body: {
           reason: `Órbita — plan ${plan}`,
-          payer_email: member.email,
           // Pantalla propia, NO /onboarding/pago-retorno: esa es para el alta
           // nueva (confirma un PendingSignup que acá no existe — el negocio ya
-          // existe). Ver pages/onboarding/plan-activado.tsx.
+          // existe). Ver pages/onboarding/plan-activado.tsx. MP vuelve con el
+          // `preapproval_id` de la suscripción que se acaba de crear.
           back_url: `${frontendUrl}/onboarding/plan-activado`,
-          status: 'pending',
-          external_reference: businessId,
           auto_recurring: { frequency, frequency_type: frequencyType, transaction_amount: montoACobrar, currency_id: this.currency },
         },
       });
     } catch (err) {
       const motivo = this.mpErrorMessage(err);
-      this.logger.warn(`MP rechazó la creación de la preapproval del plan ${plan} para ${businessId}: ${motivo}`);
+      this.logger.warn(`MP rechazó la creación del plan ${plan} para ${businessId}: ${motivo}`);
       throw new BadRequestException(`MercadoPago rechazó la activación: ${motivo}`);
     }
     if (!response.id || !response.init_point) {
       throw new BadRequestException('MercadoPago no devolvió un link de pago válido');
     }
-    if (descuento || congelado) {
-      await this.prisma.subscriptionActivationDiscount.create({
-        data: {
-          businessId,
-          preapprovalId: response.id,
-          codeId: descuento?.codeId ?? null,
-          campaignId: congelado ? sub.campaignId : null,
-          plan,
-          amountList: new Prisma.Decimal(amount),
-          amountFinal: new Prisma.Decimal(montoACobrar),
-          chargesTotal: congelado?.charges ?? 1,
-        },
-      });
-    }
+    const checkout = await this.prisma.subscriptionPlanCheckout.create({
+      data: {
+        businessId,
+        mpPlanId: response.id,
+        plan,
+        amountList: new Prisma.Decimal(amount),
+        amountFinal: new Prisma.Decimal(montoACobrar),
+        discounted: !!(descuento || congelado),
+        codeId: descuento?.codeId ?? null,
+        campaignId: congelado ? sub.campaignId : null,
+        chargesTotal: congelado?.charges ?? 1,
+      },
+    });
+    await this.reemplazarLinksAnteriores(businessId, checkout.id);
     return { initPoint: response.init_point, plan };
+  }
+
+  // Los links que el negocio había pedido antes quedan reemplazados por el
+  // nuevo (cambió de plan, aplicó un código, o volvió a apretar el botón): en
+  // MP se desactivan para que ya nadie se suscriba desde ahí. Ninguno tiene
+  // suscriptor (si alguien lo hubiera pagado, la fila estaría en USED), así que
+  // desactivarlos no toca ningún cobro. Si MP falla da igual: si igual se paga,
+  // confirmPlanActivation lo reconoce por la fila y deja una sola suscripción.
+  private async reemplazarLinksAnteriores(businessId: string, vigenteId: string) {
+    const anteriores = await this.prisma.subscriptionPlanCheckout.findMany({
+      where: { businessId, status: 'PENDING', id: { not: vigenteId } },
+      select: { id: true, mpPlanId: true },
+    });
+    if (anteriores.length === 0) return;
+    await this.prisma.subscriptionPlanCheckout.updateMany({
+      where: { id: { in: anteriores.map((a) => a.id) }, status: 'PENDING' },
+      data: { status: 'SUPERSEDED' },
+    });
+    for (const a of anteriores) {
+      await this.preapprovalPlan
+        .update({ id: a.mpPlanId, updatePreApprovalPlanRequest: { status: 'inactive' } })
+        .catch((err) => this.logger.warn(`No se pudo desactivar en MP el link ${a.mpPlanId} de ${businessId}: ${this.mpErrorMessage(err)}`));
+    }
+  }
+
+  // ¿De qué negocio es esta suscripción de MP? Las de antes del 26/11 traen el
+  // businessId en external_reference; las que salen de un link de plan, no:
+  // se reconocen por el plan del que salieron.
+  private async checkoutDePlan(mpPlanId: string | undefined) {
+    if (!mpPlanId) return null;
+    return this.prisma.subscriptionPlanCheckout.findUnique({ where: { mpPlanId } });
   }
 
   // ¿A este negocio le quedan cobros a precio congelado para el plan que está
@@ -1406,7 +1454,11 @@ export class SubscriptionsService implements OnModuleInit {
     const mp = await this.preapproval.get({ id: mpPreapprovalId });
     if (mp.status !== 'authorized') return { activated: false, status: mp.status ?? 'unknown' };
 
-    const businessId = mp.external_reference;
+    // Las suscripciones que salen de un link de plan no traen external_reference:
+    // el negocio sale de la fila del link (ver activatePlan). El SDK no tipa
+    // `preapproval_plan_id` en la respuesta, pero MP lo devuelve.
+    const checkout = await this.checkoutDePlan((mp as { preapproval_plan_id?: string }).preapproval_plan_id);
+    const businessId = mp.external_reference || checkout?.businessId;
     if (!businessId) return { activated: false, status: 'sin_external_reference' };
 
     const sub = await this.prisma.subscription.findUnique({ where: { businessId } });
@@ -1431,7 +1483,10 @@ export class SubscriptionsService implements OnModuleInit {
     // coincide con ningún precio de lista: se reconoce por la fila que dejó
     // activatePlan (mismo plan, misma frecuencia y EXACTAMENTE el monto que se
     // le mandó a cobrar a MP). Cualquier otra combinación sigue sin activarse.
-    const descuento = await this.prisma.subscriptionActivationDiscount.findUnique({ where: { preapprovalId: mpPreapprovalId } });
+    let descuento = await this.prisma.subscriptionActivationDiscount.findUnique({ where: { preapprovalId: mpPreapprovalId } });
+    // Con un link de plan, la fila del descuento recién se puede crear ahora:
+    // hasta que alguien paga no existe el id de la suscripción.
+    if (!descuento && checkout?.discounted) descuento = await this.descuentoDelLink(checkout, mpPreapprovalId);
     const planConDescuento =
       descuento && esPlanKey(descuento.plan) && this.coincideConDescuento(mp.auto_recurring, descuento.plan, Number(descuento.amountFinal))
         ? descuento.plan
@@ -1475,6 +1530,13 @@ export class SubscriptionsService implements OnModuleInit {
     if (planConDescuento && descuento && descuento.status === 'PENDING') {
       await this.marcarDescuentoActivado(descuento, businessId);
     }
+    if (checkout) {
+      await this.prisma.subscriptionPlanCheckout.update({
+        where: { id: checkout.id },
+        data: { status: 'USED', preapprovalId: mpPreapprovalId, usedAt: checkout.usedAt ?? now },
+      });
+    }
+    await this.darDeBajaSuscripcionAnterior(sub.mpPreapprovalId, mpPreapprovalId, businessId);
     await this.syncAddonAvanzado(this.prisma, businessId, plan, periodEnd);
     await this.businessesService.publish(businessId).catch(() => undefined); // por si venía suspendida por mora
     if (reactivar) {
@@ -1492,6 +1554,56 @@ export class SubscriptionsService implements OnModuleInit {
     );
 
     return { activated: true, plan, subdomain: business?.subdomain, businessId };
+  }
+
+  // Crea la fila del descuento de un link de plan con el id de la suscripción
+  // que acaba de pagarse. Si la confirmación llega dos veces a la vez (la vuelta
+  // del navegador y el webhook), la segunda choca con la unique y relee.
+  private async descuentoDelLink(
+    checkout: { businessId: string; codeId: string | null; campaignId: string | null; plan: string; amountList: Prisma.Decimal; amountFinal: Prisma.Decimal; chargesTotal: number },
+    mpPreapprovalId: string,
+  ) {
+    try {
+      return await this.prisma.subscriptionActivationDiscount.create({
+        data: {
+          businessId: checkout.businessId,
+          preapprovalId: mpPreapprovalId,
+          codeId: checkout.codeId,
+          campaignId: checkout.campaignId,
+          plan: checkout.plan,
+          amountList: checkout.amountList,
+          amountFinal: checkout.amountFinal,
+          chargesTotal: checkout.chargesTotal,
+        },
+      });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        return this.prisma.subscriptionActivationDiscount.findUnique({ where: { preapprovalId: mpPreapprovalId } });
+      }
+      throw err;
+    }
+  }
+
+  // Una sola suscripción por negocio. Si la que tenía guardada sigue
+  // autorizada en MP (la baja de activatePlan falló, o se pagó dos veces el
+  // mismo link), se la da de baja: la que vale es la que se acaba de autorizar,
+  // que es lo último que eligió el dueño. Lo normal es que la anterior ya esté
+  // cancelada y esto no haga nada. Si la anterior llegó a cobrar este período,
+  // la devolución es a mano: se avisa por mail.
+  private async darDeBajaSuscripcionAnterior(anteriorId: string | null, nuevaId: string, businessId: string) {
+    if (!anteriorId || anteriorId === nuevaId) return;
+    try {
+      const anterior = await this.preapproval.get({ id: anteriorId });
+      if (anterior.status !== 'authorized') return;
+      const ok = await this.cancelarPreapproval(anteriorId, businessId);
+      this.logger.warn(`Negocio ${businessId}: la suscripción ${anteriorId} seguía autorizada al activar ${nuevaId} — ${ok ? 'dada de baja' : 'NO se pudo dar de baja'}`);
+      await this.avisarInterno(
+        'Un negocio tenía dos suscripciones autorizadas en Mercado Pago',
+        `<p>Al activar la suscripción ${nuevaId} del negocio ${businessId}, la anterior (${anteriorId}) seguía autorizada. ${ok ? 'Se dio de baja.' : '<strong>No se pudo dar de baja</strong>: hay que cancelarla a mano en Mercado Pago.'} Revisá si llegó a cobrar este período dos veces y, si es así, devolvé uno de los cobros.</p>`,
+      );
+    } catch (err) {
+      this.logger.error(`No se pudo revisar la suscripción anterior ${anteriorId} de ${businessId}: ${this.mpErrorMessage(err)}`);
+    }
   }
 
   // ¿Lo que MP tiene autorizado es exactamente el plan con el monto rebajado
@@ -1925,16 +2037,22 @@ export class SubscriptionsService implements OnModuleInit {
   // mismo pago, no se duplica. No se usa para el cobro único del beneficio de
   // bienvenida (ver confirmAndCreate): a esa altura el negocio todavía no
   // existe, no hay `Subscription` contra la cual buscar.
-  async recordPayment(mpPaymentId: string) {
+  // `preapprovalId`: la suscripción de la que sale el cobro, cuando el aviso de
+  // MP la trae (el de cobro recurrente, ver handleWebhook).
+  async recordPayment(mpPaymentId: string, preapprovalId?: string) {
     const pago = await this.payment.get({ id: mpPaymentId });
 
-    // MP propaga el external_reference de la preapproval (= businessId,
-    // seteado en activatePlan/confirmPlanActivation) a cada cobro recurrente.
-    // Es nuestro anclaje para saber de qué negocio es.
-    const businessId = pago.external_reference;
+    // Las suscripciones de antes del 26/11 propagan su external_reference
+    // (= businessId) a cada cobro. Las que salen de un link de plan no traen
+    // ninguno: el negocio se busca por la suscripción del cobro.
+    let businessId = pago.external_reference || undefined;
+    if (!businessId) {
+      const deLaSuscripcion = preapprovalId ?? this.suscripcionDelPago(pago);
+      if (deLaSuscripcion) businessId = await this.negocioDeSuscripcion(deLaSuscripcion);
+    }
     if (!businessId) {
       this.logger.warn(
-        `Pago ${mpPaymentId} (estado ${pago.status ?? '?'}, ${pago.transaction_amount ?? '?'}) sin external_reference — no hay a qué negocio imputarlo, se ignora`,
+        `Pago ${mpPaymentId} (estado ${pago.status ?? '?'}, ${pago.transaction_amount ?? '?'}) sin external_reference ni suscripción conocida — no hay a qué negocio imputarlo, se ignora`,
       );
       return { recorded: false, reason: 'sin_external_reference' };
     }
@@ -2094,6 +2212,107 @@ export class SubscriptionsService implements OnModuleInit {
     return { recorded: true, approved: aprobado, cancelled: cancelada, renewed: aprobado && !cancelada && !!plan };
   }
 
+  // El id de la suscripción de la que sale un cobro, si el pago lo trae. MP lo
+  // informa en `metadata.preapproval_id` o en
+  // `point_of_interaction.transaction_data.subscription_id` según el caso; el
+  // SDK no tipa ninguno de los dos.
+  private suscripcionDelPago(pago: { metadata?: unknown; point_of_interaction?: unknown }): string | undefined {
+    const meta = pago.metadata as { preapproval_id?: unknown } | undefined;
+    const poi = pago.point_of_interaction as { transaction_data?: { subscription_id?: unknown } } | undefined;
+    const id = meta?.preapproval_id ?? poi?.transaction_data?.subscription_id;
+    return typeof id === 'string' && id ? id : undefined;
+  }
+
+  // De qué negocio es una suscripción de MP, para imputarle un cobro que no
+  // trae external_reference. Primero lo que ya sabemos (la suscripción activa
+  // del negocio, o el link que la originó); si no, se le pregunta a MP de qué
+  // plan salió. En ese último caso el cobro llegó antes que la confirmación
+  // (MP cobra al autorizar, y los avisos no llegan en orden): se activa el plan
+  // primero, así el cobro se registra contra el plan que se acaba de pagar.
+  private async negocioDeSuscripcion(preapprovalId: string): Promise<string | undefined> {
+    const sub = await this.prisma.subscription.findFirst({ where: { mpPreapprovalId: preapprovalId }, select: { businessId: true } });
+    if (sub) return sub.businessId;
+    const usado = await this.prisma.subscriptionPlanCheckout.findFirst({ where: { preapprovalId }, select: { businessId: true } });
+    if (usado) return usado.businessId;
+
+    let mp;
+    try {
+      mp = await this.preapproval.get({ id: preapprovalId });
+    } catch (err) {
+      this.logger.warn(`No se pudo consultar la suscripción ${preapprovalId} para imputar un cobro: ${this.mpErrorMessage(err)}`);
+      return undefined;
+    }
+    const checkout = await this.checkoutDePlan((mp as { preapproval_plan_id?: string }).preapproval_plan_id);
+    const businessId = mp.external_reference || checkout?.businessId;
+    if (checkout) {
+      const r = await this.confirmPlanActivation(preapprovalId).catch((err) => {
+        this.logger.error(`No se pudo activar la suscripción ${preapprovalId} antes de registrar su cobro: ${describeError(err)}`);
+        return undefined;
+      });
+      if (r) this.logger.log(`Suscripción ${preapprovalId} activada al llegar su cobro: ${JSON.stringify(r)}`);
+    }
+    return businessId;
+  }
+
+  // Busca en MP las suscripciones ya autorizadas desde links que seguimos
+  // viendo pendientes, y las activa. Es el respaldo de la confirmación: si el
+  // dueño pagó y cerró la pestaña antes de volver, y además se perdió el aviso
+  // de MP, sin esto el plan no se activaba nunca y el barrido de mora terminaba
+  // suspendiendo una tienda que estaba pagando.
+  // Con `businessId` (al abrir el panel) mira solo ese negocio; sin él (barrido
+  // nocturno) mira todos y vence los links de más de 30 días.
+  async rescatarActivacionesPendientes(businessId?: string): Promise<number> {
+    if (!this.mpConfigured) return 0;
+    const limite = new Date(Date.now() - 30 * 86_400_000);
+    const pendientes = await this.prisma.subscriptionPlanCheckout.findMany({
+      where: { status: 'PENDING', createdAt: { gte: limite }, ...(businessId ? { businessId } : {}) },
+      orderBy: { createdAt: 'asc' },
+      take: 200,
+      select: { mpPlanId: true, businessId: true },
+    });
+    let activadas = 0;
+    for (const p of pendientes) {
+      try {
+        const r = await this.preapproval.search({ options: { preapproval_plan_id: p.mpPlanId, status: 'authorized' } });
+        for (const s of r.results ?? []) {
+          if (!s.id || s.status !== 'authorized') continue;
+          const c = await this.confirmPlanActivation(s.id);
+          if (c.activated) {
+            activadas++;
+            this.logger.warn(`Activación rescatada: el negocio ${p.businessId} había pagado el link ${p.mpPlanId} (suscripción ${s.id}) sin que llegara la confirmación`);
+          }
+        }
+      } catch (err) {
+        this.logger.warn(`No se pudo revisar en MP el link ${p.mpPlanId} de ${p.businessId}: ${this.mpErrorMessage(err)}`);
+      }
+    }
+    if (!businessId) {
+      await this.prisma.subscriptionPlanCheckout.updateMany({
+        where: { status: 'PENDING', createdAt: { lt: limite } },
+        data: { status: 'EXPIRED' },
+      });
+    }
+    return activadas;
+  }
+
+  // Si el negocio tiene un link de activación sin confirmar, se fija en MP si
+  // ya lo pagó: así quien pagó y cerró la pestaña ve el plan activo apenas
+  // vuelve al panel, sin esperar al barrido de la noche. Solo consulta MP si hay
+  // un link pendiente, una vez por minuto como mucho, y nunca rompe la lectura.
+  private async rescatarAlAbrirElPanel(businessId: string): Promise<void> {
+    const ultima = this.rescateConsultadoEn.get(businessId) ?? 0;
+    if (Date.now() - ultima < 60_000) return;
+    try {
+      if (!this.mpConfigured) return;
+      const pendiente = await this.prisma.subscriptionPlanCheckout.findFirst({ where: { businessId, status: 'PENDING' }, select: { id: true } });
+      if (!pendiente) return;
+      this.rescateConsultadoEn.set(businessId, Date.now());
+      await this.rescatarActivacionesPendientes(businessId);
+    } catch (err) {
+      this.logger.warn(`No se pudo revisar el link de activación pendiente de ${businessId}: ${describeError(err)}`);
+    }
+  }
+
   // Mail de "tu tienda está activa de nuevo" — lo dispara tanto un cobro
   // aprobado que saca de mora (recordPayment) como una activación de plan
   // (confirmPlanActivation), así que vive en un solo lugar. Best-effort: un
@@ -2202,6 +2421,13 @@ export class SubscriptionsService implements OnModuleInit {
     if (type.includes('merchant_order') || String(body?.topic ?? query['topic'] ?? '').includes('merchant_order')) {
       return { received: true };
     }
+    // Cambios de un PLAN (los links de activación, ver activatePlan): no hay
+    // nada que hacer, lo que importa es la suscripción que alguien crea desde
+    // ahí, que llega con su propio aviso. Antes caía en la rama de preapproval
+    // y dejaba un error falso en el log buscando el plan como suscripción.
+    if (type.includes('preapproval_plan') || String(body?.topic ?? query['topic'] ?? '').includes('preapproval_plan')) {
+      return { received: true };
+    }
     const data = body?.data as { id?: string } | undefined;
     const id = data?.id ?? (body?.id as string | undefined);
     if (!id) {
@@ -2226,7 +2452,9 @@ export class SubscriptionsService implements OnModuleInit {
             `Webhook de cobro recurrente ${id} (preapproval ${factura.preapproval_id ?? '?'}, estado ${factura.status ?? '?'}): MP todavía no le asoció un pago — no hay nada que registrar`,
           );
         } else {
-          const result = await this.recordPayment(String(pagoId));
+          // Con la suscripción: los cobros de un link de plan no traen
+          // external_reference y se imputan por ella (ver recordPayment).
+          const result = await this.recordPayment(String(pagoId), factura.preapproval_id ? String(factura.preapproval_id) : undefined);
           this.logger.log(`Webhook de cobro recurrente ${id} → pago ${pagoId}: ${JSON.stringify(result)}`);
         }
       } else if (type.includes('payment')) {
@@ -2818,6 +3046,7 @@ export class SubscriptionsService implements OnModuleInit {
   // ── Lectura ──────────────────────────────────────────────────────────────
 
   async getForBusiness(businessId: string) {
+    await this.rescatarAlAbrirElPanel(businessId);
     const sub = await this.prisma.subscription.findUnique({ where: { businessId } });
     if (!sub) throw new NotFoundException('Este negocio no tiene una suscripción');
     return {
