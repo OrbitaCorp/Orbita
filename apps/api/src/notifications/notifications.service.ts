@@ -433,7 +433,7 @@ export class NotificationsService {
   private async contarStockCritico(businessId: string): Promise<number> {
     const rows = await this.prisma.variantStock.findMany({
       // showStock: una vidriera con el stock en blanco no tiene un "stock crítico" que avisar.
-      where: { variant: { showStock: true, product: { businessId, deletedAt: null } } },
+      where: { variant: { deletedAt: null, showStock: true, product: { businessId, deletedAt: null } } },
       select: { quantity: true, stockMin: true },
     });
     return rows.filter((r) => r.quantity <= r.stockMin).length;

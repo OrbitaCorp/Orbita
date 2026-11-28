@@ -244,7 +244,7 @@ export class DiscountsService {
       const n =
         dto.productLevel === 'variante'
           ? await this.prisma.productVariant.count({
-              where: { id: { in: dto.productIds }, product: { businessId, deletedAt: null } },
+              where: { id: { in: dto.productIds }, deletedAt: null, product: { businessId, deletedAt: null } },
             })
           : await this.prisma.product.count({
               where: { id: { in: dto.productIds }, businessId, deletedAt: null },
@@ -442,7 +442,7 @@ export class DiscountsService {
   private async resolverItemsDelCarrito(businessId: string, items: CartItemInput[]): Promise<CartItemForEngine[]> {
     const variantIds = [...new Set(items.map((it) => it.variantId))];
     const variantes = await this.prisma.productVariant.findMany({
-      where: { id: { in: variantIds }, product: { businessId, deletedAt: null } },
+      where: { id: { in: variantIds }, deletedAt: null, product: { businessId, deletedAt: null } },
       select: { id: true, price: true, productId: true, product: { select: { categoryId: true } } },
     });
     const porId = new Map(variantes.map((v) => [v.id, v]));

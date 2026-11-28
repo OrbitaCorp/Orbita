@@ -712,6 +712,7 @@ export class OrdersService {
     const variants = await this.prisma.productVariant.findMany({
       where: {
         id: { in: variantIds },
+        deletedAt: null,
         ...(opts?.publicCheckout ? { isActive: true } : {}),
         product: {
           businessId,

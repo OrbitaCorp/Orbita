@@ -80,7 +80,7 @@ export class SearchService {
               deletedAt: null,
               OR: [
                 { name: contains },
-                { variants: { some: { OR: [{ sku: contains }, { barcode: contains }] } } },
+                { variants: { some: { deletedAt: null, OR: [{ sku: contains }, { barcode: contains }] } } },
               ],
             },
             orderBy: { createdAt: 'desc' },

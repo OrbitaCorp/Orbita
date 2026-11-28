@@ -71,7 +71,7 @@ export class PreciosLoteService {
         status: true,
         category: { select: { name: true } },
         variants: {
-          where: { isActive: true },
+          where: { isActive: true, deletedAt: null },
           orderBy: { createdAt: 'asc' },
           select: {
             id: true, sku: true, price: true,
@@ -108,7 +108,7 @@ export class PreciosLoteService {
     for (const it of dto.items) pedidos.set(it.variantId, redondear(it.price));
 
     const variantes = await this.prisma.productVariant.findMany({
-      where: { id: { in: [...pedidos.keys()] }, product: { businessId, deletedAt: null } },
+      where: { id: { in: [...pedidos.keys()] }, deletedAt: null, product: { businessId, deletedAt: null } },
       select: {
         id: true,
         price: true,
@@ -148,7 +148,7 @@ export class PreciosLoteService {
     const productos = [...new Set(cambios.map((c) => c.productId))];
     const minimos = await this.prisma.productVariant.groupBy({
       by: ['productId'],
-      where: { productId: { in: productos }, isActive: true },
+      where: { productId: { in: productos }, isActive: true, deletedAt: null },
       _min: { price: true },
     });
     for (let i = 0; i < minimos.length; i += POR_TANDA) {

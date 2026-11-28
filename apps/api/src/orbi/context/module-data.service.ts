@@ -35,7 +35,7 @@ export class ModuleDataService {
   private async productosSinStock(businessId: string): Promise<number> {
     const productos = await this.prisma.product.findMany({
       where: { businessId, deletedAt: null },
-      select: { variants: { select: { stock: { select: { quantity: true } } } } },
+      select: { variants: { where: { deletedAt: null }, select: { stock: { select: { quantity: true } } } } },
     });
     return productos.filter(
       (p) => p.variants.reduce((s, v) => s + v.stock.reduce((x, st) => x + st.quantity, 0), 0) === 0,

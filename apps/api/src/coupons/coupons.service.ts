@@ -226,7 +226,7 @@ export class CouponsService {
       const n =
         dto.productLevel === 'variante'
           ? await this.prisma.productVariant.count({
-              where: { id: { in: dto.productIds }, product: { businessId, deletedAt: null } },
+              where: { id: { in: dto.productIds }, deletedAt: null, product: { businessId, deletedAt: null } },
             })
           : await this.prisma.product.count({
               where: { id: { in: dto.productIds }, businessId, deletedAt: null },

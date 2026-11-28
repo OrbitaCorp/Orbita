@@ -142,6 +142,7 @@ export class ReportsService {
         // pickPrimaryImageUrl().
         images: { select: { url: true, isPrimary: true, optionValueId: true }, orderBy: { position: 'asc' } },
         variants: {
+          where: { deletedAt: null },
           select: {
             id: true,
             sku: true,
@@ -736,7 +737,7 @@ export class ReportsService {
       this.prisma.storeVisit.count({ where: { businessId, createdAt: { gte: desdeAnterior, lt: desde } } }),
       this.prisma.product.findMany({
         where: { businessId, deletedAt: null },
-        select: { cost: true, variants: { select: { price: true, stock: { select: { quantity: true } } } } },
+        select: { cost: true, variants: { where: { deletedAt: null }, select: { price: true, stock: { select: { quantity: true } } } } },
       }),
     ]);
 
@@ -972,7 +973,7 @@ export class ReportsService {
       this.prisma.variantStock.findMany({
         where: {
           stockMin: { gt: 0 },
-          variant: { isActive: true, showStock: true, product: { businessId, deletedAt: null, status: 'PUBLISHED' } },
+          variant: { isActive: true, deletedAt: null, showStock: true, product: { businessId, deletedAt: null, status: 'PUBLISHED' } },
         },
         select: { quantity: true, stockMin: true },
       }),

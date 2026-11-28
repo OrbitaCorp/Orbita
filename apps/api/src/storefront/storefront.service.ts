@@ -661,7 +661,7 @@ export class StorefrontService {
         // vez de sumar todas — antes una tienda con stock repartido en varias
         // sucursales podía mostrar "hay stock" acá y rechazar la compra.
         variants: {
-          where: { isActive: true },
+          where: { isActive: true, deletedAt: null },
           // Orden determinístico — sin esto, precioRepresentativo() (y el
           // "variants[0]" que usa el frontend para el agregado directo de un
           // producto sin opciones) dependían del orden que Postgres decidiera
@@ -987,7 +987,7 @@ export class StorefrontService {
         productTags: { include: { tag: true } },
         options: { include: { values: { orderBy: { position: 'asc' } } }, orderBy: { position: 'asc' } },
         variants: {
-          where: { isActive: true },
+          where: { isActive: true, deletedAt: null },
           // Orden determinístico — ver el mismo comentario en listProducts().
           orderBy: { createdAt: 'asc' },
           include: {
@@ -1150,7 +1150,7 @@ export class StorefrontService {
 
     const variantIds = [...new Set(items.map((it) => it.variantId))];
     const variants = await this.prisma.productVariant.findMany({
-      where: { id: { in: variantIds }, isActive: true, product: { businessId: business.id, deletedAt: null, status: { in: ['PUBLISHED', 'OUT_OF_STOCK'] } } },
+      where: { id: { in: variantIds }, isActive: true, deletedAt: null, product: { businessId: business.id, deletedAt: null, status: { in: ['PUBLISHED', 'OUT_OF_STOCK'] } } },
       include: {
         // Las imágenes son del PRODUCTO (con un optionValueId opcional que
         // las liga a un valor puntual, ej. "Negro") — la variante en sí no
