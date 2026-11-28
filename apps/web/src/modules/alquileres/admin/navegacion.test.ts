@@ -90,9 +90,23 @@ describe('resolverRuta', () => {
 })
 
 describe('el panel real (con la API) muestra solo lo que ya guarda de verdad', () => {
-  it('en estadía quedan la agenda, las propiedades, los precios, los bloqueos, las reglas, la seña y Airbnb', () => {
+  it('en estadía quedan la agenda, las estadísticas, las ganancias de Airbnb, las propiedades, los precios, los bloqueos, las reglas, la seña y Airbnb', () => {
     const ids = seccionesDe('estadia', undefined, true).map(s => s.id)
-    expect(ids).toEqual(['reservas', 'disponibilidad', 'clientes', 'ingresos', 'propiedades', 'temporadas', 'bloqueos', 'reglas', 'pagos', 'calendarios'])
+    expect(ids).toEqual(['reservas', 'disponibilidad', 'clientes', 'ingresos', 'ganancias', 'propiedades', 'temporadas', 'bloqueos', 'reglas', 'pagos', 'calendarios'])
+  })
+  it('las ganancias de Airbnb tienen su propia entrada, al lado de Estadísticas (no se buscan adentro de Airbnb)', () => {
+    const secciones = seccionesDe('estadia', undefined, true)
+    const i = secciones.findIndex(s => s.id === 'ganancias')
+    expect(secciones[i]).toEqual({ id: 'ganancias', label: 'Ganancias de Airbnb', grupo: 'Hoy' })
+    expect(secciones[i - 1]).toMatchObject({ id: 'ingresos', label: 'Estadísticas', grupo: 'Hoy' })
+    expect(resolverRuta({ vista: 'ganancias' }, 'estadia', true)).toEqual({ vista: 'ganancias', corregir: false })
+  })
+  it('las ganancias de Airbnb son solo de un alojamiento real: ni la demo ni canchas ni salones las tienen', () => {
+    expect(seccionesDe('estadia').map(s => s.id)).not.toContain('ganancias')
+    expect(seccionesDe('cancha', undefined, true).map(s => s.id)).not.toContain('ganancias')
+    expect(seccionesDe('bloque', undefined, true).map(s => s.id)).not.toContain('ganancias')
+    expect(resolverRuta({ vista: 'ganancias' }, 'estadia')).toEqual({ vista: 'reservas', corregir: true })
+    expect(resolverRuta({ vista: 'ganancias' }, 'cancha', true)).toEqual({ vista: 'reservas', corregir: true })
   })
   it('los calendarios, en un negocio real de estadía, se llaman Airbnb (es lo único que se conecta); en la demo, como siempre', () => {
     expect(seccionesDe('estadia', undefined, true).find(s => s.id === 'calendarios')?.label).toBe('Airbnb')

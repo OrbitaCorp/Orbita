@@ -3,7 +3,8 @@
 //
 // Contrato de la URL: ?tipo=<modo>&vista=<sección>&tab=<sub-sección de
 // Configuración>. Cada modo tiene su barra lateral: lo de hoy (la agenda, qué
-// hay libre, la gente o los eventos, los ingresos), lo que se alquila (las
+// hay libre, la gente o los eventos, los ingresos y, en un alojamiento real,
+// las ganancias de Airbnb que se importan), lo que se alquila (las
 // canchas, los salones o las propiedades, con sus extras, paquetes y precios),
 // las reglas de la reserva (reglas, bloqueos, mensajes, pagos), los calendarios
 // externos y la configuración del negocio (datos, horarios, equipo).
@@ -20,7 +21,7 @@
 // `corregir`, para que el panel reescriba la URL.
 import type { Palabras, TipoAlquiler } from '../datos'
 
-export type Vista = 'reservas' | 'disponibilidad' | 'clientes' | 'eventos' | 'ingresos' | 'unidades' | 'extras' | 'precios' | 'salones' | 'paquetes' | 'propiedades' | 'temporadas' | 'reglas' | 'bloqueos' | 'mensajes' | 'pagos' | 'calendarios' | 'configuracion'
+export type Vista = 'reservas' | 'disponibilidad' | 'clientes' | 'eventos' | 'ingresos' | 'ganancias' | 'unidades' | 'extras' | 'precios' | 'salones' | 'paquetes' | 'propiedades' | 'temporadas' | 'reglas' | 'bloqueos' | 'mensajes' | 'pagos' | 'calendarios' | 'configuracion'
 export type TabConfiguracion = 'negocio' | 'horarios' | 'equipo'
 
 export interface SubNav { id: TabConfiguracion; label: string }
@@ -46,10 +47,18 @@ const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
  */
 const SIN_API: Vista[] = ['mensajes', 'configuracion']
 
+/**
+ * Lo que solo existe con la API: las ganancias de Airbnb se importan de un
+ * archivo que lee el servidor, y la demo no tiene nada parecido. Va al lado de
+ * Estadísticas, que es donde se ve esa plata, y no adentro de Airbnb (donde
+ * estuvo al principio, abajo de los calendarios, y no se encontraba).
+ */
+const SOLO_API: Vista[] = ['ganancias']
+
 /** `real`: el panel de un negocio de verdad (origen de la API), con solo lo que ya guarda. La demo no lo pasa. */
 export function seccionesDe(tipo: TipoAlquiler, palabras: Pick<Palabras, 'unidades' | 'clientes'> = DE_FABRICA[tipo], real = false): SeccionNav[] {
   const todas = todasLasSecciones(tipo, palabras)
-  if (!real) return todas
+  if (!real) return todas.filter(s => !SOLO_API.includes(s.id))
   // Calendarios: en un alojamiento real es la sincronización con Airbnb (lo único que se conecta), y así se llama.
   // Canchas y salones todavía no conectan ninguno.
   return todas
@@ -89,6 +98,7 @@ function todasLasSecciones(tipo: TipoAlquiler, palabras: Pick<Palabras, 'unidade
   }
   return [
     { id: 'reservas', label: 'Calendario', grupo: HOY }, disponibilidad, { id: 'clientes', label: capital(palabras.clientes), grupo: HOY }, ingresos,
+    { id: 'ganancias', label: 'Ganancias de Airbnb', grupo: HOY },
     { id: 'propiedades', label: unidades, grupo: unidades }, { id: 'temporadas', label: 'Temporadas y precios', grupo: unidades }, { id: 'bloqueos', label: 'Bloqueos', grupo: unidades },
     reglas, mensajes, pagos,
     calendarios, configuracion,

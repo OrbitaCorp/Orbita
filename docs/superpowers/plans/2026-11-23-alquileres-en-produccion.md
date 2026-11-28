@@ -154,7 +154,7 @@ Cada una con su plan propio; las ideas están en `docs/alquileres/informe-ux-alq
 |---|---|
 | 4 · Calendario de Airbnb | Hecha, en producción (25/11). `plans/2026-11-25-alquileres-airbnb-calendario.md` |
 | Vista de todas las propiedades juntas | Hecha, en producción (25/11): la grilla de ocupación |
-| 5 · Estadísticas y ganancias de Airbnb | Hecha (26/11), en producción desde el 27/11. `plans/2026-11-26-alquileres-estadisticas-y-csv-airbnb.md` |
+| 5 · Estadísticas y ganancias de Airbnb | Hecha (26/11), en producción desde el 27/11. `plans/2026-11-26-alquileres-estadisticas-y-csv-airbnb.md`. El mismo 27/11 las ganancias de Airbnb pasaron de la pantalla Airbnb a su propia entrada del menú (`?vista=ganancias`) |
 | Seña online con Mercado Pago | Pendiente. Es transversal: la decide Ale |
 | Canchas | Pendiente |
 | Salones | Pendiente |

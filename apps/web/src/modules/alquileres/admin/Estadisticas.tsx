@@ -12,7 +12,7 @@
 // - Un período que no terminó se compara contra los mismos días del anterior:
 //   medio mes contra un mes entero daría siempre en baja.
 // - Lo de Airbnb sale de dos lados: las noches, del calendario conectado; la
-//   plata y el huésped, de las ganancias importadas (pantalla Airbnb). Si hay
+//   plata y el huésped, de las ganancias importadas (Ganancias de Airbnb). Si hay
 //   noches del calendario sin su plata, se dice cuántas.
 // - Pesos y otras monedas no se suman.
 //
@@ -38,11 +38,11 @@ interface P {
   reservas: Reserva[]
   clientes: Cliente[]
   onAbrirReserva: (id: string) => void
-  /** Solo el panel real: lleva a la pantalla de Airbnb, donde se importan las ganancias. */
-  onIrAAirbnb?: () => void
+  /** Solo el panel real: lleva a "Ganancias de Airbnb", donde se importan. */
+  onImportarGanancias?: () => void
 }
 
-export default function Estadisticas({ negocio, reservas, clientes, onAbrirReserva, onIrAAirbnb }: P) {
+export default function Estadisticas({ negocio, reservas, clientes, onAbrirReserva, onImportarGanancias }: P) {
   const [periodo, setPeriodo] = useState<Periodo>('mes')
   const [desde, hasta] = periodoDe(periodo)
   const [desdeAntes, hastaAntes] = periodoAnterior(periodo)
@@ -123,7 +123,7 @@ export default function Estadisticas({ negocio, reservas, clientes, onAbrirReser
           {sinPlata > 0 && (
             <Nota tono="info">
               <span style={{ flex: 1, minWidth: 0 }}>Hay {cuenta(sinPlata, 'noche de Airbnb', 'noches de Airbnb')} sin su plata: {sinPlata === 1 ? 'cuenta como ocupada' : 'cuentan como ocupadas'}, pero lo que cobraste por {sinPlata === 1 ? 'ella' : 'ellas'} no está importado.</span>
-              {onIrAAirbnb && <button type="button" className="rv-btn rv-btn--sm" onClick={onIrAAirbnb}>Importar ganancias</button>}
+              {onImportarGanancias && <button type="button" className="rv-btn rv-btn--sm" onClick={onImportarGanancias}>Importar ganancias</button>}
             </Nota>
           )}
         </div>
@@ -165,11 +165,11 @@ export default function Estadisticas({ negocio, reservas, clientes, onAbrirReser
         <LlegadasYSalidas negocio={negocio} reservas={reservas} clientes={clientes} onAbrirReserva={onAbrirReserva} />
       </div>
 
-      {onIrAAirbnb && importadas.length === 0 && negocio.calendariosExternos.length > 0 && sinPlata === 0 && (
+      {onImportarGanancias && importadas.length === 0 && negocio.calendariosExternos.length > 0 && sinPlata === 0 && (
         <div style={{ marginTop: 14 }}>
           <Nota tono="info">
             <span style={{ flex: 1, minWidth: 0 }}>De Airbnb acá se ven las noches, no la plata. Importá tus ganancias para sumar lo que cobraste y las estadías de antes de conectar el calendario.</span>
-            <button type="button" className="rv-btn rv-btn--sm" onClick={onIrAAirbnb}>Importar ganancias</button>
+            <button type="button" className="rv-btn rv-btn--sm" onClick={onImportarGanancias}>Importar ganancias</button>
           </Nota>
         </div>
       )}

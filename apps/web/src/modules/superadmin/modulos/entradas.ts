@@ -177,6 +177,8 @@ const F24 = '2026-11-24'
 const F25 = '2026-11-25'
 // Jueves 26/11: el alta real de Turnos.
 const F26 = '2026-11-26'
+// Viernes 27/11: las ganancias de Airbnb, con su entrada en el menú.
+const F27N = '2026-11-27'
 
 export const ENTRADAS: Entrada[] = [
   // ─── Transversal · la sección Módulos ───────────────────────────────────────
@@ -4354,6 +4356,33 @@ ${comoQuedo('alquileres', ['Estadísticas · 1280', 'estadisticas-1280.webp'], [
       'apps/web/src/modules/alquileres/admin/Estadisticas.tsx:1',
       'apps/web/src/modules/alquileres/admin/configuracion/GananciasAirbnb.tsx:1',
       'apps/web/src/modules/alquileres/datos/origen/alquileresApi.ts:1',
+    ],
+  }),
+  entrada({
+    modulo: 'alquileres', fecha: F27N, slug: 'ganancias-de-airbnb-en-el-menu', tipo: 'tarea', quien: 'Alan',
+    titulo: 'Las ganancias de Airbnb, con su propia entrada en el menú',
+    foco: 'Importar las ganancias de Airbnb dejó de ser el tercer bloque de la pantalla Airbnb, abajo de todo, y pasó a ser una sección del menú, al lado de Estadísticas. El primer día en producción no se encontró.',
+    que: `**Qué pasó.** La etapa 5 salió a producción el 27/11 con la importación de ganancias adentro de la pantalla **Airbnb**, debajo de los dos bloques del calendario. En una pantalla común quedaba fuera de la vista. Alan la buscó como "la pantalla de ganancias" y no la encontró: quien busca la plata no baja hasta el fondo de la pantalla del calendario.
+
+**Qué cambió** (solo el frontend; la API no se tocó):
+
+- **Ganancias de Airbnb** es una sección del menú, en el grupo de arriba, justo después de **Estadísticas**, que es donde se ve esa plata. La dirección es \`?vista=ganancias\`. El botón "Elegir archivo" queda a la vista sin bajar.
+- Solo aparece en un alojamiento real: ni la demo ni canchas ni salones la tienen. Si la API no tiene la ruta de ganancias, la sección no se ofrece.
+- Cuando ya hay algo importado, la pantalla arranca con **Lo que ya importaste** (cuántas estadías, hasta qué fecha, cuándo fue la última vez), con "Ver en Estadísticas" y "Borrar todo lo importado". Abajo, **Importar otro archivo**.
+- La pantalla **Airbnb** vuelve a ser solo el calendario, con un atajo ("Importar ganancias") para quien la busque ahí. El atajo de Estadísticas lleva a la sección nueva.
+- El buscador del panel (Ctrl K) la encuentra por "ganancias".
+
+No cambia nada de cómo se importa: el mismo archivo, la misma vista previa, las mismas uniones de aviso con propiedad.
+
+**Verificado:** en el panel real local contra la base de dev, a 1280 y a 390 px: entrar desde el menú, la vista previa, importar, el resumen, ir a Estadísticas, borrar todo, el atajo desde Airbnb y el buscador. Sin scroll horizontal y sin errores de red. Tests del menú en verde.
+
+${comoQuedo('alquileres', ['Ganancias de Airbnb, en el menú · 1280', 'ganancias-menu-1280.webp'], ['Ganancias de Airbnb · 390', 'ganancias-menu-390.webp'], ['Airbnb, solo el calendario · 1280', 'airbnb-sin-ganancias-1280.webp'])}`,
+    archivos: [
+      'apps/web/src/modules/alquileres/admin/navegacion.ts:56',
+      'apps/web/src/modules/alquileres/admin/Panel.tsx:104',
+      'apps/web/src/modules/alquileres/admin/configuracion/GananciasAirbnb.tsx:1',
+      'apps/web/src/modules/alquileres/admin/configuracion/Airbnb.tsx:1',
+      'apps/web/src/modules/alquileres/admin/navegacion.test.ts:92',
     ],
   }),
 ]

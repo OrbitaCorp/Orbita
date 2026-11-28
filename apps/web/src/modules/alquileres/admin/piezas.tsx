@@ -13,6 +13,9 @@ export const CSS_PANEL = `
   .ala-pie-nota { margin: 12px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--color-muted); }
 
   /* La pregunta de BotonConfirmar: ocupa el lugar del botón, con la pregunta y las dos respuestas. */
+  /* Los pasos numerados de "cómo se hace en Airbnb" (pantallas Airbnb y Ganancias de Airbnb). */
+  .ala-pasos { margin: 12px 0 0; padding-left: 22px; list-style: decimal; display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--color-body); }
+
   .ala-confirmar { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .ala-confirmar-txt { font-size: 13.5px; font-weight: 600; color: var(--color-text); }
 

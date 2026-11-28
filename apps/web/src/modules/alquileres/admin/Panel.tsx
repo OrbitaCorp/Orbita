@@ -1,7 +1,7 @@
 // Panel del negocio de Alquileres (demo): el armazón estándar del panel de
 // Órbita (LayoutPanel) con todas las secciones en la barra lateral, por modo
 // (ver navegacion.ts): lo de hoy (la agenda, qué hay libre, la gente o los
-// eventos, los ingresos), lo que se alquila (con las palabras del rubro:
+// eventos, los ingresos y las ganancias de Airbnb), lo que se alquila (con las palabras del rubro:
 // canchas o salas, salones o quinchos, propiedades o deptos), las reglas de la
 // reserva, los calendarios externos y la configuración del negocio. Cambia
 // de pantalla con ?vista= (y ?tab= adentro de Configuración); la reserva o el
@@ -18,7 +18,7 @@
 // API de reservas (datos/origen), que por ahora solo lee.
 import { useEffect, useEffectEvent, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Ban, Building2, CalendarCheck, CalendarDays, CalendarSearch, Contact, HandCoins, Home, Link2, LogIn, LogOut, MessageSquare, Package, PartyPopper, Settings, ShieldCheck, Sparkles, Sun, Tag, Trophy, Wallet, type LucideIcon } from 'lucide-react'
+import { Ban, Banknote, Building2, CalendarCheck, CalendarDays, CalendarSearch, Contact, HandCoins, Home, Link2, LogIn, LogOut, MessageSquare, Package, PartyPopper, Settings, ShieldCheck, Sparkles, Sun, Tag, Trophy, Wallet, type LucideIcon } from 'lucide-react'
 import LayoutPanel, { type AvisoNav, type ItemBusqueda, type ItemNav } from '@/design-system/reservas/LayoutPanel'
 import { Nota, Vacio, useAviso } from '@/design-system/reservas/piezas'
 import { SkeletonVista, useCargaSimulada, type FormaSkeleton } from '@/design-system/reservas/skeleton'
@@ -54,16 +54,17 @@ import Mensajes from './configuracion/Mensajes'
 import Pagos from './configuracion/Pagos'
 import Calendarios from './configuracion/Calendarios'
 import Airbnb from './configuracion/Airbnb'
+import GananciasAirbnb from './configuracion/GananciasAirbnb'
 
 const ICONOS: Record<Vista, LucideIcon> = {
-  reservas: CalendarDays, disponibilidad: CalendarSearch, clientes: Contact, eventos: PartyPopper, ingresos: HandCoins,
+  reservas: CalendarDays, disponibilidad: CalendarSearch, clientes: Contact, eventos: PartyPopper, ingresos: HandCoins, ganancias: Banknote,
   unidades: Trophy, extras: Sparkles, precios: Tag, salones: Building2, paquetes: Package, propiedades: Home, temporadas: Sun,
   reglas: ShieldCheck, bloqueos: Ban, mensajes: MessageSquare, pagos: Wallet, calendarios: Link2, configuracion: Settings,
 }
 
 /** La silueta de cada sección mientras cargan sus datos: la forma de la pantalla que viene después. */
 const FORMAS: Record<Vista, FormaSkeleton> = {
-  reservas: 'agenda', disponibilidad: 'lista', clientes: 'lista', eventos: 'tabla', ingresos: 'tablero',
+  reservas: 'agenda', disponibilidad: 'lista', clientes: 'lista', eventos: 'tabla', ingresos: 'tablero', ganancias: 'formulario',
   unidades: 'formulario', extras: 'formulario', precios: 'formulario', salones: 'formulario', paquetes: 'formulario', propiedades: 'formulario', temporadas: 'formulario',
   reglas: 'formulario', bloqueos: 'formulario', mensajes: 'formulario', pagos: 'formulario', calendarios: 'formulario', configuracion: 'formulario',
 }
@@ -99,7 +100,8 @@ export default function Panel() {
   const real = origen.tipo === 'api'
   // Los formularios siembran su estado con el negocio: después de guardar en la API se vuelven a montar con lo que quedó.
   const kForm = `${k}:${n.version ?? 0}`
-  const secciones = seccionesDe(tipo, palabras, real)
+  // Las ganancias de Airbnb las importa el servidor: si la API todavía no tiene esa ruta, la sección no se ofrece.
+  const secciones = seccionesDe(tipo, palabras, real).filter(s => s.id !== 'ganancias' || !!n.ganancias)
   const r = resolverRuta(router.query, tipo, real)
   const { vista, tab } = r
   const reservaAbierta = typeof router.query.reserva === 'string' ? router.query.reserva : null
@@ -223,8 +225,12 @@ export default function Panel() {
           {/* La estadía tiene su propia pantalla: Estadísticas (ocupación, canales, Airbnb). */}
           {vista === 'ingresos' && tipo === 'estadia' && (
             <Estadisticas key={k} negocio={negocio} reservas={reservas} clientes={clientes} onAbrirReserva={verReserva}
-              onIrAAirbnb={real ? () => irA('calendarios') : undefined} />
+              onImportarGanancias={n.ganancias ? () => irA('ganancias') : undefined} />
           )}
+          {vista === 'ganancias' && (n.ganancias
+            // key = k: lee todo de lo que llega; con kForm, importar la remontaba y se perdía el aviso de lo hecho.
+            ? <GananciasAirbnb key={k} negocio={negocio} ganancias={n.ganancias} avisar={avisar} onVerEstadisticas={() => irA('ingresos')} onIrAPropiedades={() => irA('propiedades')} />
+            : <Vacio titulo="Las ganancias de Airbnb no están disponibles ahora" texto="No pudimos traerlas del servidor. Probá de nuevo en un rato." accion={<button type="button" className="rv-btn rv-btn--sm" onClick={n.reintentar}>Reintentar</button>} />)}
           {vista === 'unidades' && <Canchas key={k} negocio={negocio} reservas={reservas} onGuardar={onGuardar} />}
           {vista === 'extras' && <Extras key={k} negocio={negocio} reservas={reservas} onGuardar={onGuardar} />}
           {vista === 'precios' && <Precios key={k} negocio={negocio} onGuardar={onGuardar} />}
@@ -243,7 +249,7 @@ export default function Panel() {
               onConectar={c => hacer(() => n.agregarCalendario(tipo, c, []), 'Calendario conectado', 'Ya se bajaron las noches que Airbnb tiene tomadas.')}
               onDesconectar={id => hacer(() => n.quitarCalendario(tipo, id), 'Calendario desconectado', 'Las noches que venían de Airbnb quedaron libres.')}
               onSincronizar={id => hacer(() => n.sincronizarCalendario(tipo, id), 'Calendario sincronizado')}
-              onVerReserva={verReserva} ganancias={n.ganancias} avisar={avisar} />
+              onVerReserva={verReserva} onIrAGanancias={n.ganancias ? () => irA('ganancias') : undefined} />
           )}
           {vista === 'calendarios' && !real && <Calendarios key={k} negocio={negocio} reservas={reservas} onCalendario={(c, b) => { n.agregarCalendario(tipo, c, b); avisar('Calendario conectado', `${b.length} ${b.length === 1 ? 'fecha bloqueada' : 'fechas bloqueadas'}. Demo: sincronización simulada.`) }} onQuitarCalendario={id => { n.quitarCalendario(tipo, id); avisar('Calendario desconectado') }} />}
           {vista === 'configuracion' && tab === 'negocio' && <Negocio key={k} negocio={negocio} onGuardar={onGuardar} />}

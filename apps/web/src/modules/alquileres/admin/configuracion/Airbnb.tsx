@@ -6,8 +6,9 @@
 // - De Airbnb a Órbita: el enlace del aviso. El servidor lo baja cada 30
 //   minutos y bloquea esas noches; acá se ve cuándo fue la última vez, si
 //   falló y por qué, y se puede pedir que lo baje ahora.
-// - Ganancias de Airbnb: el calendario no trae la plata; se importa del
-//   archivo que el dueño descarga (GananciasAirbnb.tsx).
+//
+// El calendario no trae la plata: eso se importa del archivo de ganancias, en
+// su propia sección del menú (GananciasAirbnb.tsx). Acá queda un atajo.
 //
 // Lo que no se esconde: entre una sincronización y la otra pueden entrar dos
 // reservas para las mismas noches. Si pasa, se avisa acá y arriba del
@@ -24,9 +25,6 @@ import { TIPOS, cuenta, palabrasDe, type CalendarioExterno, type NegocioAlquiler
 import { hace } from '../../datos/textos'
 import { PaginaForm } from './comun'
 import { BotonConfirmar } from '../piezas'
-import type { Ganancias } from '../../datos/origen'
-import type { Avisar } from '../acciones'
-import GananciasAirbnb from './GananciasAirbnb'
 
 /** Tope de calendarios por propiedad (el mismo que aplica el servidor). */
 const MAXIMO = 3
@@ -38,15 +36,13 @@ interface P {
   onDesconectar: (id: string) => Promise<boolean>
   onSincronizar: (id: string) => Promise<boolean>
   onVerReserva: (id: string) => void
-  /** Importar las ganancias de Airbnb. Sin esto (una API que todavía no las tiene), la sección no se muestra. */
-  ganancias?: Ganancias
-  avisar: Avisar
+  /** Lleva a "Ganancias de Airbnb", donde se importa la plata. Sin esto (una API que todavía no las tiene), el atajo no se muestra. */
+  onIrAGanancias?: () => void
 }
 
 const CSS = `
   .ala-url { display: flex; gap: 8px; align-items: stretch; }
   .ala-url input { flex: 1; min-width: 0; font-family: var(--rv-mono); font-size: 13px; }
-  .ala-pasos { margin: 12px 0 0; padding-left: 22px; list-style: decimal; display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--color-body); }
   .ala-cal { padding: 12px 0; border-top: 1px solid var(--color-border); display: flex; flex-direction: column; gap: 8px; }
   .ala-cal:first-child { border-top: none; padding-top: 0; }
   .ala-cal-cab { display: flex; align-items: flex-start; gap: 10px; }
@@ -62,7 +58,7 @@ const CSS = `
   @media (max-width: 480px) { .ala-url { flex-direction: column; } .ala-cal-acc { padding-left: 0; } .ala-cal-acc .rv-btn { flex: 1 1 100%; } }
 `
 
-export default function Airbnb({ negocio, onConectar, onDesconectar, onSincronizar, onVerReserva, ganancias, avisar }: P) {
+export default function Airbnb({ negocio, onConectar, onDesconectar, onSincronizar, onVerReserva, onIrAGanancias }: P) {
   const palabras = palabrasDe(negocio)
   const propiedades = negocio.propiedades
   const [propiedadId, setPropiedadId] = useState(propiedades[0]?.id ?? '')
@@ -178,7 +174,12 @@ export default function Airbnb({ negocio, onConectar, onDesconectar, onSincroniz
           ) : <p className="rv-ayuda" style={{ margin: 0 }}>Hasta {MAXIMO} calendarios por propiedad. Desconectá uno para sumar otro.</p>}
         </Seccion>
 
-        {ganancias && <GananciasAirbnb ganancias={ganancias} propiedades={propiedades.map(p => ({ id: p.id, nombre: p.nombre }))} avisar={avisar} />}
+        {onIrAGanancias && (
+          <Nota>
+            <span style={{ flex: 1, minWidth: 0 }}>El calendario trae las noches, no la plata. Lo que cobraste por Airbnb se importa aparte, en <b>Ganancias de Airbnb</b>.</span>
+            <button type="button" className="rv-btn rv-btn--sm" onClick={onIrAGanancias}>Importar ganancias</button>
+          </Nota>
+        )}
 
         <Nota tono="info">
           <span>Órbita baja el calendario de Airbnb <b>cada 30 minutos</b>, y Airbnb lee el de Órbita cada pocas horas. En ese rato pueden entrar dos reservas para las mismas noches: si pasa, te avisamos acá y arriba del calendario.</span>
