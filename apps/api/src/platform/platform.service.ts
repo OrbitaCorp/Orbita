@@ -896,7 +896,7 @@ export class PlatformService {
       take: 100,
       include: {
         category: { select: { name: true } },
-        variants: { select: { stock: { select: { quantity: true } } } },
+        variants: { where: { deletedAt: null }, select: { stock: { select: { quantity: true } } } },
       },
     });
 

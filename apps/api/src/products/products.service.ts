@@ -64,8 +64,12 @@ const productDetailInclude = {
   productTags: { include: { tag: true } },
   options: { include: { values: { orderBy: { position: 'asc' as const } } }, orderBy: { position: 'asc' as const } },
   variants: {
+    where: { deletedAt: null },
     include: {
-      optionValues: { include: { optionValue: true } },
+      optionValues: {
+        include: { optionValue: true },
+        orderBy: { optionValue: { option: { position: 'asc' as const } } },
+      },
       stock: true,
     },
   },
@@ -85,7 +89,7 @@ export function whereDelListado(businessId: string, query: Pick<FindProductsQuer
   // `status` reventaría el enum de Prisma.
   const filtroEstado: Prisma.ProductWhereInput =
     query.status === 'OUT_OF_STOCK'
-      ? { variants: { every: { showStock: true, stock: { every: { quantity: 0 } } } } } // las de stock en blanco (vidriera) no cuentan como "sin stock"
+      ? { variants: { every: { OR: [{ deletedAt: { not: null } }, { showStock: true, stock: { every: { quantity: 0 } } }] } } } // las de stock en blanco (vidriera) y las borradas no cuentan
       : query.status
         ? { status: query.status }
         : {};
@@ -101,7 +105,7 @@ export function whereDelListado(businessId: string, query: Pick<FindProductsQuer
       ? {
           OR: [
             { name: { contains: query.search, mode: 'insensitive' as const } },
-            { variants: { some: { sku: { contains: query.search, mode: 'insensitive' as const } } } },
+            { variants: { some: { deletedAt: null, sku: { contains: query.search, mode: 'insensitive' as const } } } },
           ],
         }
       : {}),
@@ -133,7 +137,7 @@ export class ProductsService {
         where,
         include: {
           category: { select: { name: true } },
-          variants: { select: { id: true, showStock: true, stock: { select: { quantity: true } } } },
+          variants: { where: { deletedAt: null }, select: { id: true, showStock: true, stock: { select: { quantity: true } } } },
           // Se traen todas (no `take:1` filtrado por isPrimary): si el producto
           // es puramente de variantes y nunca se marcó una principal a mano,
           // igual hay que poder resolver una — ver pickPrimaryImageUrl().
@@ -304,10 +308,12 @@ export class ProductsService {
   // Criterios (RBT-302 los dejaba abiertos en el contrato):
   //  · Opciones y valores se matchean por NOMBRE, no por id — el wizard del
   //    panel trabaja con strings ("Talle" → ["S","M"]) y no arrastra ids.
-  //  · Nunca se borra algo con historial: ProductVariant tiene
+  //  · Nunca se borra físicamente algo con historial: ProductVariant tiene
   //    orderItems/stockMovements sin onDelete:Cascade. Una variante ausente del
-  //    body se borra SOLO si nunca se vendió ni tuvo movimientos; si tiene
-  //    historial se conserva, para no romper pedidos ni reportes viejos.
+  //    body se borra físicamente SOLO si nunca se vendió ni tuvo movimientos;
+  //    si tiene historial se archiva con soft-delete (`deletedAt`, `isActive: false`),
+  //    desvinculando sus `VariantOptionValue` y dejando su stock en 0, para
+  //    preservar pedidos y movimientos históricos sin que siga apareciendo.
   //  · El stock no se pisa a mano: si cambia la cantidad de una variante que ya
   //    existía se registra un movimiento de AJUSTE con el delta, igual que
   //    hace Inventario (ver inventory.service.ts → applyMovement).
@@ -328,18 +334,27 @@ export class ProductsService {
     this.validateStockOnPublish(dto, existing, vidriera || porPedido);
 
     const defaultBranch = await this.getDefaultBranch(businessId);
-    const existingVariantIds = new Set(existing.variants.map((v) => v.id));
+    const existingById = new Map(existing.variants.map((v) => [v.id, v]));
+    const existingVariantIds = new Set(existingById.keys());
 
     // Variantes que el body ya no incluye. Se decide fuera de la transacción
-    // cuáles son borrables (sin ventas ni movimientos) para no anidar queries.
+    // cuáles son borrables (sin ventas ni movimientos) y cuáles deben archivarse
+    // con soft-delete (`deletedAt`) para no romper FKs de pedidos/movimientos.
     const idsEnDto = new Set(dto.variants.map((v) => v.id).filter((x): x is string => !!x));
+    const salientes = existing.variants.filter((v) => !idsEnDto.has(v.id));
     const borrables: string[] = [];
-    for (const v of existing.variants.filter((v) => !idsEnDto.has(v.id))) {
-      const [ventas, movimientos] = await Promise.all([
-        this.prisma.orderItem.count({ where: { variantId: v.id } }),
-        this.prisma.stockMovement.count({ where: { variantId: v.id } }),
+    const archivables: typeof salientes = [];
+    if (salientes.length > 0) {
+      const idsSalientes = salientes.map((v) => v.id);
+      const [conVentas, conMovimientos] = await Promise.all([
+        this.prisma.orderItem.findMany({ where: { variantId: { in: idsSalientes } }, select: { variantId: true }, distinct: ['variantId'] }),
+        this.prisma.stockMovement.findMany({ where: { variantId: { in: idsSalientes } }, select: { variantId: true }, distinct: ['variantId'] }),
       ]);
-      if (ventas === 0 && movimientos === 0) borrables.push(v.id);
+      const conHistorial = new Set([...conVentas.map((r) => r.variantId), ...conMovimientos.map((r) => r.variantId)]);
+      for (const v of salientes) {
+        if (conHistorial.has(v.id)) archivables.push(v);
+        else borrables.push(v.id);
+      }
     }
 
     // Timeout explícito: reconcilia opciones/valores/variantes con un
@@ -421,16 +436,46 @@ export class ProductsService {
         }),
       );
 
-      // 2. Variantes que ya no van y no tienen historial.
+      // 2. Variantes que ya no van: sin historial se borran físicamente; con
+      //    historial se archivan con soft-delete (`deletedAt`) y se desvinculan
+      //    de sus valores de opción para poder barrer los valores eliminados.
       if (borrables.length > 0) {
         await tx.productVariant.deleteMany({ where: { id: { in: borrables }, productId: id } });
+      }
+      if (archivables.length > 0) {
+        const idsArchivables = archivables.map((v) => v.id);
+        await tx.productVariant.updateMany({
+          where: { id: { in: idsArchivables }, productId: id },
+          data: { deletedAt: new Date(), isActive: false, isDefault: false },
+        });
+        await tx.variantOptionValue.deleteMany({
+          where: { variantId: { in: idsArchivables } },
+        });
+        const stocksConSaldo = archivables.flatMap((v) =>
+          v.stock.filter((st) => st.quantity !== 0).map((st) => ({ ...st, variantId: v.id })),
+        );
+        for (const st of stocksConSaldo) {
+          await tx.variantStock.update({ where: { id: st.id }, data: { quantity: 0 } });
+          await tx.stockMovement.create({
+            data: {
+              businessId,
+              branchId: st.branchId,
+              variantId: st.variantId,
+              type: 'AJUSTE',
+              quantity: -st.quantity,
+              reason: 'Variante eliminada',
+              createdBy: memberId,
+            },
+          });
+        }
       }
 
       // 3. Alta/edición de variantes — cada una es independiente de las
       //    demás, en paralelo (mismo criterio que el paso 1).
       await Promise.all(
         dto.variants.map(async (v) => {
-          if (v.id && existingVariantIds.has(v.id)) {
+          const existente = v.id ? existingById.get(v.id) : undefined;
+          if (v.id && existente && existingVariantIds.has(v.id)) {
             await tx.productVariant.update({
               where: { id: v.id },
               data: {
@@ -439,6 +484,20 @@ export class ProductsService {
                 ...(porPedido ? { showStock: false } : vidriera ? (v.showStock !== undefined ? { showStock: v.showStock } : {}) : { showStock: true }),
               },
             });
+            // Si cambió el nombre de una opción (ej. "Talle" → "Tamaño") o se quitaron todas
+            // las opciones, re-vinculamos la variante existente a los nuevos ProductOptionValue.
+            if (opciones.length > 0 && v.optionValues.length === opciones.length) {
+              const esperados = this.resolveOptionValueIds(v.optionValues, opciones);
+              const actuales = new Set(existente.optionValues.map((ov) => ov.optionValueId));
+              if (esperados.length !== actuales.size || esperados.some((ovId) => !actuales.has(ovId))) {
+                await tx.variantOptionValue.deleteMany({ where: { variantId: v.id } });
+                await tx.variantOptionValue.createMany({
+                  data: esperados.map((optionValueId) => ({ variantId: v.id!, optionValueId })),
+                });
+              }
+            } else if (opciones.length === 0 && existente.optionValues.length > 0) {
+              await tx.variantOptionValue.deleteMany({ where: { variantId: v.id } });
+            }
             // Vidriera con el stock en blanco: no se toca la cantidad (no hay un número que ajustar).
             if (!porPedido && !(vidriera && v.showStock === false)) {
               await this.syncStock(tx, {
@@ -460,7 +519,7 @@ export class ProductsService {
               sku: v.sku ?? null,
               price: v.price,
               comparePrice: v.comparePrice ?? null,
-              isDefault: false,
+              isDefault: opciones.length === 0 && dto.variants.length === 1,
               isActive: v.isActive ?? true,
               showStock: porPedido ? false : vidriera ? (v.showStock ?? true) : true,
             },
@@ -483,11 +542,21 @@ export class ProductsService {
         }),
       );
 
-      // 4. Barrer opciones/valores que quedaron sin uso. Los que todavía están
-      //    referenciados por una variante o una imagen se conservan (además el
-      //    FK los protegería igual).
+      // 4. Barrer opciones/valores que quedaron sin uso. Primero desvinculamos
+      //    las fotos etiquetadas a valores eliminados para que el FK no bloquee
+      //    su limpieza (la foto sigue en la galería del producto como general).
       const NINGUNO = '00000000-0000-0000-0000-000000000000';
       const idsValores = opciones.flatMap((o) => o.values.map((v) => v.id));
+      await tx.productImage.updateMany({
+        where: {
+          productId: id,
+          AND: [
+            { optionValueId: { not: null } },
+            ...(idsValores.length > 0 ? [{ optionValueId: { notIn: idsValores } }] : []),
+          ],
+        },
+        data: { optionValueId: null },
+      });
       await tx.productOptionValue.deleteMany({
         where: {
           option: { productId: id },
@@ -552,7 +621,7 @@ export class ProductsService {
       select: {
         status: true,
         cost: true,
-        variants: { select: { price: true, stock: { select: { quantity: true } } } },
+        variants: { where: { deletedAt: null }, select: { price: true, stock: { select: { quantity: true } } } },
       },
     });
 
@@ -1036,6 +1105,7 @@ export class ProductsService {
       where: { id, businessId, deletedAt: null },
       include: {
         variants: {
+          where: { deletedAt: null },
           select: {
             stock: { select: { quantity: true } },
           },

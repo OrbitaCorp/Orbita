@@ -994,6 +994,7 @@ model ProductVariant {
   showStock    Boolean  @default(true) @map("show_stock")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at") // soft-delete: conserva variantes con ventas/movimientos sin mostrarlas
 
   product        Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
   optionValues   VariantOptionValue[]

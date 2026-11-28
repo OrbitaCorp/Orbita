@@ -178,12 +178,12 @@ export class PedidosPorChatService {
   private async variantesReales(businessId: string, pedidas: Map<string, number>): Promise<Map<string, number> | string> {
     const ids = [...pedidas.keys()];
     const esVariante = new Set(
-      (await this.prisma.productVariant.findMany({ where: { id: { in: ids.filter((i) => i.length === 36) }, isActive: true, product: { businessId } }, select: { id: true } })).map((v) => v.id),
+      (await this.prisma.productVariant.findMany({ where: { id: { in: ids.filter((i) => i.length === 36) }, isActive: true, deletedAt: null, product: { businessId } }, select: { id: true } })).map((v) => v.id),
     );
     const otros = ids.filter((i) => !esVariante.has(i));
     const productos = otros.length === 0 ? [] : await this.prisma.product.findMany({
       where: { businessId, deletedAt: null, status: 'PUBLISHED', OR: otros.map((i) => (i.length === 36 ? { id: i } : { id: { startsWith: i } })) },
-      select: { id: true, name: true, variants: { where: { isActive: true }, select: { id: true } } },
+      select: { id: true, name: true, variants: { where: { isActive: true, deletedAt: null }, select: { id: true } } },
     });
     const resultado = new Map<string, number>();
     for (const [id, cantidad] of pedidas) {

@@ -36,6 +36,7 @@ export class InventoryService {
       branchId,
       // showStock: las variantes de una vidriera con el stock en blanco no tienen inventario que mostrar.
       variant: {
+        deletedAt: null,
         showStock: true,
         product: {
           businessId,
@@ -375,7 +376,7 @@ export class InventoryService {
 
   private async validateVariant(businessId: string, variantId: string) {
     const variant = await this.prisma.productVariant.findFirst({
-      where: { id: variantId, product: { businessId } },
+      where: { id: variantId, deletedAt: null, product: { businessId } },
     });
     if (!variant) throw new BadRequestException('Variante inválida');
   }
